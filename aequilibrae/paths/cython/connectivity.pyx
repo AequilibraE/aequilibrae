@@ -13,16 +13,16 @@ def connectivity_multi_threaded(tester):
     graph = tester.graph
     cores = tester.cores
     signal = tester.connectivity
-    
+
     aux_result = MultiThreadedPaths()
     aux_result.prepare_(graph, cores, graph.compact_num_nodes + 1)
-    
+
     cdef:
         long zones = graph.num_zones
 
     pool = ThreadPool(cores)
     all_threads = {"count": 0, "run": 0}
-    results = {"disconnected":[]}
+    results = {"disconnected": []}
     for i, orig in enumerate(list(graph.centroids)):
         args = (orig, graph, aux_result, all_threads, results, signal)
         pool.apply_async(connectivity_single_threaded, args=args)
@@ -53,10 +53,10 @@ cdef connectivity_single_threaded(origin, graph, aux_result, all_threads, result
         all_threads["count"] += 1
 
     disconn = np.zeros((graph.num_zones, 2), dtype=ITYPE)
+
     cdef:
-        ITYPE_t i, b, k, thread_num
+        ITYPE_t i, b, k
         long orig = origin
-        long core = core_id
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long [:] origin_index = graph.compact_nodes_to_indices
         int zones = graph.num_zones
@@ -70,7 +70,7 @@ cdef connectivity_single_threaded(origin, graph, aux_result, all_threads, result
         long long [:, :] disconn_view = disconn[:, :]
 
     with nogil:
-        if block_flows_through_centroids: # Unblocks the centroid if that is the case
+        if block_flows_through_centroids:  # Blocks the centroid if that is the case
             b = 0
             blocking_centroid_flows(b,
                                     origin_index[orig],
@@ -84,7 +84,7 @@ cdef connectivity_single_threaded(origin, graph, aux_result, all_threads, result
                 graph_fs_view,
                 predecessors_view)
 
-        if block_flows_through_centroids: # Unblocks the centroid if that is the case
+        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
             b = 1
             blocking_centroid_flows(b,
                                     origin_index[orig],
