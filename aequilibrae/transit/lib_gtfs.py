@@ -333,7 +333,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.signal.emit(["start", "master", 1, f"Loading data for {self.day}"])
 
         c = Constants()
-        self.signal.emit(["start", "secondary", len(self.select_routes), f"Loading data ..."])
+        self.signal.emit(["start", "secondary", len(self.select_routes), "Loading data ..."])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
             if counter % 10 == 0:
                 self.signal.emit(

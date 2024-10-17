@@ -150,10 +150,12 @@ AequilibraE's development is happening mostly within the Minor and Micro levels,
 Testing
 ~~~~~~~~
 
-AequilibraE testing is done with three tools:
+AequilibraE style checking is done with two tools:
 
-* `Flake8 <https://pypi.org/project/flake8/>`_, a tool to check Python code style
+* `ruff <https://pypi.org/project/ruff/>`_, a tool to check Python code style
 * `Black <https://black.readthedocs.io/en/stable/index.html/>`_, The uncompromising code formatter
+
+Testing is done using `pytest <https://pypi.org/project/pytest/>`_...
 
 Testing is done for Windows, MacOs and Ubuntu Linux on all supported Python versions, and we use GitHub Actions
 to run these tests. These tests need to pass and additionally somebody has to
