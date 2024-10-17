@@ -79,10 +79,10 @@ cdef connectivity_single_threaded(origin, graph, aux_result, all_threads, result
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-            dfs(origin_index[orig],
-                b_nodes_view,
-                graph_fs_view,
-                predecessors_view)
+        dfs(origin_index[orig],
+            b_nodes_view,
+            graph_fs_view,
+            predecessors_view)
 
         if block_flows_through_centroids:  # Unblocks the centroid if that is the case
             b = 1
