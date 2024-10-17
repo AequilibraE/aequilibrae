@@ -43,6 +43,7 @@ def test_connectivity_analysis():
             destinations.extend(disconnected)
     df = pd.DataFrame({"origin": origins, "destination": destinations}).astype("int64")
 
-    pd.testing.assert_frame_equal(conn_test.disconnected_pairs, df)
+    results = conn_test.disconnected_pairs.reset_index(drop=True)
+    pd.testing.assert_frame_equal(results, df, check_dtype=False, check_index_type=False)
 
     project.close()

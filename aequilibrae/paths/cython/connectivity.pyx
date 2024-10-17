@@ -23,8 +23,10 @@ def connectivity_multi_threaded(tester):
     pool = ThreadPool(cores)
     all_threads = {"count": 0, "run": 0}
     results = {"disconnected": []}
+
+    disconn_array = np.zeros((cores, graph.num_zones, 2), dtype=ITYPE)
     for i, orig in enumerate(list(graph.centroids)):
-        args = (orig, graph, aux_result, all_threads, results, signal)
+        args = (orig, graph, aux_result, disconn_array, all_threads, results, signal)
         pool.apply_async(connectivity_single_threaded, args=args)
     pool.close()
     pool.join()
@@ -44,15 +46,13 @@ def connectivity_multi_threaded(tester):
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef connectivity_single_threaded(origin, graph, aux_result, all_threads, results, signal):
+cdef connectivity_single_threaded(origin, graph, aux_result, disconn_array, all_threads, results, signal):
     if threading.get_ident() in all_threads:
         core_id = all_threads[threading.get_ident()]
     else:
         all_threads[threading.get_ident()] = all_threads["count"]
         core_id = all_threads["count"]
         all_threads["count"] += 1
-
-    disconn = np.zeros((graph.num_zones, 2), dtype=ITYPE)
 
     cdef:
         ITYPE_t i, b, k
@@ -67,7 +67,7 @@ cdef connectivity_single_threaded(origin, graph, aux_result, all_threads, result
         # views from the aux-result object
         long long [:] predecessors_view = aux_result.predecessors[core_id, :]
         long long [:] b_nodes_view = aux_result.temp_b_nodes[core_id, :]
-        long long [:, :] disconn_view = disconn[:, :]
+        long long [:, :] disconn_view = disconn_array[core_id, :, :]
 
     with nogil:
         if block_flows_through_centroids:  # Blocks the centroid if that is the case
@@ -104,4 +104,4 @@ cdef connectivity_single_threaded(origin, graph, aux_result, all_threads, result
     signal.emit(["text connectivity", f"{all_threads['count']} / {zones}"])
 
     if k > 0:
-        results["disconnected"].append(disconn[:k, :])
+        results["disconnected"].append(np.array(disconn_array[core_id, :k, :]))
