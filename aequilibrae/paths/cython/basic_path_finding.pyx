@@ -374,26 +374,24 @@ cpdef void dfs(long origin,
         size_t tail_vert_idx, head_vert_idx  # indices
         unsigned int M = pred.shape[0]
         vector[ITYPE_t] visited
-        vector[bool] closed = vector[bool](M)
         size_t origin_vert = <size_t>origin
 
     for i in range(M):
         pred[i] = -1
-        closed[i] = False
 
+    pred[origin_vert] = 0
     # initialization of the list of nodes to be analysed
     visited.push_back(origin_vert)
 
     # main loop
     while not visited.empty():
-        tail_vert_idx = visited[0]
-        visited.erase(visited.begin())
-        closed[tail_vert_idx] = True
+        tail_vert_idx = visited.back()
+        visited.pop_back()
 
         # loop on outgoing edges
         for idx in range(<size_t>graph_fs[tail_vert_idx], <size_t>graph_fs[tail_vert_idx + 1]):
             head_vert_idx = <size_t>csr_indices[idx]
-            if not closed[head_vert_idx]:
+            if pred[head_vert_idx] == -1:
                 pred[head_vert_idx] = tail_vert_idx
                 visited.push_back(head_vert_idx)
 
