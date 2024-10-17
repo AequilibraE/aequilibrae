@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import os
 from random import random
 from tempfile import gettempdir
@@ -7,9 +6,6 @@ from unittest import TestCase
 from shapely.geometry import box
 
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
 
 
 class TestOSMDownloader(TestCase):

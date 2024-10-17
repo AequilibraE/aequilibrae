@@ -23,16 +23,19 @@ from shapely import Polygon
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .osm_params import http_headers, memory
 
 
-class OSMDownloader:
-    downloading = SIGNAL(object)
+class OSMDownloader(WorkerThread):
+    signal = SIGNAL(object)
 
     def __emit_all(self, *args):
-        self.downloading.emit(*args)
+        self.signal.emit(*args)
 
     def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
+        WorkerThread.__init__(self, None)
+
         self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
@@ -61,7 +64,7 @@ class OSMDownloader:
             msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
             self.logger.info(msg)
             self.__emit_all(["Value", counter])
-            self.__emit_all(["text", msg])
+            self.__emit_all(["set_text", msg])
             west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
@@ -84,7 +87,7 @@ class OSMDownloader:
                 gc.collect()
 
         self.__emit_all(["Value", len(self.polygons)])
-        self.__emit_all(["text", "Downloading finished. Processing data"])
+        self.__emit_all(["set_text", "Downloading finished. Processing data"])
         for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
             df = pd.DataFrame([])
             if len(lst) > 0:
@@ -95,7 +98,7 @@ class OSMDownloader:
             lst.clear()
             gc.collect()
 
-        self.__emit_all(["FinishedDownloading", 0])
+        self.__emit_all(["finished"])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """Send a request to the Overpass API via HTTP POST and return the JSON response.

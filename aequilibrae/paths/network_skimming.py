@@ -16,11 +16,14 @@ except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 sys.dont_write_bytecode = True
 
 
-class NetworkSkimming:
+class NetworkSkimming(WorkerThread):
+    signal = SIGNAL(object)
+
     """
 
     .. code-block:: python
@@ -55,9 +58,8 @@ class NetworkSkimming:
         >>> project.close()
     """
 
-    skimming = SIGNAL(object)
-
     def __init__(self, graph, origins=None, project=None):
+        WorkerThread.__init__(self, None)
         self.project = project
         self.origins = origins
         self.graph = graph
@@ -74,7 +76,7 @@ class NetworkSkimming:
 
     def execute(self):
         """Runs the skimming process as specified in the graph"""
-        self.skimming.emit(["zones finalized", 0])
+        self.signal.emit(["set_position", 0])
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
@@ -96,8 +98,8 @@ class NetworkSkimming:
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        self.skimming.emit(["text skimming", "Saving Outputs"])
-        self.skimming.emit(["finished_threaded_procedure", None])
+        self.signal.emit(["set_text", 0, 0, "Saving Outputs", "master"])
+        self.signal.emit(["finished"])
 
     def set_cores(self, cores: int) -> None:
         """
@@ -159,6 +161,6 @@ class NetworkSkimming:
         if x != origin:
             self.report.append(x)
 
-        self.skimming.emit(["zones finalized", self.cumulative])
+        self.signal.emit(["set_position", 0, self.cumulative, "", "master"])
         txt = str(self.cumulative) + " / " + str(self.matrix.zones)
-        self.skimming.emit(["text skimming", txt])
+        self.signal.emit(["set_text", 0, 1, txt, "master"])
