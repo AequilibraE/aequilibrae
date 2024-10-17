@@ -52,6 +52,7 @@ class ConnectivityAnalysis:
         """Runs the skimming process as specified in the graph"""
 
         self.disconnected_pairs = connectivity_multi_threaded(self)
+        self.disconnected_pairs = self.disconnected_pairs.sort_values(["origin", "destination"])
 
     def set_cores(self, cores: int) -> None:
         """
