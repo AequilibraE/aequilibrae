@@ -38,12 +38,12 @@ class Network(WorkerThread):
     req_node_flds = req_node_flds
     protected_fields = protected_fields
     link_types: LinkTypes = None
+    signal = SIGNAL(object)
 
     def __init__(self, project) -> None:
         WorkerThread.__init__(self, None)
         from aequilibrae.paths import Graph
 
-        self.netsignal = self.jobFinished if inside_qgis else SIGNAL(object)
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
         self.logger = project.logger
@@ -213,13 +213,13 @@ class Network(WorkerThread):
                         polygons.append(subarea)
         self.logger.info("Downloading data")
         dwnloader = OSMDownloader(polygons, modes, logger=self.logger)
-        dwnloader.downloading = self.netsignal
+        dwnloader.signal = self.signal
         dwnloader.doWork()
 
         self.logger.info("Building Network")
         self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
 
-        self.builder.building = self.netsignal
+        self.builder.signal = self.signal
         self.builder.doWork()
 
         self.logger.info("Network built successfully")

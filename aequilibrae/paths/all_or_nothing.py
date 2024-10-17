@@ -21,7 +21,7 @@ if False:
 
 
 class allOrNothing(WorkerThread):
-    assignment = SIGNAL(object)
+    signal = SIGNAL(object)
 
     def __init__(self, class_name, matrix, graph, results):
         # type: (str, AequilibraeMatrix, Graph, AssignmentResults)->None
@@ -32,7 +32,7 @@ class allOrNothing(WorkerThread):
         self.graph = graph
         self.results = results
         self.aux_res = MultiThreadedAoN()
-        self.assignment.emit(["start", self.matrix.zones, self.class_name])
+        self.signal.emit(["start", self.matrix.zones, self.class_name])
 
         if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -47,7 +47,7 @@ class allOrNothing(WorkerThread):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
     def _build_signal(self):
-        self.assignment.emit(["set_text", f"All-or-Nothing: {self.class_name}"])
+        self.signal.emit(["set_text", 0, 0, f"All-or-Nothing: {self.class_name}", "master"])
 
     def doWork(self):
         self.execute()
@@ -72,13 +72,13 @@ class allOrNothing(WorkerThread):
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
-        self.assignment.emit(["update", self.matrix.index.shape[0], self.class_name])
+        self.signal.emit(["update", 0, self.matrix.index.shape[0], self.class_name, "master"])
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        self.assignment.emit(["finished", None])
+        self.signal.emit(["finished"])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
@@ -92,4 +92,4 @@ class allOrNothing(WorkerThread):
         if x != origin:
             self.report.append(x)
         if self.cumulative % 10 == 0:
-            self.assignment.emit(["update", self.cumulative, self.class_name])
+            self.signal.emit(["update", 0, self.cumulative, self.class_name, "master"])

@@ -22,7 +22,7 @@ sys.dont_write_bytecode = True
 
 
 class NetworkSkimming(WorkerThread):
-    skimming = SIGNAL(object)
+    signal = SIGNAL(object)
 
     """
 
@@ -76,7 +76,7 @@ class NetworkSkimming(WorkerThread):
 
     def execute(self):
         """Runs the skimming process as specified in the graph"""
-        self.skimming.emit(["zones finalized", 0])
+        self.signal.emit(["set_position", 0])
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
@@ -98,8 +98,8 @@ class NetworkSkimming(WorkerThread):
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        self.skimming.emit(["text skimming", "Saving Outputs"])
-        self.skimming.emit(["finished", None])
+        self.signal.emit(["set_text", 0, 0, "Saving Outputs", "master"])
+        self.signal.emit(["finished"])
 
     def set_cores(self, cores: int) -> None:
         """
@@ -161,6 +161,6 @@ class NetworkSkimming(WorkerThread):
         if x != origin:
             self.report.append(x)
 
-        self.skimming.emit(["zones finalized", self.cumulative])
+        self.signal.emit(["set_position", 0, self.cumulative, "", "master"])
         txt = str(self.cumulative) + " / " + str(self.matrix.zones)
-        self.skimming.emit(["text skimming", txt])
+        self.signal.emit(["set_text", 0, 1, txt, "master"])

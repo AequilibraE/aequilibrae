@@ -61,7 +61,7 @@ class MMGraph(WorkerThread):
             Defaults to 50m
         """
         self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
-        self.signal.emit(["update", "master", 1, f"Called build_graph_with_broken_stops for mode_id={mode_id}"])
+        self.signal.emit(["update", 0, 1, f"Called build_graph_with_broken_stops for mode_id={mode_id}", "master"])
 
         self.mode_id = mode_id
         self.distance_to_project = distance_to_project
@@ -104,7 +104,7 @@ class MMGraph(WorkerThread):
 
     def __build_graph_from_cache(self):
         self.logger.info(f"Loading map-matching graph from disk for mode_id={self.mode_id}")
-        self.signal.emit(["update", "master", 2, "Building graph from cache ..."])
+        self.signal.emit(["update", 0, 2, "Building graph from cache ...", "master"])
 
         net = pd.read_csv(self.__df_file)
         centroid_corresp = pd.read_csv(self.__centroids_file)
@@ -113,12 +113,12 @@ class MMGraph(WorkerThread):
         for stop in self.stops.values():
             stop.__map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
 
-        self.signal.emit(["update", "master", 3, "Graph built from cache"])
+        self.signal.emit(["update", 0, 3, "Graph built from cache", "master"])
         return self.__graph_from_broken_net(centroids, net)
 
     def __build_graph_from_scratch(self):
         self.logger.info(f"Creating map-matching graph from scratch for mode_id={self.mode_id}")
-        self.signal.emit(["update", "master", 2, "Building graph from scratch ..."])
+        self.signal.emit(["update", 0, 2, "Building graph from scratch ...", "master"])
 
         self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=self.df.wkt.apply(shapely.wkt.loads))
         self.df.loc[self.df.link_id < 0, "link_id"] = self.df.link_id * -1 + self.df.link_id.max() + 1
@@ -127,20 +127,20 @@ class MMGraph(WorkerThread):
         self.max_link_id = self.df.link_id.max() + 1
         self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
         # Build initial index
-        self.signal.emit(["start", "secondary", self.df.shape[0], f"Indexing links - {self.__mode}"])
+        self.signal.emit(["start", 1, self.df.shape[0], f"Indexing links - {self.__mode}", "secondary"])
         self._idx = GeoIndex()
         for counter, (_, record) in enumerate(self.df.iterrows()):
-            self.signal.emit(["update", "secondary", counter + 1, f"Indexing links - {self.__mode}"])
+            self.signal.emit(["update", 1, counter + 1, f"Indexing links - {self.__mode}", "secondary"])
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
         # We will progressively break links at stops' projection
         # But only on the right side of the link (no boarding at the opposing link's side)
         centroids = []
         self.node_corresp = []
-        self.signal.emit(["start", "secondary", len(self.stops), f"Breaking links - {self.__mode}"])
+        self.signal.emit(["start", 1, len(self.stops), f"Breaking links - {self.__mode}", "secondary"])
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
         for counter, (stop_id, stop) in enumerate(self.stops.items()):
-            self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}"])
+            self.signal.emit(["update", 1, counter + 1, f"Breaking links - {self.__mode}", "secondary"])
             stop.__map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.__map_matching_id__[self.mode_id])
@@ -171,7 +171,7 @@ class MMGraph(WorkerThread):
         cols.append("wkt")
         self.df[cols].to_csv(self.__mm_graph_file, index=False)
         pd.DataFrame(self.node_corresp, columns=["node_id", "centroid_id"]).to_csv(self.__centroids_file)
-        self.signal.emit(["update", "master", 3, "Graph built from scratch"])
+        self.signal.emit(["update", 0, 3, "Graph built from scratch", "master"])
         return self.__graph_from_broken_net(centroids, net)
 
     def connect_node(self, stop) -> None:
