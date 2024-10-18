@@ -32,7 +32,7 @@ class allOrNothing(WorkerThread):
         self.graph = graph
         self.results = results
         self.aux_res = MultiThreadedAoN()
-        self.signal.emit(["start", self.matrix.zones, self.class_name])
+        self.signal.emit(["start", 0, self.matrix.zones, self.class_name, "master"])
 
         if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")

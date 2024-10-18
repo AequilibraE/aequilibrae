@@ -76,7 +76,7 @@ class NetworkSkimming(WorkerThread):
 
     def execute(self):
         """Runs the skimming process as specified in the graph"""
-        self.signal.emit(["set_position", 0])
+        self.signal.emit(["set_position", 0, 0, "", "master"])
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
