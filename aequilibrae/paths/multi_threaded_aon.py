@@ -7,8 +7,6 @@ class MultiThreadedAoN:
         self.predecessors = np.array([])
         # holds the skims for all nodes in the network (during path finding)
         self.temporary_skims = np.array([])
-        # Keeps the order in which the nodes were reached for the cascading network loading
-        self.reached_first = np.array([])
         # The previous link for each node in the tree
         self.connectors = np.array([])
         # Temporary results for assignment. Necessary for parallelization
@@ -57,7 +55,6 @@ class MultiThreadedAoN:
             self.temporary_skims = np.zeros((results.cores, results.compact_nodes, results.num_skims), dtype=ftype)
         else:
             self.temporary_skims = np.zeros((results.cores, 1, 1), dtype=ftype)
-        self.reached_first = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         self.connectors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         self.temp_link_loads = np.zeros((results.cores, results.links + 1, results.classes["number"]), dtype=ftype)
         self.temp_node_loads = np.zeros((results.cores, results.compact_nodes, results.classes["number"]), dtype=ftype)

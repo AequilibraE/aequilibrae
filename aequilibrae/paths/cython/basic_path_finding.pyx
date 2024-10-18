@@ -18,68 +18,39 @@ include 'pq_4ary_heap.pyx'
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False) # turn off bounds-checking for entire function
-cpdef void network_loading(long classes,
-                           double[:, :] demand,
-                           long long [:] pred,
-                           long long [:] conn,
-                           double[:, :] link_loads,
-                           long long [:] no_path,
-                           long long [:] reached_first,
-                           double [:, :] node_load,
-                           long found) noexcept nogil:
+cpdef void loading_with_skimming(long classes,
+                                 double[:, :] demand,
+                                 long long [:] pred,
+                                 long long [:] conn,
+                                 double [:, :] graph_costs, # multiple costs for each link
+                                 double [:, :] skims,    # multiple costs to reach each centroid
+                                 double[:, :] link_loads) noexcept nogil:
 
     cdef long long i, j, predecessor, connector, node
     cdef long long zones = demand.shape[0]
-    cdef long long N = node_load.shape[0]
-# Traditional loading, without cascading
-#    for i in range(zones):
-#        node = i
-#        predecessor = pred[node]
-#        connector = conn[node]
-#        while predecessor >= 0:
-#            for j in range(classes):
-#                link_loads[connector, j] += demand[i, j]
-#
-#            predecessor = pred[predecessor]
-#            connector = conn[predecessor]
+    cdef long long J = graph_costs.shape[1]
+    cdef int skim = skims.shape[0]
 
-    # Clean the node load array
-    for i in range(N):
-        node_load[i] = 0
+    # Traditional loading, without cascading
+    for i in range(zones):
+       node = i
+       predecessor = pred[node]
+       connector = conn[node]
 
-    # Loads the demand to the centroids
-    for j in range(classes):
-        for i in range(zones):
-            if not isnan(demand[i, j]):
-                node_load[i, j] = demand[i, j]
+       if skim > 1:
+           for j in range(J):
+               skims[node, j] += 0
 
-    #Recursively cascades to the origin
-    for i in range(found, 0, -1):
-        node = reached_first[i]
+       while predecessor >= 0:
+           for j in range(classes):
+               link_loads[connector, j] += demand[i, j]
 
-        # captures how we got to that node
-        predecessor = pred[node]
-        connector = conn[node]
+           if skim > 1:
+               for j in range(J):
+                   skims[node, j] += graph_costs[connector, j]
 
-        # loads the flow to the links for each class
-        for j in range(classes):
-            link_loads[connector, j] += node_load[node, j]
-            # Cascades the load from the node to their predecessor
-            node_load[predecessor, j] += node_load[node, j]
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cdef void _copy_skims(double[:,:] skim_matrix,  #Skim matrix_procedures computed from one origin to all nodes
-                      double[:,:] final_skim_matrix) noexcept nogil:  #Skim matrix_procedures computed for one origin to all other centroids only
-
-    cdef long i, j
-    cdef long N = final_skim_matrix.shape[0]
-    cdef long skims = final_skim_matrix.shape[1]
-
-    for i in range(N):
-        for j in range(skims):
-            final_skim_matrix[i,j]=skim_matrix[i,j]
+           predecessor = pred[predecessor]
+           connector = conn[predecessor]
 
 
 cdef int[:] return_an_int_view(input) noexcept nogil:
@@ -290,18 +261,22 @@ cpdef void skim_multiple_fields(long origin,
 @cython.embedsignature(True)
 @cython.boundscheck(False) # turn of bounds-checking for entire function
 cpdef int path_finding(long origin,
-                       long destination,
                        double[:] graph_costs,
                        long long [:] csr_indices,
                        long long [:] graph_fs,
                        long long [:] pred,
                        long long [:] ids,
                        long long [:] connectors,
-                       long long [:] reached_first) noexcept nogil:
+                       long long [:] reached_first,
+                       unsigned char [:] destinations,
+                       long long destination_count) noexcept nogil:
 
     cdef unsigned int N = graph_costs.shape[0]
     cdef unsigned int M = pred.shape[0]
 
+    if destination_count == 0:
+        with gil:
+            raise ValueError("destination_count must be either -1 (for all destination), or > 0")
 
     cdef:
         size_t tail_vert_idx, head_vert_idx, idx  # indices
@@ -309,13 +284,13 @@ cpdef int path_finding(long origin,
         PriorityQueue pqueue  # binary heap
         ElementState vert_state  # vertex state
         size_t origin_vert = <size_t>origin
-        size_t destination_vert = <size_t>destination if destination != -1 else 0
         ITYPE_t found = 0
+        int Q = reached_first.shape[0]
 
-    for i in range(M):
-        pred[i] = -1
-        connectors[i] = -1
-        reached_first[i] = -1
+    # Set the pred and connectors buffers to -1. Under twos-complemented signed
+    # integers, -1 is represented with all bits as 1.
+    memset(&(pred[0]), ~0, pred.shape[0])
+    memset(&(connectors[0]), ~0, connectors.shape[0])
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
@@ -328,10 +303,17 @@ cpdef int path_finding(long origin,
     # main loop
     while pqueue.size > 0:
         tail_vert_idx = extract_min(&pqueue)
-        reached_first[found] = tail_vert_idx
         found += 1
 
-        if destination != -1 and tail_vert_idx == destination_vert:
+        if Q > 1:
+            reached_first[found] = tail_vert_idx
+
+        if destination_count < 0:
+            pass  # early exit is disabled
+        elif destination_count > 0 and destinations[tail_vert_idx]:
+            destinations[tail_vert_idx] = False
+            destination_count -= 1
+        elif destination_count == 0:
             # If we wish to reuse the tree we've constructed in update_path_trace we need to mark the un-scanned
             # nodes as unreachable. The nodes not in the heap (NOT_IN_HEAP) are already -1
             for idx in range(pqueue.length):
