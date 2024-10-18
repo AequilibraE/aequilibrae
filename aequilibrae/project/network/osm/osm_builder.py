@@ -15,14 +15,17 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
 
 
-class OSMBuilder:
-    building = SIGNAL(object)
+class OSMBuilder(WorkerThread):
+    signal = SIGNAL(object)
 
     def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
+        WorkerThread.__init__(self, None)
 
         project.logger.info("Preparing OSM builder")
         self.__emit_all(["text", "Preparing OSM builder"])
@@ -45,7 +48,7 @@ class OSMBuilder:
         self.links_df = data["links"]
 
     def __emit_all(self, *args):
-        self.building.emit(*args)
+        self.signal.emit(*args)
 
     def doWork(self):
         with commit_and_close(connect_spatialite(self.path)) as conn:
@@ -59,7 +62,7 @@ class OSMBuilder:
             conn.commit()
             self.__do_clean(conn)
 
-        self.__emit_all(["finished_threaded_procedure", 0])
+        self.__emit_all(["finished", 0])
 
     def importing_network(self, conn):
         self.logger.info("Importing the network")

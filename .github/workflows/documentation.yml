@@ -120,9 +120,9 @@ jobs:
         SOURCE_DIR: 'docs/build/htmlv/'      # optional: defaults to entire repository
         DEST_DIR: 'python/'      # optional: defaults to entire repository
 
-    - name: Rename documentation folder to push to S3 DEV
-      if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
-      run: mv docs/build/html/ docs/build/${{ github.event.number }}/
+#    - name: Rename documentation folder to push to S3 DEV
+#      if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
+#      run: mv docs/build/html/ docs/build/${{ github.event.number }}/
 
     - name: Upload to DEV on S3
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
@@ -134,5 +134,5 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        SOURCE_DIR: 'docs/build/'      # optional: defaults to entire repository
-        DEST_DIR: 'python/dev/'      # optional: defaults to entire repository
+        SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
+        DEST_DIR: 'python/dev/${{ github.event.number }}/'      # optional: defaults to entire repository
