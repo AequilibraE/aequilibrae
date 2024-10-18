@@ -57,6 +57,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         tskim = np.zeros((1,1))
         fskm = np.zeros((1,1))
 
+    rf = np.zeros([0], np.int64)
+
     cdef double [:, :] graph_skim_view = gskim
     cdef double [:, :] skim_matrix_view = tskim
     cdef double [:, :] final_skim_matrices_view = fskm
@@ -66,7 +68,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     # views from the aux-result object
     cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
-    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [:] reached_first_view = rf
     cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
     cdef double [:, :] link_loads_view = aux_result.temp_link_loads[curr_thread, :, :]
     cdef double [:, :] node_load_view = aux_result.temp_node_loads[curr_thread, :, :]
@@ -132,19 +134,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        if skims > 0:
-            skim_single_path(origin_index,
-                     nodes,
-                     skims,
-                     skim_matrix_view,
-                     predecessors_view,
-                     conn_view,
-                     graph_skim_view,
-                     reached_first_view,
-                     w)
-            _copy_skims(skim_matrix_view,
-                        final_skim_matrices_view)
-
         # If we aren't doing SL analysis we use a fast cascade assignment in the 'network_loading' method.
         # However, if we are doing SL analysis, we have to walk the entire path for each OD pair anyway
         # Even if cascading is more efficient, we can do the link loading concurrently while executing SL loading
@@ -155,16 +144,18 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             sl_network_loading(link_list, demand_view, predecessors_view, conn_view, link_loads_view, sl_od_matrix_view,
                                sl_link_loading_view, has_flow_mask, classes)
         else:
-            # do ONLY reular loading (via cascade assignment)
-            network_loading(classes,
-                            demand_view,
-                            predecessors_view,
-                            conn_view,
-                            link_loads_view,
-                            no_path_view,
-                            reached_first_view,
-                            node_load_view,
-                            w)
+            # do ONLY regular loading (via cascade assignment)
+            loading_with_skimming(classes,
+                                  demand_view,
+                                  predecessors_view,
+                                  conn_view,
+                                  graph_skim_view,
+                                  final_skim_matrices_view,
+                                  link_loads_view,
+                                  no_path_view,
+                                  reached_first_view,
+                                  node_load_view,
+                                  w)
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
