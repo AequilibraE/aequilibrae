@@ -2,7 +2,6 @@
 import os
 
 cimport numpy as np
-from libcpp cimport bool
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
@@ -50,18 +49,15 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     if skims > 0:
         gskim = graph.compact_skims
-        tskim = aux_result.temporary_skims[curr_thread, :, :]
         fskm = result.skims.matrix_view[origin_index, :, :]
     else:
         gskim = np.zeros((1,1))
-        tskim = np.zeros((1,1))
         fskm = np.zeros((1,1))
 
     rf = np.zeros([0], np.int64)
 
     cdef double [:, :] graph_skim_view = gskim
-    cdef double [:, :] skim_matrix_view = tskim
-    cdef double [:, :] final_skim_matrices_view = fskm
+    cdef double [:, :] skim_matrix_view = fskm
 
     # views from the result object
     cdef long long [:] no_path_view = result.no_path[origin_index, :]
@@ -77,8 +73,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # path saving file paths
     cdef string path_file_base
     cdef string path_index_file_base
-    cdef bool save_paths = False
-    cdef bool write_feather = True
+    cdef bint save_paths = False
+    cdef bint write_feather = True
     if result.save_path_file:
         save_paths = True
         write_feather = result.write_feather
@@ -104,6 +100,10 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         sl_link_loading_view = aux_result.temp_sl_link_loading[curr_thread, :, :, :]
         link_list = aux_result.select_links[:, :]  # Read only, don't need to slice on curr_thread
         select_link = True
+
+    # Dummy destination set
+    cdef unsigned char [:] destinations = np.zeros(1, dtype=bool)
+
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -115,15 +115,16 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        w = path_finding(origin_index,
-                         -1,  # destination index to disable early exit
-                         g_view,
-                         b_nodes_view,
-                         graph_fs_view,
-                         predecessors_view,
-                         ids_graph_view,
-                         conn_view,
-                         reached_first_view)
+        path_finding(origin_index,
+                     g_view,
+                     b_nodes_view,
+                     graph_fs_view,
+                     predecessors_view,
+                     ids_graph_view,
+                     conn_view,
+                     reached_first_view,
+                     destinations,
+                     -1)  # destination count to disable early exit
 
         if block_flows_through_centroids: # Re-blocks the centroid if that is the case
             b = 1
@@ -150,12 +151,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                   predecessors_view,
                                   conn_view,
                                   graph_skim_view,
-                                  final_skim_matrices_view,
-                                  link_loads_view,
-                                  no_path_view,
-                                  reached_first_view,
-                                  node_load_view,
-                                  w)
+                                  skim_matrix_view,
+                                  link_loads_view)
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
@@ -209,6 +206,24 @@ def path_computation(origin, destination, graph, results):
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [:] b_nodes_view = new_b_nodes
 
+    origin_index = graph.nodes_to_indices[origin]
+
+    cdef:
+        # For Dijkstra's with multiple destinations
+        unsigned char [:] destination_set
+        long long destination_count
+
+    if results.a_star:
+        dest_index = graph.nodes_to_indices[destination]
+    elif results.early_exit:
+        # TODO Allow multiple destinations
+        destination_set = np.zeros(zones, dtype=bool)
+        destination_set[destination] = True
+        destination_count = 1
+    else:
+        destination_set = np.zeros(1, dtype=bool)
+        destination_count = -1
+
     cdef bint a_star_bint = results.a_star
     cdef double [:] lat_view
     cdef double [:] lon_view
@@ -249,15 +264,15 @@ def path_computation(origin, destination, graph, results):
             )
         else:
             w = path_finding(origin_index,
-                             dest_index if early_exit_bint else -1,
                              g_view,
                              b_nodes_view,
                              graph_fs_view,
                              predecessors_view,
                              ids_graph_view,
                              conn_view,
-                             reached_first_view)
-
+                             reached_first_view,
+                             destination_set,
+                             destination_count)
 
         if skims > 0 and not a_star_bint:
             skim_single_path(origin_index,
@@ -422,6 +437,9 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
     cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
 
+    # Dummy destination set
+    cdef unsigned char [:] destinations = np.zeros(1, dtype=bool)
+
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -433,14 +451,15 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
         w = path_finding(origin_index,
-                         -1,  # destination index to disable early exit
                          g_view,
                          b_nodes_view,
                          graph_fs_view,
                          predecessors_view,
                          ids_graph_view,
                          conn_view,
-                         reached_first_view)
+                         reached_first_view,
+                         destinations,
+                         -1)  # destination index to disable early exit
 
         skim_multiple_fields(origin_index,
                              nodes,
