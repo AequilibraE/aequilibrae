@@ -240,7 +240,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                             "update",
                             1,
                             counter + 1,
-                            f"Saving patterns ---> {counter + 1} / {len(self.select_patterns.keys())}",
+                            f"Saving patterns --> {counter} / {len(self.select_patterns.keys())}",
                             "secondary",
                         ]
                     )
@@ -259,7 +259,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                             "update",
                             1,
                             counter + 1,
-                            f"Saving trips ---> {counter + 1} / {len(self.select_trips)}",
+                            f"Saving trips --> {counter} / {len(self.select_trips)}",
                             "secondary",
                         ]
                     )
@@ -303,7 +303,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                             "update",
                             1,
                             counter + 1,
-                            f"Saving stops ---> {counter + 1} / {len(self.select_stops.keys())}",
+                            f"Saving stops --> {counter} / {len(self.select_stops.keys())}",
                             "secondary",
                         ]
                     )
@@ -343,7 +343,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                         "update",
                         1,
                         counter + 1,
-                        f"Selected routes ---> {counter + 1} / {len(self.select_routes)}",
+                        f"Selected routes --> {counter} / {len(self.select_routes)}",
                         "secondary",
                     ]
                 )

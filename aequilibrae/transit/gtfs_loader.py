@@ -132,7 +132,7 @@ class GTFSReader(WorkerThread):
                         "update",
                         1,
                         prog_counter + 1,
-                        f"De-conflicting stop times ---> {prog_counter} / {len(self.trips)}",
+                        f"De-conflicting stop times --> {prog_counter} / {len(self.trips)}",
                         "secondary",
                     ]
                 )
@@ -286,7 +286,7 @@ class GTFSReader(WorkerThread):
             shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
             self.shapes[shape_id] = shape
             if i % 20 == 0:
-                self.signal.emit(["update", 1, i + 1, f"Loading shapes ---> {i} / {len(all_shape_ids)}", "secondary"])
+                self.signal.emit(["update", 1, i + 1, f"Loading shapes --> {i} / {len(all_shape_ids)}", "secondary"])
 
     def __load_trips_table(self):
         self.logger.debug("Starting __load_trips_table")
@@ -322,7 +322,7 @@ class GTFSReader(WorkerThread):
 
         for i, line in enumerate(trips_array):
             if i % 1000 == 0:
-                self.signal.emit(["update", 1, i + 1, f"Loading trips ---> {i} / {trips_array.shape[0]}", "secondary"])
+                self.signal.emit(["update", 1, i + 1, f"Loading trips --> {i} / {trips_array.shape[0]}", "secondary"])
             trip = Trip()
             trip._populate(line, trips_array.dtype.names)
             trip.route_id = self.routes[trip.route].route_id
@@ -451,7 +451,7 @@ class GTFSReader(WorkerThread):
             counter += data.shape[0]
             if counter % 5000 == 0:
                 self.signal.emit(
-                    ["update", 1, counter, f"Loading stop times ---> {counter} / {df.shape[0]}", "secondary"]
+                    ["update", 1, counter, f"Loading stop times --> {counter} / {df.shape[0]}", "secondary"]
                 )
 
     def __load_stops_table(self):
@@ -479,7 +479,7 @@ class GTFSReader(WorkerThread):
             s.get_node_id()
             self.stops[s.stop_id] = s
             if i % 20 == 0:
-                self.signal.emit(["update", 1, i + 1, f"Loading stops ---> {i} / {stops.shape[0]}", "secondary"])
+                self.signal.emit(["update", 1, i + 1, f"Loading stops --> {i} / {stops.shape[0]}", "secondary"])
 
     def __load_routes_table(self):
         self.logger.debug("Starting __load_routes_table")
@@ -511,7 +511,7 @@ class GTFSReader(WorkerThread):
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
             if i % 10 == 0:
-                self.signal.emit(["update", 1, i + 1, f"Loading routes ---> {i} / {len(routes)}", "secondary"])
+                self.signal.emit(["update", 1, i + 1, f"Loading routes --> {i} / {len(routes)}", "secondary"])
 
     def __load_feed_calendar(self):
         self.logger.debug("Starting __load_feed_calendar")

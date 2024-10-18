@@ -127,20 +127,20 @@ class MMGraph(WorkerThread):
         self.max_link_id = self.df.link_id.max() + 1
         self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
         # Build initial index
-        self.signal.emit(["start", 1, self.df.shape[0], f"Indexing links - {self.__mode}", "secondary"])
+        self.signal.emit(["start", 1, self.df.shape[0], "Indexing links", "secondary"])
         self._idx = GeoIndex()
         for counter, (_, record) in enumerate(self.df.iterrows()):
-            self.signal.emit(["update", 1, counter + 1, f"Indexing links - {self.__mode}", "secondary"])
+            self.signal.emit(["update", 1, counter + 1, f"Indexing links: {counter}/{self.df.shape[0]}", "secondary"])
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
         # We will progressively break links at stops' projection
         # But only on the right side of the link (no boarding at the opposing link's side)
         centroids = []
         self.node_corresp = []
-        self.signal.emit(["start", 1, len(self.stops), f"Breaking links - {self.__mode}", "secondary"])
+        self.signal.emit(["start", 1, len(self.stops), "Breaking links", "secondary"])
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
         for counter, (stop_id, stop) in enumerate(self.stops.items()):
-            self.signal.emit(["update", 1, counter + 1, f"Breaking links - {self.__mode}", "secondary"])
+            self.signal.emit(["update", 1, counter + 1, f"Breaking links: {counter}/{len(self.stops)}", "secondary"])
             stop.__map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.__map_matching_id__[self.mode_id])
