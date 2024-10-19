@@ -76,7 +76,7 @@ class NetworkSkimming(WorkerThread):
 
     def execute(self):
         """Runs the skimming process as specified in the graph"""
-        self.signal.emit(["set_position", 0, 0, "", "master"])
+        self.signal.emit(["start", 0, self.graph.num_zones, "", "master"])
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
@@ -161,6 +161,4 @@ class NetworkSkimming(WorkerThread):
         if x != origin:
             self.report.append(x)
 
-        self.signal.emit(["set_position", 0, self.cumulative, "", "master"])
-        txt = str(self.cumulative) + " / " + str(self.matrix.zones)
-        self.signal.emit(["set_text", 0, 1, txt, "master"])
+        self.signal.emit(["update", 0, self.cumulative, f"{self.cumulative}/{self.graph.num_zones}", "master"])
