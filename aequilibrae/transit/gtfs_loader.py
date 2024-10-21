@@ -449,10 +449,7 @@ class GTFSReader(WorkerThread):
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
             counter += data.shape[0]
-            if counter % 5000 == 0:
-                self.signal.emit(
-                    ["update", 1, counter, f"Loading stop times --> {counter} / {df.shape[0]}", "secondary"]
-                )
+            self.signal.emit(["update", 1, counter, f"Loading stop times --> {counter} / {df.shape[0]}", "secondary"])
 
     def __load_stops_table(self):
         self.logger.debug("Starting __load_stops_table")
