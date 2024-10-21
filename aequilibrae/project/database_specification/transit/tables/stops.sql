@@ -21,11 +21,9 @@
 --@ 
 --@ **description** provides useful description of the stop location
 --@ 
---@ **street** identifies the address of a stop
+--@ **fare_zone_id** identifies the fare zone for a stop
 --@ 
---@ **zone_id** identifies the TAZ for a stop
---@ 
---@ **transit_fare_zone** identifies the transit fare zone for a stop
+--@ **transit_zone** identifies the transit fare zone for a stop
 --@ 
 --@ **route_type** indicates the type of transporation used on a route
 
@@ -38,11 +36,11 @@ CREATE TABLE IF NOT EXISTS stops (
 	name              TEXT,
 	parent_station    TEXT,
 	description       TEXT,
-	street            TEXT,
-	zone_id           INTEGER,
-	transit_fare_zone TEXT,
-	route_type        INTEGER NOT NULL DEFAULT -1,
-	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id)
+	fare_zone_id      INTEGER,
+	transit_zone      TEXT,
+	route_type        INTEGER  NOT NULL DEFAULT -1,
+	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id),
+	FOREIGN KEY("fare_zone_id") REFERENCES fare_zones("fare_zone_id")
 );
 
 --#

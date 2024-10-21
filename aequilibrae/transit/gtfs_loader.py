@@ -31,7 +31,7 @@ class GTFSReader:
         self.__pces__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
-        self.agency = Agency()
+        self.agency: Dict[int, Agency] = {}
         self.services = {}
         self.routes: Dict[int, Route] = {}
         self.trips: Dict[int, Dict[Route]] = {}
@@ -46,6 +46,7 @@ class GTFSReader:
         self.wgs84 = pyproj.Proj("epsg:4326")
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
+        self.agency_correspondence = {}
         self.logger = get_logger()
 
     def set_feed_path(self, file_path):
@@ -75,20 +76,23 @@ class GTFSReader:
     def _set_maximum_speeds(self, max_speeds: dict):
         self.__max_speeds__ = max_speeds
 
-    def load_data(self, service_date: str):
+    def load_data(self, service_date: str, description: str):
         """Loads the data for a respective service date.
 
         :Arguments:
             **service_date** (:obj:`str`): service date. e.g. "2020-04-01".
         """
-        ag_id = self.agency.agency
-        self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
+        self.service_date = service_date
+        self.description = description
+        self.logger.info(f"Loading data for {self.service_date} from the GTFS feed. This may take some time")
 
         self.__load_date()
 
     def __load_date(self):
         self.logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
+
+        self.__load_agencies()
 
         self.signal.emit(["start", 7, "Loading routes"])
         self.__load_routes_table()
@@ -207,13 +211,19 @@ class GTFSReader:
                 fareatt = parse_csv(file, column_order[fareatttxt])
             self.data_arrays[fareatttxt] = fareatt
 
+            existing_agencies = np.unique(fareatt["agency_id"])
+            if existing_agencies.shape[0] != len(self.agency):
+                self.logger.debug("agency_id exists on fare_attributes.txt but not in agency.txt")
+            elif existing_agencies.shape[0] == 1 and existing_agencies[0] == "":
+                fareatt["agency_id"] = list(self.agency.keys())[0]
+
             for line in range(fareatt.shape[0]):
                 data = tuple(fareatt[line][list(column_order[fareatttxt].keys())])
                 headers = ["fare_id", "price", "currency", "payment_method", "transfer", "transfer_duration"]
-                f = Fare(self.agency.agency_id)
+                f = Fare(fareatt[line]["agency_id"])
                 f.populate(data, headers)
                 if f.fare in self.fare_attributes:
-                    self.__fail(f"Fare ID {f.fare} for {self.agency.agency} is duplicated")
+                    self.__fail(f"Fare ID {f.fare} for {fareatt[line]['agency_id']} is duplicated")
                 self.fare_attributes[f.fare] = f
 
         farerltxt = "fare_rules.txt"
@@ -227,8 +237,6 @@ class GTFSReader:
             farerl = parse_csv(file, column_order[farerltxt])
         self.data_arrays[farerltxt] = farerl
 
-        corresp = {}
-        zone_id = self.agency.agency_id * AGENCY_MULTIPLIER + 1
         for line in range(farerl.shape[0]):
             data = tuple(farerl[line][list(column_order[farerltxt].keys())])
             fr = FareRule()
@@ -236,14 +244,9 @@ class GTFSReader:
             fr.fare_id = self.fare_attributes[fr.fare].fare_id
             if fr.route in self.routes:
                 fr.route_id = self.routes[fr.route].route_id
-            fr.agency_id = self.agency.agency_id
-            for x in [fr.origin, fr.destination]:
-                if x not in corresp:
-                    corresp[x] = zone_id
-                    zone_id += 1
-            fr.origin_id = corresp[fr.origin]
-            fr.destination_id = corresp[fr.destination] if fr.destination == "" else fr.destination_id
-            self.fare_rules.append(fr) if fr.origin == "" else fr.origin_id
+            fr.origin_id = None if fr.origin == "" else int(fr.origin)
+            fr.destination_id = None if fr.destination == "" else int(fr.destination)
+            self.fare_rules.append(fr)
 
     def __load_shapes_table(self):
         self.logger.debug("Starting __load_shapes_table")
@@ -331,6 +334,7 @@ class GTFSReader:
                 trip.source_time = list(stop_times.source_time.values)
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
+
                 # trip.shape = self.shapes.get(trip.shape)
                 trip.pce = self.routes[trip.route].pce
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
@@ -444,8 +448,7 @@ class GTFSReader:
         stops[:]["stop_lon"][:] = lons[:]
 
         for i, line in enumerate(stops):
-            s = Stop(self.agency.agency_id, line, stops.dtype.names)
-            s.agency = self.agency.agency
+            s = Stop(line, stops.dtype.names)
             s.srid = self.srid
             s.get_node_id()
             self.stops[s.stop_id] = s
@@ -474,8 +477,11 @@ class GTFSReader:
         for route_type, pce in self.__pces__.items():
             routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
+        agency_finder = routes["agency_id"].values.tolist()
+        routes.drop(columns="agency_id", inplace=True)
+
         for i, line in routes.iterrows():
-            r = Route(self.agency.agency_id)
+            r = Route(self.agency_correspondence[agency_finder[i]])
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
 
@@ -571,6 +577,25 @@ class GTFSReader:
 
         if exception_inconsistencies:
             self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
+
+    def __load_agencies(self):
+        self.logger.debug("Starting __load_agencies")
+        agencytxt = "agency.txt"
+
+        self.logger.debug('    Loading "agency" table')
+        self.agency = {}
+        with self.zip_archive.open(agencytxt, "r") as file:
+            agencies = parse_csv(file, column_order[agencytxt])
+        self.data_arrays[agencytxt] = agencies
+
+        for i, line in enumerate(agencies):
+            a = Agency()
+            a.agency = line["agency_name"]
+            a.feed_date = self.feed_date
+            a.service_date = self.service_date
+            a.description = self.description
+            self.agency[a.agency_id] = a
+            self.agency_correspondence[line["agency_id"]] = a.agency_id
 
     def __fail(self, msg: str) -> None:
         self.logger.error(msg)

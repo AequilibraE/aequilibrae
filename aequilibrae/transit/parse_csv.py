@@ -35,7 +35,7 @@ def parse_csv(file_name: str, column_order=[]):  # noqa B006
 
     missing_cols_names = [x for x in column_order.keys() if x not in data.dtype.names]
     for col in missing_cols_names:
-        data = append_fields(data, col, np.array([""] * len(tot)))
+        data = append_fields(data, col, np.array([""] * len(tot)), usemask=False)
 
     if column_order:
         col_names = [x for x in column_order.keys() if x in data.dtype.names]

@@ -30,7 +30,7 @@ class TestTransitGraphBuilder(TestCase):
 
         self.data = Transit(self.project)
         dest_path = join(self.temp_proj_folder, "gtfs_coquimbo.zip")
-        self.transit = self.data.new_gtfs_builder(agency="LISANCO", file_path=dest_path)
+        self.transit = self.data.new_gtfs_builder(file_path=dest_path)
 
         self.transit.load_date("2016-04-13")
         self.transit.save_to_disk()

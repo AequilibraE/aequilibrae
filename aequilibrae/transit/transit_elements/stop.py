@@ -4,7 +4,11 @@ from typing import Dict, Any, Optional
 
 from shapely.geometry import Point
 
-from aequilibrae.transit.constants import Constants, AGENCY_MULTIPLIER
+from contextlib import closing
+
+from aequilibrae.project.database_connection import database_connection
+
+from aequilibrae.transit.constants import Constants, STOP_ID
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
@@ -12,7 +16,7 @@ from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 class Stop(BasicPTElement):
     """Transit stop as read from the GTFS feed"""
 
-    def __init__(self, agency_id: int, record: tuple, headers: list):
+    def __init__(self, record: tuple, headers: list):
         self.stop_id = -1
         self.stop = ""
         self.stop_code = ""
@@ -20,7 +24,6 @@ class Stop(BasicPTElement):
         self.stop_desc = ""
         self.stop_lat: float = None
         self.stop_lon: float = None
-        self.stop_street = ""
         self.zone = ""
         self.zone_id = None
         self.stop_url = ""
@@ -30,8 +33,7 @@ class Stop(BasicPTElement):
 
         # Not part of GTFS
         self.taz = None
-        self.agency = ""
-        self.agency_id = agency_id
+        self.agency_id = None
         self.link = None
         self.dir = None
         self.srid = -1
@@ -49,15 +51,15 @@ class Stop(BasicPTElement):
 
         if None not in [self.stop_lon, self.stop_lat]:
             self.geo = Point(self.stop_lon, self.stop_lat)
-        if len(str(self.zone_id)) == 0:
-            self.zone_id = None
+        if len(self.zone) > 0:
+            self.zone_id = int(self.zone)
 
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
         sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
-                                    parent_station, description, street, zone_id, transit_fare_zone, route_type, geometry)
-                 values (?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
+                                    parent_station, description, fare_zone_id, transit_zone, route_type, geometry)
+                 values (?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data
         conn.execute(sql, dt)
@@ -75,7 +77,6 @@ class Stop(BasicPTElement):
             self.stop_name,
             self.parent_station,
             self.stop_desc,
-            self.stop_street,
             self.zone_id,
             self.taz,
             int(self.route_type),
@@ -84,8 +85,10 @@ class Stop(BasicPTElement):
         ]
 
     def get_node_id(self):
-        c = Constants()
+        with closing(database_connection("transit")) as conn:
+            sql = "Select count(stop_id) from stops;"
+            max_db = int(conn.execute(sql).fetchone()[0])
 
-        val = 1 + c.stops.get(self.agency_id, AGENCY_MULTIPLIER * self.agency_id)
-        c.stops[self.agency_id] = val
-        self.stop_id = c.stops[self.agency_id]
+        c = Constants()
+        c.stops["stops"] = max(c.stops.get("stops", 0), max_db) + 1
+        self.stop_id = c.stops["stops"]
