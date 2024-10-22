@@ -715,6 +715,3 @@ class LinearApproximation(WorkerThread):
         if self.rgap_target >= self.rgap:
             return True
         return False
-
-    def signal_handler(self, val):
-        self.assignment.emit(val)

@@ -30,9 +30,6 @@ from .osm_params import http_headers, memory
 class OSMDownloader(WorkerThread):
     signal = SIGNAL(object)
 
-    def __emit_all(self, *args):
-        self.signal.emit(*args)
-
     def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
 
@@ -55,16 +52,14 @@ class OSMDownloader(WorkerThread):
             "{memory}[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        self.__emit_all(["maxValue", len(self.polygons)])
-        self.__emit_all(["Value", 0])
+        self.signal.emit(["start", 0, len(self.polygons), f"Total polygons: {len(self.polygons)}", "master"])
         m = ""
         if memory > 0:
             m = f"[maxsize: {memory}]"
         for counter, poly in enumerate(self.polygons):
             msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
             self.logger.info(msg)
-            self.__emit_all(["Value", counter])
-            self.__emit_all(["set_text", msg])
+            self.signal.emit(["update", 0, counter, msg, "master"])
             west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
@@ -86,8 +81,7 @@ class OSMDownloader(WorkerThread):
                 del json
                 gc.collect()
 
-        self.__emit_all(["Value", len(self.polygons)])
-        self.__emit_all(["set_text", "Downloading finished. Processing data"])
+        self.signal.emit(["set_text", 0, 0, "Downloading finished. Processing data", "master"])
         for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
             df = pd.DataFrame([])
             if len(lst) > 0:
@@ -98,7 +92,7 @@ class OSMDownloader(WorkerThread):
             lst.clear()
             gc.collect()
 
-        self.__emit_all(["finished"])
+        self.signal.emit(["finished"])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """Send a request to the Overpass API via HTTP POST and return the JSON response.
