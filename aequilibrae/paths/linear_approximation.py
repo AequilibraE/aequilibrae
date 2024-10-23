@@ -26,10 +26,11 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 class LinearApproximation(WorkerThread):
     equilibration = SIGNAL(object)
     assignment = SIGNAL(object)
+    signal = SIGNAL(object)
 
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
-        self.assignment.emit(["set_text", 0, 0, "Linear Approximation", "master"])
+        self.signal.emit(["set_text", 0, 0, "Linear Approximation", "master"])
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
         self.project_path = project.project_base_path if project else gettempdir()
@@ -468,10 +469,9 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self.equilibration.emit(["start", 1, self.max_iter, "Equilibrium Assignment", "secondary"])
+        self.signal.emit(["start", 0, self.max_iter, "Equilibrium Assignment", "master"])
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
-        self.assignment.emit(["start", 0, c.matrix.zones, "All-or-Nothing", "master"])
         for self.iter in range(1, self.max_iter + 1):  # noqa: B020
             self.iteration_issue = []
 
@@ -480,14 +480,16 @@ class LinearApproximation(WorkerThread):
             self.__maybe_create_path_file_directories()
 
             for c in self.traffic_classes:  # type: TrafficClass
+                msg = f"All-or-Nothing - Traffic Class: {c._id}"
+                self.signal.emit(["set_text", 0, c.matrix.zones, msg, "master"])
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
-                self.assignment.emit(["refresh"])
-                self.assignment.emit(["reset"])
-                aon.assignment = self.assignment
+                self.signal.emit(["refresh"])
+                self.signal.emit(["reset"])
+                aon.signal = self.signal
 
                 aon.execute()
                 c._aon_results.link_loads *= c.pce
@@ -571,7 +573,10 @@ class LinearApproximation(WorkerThread):
                 self.fw_total_flow += self.preload
 
             if self.algorithm == "all-or-nothing":
+                msg = f"Equilibrium Assignment - Iterations: {self.iter}/{self.max_iter}"
+                self.signal.emit(["update", 0, self.iter, msg, "master"])
                 break
+
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
@@ -615,8 +620,8 @@ class LinearApproximation(WorkerThread):
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
 
-            self.equilibration.emit(["key_value", 0, self.rgap, "rgap", "secondary"])
-            self.equilibration.emit(["key_value", 0, self.iter, "iterations", "secondary"])
+            msg = f"Equilibrium Assignment - Iterations: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
+            self.signal.emit(["update", 0, self.iter, msg, "master"])
 
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
@@ -625,11 +630,8 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
-        self.equilibration.emit(
-            ["update", 1, self.max_iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}", "secondary"]
-        )
-        self.assignment.emit(["finished"])
-        self.equilibration.emit(["finished"])
+        self.signal.emit(["finished", 0, 0, "assignment", "master"])
+        self.signal.emit(["finished", 0, 0, "equilibrate", "master"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,

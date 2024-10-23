@@ -46,14 +46,12 @@ class allOrNothing(WorkerThread):
         elif not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
-    def _build_signal(self):
-        self.signal.emit(["set_text", 0, 0, f"All-or-Nothing: {self.class_name}", "master"])
-
     def doWork(self):
         self.execute()
 
     def execute(self):
-        self._build_signal()
+        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
+        self.signal.emit(["set_text", 0, self.matrix.zones, msg, "master"])
         self.report = []
         self.cumulative = 0
         self.aux_res.prepare(self.graph, self.results)
@@ -72,13 +70,15 @@ class allOrNothing(WorkerThread):
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
-        self.signal.emit(["update", 0, self.matrix.index.shape[0], self.class_name, "master"])
+        val = self.matrix.index.shape[0]
+        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {val}/{self.matrix.zones}"
+        self.signal.emit(["set_text", 0, val, msg, "master"])
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        self.signal.emit(["finished"])
+        self.signal.emit(["finished", 0, 0, "aon", "master"])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
@@ -92,4 +92,5 @@ class allOrNothing(WorkerThread):
         if x != origin:
             self.report.append(x)
         if self.cumulative % 10 == 0:
-            self.signal.emit(["update", 0, self.cumulative, self.class_name, "master"])
+            msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
+            self.signal.emit(["set_text", 0, self.cumulative, msg, "master"])
