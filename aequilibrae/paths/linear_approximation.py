@@ -573,8 +573,7 @@ class LinearApproximation(WorkerThread):
                 self.fw_total_flow += self.preload
 
             if self.algorithm == "all-or-nothing":
-                msg = f"Equilibrium Assignment - Iterations: {self.iter}/{self.max_iter}"
-                self.signal.emit(["update", 0, self.iter, msg, "master"])
+                self.signal.emit(["update", 0, self.iter, "Equilibrium Assignment - Iteration: 1/1", "master"])
                 break
 
             # Check convergence
@@ -620,7 +619,7 @@ class LinearApproximation(WorkerThread):
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
 
-            msg = f"Equilibrium Assignment - Iterations: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
+            msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
             self.signal.emit(["update", 0, self.iter, msg, "master"])
 
         for c in self.traffic_classes:
@@ -631,7 +630,6 @@ class LinearApproximation(WorkerThread):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         self.signal.emit(["finished", 0, 0, "assignment", "master"])
-        self.signal.emit(["finished", 0, 0, "equilibrate", "master"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
