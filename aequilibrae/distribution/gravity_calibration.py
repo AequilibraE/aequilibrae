@@ -87,8 +87,7 @@ class GravityCalibration:
             self.impedance = self.impedance.copy(memory_only=True)
 
         self.result_matrix = None
-        self.rows = None
-        self.columns = None
+        self.vectors: pd.DataFrame = pd.DataFrame([])
         self.gap = np.inf
 
         self.error = None
@@ -234,18 +233,17 @@ class GravityCalibration:
 
         self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"], memory_only=True)
 
-        self.rows = pd.DataFrame({"rows": self.matrix.rows()[:]}, index=self.matrix.index[:])
-
-        self.columns = pd.DataFrame({"columns": self.matrix.columns()[:]}, index=self.matrix.index[:])
+        self.vectors = pd.DataFrame(
+            {"rows": self.matrix.rows()[:], "columns": self.matrix.columns()[:]}, index=self.matrix.index[:]
+        )
 
         self.impedance_core = self.impedance.view_names[0]
 
     def __apply_gravity(self):
         args = {
             "impedance": self.impedance,
-            "rows": self.rows,
+            "vectors": self.vectors,
             "row_field": "rows",
-            "columns": self.columns,
             "column_field": "columns",
             "model": self.model,
             "parameters": self.parameters,
