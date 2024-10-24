@@ -335,7 +335,7 @@ class TransitAssignmentResults(AssignmentResultsBase):
         Resets object to prepared and pre-computation state
         """
 
-        # Since all memory for the asignment is managed by the HyperpathGenerating
+        # Since all memory for the assignment is managed by the HyperpathGenerating
         # object we don't need to do much here
         self.link_loads.fill(0)
 
@@ -349,14 +349,4 @@ class TransitAssignmentResults(AssignmentResultsBase):
         if not self.link_loads.shape[0]:
             raise ValueError("Transit assignment has not been executed yet")
 
-        res = AequilibraeData()
-        res.create_empty(
-            file_path=res.random_name(),
-            entries=self.links,
-            field_names=["volume"],
-            data_types=[np.float64],
-            index=self.lids,
-        )
-
-        res.data["volume"] = self.link_loads
-        return res
+        return pd.DataFrame({"volume": self.link_loads}, index=self.lids)
