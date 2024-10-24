@@ -14,7 +14,7 @@ data_export_types = ["aed", "csv", "sqlite"]
 
 
 class AequilibraeData(object):
-    """AequilibraE dataset
+    """AequilibraE dataset. This is deprecated in favor of Pandas DataFrames
 
     .. code-block:: python
 

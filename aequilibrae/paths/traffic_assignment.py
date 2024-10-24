@@ -623,45 +623,35 @@ class TrafficAssignment(AssignmentBase):
             "PCE_tot",
         ]
 
-        agg = AequilibraeData.empty(
-            memory_mode=True,
-            entries=res1.data.shape[0],
-            field_names=fields,
-            data_types=[np.float64] * len(fields),
-            fill=np.nan,
-            index=res1.data.index[:],
-        )
+        agg = pd.DataFrame([], columns=fields, index=res1.data.index[:])
+        agg.fillna(0.0, inplace=True)
 
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
-        agg.data["Preload_AB"][m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
-        agg.data["Preload_BA"][m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
-        agg.data["Preload_tot"][:] = np.nansum([agg.data.Preload_AB, agg.data.Preload_BA], axis=0)
+        agg["Preload_AB"].values[m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
+        agg["Preload_BA"].values[m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
-        agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
-        agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
-        agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
+        agg["Congested_Time_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
+        agg["Congested_Time_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
+        agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        agg.data["Delay_factor_AB"][m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
-        agg.data["Delay_factor_BA"][m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
-        agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
+        agg["Delay_factor_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
+        agg["Delay_factor_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
+        agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
-        agg.data["VOC_AB"][m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
-        agg.data["VOC_BA"][m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
-        agg.data["VOC_max"][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
+        agg["VOC_AB"].values[m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
+        agg["VOC_BA"].values[m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
+        agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
-        agg.data["PCE_AB"][m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
-        agg.data["PCE_BA"][m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
-        agg.data["PCE_tot"][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
+        agg["PCE_AB"].values[m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
+        agg["PCE_BA"].values[m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
+        agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
 
-        dfs = [pd.DataFrame(aed.data) for aed in assig_results]
-        dfs = [df.rename(columns={"index": "link_id"}).set_index("link_id") for df in dfs]
-        df = pd.concat(dfs, axis=1)
-
-        return df
+        return pd.concat(assig_results, axis=1)
 
     def info(self) -> dict:
         """Returns information for the traffic assignment procedure
@@ -1016,9 +1006,7 @@ class TransitAssignment(AssignmentBase):
             **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on *link_id*
         """
         assig_results = [
-            pd.DataFrame(cls.results.get_load_results().data)
-            .rename(columns={"volume": cls._id + "_volume", "index": "link_id"})
-            .set_index("link_id")
+            pd.DataFrame(cls.results.get_load_results()).rename(columns={"volume": cls._id + "_volume"})
             for cls in self.classes
         ]
 

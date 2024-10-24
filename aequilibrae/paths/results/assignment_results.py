@@ -4,11 +4,10 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
-from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
-from pathlib import Path
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
+from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
 
 try:
     from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
@@ -245,25 +244,30 @@ class AssignmentResults(AssignmentResultsBase):
         Translates the assignment results from the graph format into the network format
 
         :Returns:
-            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
+            **dataset** (:obj:`pd.DataFrame`): Pandas DataFrame data with the traffic class assignment results
         """
 
         # Get a mapping from the compressed graph to/from the network graph
         m = self.get_graph_to_network_mapping()
 
+        recs = np.unique(self.lids).shape[0]
+
         # Link flows
         link_flows = self.link_loads[self._graph_ids, :]
-        data = {}
+        aux = {}
         for i, n in enumerate(self.classes["names"]):
             # Directional Flows
+            aux[n + "_ab"] = np.zeros(recs, self.__float_type)
+            aux[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
 
-            data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
-            data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+            aux[n + "_ba"] = np.zeros(recs, self.__float_type)
+            aux[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
 
             # Tot Flow
-            res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
+            aux[n + "_tot"] = np.zeros(recs, self.__float_type)
+            aux[n + "_tot"] = np.nan_to_num(aux[n + "_ab"]) + np.nan_to_num(aux[n + "_ba"])
 
-        return res
+        return pd.DataFrame(aux, index=np.unique(self.lids))
 
     def get_sl_results(self) -> pd.DataFrame:
         # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
@@ -274,16 +278,9 @@ class AssignmentResults(AssignmentResultsBase):
             for n in self.classes["names"]
             for e in [f"{name}_{n}_ab", f"{name}_{n}_ba", f"{name}_{n}_tot"]
         ]
-        types = [np.float64] * len(fields)
-        # Create a data store with a row for each uncompressed link, columns for each set of select links
-        res = AequilibraeData.empty(
-            memory_mode=True,
-            entries=int(np.unique(self.lids).shape[0]),
-            field_names=fields,
-            data_types=types,
-            fill=np.nan,
-            index=np.unique(self.lids),
-        )
+
+        res = pd.DataFrame([], columns=fields, index=np.unique(self.lids))
+
         m = self.get_graph_to_network_mapping()
         for name in self._selected_links.keys():
             # Link flows initialised
@@ -292,35 +289,15 @@ class AssignmentResults(AssignmentResultsBase):
             assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
-                res.data[name + "_" + n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
-                res.data[name + "_" + n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+                res[name + "_" + n + "_ab"].values[m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+                res[name + "_" + n + "_ba"].values[m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
 
                 # Tot Flow
-                res.data[name + "_" + n + "_tot"] = np.nan_to_num(res.data[name + "_" + n + "_ab"]) + np.nan_to_num(
-                    res.data[name + "_" + n + "_ba"]
-                )
+                res[name + "_" + n + "_tot"] = np.nan_to_num(
+                    res.data[name + "_" + n + "_ab"].to_numpy()
+                ) + np.nan_to_num(res[name + "_" + n + "_ba"].to_numpy())
 
         return res
-
-    def save_to_disk(self, file_name=None, output="loads") -> None:
-        """
-        Function to write to disk all outputs computed during assignment.
-
-        .. deprecated:: 0.7.0
-
-        :Arguments:
-            **file_name** (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']
-
-            **output** (:obj:`str`, *Optional*): Type of output ('loads', 'path_file'). Defaults to 'loads'
-        """
-
-        if output == "loads":
-            res = self.get_load_results()
-            res.export(file_name)
-
-        # TODO: Re-factor the exporting of the path file within the AequilibraeData format
-        elif output == "path_file":
-            raise NotImplementedError
 
 
 class TransitAssignmentResults(AssignmentResultsBase):
@@ -367,7 +344,7 @@ class TransitAssignmentResults(AssignmentResultsBase):
         Translates the assignment results from the graph format into the network format
 
         :Returns:
-            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the transit class assignment results
+            **dataset** (:obj:`pd.DataFrame`): DataFrame data with the transit class assignment results
         """
         if not self.link_loads.shape[0]:
             raise ValueError("Transit assignment has not been executed yet")
