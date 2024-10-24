@@ -8,9 +8,10 @@ Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 from time import perf_counter
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae.distribution.gravity_application import GravityApplication, SyntheticGravityModel
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
 
 
@@ -233,15 +234,9 @@ class GravityCalibration:
 
         self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"], memory_only=True)
 
-        self.rows = AequilibraeData()
-        self.rows.create_empty(entries=self.matrix.zones, field_names=["rows"], memory_mode=True)
-        self.rows.index[:] = self.matrix.index[:]
-        self.rows.rows[:] = self.matrix.rows()[:]
+        self.rows = pd.DataFrame({"rows": self.matrix.rows()[:]}, index=self.matrix.index[:])
 
-        self.columns = AequilibraeData()
-        self.columns.create_empty(entries=self.matrix.zones, field_names=["columns"], memory_mode=True)
-        self.columns.index[:] = self.matrix.index[:]
-        self.columns.columns[:] = self.matrix.columns()[:]
+        self.columns = pd.DataFrame({"columns": self.matrix.columns()[:]}, index=self.matrix.index[:])
 
         self.impedance_core = self.impedance.view_names[0]
 

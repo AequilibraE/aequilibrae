@@ -14,7 +14,6 @@ from numpy import nan_to_num
 
 from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies

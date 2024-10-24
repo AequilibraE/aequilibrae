@@ -8,7 +8,7 @@ import numpy as np
 
 from aequilibrae import Project
 from aequilibrae.distribution import Ipf
-from aequilibrae.matrix import AequilibraeData
+import pandas as pd
 from ...data import siouxfalls_project
 
 
@@ -26,27 +26,18 @@ class TestIpf(TestCase):
         mats.update_database()
         seed = mats.get_matrix("SiouxFalls_omx")
         seed.computational_view("matrix")
-        # row vector
-        args = {"entries": seed.zones, "field_names": ["rows"], "data_types": [np.float64], "memory_mode": True}
-        row_vector = AequilibraeData()
-        row_vector.create_empty(**args)
-        row_vector.rows[:] = np.random.rand(seed.zones)[:] * 1000
-        row_vector.index[:] = seed.index[:]
-        # column vector
-        args["field_names"] = ["columns"]
-        column_vector = AequilibraeData()
-        column_vector.create_empty(**args)
-        column_vector.columns[:] = np.random.rand(seed.zones)[:] * 1000
-        column_vector.index[:] = seed.index[:]
-        # balance vectors
-        column_vector.columns[:] = column_vector.columns[:] * (row_vector.rows.sum() / column_vector.columns.sum())
+
+        rows = np.random.rand(seed.zones)[:] * 1000
+        cols = np.random.rand(seed.zones)[:] * 1000
+        vectors = pd.DataFrame({"rows": rows, "columns": cols}, index=seed.index)
+
+        vectors["columns"] *= vectors["rows"].sum() / vectors["columns"].sum()
 
         # The IPF per se
         args = {
             "matrix": seed,
-            "rows": row_vector,
+            "vectors": vectors,
             "row_field": "rows",
-            "columns": column_vector,
             "column_field": "columns",
             "nan_as_zero": False,
         }
@@ -65,9 +56,7 @@ class TestIpf(TestCase):
 
         result = fratar.output
 
-        self.assertAlmostEqual(
-            np.nansum(result.matrix_view), np.nansum(row_vector.data["rows"]), 4, "Ipf did not converge"
-        )
+        self.assertAlmostEqual(np.nansum(result.matrix_view), np.nansum(vectors["rows"]), 4, "Ipf did not converge")
         self.assertGreater(fratar.parameters["convergence level"], fratar.gap, "Ipf did not converge")
 
         mr = fratar.save_to_project("my_matrix_ipf", "my_matrix_ipf.aem")
