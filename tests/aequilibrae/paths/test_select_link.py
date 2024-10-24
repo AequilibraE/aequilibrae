@@ -190,11 +190,11 @@ class TestSelectLink(TestCase):
         assign.execute()
 
         # 5.receive results
-        assign_flow_res_df = assign.results().reset_index(drop=False).fillna(0)
-        select_link_flow_df = assign.select_link_flows().reset_index(drop=False).fillna(0)
+        assign_flow_res_df = assign.results().sort_index().reset_index(drop=False).fillna(0)
+        select_link_flow_df = assign.select_link_flows().sort_index().reset_index(drop=False).fillna(0)
 
         pd.testing.assert_frame_equal(
-            assign_flow_res_df[["link_id", "a_ab", "a_ba", "a_tot"]],
+            assign_flow_res_df[["index", "a_ab", "a_ba", "a_tot"]],
             select_link_flow_df.rename(
                 columns={"class_a_trace_a_ab": "a_ab", "class_a_trace_a_ba": "a_ba", "class_a_trace_a_tot": "a_tot"}
             ),

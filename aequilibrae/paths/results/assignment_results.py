@@ -294,7 +294,7 @@ class AssignmentResults(AssignmentResultsBase):
 
                 # Tot Flow
                 res[name + "_" + n + "_tot"] = np.nan_to_num(
-                    res.data[name + "_" + n + "_ab"].to_numpy()
+                    res[name + "_" + n + "_ab"].to_numpy()
                 ) + np.nan_to_num(res[name + "_" + n + "_ba"].to_numpy())
 
         return res

@@ -623,7 +623,7 @@ class TrafficAssignment(AssignmentBase):
             "PCE_tot",
         ]
 
-        agg = pd.DataFrame([], columns=fields, index=res1.data.index[:])
+        agg = pd.DataFrame([], columns=fields, index=res1.index[:])
         agg.fillna(0.0, inplace=True)
 
         # Use the first class to get a graph -> network link ID mapping
@@ -801,13 +801,11 @@ class TrafficAssignment(AssignmentBase):
             # Save OD_matrices
             if cls._selected_links is None:
                 continue
-            df = cls.results.get_sl_results()
             # Create Values table
-            df = pd.DataFrame(df.data)
+            df = cls.results.get_sl_results()
             # Remap the dataframe names to add the prefix classname for each class
             cls_cols = {x: cls._id + "_" + x if (x != "index") else "link_id" for x in df.columns}
             df.rename(columns=cls_cols, inplace=True)
-            df.set_index("link_id", inplace=True)
             class_flows.append(df)
         return pd.concat(class_flows, axis=1)
 
