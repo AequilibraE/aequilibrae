@@ -186,7 +186,6 @@ class GravityApplication:
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
         self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
 
-
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the matrix output to the project file
 
@@ -233,20 +232,13 @@ class GravityApplication:
 
         # check dimensions
         # check data types
-        if not isinstance(self.rows, pd.DataFrame):
+        if not isinstance(self.vectors, pd.DataFrame):
             raise TypeError("Row vector needs to be a Pandas DataFrame")
-
-        if not isinstance(self.columns, pd.DataFrame):
-            raise TypeError("Column vector needs to be a Pandas DataFrame")
 
         if not isinstance(self.impedance, AequilibraeMatrix):
             raise TypeError("Impedance matrix needs to be an instance of AequilibraeMatrix")
 
-        # Check data dimensions
-        if not np.array_equal(self.rows.index, self.columns.index):
-            raise ValueError("Indices from row vector do not match those from column vector")
-
-        if not np.array_equal(self.impedance.index, self.columns.index):
+        if not np.array_equal(self.impedance.index, self.vectors.index):
             raise ValueError("Indices from vectors do not match those from seed matrix")
 
         # Check if matrix was set for computation
@@ -257,13 +249,13 @@ class GravityApplication:
                 raise ValueError("Matrix' computational view needs to be set for a single matrix core")
 
         # check balancing:
-        sum_rows = np.nansum(self.rows.data[self.row_field])
-        sum_cols = np.nansum(self.columns.data[self.column_field])
+        sum_rows = np.nansum(self.vectors[self.rows_])
+        sum_cols = np.nansum(self.vectors[self.cols_])
         if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
             raise ValueError("Vectors are not balanced")
         else:
             # guarantees that they are precisely balanced
-            self.columns.data[self.column_field][:] = self.columns.data[self.column_field][:] * (sum_rows / sum_cols)
+            self.vectors[self.cols_][:] = self.vectors[self.cols_][:] * (sum_rows / sum_cols)
 
         self.__check_parameters()
 
@@ -278,9 +270,9 @@ class GravityApplication:
 
     def __apply_function(self):
         self.core_name = self.output.view_names[0]
-        for i in range(self.rows.entries):
-            p = self.rows.data[self.row_field][i]
-            a = self.columns.data[self.column_field][:]
+        for i in range(self.vectors.shape[0]):
+            p = self.vectors[self.rows_].values[i]
+            a = self.vectors[self.cols_].to_numpy()
 
             if self.model.function == "EXPO":
                 self.output.matrix_view[i, :] = np.exp(-self.model.beta * self.impedance.matrix_view[i, :]) * p * a
