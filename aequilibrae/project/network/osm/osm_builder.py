@@ -15,17 +15,19 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
 
 
-class OSMBuilder:
-    building = SIGNAL(object)
+class OSMBuilder(WorkerThread):
+    signal = SIGNAL(object)
 
     def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
+        WorkerThread.__init__(self, None)
 
         project.logger.info("Preparing OSM builder")
-        self.__emit_all(["text", "Preparing OSM builder"])
+        self.signal.emit(["set_text", 0, 0, "Preparing OSM builder", "master"])
 
         self.project = project or get_active_project()
         self.logger = self.project.logger
@@ -44,9 +46,6 @@ class OSMBuilder:
         gc.collect()
         self.links_df = data["links"]
 
-    def __emit_all(self, *args):
-        self.building.emit(*args)
-
     def doWork(self):
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
@@ -59,7 +58,7 @@ class OSMBuilder:
             conn.commit()
             self.__do_clean(conn)
 
-        self.__emit_all(["finished_threaded_procedure", 0])
+        self.signal.emit(["finished", 0])
 
     def importing_network(self, conn):
         self.logger.info("Importing the network")
@@ -71,14 +70,13 @@ class OSMBuilder:
         self.__process_link_chunk()
         shape_ = self.links_df.shape[0]
         message_step = max(1, floor(shape_ / 100))
-        self.__emit_all(["maxValue", shape_])
 
         self.logger.info("Geo-procesing links")
-        self.__emit_all(["text", "Adding network links"])
+        self.signal.emit(["start", 0, shape_, "Adding network links", "master"])
         geometries = []
         self.links_df.set_index(["osm_id"], inplace=True)
         for counter, (idx, link) in enumerate(self.links_df.iterrows()):
-            self.__emit_all(["Value", counter])
+            self.signal.emit(["update", 0, counter, f"Segments from objects: {counter} / {shape_}", "master"])
             if counter % message_step == 0:
                 self.logger.info(f"Creating segments from {counter:,} out of {shape_ :,} OSM link objects")
 
@@ -127,7 +125,7 @@ class OSMBuilder:
         self.node_df.to_parquet(osm_data_path / "nodes.parquet")
 
         self.logger.info("Adding nodes to file")
-        self.__emit_all(["text", "Adding nodes to file"])
+        self.signal.emit(["set_text", 0, 0, "Adding nodes to file", "master"])
 
         # Removing the triggers before adding all nodes makes things a LOT faster
         remove_triggers(conn, self.logger, "network")
@@ -158,7 +156,7 @@ class OSMBuilder:
         del self.links_df
         gc.collect()
         self.logger.info("Adding links to file")
-        self.__emit_all(["text", "Adding links to file"])
+        self.signal.emit(["set_text", 0, 0, "Adding links to file", "master"])
         conn.executemany(insert_qry, links_df)
 
     def _build_geometry(self, nodes: List[int]) -> str:
@@ -180,7 +178,7 @@ class OSMBuilder:
 
     def __process_link_chunk(self):
         self.logger.info("Processing link modes, types and fields")
-        self.__emit_all(["text", "Processing link modes, types and fields"])
+        self.signal.emit(["set_text", 0, 0, "Processing link modes, types and fields", "master"])
 
         # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
         # And let's also assume that each row will be 200 fields at 8 bytes each
@@ -191,10 +189,11 @@ class OSMBuilder:
         # Initialize link types
         with read_and_close(self.project.path_to_file) as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
-            self.__emit_all(["maxValue", len(list_dfs)])
+            self.signal.emit(["start", 0, len(list_dfs), "Processing chunks: ", "master"])
             for i, df in enumerate(list_dfs):
-                self.logger.info(f"Processing chunk {i + 1}/{len(list_dfs)}")
-                self.__emit_all(["Value", i])
+                msg = f"Processing chunk {i + 1}/{len(list_dfs)}"
+                self.logger.info(msg)
+                self.signal.emit(["update", 0, i, msg, "master"])
                 if "tags" in df.columns:
                     # It is critical to reset the index for the concat below to work
                     df.reset_index(drop=True, inplace=True)

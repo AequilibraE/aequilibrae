@@ -1,7 +1,5 @@
-import glob
 import logging
 import os
-import tempfile
 from datetime import datetime
 from time import perf_counter
 from uuid import uuid4
@@ -205,12 +203,6 @@ class GravityApplication:
         intrazonals = float(np.nansum(np.diagonal(self.output.matrix_view)))
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
         self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
-
-        for i in glob.glob(tempfile.gettempdir() + "*.aem"):
-            try:
-                os.unlink(i)
-            except PermissionError as err:
-                self.logger.warning(f"Could not remove {err.filename}")
 
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the matrix output to the project file

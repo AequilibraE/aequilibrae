@@ -10,12 +10,6 @@ from aequilibrae import matrix
 from aequilibrae import transit
 from aequilibrae import project
 
-try:
-    from aequilibrae.paths.AoN import path_computation
-except Exception as e:
-    global_logger.warning(f"Failed to import compiled modules. {e.args}")
-    raise
-
 from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae import distribution
@@ -32,20 +26,3 @@ from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResult
 from aequilibrae import paths
 
 name = "aequilibrae"
-
-
-def setup():
-    sys.dont_write_bytecode = True
-    cleaning()
-
-
-def cleaning():
-    p = tempfile.gettempdir() + "/aequilibrae_*"
-    for f in glob.glob(p):
-        try:
-            os.unlink(f)
-        except Exception as err:
-            global_logger.warning(err.__str__())
-
-
-setup()
