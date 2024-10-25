@@ -28,7 +28,6 @@ class Ipf:
         >>> matrix.computational_view()
 
         >>> vectors = pd.DataFrame({"productions":np.zeros(matrix.zones), "attractions":np.zeros(matrix.zones)}, index=matrix.index)
-        >>> vectors.create_empty(**dataset_args)
 
         >>> vectors.productions[:] = matrix.rows()[:]
         >>> vectors.attractions[:] = matrix.columns()[:]
