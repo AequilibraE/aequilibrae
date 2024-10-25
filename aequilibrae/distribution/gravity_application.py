@@ -52,12 +52,12 @@ class GravityApplication:
         >>> df.set_index("zone_id", inplace=True)
 
         # You create the vectors you would have
-        >>> df = df.assign(production=df.population * 3.0)
-        >>> df = df.assign(attraction=df.employment * 4.0)
-        >>> vectors = df[["production", "attraction"]]
+        >>> df = df.assign(productions=df.population * 3.0)
+        >>> df = df.assign(attractions=df.employment * 4.0)
+        >>> vectors = df[["productions", "attractions"]]
 
         # Balance the vectors
-        >>> vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
+        >>> vectors.loc[:, "attractions"] *= vectors["productions"].sum() / vectors["attractions"].sum()
 
         # Create the problem object
         >>> args = {"impedance": matrix,
@@ -255,7 +255,7 @@ class GravityApplication:
             raise ValueError("Vectors are not balanced")
         else:
             # guarantees that they are precisely balanced
-            self.vectors[self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
+            self.vectors.loc[:, self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
 
         self.__check_parameters()
 
