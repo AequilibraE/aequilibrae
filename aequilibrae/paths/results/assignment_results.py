@@ -325,8 +325,6 @@ class TransitAssignmentResults(AssignmentResultsBase):
         self.zones = graph.num_zones
         self.centroids = graph.centroids
         self.links = graph.num_links
-        # self.num_skims = len(graph.skim_fields)
-        # self.skim_names = [x for x in graph.skim_fields]
         self.lids = graph.graph.link_id.values
 
     def reset(self) -> None:
