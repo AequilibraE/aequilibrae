@@ -74,7 +74,6 @@ Matrix
    :toctree: generated/
 
    AequilibraeMatrix
-   AequilibraeData
 
 Paths
 -----
