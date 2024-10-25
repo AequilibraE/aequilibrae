@@ -29,11 +29,8 @@ class Ipf:
 
         >>> vectors = pd.DataFrame({"productions":np.zeros(matrix.zones), "attractions":np.zeros(matrix.zones)}, index=matrix.index)
 
-        >>> vectors.productions[:] = matrix.rows()[:]
-        >>> vectors.attractions[:] = matrix.columns()[:]
-
-        # We assume that the indices would be sorted and that they would match the matrix indices
-        >>> vectors.index[:] = matrix.index[:]
+        >>> vectors["productions"] = matrix.rows()
+        >>> vectors["attractions"] = matrix.columns()
 
         >>> ipf_args = {"matrix": matrix,
         ...             "vectors": vectors,
