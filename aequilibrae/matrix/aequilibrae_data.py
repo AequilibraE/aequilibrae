@@ -233,7 +233,7 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            >>> from aequilibrae.matrix import AequilibraeData
+            >>> from aequilibrae.matrix.aequilibrae_data import AequilibraeData
 
             >>> dataset = AequilibraeData()
             >>> dataset.random_name() # doctest: +ELLIPSIS
