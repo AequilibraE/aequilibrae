@@ -650,8 +650,7 @@ class TrafficAssignment(AssignmentBase):
         agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
-
-        return pd.concat(assig_results, axis=1)
+        return pd.concat(assig_results, axis=1).rename_axis("link_id")
 
     def info(self) -> dict:
         """Returns information for the traffic assignment procedure
@@ -807,7 +806,7 @@ class TrafficAssignment(AssignmentBase):
             cls_cols = {x: cls._id + "_" + x if (x != "index") else "link_id" for x in df.columns}
             df.rename(columns=cls_cols, inplace=True)
             class_flows.append(df)
-        return pd.concat(class_flows, axis=1)
+        return pd.concat(class_flows, axis=1).rename_axis("link_id")
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
