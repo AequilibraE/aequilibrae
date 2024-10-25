@@ -264,7 +264,6 @@ class AssignmentResults(AssignmentResultsBase):
             aux[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
 
             # Tot Flow
-            aux[n + "_tot"] = np.zeros(recs, self.__float_type)
             aux[n + "_tot"] = np.nan_to_num(aux[n + "_ab"]) + np.nan_to_num(aux[n + "_ba"])
 
         return pd.DataFrame(aux, index=np.unique(self.lids))
@@ -293,9 +292,9 @@ class AssignmentResults(AssignmentResultsBase):
                 res[name + "_" + n + "_ba"].values[m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
 
                 # Tot Flow
-                res[name + "_" + n + "_tot"] = np.nan_to_num(
-                    res[name + "_" + n + "_ab"].to_numpy()
-                ) + np.nan_to_num(res[name + "_" + n + "_ba"].to_numpy())
+                res[name + "_" + n + "_tot"] = np.nan_to_num(res[name + "_" + n + "_ab"].to_numpy()) + np.nan_to_num(
+                    res[name + "_" + n + "_ba"].to_numpy()
+                )
 
         return res
 
