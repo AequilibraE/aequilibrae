@@ -21,7 +21,6 @@ which are going to be the input of a future year assignnment with select link an
 #     * :func:`aequilibrae.distribution.GravityCalibration`
 #     * :func:`aequilibrae.distribution.GravityApplication`
 #     * :func:`aequilibrae.distribution.SyntheticGravityModel`
-#     * :func:`aequilibrae.matrix.AequilibraeData`
 
 # %%
 
@@ -29,6 +28,8 @@ which are going to be the input of a future year assignnment with select link an
 from uuid import uuid4
 from os.path import join
 from tempfile import gettempdir
+
+import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_number = 3
@@ -120,7 +121,7 @@ results = assig.results()
 results.head()
 
 # %%
-# We can export our results to CSV or AequilibraE Data, but let's put it directly into the results database
+# We can export our results to CSV or get a Pandas DataFrame, but let's put it directly into the results database
 assig.save_results("base_year_assignment")
 
 # %%
@@ -231,7 +232,6 @@ plt.show()
 
 # %%
 from aequilibrae.distribution import Ipf, GravityApplication, SyntheticGravityModel
-from aequilibrae.matrix import AequilibraeData
 
 # %%
 # Compute future vectors
@@ -241,24 +241,12 @@ from aequilibrae.matrix import AequilibraeData
 origins = np.sum(demand.matrix_view, axis=1)
 destinations = np.sum(demand.matrix_view, axis=0)
 
-args = {
-    "file_path": join(fldr, "synthetic_future_vector.aed"),
-    "entries": demand.zones,
-    "field_names": ["origins", "destinations"],
-    "data_types": [np.float64, np.float64],
-    "memory_mode": False,
-}
-
-vectors = AequilibraeData()
-vectors.create_empty(**args)
-
-vectors.index[:] = demand.index[:]
-
 # Then grow them with some random growth between 0 and 10%, and balance them
-vectors.origins[:] = origins * (1 + np.random.rand(vectors.entries) / 10)
-vectors.destinations[:] = destinations * (1 + np.random.rand(vectors.entries) / 10)
-vectors.destinations *= vectors.origins.sum() / vectors.destinations.sum()
+orig = origins * (1 + np.random.rand(origins.shape[0]) / 10)
+dest = destinations * (1 + np.random.rand(origins.shape[0]) / 10)
+dest *= orig.sum() / dest.sum()
 
+vectors = pd.DataFrame({"origins":orig, "destinations":dest}, index=demand.index[:])
 # %%
 # IPF for the future vectors
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -267,8 +255,7 @@ vectors.destinations *= vectors.origins.sum() / vectors.destinations.sum()
 
 args = {
     "matrix": demand,
-    "rows": vectors,
-    "columns": vectors,
+    "vectors": vectors,
     "column_field": "destinations",
     "row_field": "origins",
     "nan_as_zero": True,
@@ -304,10 +291,9 @@ for function in ["power", "expo"]:
     outmatrix = join(proj_matrices.fldr, f"demand_{function}_model.aem")
     args = {
         "impedance": imped,
-        "rows": vectors,
+        "vectors": vectors,
         "row_field": "origins",
         "model": model,
-        "columns": vectors,
         "column_field": "destinations",
         "nan_as_zero": True,
     }

@@ -96,7 +96,7 @@ class TestSelectLink(TestCase):
         Tests the functionality of Select Link when given a custom demand matrix, where only 1 OD pair has demand on it
         Confirms the OD matrix behaves, and the Link Loading is just on the path of this OD pair
         """
-        custom_demand = np.zeros((24, 24, 1))
+        custom_demand = np.zeros((24, 24, 1)).astype(float)
         custom_demand[0, 23, 0] = 1000
         self.matrix.matrix_view = custom_demand
         self.assignclass.matrix = self.matrix
@@ -137,7 +137,8 @@ class TestSelectLink(TestCase):
         """
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-        self.assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
+        with self.assertWarns(Warning):
+            self.assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
         self.assertEqual(len(self.assignclass._selected_links["test"]), 1, "Did not correctly remove duplicate link")
 
     def test_link_out_of_bounds(self):
@@ -190,8 +191,8 @@ class TestSelectLink(TestCase):
         assign.execute()
 
         # 5.receive results
-        assign_flow_res_df = assign.results().reset_index(drop=False).fillna(0)
-        select_link_flow_df = assign.select_link_flows().reset_index(drop=False).fillna(0)
+        assign_flow_res_df = assign.results().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
+        select_link_flow_df = assign.select_link_flows().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
 
         pd.testing.assert_frame_equal(
             assign_flow_res_df[["link_id", "a_ab", "a_ba", "a_tot"]],
@@ -217,8 +218,8 @@ class TestSelectLink(TestCase):
                 assignclass.set_select_links({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]})
                 assignment.execute()
 
-                assignment_results = pd.DataFrame(assignclass.results.get_load_results().data).set_index("index")
-                sl_results = pd.DataFrame(assignclass.results.get_sl_results().data).set_index("index")
+                assignment_results = assignclass.results.get_load_results()
+                sl_results = assignclass.results.get_sl_results()
 
                 self.assertAlmostEqual(
                     assignment_results["matrix_ab"].loc[1],

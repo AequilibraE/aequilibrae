@@ -11,7 +11,7 @@ from aequilibrae import transit
 from aequilibrae import project
 
 from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae import distribution
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.traffic_class import TrafficClass

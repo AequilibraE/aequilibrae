@@ -137,7 +137,7 @@ class GraphBase(ABC):  # noqa: B024
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: Optional[np.ndarray]) -> None:
+    def prepare_graph(self, centroids: Optional[np.ndarray] = None) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -341,18 +341,22 @@ class GraphBase(ABC):  # noqa: B024
         :Arguments:
             **cost_field** (:obj:`str`): Field name. Must be numeric
         """
-        if cost_field in self.graph.columns:
-            self.cost_field = cost_field
+        if cost_field not in self.graph.columns:
+            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
+
+        self.cost_field = cost_field
+
+        # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
+        if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
             df = self.__graph_groupby.sum(numeric_only=True)[[cost_field]].reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
-            if self.graph[cost_field].dtype == self.__float_type:
-                self.cost = np.array(self.graph[cost_field].values, copy=True)
-            else:
-                self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
-                self.logger.warning("Cost field with wrong type. Converting to float64")
+
+        if self.graph[cost_field].dtype == self.__float_type:
+            self.cost = np.array(self.graph[cost_field].values, copy=True)
         else:
-            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
+            self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
+            self.logger.warning("Cost field with wrong type. Converting to float64")
 
         self.__build_derived_properties()
 

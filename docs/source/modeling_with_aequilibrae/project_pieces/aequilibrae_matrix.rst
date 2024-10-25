@@ -151,7 +151,7 @@ Creating an AequilibraE matrix from an OMX file is pretty straightforward.
     >>> omx_path = os.path.join(my_folder_path, "my_new_omx_file.omx")
 
     >>> omx_mat = AequilibraeMatrix()
-    >>> omx_mat.create_from_omx(file_path, omx_path)
+    >>> omx_mat.create_from_omx(omx_path, file_path)
 
     >>> mat.get_matrix("only_ones") # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     memmap([[1., 1., 1., 1., 1.],
