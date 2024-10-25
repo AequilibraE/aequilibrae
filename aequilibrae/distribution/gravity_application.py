@@ -255,7 +255,7 @@ class GravityApplication:
             raise ValueError("Vectors are not balanced")
         else:
             # guarantees that they are precisely balanced
-            self.vectors[self.cols_][:] = self.vectors[self.cols_][:] * (sum_rows / sum_cols)
+            self.vectors[self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
 
         self.__check_parameters()
 

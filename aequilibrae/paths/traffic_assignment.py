@@ -623,7 +623,7 @@ class TrafficAssignment(AssignmentBase):
             "PCE_tot",
         ]
 
-        agg = pd.DataFrame([], columns=fields, index=res1.index[:])
+        agg = pd.DataFrame([], columns=fields, index=res1.index[:]).astype(float)
         agg.fillna(0.0, inplace=True)
 
         # Use the first class to get a graph -> network link ID mapping
