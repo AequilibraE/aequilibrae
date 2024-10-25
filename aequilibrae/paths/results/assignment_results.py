@@ -288,13 +288,11 @@ class AssignmentResults(AssignmentResultsBase):
             assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
-                res[name + "_" + n + "_ab"].values[m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
-                res[name + "_" + n + "_ba"].values[m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+                res[f"{name}_{n}_ab"].values[m.network_ab_idx] = link_flows[m.graph_ab_idx, i]
+                res[f"{name}_{n}_ba"].values[m.network_ba_idx] = link_flows[m.graph_ba_idx, i]
 
                 # Tot Flow
-                res[name + "_" + n + "_tot"] = np.nan_to_num(res[name + "_" + n + "_ab"].to_numpy()) + np.nan_to_num(
-                    res[name + "_" + n + "_ba"].to_numpy()
-                )
+                res[f"{name}_{n}_tot"] = np.nansum(res[[f"{name}_{n}_ab", f"{name}_{n}_ba"]].to_numpy(), axis=1)
 
         return res
 
