@@ -295,9 +295,9 @@ class AequilibraeMatrix(object):
         Creates an AequilibraeMatrix from an original OpenMatrix
 
         :Arguments:
-            **file_path** (:obj:`str`, *Optional*): Path for the output AequilibraeMatrix
-
             **omx_path** (:obj:`str`): Path to the OMX file one wants to import
+
+            **file_path** (:obj:`str`, *Optional*): Path for the output AequilibraeMatrix
 
             **cores** (:obj:`list`, *Optional*): List of matrix cores to be imported
 
