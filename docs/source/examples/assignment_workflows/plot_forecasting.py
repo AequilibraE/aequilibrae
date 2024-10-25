@@ -291,10 +291,9 @@ for function in ["power", "expo"]:
     outmatrix = join(proj_matrices.fldr, f"demand_{function}_model.aem")
     args = {
         "impedance": imped,
-        "rows": vectors,
+        "vectors": vectors,
         "row_field": "origins",
         "model": model,
-        "columns": vectors,
         "column_field": "destinations",
         "nan_as_zero": True,
     }
