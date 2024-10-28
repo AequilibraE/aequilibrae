@@ -6,21 +6,27 @@ import numpy as np
 from scipy.cluster.vq import kmeans2, whiten
 from scipy.spatial.distance import cdist
 import shapely.wkb
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Polygon
 from aequilibrae.utils.db_utils import commit_and_close
 
 INFINITE_CAPACITY = 99999
 
 
 def connector_creation(
-        zone_id: int, mode_id: str, network, link_types="", connectors=1, conn_: Optional[Connection] = None
+    zone_id: int,
+    mode_id: str,
+    network,
+    link_types="",
+    connectors=1,
+    conn_: Optional[Connection] = None,
+    delimiting_area: Polygon = None,
 ):
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    with conn_ or commit_and_close(network.project.project_base_path) as conn:
+    with conn_ or commit_and_close(network.project.path_to_file) as conn:
         logger = network.project.logger
-        if conn.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone() is None:
+        if sum(conn.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone()) == 0:
             logger.warning("This centroid does not exist. Please create it first")
             return
 
@@ -38,6 +44,9 @@ def connector_creation(
 
     if len(link_types) > 0:
         nodes = nodes[nodes.link_types.str.contains("|".join(list(link_types)))]
+
+    if delimiting_area is not None:
+        nodes = nodes[nodes.geometry.within(delimiting_area)]
 
     if nodes.empty:
         logger.warning(f"No nodes found for mode {mode_id} and link types {link_types}")

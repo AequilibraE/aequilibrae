@@ -153,8 +153,7 @@ airport.save()
 # %%
 # When connecting a centroid not associated with a zone, we need to tell AequilibraE what is the initial area around
 # the centroid that needs to be considered when looking for candidate nodes.
-# Distance here is in degrees, so 0.01 is equivalent to roughly 1.1km
-airport.connect_mode(airport.geometry.buffer(0.01), mode_id="c", link_types="ytrusP", connectors=1)
+airport.connect_mode(mode_id="c", link_types="ytrusP", connectors=1)
 
 # %%
 project.close()
