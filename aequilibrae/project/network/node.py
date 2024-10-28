@@ -143,10 +143,8 @@ class Node(SafeClass):
             return
 
         connector_creation(
-            area,
-            self.node_id,
-            self.__srid__,
-            mode_id,
+            zone_id=self.node_id,
+            mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
             network=self.project.network,

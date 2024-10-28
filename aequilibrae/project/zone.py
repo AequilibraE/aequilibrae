@@ -114,9 +114,7 @@ class Zone(SafeClass):
             **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
         """
         connector_creation(
-            self.geometry,
             zone_id=self.zone_id,
-            srid=self.__srid__,
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
