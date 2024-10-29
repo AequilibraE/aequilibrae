@@ -1,0 +1,59 @@
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    <li class="nav-item dropdown" id="dropdown-nav-item" style="display: none;">
+      <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="true"
+        aria-controls="pst-nav-more-links" id="python-button">
+        Python
+      </button>
+      <ul id="pst-nav-more-links" class="dropdown-menu" data-bs-popper="static">
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal" href="python.html">&#127968; Home</a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal"
+            href="https://www.aequilibrae.com/python/develop/_auto_examples/index.html">
+            Examples
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal"
+            href="https://www.aequilibrae.com/python/develop/modeling_with_aequilibrae/index.html">
+            Modeling with AequilibraE
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal"
+            href="https://www.aequilibrae.com/python/develop/api/api.html#">
+            API Reference
+          </a>
+        </li>
+      </ul>
+    </li>
+    <li class="nav-item" id="index-nav-item" style="display: none;">
+      <a class="nav-link" href="python.html">Python</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="https://www.aequilibrae.com/qgis/latest/">QGIS</a>
+    </li>
+  </ul>
+</nav>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const isIndex = window.location.pathname.endsWith("aequilibrae.html");
+    if (isIndex) {
+      document.getElementById("index-nav-item").style.display = "block";
+    } else {
+      document.getElementById("dropdown-nav-item").style.display = "block";
+    }
+
+    const isPythonPage = window.location.pathname.endsWith("python.html");
+    const pythonButton = document.getElementById("python-button");
+    if (!isPythonPage) {
+      pythonButton.innerHTML = "<b>Python</b>";
+    }
+  });
+</script>
+
+<!-- TODO: Fix this nav-link for AequilibraE. It has to redirect to .../python.html -->
+<!-- TODO: Fix dropdown links for QGIS. They're all outdated... -->

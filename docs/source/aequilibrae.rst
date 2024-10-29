@@ -31,8 +31,13 @@ Sponsors
 --------
 
 Sponsoring AequilibraE's maintenance and new features is the best way to guarantee that the bugs you need
-fixed and the features your projects require are incorporated quickly into the software. Please contact
-aequilibrae@outerloop.io for sponsoring opportunities.
+fixed and the features your projects require are incorporated quickly into the software. 
+
+Please contact aequilibrae@outerloop.io for sponsoring opportunities.
+
+.. raw:: html
+
+   <div style="display: flex; justify-content: center; gap: 20px;">
 
 .. image:: images/logos/sponsor1.png
     :target: https://www.outerloop.io
@@ -48,3 +53,7 @@ aequilibrae@outerloop.io for sponsoring opportunities.
 
 .. image:: images/logos/sponsor5.png
     :target: https://www.ipea.gov.br
+
+.. raw:: html
+
+   </div>
