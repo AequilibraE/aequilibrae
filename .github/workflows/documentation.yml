@@ -61,7 +61,7 @@ jobs:
         sphinx-build -b html docs/source docs/build
         python3 -m zipfile -c AequilibraE.zip docs/build
         cp AequilibraE.zip docs/source/_static
-        cp qaequilibrae/large_icon.png docs/source/_static/large_icon.png
+        cp large_icon.png docs/source/_static/large_icon.png
         cd docs
         make html
 
