@@ -9,18 +9,3 @@
 .bd-links__title[role="heading"][aria-level="1"] {
     display: none;
 }
-
-.navbar-header-items .active {
-    text-decoration: none;
-    border: none;
-
-    background-color: goldenrod;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 15px;
-}
-
-/* .nav-item .current .active {
-    text-decoration: none;
-    border-bottom: none;
-} */
