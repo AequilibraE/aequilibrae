@@ -162,6 +162,7 @@ latex_elements = {
         \usepackage{newunicodechar}
         \usepackage{lmodern}
         \newunicodechar{█}{\rule{0.5em}{0.5em}}
+        \newunicodechar{▉}{\rule{0.44em}{0.7em}}
         """,
     "inputenc": r"\usepackage[utf8]{inputenc}",
     "fontenc": r"\usepackage[T1]{fontenc}",
