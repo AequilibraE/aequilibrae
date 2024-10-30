@@ -163,6 +163,8 @@ latex_elements = {
         \usepackage{lmodern}
         \newunicodechar{█}{\rule{0.5em}{0.5em}}
         \newunicodechar{▉}{\rule{0.44em}{0.7em}}
+        \newunicodechar{▊}{\rule{0.38em}{0.7em}}
+        \newunicodechar{█}{\rule{0.5em}{0.7em}}
         """,
     "inputenc": r"\usepackage[utf8]{inputenc}",
     "fontenc": r"\usepackage[T1]{fontenc}",
@@ -176,7 +178,7 @@ latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", 
 
 latex_appendices = [
     "useful_information/installation",
-    "useful_information/validation_benchmarking/ipf_performance",
+    "useful_information/validation_benchmarking/ipf_benchmark",
     "useful_information/validation_benchmarking/traffic_assignment",
 ]
 
