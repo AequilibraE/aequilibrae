@@ -23,7 +23,7 @@ from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.qgis_utils import inside_qgis
 from aequilibrae.utils.spatialite_utils import connect_spatialite

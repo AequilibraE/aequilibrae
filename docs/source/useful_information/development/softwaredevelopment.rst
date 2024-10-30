@@ -198,9 +198,9 @@ Working with progress bars
 From version 1.1.0, AequilibraE is capable of displaying progress bars in Jupyter Notebooks using 
 `TQDM <https://tqdm.github.io/>`_. For the companion QGIS plugin, `PyQt5 <https://doc.qt.io/qtforpython-5/>`
 is used to emit messages in progress bars.
-
-In AequilibraE, there are specific pieces of code responsible for emitting these signals to progress bars
-depending on the environment one uses: Python or QGIS.
+ 
+AequilibraE provides a wrapper class `SIGNAL` that will use the appropriate underlying mechanism to display 
+the progress bars.
 
 .. code-block:: python
 
@@ -209,21 +209,20 @@ depending on the environment one uses: Python or QGIS.
     class MyClass:
       signal = SIGNAL(object)
 
-      def __init__(self, *arg):
-        pass
+      def my_method(self):
+        signal.emit(['start', 10, 'running my method']) 
+        for i in range(0,10):
+           signal.emit(['update', i])
+           sleep(0.4)
 
-The signal emitted contains a list with the following structure:: 
-  
-  ['action', 'bar hierarchy', 'value', 'text', 'master']
 
-where
+Calling `MyClass().my_method()` will generate a progress bar in the following form (outside QGIS).
 
-  * ``action`` refers to the action, such as 'start', 'update', 'refresh', 'reset', 'set_position', 'set_text', 
-    'key_value', or 'finished' (this one only applies in QGIS), for example.
-  * ``position``: Position (0 for top, 1 for bottom)
-  * ``value``: numerical value for the action (total or current)
-  * ``text``: whatever label to be updated
-  * ``master``: the corresponding master bar for this task
+.. code-block:: text
+
+    running my method                                 :  30%|█████▍            | 3/10 [00:01<00:02,  2.50it/s]
+
+The full set of emitted signals which can be used to control progress bars is given in `python_signal.py`
 
 Releases
 ~~~~~~~~~

@@ -18,6 +18,7 @@ from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
 from aequilibrae.transit.transit_elements import mode_correspondence
+from aequilibrae.utils.aeq_signal import simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 GRAPH_VERSION = 1
@@ -104,7 +105,7 @@ class MMGraph(WorkerThread):
     def __build_graph_from_cache(self):
         msg = f"Loading map-matching graph from disk for mode_id={self.mode_id} (Step: 8/12)"
         self.logger.info(msg)
-        self.signal.emit(["set_text", 0, 0, msg, "master"])
+        self.signal.emit(["set_text", msg])
 
         net = pd.read_csv(self.__df_file)
         centroid_corresp = pd.read_csv(self.__centroids_file)
@@ -118,7 +119,7 @@ class MMGraph(WorkerThread):
     def __build_graph_from_scratch(self):
         msg = f"Creating map-matching graph from scratch for mode_id={self.mode_id} (Step: 8/12)"
         self.logger.info(msg)
-        self.signal.emit(["set_text", 0, 0, msg, "master"])
+        self.signal.emit(["set_text", msg])
 
         self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=self.df.wkt.apply(shapely.wkt.loads))
         self.df.loc[self.df.link_id < 0, "link_id"] = self.df.link_id * -1 + self.df.link_id.max() + 1
@@ -128,25 +129,20 @@ class MMGraph(WorkerThread):
         self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
 
         # Build initial index
-        max_val = self.df.shape[0]
-        msg = "Building graphs - Indexing links (Step: 8/12) - {}/{}"
-        self.signal.emit(["start", 0, max_val, msg.format(0, max_val), "master"])
         self._idx = GeoIndex()
-        for counter, (_, record) in enumerate(self.df.iterrows()):
-            # self.signal.emit(["update", 0, counter + 1, msg.format(counter + 1, max_val), "master"])
+        msg = "Building graphs - Indexing links (Step: 8/12)"
+        for (_, record) in simple_progress(self.df.iterrows(), self.signal, msg):
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
 
         # We will progressively break links at stops' projection
         # But only on the right side of the link (no boarding at the opposing link's side)
         centroids = []
         self.node_corresp = []
-        max_val = len(self.stops)
-        msg = "Building graphs - Breaking links (Step: 8/12) - {}/{}"
-        self.signal.emit(["start", 0, max_val, msg.format(0, max_val), "master"])
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
-        for counter, (stop_id, stop) in enumerate(self.stops.items()):
-            # self.signal.emit(["update", 0, counter + 1, msg.format(counter + 1, max_val), "master"])
+
+        msg = "Building graphs - Breaking links (Step: 8/12)"
+        for (stop_id, stop) in simple_progress(self.stops.items(), self.signal, msg):
             stop.__map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.__map_matching_id__[self.mode_id])

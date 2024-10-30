@@ -12,7 +12,7 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
@@ -146,9 +146,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
-        self.signal.emit(["start", 0, len(self.select_patterns), "Map-matching patterns", "master"])
-        for i, pat in enumerate(self.select_patterns.values()):
-            self.signal.emit(["update", 0, i, f"Map-matching pattern {pat.pattern_id}", "master"])
+        for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
@@ -227,26 +225,17 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """Saves all transit elements built in memory to disk"""
 
         with closing(database_connection("transit")) as conn:
-
-            max_val = len(self.select_patterns.keys())
-            msg = "Saving patterns (Step: 10/12) - {}/{}"
-            self.signal.emit(["start", 0, max_val, msg.format(0, max_val), "master"])
-            for counter, (_, pattern) in enumerate(self.select_patterns.items()):
+            for pattern in simple_progress(self.select_patterns.values(), self.signal, "Saving patterns (Step: 10/12)"):
                 pattern.save_to_database(conn, commit=False)
-                self.signal.emit(["update", 0, counter + 1, msg.format(counter + 1, max_val), "master"])
             conn.commit()
 
             self.gtfs_data.agency.save_to_database(conn)
 
-            max_val = len(self.select_trips)
-            msg = "Saving trips (Step: 11/12) - {}/{}"
-            self.signal.emit(["start", 0, len(self.select_trips), msg.format(0, max_val), "master"])
-            for counter, trip in enumerate(self.select_trips):
+            for trip in simple_progress(self.select_trips, self.signal, "Saving trips (Step: 11/12)"):
                 trip.save_to_database(conn, commit=False)
-                self.signal.emit(["update", 0, counter + 1, msg.format(counter + 1, max_val), "master"])
             conn.commit()
 
-            for counter, (_, link) in enumerate(self.select_links.items()):
+            for link in simple_progress(self.select_links.values(), self.signal, "Saving links (Step: 11/12)"):
                 link.save_to_database(conn, commit=False)
             conn.commit()
 
@@ -267,10 +256,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for fare_rule in self.gtfs_data.fare_rules:
                 fare_rule.save_to_database(conn)
 
-            max_val = len(self.select_stops.keys())
-            msg = "Saving stops (Step: 12/12) - {}/{}"
-            self.signal.emit(["start", 0, max_val, msg.format(0, max_val), "master"])
-            for counter, (_, stop) in enumerate(self.select_stops.items()):
+            for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 12/12)"):
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
                 if self.__has_taz:
@@ -278,15 +264,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
                     if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
                         stop.taz = closest_zone
                 stop.save_to_database(conn, commit=False)
-                self.signal.emit(["update", 0, counter + 1, msg.format(counter + 1, max_val), "master"])
             conn.commit()
 
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
             msg = "    Some stops are outside the zoning system. Check the result on a map and see the log for info"
             self.logger.warning(msg)
-
-        self.signal.emit(["finished"])
 
     def __build_data(self):
         self.logger.debug("Starting __build_data")
@@ -299,13 +282,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if self.__do_execute_map_matching:
             self.builds_link_graphs_with_broken_stops()
 
-        max_val = len(self.select_routes)
         msg = f"Loading data for {self.day} (Step: 9/12) - "
-        msg = msg + "{}/{}"
-        self.signal.emit(["start", 0, max_val, msg.format(0, max_val), "master"])
         c = Constants()
-        for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            self.signal.emit(["update", 0, counter + 1, msg.format(counter + 1, max_val), "master"])
+        for route_id, route in simple_progress(self.select_routes.items(), self.signal, msg):
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]

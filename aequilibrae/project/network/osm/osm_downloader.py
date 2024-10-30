@@ -22,7 +22,7 @@ from shapely import Polygon
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .osm_params import http_headers, memory
 
@@ -52,14 +52,11 @@ class OSMDownloader(WorkerThread):
             "{memory}[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        self.signal.emit(["start", 0, len(self.polygons), f"Total polygons: {len(self.polygons)}", "master"])
         m = ""
         if memory > 0:
             m = f"[maxsize: {memory}]"
-        for counter, poly in enumerate(self.polygons):
-            msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
-            self.logger.info(msg)
-            self.signal.emit(["update", 0, counter, msg, "master"])
+        msg = f"Total polygons: {len(self.polygons)}"
+        for poly in simple_progress(self.polygons, self.signal, msg):
             west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
@@ -81,7 +78,7 @@ class OSMDownloader(WorkerThread):
                 del json
                 gc.collect()
 
-        self.signal.emit(["set_text", 0, 0, "Downloading finished. Processing data", "master"])
+        self.signal.emit(["set_text", "Downloading finished. Processing data"])
         for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
             df = pd.DataFrame([])
             if len(lst) > 0:

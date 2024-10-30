@@ -11,7 +11,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils.core_setter import set_cores
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 sys.dont_write_bytecode = True
@@ -72,7 +72,8 @@ class NetworkSkimming(WorkerThread):
 
     def execute(self):
         """Runs the skimming process as specified in the graph"""
-        self.signal.emit(["start", 0, self.graph.num_zones, "", "master"])
+        self.signal.deactivate = False
+        self.signal.emit(["start", self.graph.num_zones, ""])
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
@@ -93,7 +94,7 @@ class NetworkSkimming(WorkerThread):
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        self.signal.emit(["set_text", 0, 0, "Saving Outputs", "master"])
+        self.signal.emit(["set_text", "Saving Outputs"])
         self.signal.emit(["finished"])
 
     def set_cores(self, cores: int) -> None:
@@ -145,4 +146,4 @@ class NetworkSkimming(WorkerThread):
         if x != origin:
             self.report.append(x)
 
-        self.signal.emit(["update", 0, self.cumulative, f"{self.cumulative}/{self.graph.num_zones}", "master"])
+        self.signal.emit(["update", self.cumulative, f"{self.cumulative}/{self.graph.num_zones}"])

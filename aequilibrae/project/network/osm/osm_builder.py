@@ -14,7 +14,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
@@ -27,7 +27,7 @@ class OSMBuilder(WorkerThread):
         WorkerThread.__init__(self, None)
 
         project.logger.info("Preparing OSM builder")
-        self.signal.emit(["set_text", 0, 0, "Preparing OSM builder", "master"])
+        self.signal.emit(["set_text", "Preparing OSM builder"])
 
         self.project = project or get_active_project()
         self.logger = self.project.logger
@@ -58,7 +58,7 @@ class OSMBuilder(WorkerThread):
             conn.commit()
             self.__do_clean(conn)
 
-        self.signal.emit(["finished", 0])
+        self.signal.emit(["finished"])
 
     def importing_network(self, conn):
         self.logger.info("Importing the network")
@@ -68,17 +68,12 @@ class OSMBuilder(WorkerThread):
         self.node_df.set_index(["osm_id"], inplace=True)
 
         self.__process_link_chunk()
-        shape_ = self.links_df.shape[0]
-        message_step = max(1, floor(shape_ / 100))
 
         self.logger.info("Geo-procesing links")
-        self.signal.emit(["start", 0, shape_, "Adding network links", "master"])
         geometries = []
         self.links_df.set_index(["osm_id"], inplace=True)
-        for counter, (idx, link) in enumerate(self.links_df.iterrows()):
-            self.signal.emit(["update", 0, counter, f"Segments from objects: {counter} / {shape_}", "master"])
-            if counter % message_step == 0:
-                self.logger.info(f"Creating segments from {counter:,} out of {shape_ :,} OSM link objects")
+
+        for idx, link in simple_progress(self.links_df.iterrows(), self.signal, "Adding network links"):
 
             # How can I link have less than two points?
             if not isinstance(link["nodes"], list):
@@ -125,7 +120,7 @@ class OSMBuilder(WorkerThread):
         self.node_df.to_parquet(osm_data_path / "nodes.parquet")
 
         self.logger.info("Adding nodes to file")
-        self.signal.emit(["set_text", 0, 0, "Adding nodes to file", "master"])
+        self.signal.emit(["set_text", "Adding nodes to file"])
 
         # Removing the triggers before adding all nodes makes things a LOT faster
         remove_triggers(conn, self.logger, "network")
@@ -156,7 +151,7 @@ class OSMBuilder(WorkerThread):
         del self.links_df
         gc.collect()
         self.logger.info("Adding links to file")
-        self.signal.emit(["set_text", 0, 0, "Adding links to file", "master"])
+        self.signal.emit(["set_text", "Adding links to file"])
         conn.executemany(insert_qry, links_df)
 
     def _build_geometry(self, nodes: List[int]) -> str:
@@ -178,22 +173,18 @@ class OSMBuilder(WorkerThread):
 
     def __process_link_chunk(self):
         self.logger.info("Processing link modes, types and fields")
-        self.signal.emit(["set_text", 0, 0, "Processing link modes, types and fields", "master"])
+        self.signal.emit(["set_text", "Processing link modes, types and fields"])
 
         # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
         # And let's also assume that each row will be 200 fields at 8 bytes each
         # This makes 2Gb roughly equal to 2.6 million rows, so 2 million would so.
         chunk_size = 1_000_000
         list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
-        self.links_df = pd.DataFrame([])
+        self.links_df = []
         # Initialize link types
         with read_and_close(self.project.path_to_file) as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
-            self.signal.emit(["start", 0, len(list_dfs), "Processing chunks: ", "master"])
-            for i, df in enumerate(list_dfs):
-                msg = f"Processing chunk {i + 1}/{len(list_dfs)}"
-                self.logger.info(msg)
-                self.signal.emit(["update", 0, i, msg, "master"])
+            for df in simple_progress(list_dfs, self.signal, "Processing chunks"):
                 if "tags" in df.columns:
                     # It is critical to reset the index for the concat below to work
                     df.reset_index(drop=True, inplace=True)
@@ -205,14 +196,14 @@ class OSMBuilder(WorkerThread):
                 else:
                     self.logger.error("OSM link data does not have tags. Skipping an entire data chunk")
                     df = pd.DataFrame([])
-                list_dfs[i] = df
-        self.links_df = pd.concat(list_dfs, ignore_index=True)
+                self.links_df.append(df)
+        self.links_df = pd.concat(self.links_df, ignore_index=True)
 
     def __build_link_types(self, df):
         data = []
         df = df.fillna(value={"highway": "missing"})
         df.highway = df.highway.str.lower()
-        for i, lt in enumerate(df.highway.unique()):
+        for lt in df.highway.unique():
             if str(lt) in self.__all_ltp.highway.values:
                 continue
             data.append([*self.__define_link_type(str(lt)), str(lt)])

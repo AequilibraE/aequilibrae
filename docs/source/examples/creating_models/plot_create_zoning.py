@@ -1,3 +1,20 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: venv
+#     language: python
+#     name: python3
+# ---
+
+# %%
 """
 .. _create_zones:
 
@@ -37,7 +54,11 @@ from os.path import join
 from math import sqrt
 from shapely.geometry import Point
 import shapely.wkb
+
 from aequilibrae.utils.create_example import create_example, list_examples
+from aequilibrae.utils.aeq_signal import simple_progress, SIGNAL
+s = SIGNAL(object)
+
 # sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
 
 # %%
@@ -110,9 +131,10 @@ for i in range(1, 301):
     nd.renumber(i + 1300)
 
 # %%
+
 # Now we can add them to the model and add centroids to them while we are at it.
 zoning = project.zoning
-for i, zone_geo in enumerate(grid):
+for i, zone_geo in enumerate(simple_progress(grid, s, "Add zone centroids")):
     zone = zoning.new(i + 1)
     zone.geometry = zone_geo
     zone.save()

@@ -12,7 +12,7 @@ from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.utils.db_utils import read_and_close
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 import sqlite3
 import pandas as pd

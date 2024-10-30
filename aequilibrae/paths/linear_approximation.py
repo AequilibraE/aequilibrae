@@ -19,7 +19,7 @@ from aequilibrae.paths.traffic_class import TrafficClass
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
@@ -30,7 +30,7 @@ class LinearApproximation(WorkerThread):
 
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
-        self.signal.emit(["set_text", 0, 0, "Linear Approximation", "master"])
+        self.signal.emit(["set_text", "Linear Approximation"])
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
         self.project_path = project.project_base_path if project else gettempdir()
@@ -469,10 +469,11 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self.signal.emit(["start", 0, self.max_iter, "Equilibrium Assignment", "master"])
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
-        for self.iter in range(1, self.max_iter + 1):  # noqa: B020
+
+        msg = "Equilibrium Assignment"
+        for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
             self.iteration_issue = []
 
             aon_flows = []
@@ -481,7 +482,7 @@ class LinearApproximation(WorkerThread):
 
             for c in self.traffic_classes:  # type: TrafficClass
                 msg = f"All-or-Nothing - Traffic Class: {c._id}"
-                self.signal.emit(["set_text", 0, c.matrix.zones, msg, "master"])
+                self.signal.emit(["set_text", msg])
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
@@ -573,7 +574,6 @@ class LinearApproximation(WorkerThread):
                 self.fw_total_flow += self.preload
 
             if self.algorithm == "all-or-nothing":
-                self.signal.emit(["update", 0, self.iter, "Equilibrium Assignment - Iteration: 1/1", "master"])
                 break
 
             # Check convergence
@@ -620,7 +620,7 @@ class LinearApproximation(WorkerThread):
                     c.graph.skims[:, idx] = self.congested_time[:]
 
             msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
-            self.signal.emit(["update", 0, self.iter, msg, "master"])
+            self.signal.emit(["set_text", msg])
 
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
@@ -629,7 +629,7 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
-        self.signal.emit(["finished", 0, 0, "assignment", "master"])
+        self.signal.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,

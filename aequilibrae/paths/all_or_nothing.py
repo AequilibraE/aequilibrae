@@ -12,7 +12,7 @@ try:
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 if False:
@@ -32,7 +32,7 @@ class allOrNothing(WorkerThread):
         self.graph = graph
         self.results = results
         self.aux_res = MultiThreadedAoN()
-        self.signal.emit(["start", 0, self.matrix.zones, self.class_name, "master"])
+        self.signal.emit(["start", self.matrix.zones, self.class_name])
 
         if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -51,7 +51,7 @@ class allOrNothing(WorkerThread):
 
     def execute(self):
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
-        self.signal.emit(["set_text", 0, self.matrix.zones, msg, "master"])
+        self.signal.emit(["set_text", msg])
         self.report = []
         self.cumulative = 0
         self.aux_res.prepare(self.graph, self.results)
@@ -72,13 +72,13 @@ class allOrNothing(WorkerThread):
         pool.join()
         val = self.matrix.index.shape[0]
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {val}/{self.matrix.zones}"
-        self.signal.emit(["set_text", 0, val, msg, "master"])
+        self.signal.emit(["set_text", msg])
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        self.signal.emit(["finished", 0, 0, "aon", "master"])
+        self.signal.emit(["finished"])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
@@ -93,4 +93,4 @@ class allOrNothing(WorkerThread):
             self.report.append(x)
         if self.cumulative % 10 == 0:
             msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
-            self.signal.emit(["set_text", 0, self.cumulative, msg, "master"])
+            self.signal.emit(["set_text", msg])

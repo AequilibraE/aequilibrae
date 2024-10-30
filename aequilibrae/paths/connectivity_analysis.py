@@ -4,7 +4,7 @@ import sys
 from aequilibrae.paths.AoN import connectivity_multi_threaded
 
 from aequilibrae.utils.core_setter import set_cores
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
 
 sys.dont_write_bytecode = True
 
