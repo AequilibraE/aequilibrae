@@ -155,21 +155,7 @@ html_title = f"AequilibraE {version}"
 htmlhelp_basename = "AequilibraEdoc"
 
 # -- Options for LaTeX output ------------------------------------------------
-
-latex_elements = {
-    "preamble": r"""
-        \usepackage[utf8]{inputenc}
-        \usepackage{newunicodechar}
-        \usepackage{lmodern}
-        \newunicodechar{█}{\rule{0.5em}{0.5em}}
-        \newunicodechar{▉}{\rule{0.44em}{0.7em}}
-        \newunicodechar{▊}{\rule{0.38em}{0.7em}}
-        \newunicodechar{█}{\rule{0.5em}{0.7em}}
-        """,
-    "inputenc": r"\usepackage[utf8]{inputenc}",
-    "fontenc": r"\usepackage[T1]{fontenc}",
-    "babel": r"\usepackage[english]{babel}",
-}
+# latex_elements = {}
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,

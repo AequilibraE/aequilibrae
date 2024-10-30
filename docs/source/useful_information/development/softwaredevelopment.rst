@@ -218,10 +218,6 @@ the progress bars.
 
 Calling `MyClass().my_method()` will generate a progress bar in the following form (outside QGIS).
 
-.. code-block::
-
-    running my method: 30%|██████            | 3/10 [00:01<00:02,  2.50it/s]
-
 The full set of emitted signals which can be used to control progress bars is given in `python_signal.py`
 
 Releases
