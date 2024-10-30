@@ -13,6 +13,7 @@ from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 
 sys.dont_write_bytecode = True
 
@@ -72,7 +73,8 @@ class NetworkSkimming(WorkerThread):
 
     def execute(self):
         """Runs the skimming process as specified in the graph"""
-        self.signal.deactivate = False
+        if not inside_qgis:
+            self.signal.deactivate = False
         self.signal.emit(["start", self.graph.num_zones, ""])
         self.results.cores = self.cores
         self.results.prepare(self.graph)

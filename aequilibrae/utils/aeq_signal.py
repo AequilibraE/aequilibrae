@@ -25,7 +25,7 @@ class simple_progress(object):
         try:
             num_elements = len(self.thing)
         except (TypeError, AttributeError):
-            num_elements = None
+            num_elements = 0
 
         self.msg = msg or f"{{}}/{num_elements}"
         self.signal = signal

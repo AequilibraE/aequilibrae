@@ -78,7 +78,6 @@ class allOrNothing(WorkerThread):
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        self.signal.emit(["finished"])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
