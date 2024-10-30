@@ -178,7 +178,7 @@ latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", 
 
 latex_appendices = [
     "useful_information/installation",
-    "useful_information/validation_benchmarking/ipf_benchmark",
+    "useful_information/validation_benchmarking/ipf_performance",
     "useful_information/validation_benchmarking/traffic_assignment",
 ]
 
