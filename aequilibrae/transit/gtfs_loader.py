@@ -421,7 +421,7 @@ class GTFSReader(WorkerThread):
         df = df.assign(source_time=0)
 
         msg = "Loading stop times (Step: 3/12)"
-        for trip_id, data in simple_progress(df.groupby(df["trip_id"]), self.signal,  msg):
+        for trip_id, data in simple_progress(df.groupby(df["trip_id"]), self.signal, msg):
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
 
@@ -442,7 +442,7 @@ class GTFSReader(WorkerThread):
         stops[:]["stop_lat"][:] = lats[:]
         stops[:]["stop_lon"][:] = lons[:]
 
-        for line in simple_progress(stops, self.signal,  "Loading stops (Step: 2/12)"):
+        for line in simple_progress(stops, self.signal, "Loading stops (Step: 2/12)"):
             s = Stop(self.agency.agency_id, line, stops.dtype.names)
             s.agency = self.agency.agency
             s.srid = self.srid

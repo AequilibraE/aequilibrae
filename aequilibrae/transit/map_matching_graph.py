@@ -131,7 +131,7 @@ class MMGraph(WorkerThread):
         # Build initial index
         self._idx = GeoIndex()
         msg = "Building graphs - Indexing links (Step: 8/12)"
-        for (_, record) in simple_progress(self.df.iterrows(), self.signal, msg):
+        for _, record in simple_progress(self.df.iterrows(), self.signal, msg):
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
 
         # We will progressively break links at stops' projection
@@ -142,7 +142,7 @@ class MMGraph(WorkerThread):
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
 
         msg = "Building graphs - Breaking links (Step: 8/12)"
-        for (stop_id, stop) in simple_progress(self.stops.items(), self.signal, msg):
+        for stop_id, stop in simple_progress(self.stops.items(), self.signal, msg):
             stop.__map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.__map_matching_id__[self.mode_id])
