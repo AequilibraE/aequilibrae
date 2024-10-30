@@ -210,17 +210,17 @@ the progress bars.
       signal = SIGNAL(object)
 
       def my_method(self):
-        signal.emit(['start', 0, 10, 'running my method']) 
+        signal.emit(['start', 10, 'running my method']) 
         for i in range(0, 10):
-           signal.emit(['update', 0, i])
+           signal.emit(['update', i, f"Current val: {i}"])
            sleep(0.4)
 
 
 Calling `MyClass().my_method()` will generate a progress bar in the following form (outside QGIS).
 
-.. parsed-literal::
+.. code-block::
 
-    running my_method: 30%|██████            | 3/10 [00:01<00:02,  2.50it/s]
+    running my method: 30%|██████            | 3/10 [00:01<00:02,  2.50it/s]
 
 The full set of emitted signals which can be used to control progress bars is given in `python_signal.py`
 
