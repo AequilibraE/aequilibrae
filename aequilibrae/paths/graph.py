@@ -518,13 +518,13 @@ class GraphBase(ABC):  # noqa: B024
                 self.logger.warning("Could not convert {} - {}".format(new_type, verr.__str__()))
         if isinstance(new_type, int):
             def_type = int
-            if current_type == float:
+            if current_type is float:
                 def_type = float
-            elif current_type == str:
+            elif current_type is str:
                 def_type = str
         elif isinstance(new_type, float):
             def_type = float
-            if current_type == str:
+            if current_type is str:
                 def_type = str
         elif isinstance(new_type, str):
             def_type = str
