@@ -1,11 +1,6 @@
-from math import pi, sqrt
 from sqlite3 import Connection
 from typing import Optional
 
-import numpy as np
-from scipy.cluster.vq import kmeans2, whiten
-from scipy.spatial.distance import cdist
-import shapely.wkb
 from shapely.geometry import LineString, Polygon
 from aequilibrae.utils.db_utils import commit_and_close
 
@@ -49,11 +44,12 @@ def connector_creation(
         nodes = nodes[nodes.geometry.within(delimiting_area)]
 
     if nodes.empty:
-        logger.warning(f"No nodes found for mode {mode_id} and link types {link_types}")
+        zone_id = centroid["zone_id"].values[0]
+        logger.warning(f"No nodes found for centroid {zone_id} (mode {mode_id} and link types {link_types})")
         return
 
     joined = nodes[["node_id", "geometry"]].sjoin_nearest(centroid, distance_col="distance_connector")
-    joined = joined.nlargest(connectors, "distance_connector")
+    joined = joined.nsmallest(connectors, "distance_connector")
 
     centr_geo = centroid.geometry.values[0]
     links = network.links
