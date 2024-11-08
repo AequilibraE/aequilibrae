@@ -11,7 +11,7 @@ from setuptools.discovery import FlatLayoutPackageFinder
 
 # When updating the version, one must also update the docs/source/_static/switcher.json file
 version = 1.1
-minor_version = 2
+minor_version = 3
 
 release_version = f"{version}.{minor_version}"
 
