@@ -116,7 +116,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
         w = path_finding(origin_index,
                          destinations,
-                         zones,  # destination index to disable early exit
+                         zones,
                          g_view,
                          b_nodes_view,
                          graph_fs_view,
