@@ -38,7 +38,7 @@ class TestTransitGraphBuilder(TestCase):
     def tearDown(self) -> None:
         self.project.close()
 
-    def test_create_line_gemoetry(self):
+    def test_create_line_geometry(self):
         self.project.network.build_graphs()
         for connector_method in ["overlapping_regions", "nearest_neighbour"]:
             for method in ["connector project match", "direct"]:

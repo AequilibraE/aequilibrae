@@ -12,11 +12,15 @@ from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.utils.db_utils import read_and_close
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 import sqlite3
 import pandas as pd
 
 
-class Transit:
+class Transit(WorkerThread):
+
+    transit = SIGNAL(object)
     default_capacities = {
         0: [150, 300],  # Tram, Streetcar, Light rail
         1: [280, 560],  # Subway/metro
@@ -38,6 +42,7 @@ class Transit:
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
         """
+        WorkerThread.__init__(self, None)
 
         self.project_base_path = project.project_base_path
         self.logger = logger
@@ -71,6 +76,9 @@ class Transit:
             capacities=self.default_capacities,
             pces=self.default_pces,
         )
+
+        gtfs.signal = self.transit
+        gtfs.gtfs_data.signal = self.transit
         return gtfs
 
     def create_transit_database(self):

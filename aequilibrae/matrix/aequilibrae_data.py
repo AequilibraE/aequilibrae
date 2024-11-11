@@ -2,8 +2,10 @@ import os
 import sqlite3
 import tempfile
 import uuid
+import warnings
 
 import numpy as np
+import pandas as pd
 from numpy.lib.format import open_memmap
 
 MEMORY = 1
@@ -12,11 +14,11 @@ data_export_types = ["aed", "csv", "sqlite"]
 
 
 class AequilibraeData(object):
-    """AequilibraE dataset
+    """AequilibraE dataset. This is deprecated in favor of Pandas DataFrames
 
     .. code-block:: python
 
-        >>> from aequilibrae.matrix import AequilibraeData
+        >>> from aequilibrae.matrix.aequilibrae_data import AequilibraeData
 
         >>> args = {"file_path": os.path.join(my_folder_path, "vectors.aed"),
         ...         "entries": 3,
@@ -160,6 +162,15 @@ class AequilibraeData(object):
         self.num_fields = len(self.fields)
         self.data_types = [self.data[x].dtype.type for x in self.fields]
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Converts the dataset to a Pandas DataFrame
+
+        :Returns:
+            **data** (:obj:`pd.DataFrame`): Pandas DataFrame with the dataset
+        """
+        return pd.DataFrame(self.data, index=self.index)
+
     def export(self, file_name, table_name="aequilibrae_table"):
         """
         Exports the dataset to another format. Supports CSV and SQLite
@@ -169,7 +180,7 @@ class AequilibraeData(object):
 
             **table_name** (:obj:`str`): It only applies if you are saving to an SQLite table. Otherwise ignored
         """
-
+        DeprecationWarning("This method is deprecated and will be removed in the future. Use Pandas DataFrames instead")
         file_type = os.path.splitext(file_name)[1]
         headers = ["index"]
         headers.extend(self.fields)
@@ -222,7 +233,7 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            >>> from aequilibrae.matrix import AequilibraeData
+            >>> from aequilibrae.matrix.aequilibrae_data import AequilibraeData
 
             >>> dataset = AequilibraeData()
             >>> dataset.random_name() # doctest: +ELLIPSIS

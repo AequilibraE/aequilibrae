@@ -41,7 +41,7 @@ CREATE TABLE  if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                    CHECK(TYPEOF(b_node) == 'integer')
                                    CHECK(TYPEOF(direction) == 'integer')
                                    CHECK(LENGTH(modes)>0)
-                                   CHECK(LENGTH(direction)==1));
+                                   CHECK(direction IN (-1, 0, 1)));
 
 --#
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);

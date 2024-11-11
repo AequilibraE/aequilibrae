@@ -113,7 +113,14 @@ class Node(SafeClass):
         sql = f"Update Nodes set {txts}"
         return data, sql
 
-    def connect_mode(self, area: Polygon, mode_id: str, link_types="", connectors=1, conn: Optional[Connection] = None):
+    def connect_mode(
+        self,
+        mode_id: str,
+        link_types="",
+        connectors=1,
+        conn: Optional[Connection] = None,
+        area: Optional[Polygon] = None,
+    ):
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
@@ -129,7 +136,6 @@ class Node(SafeClass):
         If fewer candidates than required connectors are found, all candidates are connected.
 
         :Arguments:
-            **area** (:obj:`Polygon`): Initial area where AequilibraE will look for nodes to connect
 
             **mode_id** (:obj:`str`): Mode ID we are trying to connect
 
@@ -137,20 +143,21 @@ class Node(SafeClass):
             be considered. eg: yCdR. Defaults to ALL link types
 
             **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
+
+            **area** (:obj:`Polygon`, *Optional*): Area limiting the search for connectors
         """
         if self.is_centroid != 1 or self.__original__["is_centroid"] != 1:
             self._logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
         connector_creation(
-            area,
-            self.node_id,
-            self.__srid__,
-            mode_id,
+            zone_id=self.node_id,
+            mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
             network=self.project.network,
             conn_=conn,
+            delimiting_area=area,
         )
 
     def __setattr__(self, instance, value) -> None:

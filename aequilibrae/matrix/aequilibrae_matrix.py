@@ -283,8 +283,8 @@ class AequilibraeMatrix(object):
 
     def create_from_omx(
         self,
-        file_path: str,
         omx_path: str,
+        file_path: str = None,
         cores: List[str] = None,
         mappings: List[str] = None,
         robust: bool = True,
@@ -295,9 +295,9 @@ class AequilibraeMatrix(object):
         Creates an AequilibraeMatrix from an original OpenMatrix
 
         :Arguments:
-            **file_path** (:obj:`str`): Path for the output AequilibraeMatrix
-
             **omx_path** (:obj:`str`): Path to the OMX file one wants to import
+
+            **file_path** (:obj:`str`, *Optional*): Path for the output AequilibraeMatrix
 
             **cores** (:obj:`list`, *Optional*): List of matrix cores to be imported
 

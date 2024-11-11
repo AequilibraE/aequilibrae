@@ -23,23 +23,25 @@ from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
-class Network:
+class Network(WorkerThread):
     """
     Network class. Member of an AequilibraE Project
     """
-
-    netsignal = SIGNAL(object)
 
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
     protected_fields = protected_fields
     link_types: LinkTypes = None
+    signal = SIGNAL(object)
 
     def __init__(self, project) -> None:
+        WorkerThread.__init__(self, None)
         from aequilibrae.paths import Graph
 
         self.graphs = {}  # type: Dict[Graph]
@@ -211,13 +213,13 @@ class Network:
                         polygons.append(subarea)
         self.logger.info("Downloading data")
         dwnloader = OSMDownloader(polygons, modes, logger=self.logger)
-        dwnloader.downloading = self.netsignal
+        dwnloader.signal = self.signal
         dwnloader.doWork()
 
         self.logger.info("Building Network")
         self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
 
-        self.builder.building = self.netsignal
+        self.builder.signal = self.signal
         self.builder.doWork()
 
         self.logger.info("Network built successfully")

@@ -90,18 +90,16 @@ class Zone(SafeClass):
             data = [self.zone_id, point.wkb, self.__srid__]
             conn.execute(sql, data)
 
-    def connect_mode(self, mode_id: str, link_types="", connectors=1, conn: Optional[Connection] = None) -> None:
+    def connect_mode(
+        self, mode_id: str, link_types="", connectors=1, conn: Optional[Connection] = None, limit_to_zone=True
+    ) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
         all those that satisfy the mode and link_types criteria and are inside the zone.
 
-        The selection of the nodes that will be connected is done simply by computing running the
-        `KMeans2 <https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.vq.kmeans2.html>`_
-        clustering algorithm from SciPy and selecting the nodes closest to each cluster centroid.
-
-        When there are no node candidates inside the zone, the search area is progressively expanded until
-        at least one candidate is found.
+        The selection of the nodes that will be connected is done simply by searching for the node closest to the
+        zone centroid, or the N closest nodes to the centroid.
 
         If fewer candidates than required connectors are found, all candidates are connected.
 
@@ -112,16 +110,21 @@ class Zone(SafeClass):
             eg: yCdR. Defaults to ALL link types
 
             **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
+
+            **conn** (:obj:`sqlite3.Connection`, *Optional*): Connection to the database.
+
+            **limit_to_zone** (:obj:`bool`): Limits the search for nodes inside the zone. Defaults to ``True``.
         """
+
+        area = self.geometry if limit_to_zone else None
         connector_creation(
-            self.geometry,
             zone_id=self.zone_id,
-            srid=self.__srid__,
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
             network=self.project.network,
             conn_=conn,
+            delimiting_area=area,
         )
 
     def disconnect_mode(self, mode_id: str) -> None:

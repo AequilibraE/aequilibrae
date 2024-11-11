@@ -1,18 +1,17 @@
-import glob
 import logging
 import os
-import tempfile
 from datetime import datetime
 from time import perf_counter
 from uuid import uuid4
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.matrix import AequilibraeMatrix
 
 
 class GravityApplication:
@@ -22,11 +21,11 @@ class GravityApplication:
 
     Impedance is an instance of AequilibraEMatrix.
 
-    Row and Column vectors are instances of AequilibraeData.
+    Vectors are a pandas DataFrame.
 
     .. code-block:: python
 
-        >>> from aequilibrae.matrix import AequilibraeData
+        >>> import pandas as pd
         >>> from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
 
         >>> project = create_example(project_path)
@@ -50,36 +49,21 @@ class GravityApplication:
         >>> query = "SELECT zone_id, population, employment FROM zones;"
         >>> df = pd.read_sql(query, project.conn)
         >>> df.sort_values(by="zone_id", inplace=True)
+        >>> df.set_index("zone_id", inplace=True)
 
         # You create the vectors you would have
-        >>> df = df.assign(production=df.population * 3.0)
-        >>> df = df.assign(attraction=df.employment * 4.0)
-
-        >>> zones = df.index.shape[0]
-
-        # We create the vector database
-        >>> args = {"entries": zones,
-        ...         "field_names": ["productions", "attractions"],
-        ...         "data_types": [np.float64, np.float64],
-        ...         "memory_mode": True}
-
-        >>> vectors = AequilibraeData()
-        >>> vectors.create_empty(**args)
-
-        # Assign the data to the vector object
-        >>> vectors.productions[:] = df.production.values[:]
-        >>> vectors.attractions[:] = df.attraction.values[:]
-        >>> vectors.index[:] = df.zone_id.values[:]
+        >>> df = df.assign(productions=df.population * 3.0)
+        >>> df = df.assign(attractions=df.employment * 4.0)
+        >>> vectors = df[["productions", "attractions"]]
 
         # Balance the vectors
-        >>> vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
+        >>> vectors.loc[:, "attractions"] *= vectors["productions"].sum() / vectors["attractions"].sum()
 
         # Create the problem object
         >>> args = {"impedance": matrix,
-        ...         "rows": vectors,
+        ...         "vectors": vectors,
         ...         "row_field": "productions",
         ...         "model": model,
-        ...         "columns": vectors,
         ...         "column_field": "attractions",
         ...         "output": os.path.join(project_path, 'matrices/gravity_matrix.aem'),
         ...         "nan_as_zero":True
@@ -100,11 +84,9 @@ class GravityApplication:
 
             **impedance** (:obj:`AequilibraeMatrix`): Impedance matrix to be used
 
-            **rows** (:obj:`AequilibraeData`): Vector object with data for row totals
+            **vectors** (:obj:`pd.DataFrame`): Dataframe with data for row and column totals
 
             **row_field** (:obj:`str`): Field name that contains the data for the row totals
-
-            **columns** (:obj:`AequilibraeData`): Vector object with data for column totals
 
             **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
@@ -131,11 +113,10 @@ class GravityApplication:
 
         self.parameters = kwargs.get("parameters", self.__get_parameters())
 
-        self.rows = kwargs.get("rows")
-        self.row_field = kwargs.get("row_field", None)
+        self.vectors = kwargs.get("vectors")
+        self.rows_ = kwargs.get("row_field", None)
 
-        self.columns = kwargs.get("columns")
-        self.column_field = kwargs.get("column_field", None)
+        self.cols_ = kwargs.get("column_field", None)
 
         self.impedance = kwargs.get("impedance")  # type: AequilibraeMatrix
         self.model = kwargs.get("model")  # type: SyntheticGravityModel
@@ -176,16 +157,15 @@ class GravityApplication:
             self.output.matrix_view[:, :] = a * self.output.matrix_view[:, :]
 
         # We adjust the total of the self.output
-        total_factor = np.nansum(self.rows.data[self.row_field]) / np.nansum(self.output.matrix_view[:, :])
+        total_factor = np.nansum(self.vectors[self.rows_]) / np.nansum(self.output.matrix_view[:, :])
         self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * total_factor
 
         # And adjust with a fratar
         self.__ipf = Ipf(
             matrix=self.output,
-            rows=self.rows,
-            columns=self.columns,
-            column_field=self.column_field,
-            row_field=self.row_field,
+            vectors=self.vectors,
+            column_field=self.cols_,
+            row_field=self.rows_,
             nan_as_zero=self.nan_as_zero,
         )
 
@@ -205,12 +185,6 @@ class GravityApplication:
         intrazonals = float(np.nansum(np.diagonal(self.output.matrix_view)))
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
         self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
-
-        for i in glob.glob(tempfile.gettempdir() + "*.aem"):
-            try:
-                os.unlink(i)
-            except PermissionError as err:
-                self.logger.warning(f"Could not remove {err.filename}")
 
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the matrix output to the project file
@@ -258,20 +232,13 @@ class GravityApplication:
 
         # check dimensions
         # check data types
-        if not isinstance(self.rows, AequilibraeData):
-            raise TypeError("Row vector needs to be an instance of AequilibraeData")
-
-        if not isinstance(self.columns, AequilibraeData):
-            raise TypeError("Column vector needs to be an instance of AequilibraeData")
+        if not isinstance(self.vectors, pd.DataFrame):
+            raise TypeError("Row vector needs to be a Pandas DataFrame")
 
         if not isinstance(self.impedance, AequilibraeMatrix):
             raise TypeError("Impedance matrix needs to be an instance of AequilibraeMatrix")
 
-        # Check data dimensions
-        if not np.array_equal(self.rows.index, self.columns.index):
-            raise ValueError("Indices from row vector do not match those from column vector")
-
-        if not np.array_equal(self.impedance.index, self.columns.index):
+        if not np.array_equal(self.impedance.index, self.vectors.index):
             raise ValueError("Indices from vectors do not match those from seed matrix")
 
         # Check if matrix was set for computation
@@ -282,13 +249,13 @@ class GravityApplication:
                 raise ValueError("Matrix' computational view needs to be set for a single matrix core")
 
         # check balancing:
-        sum_rows = np.nansum(self.rows.data[self.row_field])
-        sum_cols = np.nansum(self.columns.data[self.column_field])
+        sum_rows = np.nansum(self.vectors[self.rows_])
+        sum_cols = np.nansum(self.vectors[self.cols_])
         if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
             raise ValueError("Vectors are not balanced")
         else:
             # guarantees that they are precisely balanced
-            self.columns.data[self.column_field][:] = self.columns.data[self.column_field][:] * (sum_rows / sum_cols)
+            self.vectors.loc[:, self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
 
         self.__check_parameters()
 
@@ -303,9 +270,9 @@ class GravityApplication:
 
     def __apply_function(self):
         self.core_name = self.output.view_names[0]
-        for i in range(self.rows.entries):
-            p = self.rows.data[self.row_field][i]
-            a = self.columns.data[self.column_field][:]
+        for i in range(self.vectors.shape[0]):
+            p = self.vectors[self.rows_].values[i]
+            a = self.vectors[self.cols_].to_numpy()
 
             if self.model.function == "EXPO":
                 self.output.matrix_view[i, :] = np.exp(-self.model.beta * self.impedance.matrix_view[i, :]) * p * a

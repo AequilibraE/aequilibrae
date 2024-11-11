@@ -159,8 +159,7 @@ html_title = f"AequilibraE {version}"
 htmlhelp_basename = "AequilibraEdoc"
 
 # -- Options for LaTeX output ------------------------------------------------
-
-latex_elements = {}
+# latex_elements = {}
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto, manual, or own class]).

@@ -12,23 +12,27 @@ try:
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 if False:
     from .results import AssignmentResults
     from .graph import Graph
 
 
-class allOrNothing:
+class allOrNothing(WorkerThread):
+    signal = SIGNAL(object)
+
     def __init__(self, class_name, matrix, graph, results):
-        # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
-        self.assignment: SIGNAL = None
+        # type: (str, AequilibraeMatrix, Graph, AssignmentResults)->None
+        WorkerThread.__init__(self, None)
 
         self.class_name = class_name
         self.matrix = matrix
         self.graph = graph
         self.results = results
         self.aux_res = MultiThreadedAoN()
+        self.signal.emit(["start", self.matrix.zones, self.class_name])
 
         if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -42,16 +46,12 @@ class allOrNothing:
         elif not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
-    def _build_signal(self):
-        if self.assignment is None:
-            self.assignment = SIGNAL(object)
-            self.assignment.emit(["start", self.matrix.zones, self.class_name])
-
     def doWork(self):
         self.execute()
 
     def execute(self):
-        self._build_signal()
+        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
+        self.signal.emit(["set_text", msg])
         self.report = []
         self.cumulative = 0
         self.aux_res.prepare(self.graph, self.results)
@@ -70,7 +70,9 @@ class allOrNothing:
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
-        self.assignment.emit(["update", self.matrix.index.shape[0], self.class_name])
+        val = self.matrix.index.shape[0]
+        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {val}/{self.matrix.zones}"
+        self.signal.emit(["set_text", msg])
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
@@ -89,4 +91,5 @@ class allOrNothing:
         if x != origin:
             self.report.append(x)
         if self.cumulative % 10 == 0:
-            self.assignment.emit(["update", self.cumulative, self.class_name])
+            msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
+            self.signal.emit(["set_text", msg])

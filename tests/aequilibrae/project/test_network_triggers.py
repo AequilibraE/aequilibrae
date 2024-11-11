@@ -3,6 +3,7 @@ from tempfile import gettempdir
 import os
 import uuid
 from shutil import copytree
+import sqlite3
 from aequilibrae.project import Project
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from ...data import siouxfalls_project
@@ -67,3 +68,26 @@ class TestNetworkTriggers(TestCase):
         curr.execute("Update nodes set is_centroid=0 where node_id=?", data[:1])
         self.siouxfalls.conn.commit()
         self.assertEqual(nodes, network.count_nodes(), "Failed to delete node when changing centroid flag")
+
+    def test_link_direction(self):
+        curr = self.siouxfalls.conn.cursor()
+        network = self.siouxfalls.network
+        links = network.count_links()
+
+        sql = "UPDATE links SET direction=-2 WHERE link_id=1;"
+        with self.assertRaises(sqlite3.IntegrityError):
+            curr.execute(sql)
+
+        data = [987654, 2, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb]
+        sql = "insert into links (link_id, direction, modes, link_type, geometry) Values(?,?,?,?,GeomFromWKB(?, 4326));"
+        with self.assertRaises(sqlite3.IntegrityError):
+            curr.execute(sql, data)
+
+        data = [
+            (987654, -1, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb),
+            (876543, 0, "c", "default", LineString([Point(1, 0), Point(1, 1)]).wkb),
+            (765432, 1, "c", "default", LineString([Point(1, 1), Point(0, 1)]).wkb),
+        ]
+        curr.executemany(sql, data)
+        self.siouxfalls.conn.commit()
+        self.assertEqual(network.count_links(), links + 3, "Failed when adding new links to the project.")

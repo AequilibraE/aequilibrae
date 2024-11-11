@@ -26,18 +26,19 @@ The data used in this example comes from Table 5.6 in
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.matrix.AequilibraeMatrix`
-#     * :func:`aequilibrae.matrix.AequilibraeData`
 #     * :func:`aequilibrae.distribution.Ipf`
 
 # %%
 
 # Imports
-import numpy as np
 from os.path import join
 from tempfile import gettempdir
 
+import numpy as np
+import pandas as pd
+
 from aequilibrae.distribution import Ipf
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.matrix import AequilibraeMatrix
 # sphinx_gallery_thumbnail_path = 'images/ipf.png'
 
 # %%
@@ -66,20 +67,12 @@ args = {
     "file_path": join(folder, "vectors.aem"),
 }
 
-vectors = AequilibraeData()
-vectors.create_empty(**args)
-
-vectors.productions[:] = future_prod[:]
-vectors.attractions[:] = future_attr[:]
-
-vectors.index[:] = mtx.index[:]
-
+vectors = pd.DataFrame({"productions": future_prod, "attractions":future_attr}, index=mtx.index)
 # %%
 args = {
     "matrix": mtx,
-    "rows": vectors,
+    "vectors": vectors,
     "row_field": "productions",
-    "columns": vectors,
     "column_field": "attractions",
     "nan_as_zero": True,
 }

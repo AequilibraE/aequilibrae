@@ -22,17 +22,17 @@ from shapely import Polygon
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .osm_params import http_headers, memory
 
 
-class OSMDownloader:
-    downloading = SIGNAL(object)
-
-    def __emit_all(self, *args):
-        self.downloading.emit(*args)
+class OSMDownloader(WorkerThread):
+    signal = SIGNAL(object)
 
     def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
+        WorkerThread.__init__(self, None)
+
         self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
@@ -52,16 +52,11 @@ class OSMDownloader:
             "{memory}[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        self.__emit_all(["maxValue", len(self.polygons)])
-        self.__emit_all(["Value", 0])
         m = ""
         if memory > 0:
             m = f"[maxsize: {memory}]"
-        for counter, poly in enumerate(self.polygons):
-            msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
-            self.logger.info(msg)
-            self.__emit_all(["Value", counter])
-            self.__emit_all(["text", msg])
+        msg = f"Total polygons: {len(self.polygons)}"
+        for poly in simple_progress(self.polygons, self.signal, msg):
             west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
@@ -83,8 +78,7 @@ class OSMDownloader:
                 del json
                 gc.collect()
 
-        self.__emit_all(["Value", len(self.polygons)])
-        self.__emit_all(["text", "Downloading finished. Processing data"])
+        self.signal.emit(["set_text", "Downloading finished. Processing data"])
         for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
             df = pd.DataFrame([])
             if len(lst) > 0:
@@ -95,7 +89,7 @@ class OSMDownloader:
             lst.clear()
             gc.collect()
 
-        self.__emit_all(["FinishedDownloading", 0])
+        self.signal.emit(["finished"])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """Send a request to the Overpass API via HTTP POST and return the JSON response.

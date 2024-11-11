@@ -4,11 +4,12 @@ from time import perf_counter
 from uuid import uuid4
 
 import numpy as np
+import pandas as pd
 import yaml
 from aequilibrae.distribution.ipf_core import ipf_core
 
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
 
 
@@ -18,31 +19,22 @@ class Ipf:
     .. code-block:: python
 
         >>> from aequilibrae.distribution import Ipf
-        >>> from aequilibrae.matrix import AequilibraeData
+        >>> import pandas as pd
+        >>> import numpy as np
 
         >>> project = create_example(project_path)
 
         >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
 
-        >>> dataset_args = {"entries": matrix.zones,
-        ...                 "field_names": ["productions", "attractions"],
-        ...                 "data_types": [np.float64, np.float64],
-        ...                 "memory_mode": True}
+        >>> vectors = pd.DataFrame({"productions":np.zeros(matrix.zones), "attractions":np.zeros(matrix.zones)}, index=matrix.index)
 
-        >>> vectors = AequilibraeData()
-        >>> vectors.create_empty(**dataset_args)
-
-        >>> vectors.productions[:] = matrix.rows()[:]
-        >>> vectors.attractions[:] = matrix.columns()[:]
-
-        # We assume that the indices would be sorted and that they would match the matrix indices
-        >>> vectors.index[:] = matrix.index[:]
+        >>> vectors["productions"] = matrix.rows()
+        >>> vectors["attractions"] = matrix.columns()
 
         >>> ipf_args = {"matrix": matrix,
-        ...             "rows": vectors,
+        ...             "vectors": vectors,
         ...             "row_field": "productions",
-        ...             "columns": vectors,
         ...             "column_field": "attractions",
         ...             "nan_as_zero": False}
 
@@ -51,7 +43,6 @@ class Ipf:
 
         # We can get back to our OMX matrix in the end
         >>> fratar.output.export(os.path.join(my_folder_path, "to_omx_output.omx"))
-        >>> fratar.output.export(os.path.join(my_folder_path, "to_omx_output.aem"))
     """
 
     def __init__(self, project=None, **kwargs):
@@ -61,11 +52,9 @@ class Ipf:
         :Arguments:
             **matrix** (:obj:`AequilibraeMatrix`): Seed Matrix
 
-            **rows** (:obj:`AequilibraeData`): Vector object with data for row totals
+            **vectors** (:obj:`pd.DataFrame`): Dataframe with the vectors to be used for the IPF
 
             **row_field** (:obj:`str`): Field name that contains the data for the row totals
-
-            **columns** (:obj:`AequilibraeData`): Vector object with data for column totals
 
             **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
@@ -90,13 +79,12 @@ class Ipf:
         self.nan_as_zero = kwargs.get("nan_as_zero", True)
 
         # row vector
-        self.rows = kwargs.get("rows", None)
-        self.row_field = kwargs.get("row_field", None)
-        self.output_name = kwargs.get("output", AequilibraeMatrix().random_name())
-
-        # Column vector
-        self.columns = kwargs.get("columns", None)
-        self.column_field = kwargs.get("column_field", None)
+        self.__col_vector: np.array = np.zeros([])
+        self.__row_vector: np.array = np.zeros([])
+        self.vectors = kwargs.get("vectors", None)
+        self.rows_ = kwargs.get("row_field", None)
+        self.cols_ = kwargs.get("column_field", None)
+        self.output_name = kwargs.get("output")
 
         self.output = AequilibraeMatrix()
         self.error = None
@@ -108,15 +96,11 @@ class Ipf:
         self.procedure_id = ""
 
     def __check_data(self):
-        self.error = None
         self.__check_parameters()
 
         # check data types
-        if not isinstance(self.rows, AequilibraeData):
-            raise TypeError("Row vector needs to be an instance of AequilibraeData")
-
-        if not isinstance(self.columns, AequilibraeData):
-            raise TypeError("Column vector needs to be an instance of AequilibraeData")
+        if not isinstance(self.vectors, pd.DataFrame):
+            raise TypeError("Row vector needs to be a Pandas DataFrame")
 
         if not isinstance(self.matrix, AequilibraeMatrix):
             raise TypeError("Seed matrix needs to be an instance of AequilibraeMatrix")
@@ -125,20 +109,16 @@ class Ipf:
         if not np.issubdtype(self.matrix.dtype, np.floating):
             raise ValueError("Seed matrix need to be a float type")
 
-        row_data = self.rows.data
-        col_data = self.columns.data
+        row_data = self.vectors[self.rows_]
+        col_data = self.vectors[self.cols_]
 
-        if not np.issubdtype(row_data[self.row_field].dtype, np.floating):
+        if not np.issubdtype(row_data.dtype, np.floating):
             raise ValueError("production/rows vector must be a float type")
 
-        if not np.issubdtype(col_data[self.column_field].dtype, np.floating):
+        if not np.issubdtype(col_data.dtype, np.floating):
             raise ValueError("Attraction/columns vector must be a float type")
 
-        # Check data dimensions
-        if not np.array_equal(self.rows.index, self.columns.index):
-            raise ValueError("Indices from row vector do not match those from column vector")
-
-        if not np.array_equal(self.matrix.index, self.columns.index):
+        if not np.array_equal(self.matrix.index, self.vectors.index):
             raise ValueError("Indices from vectors do not match those from seed matrix")
 
         # Check if matrix was set for computation
@@ -148,18 +128,16 @@ class Ipf:
             if len(self.matrix.matrix_view.shape[:]) > 2:
                 raise ValueError("Matrix' computational view needs to be set for a single matrix core")
 
-        if self.error is None:
-            # check balancing:
-            sum_rows = np.nansum(row_data[self.row_field])
-            sum_cols = np.nansum(col_data[self.column_field])
-            if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
-                self.error = "Vectors are not balanced"
-            else:
-                # guarantees that they are precisely balanced
-                col_data[self.column_field][:] = col_data[self.column_field][:] * (sum_rows / sum_cols)
-
-        if self.error is not None:
-            self.error_free = False
+        # check balancing:
+        sum_rows = np.nansum(row_data)
+        sum_cols = np.nansum(col_data)
+        self.__col_vector = col_data.to_numpy() * (sum_rows / sum_cols)
+        self.__row_vector = row_data.to_numpy()
+        if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
+            self.error = "Vectors are not balanced"
+        else:
+            # guarantees that they are precisely balanced
+            self.__col_vector = col_data.to_numpy() * (sum_rows / sum_cols)
 
     def __check_parameters(self):
         for i in self.__required_parameters:
@@ -185,35 +163,35 @@ class Ipf:
 
             if self.matrix.is_omx():
                 self.output = AequilibraeMatrix()
-                self.output.create_from_omx(
-                    self.output.random_name(), self.matrix.file_path, cores=self.matrix.view_names
-                )
+                self.output.create_from_omx(omx_path=self.matrix.file_path, cores=self.matrix.view_names)
                 self.output.computational_view()
             else:
-                self.output = self.matrix.copy(self.output_name, memory_only=True)
+                self.output = self.matrix.copy(self.output_name)
             if self.nan_as_zero:
                 self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
 
-            rows = self.rows.data[self.row_field]
-            columns = self.columns.data[self.column_field]
             tot_matrix = np.nansum(self.output.matrix_view[:, :])
 
             # Reporting
             self.report.append("Target convergence criteria: " + str(conv_criteria))
             self.report.append("Maximum iterations: " + str(max_iter))
             self.report.append("")
-            self.report.append("Rows:" + str(self.rows.entries))
-            self.report.append("Columns: " + str(self.columns.entries))
+            self.report.append(f"Rows/columns: {self.vectors.shape[0]}")
 
             self.report.append("Total of seed matrix: " + "{:28,.4f}".format(float(tot_matrix)))
-            self.report.append("Total of target vectors: " + "{:25,.4f}".format(float(np.nansum(rows))))
+            self.report.append("Total of target vectors: " + "{:25,.4f}".format(float(np.nansum(self.__row_vector))))
             self.report.append("")
             self.report.append("Iteration,   Convergence")
             self.gap = conv_criteria + 1
 
             seed = np.array(self.output.matrix_view[:, :], copy=True)
             iter, self.gap = ipf_core(
-                seed, rows, columns, max_iterations=max_iter, tolerance=conv_criteria, cores=self.cpus
+                seed,
+                self.__row_vector,
+                self.__col_vector,
+                max_iterations=max_iter,
+                tolerance=conv_criteria,
+                cores=self.cpus,
             )
             self.output.matrix_view[:, :] = seed[:, :]
 

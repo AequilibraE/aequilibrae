@@ -10,20 +10,20 @@ AequilibraE and lists the requirements for all pull requests to be merged into m
 Software Design and requirements
 --------------------------------
 
-The most important piece of AequilibraE's backend is, without a doubt, `numpy <http://numpy.org>`__.
+The most important piece of AequilibraE's backend is, without a doubt, `NumPy <http://numpy.org>`__.
 
 Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
 accelerate computation. All compiled code is written in `Cython <https://cython.org/>`_.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
-found in `this article. <http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.1001745>`__
+found in `this article <http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.1001745>`_.
 
 Development Install
 -------------------
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.9, 3.10, 3.11 & 3.12, but we recommend using Python 3.9 or 2.10 for 
+AequilibraE is currently tested for Python 3.9, 3.10, 3.11 & 3.12, but we recommend using Python 3.11 or 3.12 for 
 development.
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or 
@@ -40,11 +40,11 @@ Non-Windows
 Windows
 ~~~~~~~
 
-Make sure to clone the AequilibraE repository and run the following from withinthat cloned repo using an elevated command prompt.
+Make sure to clone the AequilibraE repository and run the following from within that cloned repo using an elevated command prompt.
 
-Python 3.9 (or whatever version you chose) needs to be installed, and the
-following instructions assume you are using `Chocolatey
-<https://chocolatey.org/>`_ as a package manager.
+Python 3.12 (or whatever version you chose) needs to be installed, and the following instructions assume you are 
+using `Chocolatey <https://chocolatey.org/>`_ as a package manager.
+
 ::
 
     cinst python3 --version 3.9
@@ -62,7 +62,6 @@ Setup Pycharm with the virtual environment you just created.
 
     Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
 
-
 Development Guidelines
 -----------------------
 
@@ -74,8 +73,8 @@ Style
 
 * Python code should follow (mostly) the `pycodestyle style guide <https://pypi.python.org/pypi/pycodestyle>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/dev/peps/pep-0287/>`_
-* We are big fans of auto-code formatting. 
-  For that, we use `Black <https://black.readthedocs.io/en/stable/index.html/>`_
+* We are big fans of auto-code formatting. For that, we use `ruff <https://pypi.org/project/ruff/>`_ and 
+  `Black <https://black.readthedocs.io/en/stable/index.html/>`_.
 * Negating some of what we have said so far, we use maximum line length of 120 characters
 
 Imports
@@ -138,22 +137,24 @@ AequilibraE uses the de-facto Python standard for `versioning
 - MAJOR designates a major revision number for the software. Usually, raising a major revision number means that
   you are adding a lot of features, breaking backward-compatibility or drastically changing the API.
 
-- MINOR usually groups moderate changes to the software like bug fixes or minor improvements. Most of the time, end \
-  users can upgrade with no risks their software to a new minor release. In case an API changes, the end users will be \
+- MINOR usually groups moderate changes to the software like bug fixes or minor improvements. Most of the time, end
+  users can upgrade with no risks their software to a new minor release. In case an API changes, the end users will be
   notified with deprecation warnings. In other words, API stability is usually a promise between two minor releases.
 
 - Some software use a third level: MICRO. This level is used when the release cycle of minor release is quite long.
   In that case, micro releases are dedicated to bug fixes.
 
-AequilibraE's development is happening mostly within the Minor and Micro levels, as we are still in version 0
+AequilibraE's development is happening mostly within the Minor and Micro levels.
 
 Testing
 ~~~~~~~~
 
-AequilibraE testing is done with three tools:
+AequilibraE style checking is done with two tools:
 
-* `Flake8 <https://pypi.org/project/flake8/>`_, a tool to check Python code style
+* `ruff <https://pypi.org/project/ruff/>`_, a tool to check Python code style
 * `Black <https://black.readthedocs.io/en/stable/index.html/>`_, The uncompromising code formatter
+
+And testing is done using `pytest <https://pypi.org/project/pytest/>`_.
 
 Testing is done for Windows, MacOs and Ubuntu Linux on all supported Python versions, and we use GitHub Actions
 to run these tests. These tests need to pass and additionally somebody has to
@@ -164,16 +165,17 @@ are now the correct results.  In order to update the test targets, first determi
 failing and then review the failing lines in the source files.  These are easy to identify since each 
 test ultimately comes down to one of Python's various types of ``assert`` statements.  Once you identify 
 which ``assert`` is failing, you can work your way back through the code that creates the test targets in 
-order to update it.  After updating the test targets, re-run the tests to confirm the new code passes all 
+order to update it. After updating the test targets, re-run the tests to confirm the new code passes all 
 the tests.
 
 Documentation
 ~~~~~~~~~~~~~~
 
-All the AequilibraE documentation is (unfortunately) written in `reStructuredText
-<http://docutils.sourceforge.net/rst.html>`__  and built with `Sphinx <http://www.sphinx-doc.org/en/stable/>`__.
-Although Restructured Text is often unnecessarily convoluted to write, Sphinx is capable of converting it to standard-
-looking html pages, while also bringing the docstring documentation along for the ride.
+All the AequilibraE documentation is (unfortunately) written in 
+`reStructuredText <http://docutils.sourceforge.net/rst.html>`_  and built with 
+`Sphinx <http://www.sphinx-doc.org/en/stable/>`_.
+Although reStructuredText is often unnecessarily convoluted to write, Sphinx is capable of converting it to standard-
+looking HTML pages, while also bringing the docstring documentation along for the ride.
 
 To build the documentation, first make sure the required packages are installed. If you have correctly setup the dev
 environment above, then nothing else is needed. However, if you have incorrectly only run::
@@ -184,21 +186,52 @@ Then you will have to run::
 
     python -m pipenv install --dev
 
-
 Next, build the documentation in html format with the following commands run from the ``root`` folder::
 
     sphinx-apidoc -T -o docs/source/generated aequilibrae
     cd docs
     make html
 
+Working with progress bars
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From version 1.1.0, AequilibraE is capable of displaying progress bars in Jupyter Notebooks using 
+`TQDM <https://tqdm.github.io/>`_. For the companion QGIS plugin, `PyQt5 <https://doc.qt.io/qtforpython-5/>`_
+is used to emit messages in progress bars.
+ 
+AequilibraE provides a wrapper class `SIGNAL` that will use the appropriate underlying mechanism to display 
+the progress bars.
+
+.. code-block:: python
+
+    from aequilibrae.utils.signal import SIGNAL
+
+    class MyClass:
+      signal = SIGNAL(object)
+
+      def my_method(self):
+        signal.emit(['start', 10, 'running my method']) 
+        for i in range(0, 10):
+           signal.emit(['update', i, f"Current val: {i}"])
+           sleep(0.4)
+
+
+Calling `MyClass().my_method()` will generate a progress bar in the following form (outside QGIS).
+
+.. code-block:: text
+
+    running my method                                 :  30%|█████▍            | 3/10 [00:01<00:02,  2.50it/s]
+
+The full set of emitted signals which can be used to control progress bars is given in `python_signal.py`
+
 Releases
 ~~~~~~~~~
 
-AequilibraE releases are automatically  uploaded to the `Python Package Index
-<https://pypi.python.org/pypi/aequilibrae>`_ (pypi) at each new GitHub release (2 to 6 times per year).
+AequilibraE releases are automatically uploaded to the `Python Package Index
+<https://pypi.python.org/pypi/aequilibrae>`_ (PyPi) at each new GitHub release (2 to 6 times per year).
 
 Acknowledgement
 ~~~~~~~~~~~~~~~
 
 A LOT of the structure around the documentation was borrowed (copied) from the excellent project `ActivitySim
-<https://activitysim.github.io/>`_
+<https://activitysim.github.io/>`_.

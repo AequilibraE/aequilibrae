@@ -19,17 +19,18 @@ from aequilibrae.paths.traffic_class import TrafficClass
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
-from aequilibrae.utils.signal import SIGNAL
-from aequilibrae.utils.python_signal import PythonSignal
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
-class LinearApproximation:
+class LinearApproximation(WorkerThread):
+    equilibration = SIGNAL(object)
+    assignment = SIGNAL(object)
+    signal = SIGNAL(object)
+
     def __init__(self, assig_spec, algorithm, project=None) -> None:
-        self.equilibration = SIGNAL(object)
-        self.assignment = SIGNAL(object)
-        if isinstance(self.assignment, PythonSignal):
-            self.assignment.pos = 1
-
+        WorkerThread.__init__(self, None)
+        self.signal.emit(["set_text", "Linear Approximation"])
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
         self.project_path = project.project_base_path if project else gettempdir()
@@ -468,28 +469,28 @@ class LinearApproximation:
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self.equilibration.emit(["start", self.max_iter, "Equilibrium Assignment"])
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
-        for self.iter in range(1, self.max_iter + 1):  # noqa: B020
+
+        msg = "Equilibrium Assignment"
+        for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
             self.iteration_issue = []
-            self.equilibration.emit(["key_value", "rgap", self.rgap])
-            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             aon_flows = []
 
             self.__maybe_create_path_file_directories()
 
             for c in self.traffic_classes:  # type: TrafficClass
-                self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
+                msg = f"All-or-Nothing - Traffic Class: {c._id}"
+                self.signal.emit(["set_text", msg])
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
-                self.assignment.emit(["refresh"])
-                self.assignment.emit(["reset"])
-                aon.assignment = self.assignment
+                self.signal.emit(["refresh"])
+                self.signal.emit(["reset"])
+                aon.signal = self.signal
 
                 aon.execute()
                 c._aon_results.link_loads *= c.pce
@@ -574,10 +575,10 @@ class LinearApproximation:
 
             if self.algorithm == "all-or-nothing":
                 break
+
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-            self.equilibration.emit(["update", self.iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
             self.vdf.apply_vdf(
                 self.congested_time,
                 self.fw_total_flow,
@@ -596,8 +597,6 @@ class LinearApproximation:
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
-            self.equilibration.emit(["key_value", "rgap", self.rgap])
-            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             if self.algorithm in ["cfw", "bfw"]:
                 self.convergence_report["beta0"].append(self.betas[0])
@@ -620,6 +619,9 @@ class LinearApproximation:
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
 
+            msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
+            self.signal.emit(["set_text", msg])
+
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
@@ -627,9 +629,7 @@ class LinearApproximation:
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
-        self.equilibration.emit(["update", self.max_iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
-        self.assignment.emit(["finished"])
-        self.equilibration.emit(["finished"])
+        self.signal.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
@@ -715,6 +715,3 @@ class LinearApproximation:
         if self.rgap_target >= self.rgap:
             return True
         return False
-
-    def signal_handler(self, val):
-        self.assignment.emit(val)

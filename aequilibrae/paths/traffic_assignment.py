@@ -14,13 +14,13 @@ from numpy import nan_to_num
 
 from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.utils.core_setter import set_cores
 
 
 class AssignmentBase(ABC):
@@ -410,10 +410,10 @@ class TrafficAssignment(AssignmentBase):
         if not self.classes:
             raise RuntimeError("You need load traffic classes before overwriting the number of cores")
 
-        self.cores = cores
+        self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(cores)
-            c._aon_results.set_cores(cores)
+            c.results.set_cores(self.cores)
+            c._aon_results.set_cores(self.cores)
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -623,45 +623,34 @@ class TrafficAssignment(AssignmentBase):
             "PCE_tot",
         ]
 
-        agg = AequilibraeData.empty(
-            memory_mode=True,
-            entries=res1.data.shape[0],
-            field_names=fields,
-            data_types=[np.float64] * len(fields),
-            fill=np.nan,
-            index=res1.data.index[:],
-        )
+        agg = pd.DataFrame([], columns=fields, index=res1.index[:]).astype(float)
+        agg.fillna(0.0, inplace=True)
 
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
-        agg.data["Preload_AB"][m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
-        agg.data["Preload_BA"][m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
-        agg.data["Preload_tot"][:] = np.nansum([agg.data.Preload_AB, agg.data.Preload_BA], axis=0)
+        agg["Preload_AB"].values[m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
+        agg["Preload_BA"].values[m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
-        agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
-        agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
-        agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
+        agg["Congested_Time_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
+        agg["Congested_Time_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
+        agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        agg.data["Delay_factor_AB"][m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
-        agg.data["Delay_factor_BA"][m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
-        agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
+        agg["Delay_factor_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
+        agg["Delay_factor_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
+        agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
-        agg.data["VOC_AB"][m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
-        agg.data["VOC_BA"][m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
-        agg.data["VOC_max"][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
+        agg["VOC_AB"].values[m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
+        agg["VOC_BA"].values[m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
+        agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
-        agg.data["PCE_AB"][m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
-        agg.data["PCE_BA"][m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
-        agg.data["PCE_tot"][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
+        agg["PCE_AB"].values[m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
+        agg["PCE_BA"].values[m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
+        agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
-
-        dfs = [pd.DataFrame(aed.data) for aed in assig_results]
-        dfs = [df.rename(columns={"index": "link_id"}).set_index("link_id") for df in dfs]
-        df = pd.concat(dfs, axis=1)
-
-        return df
+        return pd.concat(assig_results, axis=1).rename_axis("link_id")
 
     def info(self) -> dict:
         """Returns information for the traffic assignment procedure
@@ -811,15 +800,13 @@ class TrafficAssignment(AssignmentBase):
             # Save OD_matrices
             if cls._selected_links is None:
                 continue
-            df = cls.results.get_sl_results()
             # Create Values table
-            df = pd.DataFrame(df.data)
+            df = cls.results.get_sl_results()
             # Remap the dataframe names to add the prefix classname for each class
             cls_cols = {x: cls._id + "_" + x if (x != "index") else "link_id" for x in df.columns}
             df.rename(columns=cls_cols, inplace=True)
-            df.set_index("link_id", inplace=True)
             class_flows.append(df)
-        return pd.concat(class_flows, axis=1)
+        return pd.concat(class_flows, axis=1).rename_axis("link_id")
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
@@ -927,9 +914,9 @@ class TransitAssignment(AssignmentBase):
         if not self.classes:
             raise RuntimeError("You need load transit classes before overwriting the number of cores")
 
-        self.cores = cores
+        self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(cores)
+            c.results.set_cores(self.cores)
 
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
@@ -1016,9 +1003,7 @@ class TransitAssignment(AssignmentBase):
             **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on *link_id*
         """
         assig_results = [
-            pd.DataFrame(cls.results.get_load_results().data)
-            .rename(columns={"volume": cls._id + "_volume", "index": "link_id"})
-            .set_index("link_id")
+            pd.DataFrame(cls.results.get_load_results()).rename(columns={"volume": cls._id + "_volume"})
             for cls in self.classes
         ]
 

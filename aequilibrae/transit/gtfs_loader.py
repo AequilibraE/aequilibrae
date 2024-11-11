@@ -18,15 +18,18 @@ from aequilibrae.transit.date_tools import to_seconds, create_days_between, form
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
-class GTFSReader:
-    """Loader for GTFS data. Not meant to be used directly by the user"""
-
+class GTFSReader(WorkerThread):
     signal = SIGNAL(object)
 
+    """Loader for GTFS data. Not meant to be used directly by the user"""
+
     def __init__(self):
+        WorkerThread.__init__(self, None)
+
         self.__capacities__ = {}
         self.__pces__ = {}
         self.__max_speeds__ = {}
@@ -90,36 +93,29 @@ class GTFSReader:
         self.logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
 
-        self.signal.emit(["start", 7, "Loading routes"])
         self.__load_routes_table()
 
-        self.signal.emit(["update", 1, "Loading stops"])
         self.__load_stops_table()
 
-        self.signal.emit(["update", 2, "Loading stop times"])
         self.__load_stop_times()
 
-        self.signal.emit(["update", 3, "Loading shapes"])
         self.__load_shapes_table()
 
-        self.signal.emit(["update", 4, "Loading trips"])
         self.__load_trips_table()
 
-        self.signal.emit(["update", 5, "De-conflicting stop times"])
         self.__deconflict_stop_times()
 
-        self.signal.emit(["update", 6, "Loading fares"])
         self.__load_fare_data()
 
         self.zip_archive.close()
-        self.signal.emit(["finished"])
         self.signal = SIGNAL(object)
 
     def __deconflict_stop_times(self) -> None:
         self.logger.info("Starting deconflict_stop_times")
 
+        msg = "De-conflicting stop times (Step: 6/12)"
         total_fast = 0
-        for prog_counter, route in enumerate(self.trips):
+        for route in simple_progress(self.trips, self.signal, msg):
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
                 for trip in self.trips[route][pattern]:
@@ -200,6 +196,7 @@ class GTFSReader:
         self.logger.debug("Starting __load_fare_data")
         fareatttxt = "fare_attributes.txt"
         self.fare_attributes = {}
+        self.signal.emit(["set_text", "Loading fare data (Step: 7/12)"])
         if fareatttxt in self.zip_archive.namelist():
             self.logger.debug('  Loading "fare_attributes" table')
 
@@ -263,7 +260,8 @@ class GTFSReader:
         lats, lons = self.transformer.transform(shapes[:]["shape_pt_lat"], shapes[:]["shape_pt_lon"])
         shapes[:]["shape_pt_lat"][:] = lats[:]
         shapes[:]["shape_pt_lon"][:] = lons[:]
-        for i, shape_id in enumerate(all_shape_ids):
+
+        for shape_id in simple_progress(all_shape_ids, self.signal, "Loading shapes (Step: 4/12)"):
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
             shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
@@ -299,7 +297,7 @@ class GTFSReader:
 
         self.trips = {str(x): {} for x in np.unique(trips_array["route_id"])}
 
-        for i, line in enumerate(trips_array):
+        for line in simple_progress(trips_array, self.signal, "Loading trips (Step: 5/12)"):
             trip = Trip()
             trip._populate(line, trips_array.dtype.names)
             trip.route_id = self.routes[trip.route].route_id
@@ -421,10 +419,11 @@ class GTFSReader:
         df = df.merge(stop_list, on="stop")
         df.sort_values(["trip_id", "stop_sequence"], inplace=True)
         df = df.assign(source_time=0)
-        for trip_id, data in [[trip_id, x] for trip_id, x in df.groupby(df["trip_id"])]:
+
+        msg = "Loading stop times (Step: 3/12)"
+        for trip_id, data in simple_progress(df.groupby(df["trip_id"]), self.signal, msg):
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
-            counter += data.shape[0]
 
     def __load_stops_table(self):
         self.logger.debug("Starting __load_stops_table")
@@ -443,7 +442,7 @@ class GTFSReader:
         stops[:]["stop_lat"][:] = lats[:]
         stops[:]["stop_lon"][:] = lons[:]
 
-        for i, line in enumerate(stops):
+        for line in simple_progress(stops, self.signal, "Loading stops (Step: 2/12)"):
             s = Stop(self.agency.agency_id, line, stops.dtype.names)
             s.agency = self.agency.agency
             s.srid = self.srid
@@ -474,7 +473,7 @@ class GTFSReader:
         for route_type, pce in self.__pces__.items():
             routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
-        for i, line in routes.iterrows():
+        for i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
             r = Route(self.agency.agency_id)
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
@@ -485,6 +484,7 @@ class GTFSReader:
 
         has_cal, has_caldate = True, True
 
+        self.signal.emit(["set_text", "Loading feed calendar"])
         caltxt = "calendar.txt"
         if caltxt in self.zip_archive.namelist():
             self.logger.debug('    Loading "calendar" table')
