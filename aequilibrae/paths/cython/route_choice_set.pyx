@@ -282,7 +282,7 @@ cdef class RouteChoiceSet:
             with nogil, parallel(num_threads=c_cores):
                 route_set = new RouteSet_t()
                 thread_id = threadid()
-                for i in prange(demand.ods.size()):
+                for i in prange(demand.ods.size(), schedule="guided"):
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
 
