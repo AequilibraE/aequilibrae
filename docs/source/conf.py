@@ -87,7 +87,7 @@ sphinx_gallery_conf = {
             "examples/other_applications",
         ]
     ),
-    # "plot_gallery": False,
+    "plot_gallery": True,
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -163,7 +163,7 @@ htmlhelp_basename = "AequilibraEdoc"
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto, manual, or own class]).
-latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", author, "manual")]
+latex_documents = [("latex_index", "AequilibraE.tex", "AequilibraE Documentation", author, "manual")]
 
 latex_appendices = [
     "useful_information/installation",
