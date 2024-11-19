@@ -9,7 +9,7 @@
 Python
 ======
 
-**Download documentation**: :download:`HTML <_static/AequilibraE.zip>` | :download:`PDF <_static/latex/AequilibraE.pdf>`
+**Download documentation**: :download:`HTML <_static/AequilibraE.zip>` | :download:`PDF <_static/latex/aequilibrae.pdf>`
 
 **Previous versions**: documentation for AequilibraE's versions before 0.9.0 are available :ref:`here <versionhistory>`.
 
