@@ -42,36 +42,36 @@ Sponsoring AequilibraE's maintenance and new features is the best way to guarant
 fixed and the features your projects require are incorporated quickly into the software. Please contact
 aequilibrae@outerloop.io for sponsoring opportunities.
 
-Maintenance sponsors
-~~~~~~~~~~~~~~~~~~~~
+.. table:: 
+   :align: center
+   :width: 50%
 
-2024:
+   +------+---------------------------------------------------------------------------------+
+   | Maintenance Sponsors                                                                   |
+   +======+=================================================================================+
+   | 2024 |  `ADEME <https://www.ademe.fr>`_                                                |
+   +------+---------------------------------------------------------------------------------+
+   | 2023 | `Outer Loop Consulting <https://www.outerloop.io>`_ -                           |
+   |      | `La Fabrique des Mobilités <https://lafabriquedesmobilites.fr/>`_  -            |
+   |      | `EGIS France <https://www.egis.fr/>`_                                           |
+   +------+---------------------------------------------------------------------------------+
+   | 2022 | `Outer Loop Consulting <https://www.outerloop.io>`_                             |
+   +------+---------------------------------------------------------------------------------+
+   | 2021 | `Outer Loop Consulting <https://www.outerloop.io>`_                             |
+   +------+---------------------------------------------------------------------------------+
+   | 2016 | `Instituto de Pesquisa Econômica Aplicada <https://www.ipea.gov.br>`_           |
+   +------+---------------------------------------------------------------------------------+
 
-* `ADEME <https://www.ademe.fr>`_
+.. table:: 
+   :align: center
+   :width: 50%
 
-2023:
-
-* `Outer Loop Consulting <https://www.outerloop.io>`_
-* `La Fabrique des Mobilités <https://lafabriquedesmobilites.fr/>`_
-* `EGIS France <https://www.egis.fr/>`_
-
-2022:
-
-* `Outer Loop Consulting <https://www.outerloop.io>`_
-
-2021:
-
-* `Outer Loop Consulting <https://www.outerloop.io>`_
-
-2016:
-
-* `Instituto de Pesquisa Econômica Aplicada <https://www.ipea.gov.br>`_
-
-Feature sponsors
-~~~~~~~~~~~~~~~~
-
-2023:
-
-* GTFS import - `La Fabrique des Mobilités <https://lafabriquedesmobilites.fr/>`_
-* Transit assignment - `EGIS France <https://www.egis.fr/>`_
-* Select Link Analysis - `Outer Loop Consulting <https://www.outerloop.io>`_
+   +------+---------------------------------------------------------------------------------+
+   | Feature Sponsors                                                                       |
+   +======+=================================================================================+
+   | 2023 | GTFS import - `La Fabrique des Mobilités <https://lafabriquedesmobilites.fr/>`_ |
+   |      +---------------------------------------------------------------------------------+
+   |      | Transit assignment - `EGIS France <https://www.egis.fr/>`_                      |
+   |      +---------------------------------------------------------------------------------+
+   |      | Select Link Analysis - `Outer Loop Consulting <https://www.outerloop.io>`_      |
+   +------+---------------------------------------------------------------------------------+

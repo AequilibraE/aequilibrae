@@ -7,6 +7,6 @@ AequilibraE
    :hidden:
    :maxdepth: 1
 
-   examples_index
-   modeling_with_aequilibrae/index
-   api/api
+   examples
+   ../modeling_with_aequilibrae/index
+   ../api/api

@@ -114,7 +114,7 @@ OpenStreetMap
 The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
 
 **modes** contains the list of key tags we will import for each mode. Description of tags can be found on
-`OpenStreetMap Wiki <https://wiki:openstreetmap:org/wiki/Key:highway:>`_, and we recommend
+`OpenStreetMap Wiki <https://wiki.openstreetmap.org/>`_, and we recommend
 not changing the standard parameters unless you are exactly sure of what you are doing.
 
 For each mode to be imported there is also a mode filter to control for non-default

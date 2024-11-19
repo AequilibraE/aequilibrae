@@ -16,7 +16,7 @@ Whenever vectorization is not possible through the use of NumPy functions, compi
 accelerate computation. All compiled code is written in `Cython <https://cython.org/>`_.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
-found in `this article <http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.1001745>`_.
+found in `this article <https://doi.org/10.1371/journal.pbio.1001745>`_.
 
 Development Install
 -------------------
@@ -35,7 +35,7 @@ Non-Windows
 ~~~~~~~~~~~
 ::
 
-    ./ci.sh setup_dev
+  ./ci.sh setup_dev
 
 Windows
 ~~~~~~~
@@ -47,20 +47,20 @@ using `Chocolatey <https://chocolatey.org/>`_ as a package manager.
 
 ::
 
-    cinst python3 --version 3.9
-    cinst python
+  cinst python3 --version 3.12
+  cinst python
 
-    set PATH=C:\Python39;%PATH%
-    python -m pip install pipenv
-    virtualenv .venv #Only if you want to save the virtual environment in the same folder
-    python -m pipenv install --dev
-    python -m pipenv run pre-commit-install
+  set PATH=C:\Python312;%PATH%
+  python -m pip install pipenv
+  virtualenv .venv #Only if you want to save the virtual environment in the same folder
+  python -m pipenv install --dev
+  python -m pipenv run pre-commit-install
 
 Setup Pycharm with the virtual environment you just created.
 
 ::
 
-    Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
+  Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
 
 Development Guidelines
 -----------------------
@@ -71,10 +71,10 @@ portions of the code are still not up to such standards.
 Style
 ~~~~~
 
-* Python code should follow (mostly) the `pycodestyle style guide <https://pypi.python.org/pypi/pycodestyle>`_
+* Python code should follow (mostly) the `pycodestyle style guide <https://pycodestyle.pycqa.org/en/latest/>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/dev/peps/pep-0287/>`_
-* We are big fans of auto-code formatting. For that, we use `ruff <https://pypi.org/project/ruff/>`_ and 
-  `Black <https://black.readthedocs.io/en/stable/index.html/>`_.
+* We are big fans of auto-code formatting. For that, we use `ruff <https://docs.astral.sh/ruff/>`_ and 
+  `Black <https://black.readthedocs.io/en/stable/>`_.
 * Negating some of what we have said so far, we use maximum line length of 120 characters
 
 Imports
@@ -82,7 +82,7 @@ Imports
 
 * Imports should be one per line.
 * Imports should be grouped into standard library, third-party, and intra-library imports 
-  (``ctrl+shit+o`` does it automatically on PyCharm).
+  (``CTRL + SHIFT + o`` does it automatically on PyCharm).
 * Imports of NumPy and Pandas should follow the following convention:
 
 .. code-block:: python
@@ -93,7 +93,7 @@ Imports
 Contributing to AequilibraE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-GitHub has a nice visual explanation on how collaboration is done `GitHub Flow
+GitHub has a nice visual explanation on how collaboration is done using `GitHub flow
 <https://guides.github.com/introduction/flow>`_.
 
 In a nutshell:
@@ -106,7 +106,7 @@ In a nutshell:
 
 In a more verbose way...
 
-* The ``master`` branch contains the latest release version of AequilibraE.
+* The ``main`` branch contains the latest release version of AequilibraE.
 * The ``develop`` branch contains all new features and bug fixes that will be
   included in the next release. It can be seen as a *release candidate*, so work is not often
   performed on that branch.
@@ -116,19 +116,22 @@ In a more verbose way...
 * The project maintainers have absolute discretion to accept or reject PR's, but reasons
   for refusing contributions will always be made clear on the PR's comments/review.
 * Work is done in an issue/feature branch (or a fork) and then pushed to a new branch.
-* Automated testing is run using Github Actions. All tests must pass
-    * Unit testing
-    * Build/packaging tests
-    * Documentation building test
+* Automated testing is run using Github Actions. All tests must pass:
+
+  * Unit testing
+  * Build/packaging tests
+  * Documentation building test
+
 * If the tests pass, then a manual pull request can be approved to merge into develop.
-* The master and develop branches are protected and therefore can only be written to after the code has been reviewed and approved.
-* No individual has the privileges to push to the master or developer branches.
+* The ``main`` and ``develop`` branches are protected and therefore can only be written to 
+  after the code has been reviewed and approved.
+* No individual has the privileges to push to the ``main`` or ``develop`` branches.
 
 Release versions
 ~~~~~~~~~~~~~~~~~
 
 AequilibraE uses the de-facto Python standard for `versioning
-<http://the-hitchhikers-guide-to-packaging.readthedocs.io/en/latest/specification.html>`_
+<http://the-hitchhikers-guide-to-packaging.readthedocs.io/en/latest/specification.html>`_.
 
 ::
 
@@ -151,10 +154,10 @@ Testing
 
 AequilibraE style checking is done with two tools:
 
-* `ruff <https://pypi.org/project/ruff/>`_, a tool to check Python code style
-* `Black <https://black.readthedocs.io/en/stable/index.html/>`_, The uncompromising code formatter
+* `ruff <https://docs.astral.sh/ruff/>`_, a tool to check Python code style
+* `Black <https://black.readthedocs.io/en/stable/>`_, The uncompromising code formatter
 
-And testing is done using `pytest <https://pypi.org/project/pytest/>`_.
+And testing is done using `pytest <https://docs.pytest.org/en/stable/>`_.
 
 Testing is done for Windows, MacOs and Ubuntu Linux on all supported Python versions, and we use GitHub Actions
 to run these tests. These tests need to pass and additionally somebody has to

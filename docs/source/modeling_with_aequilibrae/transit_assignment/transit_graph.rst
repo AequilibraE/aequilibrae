@@ -13,10 +13,10 @@ Let’s start by giving a few definitions:
 -  *transit* definition from
    `Wikipedia <https://en.wikipedia.org/wiki/Public_transport>`_:
 
-      system of transport for passengers by group travel systems available
-      for use by the general public unlike private transport, typically
-      managed on a schedule, operated on established routes, and that
-      charge a posted fee for each trip.
+   system of transport for passengers by group travel systems available
+   for use by the general public unlike private transport, typically
+   managed on a schedule, operated on established routes, and that
+   charge a posted fee for each trip.
 
 -  *transit network*: a set of transit lines and stops, where passengers
    can board, alight or change vehicles.
