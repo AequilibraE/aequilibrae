@@ -51,3 +51,13 @@ Please contact aequilibrae@outerloop.io for sponsoring opportunities.
 .. raw:: html
 
    </div>
+
+|
+|
+|
+|
+|
+
+Credits for the photo in the banner to `Juan Cruz Mountford <https://unsplash.com/@juanmount?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash>`_ on `Unsplash <https://unsplash.com/photos/time-lapse-photography-of-city-buildings-and-road-MAwW2lhmEJA?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash>`_. 
+The fonts used are `Arvo <https://fonts.google.com/specimen/Arvo/license>`_ and
+`Quicksand <https://fonts.google.com/specimen/Quicksand/license>`_.
