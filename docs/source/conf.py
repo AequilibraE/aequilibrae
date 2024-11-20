@@ -132,14 +132,9 @@ html_theme_options = {
     "show_nav_level": 0,
     "navbar_center": ["navigation_header"],
     "navbar_start": ["navbar-logo"],
-    "navbar_end": ["theme-switcher", "navbar-icon-links", "version-switcher"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
     "navbar_persistent":["search-button"],
     "navbar_align": "left",
-    "switcher": {
-        "json_url": "https://www.aequilibrae.com/python/latest/_static/switcher.json",
-        "version_match": version,
-    },
-    # "check_switcher": False,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
     "analytics": {
         "google_analytics_id": "G-0HRKZDXRZ7",
@@ -148,6 +143,7 @@ html_theme_options = {
         "text": "AequilibraE",
         "image_light": "_static/large_icon.png",
         "image_dark": "_static/large_icon.png",
+        "link": "https://www.aequilibrae.com/latest/home.html",
     },
 }
 

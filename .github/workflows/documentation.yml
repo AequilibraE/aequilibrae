@@ -76,7 +76,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
-        DEST_DIR: 'python/develop/'      # optional: defaults to entire repository
+        DEST_DIR: 'develop/python/'      # optional: defaults to entire repository
 
     - name: Upload to RELEASE on S3
       if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') }}
@@ -89,7 +89,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
-        DEST_DIR: 'python/latest/'      # optional: defaults to entire repository
+        DEST_DIR: 'latest/python/'      # optional: defaults to entire repository
 
     - name: Create Documentation history folder
       if: ${{ github.event_name == 'release'}}
@@ -106,7 +106,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: 'docs/website/'      # optional: defaults to entire repository
-        DEST_DIR: 'python/'      # optional: defaults to entire repository
+        DEST_DIR: 'docs/python/'      # optional: defaults to entire repository
 
     - name: Upload documentation to LATEST on AWS
       if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') }}
@@ -119,7 +119,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: 'docs/build/htmlv/'      # optional: defaults to entire repository
-        DEST_DIR: 'python/'      # optional: defaults to entire repository
+        DEST_DIR: 'latest/'      # optional: defaults to entire repository
 
 
     - name: Upload to DEV on S3
@@ -133,4 +133,4 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
-        DEST_DIR: 'python/dev/${{ github.event.number }}/'      # optional: defaults to entire repository
+        DEST_DIR: 'dev/${{ github.event.number }}/python'      # optional: defaults to entire repository
