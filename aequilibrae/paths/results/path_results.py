@@ -1,13 +1,9 @@
-import numpy as np
-
-from aequilibrae import global_logger
-from aequilibrae.paths.graph import Graph
 from typing import Union, List
 
-try:
-    from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
-except ImportError as ie:
-    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
+import numpy as np
+from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
+
+from aequilibrae.paths.graph import Graph
 
 
 class PathResults:

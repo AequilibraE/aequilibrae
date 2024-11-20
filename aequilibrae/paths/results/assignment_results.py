@@ -3,16 +3,11 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
+from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
 
-from aequilibrae import global_logger
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
-
-try:
-    from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
-except ImportError as ie:
-    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 """
 TO-DO:

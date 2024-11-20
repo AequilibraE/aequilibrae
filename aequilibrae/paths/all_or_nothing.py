@@ -2,18 +2,12 @@ import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
 import numpy as np
+from aequilibrae.paths.AoN import one_to_all, assign_link_loads
 
-from aequilibrae import global_logger
 from aequilibrae.matrix import AequilibraeMatrix
-from .multi_threaded_aon import MultiThreadedAoN
-
-try:
-    from aequilibrae.paths.AoN import one_to_all, assign_link_loads
-except ImportError as ie:
-    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
-
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from .multi_threaded_aon import MultiThreadedAoN
 
 if False:
     from .results import AssignmentResults
