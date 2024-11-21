@@ -8,5 +8,5 @@ AequilibraE
    :maxdepth: 1
 
    examples
-   ../modeling_with_aequilibrae/index
-   ../api/api
+   ../python/modeling_with_aequilibrae/index
+   ../python/api/api
