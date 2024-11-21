@@ -86,7 +86,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        SOURCE_DIR: 'docs/build/html/home.html'      # optional: defaults to entire repository
+        SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
         DEST_DIR: 'develop/home.html'      # optional: defaults to entire repository
 
     - name: Upload to latest/python on S3
@@ -112,7 +112,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        SOURCE_DIR: 'docs/build/html/home.html'      # optional: defaults to entire repository
+        SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
         DEST_DIR: 'latest/home.html'      # optional: defaults to entire repository
 
     - name: Create Documentation history folder
@@ -155,8 +155,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        SOURCE_DIR: 'docs/build/html/python'      # optional: defaults to entire repository
-        DEST_DIR: 'test/${{ github.event.number }}/python'      # optional: defaults to entire repository
+        SOURCE_DIR: 'docs/build/html/python/'      # optional: defaults to entire repository
+        DEST_DIR: 'test/${{ github.event.number }}/python/'      # optional: defaults to entire repository
 
     - name: Upload to dev/home on S3
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
@@ -168,5 +168,5 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        SOURCE_DIR: 'docs/build/html'      # optional: defaults to entire repository
-        DEST_DIR: 'test/${{ github.event.number }}/home.html'      # optional: defaults to entire repository
+        SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
+        DEST_DIR: 'test/${{ github.event.number }}/'      # optional: defaults to entire repository
