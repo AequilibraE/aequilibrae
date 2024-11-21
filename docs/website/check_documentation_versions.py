@@ -12,7 +12,7 @@ release_version = pkg_resources.get_distribution("aequilibrae").version
 
 # We check if the reference to all existing versions were added by checking
 # that the current version is referenced
-with open(os.path.join(npth, "docs/source/_static/switcher.json"), mode="r") as f:
+with open(os.path.join(npth, "docs/source/useful_information/version_history.rst"), mode="r") as f:
     txt = f.read()
 
 print(f"python/V.{release_version}")
