@@ -133,7 +133,7 @@ html_theme_options = {
     "navbar_center": ["navigation_header"],
     "navbar_start": ["navbar-logo"],
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
-    "navbar_persistent":["search-button"],
+    "navbar_persistent": ["search-button"],
     "navbar_align": "left",
     "github_url": "https://github.com/AequilibraE/aequilibrae",
     "analytics": {

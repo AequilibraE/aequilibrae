@@ -31,7 +31,9 @@ class CreateTablesSRC:
             *Path(realpath(__file__)).parts[:-1],
             f"../aequilibrae/project/database_specification/{self.__folder}/tables",
         )
-        self.doc_path = str(Path(realpath(__file__)).parent / "source" / "modeling_with_aequilibrae" / tgt_fldr)
+        self.doc_path = str(
+            Path(realpath(__file__)).parent / "source" / "python" / "modeling_with_aequilibrae" / tgt_fldr
+        )
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
 
