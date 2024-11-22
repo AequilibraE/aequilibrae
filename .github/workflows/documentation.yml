@@ -86,7 +86,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        DEST_DIR: 'test/home.html'      # optional: defaults to entire repository
+        SOURCE_DIR: './'
+        DEST_DIR: 'test/'      # optional: defaults to entire repository
 
     - name: Upload to DEVELOP on S3
       if: ${{ (github.ref == 'refs/heads/develop') && (github.event_name == 'push') && (env.HAS_SECRETS == 'true') }}
