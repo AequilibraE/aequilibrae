@@ -63,7 +63,7 @@ jobs:
         cd docs
         make html
 
-    - name: Upload to DEV on S3
+    - name: Upload python to DEV on S3
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
       uses: jakejarvis/s3-sync-action@master
       with:
@@ -73,7 +73,19 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
+        SOURCE_DIR: 'docs/build/html/python/'      # optional: defaults to entire repository
+        DEST_DIR: 'test/python/'      # optional: defaults to entire repository
+  
+    - name: Upload landing page to DEV on S3
+      if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
+      uses: jakejarvis/s3-sync-action@master
+      with:
+        args: --acl public-read --exclude '*' --include 'docs/build/html/home.html'
+      env:
+        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         DEST_DIR: 'test/'      # optional: defaults to entire repository
 
     - name: Upload to DEVELOP on S3
