@@ -45,7 +45,7 @@ from tempfile import gettempdir
 from aequilibrae.project import Project
 from aequilibrae.parameters import Parameters
 import folium
-# sphinx_gallery_thumbnail_path = 'images/plot_import_from_gmns.png'
+# sphinx_gallery_thumbnail_path = '../../images/plot_import_from_gmns.png'
 
 # %%
 

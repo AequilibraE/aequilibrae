@@ -33,7 +33,7 @@ from tempfile import gettempdir
 
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
-# sphinx_gallery_thumbnail_path = 'images/transit/hyperpath_bell_n_10_alpha_100d0.png'
+# sphinx_gallery_thumbnail_path = '../../images/transit/hyperpath_bell_n_10_alpha_100d0.png'
 
 # %%
 

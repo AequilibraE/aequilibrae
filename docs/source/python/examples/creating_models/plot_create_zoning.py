@@ -59,7 +59,7 @@ from aequilibrae.utils.create_example import create_example, list_examples
 from aequilibrae.utils.aeq_signal import simple_progress, SIGNAL
 s = SIGNAL(object)
 
-# sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
+# sphinx_gallery_thumbnail_path = "../../images/plot_create_zoning.png"
 
 # %%
 # Let's print the list of examples that ship with AequilibraE

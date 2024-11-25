@@ -28,7 +28,7 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 
-# sphinx_gallery_thumbnail_path = 'images/plot_route_choice_assignment.png'
+# sphinx_gallery_thumbnail_path = '../../images/plot_route_choice_assignment.png'
 
 # %%
 
