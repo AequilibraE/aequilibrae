@@ -27,7 +27,7 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae import Project
 import folium
-# sphinx_gallery_thumbnail_path = '../../images/nauru.png'
+# sphinx_gallery_thumbnail_path = '../source/python/images/nauru.png'
 
 # %%
 

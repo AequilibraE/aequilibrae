@@ -42,7 +42,7 @@ import pandas as pd
 import numpy as np
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.paths.results import PathResults
-# sphinx_gallery_thumbnail_path = '../../images/disconnected_network.png'
+# sphinx_gallery_thumbnail_path = '../source/python/images/disconnected_network.png'
 
 # %%
 

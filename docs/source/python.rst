@@ -9,7 +9,7 @@
 Python
 ======
 
-**Download documentation**: :download:`HTML <../_static/AequilibraE.zip>` | :download:`PDF <../_static/latex/aequilibrae.pdf>`
+**Download documentation**: :download:`HTML <_static/AequilibraE.zip>` | :download:`PDF <_static/latex/aequilibrae.pdf>`
 
 **Previous versions**: documentation for all AequilibraE's versions are available :ref:`here <versionhistory>`.
 
@@ -47,7 +47,7 @@ Python
       Reference guide to AequilibraE's API.
 
    .. grid-item-card:: :material-outlined:`person;1.5em` Not a programmer?
-      :link: https://www.aequilibrae.com/latest/qgis.html
+      :link: https://www.aequilibrae.com/test/qgis.html
       :text-align: center
       
       Take me to the GUI!

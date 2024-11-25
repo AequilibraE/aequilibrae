@@ -29,7 +29,7 @@ from tempfile import gettempdir
 from aequilibrae.utils.create_example import create_example
 import pandas as pd
 import folium
-# sphinx_gallery_thumbnail_path = '../../images/plot_export_to_gmns.png'
+# sphinx_gallery_thumbnail_path = '../source/python/images/plot_export_to_gmns.png'
 
 # %%
 

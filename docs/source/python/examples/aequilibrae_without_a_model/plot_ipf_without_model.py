@@ -39,7 +39,7 @@ import pandas as pd
 
 from aequilibrae.distribution import Ipf
 from aequilibrae.matrix import AequilibraeMatrix
-# sphinx_gallery_thumbnail_path = '../../images/ipf.png'
+# sphinx_gallery_thumbnail_path = '../source/python/images/ipf.png'
 
 # %%
 folder = gettempdir()
