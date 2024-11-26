@@ -7,7 +7,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 
 AequilibraE has also a fully features interface available as a plugin for the
 open source software QGIS, which is separately maintained and discussed in
-detail its `documentation <http://www.aequilibrae.com/test/qgis/qgis.html>`_.
+detail its `documentation <http://www.aequilibrae.com/test/qgis/index.html>`_.
 
 Contributions are welcome to the existing modules and/or in the form of new modules.
 
