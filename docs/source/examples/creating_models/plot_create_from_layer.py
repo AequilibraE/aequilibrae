@@ -38,7 +38,7 @@ import pandas as pd
 import folium
 
 from aequilibrae import Project
-# sphinx_gallery_thumbnail_path = '../source/python/images/plot_from_layer.png'
+# sphinx_gallery_thumbnail_path = '../source/images/plot_from_layer.png'
 
 # %%
 

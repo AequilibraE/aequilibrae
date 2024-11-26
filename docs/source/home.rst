@@ -11,7 +11,7 @@
 AequilibraE
 ===========
 
-.. image:: python/images/logos/banner-transparent.png
+.. image:: images/logos/banner-transparent.png
     :align: center
 
 |
@@ -33,19 +33,19 @@ Please contact aequilibrae@outerloop.io for sponsoring opportunities.
 
    <div style="display: flex; justify-content: center; gap: 20px;">
 
-.. image:: python/images/logos/sponsor1.png
+.. image:: images/logos/sponsor1.png
     :target: https://www.outerloop.io
 
-.. image:: python/images/logos/sponsor2.png
+.. image:: images/logos/sponsor2.png
     :target: https://www.ademe.fr
 
-.. image:: python/images/logos/sponsor3.png
+.. image:: images/logos/sponsor3.png
     :target: https://lafabriquedesmobilites.fr/
 
-.. image:: python/images/logos/sponsor4.png
+.. image:: images/logos/sponsor4.png
     :target: https://www.egis.fr/
 
-.. image:: python/images/logos/sponsor5.png
+.. image:: images/logos/sponsor5.png
     :target: https://www.ipea.gov.br
 
 .. raw:: html

@@ -36,7 +36,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
-# sphinx_gallery_thumbnail_path = '../source/python/images/skims.png'
+# sphinx_gallery_thumbnail_path = '../source/images/skims.png'
 
 # %%
 

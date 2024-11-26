@@ -21,7 +21,7 @@ Python
 .. grid::
 
     .. grid-item-card:: :material-outlined:`folder;1.5em` Examples
-        :link: python/_auto_examples/index
+        :link: _auto_examples/index
         :link-type: any
         :text-align: center
         
@@ -30,7 +30,7 @@ Python
         results.
 
     .. grid-item-card:: :material-outlined:`menu_book;1.5em` Modeling with AequilibraE
-        :link: python/modeling_with_aequilibrae/index
+        :link: modeling_with_aequilibrae/index
         :link-type: any
         :text-align: center
         
@@ -47,7 +47,7 @@ Python
       Reference guide to AequilibraE's API.
 
    .. grid-item-card:: :material-outlined:`person;1.5em` Not a programmer?
-      :link: https://www.aequilibrae.com/test/qgis.html
+      :link: https://www.aequilibrae.com/test/qgis/index.html
       :text-align: center
       
       Take me to the GUI!
@@ -56,6 +56,6 @@ Python
    :hidden:
    :maxdepth: 1
 
-   python/_auto_examples/index
-   python/modeling_with_aequilibrae/index
-   python/api/api
+   _auto_examples/index
+   modeling_with_aequilibrae/index
+   api

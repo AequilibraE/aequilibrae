@@ -7,7 +7,7 @@ Project
 -------
 .. currentmodule:: aequilibrae.project
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Project
 
@@ -15,7 +15,7 @@ Project Components
 ~~~~~~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.project
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    About
    FieldEditor
@@ -28,7 +28,7 @@ Project Objects
 ~~~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.project
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Zone
 
@@ -36,7 +36,7 @@ Network Data
 ------------
 .. currentmodule:: aequilibrae.project.network
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Modes
    LinkTypes
@@ -48,7 +48,7 @@ Network Items
 -------------
 .. currentmodule:: aequilibrae.project.network
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Mode
    LinkType
@@ -60,7 +60,7 @@ Distribution
 ------------
 .. currentmodule:: aequilibrae.distribution
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Ipf
    GravityCalibration
@@ -71,7 +71,7 @@ Matrix
 ------
 .. currentmodule:: aequilibrae.matrix
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    AequilibraeMatrix
 
@@ -82,7 +82,7 @@ Skimming
 ~~~~~~~~
 .. currentmodule:: aequilibrae.paths
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    NetworkSkimming
 
@@ -90,7 +90,7 @@ Graph
 ~~~~~
 .. currentmodule:: aequilibrae.paths
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Graph
    TransitGraph
@@ -99,7 +99,7 @@ Traffic assignment
 ~~~~~~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.paths
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
    
    TrafficClass
    TransitClass
@@ -115,7 +115,7 @@ Route choice
 ~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.paths
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    HyperpathGenerating
    OptimalStrategies
@@ -126,7 +126,7 @@ Transit
 -------
 .. currentmodule:: aequilibrae.transit
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Transit
    TransitGraphBuilder
@@ -136,7 +136,7 @@ Utils
 -----
 .. currentmodule:: aequilibrae.utils
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    create_delaunay_network.DelaunayAnalysis
    create_example
@@ -145,6 +145,6 @@ Parameters
 ----------
 .. currentmodule:: aequilibrae
 .. autosummary::
-   :toctree: generated/
+   :toctree: _generated/
 
    Parameters

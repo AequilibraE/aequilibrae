@@ -30,7 +30,7 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
-# sphinx_gallery_thumbnail_path = '../source/python/images/plot_import_gtfs.png'
+# sphinx_gallery_thumbnail_path = '../source/images/plot_import_gtfs.png'
 
 # %%
 
