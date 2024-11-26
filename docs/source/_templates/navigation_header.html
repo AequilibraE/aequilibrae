@@ -49,6 +49,13 @@
     } else {
       document.getElementById("dropdown-nav-item").style.display = "block";
     }
+
+    const isPythonPage = window.location.pathname.endsWith("python.html");
+    const pythonButton = document.getElementById("python-button");
+    if (!isPythonPage) {
+      pythonButton.innerHTML = "<b>Python</b>";
+    }
+  });
 </script>
 
 <!-- TODO: Fix navigation links -->
