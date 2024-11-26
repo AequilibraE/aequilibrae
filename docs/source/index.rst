@@ -47,7 +47,7 @@ Python
       Reference guide to AequilibraE's API.
 
    .. grid-item-card:: :material-outlined:`person;1.5em` Not a programmer?
-      :link: https://www.aequilibrae.com/dev/qgis/index.html
+      :link: https://www.aequilibrae.com/latest/qgis/index.html
       :text-align: center
       
       Take me to the GUI!

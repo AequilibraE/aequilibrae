@@ -143,7 +143,7 @@ html_theme_options = {
         "text": "AequilibraE",
         "image_light": "_static/large_icon.png",
         "image_dark": "_static/large_icon.png",
-        "link": "https://www.aequilibrae.com/dev/home.html",
+        "link": "https://www.aequilibrae.com/latest/home.html",
     },
 }
 
