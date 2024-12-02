@@ -17,12 +17,20 @@ def replace_regex(event):
             if file.endswith((".drawio", ".txt", ".omx")):
                 continue
             full_path = os.path.join(root, file)
-            print(full_path)
             with open(full_path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as s:
                 content = s.read().decode("utf-8")
 
-                # Find and replace regex containing the site
-                modified_content = re.sub(r"www.aequilibrae.com/latest/", rf"www.aequilibrae.com/{event}/", content)
+                # Find and replace regex containing the website
+                modified_content = re.sub(
+                    r"www.aequilibrae.com/latest/python/", rf"www.aequilibrae.com/{event}/python/", content
+                )
+
+                if "/" in event:
+                    modified_content = re.sub(
+                        r"www.aequilibrae.com/latest/qgis/",
+                        rf"www.aequilibrae.com/{event.split('/')[0]}/qgis/",
+                        modified_content,
+                    )
 
                 # Write modified content back to file
                 with open(full_path, "w", encoding="utf-8") as w:
