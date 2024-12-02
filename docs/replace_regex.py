@@ -20,17 +20,20 @@ def replace_regex(event):
             with open(full_path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as s:
                 content = s.read().decode("utf-8")
 
-                # Find and replace regex containing the website
-                modified_content = re.sub(
-                    r"www.aequilibrae.com/latest/python/", rf"www.aequilibrae.com/{event}/python/", content
+                in_path = r"www.aequilibrae.com/latest/" if file == "conf.py" else r"www.aequilibrae.com/latest/python/"
+                out_path = (
+                    rf"www.aequilibrae.com/{event}/" if file == "conf.py" else rf"www.aequilibrae.com/{event}/python/"
                 )
 
-                if "/" in event:
-                    modified_content = re.sub(
-                        r"www.aequilibrae.com/latest/qgis/",
-                        rf"www.aequilibrae.com/{event.split('/')[0]}/qgis/",
-                        modified_content,
-                    )
+                # Find and replace regex containing the website
+                modified_content = re.sub(in_path, out_path, content)
+
+                events = event.split("/")
+                modified_content = re.sub(
+                    r"www.aequilibrae.com/latest/qgis/",
+                    rf"www.aequilibrae.com/{events[0]}/qgis/",
+                    modified_content,
+                )
 
                 # Write modified content back to file
                 with open(full_path, "w", encoding="utf-8") as w:
