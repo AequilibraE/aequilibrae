@@ -60,7 +60,7 @@ jobs:
     - name: Prepare links for DEVELOP
       if: ${{ (github.ref == 'refs/heads/develop') && (github.event_name == 'push')}}
       run: |
-        python -c "from ci.replace_regex import replace_regex; replace_regex('develop')"
+        python -c "from docs.replace_regex import replace_regex; replace_regex('develop')"
 
     - name: Build documentation
       run: |
