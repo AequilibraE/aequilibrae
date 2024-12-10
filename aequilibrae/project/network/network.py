@@ -280,7 +280,7 @@ class Network(WorkerThread):
             **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
             database, it may be useful to generate only those we need
 
-            **limit_to_area** (:obj:`list`, *Polygon*): When working with a very large model area, you may want to
+            **limit_to_area** (:obj:`Polygon`, *Optional*): When working with a very large model area, you may want to
             filter your database to a small area for your computation, which you can do by providing a polygon.
             The search is limited to a spatial index search, so it is very fast but NOT PRECISE.
 
@@ -328,7 +328,11 @@ class Network(WorkerThread):
                     df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
                 else:
                     sql += spatial_add
-                    df = pd.read_sql_query(sql, conn, (limit_to_area.wkb,)).fillna(value=np.nan).infer_objects(False)
+                    df = (
+                        pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                        .fillna(value=np.nan)
+                        .infer_objects(False)
+                    )
 
                     # We filter to centroids existing in our filtered area
                     centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
