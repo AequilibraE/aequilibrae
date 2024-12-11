@@ -25,6 +25,10 @@ Installation
 
   pip install aequilibrae
 
+.. admonition:: Python installations from the Windows store are NOT SUPPORTED
+
+  The Windows App Store ships a version of Python that contains an sqlite dll that does not support the loading of extensions. This means that Spatialite will not be loaded, and therefore AequilibraE will not work properly.
+
 .. _dependencies:
 
 Dependencies
