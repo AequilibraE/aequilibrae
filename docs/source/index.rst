@@ -13,7 +13,7 @@ Python
 
 **Previous versions**: documentation for all AequilibraE's versions are available :ref:`here <versionhistory>`.
 
-**Useful links**: :ref:`installation` | :ref:`validation` | :ref:`developing_aequilibrae` | :ref:`support` | 
+**Useful links**: :ref:`installation` | :ref:`api` | :ref:`developing_aequilibrae` | :ref:`support` | 
 :ref:`history_of_aequilibrae`
 
 |
