@@ -83,10 +83,14 @@ class TestNetwork(TestCase):
         modes = ["c"]
 
         self.siouxfalls.network.build_graphs(fields, modes, polygon)
-        g = self.siouxfalls.network.graphs["c"]
+        assert len(self.siouxfalls.network.graphs) == 1
 
+        g = self.siouxfalls.network.graphs["c"]
         assert g.num_nodes == 19
         assert g.num_links == 52
+
+        existing_nodes = [i for i in range(1, 25) if i not in [1, 2, 3, 6, 7]]
+        assert list(g.centroids) == existing_nodes
 
     def test_build_graphs_without_polygons(self):
         self.siouxfalls.network.build_graphs()
@@ -95,3 +99,4 @@ class TestNetwork(TestCase):
         g = self.siouxfalls.network.graphs["c"]
         assert g.num_nodes == 24
         assert g.num_links == 76
+        assert list(g.centroids) == list(range(1, 25))

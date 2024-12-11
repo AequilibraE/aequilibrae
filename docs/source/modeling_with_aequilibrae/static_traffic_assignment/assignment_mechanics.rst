@@ -79,6 +79,16 @@ API is a method call for excluding one or more links from the Graph, **which is 
 
     >>> graph.exclude_links([123, 975])
 
+When working with very large networks, it is possible to filter the database to a small
+area for computation by providing a polygon that delimits the desired area, instead of
+selecting the links for deletion. The selection of links and nodes is limited to a spatial
+inidex search, which is very fast but not accurate.
+
+.. code-block:: python
+
+    >>> polygon = Polygon([(-71.35, -29.95), (-71.35, -29.90), (-71.30, -29.90), (-71.30, -29.95), (-71.35, -29.95)])
+    >>> project.network.build_graphs(limit_to_area=polygon) # doctest: +SKIP
+
 More sophisticated graph editing is also possible, but it is recommended that
 changes to be made in the network DataFrame. For example:
 
