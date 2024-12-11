@@ -1,5 +1,13 @@
+.. _developing_aequilibrae:
+
+Developing
+----------
+
+This section describes how to contribute to AequilibraE's development and what
+is our current roadmap.
+
 Contributing to AequilibraE
-===========================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This page presents some initial instructions on how to set up your system to start contributing to 
 AequilibraE and lists the requirements for all pull requests to be merged into master.
@@ -8,7 +16,7 @@ AequilibraE and lists the requirements for all pull requests to be merged into m
    The recommendations on this page are current as of October 2021.
 
 Software Design and requirements
---------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The most important piece of AequilibraE's backend is, without a doubt, `NumPy <http://numpy.org>`__.
 
@@ -19,7 +27,7 @@ We have not yet found an ideal source of recommendations for developing Aequilib
 found in `this article <https://doi.org/10.1371/journal.pbio.1001745>`_.
 
 Development Install
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
@@ -32,13 +40,13 @@ We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or
 If you are using a different IDE, we would welcome if you could contribute with instructions to set that up.
 
 Non-Windows
-~~~~~~~~~~~
++++++++++++
 ::
 
   ./ci.sh setup_dev
 
 Windows
-~~~~~~~
++++++++
 
 Make sure to clone the AequilibraE repository and run the following from within that cloned repo using an elevated command prompt.
 
@@ -63,13 +71,13 @@ Setup Pycharm with the virtual environment you just created.
   Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
 
 Development Guidelines
------------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 AequilibraE development (tries) to follow a few standards. Since this is largely an after-the-fact concern, several
 portions of the code are still not up to such standards.
 
 Style
-~~~~~
+^^^^^
 
 * Python code should follow (mostly) the `pycodestyle style guide <https://pycodestyle.pycqa.org/en/latest/>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/latest/peps/pep-0287/>`_
@@ -78,7 +86,7 @@ Style
 * Negating some of what we have said so far, we use maximum line length of 120 characters
 
 Imports
-~~~~~~~
+^^^^^^^
 
 * Imports should be one per line.
 * Imports should be grouped into standard library, third-party, and intra-library imports 
@@ -91,7 +99,7 @@ Imports
     import pandas as pd
 
 Contributing to AequilibraE
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 GitHub has a nice visual explanation on how collaboration is done using `GitHub flow
 <https://guides.github.com/introduction/flow>`_.
@@ -128,7 +136,7 @@ In a more verbose way...
 * No individual has the privileges to push to the ``main`` or ``develop`` branches.
 
 Release versions
-~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^
 
 AequilibraE uses the de-facto Python standard for `versioning
 <http://the-hitchhikers-guide-to-packaging.readthedocs.io/en/latest/specification.html>`_.
@@ -150,7 +158,7 @@ AequilibraE uses the de-facto Python standard for `versioning
 AequilibraE's development is happening mostly within the Minor and Micro levels.
 
 Testing
-~~~~~~~~
+^^^^^^^
 
 AequilibraE style checking is done with two tools:
 
@@ -172,7 +180,7 @@ order to update it. After updating the test targets, re-run the tests to confirm
 the tests.
 
 Documentation
-~~~~~~~~~~~~~~
+^^^^^^^^^^^^^
 
 All the AequilibraE documentation is (unfortunately) written in 
 `reStructuredText <http://docutils.sourceforge.net/rst.html>`_  and built with 
@@ -196,7 +204,7 @@ Next, build the documentation in html format with the following commands run fro
     make html
 
 Working with progress bars
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 From version 1.1.0, AequilibraE is capable of displaying progress bars in Jupyter Notebooks using 
 `TQDM <https://tqdm.github.io/>`_. For the companion QGIS plugin, `PyQt5 <https://doc.qt.io/qtforpython-5/>`_
@@ -228,13 +236,60 @@ Calling `MyClass().my_method()` will generate a progress bar in the following fo
 The full set of emitted signals which can be used to control progress bars is given in `python_signal.py`
 
 Releases
-~~~~~~~~~
+^^^^^^^^
 
 AequilibraE releases are automatically uploaded to the `Python Package Index
 <https://pypi.python.org/pypi/aequilibrae>`_ (PyPi) at each new GitHub release (2 to 6 times per year).
 
 Acknowledgement
-~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^
 
 A LOT of the structure around the documentation was borrowed (copied) from the excellent project `ActivitySim
 <https://activitysim.github.io/>`_.
+
+Development Roadmap
+~~~~~~~~~~~~~~~~~~~
+
+As AequilibraE is a project with an incredibly small team and very little external
+funding, it is not feasible to determine a precise schedule for the development
+of new features or even a detailed roadmap.
+
+However, there are a number of enhancements to the software that we have already
+identified and that we intend to dedicate some time to in the future.
+
+* Network data model
+
+  * Introduce centroid connector data type to replace the inference that all links
+    connected to centroids are connectors
+
+* Traffic assignment
+
+  * Re-development of the path-finding algorithm to allow for turn
+    penalties/bans
+  * New origin-based traffic assignment to achieve ultra-converged
+    assignment
+  * New path-finding algorithm based on contraction-hierarchies
+
+* Public Transport
+
+  * Export of GTFS (enables editing of GTFS in QGIS)
+
+* Project
+
+  * Inclusion of new table for scalar values
+  * Inclusion of new table for vectors based on centroid IDs (plus metadata
+    table)
+  * Inclusion of new table for vectors based on node IDs (plus metadata table)
+  * Inclusion of new table for vectors based on link IDs (plus metadata table)
+
+* QGIS
+
+  * Inclusion of TSP and more general vehicle routing problems (resource
+    constraints, pick-up, and delivery, etc.)
+
+If there is any other feature you would like to suggest, please record a new
+issue on `GitHub <https://github.com/AequilibraE/aequilibrae/issues>`_, or drop
+us a line.
+
+If your organization is making use of AequilibraE, please consider funding some
+of the new developments or maintenance of the project.

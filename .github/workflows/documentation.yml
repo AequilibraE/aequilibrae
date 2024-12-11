@@ -49,8 +49,8 @@ jobs:
         python -m pytest --doctest-modules aequilibrae/project
         python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py 
         python -m pytest --doctest-modules aequilibrae/transit
-        python -m pytest --doctest-glob=*.rst docs/source/modeling_with_aequilibrae/project_pieces
-        python -m pytest --doctest-glob=*.rst docs/source/modeling_with_aequilibrae/static_traffic_assignment
+        python -m pytest --doctest-glob=*.rst docs/source/project_components
+        python -m pytest --doctest-glob=*.rst docs/source/traffic_assignment
 
     - name: Prepare links for DEV
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}

@@ -99,3 +99,11 @@ These software layers are *stacked* and depend on each other, which means that a
 network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
 while any procedure such as traffic assignment done in QGIS is nothing more than an
 API call to the corresponding Python method.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   aequilibrae_project/project_database
+   aequilibrae_project/parameter_file
+   aequilibrae_project/transit_database
