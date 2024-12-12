@@ -2,11 +2,10 @@
 _build
 _static
 _templates
-docs/source/sg_execution_times.rst
-docs/source/_auto_examples
-docs/source/useful_links/_generated
-docs/source/aequilibrae_project/project_database/data_model
-docs/source/aequilibrae_project/transit_database/data_model
+sg_execution_times.rst
+_auto_examples
+_generated
+data_model
 
 # User-specific stuff:
 .idea/**/workspace.xml
