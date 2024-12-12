@@ -1,2 +1,0 @@
-Transit Assignment
-------------------

@@ -51,3 +51,14 @@ Python
       :link: route_choice/index
       :link-type: any
       :text-align: center
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   aequilibrae_project
+   project_components
+   network_manipulation
+   traffic_assignment/index
+   transit_assignment/index
+   route_choice/index

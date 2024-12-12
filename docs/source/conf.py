@@ -162,9 +162,7 @@ htmlhelp_basename = "AequilibraEdoc"
 latex_documents = [("_latex/index", "aequilibrae.tex", html_title, author, "manual")]
 
 latex_appendices = [
-    "useful_information/installation",
-    "useful_information/validation_benchmarking/ipf_performance",
-    "useful_information/validation_benchmarking/traffic_assignment",
+    "useful_links/installation"
 ]
 
 # -- Options for manual page output ------------------------------------------

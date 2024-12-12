@@ -20,7 +20,8 @@ we detail how these concepts are translated into the AequilibraE tools and recom
 
 .. toctree::
     :maxdepth: 1
-    :caption: Static Traffic Assignment
+    :hidden:
 
     assignment_mechanics
     multi_class_equilibrium
+    _auto_examples/index

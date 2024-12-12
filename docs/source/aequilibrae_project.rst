@@ -107,3 +107,4 @@ API call to the corresponding Python method.
    aequilibrae_project/project_database
    aequilibrae_project/parameter_file
    aequilibrae_project/transit_database
+   aequilibrae_project/_auto_examples/index

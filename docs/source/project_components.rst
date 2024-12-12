@@ -1,5 +1,3 @@
-:orphan:
-
 Data Components
 =======================
 
@@ -572,3 +570,5 @@ Each item in the 'periods' table is a ``Period`` object.
 
    project_components/aequilibrae_graph
    project_components/aequilibrae_matrix
+   project_components/_auto_examples/index
+

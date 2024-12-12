@@ -71,10 +71,11 @@ be presented at the ATRF 2024 [1]_ [3]_ [4]_.
 
 .. toctree::
     :maxdepth: 1
-    :caption: Dive deep into route choice
+    :hidden:
 
     route_choice_model.rst
     choice_set_generation.rst
+    _auto_examples/index
 
 .. [1] Zill, J. C., and P. V. de Camargo. State-Wide Route Choice Models (Submitted).
        Presented at the ATRF, Melbourne, Australia, 2024.

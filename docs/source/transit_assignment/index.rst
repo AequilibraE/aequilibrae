@@ -18,7 +18,8 @@ network, and the hyperpath routing for transit assignment.
 
 .. toctree::
     :maxdepth: 1
-    :caption: Transit assignment
+    :hidden:
 
     transit_graph.rst
     hyperpath_routing.rst
+    _auto_examples/index
