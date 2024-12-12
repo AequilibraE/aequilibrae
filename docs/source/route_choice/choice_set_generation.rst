@@ -74,7 +74,7 @@ In an experiment with nearly 9,000 observed vehicle GPS routes covering a large 
 all three algorithms (LP, BFS-LE, and BFS-LE+LP) had excellent performance in reproducing the observed routes. However,
 the computational overhead of BFS-LE is substantial enough to recommend always verifying if LP is fit-for-purpose.
 
-.. image:: ../../images/route_choice_sets.png
+.. image:: ../images/route_choice_sets.png
    :width: 600
    :align: center
    :alt: Choice set comparison
@@ -120,5 +120,5 @@ References
        Transportmetrica A: Transport Science, 9(9), 825–845.
        https://doi.org/10.1080/18128602.2012.671383
 
-.. .. [2] Moss, J., P. V. de Camargo, C. de Freitas, and R. Imai. High-Performance Route Choice Set Generation on
-..       Large Networks (Submitted). Presented at the ATRF, Melbourne, 2024.
+.. [2] Moss, J., P. V. de Camargo, C. de Freitas, and R. Imai. High-Performance Route Choice Set Generation on
+      Large Networks (Submitted). Presented at the ATRF, Melbourne, 2024.

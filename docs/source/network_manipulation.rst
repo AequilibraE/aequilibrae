@@ -67,10 +67,10 @@ Before importing a network from a source in GMNS format, it is imperative to kno
 in which spatial reference its geometries (links and nodes) were created. If the SRID
 is different than 4326, it must be passed as an input using the argument ``srid``.
 
-.. image:: ../../images/plot_import_from_gmns.png
+.. image:: images/plot_import_from_gmns.png
     :align: center
     :alt: example
-    :target: ../../../_auto_examples/plot_import_from_gmns.html
+    :target: _auto_examples/plot_import_from_gmns.html
 
 It is possible to import the following files from a GMNS source:
 
@@ -114,7 +114,7 @@ Exporting AequilibraE model to GMNS format
 
 After loading an existing AequilibraE project, you can export it to GMNS format. 
 
-.. image:: ../../images/plot_export_to_gmns.png
+.. image:: images/plot_export_to_gmns.png
     :align: center
     :alt: example
     :target: export_to_gmns

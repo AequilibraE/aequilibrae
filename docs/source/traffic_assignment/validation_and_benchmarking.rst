@@ -13,5 +13,5 @@ of Traffic Assignment, linked below.
 .. toctree::
     :maxdepth: 1
 
-    traffic_assignment
-    IPF_benchmark
+    validation_benchmarking/validation
+    validation_benchmarking/IPF_benchmark

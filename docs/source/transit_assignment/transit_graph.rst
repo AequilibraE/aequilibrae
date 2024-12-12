@@ -53,7 +53,7 @@ Transit stops and stations
 Transit stops are points where passenger can board, alight or change
 vehicles. Also, they can be part of larger stations:
 
-.. image:: ../../images/transit/transit_graph_stops_stations.png
+.. image:: ../images/transit/transit_graph_stops_stations.png
    :width: 600
    :align: center
    :alt: transit stops and stations
@@ -74,7 +74,7 @@ A routes is described by a sequence of stop nodes. We assume here the
 routes to be directed. For example, we can take a simple case with 3
 stops:
 
-.. image:: ../../images/transit/transit_graph_routes_1.png
+.. image:: ../images/transit/transit_graph_routes_1.png
    :width: 600
    :align: center
    :alt: transit routes 1
@@ -88,7 +88,7 @@ Various configurations are possible, such as:
 - a route with an additional stop : ABDC 
 - a route that does not stop at a given stop: AC
 
-.. image:: ../../images/transit/transit_graph_routes_2.png
+.. image:: ../images/transit/transit_graph_routes_2.png
    :width: 600
    :align: center
    :alt: transit routes 2
@@ -149,7 +149,7 @@ between regions is crucial. This is achieved by first decomposing the
 network area into a partition of transit assignment zones, as
 illustrated below with 4 non-overlapping zones:
 
-.. image:: ../../images/transit/transit_graph_zones.png
+.. image:: ../images/transit/transit_graph_zones.png
    :width: 400
    :align: center
    :alt: transit zones
@@ -158,7 +158,7 @@ The demand is then expressed as a number of trips from each zone to every other 
 
 Additionally, each zone centroid is connected to specific network nodes to facilitate the connection between supply and demand. These connection points are referred to as *connectors*.
 
-.. image:: ../../images/transit/transit_graph_connectors.png
+.. image:: ../images/transit/transit_graph_connectors.png
    :width: 400
    :align: center
    :alt: transit connectors
@@ -195,7 +195,7 @@ categories play crucial roles in this representation.
 
 To illustrate, consider the anatomy of a simple stop:
 
-.. image:: ../../images/transit/transit_graph_stop_anatomy.png
+.. image:: ../images/transit/transit_graph_stop_anatomy.png
    :width: 500
    :align: center
    :alt: transit stop anatomy
@@ -207,7 +207,7 @@ segment is associated with a *boarding*, an *on-board* and an
 *Transfer* links enable to compute the passenger flow count between line
 couples at the same stop:
 
-.. image:: ../../images/transit/transit_graph_transfer_links.png
+.. image:: ../images/transit/transit_graph_transfer_links.png
    :width: 500
    :align: center
    :alt: transfer links
@@ -216,7 +216,7 @@ These links can be extended between all lines of a station if an increase in the
 
 *walking* links connect *stop* nodes within a station, while *connector* links connect the zone centroids (*od* nodes) to *stop* nodes:
 
-.. image:: ../../images/transit/transit_graph_walking_links.png
+.. image:: ../images/transit/transit_graph_walking_links.png
    :width: 500
    :align: center
    :alt: walking links
@@ -280,7 +280,7 @@ A Small example : Spiess and Florian
 
 This illustrative example is taken from *Spiess and Florian* [1]_:
 
-.. image:: ../../images/transit/transit_graph_spiess_florian_1.png
+.. image:: ../images/transit/transit_graph_spiess_florian_1.png
    :width: 600
    :align: center
    :alt: Spiess Florian 1
@@ -305,7 +305,7 @@ Travel time are indicated on the figure. We have the following four distinct lin
 
 Passengers aim to travel from A to B, prompting the division of the network area into two distinct zones: TAZ 1 and TAZ 2. The assignment graph associated with this network encompasses 26 links:
 
-.. image:: ../../images/transit/transit_graph_spiess_florian_2.png
+.. image:: ../images/transit/transit_graph_spiess_florian_2.png
    :width: 600
    :align: center
    :alt: Spiess Florian 2
@@ -420,21 +420,21 @@ Here is a simple example of a station with two stops, with two lines each:
 
 - walking edges only:
 
-.. image:: ../../images/transit/transit_graph_transfer_1.png
+.. image:: ../images/transit/transit_graph_transfer_1.png
    :width: 400
    :align: center
    :alt: walking edges only
 
 - inner transfer edges, but no outer transfer ones:
 
-.. image:: ../../images/transit/transit_graph_transfer_2.png
+.. image:: ../images/transit/transit_graph_transfer_2.png
    :width: 400
    :align: center
    :alt: inner transfer edges, but no outer transfer edge
 
 - both inner and outer transfer edges:
 
-.. image:: ../../images/transit/transit_graph_transfer_3.png
+.. image:: ../images/transit/transit_graph_transfer_3.png
    :width: 400
    :align: center
    :alt: both inner and outer transfer edges

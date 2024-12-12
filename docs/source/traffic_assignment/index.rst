@@ -1,3 +1,5 @@
+:orphan:
+
 .. _static_traffic_assignment:
 
 Static Traffic Assignment

@@ -1,3 +1,5 @@
+:orphan:
+
 .. _transit_assignment:
 
 Transit assignment

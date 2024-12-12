@@ -36,7 +36,7 @@ Since version 0.7, the AequilibraE project consists of a main folder, where a
 series of files and sub folders exist, and the current project organization
 is as follows:
 
-.. image:: ../images/project_structure.png
+.. image:: images/project_structure.png
     :scale: 25 %
     :align: center
     :alt: AequilibraE project structure

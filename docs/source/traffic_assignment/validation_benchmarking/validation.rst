@@ -1,7 +1,7 @@
 .. _numerical_study_traffic_assignment:
 
-Traffic Assignment
-==================
+Traffic Assignment Validation
+=============================
 
 Similar to other complex algorithms that handle a large amount of data through
 complex computations, traffic assignment procedures can always be subject to at
@@ -14,9 +14,6 @@ comparing algorithm results.
 Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
 All tests were performed with the AequilibraE version 1.1.0.
-
-Validation
-----------
 
 As shown below, the results produced by AequilibraE are within expected, although
 some differences have been found, particularly for Winnipeg. We suspect that there are 

@@ -18,8 +18,7 @@ Technical requirements
 ----------------------
 
 This documentation is not intended to discuss in detail the mathematical
-requirements of multi-class traffic assignment, which can be found discussed in
-detail on [3]_.
+requirements of multi-class traffic assignment, which can be found on [3]_.
 
 A few requirements, however, need to be made clear.
 

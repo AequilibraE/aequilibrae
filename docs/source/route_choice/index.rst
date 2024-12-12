@@ -1,3 +1,5 @@
+:orphan:
+
 .. _route_choice:
 
 Route Choice

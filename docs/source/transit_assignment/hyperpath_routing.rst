@@ -216,7 +216,7 @@ vertex is the destination (*d*) for the hyperpath computation.
    ax = plt.gca()
    _ = ax.set_title(f"Bell's network with $n$={n}", color="k")
 
-.. image:: ../../images/transit/hyperpath_bell_s_network.png
+.. image:: ../images/transit/hyperpath_bell_s_network.png
    :scale: 80%
    :align: center
    :alt: Bell's network
@@ -252,7 +252,7 @@ We can also visualize the edge travel time:
        "Bell's network - edge travel time :  $\\textit{trav_time}$", color="k"
    )
 
-.. image:: ../../images/transit/hyperpath_bell_edge_travel_time.png
+.. image:: ../images/transit/hyperpath_bell_edge_travel_time.png
    :scale: 80%
    :align: center
    :alt: Bell's network - edge travel time
@@ -286,7 +286,7 @@ And the base delay:
    ax = plt.gca()
    _ = ax.set_title("Bell's network - edge base delay : $\\textit{delay_base}$", color="k")
 
-.. image:: ../../images/transit/hyperpath_bell_edge_base_delay.png
+.. image:: ../images/transit/hyperpath_bell_edge_base_delay.png
    :scale: 80%
    :align: center
    :alt: Bell's network - edge base delay
@@ -369,7 +369,7 @@ all the network.
 
    plot_shortest_hyperpath(n=10, alpha=0.0)
 
-.. image:: ../../images/transit/hyperpath_bell_n_10_alpha_0d0.png
+.. image:: ../images/transit/hyperpath_bell_n_10_alpha_0d0.png
    :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=0.0
@@ -421,7 +421,7 @@ Dijkstra’s algorithm would have computed. We call NetworkX’s
        f"Shortest path - Bell's network", color="k"
    )
 
-.. image:: ../../images/transit/hyperpath_bell_n_10_shartest_path.png
+.. image:: ../images/transit/hyperpath_bell_n_10_shartest_path.png
    :scale: 80%
    :align: center
    :alt: Shortest path - Bell's network
@@ -432,7 +432,7 @@ Let’s introduce some delay by increasing the value of :math:`\alpha`:
 
    plot_shortest_hyperpath(n=10, alpha=0.5)
 
-.. image:: ../../images/transit/hyperpath_bell_n_10_alpha_0d5.png
+.. image:: ../images/transit/hyperpath_bell_n_10_alpha_0d5.png
    :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=0.5
@@ -447,7 +447,7 @@ apparent as we further increase :math:`\alpha`:
 
    plot_shortest_hyperpath(n=10, alpha=1.0)
 
-.. image:: ../../images/transit/hyperpath_bell_n_10_alpha_1d0.png
+.. image:: ../images/transit/hyperpath_bell_n_10_alpha_1d0.png
    :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=1.0
@@ -457,7 +457,7 @@ apparent as we further increase :math:`\alpha`:
    plot_shortest_hyperpath(n=10, alpha=100.0)
 
 
-.. image:: ../../images/transit/hyperpath_bell_n_10_alpha_100d0.png
+.. image:: ../images/transit/hyperpath_bell_n_10_alpha_100d0.png
    :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=100.0

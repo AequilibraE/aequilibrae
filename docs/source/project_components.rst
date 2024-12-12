@@ -1,10 +1,10 @@
-.. _project_components:
+:orphan:
 
 Data Components
 =======================
 
 In the :ref:`aeq_project_structure` section, we present the main file components and folders that
-consists an AequilibraE project. We also present in :ref:`aeq_project_database_tables` all tables
+consists an AequilibraE project. We also present in :ref:`project_datamodel` all tables
 that are part of the project database, how do they look like, and what fields do they have.
 
 The components of an AequilibraE project are:
@@ -25,7 +25,7 @@ object with similar name that corresponds to one object in the class. Thus ``pro
 enables the access to manipulate the 'links' table, and each item in the items table is a 
 ``Link`` object.
 
-.. image:: ../../images/project_components_and_items.png
+.. image:: images/project_components_and_items.png
    :align: center
    :alt: basics on project components
 
