@@ -1,3 +1,5 @@
+.. _project_data_components:
+
 Data Components
 =======================
 
@@ -564,11 +566,33 @@ Each item in the 'periods' table is a ``Period`` object.
     * :ref:`tables_period`
         Table documentation
 
-.. toctree::
-   :hidden:
-   :maxdepth: 1
+.. raw:: html
 
-   project_components/aequilibrae_graph
-   project_components/aequilibrae_matrix
-   project_components/_auto_examples/index
+   <footer class="prev-next-footer d-print-none">
+    <div class="prev-next-area">
+        <a class="left-prev" href="aequilibrae_project.html" title="previous page">
+        <i class="fa-solid fa-angle-left"></i>
+        <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Só para teste</p>
+        </div>
+        </a>
+        <a class="right-next" href="project_components/aequilibrae_graph.html" title="next page">
+        <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">AequilibraE Graph</p>
+        </div>
+        <i class="fa-solid fa-angle-right"></i>
+        </a>
+    </div>
+   </footer>
+
+.. 
+    .. toctree::
+    :hidden:
+    :maxdepth: 1
+
+    project_components/aequilibrae_graph
+    project_components/aequilibrae_matrix
+    project_components/_auto_examples/index
 

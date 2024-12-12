@@ -1,3 +1,5 @@
+.. _net_manipulation:
+
 Network manipulation
 --------------------
 
