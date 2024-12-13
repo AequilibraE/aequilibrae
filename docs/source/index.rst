@@ -62,6 +62,18 @@ Python
         :doc:`network_manipulation/_auto_examples/index`
 
 .. grid::
+
+   .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
+
+      .. rst-class:: big-font 
+        
+        :doc:`Distribution Procedures <model_distribution>`
+
+      Run IPF
+      +++
+      :doc:`model_distribution/_auto_examples/index`
     
    .. grid-item-card::
       :text-align: center
@@ -81,11 +93,13 @@ Python
 
       .. rst-class:: big-font 
 
-         :ref:`Transit Assignment <transit_assignment>`
+         :doc:`Transit Assignment <transit_assignment>`
 
       Perform transit assignment for your transit data!
       +++
       :doc:`transit_assignment/_auto_examples/index`
+
+.. grid::
 
    .. grid-item-card::
       :text-align: center
@@ -99,20 +113,9 @@ Python
       +++
       :doc:`route_choice/_auto_examples/index`
 
-.. 
-    .. raw:: html
+   .. grid-item:: 
 
-    <footer class="prev-next-footer d-print-none">
-        <div class="prev-next-area">
-            <a class="right-next" href="aequilibrae_project.html" title="next page">
-            <div class="prev-next-info">
-                <p class="prev-next-subtitle">next</p>
-                <p class="prev-next-title">The AequilibraE Project</p>
-            </div>
-            <i class="fa-solid fa-angle-right"></i>
-            </a>
-        </div>
-    </footer>
+   .. grid-item::
 
 .. toctree::
    :hidden:
@@ -122,5 +125,5 @@ Python
    project_components
    network_manipulation
    static_traffic_assignment
-   transit_assignment/index
+   transit_assignment
    route_choice

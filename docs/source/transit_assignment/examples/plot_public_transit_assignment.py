@@ -12,7 +12,7 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # %%
 # .. admonition:: References
 # 
-#   * :ref:`transit_assignment`
+#   * :doc:`../../transit_assignment`
 
 # %%
 # .. seealso::
