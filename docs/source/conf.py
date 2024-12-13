@@ -66,6 +66,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_git",
     "sphinx_tabs.tabs",
+    "sphinx_subfigure",
 ]
 
 sphinx_tabs_disable_tab_closing = True
