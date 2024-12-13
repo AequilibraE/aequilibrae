@@ -16,7 +16,7 @@ from os.path import join
 from aequilibrae.utils.create_example import create_example
 import logging
 import sys
-# sphinx_gallery_thumbnail_path = '../source/images/plot_logging_to_terminal_image.png'
+# sphinx_gallery_thumbnail_path = '../source/_images/plot_logging_to_terminal_image.png'
 
 # %%
 

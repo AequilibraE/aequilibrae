@@ -11,7 +11,7 @@ AequilibraE
    ../aequilibrae_project
    ../network_manipulation
    ../project_components
-   ../traffic_assignment/index
+   ../static_traffic_assignment
    ../transit_assignment/index
    ../route_choice/index
    ../useful_links/api

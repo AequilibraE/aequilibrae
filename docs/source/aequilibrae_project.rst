@@ -1,5 +1,3 @@
-.. _project:
-
 The AequilibraE project
 =======================
 
@@ -36,7 +34,7 @@ Since version 0.7, the AequilibraE project consists of a main folder, where a
 series of files and sub folders exist, and the current project organization
 is as follows:
 
-.. image:: images/project_structure.png
+.. image:: _images/project_structure.png
     :scale: 25 %
     :align: center
     :alt: AequilibraE project structure
@@ -105,6 +103,8 @@ API call to the corresponding Python method.
    :maxdepth: 1
 
    aequilibrae_project/project_database
+   aequilibrae_project/project_database/data_model/datamodel
    aequilibrae_project/parameter_file
    aequilibrae_project/transit_database
+   aequilibrae_project/transit_database/data_model/datamodel
    aequilibrae_project/_auto_examples/index

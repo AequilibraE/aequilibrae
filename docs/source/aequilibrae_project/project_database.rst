@@ -61,7 +61,7 @@ As described in the SQL data model, all AequilibraE models are created with 4
 standard modes, which can be added to or removed by the user, and would look like
 the following.
 
-.. image:: ../images/modes_table.png
+.. image:: ../_images/modes_table.png
     :align: center
     :alt: Modes table structure
 
@@ -182,7 +182,7 @@ Adding new link types to a project
 Adding link types to a project can be done through the Python API or directly into
 the 'link_types' table, which could look like the following.
 
-.. image:: ../images/link_types_table.png
+.. image:: ../_images/link_types_table.png
     :align: center
     :alt: Link_types table structure
 
@@ -311,7 +311,7 @@ This index, which looks like below, has two main columns. The first one is the
 AequilibraE to find the file, and **name**, which is the name by which the user
 should refer to the matrix in order to access it through the API.
 
-.. image:: ../images/matrices_table.png
+.. image:: ../_images/matrices_table.png
     :align: center
     :alt: Matrices table structure
 
@@ -346,7 +346,7 @@ We strongly recommend not to edit the information on **projection** and
 the software to produce valuable information to the user with regards to
 opportunities for version upgrades.
 
-.. image:: ../images/about_table_example.png
+.. image:: ../_images/about_table_example.png
     :alt: About table structure
     :align: center
 
@@ -371,7 +371,7 @@ itself.
 
 As a simple table, it looks as follows:
 
-.. image:: ../images/attributes_documentation.png
+.. image:: ../_images/attributes_documentation.png
     :align: center
     :alt: attributes documentation table 
 
@@ -396,7 +396,7 @@ essentially clutter the **project_database.sqlite**.
 
 As a simple table, it looks as follows:
 
-.. image:: ../images/results_table.png
+.. image:: ../_images/results_table.png
     :align: center
     :alt: results table structure
 
@@ -409,7 +409,7 @@ As a simple table, it looks as follows:
 Periods table
 ~~~~~~~~~~~~~
     
-.. image:: ../images/periods_table.png
+.. image:: ../_images/periods_table.png
     :align: center
     :alt: periods table structure
 
@@ -419,11 +419,3 @@ Periods table
         Class documentation
     * :ref:`periods_network_data_model`
         Data model
-
-.. _project_datamodel:
-
-.. toctree::
-   :caption: Project database data structures
-   :maxdepth: 1
-
-   data_model/datamodel.rst

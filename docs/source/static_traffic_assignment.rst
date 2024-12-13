@@ -1,7 +1,5 @@
 :orphan:
 
-.. _static_traffic_assignment:
-
 Static Traffic Assignment
 =========================
 
@@ -39,10 +37,6 @@ Running traffic assignment in AequilibraE consists in creating the traffic class
 to be assigned, add them to a traffic assignment object, set the traffic assignment parameters, and
 run the assignment.
 
-.. code-block:: python
-
-    >>> project = create_example(project_path)
-
 ``TrafficClass``
 ~~~~~~~~~~~~~~~~
 
@@ -60,6 +54,7 @@ assigned. There are three pieces of information that are required in the instant
 
     >>> from aequilibrae.paths import TrafficClass
 
+    >>> project = create_example(project_path)
     >>> project.network.build_graphs()
 
     # We get the graphs for cars and trucks
@@ -84,14 +79,14 @@ method call:
   equilibrium in a consistent manner (see [3]_ for the technical detail), and its value is set to 1.0 
   by default.
 
-  .. code-block:: python
+.. code-block:: python
 
     >>> tc_truck.set_pce(2.5)
 
 * **Fixed costs**: in case there are fixed costs associated with the traversal of links in the network, the user 
   can provide the name of the field in the graph that contains that network.
 
-  .. code-block:: python
+.. code-block:: python
 
     >>> tc_truck.set_fixed_cost("distance")
 
@@ -99,7 +94,7 @@ method call:
   within a generalized cost function. In the event that fixed cost is measured in the same unit as free-flow travel
   time, then *vot* must be set to 1.0.
 
-  .. code-block:: python
+.. code-block:: python
 
     >>> tc_truck.set_vot(0.35)
 
@@ -118,7 +113,7 @@ procedure.
 
 * **classes**: list of completely specified traffic classes
 
-  .. code-block:: python
+.. code-block:: python
 
     # You can add one or more traffic classes to the assignment instance
     >>> assig.add_class(tc_truck) # doctest: +SKIP
@@ -127,7 +122,7 @@ procedure.
 
 * **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``, or ``INRETS``
 
-  .. code-block:: python
+.. code-block:: python
 
     >>> assig.set_vdf('BPR')
 
@@ -141,10 +136,9 @@ procedure.
   Setting the VDF parameters should be done *AFTER* setting the VDF function of choice and adding traffic classes 
   to the assignment, or it will *fail*.
 
-  .. code-block:: python
+.. code-block:: python
 
-    # The VDF parameters can be either an existing field in the graph, passed
-    # as a parameter:
+    # The VDF parameters can be either an existing field in the graph, passed as a parameter:
     >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"}) # doctest: +SKIP
 
     # Or as a global value:
@@ -154,7 +148,7 @@ procedure.
   collect this information from the graph associated with the first traffic class provided, but will check 
   if all graphs have the same information on free-flow travel time
   
-  .. code-block:: python
+.. code-block:: python
 
     >>> assig.set_time_field("free_flow_time")
 
@@ -162,14 +156,14 @@ procedure.
   this information from the graph associated with the first traffic class provided, but will check if all graphs
   have the same information on capacity
 
-  .. code-block:: python
+.. code-block:: python
 
     >>> assig.set_capacity_field("capacity")
 
 * **algorithm**: the assignment algorithm to be used, being one of ``all-or-nothing``, ``bfw``, ``cfw``, ``fw``,  
   ``franke-wolfe``, or ``msa``.
 
-  .. code-block:: python
+.. code-block:: python
 
     >>> assig.set_algorithm("bfw")
 
@@ -199,7 +193,7 @@ and after capacity
 More functions will be added as needed/requested/possible.
 
 Setting Preloads
-^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~
 
 We can also optionally include a preload vector for constant flows which are not being otherwise modelled. 
 For example, this can be used to account for scheduled  public transport vehicles, adding an equivalent 

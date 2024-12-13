@@ -19,7 +19,7 @@ The data used in this example comes from Table 5.6 in
 # .. admonition:: References
 # 
 #   * :ref:`all_about_aeq_matrices` 
-#   * :ref:`validation`
+#   * :doc:`../IPF_benchmark`
 
 # %%
 # .. seealso::
@@ -39,7 +39,7 @@ import pandas as pd
 
 from aequilibrae.distribution import Ipf
 from aequilibrae.matrix import AequilibraeMatrix
-# sphinx_gallery_thumbnail_path = '../source/images/ipf.png'
+# sphinx_gallery_thumbnail_path = '../source/_images/ipf.png'
 
 # %%
 folder = gettempdir()

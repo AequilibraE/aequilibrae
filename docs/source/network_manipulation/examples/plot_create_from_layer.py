@@ -14,7 +14,7 @@ We use Folium to visualize the resulting network.
 # %%
 # .. admonition:: References
 # 
-#   * :ref:`accessing_project_data`
+#   * :doc:`../../project_components`
 
 # %%
 # .. seealso::
@@ -38,7 +38,7 @@ import pandas as pd
 import folium
 
 from aequilibrae import Project
-# sphinx_gallery_thumbnail_path = '../source/images/plot_from_layer.png'
+# sphinx_gallery_thumbnail_path = '../source/_images/plot_from_layer.png'
 
 # %%
 

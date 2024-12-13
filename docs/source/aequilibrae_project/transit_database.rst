@@ -23,9 +23,3 @@ for the first time.
 In the following sections, we'll dive deep into the tables existing in the public transport database.
 Please notice that some tables are homonyms to the ones existing in the **project_database.sqlite**,
 but its contents are related to the public transport graph building and assignment processes. 
-
-.. toctree::
-    :caption: Get to know the data structures in public transport database!
-    :maxdepth: 1
-
-    data_model/datamodel.rst

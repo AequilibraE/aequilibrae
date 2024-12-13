@@ -17,7 +17,7 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 import folium
-# sphinx_gallery_thumbnail_path = '../source/images/plot_network_image.png'
+# sphinx_gallery_thumbnail_path = '../source/_images/plot_network_image.png'
 
 # %%
 

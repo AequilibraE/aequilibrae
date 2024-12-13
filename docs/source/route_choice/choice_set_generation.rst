@@ -26,7 +26,8 @@ The process is designed to run multiple calculations simultaneously across the o
 multi-core processors and improving computational performance. As Rieser-Schüssler et al. [1]_ noted, pathfinding is
 the most time-consuming stage in generating a set of route choices. Despite the optimisations implemented to reduce the
 computational load of maintaining the route set generation overhead, computational time is still not trivial, as
-pathfinding remains the dominant factor in determining runtime.
+pathfinding remains the dominant factor in determining runtime. An application of route choice algorithm for very
+large networks is presented in [2]_.
 
 Link-Penalization
 ~~~~~~~~~~~~~~~~~
@@ -74,7 +75,7 @@ In an experiment with nearly 9,000 observed vehicle GPS routes covering a large 
 all three algorithms (LP, BFS-LE, and BFS-LE+LP) had excellent performance in reproducing the observed routes. However,
 the computational overhead of BFS-LE is substantial enough to recommend always verifying if LP is fit-for-purpose.
 
-.. image:: ../images/route_choice_sets.png
+.. image:: ../_images/route_choice_sets.png
    :width: 600
    :align: center
    :alt: Choice set comparison
@@ -121,4 +122,4 @@ References
        https://doi.org/10.1080/18128602.2012.671383
 
 .. [2] Moss, J., P. V. de Camargo, C. de Freitas, and R. Imai. High-Performance Route Choice Set Generation on
-      Large Networks (Submitted). Presented at the ATRF, Melbourne, 2024.
+      Large Networks. Presented at the ATRF, Melbourne, 2024.

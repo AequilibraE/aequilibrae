@@ -33,7 +33,7 @@ import folium
 
 from aequilibrae.utils.create_example import create_example
 
-# sphinx_gallery_thumbnail_path = '../source/images/plot_subarea_analysis.png'
+# sphinx_gallery_thumbnail_path = '../source/_images/plot_subarea_analysis.png'
 
 # %%
 

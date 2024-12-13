@@ -1,5 +1,3 @@
-.. _project_data_components:
-
 Data Components
 =======================
 
@@ -25,7 +23,7 @@ object with similar name that corresponds to one object in the class. Thus ``pro
 enables the access to manipulate the 'links' table, and each item in the items table is a 
 ``Link`` object.
 
-.. image:: images/project_components_and_items.png
+.. image:: _images/project_components_and_items.png
    :align: center
    :alt: basics on project components
 

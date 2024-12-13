@@ -1,3 +1,5 @@
+:orphan:
+
 .. _multiclass_equilibrium:
 
 Traffic Assignment Insights

@@ -15,10 +15,11 @@ Python
 
 **Download documentation**: :download:`HTML <_static/AequilibraE.zip>` | :download:`PDF <_static/latex/aequilibrae.pdf>`
 
-**Previous versions**: documentation for all AequilibraE's versions are available :ref:`here <versionhistory>`.
+**Previous versions**: documentation for all AequilibraE's versions are available 
+:doc:`here <useful_links/version_history>`.
 
-**Useful links**: :ref:`installation` | :ref:`api_reference` | :ref:`developing_aequilibrae` | :ref:`support` | 
-:ref:`history_of_aequilibrae`
+**Useful links**: :doc:`useful_links/installation` | :doc:`useful_links/api` | 
+:doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history`
 
 |
 
@@ -26,12 +27,11 @@ Python
 
     .. grid-item-card::
         :text-align: center
-        :class-card: sd-border-1 sd-rounded-2
-        :class-footer: sd-border-2 sd-rounded-2 sd-bg-light sd-font-weight-bold
+        :class-footer: sd-bg-light sd-font-weight-bold
 
         .. rst-class:: big-font 
 
-            :ref:`The AequilibraE Project <project>`
+            :doc:`The AequilibraE Project <aequilibrae_project>`
 
         Get to know the structure of an AequilibraE project
         +++
@@ -39,12 +39,11 @@ Python
 
     .. grid-item-card::
         :text-align: center
-        :class-card: sd-border-1 sd-rounded-2
-        :class-footer: sd-border-2 sd-rounded-2 sd-bg-light sd-font-weight-bold
+        :class-footer: sd-bg-light sd-font-weight-bold
 
         .. rst-class:: big-font 
 
-            :ref:`Project Components <project_data_components>`
+            :doc:`Project Components <project_components>`
 
         Get to know the components of each AequilibraE project
         +++
@@ -52,12 +51,11 @@ Python
 
     .. grid-item-card::
         :text-align: center
-        :class-card: sd-border-1 sd-rounded-2
-        :class-footer: sd-border-2 sd-rounded-2 sd-bg-light sd-font-weight-bold
+        :class-footer: sd-bg-light sd-font-weight-bold
 
         .. rst-class:: big-font 
 
-            :ref:`Network Manipulation <net_manipulation>`
+            :doc:`Network Manipulation <network_manipulation>`
 
         Create and edit networks and models
         +++
@@ -67,12 +65,11 @@ Python
     
    .. grid-item-card::
       :text-align: center
-      :class-card: sd-border-1 sd-rounded-2
-      :class-footer: sd-border-2 sd-rounded-2 sd-bg-light sd-font-weight-bold
+      :class-footer: sd-bg-light sd-font-weight-bold
 
       .. rst-class:: big-font 
         
-        :ref:`Traffic Assignment <static_traffic_assignment>`
+        :doc:`Traffic Assignment <static_traffic_assignment>`
 
       Run traffic allocation.
       +++
@@ -80,8 +77,7 @@ Python
 
    .. grid-item-card:: 
       :text-align: center
-      :class-card: sd-border-1 sd-rounded-2
-      :class-footer: sd-border-2 sd-rounded-2 sd-bg-light sd-font-weight-bold
+      :class-footer: sd-bg-light sd-font-weight-bold
 
       .. rst-class:: big-font 
 
@@ -93,8 +89,7 @@ Python
 
    .. grid-item-card::
       :text-align: center
-      :class-card: sd-border-1 sd-rounded-2
-      :class-footer: sd-border-2 sd-rounded-2 sd-bg-light sd-font-weight-bold
+      :class-footer: sd-bg-light sd-font-weight-bold
 
       .. rst-class:: big-font 
         
@@ -104,16 +99,28 @@ Python
       +++
       :doc:`route_choice/_auto_examples/index`
 
-.. raw:: html
+.. 
+    .. raw:: html
 
-   <footer class="prev-next-footer d-print-none">
-    <div class="prev-next-area">
-        <a class="right-next" href="aequilibrae_project.html" title="next page">
-        <div class="prev-next-info">
-            <p class="prev-next-subtitle">next</p>
-            <p class="prev-next-title">The AequilibraE Project</p>
+    <footer class="prev-next-footer d-print-none">
+        <div class="prev-next-area">
+            <a class="right-next" href="aequilibrae_project.html" title="next page">
+            <div class="prev-next-info">
+                <p class="prev-next-subtitle">next</p>
+                <p class="prev-next-title">The AequilibraE Project</p>
+            </div>
+            <i class="fa-solid fa-angle-right"></i>
+            </a>
         </div>
-        <i class="fa-solid fa-angle-right"></i>
-        </a>
-    </div>
-   </footer>
+    </footer>
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   aequilibrae_project
+   project_components
+   network_manipulation
+   static_traffic_assignment
+   transit_assignment/index
+   route_choice/index
