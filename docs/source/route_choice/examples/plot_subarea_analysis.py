@@ -9,7 +9,7 @@ Metropolitan Area in Chile.
 
 .. admonition:: References
  
-   * :ref:`route_choice`
+   * :doc:`../../route_choice`
 
 .. seealso::
     Several functions, methods, classes and modules are used in this example:

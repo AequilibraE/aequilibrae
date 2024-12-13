@@ -1,5 +1,3 @@
-:orphan:
-
 Static Traffic Assignment
 =========================
 
@@ -232,3 +230,10 @@ Finally, run traffic assignment!
 .. [3] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: 
        Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. 
        Available in: https://doi.org/10.1177%2F0361198119837496
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   traffic_assignment/traffic_assignment_insights
+   traffic_assignment/traffic_assignment_validation

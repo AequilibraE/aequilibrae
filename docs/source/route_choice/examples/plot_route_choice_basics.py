@@ -10,7 +10,7 @@ Serena Metropolitan Area in Chile.
 # %%
 # .. admonition:: References
 # 
-#   * :ref:`route_choice`
+#   * :doc:`../../route_choice`
 
 # %%
 # .. seealso::

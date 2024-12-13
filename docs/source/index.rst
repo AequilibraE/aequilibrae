@@ -93,7 +93,7 @@ Python
 
       .. rst-class:: big-font 
         
-        :ref:`Route Choice <route_choice>`
+        :doc:`Route Choice <route_choice>`
 
       Explore the route choice models.
       +++
@@ -123,4 +123,4 @@ Python
    network_manipulation
    static_traffic_assignment
    transit_assignment/index
-   route_choice/index
+   route_choice

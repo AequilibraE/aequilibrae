@@ -1,5 +1,3 @@
-:orphan:
-
 .. _aequilibrae-graphs:
 
 AequilibraE Graphs

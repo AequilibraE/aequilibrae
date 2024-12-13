@@ -1,10 +1,10 @@
 .. _supply_data_model:
 
-SQL Data model
-^^^^^^^^^^^^^^
+Project database SQL data model
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The data model presented in this section pertains only to the structure of
-AequilibraE's project_database and general information about the usefulness
+AequilibraE's 'project_database' and general information about the usefulness
 of specific fields, especially on the interdependency between tables.
 
 Conventions

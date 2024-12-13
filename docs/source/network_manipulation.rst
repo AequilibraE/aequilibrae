@@ -455,7 +455,7 @@ Fields 'a_node' and 'b_node'
 The user should not change the a_node and b_node fields, as they are controlled
 by the triggers that govern the consistency between links and nodes. It is not
 possible to enforce that users do not change these two fields, as it is not
-possible to choose the trigger application sequence in SQLite
+possible to choose the trigger application sequence in SQLite.
 
 .. toctree::
    :hidden:
