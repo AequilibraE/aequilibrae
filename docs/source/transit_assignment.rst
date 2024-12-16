@@ -346,6 +346,7 @@ The graph creation process in AequilibraE incorporates several edge types to cap
 transit networks. Notable distinctions include:
 
 * Connectors
+
   - access connectors: directed from od nodes to the network   
   - egress connectors: directed from the network to the od nodes  
 

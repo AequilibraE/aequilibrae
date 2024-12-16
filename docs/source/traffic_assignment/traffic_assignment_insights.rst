@@ -161,7 +161,10 @@ when we are aggregating flows.
 The use of the AequilibraE project and its built-in methods to build graphs ensure that all graph will be built 
 in a consistent manner and multi-class assignment is possible.
 
-.. [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."
+References
+----------
+
+.. [1] Wardrop, J.G. (1952) "Some theoretical aspects of road traffic research."
        Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. 
        Available in: https://www.icevirtuallibrary.com/doi/abs/10.1680/ipeds.1952.11259
 
@@ -179,16 +182,16 @@ in a consistent manner and multi-class assignment is possible.
        Transportation Research Part B, 22(4):261-274. 
        Available in: https://doi.org/10.1016/0191-2615(88)90003-3
 
-.. [5] Florian, M., Morosan, C. D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment",
+.. [5] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment",
        Transportation Research Part B, 70:261-274. 
        Available in: https://doi.org/10.1016/j.trb.2014.06.011
 
-.. [6] LeBlanc, L. J., Morlok, E. K., Pierskalla, W. P. (1975) 
+.. [6] LeBlanc, L.J., Morlok, E.K., Pierskalla, W.P. (1975) 
        "An efficient approach to solving the road network equilibrium traffic assignment problem". 
        Transportation Research, 9(5):309-318. 
        Available in: https://doi.org/10.1016/0041-1647(75)90030-1
 
-.. [7] Mitradjieva, M., Lindberg, P. O. (2013) 
+.. [7] Mitradjieva, M., Lindberg, P.O. (2013) 
        "The Stiff Is Moving—Conjugate Direction Frank-Wolfe Methods with Applications to Traffic Assignment".
        Transportation Science, 47(2):280-293. 
        Available in: https://doi.org/10.1287/trsc.1120.0409

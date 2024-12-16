@@ -74,12 +74,14 @@ sphinx_tabs_disable_tab_closing = True
 # Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
     "examples_dirs": ["aequilibrae_project/examples",
+                      "model_distribution/examples",
                       "network_manipulation/examples",
                       "project_components/examples",
                       "route_choice/examples",
                       "traffic_assignment/examples",
                       "transit_assignment/examples"],  # path to your example scripts
     "gallery_dirs": ["aequilibrae_project/_auto_examples",
+                     "model_distribution/_auto_examples",
                       "network_manipulation/_auto_examples",
                       "project_components/_auto_examples",
                       "route_choice/_auto_examples",

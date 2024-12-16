@@ -15,10 +15,11 @@ The data used in this example comes from Table 5.6 in
 `Ortúzar & Willumsen (2011) <https://www.wiley.com/en-us/Modelling+Transport%2C+4th+Edition-p-9780470760390>`_.
 
 """
+
 # %%
 # .. admonition:: References
-# 
-#   * :ref:`all_about_aeq_matrices` 
+#
+#   * :ref:`all_about_aeq_matrices`
 #   * :doc:`../IPF_benchmark`
 
 # %%
@@ -39,14 +40,14 @@ import pandas as pd
 
 from aequilibrae.distribution import Ipf
 from aequilibrae.matrix import AequilibraeMatrix
+
 # sphinx_gallery_thumbnail_path = '../source/_images/ipf.png'
 
 # %%
 folder = gettempdir()
 
 # %%
-matrix = np.array([[5, 50, 100, 200], [50, 5, 100, 300], 
-                   [50, 100, 5, 100], [100, 200, 250, 20]], dtype="float64")
+matrix = np.array([[5, 50, 100, 200], [50, 5, 100, 300], [50, 100, 5, 100], [100, 200, 250, 20]], dtype="float64")
 future_prod = np.array([400, 460, 400, 702], dtype="float64")
 future_attr = np.array([260, 400, 500, 802], dtype="float64")
 
@@ -67,7 +68,7 @@ args = {
     "file_path": join(folder, "vectors.aem"),
 }
 
-vectors = pd.DataFrame({"productions": future_prod, "attractions":future_attr}, index=mtx.index)
+vectors = pd.DataFrame({"productions": future_prod, "attractions": future_attr}, index=mtx.index)
 # %%
 args = {
     "matrix": mtx,
@@ -85,4 +86,3 @@ fratar.output.matrix_view
 # %%
 for line in fratar.report:
     print(line)
-    
