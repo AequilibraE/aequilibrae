@@ -14,7 +14,7 @@ def replace_regex(event):
         dirs = ["_auto_examples", "_generated", "_latex", "_static", "images"]
         directories[:] = [d for d in directories if d not in dirs]
         for file in files:
-            if file.endswith((".drawio", ".txt", ".omx")):
+            if file.endswith((".drawio", ".txt", ".omx", ".png")):
                 continue
             full_path = os.path.join(root, file)
             with open(full_path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as s:
