@@ -15,7 +15,7 @@ for example.
 
 .. toctree::
     :hidden:
-    :maxlevel: 1
+    :maxdepth: 1
 
     path_computation/_auto_examples/index
 

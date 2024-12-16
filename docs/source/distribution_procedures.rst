@@ -71,7 +71,7 @@ IPF.
     :hidden:
     :maxdepth: 1
 
-    model_distribution/IPF_benchmark
+    distribution_procedures/IPF_benchmark
 
 .. seealso::
 

@@ -65,7 +65,7 @@ jobs:
 
     - name: Build documentation
       run: |
-        jupyter nbconvert --to rst docs/source/model_distribution/IPF_benchmark.ipynb
+        jupyter nbconvert --to rst docs/source/distribution_procedures/IPF_benchmark.ipynb
         sphinx-build -M latexpdf docs/source docs/source/_static -D plot_gallery=False
         sphinx-build -D plot_gallery=False -b html docs/source docs/build
         python -m zipfile -c AequilibraE.zip docs/build

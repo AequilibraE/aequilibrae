@@ -25,109 +25,107 @@ Python
 
 .. grid::
 
-    .. grid-item-card::
-        :text-align: center
-        :class-footer: sd-bg-light sd-font-weight-bold
+  .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
 
-        .. rst-class:: big-font 
+      .. rst-class:: big-font 
 
-            :doc:`The AequilibraE Project <aequilibrae_project>`
+          :doc:`The AequilibraE Project <aequilibrae_project>`
 
-        Get to know the structure of an AequilibraE project
-        +++
-        :doc:`aequilibrae_project/_auto_examples/index`
+      Get to know the structure of an AequilibraE project
+      +++
+      :doc:`aequilibrae_project/_auto_examples/index`
 
-    .. grid-item-card::
-        :text-align: center
-        :class-footer: sd-bg-light sd-font-weight-bold
+  .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
 
-        .. rst-class:: big-font 
+      .. rst-class:: big-font 
 
-            :doc:`Project Components <project_components>`
+          :doc:`Project Components <project_components>`
 
-        Get to know the components of each AequilibraE project
-        +++
-        :doc:`project_components/_auto_examples/index`
+      Get to know the components of each AequilibraE project
+      +++
+      :doc:`project_components/_auto_examples/index`
 
-    .. grid-item-card::
-        :text-align: center
-        :class-footer: sd-bg-light sd-font-weight-bold
+  .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
 
-        .. rst-class:: big-font 
+      .. rst-class:: big-font 
 
-            :doc:`Network Manipulation <network_manipulation>`
+          :doc:`Network Manipulation <network_manipulation>`
 
-        Create and edit networks and models
-        +++
-        :doc:`network_manipulation/_auto_examples/index`
+      Create and edit networks and models
+      +++
+      :doc:`network_manipulation/_auto_examples/index`
 
 .. grid::
 
-   .. grid-item-card::
-      :text-align: center
-      :class-footer: sd-bg-light sd-font-weight-bold
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
 
-      .. rst-class:: big-font 
-        
-        :doc:`Distribution Procedures <model_distribution>`
+    .. rst-class:: big-font 
+      
+      :doc:`Distribution Procedures <distribution_procedures>`
 
-      Run IPF
-      +++
-      :doc:`model_distribution/_auto_examples/index`
-    
-   .. grid-item-card::
-      :text-align: center
-      :class-footer: sd-bg-light sd-font-weight-bold
+    Run IPF and calibrate and apply gravity models
+    +++
+    :doc:`distribution_procedures/_auto_examples/index`
 
-      .. rst-class:: big-font 
-        
-        :doc:`path_computation`
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
 
-      Create skim matrices and compute the shortest path
-      +++
-      :doc:`path_computation/_auto_examples/index`
+    .. rst-class:: big-font 
+      
+      :doc:`path_computation`
 
-   .. grid-item-card::
-      :text-align: center
-      :class-footer: sd-bg-light sd-font-weight-bold
+    Create skim matrices and compute the shortest path
+    +++
+    :doc:`path_computation/_auto_examples/index`
 
-      .. rst-class:: big-font 
-        
-        :doc:`Traffic Assignment <static_traffic_assignment>`
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
 
-      Run traffic allocation.
-      +++
-      :doc:`traffic_assignment/_auto_examples/index`
+    .. rst-class:: big-font 
+      
+      :doc:`Traffic Assignment <static_traffic_assignment>`
+
+    Run traffic allocation.
+    +++
+    :doc:`traffic_assignment/_auto_examples/index`
 
 .. grid::
 
-   .. grid-item-card:: 
-      :text-align: center
-      :class-footer: sd-bg-light sd-font-weight-bold
+  .. grid-item-card:: 
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
 
-      .. rst-class:: big-font 
+    .. rst-class:: big-font 
 
-         :doc:`Transit Assignment <transit_assignment>`
+      :doc:`Transit Assignment <transit_assignment>`
 
-      Perform transit assignment for your transit data!
-      +++
-      :doc:`transit_assignment/_auto_examples/index`
+    Perform transit assignment for your transit data!
+    +++
+    :doc:`transit_assignment/_auto_examples/index`
 
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
 
+    .. rst-class:: big-font 
+      
+      :doc:`Route Choice <route_choice>`
 
-   .. grid-item-card::
-      :text-align: center
-      :class-footer: sd-bg-light sd-font-weight-bold
+    Explore the route choice models.
+    +++
+    :doc:`route_choice/_auto_examples/index`
 
-      .. rst-class:: big-font 
-        
-        :doc:`Route Choice <route_choice>`
-
-      Explore the route choice models.
-      +++
-      :doc:`route_choice/_auto_examples/index`
-
-   .. grid-item::
+  .. grid-item::
 
 .. toctree::
    :hidden:
@@ -136,6 +134,8 @@ Python
    aequilibrae_project
    project_components
    network_manipulation
+   distribution_procedures
+   path_computation
    static_traffic_assignment
    transit_assignment
    route_choice

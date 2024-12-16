@@ -8,7 +8,7 @@ AequilibraE
    :maxdepth: 1
 
    ../aequilibrae_project
-   ../model_distribution
+   ../distribution_procedures
    ../network_manipulation
    ../path_computation
    ../project_components

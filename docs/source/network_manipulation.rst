@@ -218,7 +218,7 @@ can do to links and nodes, and you can use the table below to navigate between
 each of the changes to see how they are treated through triggers.
 
 .. table::
-   :width: 60%
+   :width: 75%
    :align: center
 
    +-------------------------------+----------------------------------+--------------------------+
