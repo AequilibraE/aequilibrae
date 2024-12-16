@@ -76,6 +76,7 @@ sphinx_gallery_conf = {
     "examples_dirs": ["aequilibrae_project/examples",
                       "model_distribution/examples",
                       "network_manipulation/examples",
+                      "path_computation/examples",
                       "project_components/examples",
                       "route_choice/examples",
                       "traffic_assignment/examples",
@@ -83,6 +84,7 @@ sphinx_gallery_conf = {
     "gallery_dirs": ["aequilibrae_project/_auto_examples",
                      "model_distribution/_auto_examples",
                       "network_manipulation/_auto_examples",
+                      "path_computation/_auto_examples",
                       "project_components/_auto_examples",
                       "route_choice/_auto_examples",
                       "traffic_assignment/_auto_examples",
@@ -164,9 +166,9 @@ htmlhelp_basename = "AequilibraEdoc"
 # (source start file, target name, title, author, documentclass [howto, manual, or own class]).
 latex_documents = [("_latex/index", "aequilibrae.tex", html_title, author, "manual")]
 
-latex_appendices = [
-    "useful_links/installation"
-]
+latex_appendices = ["useful_links/installation"]
+
+latex_engine = 'xelatex'
 
 # -- Options for manual page output ------------------------------------------
 

@@ -4,8 +4,8 @@
 Running IPF with NumPy array
 ============================
 
-In this example, we show how to use `aequilibrae.distribution.ipf_core`, an alternative to 
-`aequilibrae.distribution.Ipf` for all those who don't want to run an IPF procedure without
+In this example, we show how to use ``aequilibrae.distribution.ipf_core``, an alternative to 
+``aequilibrae.distribution.Ipf`` for all those who want to run an IPF procedure without
 creating a model or using data types such as Aequilibrae Matrix.
 
 Let's consider that you have an OD-matrix, the future production and future attraction values.
@@ -51,6 +51,6 @@ matrix
 
 # %%
 # Notice that the results are the same as in :ref:`plot_ipf_without_model`, and this is no
-# such coincidence. Under the hood, when we call `aequilibrae.distribution.Ipf`, we are actually
-# calling the `ipf_core function`. For all those who only want to use AequilibraE's IPF procedure
+# such coincidence. Under the hood, when we call ``aequilibrae.distribution.Ipf``, we are actually
+# calling the ``ipf_core`` method. For all those who want to use AequilibraE's IPF procedure
 # regardless of the purpose, this is the method for you!

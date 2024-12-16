@@ -81,11 +81,25 @@ Python
 
       .. rst-class:: big-font 
         
+        :doc:`path_computation`
+
+      Create skim matrices and compute the shortest path
+      +++
+      :doc:`path_computation/_auto_examples/index`
+
+   .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
+
+      .. rst-class:: big-font 
+        
         :doc:`Traffic Assignment <static_traffic_assignment>`
 
       Run traffic allocation.
       +++
       :doc:`traffic_assignment/_auto_examples/index`
+
+.. grid::
 
    .. grid-item-card:: 
       :text-align: center
@@ -99,7 +113,7 @@ Python
       +++
       :doc:`transit_assignment/_auto_examples/index`
 
-.. grid::
+
 
    .. grid-item-card::
       :text-align: center
@@ -112,8 +126,6 @@ Python
       Explore the route choice models.
       +++
       :doc:`route_choice/_auto_examples/index`
-
-   .. grid-item:: 
 
    .. grid-item::
 

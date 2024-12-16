@@ -2,7 +2,7 @@ Data Components
 =======================
 
 In the :ref:`aeq_project_structure` section, we present the main file components and folders that
-consists an AequilibraE project. We also present in :doc:`supply_data_model` all tables
+consists an AequilibraE project. We also present in :ref:`supply_data_model` all tables
 that are part of the project database, how do they look like, and what fields do they have.
 
 The components of an AequilibraE project are:

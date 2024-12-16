@@ -7,11 +7,12 @@ AequilibraE
    :hidden:
    :maxdepth: 1
 
-   examples
    ../aequilibrae_project
+   ../model_distribution
    ../network_manipulation
+   ../path_computation
    ../project_components
    ../static_traffic_assignment
-   ../transit_assignment/index
+   ../transit_assignment
    ../route_choice
    ../useful_links/api

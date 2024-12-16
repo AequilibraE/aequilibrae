@@ -24,7 +24,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc latexmk texlive-latex-extra
+        sudo apt-get install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc 
+        sudo apt-get install latexmk texlive-xetex texlive-latex-extra fonts-freefont-otf xindy
         python -m pip install --upgrade pip
         pip install wheel openmatrix pytest
         pip install -r requirements.txt
@@ -50,7 +51,7 @@ jobs:
         python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py 
         python -m pytest --doctest-modules aequilibrae/transit
         python -m pytest --doctest-glob=*.rst docs/source/project_components
-        python -m pytest --doctest-glob=*.rst docs/source/traffic_assignment
+        python -m pytest --doctest-glob=*.rst docs/source/static_traffic_assignment.rst
 
     - name: Prepare links for DEV
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
@@ -64,7 +65,7 @@ jobs:
 
     - name: Build documentation
       run: |
-        jupyter nbconvert --to rst docs/source/traffic_assignment/IPF_benchmark.ipynb
+        jupyter nbconvert --to rst docs/source/model_distribution/IPF_benchmark.ipynb
         sphinx-build -M latexpdf docs/source docs/source/_static -D plot_gallery=False
         sphinx-build -D plot_gallery=False -b html docs/source docs/build
         python -m zipfile -c AequilibraE.zip docs/build
