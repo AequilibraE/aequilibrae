@@ -1,7 +1,7 @@
 Project database
 ----------------
 
-In this section we discuss on a nearly *per-table* basis the role of each table for an
+In this section we discuss on a nearly per-table basis the role of each table for an
 AequilibraE model. In the end, a more technical view of the :ref:`database structure <supply_data_model>`, 
 including the SQL queries used to create each table and the indices used for each table are also available.
 

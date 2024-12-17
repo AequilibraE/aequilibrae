@@ -564,29 +564,6 @@ Each item in the 'periods' table is a ``Period`` object.
     * :ref:`tables_period`
         Table documentation
 
-.. 
-    .. raw:: html
-
-    <footer class="prev-next-footer d-print-none">
-        <div class="prev-next-area">
-            <a class="left-prev" href="aequilibrae_project.html" title="previous page">
-            <i class="fa-solid fa-angle-left"></i>
-            <div class="prev-next-info">
-            <p class="prev-next-subtitle">previous</p>
-            <p class="prev-next-title">Só para teste</p>
-            </div>
-            </a>
-            <a class="right-next" href="project_components/aequilibrae_graph.html" title="next page">
-            <div class="prev-next-info">
-            <p class="prev-next-subtitle">next</p>
-            <p class="prev-next-title">AequilibraE Graph</p>
-            </div>
-            <i class="fa-solid fa-angle-right"></i>
-            </a>
-        </div>
-    </footer>
-
- 
 .. toctree::
     :hidden:
     :maxdepth: 1

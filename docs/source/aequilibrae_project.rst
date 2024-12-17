@@ -25,6 +25,31 @@ please refer to :ref:`dependencies`. For QGIS users this is not a concern, while
 for Windows users this dependency is automatically handled under the hood, but
 the details are also discussed in the aforementioned dependencies section.
 
+Package components: A conceptual view
+-------------------------------------
+
+As all the components of an AequilibraE model are based on open-source software and
+open-data standards, modeling with AequilibraE is a little different from
+modeling with commercial packages, as the user can read and manipulate model
+components outside the software modeling environments (Python and QGIS).
+
+Thus, using/manipulating each one of an AequilibraE model components can be done
+in different ways depending on the tool you use for such.
+
+It is then important to highlight that AequilibraE, as a software, is divided in
+three very distinctive layers. The first, which is responsible for tables
+consistent with each other (including links and nodes, modes and link_types),
+are embedded in the data layer in the form of geo-spatial database triggers. The
+second is the Python API, which provides all of AequilibraE's core algorithms
+and data manipulation facilities. The third is the GUI implemented in QGIS,
+which provides a user-friendly interface to access the model, visualize results
+and run procedures.
+
+These software layers are *stacked* and depend on each other, which means that any
+network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
+while any procedure such as traffic assignment done in QGIS is nothing more than an
+API call to the corresponding Python method.
+
 .. _aeq_project_structure:
 
 Project structure
@@ -35,7 +60,6 @@ series of files and sub folders exist, and the current project organization
 is as follows:
 
 .. image:: _images/project_structure.png
-    :scale: 25 %
     :align: center
     :alt: AequilibraE project structure
 
@@ -49,7 +73,7 @@ folders and databases.
 The second key component of any model is the **parameters.yaml** file, which
 holds the default values for a number of procedures (e.g. assignment
 convergence), as well as the specification for networks imported from
-OpenStreetMap and other general *import-export* parameters.
+OpenStreetMap and other general import/export parameters.
 
 The third and last required component of an AequilibraE model is the **Matrices
 folder**, where all the matrices in binary format (in AequilibraE's native AEM or
@@ -67,39 +91,16 @@ is no pre-defined demand model available for use with AequilibraE. This database
 is not created with the model, but we recommend using this concept on
 your demand models.
 
-The **public_transport.sqlite** database holds a *transportation route system* for
+The **public_transport.sqlite** database holds a transportation route system for
 a model, and has been introduced in AequilibraE version 0.9. This database is
-also created *on-the-fly* when the user imports a GTFS source into an AequilibraE
+also created on-the-fly when the user imports a GTFS source into an AequilibraE
 model, but there is still no support for manually or programmatically adding routes
 to a route system as of yet.
 
-Package components: A conceptual view
--------------------------------------
-
-As all the components of an AequilibraE model are based on open-source software and
-open-data standards, modeling with AequilibraE is a little different from
-modeling with commercial packages, as the user can read and manipulate model
-components outside the software modeling environments (Python and QGIS).
-
-Thus, using/manipulating each one of an AequilibraE model components can be done
-in different ways depending on the tool you use for such.
-
-It is then important to highlight that AequilibraE, as a software, is divided in
-three very distinctive layers.  The first, which is responsible for tables
-consistent with each other (including links and nodes, modes and link_types),
-are embedded in the data layer in the form of geo-spatial database triggers. The
-second is the Python API, which provides all of AequilibraE's core algorithms
-and data manipulation facilities. The third is the GUI implemented in QGIS,
-which provides a user-friendly interface to access the model, visualize results
-and run procedures.
-
-These software layers are *stacked* and depend on each other, which means that any
-network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
-while any procedure such as traffic assignment done in QGIS is nothing more than an
-API call to the corresponding Python method.
+In the following sections, we present the structure of each component of an AequilibraE project.
 
 .. toctree::
-   :hidden:
+   :caption: The AequilibraE Project
    :maxdepth: 1
 
    aequilibrae_project/project_database
