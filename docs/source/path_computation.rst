@@ -10,14 +10,9 @@ map-matching GPS data and simulation of Demand Responsive Transport (DRT, e.g. U
 for example.
 
 #. **Path computation**: computes the path between two arbritrary nodes.
+
 #. **Network skimming**: can compute either the distance, the travel time, or your own cost matrix
    between a series of nodes.
-
-.. toctree::
-    :hidden:
-    :maxdepth: 1
-
-    path_computation/_auto_examples/index
 
 .. seealso::
     
@@ -27,3 +22,9 @@ for example.
         Usage example
     * :ref:`example_usage_skimming`
         Usage example
+
+.. toctree::
+    :caption: Path Computation
+    :maxdepth: 1
+
+    path_computation/_auto_examples/index

@@ -71,7 +71,7 @@ Python
       
       :doc:`Distribution Procedures <distribution_procedures>`
 
-    Run IPF and calibrate and apply gravity models
+    Calibrate and apply gravity models and perform IPF
     +++
     :doc:`distribution_procedures/_auto_examples/index`
 
@@ -109,7 +109,7 @@ Python
 
       :doc:`Transit Assignment <transit_assignment>`
 
-    Perform transit assignment for your transit data!
+    Run assignment for your transit data!
     +++
     :doc:`transit_assignment/_auto_examples/index`
 
