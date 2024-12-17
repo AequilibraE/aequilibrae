@@ -10,7 +10,7 @@ AequilibraE's distribution module comprises three different classes: ``GravityAp
 This class, as its own name explains, applies a synthetic gravity model, using one of the available
 deterrence funcions: ``EXPO``, ``POWER``, or ``GAMMA``. It requires some parameters, such as:
 
-* Synthetic gravity model (which is an instance of `aequilibrae.distribution.SyntheticGravityModel`)
+* Synthetic gravity model (which is an instance of ``SyntheticGravityModel``)
 * Impedance matrix (``AequilibraeMatrix``);
 * Vector (``Pandas.DataFrame``) with data for row and column totals;
 * Row and column fields, which are the names of the fields that contain the data for row and column
@@ -24,6 +24,8 @@ documentation.
 
 .. seealso::
     
+    * :func:`aequilibrae.distribution.SyntheticGravityModel`
+        Function documentation
     * :func:`aequilibrae.distribution.GravityApplication`
         Function documentation
 

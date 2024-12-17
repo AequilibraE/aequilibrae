@@ -11,7 +11,7 @@ We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetwor
 # %%
 # .. admonition:: References
 # 
-#   * :doc:`static_traffic_assignment`
+#   * :doc:`../source/static_traffic_assignment`
 
 # %%
 # .. seealso::

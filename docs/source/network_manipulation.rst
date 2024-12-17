@@ -1,7 +1,10 @@
 Network Manipulation
 ====================
 
-In this section, we talk about 
+In this section, we discuss how can we import and export data to/from an AequilibraE project.
+Besides, important concepts on geometry manipulation are presented. Finally, some examples that
+involve project creation, edition of links and nodes, and identification of disconnected links
+for network clean up are presented.
 
 .. toctree::
    :caption: Network Manipulation

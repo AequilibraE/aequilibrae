@@ -1,13 +1,7 @@
 .. _aequilibrae-graphs:
 
 AequilibraE Graphs
-~~~~~~~~~~~~~~~~~~
-
-As mentioned above, AequilibraE's graphs are the backbone of path computation,
-skimming and Traffic Assignment. Besides handling the selection of links available to
-each mode in an AequilibraE model, graphs also handle the existence of bi-directional
-links with direction-specific characteristics (e.g. speed limit, congestion levels, tolls,
-etc.).
+==================
 
 The Graph object is rather complex, but the difference between the graph and the physical 
 links are the availability of two class member variables consisting of Pandas DataFrames: the
@@ -23,7 +17,7 @@ links are the availability of two class member variables consisting of Pandas Da
     >>> g.graph # doctest: +SKIP
 
 Directionality
-^^^^^^^^^^^^^^
+--------------
 
 Links in the Network table (the Pandas representation of the project's *Links* table) are
 potentially bi-directional, and the directions allowed for traversal are dictated by the
@@ -39,7 +33,7 @@ the graph used to set computations (e.g. field to minimize during path-finding, 
 etc.) will be **free_flow_travel_time**.
 
 Graphs from a model
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
 Building graphs directly from an AequilibraE model is the easiest option for beginners
 or when using AequilibraE in anger, as much of the setup is done by default.
@@ -52,7 +46,7 @@ or when using AequilibraE in anger, as much of the setup is done by default.
     >>> graph = project.network.graphs['c'] # we grab the graph for cars
 
 Manipulating graphs in memory
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------------
 
 As mentioned before, the AequilibraE Graph can be manipulated in memory, with all its
 components available for editing. One of the simple tools available directly in the
@@ -86,7 +80,8 @@ changes to be made in the network DataFrame. For example:
     >>> graph.network.loc[graph.network.link_type == "motorway", "speed_ba"] = 100
 
 Skimming settings
-^^^^^^^^^^^^^^^^^
+-----------------
+
 Skimming the field of a graph when computing shortest path or performing
 traffic assignment must be done by setting the skimming fields in the
 Graph object, and there are no limits (other than memory) to the number
@@ -97,7 +92,7 @@ of fields that can be skimmed.
     >>> graph.set_skimming(["distance", "travel_time"])
 
 Setting centroids
-^^^^^^^^^^^^^^^^^
+-----------------
 
 Like other elements of the AequilibraE Graph, the user can also manipulate the
 set of nodes interpreted by the software as centroids in the Graph itself.

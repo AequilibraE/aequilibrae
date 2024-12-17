@@ -7,6 +7,7 @@ AequilibraE
    :hidden:
    :maxdepth: 1
 
+   ../useful_links/installation
    ../aequilibrae_project
    ../distribution_procedures
    ../network_manipulation

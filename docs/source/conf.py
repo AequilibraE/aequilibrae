@@ -166,7 +166,7 @@ htmlhelp_basename = "AequilibraEdoc"
 # (source start file, target name, title, author, documentclass [howto, manual, or own class]).
 latex_documents = [("_latex/index", "aequilibrae.tex", html_title, author, "manual")]
 
-latex_appendices = ["useful_links/installation"]
+# latex_appendices = ["useful_links/installation"]
 
 latex_engine = 'xelatex'
 
