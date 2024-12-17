@@ -267,7 +267,7 @@ class Network(WorkerThread):
 
         self.logger.info("Network exported successfully")
 
-    def build_graphs(self, fields: list = None, modes: list = None) -> None:
+    def build_graphs(self, fields: list = None, modes: list = None, limit_to_area: Polygon = None) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
@@ -279,6 +279,10 @@ class Network(WorkerThread):
 
             **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
             database, it may be useful to generate only those we need
+
+            **limit_to_area** (:obj:`Polygon`, *Optional*): When working with a very large model area, you may want to
+            filter your database to a small area for your computation, which you can do by providing a polygon.
+            The search is limited to a spatial index search, so it is very fast but NOT PRECISE.
 
         To use the 'fields' parameter, a minimalistic option is the following
 
@@ -308,19 +312,36 @@ class Network(WorkerThread):
             elif isinstance(modes, str):
                 modes = [modes]
 
+            if limit_to_area is not None:
+                spatial_add = """ WHERE links.rowid in (
+                                        select rowid from SpatialIndex where f_table_name = 'links' and
+                                       search_frame = GeomFromWKB(?, 4326))"""
+
             sql = f"select {','.join(all_fields)} from links"
 
-            with pd.option_context("future.no_silent_downcasting", True):
-                df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
-            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
-            sql = "select node_id from nodes where is_centroid=1 order by node_id;"
-            centroids = np.array([i[0] for i in conn.execute(sql).fetchall()], np.uint32)
+            sql_centroids = "select node_id from nodes where is_centroid=1 order by node_id;"
+            centroids = np.array([i[0] for i in conn.execute(sql_centroids).fetchall()], np.uint32)
             centroids = centroids if centroids.shape[0] else None
+
+            with pd.option_context("future.no_silent_downcasting", True):
+                if limit_to_area is None:
+                    df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
+                else:
+                    sql += spatial_add
+                    df = (
+                        pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                        .fillna(value=np.nan)
+                        .infer_objects(False)
+                    )
+
+                    # We filter to centroids existing in our filtered area
+                    centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+
+            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[valid_fields]
         for m in modes:
-
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
             # the compressed graph representation is created)
             net = pd.DataFrame(data, copy=True)

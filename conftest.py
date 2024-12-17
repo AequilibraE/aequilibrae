@@ -10,6 +10,7 @@ import pytest
 
 import pandas as pd
 import numpy as np
+from shapely.geometry import Polygon
 
 from aequilibrae import Project
 from aequilibrae.project.database_connection import database_connection
@@ -113,3 +114,4 @@ def doctest_fixtures(doctest_namespace, create_path, tmp_path_factory):
     doctest_namespace["os"] = os
     doctest_namespace["pd"] = pd
     doctest_namespace["np"] = np
+    doctest_namespace["Polygon"] = Polygon
