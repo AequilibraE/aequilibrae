@@ -33,4 +33,3 @@ the items table is a ``Link`` object.
 
     project_components/components
     project_components/aequilibrae_matrix
-    project_components/_auto_examples/index

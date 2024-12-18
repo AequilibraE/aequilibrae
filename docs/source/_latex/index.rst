@@ -9,11 +9,13 @@ AequilibraE
 
    ../useful_links/installation
    ../aequilibrae_project
-   ../distribution_procedures
-   ../network_manipulation
-   ../path_computation
    ../project_components
+   ../network_manipulation
+   ../distribution_procedures
+   ../path_computation
    ../static_traffic_assignment
+   ../public_transport
    ../transit_assignment
    ../route_choice
+   ../other_applications
    ../useful_links/api

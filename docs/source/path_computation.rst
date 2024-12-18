@@ -34,7 +34,7 @@ entirely dedicated to this object.
 
 .. seealso::
     
-    * :func:`aequilibrae.paths.results.PathResults`
+    * :func:`aequilibrae.paths.PathResults`
         Class documentation
     * :ref:`example_usage_path_computation` 
         Usage example

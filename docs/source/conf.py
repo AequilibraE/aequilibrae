@@ -77,7 +77,8 @@ sphinx_gallery_conf = {
                       "distribution_procedures/examples",
                       "network_manipulation/examples",
                       "path_computation/examples",
-                      "project_components/examples",
+                      "other_applications/examples",
+                      "public_transport/examples",
                       "route_choice/examples",
                       "traffic_assignment/examples",
                       "transit_assignment/examples"],  # path to your example scripts
@@ -85,7 +86,8 @@ sphinx_gallery_conf = {
                      "distribution_procedures/_auto_examples",
                       "network_manipulation/_auto_examples",
                       "path_computation/_auto_examples",
-                      "project_components/_auto_examples",
+                      "other_applications/_auto_examples",
+                      "public_transport/_auto_examples",
                       "route_choice/_auto_examples",
                       "traffic_assignment/_auto_examples",
                       "transit_assignment/_auto_examples"],  # path to where to save gallery generated output
@@ -133,7 +135,7 @@ html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 
 html_theme_options = {
-    "show_nav_level": 0,
+    "show_nav_level": 1,
     "navbar_center": ["navigation_header"],
     "navbar_start": ["navbar-logo"],
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
@@ -166,7 +168,7 @@ htmlhelp_basename = "AequilibraEdoc"
 # (source start file, target name, title, author, documentclass [howto, manual, or own class]).
 latex_documents = [("_latex/index", "aequilibrae.tex", html_title, author, "manual")]
 
-# latex_appendices = ["useful_links/installation"]
+# latex_appendices = []
 
 latex_engine = 'xelatex'
 

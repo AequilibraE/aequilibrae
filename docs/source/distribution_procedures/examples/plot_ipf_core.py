@@ -4,11 +4,14 @@
 Running IPF with NumPy array
 ============================
 
-In this example, we show how to use ``aequilibrae.distribution.ipf_core``, an alternative to 
-``aequilibrae.distribution.Ipf`` for all those who want to run an IPF procedure without
-creating a model or using data types such as Aequilibrae Matrix.
+In this example, we show how to use ``aequilibrae.distribution.ipf_core``, a high-performance 
+alternative for all those who want to (re)balance values within a matrix making direct use of
+growth factors. ``ipf_core`` was built to suit countless applications rather than being limited
+to trip distribution.
 
-Let's consider that you have an OD-matrix, the future production and future attraction values.
+We demonstrate the usage of ``ipf_core`` with a 4x4 matrix with 64-bit data, which is indeed very
+small. Additionally, a more comprehensive discussion of the algorithm's performance
+with a 32-bit or 64-bit seed matrices is provided in :doc:`../IPF_benchmark`.
 
 The data used in this example comes from Table 5.6 in 
 `Ortúzar & Willumsen (2011) <https://www.wiley.com/en-us/Modelling+Transport%2C+4th+Edition-p-9780470760390>`_.
@@ -50,7 +53,6 @@ num_iter, gap = ipf_core(matrix, future_prod, future_attr, tolerance=0.0001)
 matrix
 
 # %%
-# Notice that the results are the same as in :ref:`plot_ipf_without_model`, and this is no
-# such coincidence. Under the hood, when we call ``aequilibrae.distribution.Ipf``, we are actually
-# calling the ``ipf_core`` method. For all those who want to use AequilibraE's IPF procedure
-# regardless of the purpose, this is the method for you!
+# Notice that the matrix value was updated, and results are the same as in :ref:`plot_ipf_without_model`
+# - and this is no coincidence. Under the hood, when we call ``aequilibrae.distribution.Ipf``, we 
+# are actually calling the ``ipf_core`` method.

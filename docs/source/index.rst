@@ -46,8 +46,6 @@ Python
           :doc:`Project Components <project_components>`
 
       Get to know the components of each AequilibraE project
-      +++
-      :doc:`project_components/_auto_examples/index`
 
   .. grid-item-card::
       :text-align: center
@@ -145,11 +143,11 @@ Python
 
     .. rst-class:: big-font 
       
-      Other usages
+      :doc:`other_applications`
 
-    Explore the route choice models.
+    Explore other applcations of AequilibraE!
     +++
-    Examples
+    :doc:`other_applications/_auto_examples/index`
 
   .. grid-item::
 
@@ -168,3 +166,4 @@ Python
    public_transport
    transit_assignment
    route_choice
+   other_applications
