@@ -107,6 +107,18 @@ Python
 
     .. rst-class:: big-font 
 
+      :doc:`Public Transport <public_transport>`
+
+    Add a transit feed to your project
+    +++
+    :doc:`public_transport/_auto_examples/index`
+
+  .. grid-item-card:: 
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
+
+    .. rst-class:: big-font 
+
       :doc:`Transit Assignment <transit_assignment>`
 
     Run assignment for your transit data!
@@ -125,6 +137,22 @@ Python
     +++
     :doc:`route_choice/_auto_examples/index`
 
+.. grid::
+
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
+
+    .. rst-class:: big-font 
+      
+      Other usages
+
+    Explore the route choice models.
+    +++
+    Examples
+
+  .. grid-item::
+
   .. grid-item::
 
 .. toctree::
@@ -137,5 +165,6 @@ Python
    distribution_procedures
    path_computation
    static_traffic_assignment
+   public_transport
    transit_assignment
    route_choice
