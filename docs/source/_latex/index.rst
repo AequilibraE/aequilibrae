@@ -15,7 +15,6 @@ AequilibraE
    ../path_computation
    ../static_traffic_assignment
    ../public_transport
-   ../transit_assignment
    ../route_choice
    ../other_applications
    ../useful_links/api

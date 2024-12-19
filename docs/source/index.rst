@@ -107,21 +107,9 @@ Python
 
       :doc:`Public Transport <public_transport>`
 
-    Add a transit feed to your project
+    Add a transit feed or run transit assignment
     +++
     :doc:`public_transport/_auto_examples/index`
-
-  .. grid-item-card:: 
-    :text-align: center
-    :class-footer: sd-bg-light sd-font-weight-bold
-
-    .. rst-class:: big-font 
-
-      :doc:`Transit Assignment <transit_assignment>`
-
-    Run assignment for your transit data!
-    +++
-    :doc:`transit_assignment/_auto_examples/index`
 
   .. grid-item-card::
     :text-align: center
@@ -135,8 +123,6 @@ Python
     +++
     :doc:`route_choice/_auto_examples/index`
 
-.. grid::
-
   .. grid-item-card::
     :text-align: center
     :class-footer: sd-bg-light sd-font-weight-bold
@@ -149,10 +135,6 @@ Python
     +++
     :doc:`other_applications/_auto_examples/index`
 
-  .. grid-item::
-
-  .. grid-item::
-
 .. toctree::
    :hidden:
    :maxdepth: 1
@@ -164,6 +146,5 @@ Python
    path_computation
    static_traffic_assignment
    public_transport
-   transit_assignment
    route_choice
    other_applications

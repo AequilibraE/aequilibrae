@@ -15,10 +15,20 @@ The GTFS protocol is being constantly updated and so are AequilibraE's capabilit
 these changes. We strongly encourage you to take a look at the documentation provided 
 by `Mobility Data <https://gtfs.org/documentation/schedule/reference/>`_.
 
+In this section we also present the transit assignment models, which are mathematical tools that 
+predict how passengers behave and travel in a transit network, given some assumptions and inputs.
+
+Transit assignment models aim to answer questions such as: 
+
+* How do transit passengers choose their routes in a complex network of lines and services?
+* How can we estimate the distribution of passenger flows and the performance of transit systems?
+
 .. toctree::
    :caption: Public Transport
    :maxdepth: 1
-
+   
+   public_transport/transit_graph
+   public_transport/hyperpath_routing
    public_transport/_auto_examples/index
 
 References
