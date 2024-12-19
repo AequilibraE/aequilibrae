@@ -190,7 +190,7 @@ class PathResults:
             **heuristic** (:obj:`str`): Heuristic to use in A*.
         """
         if heuristic not in HEURISTIC_MAP.keys():
-            raise ValueError(f"heruistic must be one of {self.get_heuristics()}")
+            raise ValueError(f"heuristic must be one of {self.get_heuristics()}")
 
         self._heuristic = heuristic
 

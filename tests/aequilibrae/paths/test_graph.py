@@ -83,6 +83,28 @@ class TestGraph(TestCase):
             if i not in avail:
                 self.fail("Skim availability with problems")
 
+    def test_compute_path(self):
+        graph = self.project.network.graphs["c"]
+        graph.prepare_graph()
+        graph.set_graph("distance")
+        graph.set_blocked_centroid_flows(False)
+
+        res = graph.compute_path(1, 6)
+        self.assertEqual(list(res.path), [1, 4], "Number of path links is not correct")
+        self.assertEqual(list(res.path_nodes), [1, 2, 6], "Number of path nodes is not correct")
+
+    def test_compute_skims(self):
+        graph = self.project.network.graphs["c"]
+        graph.prepare_graph()
+        graph.set_graph("distance")
+        graph.set_skimming(["distance", "free_flow_time"])
+        graph.set_blocked_centroid_flows(False)
+
+        skm = graph.compute_skims()
+        skims = skm.skims
+        self.assertEqual(skims.cores, 2, "Number of cores is not correct")
+        self.assertEqual(skims.names, ["distance", "free_flow_time"], "Matrices names are not correct")
+
     def test_exclude_links(self):
         # excludes a link before any setting or preparation
         self.graph.set_blocked_centroid_flows(False)

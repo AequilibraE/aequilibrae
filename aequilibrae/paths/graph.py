@@ -3,7 +3,7 @@ import uuid
 from abc import ABC
 from datetime import datetime
 from os.path import join
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 import dataclasses
 
 import numpy as np
@@ -273,6 +273,54 @@ class GraphBase(ABC):  # noqa: B024
         df["direction"] = df.direction.values.astype(np.int8)
 
         return all_nodes, num_nodes, nodes_to_indices, fs, df
+
+    def compute_path(
+        self,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
+    ):
+        """
+        Returns the results from path computation result holder.
+
+        :Arguments:
+            **origin** (:obj:`int`): origin for the path
+
+            **destination** (:obj:`int`): destination for the path
+
+            **early_exit** (:obj:`bool`): stop constructing the shortest path tree once the destination is found.
+            Doing so may cause subsequent calls to ``update_trace`` to recompute the tree. Default is ``False``.
+
+            **a_star** (:obj:`bool`): whether or not to use A* over Dijkstra's algorithm.
+            When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
+
+            **heuristic** (:obj:`str`): heuristic to use if ``a_star`` is enabled. Default is ``None``.
+        """
+        from aequilibrae.paths import PathResults
+
+        res = PathResults()
+        res.prepare(self)
+        res.compute_path(origin, destination, early_exit, a_star, heuristic)
+
+        return res
+
+    def compute_skims(self, cores: Union[int, None] = None):
+        """
+        Returns the results from network skimming result holder.
+
+        :Arguments:
+            **cores** (:obj:`Union[int, None]`): number of cores (threads) to be used in computation
+        """
+        from aequilibrae.paths import NetworkSkimming
+
+        skimmer = NetworkSkimming(self)
+        if cores:
+            skimmer.set_cores(cores)
+        skimmer.execute()
+
+        return skimmer.results
 
     def exclude_links(self, links: list) -> None:
         """
