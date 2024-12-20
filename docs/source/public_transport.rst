@@ -23,6 +23,11 @@ Transit assignment models aim to answer questions such as:
 * How do transit passengers choose their routes in a complex network of lines and services?
 * How can we estimate the distribution of passenger flows and the performance of transit systems?
 
+.. seealso::
+   
+   * :ref:`public_transport_database`
+      Database structure
+
 .. toctree::
    :caption: Public Transport
    :maxdepth: 1

@@ -27,6 +27,7 @@ In this example, we show how to perform network skimming for Coquimbo, a city in
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
+#     * :func:`aequilibrae.paths.Graph`
 #     * :func:`aequilibrae.paths.NetworkSkimming`
 
 # %%
@@ -62,7 +63,6 @@ logger.addHandler(stdout_handler)
 # ----------------
 
 # %%
-from aequilibrae.paths import NetworkSkimming
 import numpy as np
 
 # %%
@@ -91,8 +91,16 @@ graph.prepare_graph(np.array(list(range(28, 41)) + list(range(49, 91))))
 
 # %%
 # And run the skimming
-skm = NetworkSkimming(graph)
-skm.execute()
+skm = graph.compute_skims()
+
+# %%
+# Building network skims directly from the graph is more straightforward, though  
+# we could alternatively use the class ``NetworkSkimming`` to achieve the same result.
+
+# from aequilibrae.paths import NetworkSkimming
+
+# skm = NetworkSkimming(graph)
+# skm.execute()
 
 # %%
 # The result is an AequilibraEMatrix object

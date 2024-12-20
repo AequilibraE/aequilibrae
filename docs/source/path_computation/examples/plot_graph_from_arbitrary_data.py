@@ -38,7 +38,8 @@ net = pd.read_csv(net_file, skiprows=8, sep="\t", lineterminator="\n", usecols=n
 
 # %%
 # The Graph object requires several default fields: link_id, a_node, b_node, and direction.
-# We'll need to manipulate the data to add the missing fields (link_id and direction) and
+# 
+# We need to manipulate the data to add the missing fields (link_id and direction) and
 # rename the node columns accordingly.
 net.insert(0, "link_id", np.arange(1, net.shape[0] + 1))
 net = net.assign(direction=1)
@@ -67,9 +68,38 @@ graph.set_blocked_centroid_flows(False)  # we don't block flows through centroid
                                          # in the Sioux Falls network are centroids
 
 # %%
-# Now we're all set! We can proceed to computing skim matrices, path computation, traffic
-# assignment, and so on.
+# Two of AequilibraE's new features consist in directly computing path or skims.
+#
+# Let's compute the path between nodes 1 and 17...
+res = graph.compute_path(1, 17)
 
+# %%
+# ... and print the corresponding nodes...
+res.path_nodes
+
+# %%
+# ... and the path links.
+res.path
+# %%
+# For path computation, when we call the method ``graph.compute_path(1, 17)``, we are calling the class
+# ``PathComputation`` and storing its results into a variable.
+# 
+# Notice that other methods related to path computation, such as ``milepost`` can also be used with
+# ``res``.
+
+# %%
+# For skim computation, the process is quite similar. When calligng the method ``graph.compute_skims()``
+# we are actually calling the class ``NetworkSkimming``, and storing its results into ``skm``.
+
+skm = graph.compute_skims()
+
+# %%
+# Let's get the values for 'free_flow_time' matrix.
+skims = skm.results.skims
+skims.get_matrix("free_flow_time")
+
+# %%
+# Now we're all set!
 
 # %%
 # Graph image credits to

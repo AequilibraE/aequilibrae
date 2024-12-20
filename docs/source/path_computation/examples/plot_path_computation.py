@@ -10,6 +10,7 @@ In this example, we show how to perform path computation for Coquimbo, a city in
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
+#     * :func:`aequilibrae.paths.Graph`
 #     * :func:`aequilibrae.paths.PathResults`
 
 # %%
@@ -42,7 +43,6 @@ logger.addHandler(stdout_handler)
 # %%
 # Path Computation
 # ----------------
-from aequilibrae.paths import PathResults
 
 # %%
 # We build all graphs
@@ -68,14 +68,21 @@ graph.set_skimming(["travel_time", "distance"])
 graph.set_blocked_centroid_flows(False)
 
 # %%
-# Let's instantiate a path results object and prepare it to work with the graph
-res = PathResults()
-res.prepare(graph)
+# Let's create a path results object from the graph and compute a path from 
+# node 32343 (near the airport) to 22041 (near Fort Lambert, overlooking Coquimbo Bay).
+res = graph.compute_path(32343, 22041)
 
-# compute a path from node 32343 to 22041, thats from near the airport to Fort Lambert, 
-# a popular location due to its views of the Coquimbo bay.
-res.compute_path(32343, 22041)
+# %%
+# Computing paths directly from the graph is more straightforward, though we could
+# alternatively use ``PathComputation`` class to achieve the same result.
 
+# from aequilibrae.paths import PathResults
+
+# res = PathResults()
+# res.prepare(graph)
+# res.compute_path(32343, 22041)
+
+# %%
 # We can get the sequence of nodes we traverse
 res.path_nodes
 
@@ -93,13 +100,13 @@ res.milepost
 # to quit once it's discovered the destination, this means it will perform better for ODs that are 
 # topographically close. However, exiting early may cause subsequent calls to ``update_trace``
 # to recompute the tree in cases where it usually wouldn't. ``a_star=True`` has precedence of ``early_exit=True``.
-res.compute_path(32343, 22041, early_exit=True)
+res = graph.compute_path(32343, 22041, early_exit=True)
 
 # %%
 # If you'd prefer to find a potentially non-optimal path to the destination faster provide 
 # ``a_star=True`` to use `A*` with a heuristic. 
 # With this method ``update_trace`` will always recompute the path.
-res.compute_path(32343, 22041, a_star=True)
+res = graph.compute_path(32343, 22041, a_star=True)
 
 # %%
 # By default a equirectangular heuristic is used. We can view the available heuristics via
@@ -107,11 +114,7 @@ res.get_heuristics()
 
 # %%
 # If you'd like the more accurate, but slower, but more accurate haversine heuristic you can set it using
-res.set_heuristic("haversine")
-
-# %%
-# or
-res.compute_path(32343, 22041, a_star=True, heuristic="haversine")
+res = graph.compute_path(32343, 22041, a_star=True, heuristic="haversine")
 
 # %%
 # If we want to compute the path for a different destination and the same origin, we can just do this.
