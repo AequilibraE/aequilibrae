@@ -101,7 +101,7 @@ class TestGraph(TestCase):
         graph.set_blocked_centroid_flows(False)
 
         skm = graph.compute_skims()
-        skims = skm.skims
+        skims = skm.results.skims
         self.assertEqual(skims.cores, 2, "Number of cores is not correct")
         self.assertEqual(skims.names, ["distance", "free_flow_time"], "Matrices names are not correct")
 

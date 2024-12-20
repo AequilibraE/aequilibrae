@@ -320,7 +320,7 @@ class GraphBase(ABC):  # noqa: B024
             skimmer.set_cores(cores)
         skimmer.execute()
 
-        return skimmer.results
+        return skimmer
 
     def exclude_links(self, links: list) -> None:
         """
