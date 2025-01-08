@@ -7,6 +7,9 @@ def clean(project):
         """DELETE from Nodes where is_centroid=0 and
                                       (SELECT count(*) FROM links WHERE a_node = node_id OR b_node = node_id) = 0;"""
     ]
+    ##### UPDATED FOR WINDOWS #####
+    conn.enable_load_extension(True)
+    conn.load_extension("mod_spatialite")
 
     for sql in sqls:
         conn.execute(sql)

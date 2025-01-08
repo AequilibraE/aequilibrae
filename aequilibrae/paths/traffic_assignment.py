@@ -119,7 +119,7 @@ class AssignmentBase(ABC):
 
         self.classes.append(transport_class)
 
-    def _check_field(self, field: str) -> None:
+    def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws expection if field is invalid."""
         if not self.classes:
             raise ValueError("You need add at least one transport class first")
@@ -131,7 +131,7 @@ class AssignmentBase(ABC):
             if np.any(np.isnan(c.graph.graph[field].values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            if c.graph.graph[field].values.min() <= 0:
+            if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
     def set_time_field(self, time_field: str) -> None:
@@ -883,6 +883,8 @@ class TransitAssignment(AssignmentBase):
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self._config["Skimming Fields"] = None
+
     def set_algorithm(self, algorithm: str):
         """
         Chooses the assignment algorithm. Currently only 'optimal-strategies' is available.
@@ -1009,6 +1011,19 @@ class TransitAssignment(AssignmentBase):
 
         return pd.concat(assig_results, axis=1)
 
+    def get_skim_results(self) -> pd.DataFrame:
+        """Prepares the assignment results as a Pandas DataFrame
+
+        :Returns:
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on *link_id*
+        """
+        assig_results = [
+            cls.results.get_load_skim_results()
+            for cls in self.classes
+        ]
+
+        return assig_results
+
     def set_time_field(self, time_field: str) -> None:
         """
         Sets the graph field that contains free flow travel time -> e.g. 'trav_time'
@@ -1028,3 +1043,23 @@ class TransitAssignment(AssignmentBase):
         """
         self._check_field(frequency_field)
         self._config["Frequency field"] = frequency_field
+
+    def set_skimming_fields(self, skimming_fields: list[str] = None) -> None:
+        """
+        Sets the graph field that contains the frequency -> e.g. 'freq'
+
+        :Arguments:
+            **frequency_field** (:obj:`str`): Field name
+        """
+
+        if skimming_fields:
+            if isinstance(skimming_fields, (tuple, set)):
+                skimming_fields = list(skimming_fields)
+
+            if not isinstance(skimming_fields, list):
+                raise TypeError("Skimming Fields should be defined on a list, tuple or set")
+
+            # for field in skimming_fields:
+            #     self._check_field(field, True)
+
+        self._config["Skimming Fields"] = skimming_fields

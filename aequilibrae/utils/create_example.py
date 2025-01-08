@@ -20,6 +20,7 @@ def create_example(path: str, from_model="sioux_falls") -> Project:
         **project** (:obj:`Project`): Aequilibrae Project handle (open)
 
     """
+
     if os.path.isdir(path):
         raise FileExistsError("Cannot overwrite an existing directory")
 

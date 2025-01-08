@@ -907,7 +907,7 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
 
     def copy(
         self,

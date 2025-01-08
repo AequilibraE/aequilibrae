@@ -13,10 +13,12 @@ cimport openmp
 
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.context import get_active_project
+from aequilibrae.matrix import AequilibraeMatrix
 import sqlite3
 
 include 'hyperpath.pyx'
 
+from typing import Union
 
 class HyperpathGenerating:
     """A class for hyperpath generation.
@@ -37,12 +39,20 @@ class HyperpathGenerating:
     """
 
 
-    def __init__(self, edges, tail="tail", head="head", trav_time="trav_time", freq="freq", check_edges=False):
+    def __init__(self, edges, tail="tail", head="head", trav_time="trav_time", freq="freq",
+                                                                check_edges=False,
+                                                                skim_cols = None,
+                                                                centroids = None):
+
+        skim_cols = self.check_skim_cols(skim_cols)
+
+        edges, skim_cols = self.compute_skim_cols(skim_cols, edges, trav_time)
         # load the edges
         if check_edges:
-            self._check_edges(edges, tail, head, trav_time, freq)
-        self._edges = edges[[tail, head, trav_time, freq]].copy(deep=True)
+            self._check_edges(edges, tail, head, trav_time, freq, skim_cols)
+        self._edges = edges[list(set([tail, head, trav_time, freq]+skim_cols))].copy(deep=True)
         self.edge_count = len(self._edges)
+
 
         # remove inf values if any, and values close to zero
         self._edges[trav_time] = np.where(
@@ -73,10 +83,124 @@ class HyperpathGenerating:
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
 
+        if self._skimming:
+
+            self._is_travel_time = trav_time in skim_cols
+            if self._is_travel_time:  skim_cols.remove(trav_time)
+            if not skim_cols:
+                self._skim_cols = np.zeros((self._trav_time.shape[0],1), dtype=DATATYPE_PY)
+            else:            
+                self._skim_cols = self._edges.loc[:,skim_cols].values.astype(DATATYPE_PY)
+                self._skim_cols = self._skim_cols.copy(order='C')
+                
+            self._skim_cols_names = skim_cols
+            self._trav_time_name = trav_time
+
+            self._centroids = centroids.astype(np.uint32)
+            self._centroids_idx = np.array(range(len(self._centroids)))
+            self._centroids_idx_pos = np.zeros_like(np.array(list(range(self._centroids[-1]+1))))
+            for i in self._centroids_idx:
+                self._centroids_idx_pos[self._centroids[i]] = i
+            self._centroids_idx_pos = self._centroids_idx_pos.astype(np.uint32)
+        
+        else:
+            self._skim_cols = np.zeros((self._trav_time.shape[0],1), dtype=DATATYPE_PY)
+
+            self._skim_cols_names = []
+
+            self._centroids = np.array([0], dtype=np.uint32)
+            self._centroids_idx_pos = np.array([0], dtype=np.uint32)
+
+            self._is_travel_time = False
+
+
+    def compute_skim_cols(self, skim_cols: list, edges: pd.DataFrame, trav_time: str):
+
+        self._get_waiting_time = False
+        edges_cols = edges.columns.tolist()
+
+        link_type_values = {'boardings': 'boarding', 'in_vehicle_trav_time': ['on-board','dwell'],
+        'egress_trav_time': 'egress_connector', 'access_trav_time': 'access_connector'}
+        
+        if any(item in skim_cols for item in ['boardings', 'in_vehicle_trav_time', 'egress_trav_time', 'access_trav_time']):
+
+            if 'link_type' not in edges_cols:
+                return edges, skim_cols
+
+        if 'boardings' in skim_cols and 'boardings' not in edges_cols:	
+            edges['boardings'] = edges['link_type'].apply(lambda x: 1 if x == link_type_values['boardings'] else 0)
+            
+        if 'waiting_time' in skim_cols and 'waiting_time' not in edges_cols: 
+            edges['in_vehicle_trav_time'] = np.where(edges['link_type'].isin(link_type_values['in_vehicle_trav_time']), 0, edges[trav_time])
+            edges['egress_trav_time'] = np.where(edges['link_type'] != link_type_values['egress_trav_time'], 0, edges[trav_time])
+            edges['access_trav_time'] = np.where(edges['link_type'] != link_type_values['access_trav_time'], 0, edges[trav_time])
+
+            skim_cols.remove('waiting_time')
+            skim_cols = list(set(skim_cols + [trav_time, 'in_vehicle_trav_time', 'egress_trav_time', 'access_trav_time']))
+            self._get_waiting_time = True
+
+        else:
+            if 'in_vehicle_trav_time' in skim_cols and 'in_vehicle_trav_time' not in edges_cols:
+                edges['in_vehicle_trav_time'] = np.where(edges['link_type'].isin(link_type_values['in_vehicle_trav_time']), 0, edges[trav_time])
+            
+            if 'egress_trav_time' in skim_cols and 'egress_trav_time' not in edges_cols:
+                edges['egress_trav_time'] = np.where(edges['link_type'] != link_type_values['egress_trav_time'], 0, edges[trav_time])
+            
+            if 'access_trav_time' in skim_cols and 'access_trav_time' not in edges_cols:
+                edges['access_trav_time'] = np.where(edges['link_type'] != link_type_values['access_trav_time'], 0, edges[trav_time])
+        
+        return edges, skim_cols
+
+
+    def check_skim_cols(self, skim_cols: Union(list[str], tuple[str], set(str))):
+
+        self._skimming = True
+        if isinstance(skim_cols, (tuple,set)):
+            skim_cols = list(skim_cols)
+
+        if not skim_cols or not isinstance(skim_cols, list):
+            skim_cols = []
+            self._skimming = False
+        
+        return skim_cols
+
+    def drop_attribute(self, attr_name: str):
+        try:
+            delattr(self, attr_name)
+        except AttributeError:
+            print(f"Attribute '{attr_name}' does not exist.")
+
+    def _update_od_values(self, origin_column: np.array, destination_column: np.array,
+                                demand_column: np.array):
+
+        # get all O-D combinations between centroids
+        n = len(self._centroids)
+        origin_values = np.repeat(self._centroids, n)
+
+        # # skip if all centroids combinations are already listed
+        # if origin_values.shape == origin_column.shape:
+        #     return origin_column, destination_column, demand_column
+
+        destination_values = np.tile(self._centroids, n)
+
+        check_bool = origin_values != destination_values
+        centroids_origin_column = origin_values[check_bool]
+        centroids_destination_column = destination_values[check_bool]
+        
+        not_included = ~np.logical_and(np.isin(centroids_origin_column, origin_column), 
+        np.isin(centroids_destination_column, destination_column)) # the combinations of centroids that are not in
+
+        centroids_demand = np.concatenate((demand_column, np.zeros_like(centroids_origin_column[not_included])))
+        centroids_origin_column = np.concatenate((origin_column, centroids_origin_column[not_included]))
+        centroids_destination_column = np.concatenate((destination_column, centroids_destination_column[not_included]))
+
+        return centroids_origin_column, centroids_destination_column, centroids_demand
+
     def run(self, origin, destination, volume, return_inf=False):
         # column storing the resulting edge volumes
         self._edges["volume"] = 0.0
-        self.u_i_vec = None
+        self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
+        
 
         # input check
         if type(origin) is not list:
@@ -96,10 +220,12 @@ class HyperpathGenerating:
         demand_vls = np.array(volume, dtype=DATATYPE_PY)
 
         destination_vertex_indices = d_vert_ids  # Only one index allowed so must be unique
+        assert destination_vertex_indices.shape[0] == 1, "To output travel time there must only be one destination"
 
-        cdef cnp.float64_t *u_i_vec
+        n_centroids = self._centroids.shape[0]
+        self.skim_matrix = np.zeros((n_centroids, n_centroids, 1))
 
-        u_i_vec = compute_SF_in_parallel(
+        compute_SF_in_parallel(
             self._indptr[:],
             self._edge_idx[:],
             self._trav_time[:],
@@ -111,14 +237,20 @@ class HyperpathGenerating:
             o_vert_ids[:],
             demand_vls[:],
             self._edges["volume"].values,
-            True,
             self.vertex_count,
             self._edges["volume"].shape[0],
-            1,  # Single destination so no reason to parallelise
+            1,  # Single destination so no reason to paralleliseS
+            self._skim_cols[:,:],
+            self.u_i_vec,
+            self.skim_matrix,
+            self._centroids[:],
+            self._centroids_idx_pos[:],
+            False,
+            self._is_travel_time,
+            0
         )
 
-        if u_i_vec != NULL:
-            self.u_i_vec = np.asarray(<cnp.float64_t[:self.vertex_count]> u_i_vec)
+        self.drop_attribute('skim_matrix')
 
     def _check_vertex_idx(self, idx):
         assert isinstance(idx, int)
@@ -129,19 +261,22 @@ class HyperpathGenerating:
         assert isinstance(v, float)
         assert v >= 0.0
 
-    def _check_edges(self, edges, tail, head, trav_time, freq):
+    def _check_edges(self, edges, tail, head, trav_time, freq, skim_cols):
+
         if type(edges) != pd.core.frame.DataFrame:
             raise TypeError("edges should be a pandas DataFrame")
 
-        for col in [tail, head, trav_time, freq]:
+        cols = [tail, head, trav_time, freq] + skim_cols
+
+        for col in cols:
             if col not in edges:
                 raise KeyError(f"edge column '{col}' not found in graph edges dataframe")
 
-        if edges[[tail, head, trav_time, freq]].isna().any().any():
+        if edges[cols].isna().any().any():
             raise ValueError(
                 " ".join(
-                    [
-                        f"edges[[{tail}, {head}, {trav_time}, {freq}]] ",
+                    [   f"edges[[{', '.join(map(str, cols))}]]",
+                        #f"edges[[{tail}, {head}, {trav_time}, {freq}]] ",
                         "should not have any missing value",
                     ]
                 )
@@ -151,7 +286,7 @@ class HyperpathGenerating:
             if not pd.api.types.is_integer_dtype(edges[col].dtype):
                 raise TypeError(f"column '{col}' should be of integer type")
 
-        for col in [trav_time, freq]:
+        for col in [trav_time, freq] + skim_cols:
             if not pd.api.types.is_numeric_dtype(edges[col].dtype):
                 raise TypeError(f"column '{col}' should be of numeric type")
 
@@ -183,6 +318,13 @@ class HyperpathGenerating:
             **threads** (:obj:`int`):The number of threads to use for computation (*Optional*, default is 0, using all available threads).
         """
 
+        if self._skimming:
+            origin_column, destination_column, demand_column = self._update_od_values(origin_column,
+                                                                destination_column, demand_column)
+
+        self.origin_column = origin_column.astype(np.uint32)
+        self.destination_column = destination_column.astype(np.uint32)
+        self.demand_column =  demand_column.astype(DATATYPE_PY)
         # check the input demand paramater
         if check_demand:
             self._check_demand(origin_column, destination_column, demand_column)
@@ -194,10 +336,19 @@ class HyperpathGenerating:
         self._edges["volume"] = 0.0
 
         # travel time is computed but not saved into an array in the following
-        self.u_i_vec = None
-
+        self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
+        
         # get the list of all destinations
-        destination_vertex_indices = np.unique(destination_column)
+        destination_vertex_indices = np.unique(self.destination_column)
+
+        n_centroids = self._centroids.shape[0]
+        n_skim_cols = len(self._skim_cols_names)
+        skim_cols = self._skim_cols_names
+        if self._is_travel_time: 
+            skim_cols = [self._trav_time_name] + skim_cols
+            n_skim_cols = n_skim_cols + 1 # n_skim_cols += 1
+        
+        self.skim_matrix = np.zeros((n_centroids, n_centroids, n_skim_cols))
 
         compute_SF_in_parallel(
             self._indptr[:],
@@ -206,16 +357,47 @@ class HyperpathGenerating:
             self._freq[:],
             self._tail[:],
             self._head[:],
-            destination_column[:],
+            self.destination_column[:],
             destination_vertex_indices[:],
-            origin_column[:],
-            demand_column[:],
+            self.origin_column[:],
+            self.demand_column[:],
             self._edges["volume"].values,
-            False,
             self.vertex_count,
             self._edges["volume"].shape[0],
-            (multiprocessing.cpu_count() if threads < 1 else threads)
+            (multiprocessing.cpu_count() if threads < 1 else threads),
+            self._skim_cols[:],
+            self.u_i_vec,
+            self.skim_matrix,
+            self._centroids[:],
+            self._centroids_idx_pos[:],
+            self._skimming,
+            self._is_travel_time,
+            len(self._skim_cols_names)
         )
+
+        if self._skimming:
+
+            self.skim_matrix = self.skim_matrix.transpose(2,1,0)
+            arr = self.skim_matrix.copy()
+            print(arr.shape)
+            if self._get_waiting_time:
+                skim_matrix_dict = {}
+                for i in range(n_skim_cols):
+
+                    skim_matrix_dict[skim_cols[i]] = arr[i]
+
+                skim_matrix_dict['waiting_time'] = skim_matrix_dict['trav_time']  - skim_matrix_dict['in_vehicle_trav_time'] - skim_matrix_dict['egress_trav_time'] - skim_matrix_dict['access_trav_time']
+                skim_cols = skim_cols + ['waiting_time']
+                arr = np.concatenate((arr, np.expand_dims(skim_matrix_dict['waiting_time'], axis=0)), axis=0)     
+
+            self.skim_matrix = AequilibraeMatrix()
+            self.skim_matrix.create_empty(zones = len(self._centroids), matrix_names = skim_cols)
+            self.skim_matrix.index = self._centroids
+            self.skim_matrix.computational_view()
+            self.skim_matrix.matrices[:,:,:] = arr.transpose(1, 2, 0)[:,:,:]
+            
+        else:
+            self.drop_attribute('skim_matrix')
 
     def _check_demand(self, origin_column, destination_column, demand_column):
         for col, col_name in zip([origin_column, destination_column, demand_column], ["origin", "destination", "demand"]):
@@ -277,4 +459,3 @@ class HyperpathGenerating:
         )
         conn.commit()
         conn.close()
-

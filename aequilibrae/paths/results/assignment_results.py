@@ -301,6 +301,7 @@ class TransitAssignmentResults(AssignmentResultsBase):
         super().__init__()
 
         self.link_loads = np.array([])
+        # self.skim_results = np.array([])
         # self.skims = AequilibraeMatrix()
 
     def prepare(self, graph: TransitGraph, matrix: AequilibraeMatrix) -> None:
@@ -340,3 +341,10 @@ class TransitAssignmentResults(AssignmentResultsBase):
             raise ValueError("Transit assignment has not been executed yet")
 
         return pd.DataFrame({"volume": self.link_loads}, index=self.lids)
+
+    def get_load_skim_results(self) -> pd.DataFrame:
+
+        if hasattr(self, "skim_results"):
+            return self.skim_results
+        else:
+            raise ValueError("Skimming was not executed")

@@ -209,7 +209,7 @@ class TrafficClass(TransportClassBase):
 
 
 class TransitClass(TransportClassBase):
-    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix, matrix_core: str = None):
+    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
         super().__init__(name, graph, matrix)
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()

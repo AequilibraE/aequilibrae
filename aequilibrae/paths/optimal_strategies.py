@@ -24,6 +24,8 @@ class OptimalStrategies:
                 tail="b_node",
                 trav_time=assig_spec._config["Time field"],
                 freq=assig_spec._config["Frequency field"],
+                skim_cols=assig_spec._config["Skimming Fields"],
+                centroids=cls.graph.centroids
             )
 
             demand = sparse.coo_matrix(cls.matrix.matrix[cls.matrix_core], dtype=np.float64)
@@ -49,6 +51,8 @@ class OptimalStrategies:
 
             hyperpath.assign(**self.__demand_cols[cls_id], threads=self.__assig_spec.cores)
             self.__results[cls_id].link_loads = hyperpath._edges["volume"].values
+            if hyperpath._skimming:
+                self.__results[cls_id].skim_results = hyperpath.skim_matrix
 
     # def run(self, origin=None, destination=None, volume=None):
     #     for cls_id, hyperpath in self.__classes.items():
