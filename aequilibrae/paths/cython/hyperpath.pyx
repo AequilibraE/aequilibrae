@@ -313,9 +313,6 @@ cdef void compute_SF_in_parallel(
         #     free(thread_u_i_vec)
         #     free(thread_skim_i_vec)
 
-        free(thread_u_i_vec)
-        free(thread_skim_i_vec)
-
         free(thread_f_i_vec)
         free(thread_u_j_c_a_vec)
         free(thread_v_i_vec)
