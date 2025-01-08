@@ -78,7 +78,7 @@ class HyperpathGenerating:
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
         if skim_cols:
-            self._skim_cols = self._edges[skim_cols].values.astype(DATATYPE_PY)
+            self._skim_cols = self._edges[skim_cols].values.reshape(self._trav_time.shape[0],).astype(DATATYPE_PY)
         else:
             self._skim_cols = np.zeros(self._trav_time.shape[0], dtype=DATATYPE_PY)
 
