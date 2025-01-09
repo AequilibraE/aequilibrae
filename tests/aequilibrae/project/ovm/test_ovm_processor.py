@@ -42,6 +42,7 @@ def test_link_geo_trimmer():
 
         project.close()
 
+
 def test_link_lanes():
     """
     segment and node infomation is currently [1] element of links when running from_ovm.py
@@ -74,9 +75,10 @@ def test_link_lanes():
     ]
 
     lane_ends = [
-        [{
-            "at": [0, 0.67],
-            "value": [{"direction": "backward"}, {"direction": "forward"}, {"direction": "forward"}],
+        [
+            {
+                "at": [0, 0.67],
+                "value": [{"direction": "backward"}, {"direction": "forward"}, {"direction": "forward"}],
             }
         ],
         [{"at": [0.67, 1], "value": [{"direction": "backward"}, {"direction": "forward"}]}],
@@ -158,10 +160,10 @@ def test_link_lanes():
             ),
         }
         return segment
-    
+
     # def link_gdf(lane_info):
     #     return gpd.GeoDataFrame(segment(lane_info, road(lane_info)))
-    
+
     def set_up_ovmbuilder(lane_info, output_dir, project):
         print(lane_info)
         print()
@@ -174,7 +176,6 @@ def test_link_lanes():
         link_gdf = o.formatting(links, node_df, output_dir)
         print(link_gdf)
         return link_gdf
-
 
     with tempfile.TemporaryDirectory() as output_dir:
         output_dir = Path(output_dir)
@@ -199,7 +200,7 @@ def test_link_lanes():
         assert len(lanes_3) == 3
         assert gdf_lanes_3["direction"][0] == 1
         assert gdf_lanes_3["lanes_ab"][0] == 3
-        assert gdf_lanes_3["lanes_ba"][0] == None
+        assert gdf_lanes_3["lanes_ba"][0] is None
 
         gdf_highway = set_up_ovmbuilder(highway, output_dir, project)
 

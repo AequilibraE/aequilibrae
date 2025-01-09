@@ -1,6 +1,4 @@
 import math
-from sqlite3 import Connection as sqlc
-from typing import Dict
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -8,14 +6,11 @@ import numpy as np
 import pandas as pd
 import shapely.wkb
 import shapely.wkt
-from shapely.geometry import Polygon, box
 from shapely import union_all
+from shapely.geometry import Polygon, box
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.network import OSMDownloader
-from aequilibrae.project.network.ovm_builder import OVMBuilder
-from aequilibrae.project.network.ovm_downloader import OVMDownloader
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.haversine import haversine
@@ -23,16 +18,17 @@ from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
-from aequilibrae.project.network.osm_builder import OSMBuilder
+
 # from aequilibrae.project.network.ovm_builder import OVMBuilder
-from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
+from aequilibrae.project.network.ovm_builder import OVMBuilder
+from aequilibrae.project.network.ovm_downloader import OVMDownloader
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
-from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.qgis_utils import inside_qgis
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -133,7 +129,7 @@ class Network(WorkerThread):
         place_name: str = None,
         data_source: Path = None,
         output_dir: Path = None,
-        modes=["car", "transit", "bicycle", "walk"],
+        modes: list = None,
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -199,14 +195,14 @@ class Network(WorkerThread):
 
         self.logger.info("Downloading data")
         self.downloader = OVMDownloader(modes, self.source, logger=self.logger)
-        if pyqt:
+        if inside_qgis:
             self.downloader.downloading.connect(self.signal_handler)
-        segments_gdf, connectors_gdf = self.downloader.downloadTransportation(bbox,data_source,output_dir)
+        segments_gdf, connectors_gdf = self.downloader.downloadTransportation(bbox, data_source, output_dir)
 
         self.logger.info("Building Network")
         self.builder = OVMBuilder(segments_gdf, connectors_gdf, self.source, project=self.project)
 
-        if pyqt:
+        if inside_qgis:
             self.builder.building.connect(self.signal_handler)
 
         self.builder.doWork(output_dir)

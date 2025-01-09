@@ -1,44 +1,27 @@
 import json
-import importlib.util as iutil
-import sqlite3
 import logging
-from pathlib import Path
 import string
+from pathlib import Path
+from typing import Union
+
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+import shapely
 
 from aequilibrae.context import get_active_project
-from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.context import get_logger
-import importlib.util as iutil
-from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.haversine import haversine
-from aequilibrae.utils import WorkerThread
-
-# from .haversine import haversine
-# from ...utils import WorkerThread
-
-import duckdb
-import shapely
-import geopandas as gpd
-import pandas as pd
-import numpy as np
-from typing import Union
-from shapely.geometry import LineString, Point
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
-
-spec = iutil.find_spec("qgis")
-isqgis = spec is not None
-if isqgis:
-    import qgis
+from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class OVMBuilder(WorkerThread):
-    if pyqt:
-        building = pyqtSignal(object)
+    signal = SIGNAL(object)
 
     def __init__(
         self,
@@ -68,8 +51,7 @@ class OVMBuilder(WorkerThread):
         self.pth = str(self.__project_path).replace("\\", "/")
 
     def __emit_all(self, *args):
-        if pyqt:
-            self.building.emit(*args)
+        self.signal.emit(*args)
 
     def doWork(self, output_dir: Path):
         self.conn = connect_spatialite(self.pth)
@@ -80,8 +62,8 @@ class OVMBuilder(WorkerThread):
 
     def formatting(self, links_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, output_dir: Path):
         output_dir = Path(output_dir)
-        output_file_link = output_dir / f"type=segment" / f"transportation_data_segment.parquet"
-        output_file_node = output_dir / f"type=connector" / f"transportation_data_connector.parquet"
+        output_file_link = output_dir / "type=segment" / "transportation_data_segment.parquet"
+        output_file_node = output_dir / "type=connector" / "transportation_data_connector.parquet"
 
         links_gdf = links_gdf.copy()
         links_gdf["name"] = links_gdf["name"].apply(lambda x: json.loads(x)[0]["value"] if x else None)
@@ -101,8 +83,7 @@ class OVMBuilder(WorkerThread):
         links_gdf["link_id"] = pd.Series(list(range(1, len(links_gdf) + 1)))
         links_gdf["ogc_fid"] = pd.Series(list(range(1, len(links_gdf) + 1)))
         links_gdf["geometry"] = [
-            self.trim_geometry(self.node_ids, row)
-            for e, row in links_gdf[["a_node", "b_node", "geometry"]].iterrows()
+            self.trim_geometry(self.node_ids, row) for e, row in links_gdf[["a_node", "b_node", "geometry"]].iterrows()
         ]
 
         distance_list = []
@@ -122,7 +103,7 @@ class OVMBuilder(WorkerThread):
         links_gdf["modes"] = links_gdf["link_type"].apply(lambda x: mode_codes.get(x, not_found_tags))
 
         common_nodes = links_gdf["a_node"].isin(nodes_gdf["node_id"])
-        
+
         # Check if any common nodes exist
         if common_nodes.any():
             # If common node exist, retrieve the DataFrame of matched rows using boolean indexing
@@ -159,10 +140,12 @@ class OVMBuilder(WorkerThread):
         self.logger.info("Adding network nodes")
         self.__emit_all(["text", "Adding network nodes"])
 
-        node_df = pd.DataFrame(nodes_gdf[["node_id", "is_centroid", "modes", "link_types", "ovm_id"]]) # drop geom and ogc_fid
-        node_df['x'] = nodes_gdf.geometry.apply(lambda x: x.coords[0][0])
-        node_df['y'] = nodes_gdf.geometry.apply(lambda x: x.coords[0][1])
-        node_records = node_df.drop_duplicates(subset=['x', 'y']).to_records(index=False)
+        node_df = pd.DataFrame(
+            nodes_gdf[["node_id", "is_centroid", "modes", "link_types", "ovm_id"]]
+        )  # drop geom and ogc_fid
+        node_df["x"] = nodes_gdf.geometry.apply(lambda x: x.coords[0][0])
+        node_df["y"] = nodes_gdf.geometry.apply(lambda x: x.coords[0][1])
+        node_records = node_df.drop_duplicates(subset=["x", "y"]).to_records(index=False)
 
         sql = "insert into nodes(node_id, is_centroid, modes, link_types, ovm_id, geometry) Values(?, ?, ?, ?, ?, MakePoint(?,?, 4326))"
         self.conn.executemany(sql, node_records)
@@ -170,7 +153,6 @@ class OVMBuilder(WorkerThread):
         del nodes_gdf
 
         all_attrs = links_gdf.values.tolist()
-
 
         insert_qry = """INSERT INTO "links" ({}, geometry) VALUES({}, GeomFromWKB(?, 4326))"""
         sql = insert_qry.format(field_names, ",".join(["?"] * (len(link_order) - 1)))
@@ -223,7 +205,7 @@ class OVMBuilder(WorkerThread):
                 for letter in string.ascii_letters:
                     if letter not in self.__model_link_type_ids:
                         break
-        letter
+
         lt = self.__link_types.new(letter)
         lt.link_type = link_type
         lt.description = f"Link types from Overture Maps: {original_link_type}"
@@ -324,13 +306,13 @@ class OVMBuilder(WorkerThread):
         """
         This function returns the speed of a road, if they have multiple speeds listed it will total the speeds listed by the proportions of the road they makeup.
         """
-        if speed_row == None:
+        if speed_row is None:
             adjusted_speed = speed_row
         else:
             speed = json.loads(speed_row)
-            if type(speed) == dict:
+            if isinstance(speed, dict):
                 adjusted_speed = speed["maxSpeed"][0]
-            elif type(speed) == list and len(speed) >= 1:
+            elif isinstance(speed, list) and len(speed) >= 1:
                 # Extract the 'at' list from each dictionary
                 # eg [[0.0, 0.064320774], [0.064320774, 1.0]]
                 at_values_list = [entry["at"] for entry in speed]
@@ -407,21 +389,22 @@ class OVMBuilder(WorkerThread):
         }
 
         # Lambda function to check numbers and create a new dictionary
-        check_numbers = lambda lst: {
-            "direction": 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0,
-            "lanes_ab": lst.count(1) if 1 in lst else None,
-            "lanes_ba": lst.count(-1) if -1 in lst else None,
-        }
+        def check_numbers(lst):
+            return {
+                "direction": 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0,
+                "lanes_ab": lst.count(1) if 1 in lst else None,
+                "lanes_ba": lst.count(-1) if -1 in lst else None,
+            }
 
         if directions_list is None:
             new_list = [-1, 1]
-        elif directions_list != None:
+        elif directions_list is not None:
             for direct in directions_list:
-                if type(direct) == dict:
+                if isinstance(direct, dict):
                     # Extract direction from the dictionary and append to new_list
                     direction = direction_dict[direct["direction"]]
                     new_list.append(direction)
-                elif type(direct) == list:
+                elif isinstance(direct, list):
                     a_list = []
                     at_dictionary[str(direct[0]["at"])] = direct[0]["at"][1] - direct[0]["at"][0]
                     max_key = max(at_dictionary, key=at_dictionary.get)

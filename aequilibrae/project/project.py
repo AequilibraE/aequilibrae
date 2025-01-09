@@ -123,7 +123,6 @@ class Project:
                 self.logger.removeHandler(h)
                 h.close()
 
-
         except (sqlite3.ProgrammingError, AttributeError):
             global_logger.warning(f"This project at {self.project_base_path} is already closed")
 

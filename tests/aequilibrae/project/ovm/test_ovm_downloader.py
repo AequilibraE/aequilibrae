@@ -16,7 +16,7 @@ def test_download():
             output_dir = Path(output_dir)
             # bbo = [148.71641, -20.27082, 148.71861, -20.27001]
             # woolworths_parkinglot = [148.718, -20.27049, 148.71889, -20.27006]
-            expected_file = output_dir / f"theme=transportation" / f"type={t}" / f"transportation_data_{t}.parquet"
+            expected_file = output_dir / "theme=transportation" / f"type={t}" / f"transportation_data_{t}.parquet"
             assert expected_file.exists()
 
             link_columns = ["ovm_id", "connectors", "direction", "link_type", "name", "speed", "road", "geometry"]
@@ -29,4 +29,3 @@ def test_download():
 
             # assert 'is_centroid' in gdf_node.columns
             # assert ['unknown', 'secondary', 'residential', 'parkingAisle'] == list(list_gdf[0]['link_type'].unique())
-

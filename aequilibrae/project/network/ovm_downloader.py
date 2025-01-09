@@ -1,49 +1,27 @@
-import json
-import importlib.util as iutil
-import sqlite3
 import logging
 from pathlib import Path
-import string
+from typing import Union
 
-from aequilibrae.context import get_active_project
-from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.link_types import LinkTypes
+import duckdb
+import geopandas as gpd
+import pandas as pd
+
 from aequilibrae.context import get_logger
-import importlib.util as iutil
-from aequilibrae.utils.spatialite_utils import connect_spatialite
-from aequilibrae.project.network.haversine import haversine
-from aequilibrae.utils import WorkerThread
+from aequilibrae.parameters import Parameters
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 # from .haversine import haversine
 # from ...utils import WorkerThread
 
-import duckdb
-import shapely
-import geopandas as gpd
-import pandas as pd
-import numpy as np
-from typing import Union
-from shapely.geometry import LineString, Point
-
 DEFAULT_OVM_S3_LOCATION = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0//theme=transportation"
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
-
-spec = iutil.find_spec("qgis")
-isqgis = spec is not None
-if isqgis:
-    import qgis 
 
 class OVMDownloader(WorkerThread):
-    if pyqt:
-        downloading = pyqtSignal(object)
+    signal = SIGNAL(object)
 
     def __emit_all(self, *args):
-        if pyqt:
-            self.downloading.emit(*args)
+        self.signal.emit(*args)
 
     def __init__(self, modes: list, project_path: Union[str, Path], logger: logging.Logger = None) -> None:
         WorkerThread.__init__(self, None)
@@ -59,7 +37,7 @@ class OVMDownloader(WorkerThread):
         c = conn.cursor()
 
         c.execute(
-            """INSTALL spatial; 
+            """INSTALL spatial;
                 INSTALL httpfs;
                 INSTALL parquet;
             """
@@ -98,35 +76,34 @@ class OVMDownloader(WorkerThread):
                 AND bbox.maxy < '{self.bbox[3]}')
             TO '{pth}';
             """
-        
+
         c = self.initialise_duckdb_spatial()
         c.execute(sql)
 
-
     def downloadTransportation(self, bbox: list, data_source: Union[str, Path], output_dir: Union[str, Path]):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
-        output_dir = Path(output_dir)  / "theme=transportation"      
-            
-        output_file_link = output_dir / f'type=segment' / f'transportation_data_segment.parquet'
-        output_file_node = output_dir / f'type=connector' / f'transportation_data_connector.parquet'
-            # output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
+        output_dir = Path(output_dir) / "theme=transportation"
+
+        output_file_link = output_dir / "type=segment" / "transportation_data_segment.parquet"
+        output_file_node = output_dir / "type=connector" / "transportation_data_connector.parquet"
+        # output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
         output_file_link.parent.mkdir(parents=True, exist_ok=True)
         output_file_node.parent.mkdir(parents=True, exist_ok=True)
 
         # Uncomment to see what information is stored the parquet file
         # sql = f"""
         #     DESCRIBE
-        #     SELECT 
+        #     SELECT
         #         road
         #     FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
         # """
         # c = self.initialise_duckdb_spatial()
         # g = c.execute(sql)
         # print(g.df())
-        
+
         sql_link = f"""
             COPY (
-            SELECT 
+            SELECT
                 id AS ovm_id,
                 connectors,
                 CAST(road AS JSON) ->>'lanes' AS direction,
@@ -147,7 +124,7 @@ class OVMDownloader(WorkerThread):
 
         sql_node = f"""
             COPY (
-            SELECT 
+            SELECT
                 id AS ovm_id,
                 geometry
             FROM read_parquet('{data_source}/type=connector/*', union_by_name=True)
@@ -163,12 +140,12 @@ class OVMDownloader(WorkerThread):
         # Creating links GeoDataFrame
         df_link = pd.read_parquet(output_file_link)
         geo_link = gpd.GeoSeries.from_wkb(df_link.geometry, crs=4326)
-        gdf_link = gpd.GeoDataFrame(df_link,geometry=geo_link)
+        gdf_link = gpd.GeoDataFrame(df_link, geometry=geo_link)
 
         # Creating nodes GeoDataFrame
         df_node = pd.read_parquet(output_file_node)
         geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
-        gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
+        gdf_node = gpd.GeoDataFrame(df_node, geometry=geo_node)
 
         return gdf_link, gdf_node
 
@@ -176,7 +153,7 @@ class OVMDownloader(WorkerThread):
         """
         loosely adapted from http://www.github.com/gboeing/osmnx
         """
-        
+
         p = Parameters().parameters["network"]["ovm"]
         all_tags = p["all_link_types"]
 
@@ -200,20 +177,34 @@ class OVMDownloader(WorkerThread):
         filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
         return filter
-    
+
     def _download_test_data(self, data_source: Union[str, Path]):
-        '''This method only used to seed/bootstrap a local copy of a small test data set which should be commited to version control'''
-        airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
+        """This method only used to seed/bootstrap a local copy of a small test data set which should be commited to version control"""
+        airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621]
         # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
         data_source = data_source.replace("\\", "/")
 
-
-        for t in ['segment','connector']:
-            (Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f'type={t}').mkdir(parents=True, exist_ok=True)
-            pth1 = Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f"type={t}" / f'airlie_beach_transportation_{t}.parquet'
+        for t in ["segment", "connector"]:
+            (
+                Path(__file__).parent.parent.parent.parent
+                / "tests"
+                / "data"
+                / "overture"
+                / "theme=transportation"
+                / f"type={t}"
+            ).mkdir(parents=True, exist_ok=True)
+            pth1 = (
+                Path(__file__).parent.parent.parent.parent
+                / "tests"
+                / "data"
+                / "overture"
+                / "theme=transportation"
+                / f"type={t}"
+                / f"airlie_beach_transportation_{t}.parquet"
+            )
             sql = f"""
                 COPY (
-                SELECT 
+                SELECT
                     *
                 FROM read_parquet('{data_source}/type={t}/*', union_by_name=True)
                 WHERE bbox.minx > '{airlie_bbox[0]}'
@@ -228,7 +219,6 @@ class OVMDownloader(WorkerThread):
 
             df = pd.read_parquet(Path(pth1))
             geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
-            gdf = gpd.GeoDataFrame(df,geometry=geo)
+            gdf = gpd.GeoDataFrame(df, geometry=geo)
             gdf.to_parquet(Path(pth1))
-        # return gdf    
-
+        # return gdf
