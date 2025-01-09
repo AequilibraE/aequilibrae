@@ -17,6 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from sphinx_gallery.sorting import ExplicitOrder
+import pkg_resources
 
 project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
@@ -27,7 +28,7 @@ project_dir = os.path.abspath("../../")
 if str(project_dir) not in sys.path:
     sys.path.insert(0, project_dir)
 
-from __version__ import release_version
+release_version = pkg_resources.get_distribution("aequilibrae").version
 
 # -- Project information -----------------------------------------------------
 
@@ -56,40 +57,51 @@ else:
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
+    "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
     "sphinx.ext.doctest",
-    "sphinx.ext.intersphinx",
-    "sphinx.ext.todo",
-    "sphinx.ext.coverage",
-    "sphinx.ext.mathjax",
     "sphinx_gallery.gen_gallery",
     "sphinx_design",
-    "sphinx_copybutton"
+    "sphinx_copybutton",
+    "sphinx_git",
+    "sphinx_tabs.tabs",
+    "sphinx_subfigure",
 ]
+
+sphinx_tabs_disable_tab_closing = True
 
 # Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
-    "examples_dirs": ["examples"],  # path to your example scripts
-    "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
-    'capture_repr': ('_repr_html_', '__repr__'),
-    'remove_config_comments': True,
-    "subsection_order": ExplicitOrder(["examples/creating_models",
-                                      "examples/editing_networks",
-                                      "examples/trip_distribution",
-                                      "examples/visualization",
-                                      "examples/aequilibrae_without_a_model",
-                                      "examples/full_workflows",
-                                      "examples/other_applications"]),
+    "examples_dirs": [
+        "aequilibrae_project/examples",
+        "distribution_procedures/examples",
+        "network_manipulation/examples",
+        "path_computation/examples",
+        "other_applications/examples",
+        "public_transport/examples",
+        "route_choice/examples",
+        "traffic_assignment/examples",
+    ],  # path to your example scripts
+    "gallery_dirs": [
+        "aequilibrae_project/_auto_examples",
+        "distribution_procedures/_auto_examples",
+        "network_manipulation/_auto_examples",
+        "path_computation/_auto_examples",
+        "other_applications/_auto_examples",
+        "public_transport/_auto_examples",
+        "route_choice/_auto_examples",
+        "traffic_assignment/_auto_examples",
+    ],  # path to where to save gallery generated output
+    "capture_repr": ("_repr_html_", "__repr__"),
+    "remove_config_comments": True,
+    "plot_gallery": True,
 }
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
-# The suffix(es) of source filenames.¶
-# You can specify multiple suffix as a list of string:
-#
-# source_suffix = ['.rst', '.md']
+# The suffix(es) of source filenames.
 source_suffix = ".rst"
 
 # The master toctree document.
@@ -105,7 +117,7 @@ language = "en"
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "*.pyx"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -115,29 +127,35 @@ highlight_language = "python3"
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#
 html_theme = "pydata_sphinx_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static', '_static/.htaccess', "_static/switcher.json"]
+html_static_path = ["_static"]
+
+html_css_files = ["custom.css"]
 
 html_theme_options = {
-    "navbar_center": ["navbar-nav"],
-    "show_nav_level": 0,
-    "github_url": "https://github.com/AequilibraE/aequilibrae",
-    "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
-    "navbar_start": ["navbar-logo", "version-switcher"],
-    "switcher": {
-        "json_url": "./_static/switcher.json",
-        "version_match": switcher_version,
-    },
+    "show_nav_level": 1,
+    "navbar_center": ["navigation_header"],
+    "navbar_start": ["navbar-logo"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    "navbar_persistent": ["search-button"],
     "navbar_align": "left",
-    "search_bar_text": "Search",
+    "github_url": "https://github.com/AequilibraE/aequilibrae",
+    "analytics": {
+        "google_analytics_id": "G-0HRKZDXRZ7",
+    },
+    "logo": {
+        "text": "AequilibraE",
+        "image_light": "_static/large_icon.png",
+        "image_dark": "_static/large_icon.png",
+        "link": "https://www.aequilibrae.com/latest/home.html",
+    },
 }
 
-# The name for this set of Sphinx documents.  If None, it defaults to
+# The name for this set of Sphinx documents. If None, it defaults to
 html_title = f"AequilibraE {version}"
 
 # -- Options for HTMLHelp output ---------------------------------------------
@@ -146,33 +164,27 @@ html_title = f"AequilibraE {version}"
 htmlhelp_basename = "AequilibraEdoc"
 
 # -- Options for LaTeX output ------------------------------------------------
-
-latex_elements = {}
+# latex_elements = {}
 
 # Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
-latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
+# (source start file, target name, title, author, documentclass [howto, manual, or own class]).
+latex_documents = [("_latex/index", "aequilibrae.tex", html_title, author, "manual")]
+
+# latex_appendices = []
+
+latex_engine = "xelatex"
 
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 1)]
+man_pages = [(master_doc, "aequilibrae", html_title, [author], 1)]
 
 # -- Options for Texinfo output ----------------------------------------------
 
-autodoc_default_options = {
-    "members": "var1, var2",
-    "member-order": "bysource",
-    "special-members": False,
-    "private-members": False,
-    "undoc-members": True,
-    "exclude-members": "__weakref__",
-}
+autodoc_default_options = {"members": True, "inherited-members": True, "undoc-members": True, "autosummary": True}
 
 autodoc_member_order = "groupwise"
-
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
 autosummary_generate = True
@@ -187,7 +199,7 @@ texinfo_documents = [
         "AequilibraE Documentation",
         author,
         "AequilibraE",
-        "One line description of project.",
+        "Comprehensive Python package for transportation modeling",
         "Miscellaneous",
     )
 ]

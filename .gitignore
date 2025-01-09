@@ -2,6 +2,10 @@
 _build
 _static
 _templates
+sg_execution_times.rst
+_auto_examples
+_generated
+data_model
 
 # User-specific stuff:
 .idea/**/workspace.xml
@@ -61,12 +65,11 @@ aequilibrae/**/*.pyd
 aequilibrae/**/*.c
 aequilibrae/**/*.html
 aequilibrae/**/build/*
-docs/build/*
-docs/source/_generated/*
-docs/source/project_database/*
-docs/source/_auto_examples/*
 *.cpp 
 
+# Build documentation
+docs/build/*
+docs/source/project_database/*
 
 #Virtual environment
 .venv/
@@ -98,3 +101,5 @@ coverage.xml
 #### End snippet
 tests/data/overture/theme=transportation/type=connector/transportation_data_connector.parquet
 tests/data/overture/theme=transportation/type=segment/transportation_data_segment.parquet
+.DS_Store
+.vscode

@@ -10,9 +10,8 @@ class Log:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = Project()
+        >>> project.new(project_path)
 
         >>> log = project.log()
 
@@ -29,7 +28,7 @@ class Log:
     def contents(self) -> list:
         """Returns contents of log file
 
-        :Return:
+        :Returns:
             **log_contents** (:obj:`list`): List with all entries in the log file
         """
 
@@ -44,17 +43,8 @@ class Log:
 
 def _setup_logger():
     # CREATE THE GLOBAL LOGGER
-
-    par = Parameters._default
-    do_log = par["system"]["logging"]
-    temp_folder = tempfile.gettempdir()
-
     logger = logging.getLogger("aequilibrae")
     logger.setLevel(logging.DEBUG)
-
-    if not len(logger.handlers) and do_log:
-        log_file = os.path.join(temp_folder, "aequilibrae.log")
-        logger.addHandler(get_log_handler(log_file))
     return logger
 
 

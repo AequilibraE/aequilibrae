@@ -28,9 +28,9 @@ class DelaunayAnalysis:
         """Creates a delaunay network based on the existing model
 
         :Arguments:
-            **source** (:obj:`str`, optional): Source of the centroids/zones. Either ``zones`` or ``network``. Default ``zones``
+            **source** (:obj:`str`, *Optional*): Source of the centroids/zones. Either ``zones`` or ``network``. Default ``zones``
 
-            **overwrite path** (:obj:`bool`, optional): Whether to should overwrite an existing Delaunay Network. Default ``False``
+            **overwrite path** (:obj:`bool`, *Optional*): Whether to should overwrite an existing Delaunay Network. Default ``False``
 
         """
 

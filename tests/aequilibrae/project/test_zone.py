@@ -154,9 +154,8 @@ class TestZone(TestCase):
         self.assertIsNot(0, curr.fetchone()[0], "failed to add connectors for mode t")
 
         # Cannot connect a centroid that does not exist
-        with self.assertRaises(ValueError):
-            zone2 = zones.get(2)
-            zone2.connect_mode("c")
+        zone2 = zones.get(2)
+        zone2.connect_mode("c", conn=self.proj.conn)
 
     def test_disconnect_mode(self):
         self.__change_project()

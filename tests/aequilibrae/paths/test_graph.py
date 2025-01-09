@@ -39,6 +39,11 @@ class TestGraph(TestCase):
         graph = self.project.network.graphs["c"]
         graph.prepare_graph(np.arange(5) + 1)
 
+    def test_prepare_graph_no_centroids(self):
+        graph = self.project.network.graphs["c"]
+        graph.prepare_graph()
+        graph.set_graph("distance")
+
     def test_set_graph(self):
         self.graph.set_graph(cost_field="distance")
         self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
@@ -77,6 +82,28 @@ class TestGraph(TestCase):
         for i in data_fields:
             if i not in avail:
                 self.fail("Skim availability with problems")
+
+    def test_compute_path(self):
+        graph = self.project.network.graphs["c"]
+        graph.prepare_graph()
+        graph.set_graph("distance")
+        graph.set_blocked_centroid_flows(False)
+
+        res = graph.compute_path(1, 6)
+        self.assertEqual(list(res.path), [1, 4], "Number of path links is not correct")
+        self.assertEqual(list(res.path_nodes), [1, 2, 6], "Number of path nodes is not correct")
+
+    def test_compute_skims(self):
+        graph = self.project.network.graphs["c"]
+        graph.prepare_graph()
+        graph.set_graph("distance")
+        graph.set_skimming(["distance", "free_flow_time"])
+        graph.set_blocked_centroid_flows(False)
+
+        skm = graph.compute_skims()
+        skims = skm.results.skims
+        self.assertEqual(skims.cores, 2, "Number of cores is not correct")
+        self.assertEqual(skims.names, ["distance", "free_flow_time"], "Matrices names are not correct")
 
     def test_exclude_links(self):
         # excludes a link before any setting or preparation

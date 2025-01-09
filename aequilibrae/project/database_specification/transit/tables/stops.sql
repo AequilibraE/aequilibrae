@@ -1,7 +1,7 @@
 --@ The *stops* table holds information on the stops where vehicles
 --@ pick up or drop off riders. This table information comes from
 --@ the GTFS file *stops.txt*. You can find more information about
---@ it `here <https://developers.google.com/transit/gtfs/reference#stopstxt>`_.
+--@ `the stops table here <https://gtfs.org/documentation/schedule/reference/#stopstxt>`_.
 --@ 
 --@ **stop_id** is an unique identifier for a stop
 --@ 
@@ -23,27 +23,26 @@
 --@ 
 --@ **street** identifies the address of a stop
 --@ 
---@ **fare_zone_id** identifies the fare zone for a stop
+--@ **zone_id** identifies the TAZ for a stop
 --@ 
---@ **transit_zone** identifies the TAZ for a fare zone
+--@ **transit_fare_zone** identifies the transit fare zone for a stop
 --@ 
 --@ **route_type** indicates the type of transporation used on a route
 
 CREATE TABLE IF NOT EXISTS stops (
-	stop_id           TEXT     PRIMARY KEY,
-	stop              TEXT     NOT NULL ,
-	agency_id         INTEGER  NOT NULL,
+	stop_id           TEXT    PRIMARY KEY,
+	stop              TEXT    NOT NULL ,
+	agency_id         INTEGER NOT NULL,
 	link              INTEGER,
 	dir               INTEGER,
 	name              TEXT,
 	parent_station    TEXT,
 	description       TEXT,
 	street            TEXT,
-	fare_zone_id      INTEGER,
-	transit_zone      TEXT,
-	route_type        INTEGER  NOT NULL DEFAULT -1,
-	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id),
-	FOREIGN KEY("fare_zone_id") REFERENCES fare_zones("fare_zone_id")
+	zone_id           INTEGER,
+	transit_fare_zone TEXT,
+	route_type        INTEGER NOT NULL DEFAULT -1,
+	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id)
 );
 
 --#

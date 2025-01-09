@@ -1,5 +1,5 @@
 numpy<1.99
-scipy
+scipy>=1.4
 pyaml
 cython
 requests
@@ -9,4 +9,6 @@ pyproj
 rtree
 openmatrix
 duckdb
+pyarrow==17.0.0
 geopandas
+tqdm

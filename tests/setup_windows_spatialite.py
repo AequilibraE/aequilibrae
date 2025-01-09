@@ -16,7 +16,7 @@ fldr = join(outfolder, "temp_data")
 zipfile.ZipFile(dest_path).extractall(fldr)
 
 if "WINDOWS" in platform.platform().upper():
-    # We now set sqlite. Only needed in thge windows server in Github
+    # We now set sqlite. Only needed in the windows server in Github
     plats = {
         "x86": "https://sqlite.org/2020/sqlite-dll-win32-x86-3320100.zip",
         "x64": "https://sqlite.org/2020/sqlite-dll-win64-x64-3320100.zip",

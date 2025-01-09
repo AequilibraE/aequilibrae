@@ -1,22 +1,13 @@
-import importlib.util as iutil
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
+
 import numpy as np
+from aequilibrae.paths.AoN import one_to_all, assign_link_loads
 
-from .multi_threaded_aon import MultiThreadedAoN
-from ..utils import WorkerThread
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae import global_logger
-
-try:
-    from aequilibrae.paths.AoN import one_to_all, assign_link_loads
-except ImportError as ie:
-    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from .multi_threaded_aon import MultiThreadedAoN
 
 if False:
     from .results import AssignmentResults
@@ -24,18 +15,18 @@ if False:
 
 
 class allOrNothing(WorkerThread):
-    if pyqt:
-        assignment = SIGNAL(object)
+    signal = SIGNAL(object)
 
-    def __init__(self, matrix, graph, results):
-        # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
-
+    def __init__(self, class_name, matrix, graph, results):
+        # type: (str, AequilibraeMatrix, Graph, AssignmentResults)->None
         WorkerThread.__init__(self, None)
 
+        self.class_name = class_name
         self.matrix = matrix
         self.graph = graph
         self.results = results
         self.aux_res = MultiThreadedAoN()
+        self.signal.emit(["start", self.matrix.zones, self.class_name])
 
         if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -53,12 +44,10 @@ class allOrNothing(WorkerThread):
         self.execute()
 
     def execute(self):
+        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
+        self.signal.emit(["set_text", msg])
         self.report = []
         self.cumulative = 0
-
-        if pyqt:
-            self.assignment.emit(["zones finalized", 0])
-
         self.aux_res.prepare(self.graph, self.results)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape(
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
@@ -75,13 +64,14 @@ class allOrNothing(WorkerThread):
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
+        val = self.matrix.index.shape[0]
+        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {val}/{self.matrix.zones}"
+        self.signal.emit(["set_text", msg])
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        if pyqt:
-            self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
@@ -94,6 +84,6 @@ class allOrNothing(WorkerThread):
         self.cumulative += 1
         if x != origin:
             self.report.append(x)
-        if pyqt:
-            self.assignment.emit(["zones finalized", self.cumulative])
-            self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])
+        if self.cumulative % 10 == 0:
+            msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
+            self.signal.emit(["set_text", msg])

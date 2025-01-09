@@ -2,8 +2,10 @@ import os
 import sqlite3
 import tempfile
 import uuid
+import warnings
 
 import numpy as np
+import pandas as pd
 from numpy.lib.format import open_memmap
 
 MEMORY = 1
@@ -12,7 +14,30 @@ data_export_types = ["aed", "csv", "sqlite"]
 
 
 class AequilibraeData(object):
-    """AequilibraE dataset"""
+    """AequilibraE dataset. This is deprecated in favor of Pandas DataFrames
+
+    .. code-block:: python
+
+        >>> from aequilibrae.matrix.aequilibrae_data import AequilibraeData
+
+        >>> args = {"file_path": os.path.join(my_folder_path, "vectors.aed"),
+        ...         "entries": 3,
+        ...         "field_names": ["production"],
+        ...         "data_types": [np.float64]}
+
+        >>> vectors = AequilibraeData()
+        >>> vectors.create_empty(**args)
+
+        >>> vectors.production[:] = [1, 4, 7]
+        >>> vectors.index[:] = [1, 2, 3]
+
+        >>> vectors.export(os.path.join(my_folder_path, "vectors.csv"))
+
+        >>> reload_dataset = AequilibraeData()
+        >>> reload_dataset.load(os.path.join(my_folder_path, "vectors.aed"))
+        >>> reload_dataset.production
+        memmap([1., 4., 7.])
+    """
 
     def __init__(self):
         self.data = None
@@ -37,40 +62,20 @@ class AequilibraeData(object):
         Creates a new empty dataset
 
         :Arguments:
-            **file_path** (:obj:`str`, Optional): Full path for the output data file. If *memory_mode* is 'false' and
-            path is missing, then the file is created in the temp folder
+            **file_path** (:obj:`str`, *Optional*): Full path for the output data file. If 'memory_mode' is ``False``
+            and path is missing, then the file is created in the temp folder
 
-            **entries** (:obj:`int`, Optional): Number of records in the dataset. Default is 1
+            **entries** (:obj:`int`, *Optional*): Number of records in the dataset. Default is 1
 
-            **field_names** (:obj:`list`, Optional): List of field names for this dataset. If no list is provided, the
+            **field_names** (:obj:`list`, *Optional*): List of field names for this dataset. If no list is provided, the
             field 'data' will be created
 
-            **data_types** (:obj:`np.dtype`, Optional): List of data types for the dataset. Types need to be NumPy data
-            types (e.g. np.int16, np.float64). If no list of types are provided, type will be *np.float64*
+            **data_types** (:obj:`np.dtype`, *Optional*): List of data types for the dataset.
+            Types need to be NumPy data types (e.g. ``np.int16``, ``np.float64``).
+            If no list of types are provided, type will be ``np.float64``
 
-            **memory_mode** (:obj:`bool`, Optional): If true, dataset will be kept in memory. If false, the dataset will
-            be a memory-mapped numpy array
-
-        .. code-block:: python
-
-            >>> from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
-
-            >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/test_project/matrices/demand.omx')
-            >>> mat.computational_view()
-
-            >>> vectors = "/tmp/test_project/vectors.aed"
-
-            >>> args = {
-            ...      "file_path": vectors,
-            ...      "entries": mat.zones,
-            ...      "field_names": ["origins", "destinations"],
-            ...      "data_types": [np.float64, np.float64]
-            ... }
-
-            >>> dataset = AequilibraeData()
-            >>> dataset.create_empty(**args)
-
+            **memory_mode** (:obj:`bool`, *Optional*): If ``True``, dataset will be kept in memory.
+            If ``False``, the dataset will be a memory-mapped numpy array
         """
 
         if file_path is not None or memory_mode:
@@ -144,13 +149,6 @@ class AequilibraeData(object):
 
         :Arguments:
             **file_path** (:obj:`str`): Full file path to the AequilibraeData to be loaded
-
-        .. code-block:: python
-
-            >>> from aequilibrae.matrix import AequilibraeData
-
-            >>> dataset = AequilibraeData()
-            >>> dataset.load("/tmp/test_project/vectors.aed")
         """
         f = open(file_path)
         self.file_path = os.path.realpath(f.name)
@@ -164,6 +162,15 @@ class AequilibraeData(object):
         self.num_fields = len(self.fields)
         self.data_types = [self.data[x].dtype.type for x in self.fields]
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Converts the dataset to a Pandas DataFrame
+
+        :Returns:
+            **data** (:obj:`pd.DataFrame`): Pandas DataFrame with the dataset
+        """
+        return pd.DataFrame(self.data, index=self.index)
+
     def export(self, file_name, table_name="aequilibrae_table"):
         """
         Exports the dataset to another format. Supports CSV and SQLite
@@ -172,16 +179,8 @@ class AequilibraeData(object):
             **file_name** (:obj:`str`): File name with PATH and extension (csv, or sqlite3, sqlite or db)
 
             **table_name** (:obj:`str`): It only applies if you are saving to an SQLite table. Otherwise ignored
-
-        .. code-block:: python
-
-            >>> from aequilibrae.matrix import AequilibraeData
-
-            >>> dataset = AequilibraeData()
-            >>> dataset.load("/tmp/test_project/vectors.aed")
-            >>> dataset.export("/tmp/test_project/vectors.csv")
         """
-
+        DeprecationWarning("This method is deprecated and will be removed in the future. Use Pandas DataFrames instead")
         file_type = os.path.splitext(file_name)[1]
         headers = ["index"]
         headers.extend(self.fields)
@@ -234,11 +233,10 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            >>> from aequilibrae.matrix import AequilibraeData
+            >>> from aequilibrae.matrix.aequilibrae_data import AequilibraeData
 
-            >>> name = AequilibraeData().random_name() # doctest: +ELLIPSIS
-
-            # This is an example of output
-            # '/tmp/Aequilibrae_data_5werr5f36-b123-asdf-4587-adfglkjhqwe.aed'
+            >>> dataset = AequilibraeData()
+            >>> dataset.random_name() # doctest: +ELLIPSIS
+            '/tmp/Aequilibrae_data_...'
         """
         return os.path.join(tempfile.gettempdir(), f"Aequilibrae_data_{uuid.uuid4()}.aed")

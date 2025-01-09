@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import os
 from random import random
 from tempfile import gettempdir
@@ -7,9 +6,6 @@ from unittest import TestCase
 from shapely.geometry import box
 
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
 
 
 class TestOSMDownloader(TestCase):
@@ -32,7 +28,7 @@ class TestOSMDownloader(TestCase):
         o = OSMDownloader([box(-112.185, 36.59, -112.179, 36.60)], ["car"])
         o.doWork()
 
-        if "elements" not in o.json[0]:
+        if len(o.json) == 0 or "elements" not in o.json[0]:
             return
 
         if len(o.json[0]["elements"]) > 1000:

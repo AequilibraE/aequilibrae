@@ -1,60 +1,52 @@
 from contextlib import closing
 from copy import deepcopy
-import importlib.util as iutil
 
+import geopandas as gpd
 import pandas as pd
 import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
-from aequilibrae.context import get_active_project
-from aequilibrae.project.database_connection import database_connection
 
+from aequilibrae.context import get_active_project, get_logger
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.log import logger
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
-from .functions import PathStorage
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
-from ..utils.worker_thread import WorkerThread
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SignalImpl
-else:
-
-    class SignalImpl:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def emit(*args, **kwargs):
-            pass
 
 
 class GTFSRouteSystemBuilder(WorkerThread):
+    signal = SIGNAL(object)
+
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    signal = SignalImpl(object)
-
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
+    def __init__(
+        self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None
+    ):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
 
             **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
+
             **agency_identifier** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
+
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
+
             **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
+
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
         WorkerThread.__init__(self, None)
 
         self.__network = network
-        self.geotool = get_active_project(False)
+        self.project = get_active_project(False)
         self.archive_dir = None  # type: str
         self.day = day
-        self.logger = logger
+        self.logger = get_logger()
         self.gtfs_data = GTFSReader()
 
         self.srid = get_srid()
@@ -67,34 +59,45 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
-        self.__default_capacities = capacities
+        self.__default_capacities = {} if capacities is None else capacities
+        self.__default_pces = {} if pces is None else pces
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
-        self.__has_taz = 1 if len(self.geotool.zoning.all_zones()) > 0 else 0
-        self.path_store = PathStorage()
+        self.__has_taz = len(self.project.zoning.all_zones()) > 0
 
         if file_path is not None:
             self.logger.info(f"Creating GTFS feed object for {file_path}")
             self.gtfs_data.set_feed_path(file_path)
             self.gtfs_data._set_capacities(self.__default_capacities)
+            self.gtfs_data._set_pces(self.__default_pces)
 
         self.select_routes = {}
         self.select_trips = []
         self.select_stops = {}
         self.select_patterns = {}
         self.select_links = {}
-        self.__mt = ""
+
+        links = self.project.network.links.data
+        self.geo_links = gpd.GeoDataFrame(links, geometry=links.geometry, crs="EPSG:4326")
 
     def set_capacities(self, capacities: dict):
         """Sets default capacities for modes/vehicles.
 
         :Arguments:
             **capacities** (:obj:`dict`): Dictionary with GTFS types as keys, each with a list
-                                        of 3 items for values for capacities: seated and total
-                                        i.e. -> "{0: [150, 300],...}"
+            of 3 items for values for capacities: seated and total i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
+
+    def set_pces(self, pces: dict):
+        """Sets default passenger car equivalent (PCE) factor for each GTFS mode.
+
+        :Arguments:
+            **pces** (:obj:`dict`): Dictionary with GTFS types as keys and the corresponding PCE
+            value i.e. -> "{0: 2.0,...}"
+        """
+        self.gtfs_data._set_pces(pces)
 
     def set_maximum_speeds(self, max_speeds: pd.DataFrame):
         """Sets the maximum speeds to be enforced at segments.
@@ -116,11 +119,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
         return deepcopy(self.gtfs_data.feed_dates)
 
     def set_allow_map_match(self, allow=True):
-        """Changes behavior for finding transit-link shapes. Defaults to True.
+        """Changes behavior for finding transit-link shapes. Defaults to ``True``.
 
         :Arguments:
-              **allow** (:obj:`bool` *optional*): If True, allows uses map-matching in search of precise
-              transit_link shapes. If False, sets transit_link shapes equal to straight lines between
+              **allow** (:obj:`bool` *Optional*): If ``True``, allows uses map-matching in search of precise
+              transit_link shapes. If ``False``, sets transit_link shapes equal to straight lines between
               stops. In the presence of GTFS raw shapes it has no effect.
         """
 
@@ -131,7 +134,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         Defaults to map-matching Bus routes (type 3) only.
 
-        For a reference of route types, see https://developers.google.com/transit/gtfs/reference#routestxt
+        For a reference of route types, see the inputs for
+        `route_type here <https://gtfs.org/documentation/schedule/reference/#routestxt>`_.
 
         :Arguments:
             **route_types** (:obj:`List[int]` or :obj:`Tuple[int]`): Default is [3], for bus only
@@ -142,16 +146,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
-        mt = f"Map-matching routes for {self.gtfs_data.agency.agency}"
-        self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Map-matching", mt])
-        for i, pat in enumerate(self.select_patterns.values()):
-            self.signal.emit(["update", "secondary", i + 1, "Map-matching", mt])
+        for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
                 if msg is not None:
                     self.logger.warning(msg)
-        self.path_store.clear()
 
     def set_agency_identifier(self, agency_id: str) -> None:
         """Adds agency ID to this GTFS for use on import.
@@ -199,13 +199,14 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.gtfs_data.load_data(service_date)
 
         self.logger.info("  Building data structures")
+
         self.__build_data()
+
         self.gtfs_data.agency.service_date = self.day
 
     def doWork(self):
         """Alias for execute_import"""
         self.execute_import()
-        self.finished()
 
     def execute_import(self):
         self.logger.debug("Starting execute_import")
@@ -217,42 +218,25 @@ class GTFSRouteSystemBuilder(WorkerThread):
             return
 
         self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
-        self.__mt = f"Importing {self.gtfs_data.agency.agency} to supply"
-        self.signal.emit(["start", "master", 1, self.day, self.__mt])
 
         self.save_to_disk()
-
-        if self.__do_execute_map_matching:
-            self.logger.info(
-                f"{self.path_store.uses:,} paths requested. {self.path_store.total_paths:,} objects created"
-            )
-        self.path_store.clear()
 
     def save_to_disk(self):
         """Saves all transit elements built in memory to disk"""
 
         with closing(database_connection("transit")) as conn:
-            st = f"Importing routes for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
-            for counter, (_, pattern) in enumerate(self.select_patterns.items()):
+            for pattern in simple_progress(self.select_patterns.values(), self.signal, "Saving patterns (Step: 10/12)"):
                 pattern.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.gtfs_data.agency.save_to_database(conn)
 
-            st = f"Importing trips for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
-            for counter, trip in enumerate(self.select_trips):
+            for trip in simple_progress(self.select_trips, self.signal, "Saving trips (Step: 11/12)"):
                 trip.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
-            st = f"Importing links for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_links.keys()), st, self.__mt])
-            for counter, (_, link) in enumerate(self.select_links.items()):
+            for link in simple_progress(self.select_links.values(), self.signal, "Saving links (Step: 11/12)"):
                 link.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.__outside_zones = 0
@@ -262,7 +246,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
             if zones:
-                sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
+                sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
             conn.commit()
 
@@ -272,26 +256,20 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for fare_rule in self.gtfs_data.fare_rules:
                 fare_rule.save_to_database(conn)
 
-            st = f"Importing stops for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_stops.keys()), st, self.__mt])
-            for counter, (_, stop) in enumerate(self.select_stops.items()):
+            for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 12/12)"):
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
                 if self.__has_taz:
-                    closest_zone = self.geotool.zoning.get_closest_zone(stop.geo)
-                    if stop.geo.within(self.geotool.zoning.get(closest_zone).geometry):
+                    closest_zone = self.project.zoning.get_closest_zone(stop.geo)
+                    if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
                         stop.taz = closest_zone
                 stop.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
             msg = "    Some stops are outside the zoning system. Check the result on a map and see the log for info"
             self.logger.warning(msg)
-
-    def finished(self):
-        self.signal.emit(["finished_static_gtfs_procedure"])
 
     def __build_data(self):
         self.logger.debug("Starting __build_data")
@@ -304,11 +282,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if self.__do_execute_map_matching:
             self.builds_link_graphs_with_broken_stops()
 
+        msg = f"Loading data for {self.day} (Step: 9/12) - "
         c = Constants()
-        msg_txt = f"Building data for {self.gtfs_data.agency.agency}"
-        self.signal.emit(["start", "secondary", len(self.select_routes), msg_txt, self.__mt])
-        for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            self.signal.emit(["update", "secondary", counter + 1, msg_txt, self.__mt])
+        for route_id, route in simple_progress(self.select_routes.items(), self.signal, msg):
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
@@ -346,6 +322,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         p.shortname = route.route_short_name
         p.longname = route.route_long_name
         p.description = route.route_desc
+        p.pce = route.pce
         p.seated_capacity = route.seated_capacity
         p.total_capacity = route.total_capacity
         for stop_id in self.gtfs_data.stop_times[trip.trip].stop_id.values:
@@ -448,10 +425,14 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """
 
         route_types = list({r.route_type for r in self.select_routes.values()})
-        route_types = [mode_id for mode_id in route_types if mode_correspondence[mode_id] not in self.graphs]
+        route_types = [
+            mode_id
+            for mode_id in route_types
+            if mode_id in mode_correspondence and mode_correspondence[mode_id] not in self.graphs
+        ]
         if not route_types:
             return
-        mm = MMGraph(self, self.__mt)
+        mm = MMGraph(self)
         for mode_id in route_types:
             mode = mode_correspondence[mode_id]
             graph = mm.build_graph_with_broken_stops(mode_id)

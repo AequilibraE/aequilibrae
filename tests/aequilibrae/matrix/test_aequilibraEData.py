@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from aequilibrae.matrix import AequilibraeData
+from aequilibrae.matrix.aequilibrae_data import AequilibraeData
 
 
 class TestAequilibraEData(TestCase):

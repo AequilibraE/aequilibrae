@@ -6,9 +6,7 @@ import os
 def pat(create_path, create_gtfs_project):
     gtfs_fldr = os.path.join(create_path, "gtfs_coquimbo.zip")
 
-    transit = create_gtfs_project.new_gtfs_builder(
-        agency="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_fldr, description=""
-    )
+    transit = create_gtfs_project.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
     transit.load_date("2016-04-13")
 
     patterns = transit.select_patterns
@@ -24,7 +22,9 @@ def test_save_to_database(pat, transit_conn):
 
 def test_best_shape(pat):
     shp = pat.best_shape()
-    assert shp == pat._stop_based_shape, "Returned the wrong shape"
+
+    # shp and pat._stop_based_shape must be different because there is a shape.txt file in the gtfs.
+    assert shp != pat._stop_based_shape, "Returned the wrong shape"
 
 
 def test_get_error(pat):

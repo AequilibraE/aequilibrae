@@ -62,5 +62,9 @@ class MultiThreadedAoN:
         self.temp_link_loads = np.zeros((results.cores, results.links + 1, results.classes["number"]), dtype=ftype)
         self.temp_node_loads = np.zeros((results.cores, results.compact_nodes, results.classes["number"]), dtype=ftype)
         self.temp_b_nodes = np.zeros((results.cores, graph.compact_graph.b_node.shape[0]), dtype=itype)
+        self.destinations = np.zeros((results.cores, results.compact_nodes), dtype=bool)
+
+        centroids_idx = graph.nodes_to_indices[graph.centroids]
         for i in range(results.cores):
             self.temp_b_nodes[i, :] = graph.compact_graph.b_node.values[:]
+            self.destinations[i, centroids_idx] = True

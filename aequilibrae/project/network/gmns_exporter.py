@@ -1,14 +1,13 @@
-import pandas as pd
 from os.path import join
-from ...utils import WorkerThread
+
+import pandas as pd
 
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.db_utils import commit_and_close
 
 
-class GMNSExporter(WorkerThread):
+class GMNSExporter:
     def __init__(self, net, path) -> None:
-        WorkerThread.__init__(self, None)
         self.p = Parameters()
         self.links_df = net.links.data
         self.nodes_df = net.nodes.data

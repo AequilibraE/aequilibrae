@@ -12,11 +12,9 @@ class Modes:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path)
 
-        >>> p = Project.from_path("/tmp/test_project")
-
-        >>> modes = p.network.modes
+        >>> modes = project.network.modes
 
         # We can get a dictionary of all modes in the model
         >>> all_modes = modes.all_modes()

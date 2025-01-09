@@ -17,6 +17,7 @@ class Route(BasicPTElement):
     * route_text_color (:obj:`str`): Route color (text) for mapping as found in the GTFS feed
     * route_sort_order (:obj:`int`): Route rendering order as found in the GTFS feed
     * agency_id (:obj:`str`): Agency ID
+    * pce (:obj:`float`): Vehicle PCE for this route
     * seated_capacity (:obj:`float`): Vehicle seated capacity for this route
     * total_capacity (:obj:`float`): Total vehicle capacity for this route"""
 
@@ -36,14 +37,15 @@ class Route(BasicPTElement):
         # Not part of GTFS
         self.pattern_id = 0
         self.pattern = ""
+        self.pce = 2.0
         self.seated_capacity = 0
         self.total_capacity = 0
         self.shape: MultiLineString
         self.srid = -1
         self.number_of_cars = 0
         self.__sql = """insert into routes (route_id, pattern_id, route, agency_id, shortname, longname, description,
-                                            route_type, seated_capacity, total_capacity{})
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?{});"""
+                                            route_type, pce, seated_capacity, total_capacity{})
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{});"""
         self.sql = self.__sql
         self.__get_route_id()
 
@@ -75,6 +77,7 @@ class Route(BasicPTElement):
             self.route_long_name,
             self.route_desc,
             int(self.route_type),
+            self.pce,
             self.seated_capacity,
             self.total_capacity,
         ]

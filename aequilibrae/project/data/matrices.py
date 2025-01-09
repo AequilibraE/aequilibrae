@@ -88,8 +88,9 @@ class Matrices:
 
     def list(self) -> pd.DataFrame:
         """List of all matrices available
-        Returns:
-             df (:obj:`pd.DataFrame`:) Pandas DataFrame listing all matrices available in the model
+
+        :Returns:
+            **df** (:obj:`pd.DataFrame`): Pandas DataFrame listing all matrices available in the model
         """
 
         def check_if_exists(file_name):
@@ -110,11 +111,11 @@ class Matrices:
 
         Raises an error if matrix does not exist
 
-        Args:
-            matrix_name (:obj:`str`:) Name of the matrix to be loaded
+        :Arguments:
+            **matrix_name** (:obj:`str`): Name of the matrix to be loaded
 
-        Returns:
-            matrix (:obj:`AequilibraeMatrix`:) Matrix object
+        :Returns:
+            **matrix** (:obj:`AequilibraeMatrix`): Matrix object
         """
 
         return self.get_record(matrix_name).get_data()
@@ -133,8 +134,8 @@ class Matrices:
     def check_exists(self, name: str) -> bool:
         """Checks whether a matrix with a given name exists
 
-        Returns:
-            exists (:obj:`bool`:) Does the matrix exist?
+        :Returns:
+            **exists** (:obj:`bool`): Does the matrix exist?
         """
         return name.lower() in self.__items
 
@@ -148,12 +149,13 @@ class Matrices:
 
         If the matrix file is not already on disk, it will fail
 
-        Args:
-            *name* (:obj:`str`): Name of the matrix
-            *file_name* (:obj:`str`): Name of the file on disk
+        :Arguments:
+            **name** (:obj:`str`): Name of the matrix
 
-        Return:
-            *matrix_record* (:obj:`MatrixRecord`): A matrix record that can be manipulated in memory before saving
+            **file_name** (:obj:`str`): Name of the file on disk
+
+        :Returns:
+            **matrix_record** (:obj:`MatrixRecord`): A matrix record that can be manipulated in memory before saving
         """
         matrix = matrix or AequilibraeMatrix()
         if name in self.__items:

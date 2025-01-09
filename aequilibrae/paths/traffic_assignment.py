@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import logging
 import socket
 import sqlite3
@@ -15,16 +14,13 @@ from numpy import nan_to_num
 
 from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.database_connection import database_connection
-
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
+from aequilibrae.utils.core_setter import set_cores
 
 
 class AssignmentBase(ABC):
@@ -101,7 +97,7 @@ class AssignmentBase(ABC):
         Sets Transport classes to be assigned
 
         :Arguments:
-            **classes** (:obj:`List[TransportClassBase]`:) List of TransportClass's for assignment
+            **classes** (:obj:`List[TransportClassBase]`): List of TransportClass's for assignment
         """
 
         ids = {x._id for x in classes}
@@ -114,7 +110,7 @@ class AssignmentBase(ABC):
         Adds a Transport class to the assignment
 
         :Arguments:
-            **transport_class** (:obj:`TransportClassBase`:) Transport class
+            **transport_class** (:obj:`TransportClassBase`): Transport class
         """
 
         ids = [x._id for x in self.classes if x._id == transport_class._id]
@@ -154,11 +150,9 @@ class TrafficAssignment(AssignmentBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-        >>> from aequilibrae.matrix import AequilibraeMatrix
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
@@ -168,7 +162,6 @@ class TrafficAssignment(AssignmentBase):
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = AequilibraeMatrix()
         >>> demand = proj_matrices.get_matrix("demand_omx")
 
         # We will only assign one user class stored as 'matrix' inside the OMX file
@@ -195,14 +188,12 @@ class TrafficAssignment(AssignmentBase):
         # And the algorithm we want to use to assign
         >>> assig.set_algorithm('bfw')
 
-        # Since we haven't checked the parameters file, let's make sure convergence criteria is good
-        >>> assig.max_iter = 1000
+        >>> assig.max_iter = 10
         >>> assig.rgap_target = 0.00001
 
         >>> assig.execute() # we then execute the assignment
 
         # If you want, it is possible to access the convergence report
-        >>> import pandas as pd
         >>> convergence_report = pd.DataFrame(assig.assignment.convergence_report)
 
         # Assignment results can be viewed as a Pandas DataFrame
@@ -240,6 +231,7 @@ class TrafficAssignment(AssignmentBase):
         self.capacity = None  # type: np.ndarray
         self.congested_time = None  # type: np.ndarray
         self.save_path_files = False  # type: bool
+        self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
 
@@ -300,7 +292,7 @@ class TrafficAssignment(AssignmentBase):
         Sets the Volume-delay function to be used
 
         :Arguments:
-            **vdf_function** (:obj:`str`:) Name of the VDF to be used
+            **vdf_function** (:obj:`str`): Name of the VDF to be used
         """
         self.vdf = vdf_function
 
@@ -309,7 +301,7 @@ class TrafficAssignment(AssignmentBase):
         Sets Traffic classes to be assigned
 
         :Arguments:
-            **classes** (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
+            **classes** (:obj:`List[TrafficClass]`): List of Traffic classes for assignment
         """
 
         ids = {x._id for x in classes}
@@ -322,7 +314,7 @@ class TrafficAssignment(AssignmentBase):
         Adds a traffic class to the assignment
 
         :Arguments:
-            **traffic_class** (:obj:`TrafficClass`:) Traffic class
+            **traffic_class** (:obj:`TrafficClass`): Traffic class
         """
 
         ids = [x._id for x in self.classes if x._id == traffic_class._id]
@@ -410,7 +402,7 @@ class TrafficAssignment(AssignmentBase):
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
 
-            Inherited from :obj:`AssignmentResultsBase`
+        Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
@@ -418,10 +410,10 @@ class TrafficAssignment(AssignmentBase):
         if not self.classes:
             raise RuntimeError("You need load traffic classes before overwriting the number of cores")
 
-        self.cores = cores
+        self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(cores)
-            c._aon_results.set_cores(cores)
+            c.results.set_cores(self.cores)
+            c._aon_results.set_cores(self.cores)
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -484,6 +476,55 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
+    def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
+        """
+        Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
+
+        :Arguments:
+            **preload** (:obj:`pd.DataFrame`): dataframe mapping 'link_id' & 'direction' to 'preload'
+            **name** (:obj:`str`): Name for particular preload (optional - default name will be chosen if not specified)
+        """
+        # Create preloads dataframe in correct order if not already initialised
+        if self.preloads is None:
+            g = self.classes[0].graph.graph
+            self.preloads = g.sort_values(by="__supernet_id__")[["link_id", "direction"]].copy()
+
+        # Check that columns of preload are link_id, direction, preload:
+        expected = {"link_id", "direction", "preload"}
+        missing = expected - set(preload.columns)
+        additional = set(preload.columns) - expected
+        if missing:
+            raise ValueError(
+                f"Input preload dataframe is missing columns: {missing}\n" f"expected columns are {expected}"
+            )
+        elif additional:
+            raise ValueError(
+                f"Input preload dataframe has additional columns: {additional}\n" f"expected columns are {expected}"
+            )
+
+        # Reject empty preloads
+        if len(preload) == 0:
+            raise ValueError("Cannot set empty preload!")
+
+        # Check name is not already used (generate new name if needed):
+        name = (
+            name if name else f"preload_{len(self.preloads.columns) - 1}"
+        )  # -1 -> remove keys to get 1 indexed preload columns
+        if name in self.preloads.columns:
+            raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
+        preload.rename(columns={"preload": name}, inplace=True)
+
+        # Merge onto current preload dataframe
+        self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
+        self.preloads[name] = self.preloads[name].fillna(0)
+
+        # Enable preload to be added before or after specifyig the algorithm
+        if self.assignment is not None:
+            if self.assignment.preload is None:
+                self.assignment.preload = self.preloads[name].to_numpy()
+            else:
+                self.assignment.preload += self.preloads[name]
+
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
     # def load_assignment_spec(self, specs: dict) -> None:
@@ -517,8 +558,11 @@ class TrafficAssignment(AssignmentBase):
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table to hold this assignment result
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
 
         df = self.results()
@@ -546,7 +590,7 @@ class TrafficAssignment(AssignmentBase):
         """Prepares the assignment results as a Pandas DataFrame
 
         :Returns:
-            **DataFrame** (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on `link_id`
         """
 
         idx = self.classes[0].graph.graph.__supernet_id__
@@ -559,8 +603,12 @@ class TrafficAssignment(AssignmentBase):
         voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
+        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
 
         fields = [
+            "Preload_AB",
+            "Preload_BA",
+            "Preload_tot",
             "Congested_Time_AB",
             "Congested_Time_BA",
             "Congested_Time_Max",
@@ -575,41 +623,34 @@ class TrafficAssignment(AssignmentBase):
             "PCE_tot",
         ]
 
-        agg = AequilibraeData.empty(
-            memory_mode=True,
-            entries=res1.data.shape[0],
-            field_names=fields,
-            data_types=[np.float64] * len(fields),
-            fill=np.nan,
-            index=res1.data.index[:],
-        )
+        agg = pd.DataFrame([], columns=fields, index=res1.index[:]).astype(float)
+        agg.fillna(0.0, inplace=True)
 
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
-        agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
-        agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
-        agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
+        agg["Preload_AB"].values[m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
+        agg["Preload_BA"].values[m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
-        agg.data["Delay_factor_AB"][m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
-        agg.data["Delay_factor_BA"][m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
-        agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
+        agg["Congested_Time_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
+        agg["Congested_Time_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
+        agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        agg.data["VOC_AB"][m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
-        agg.data["VOC_BA"][m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
-        agg.data["VOC_max"][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
+        agg["Delay_factor_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
+        agg["Delay_factor_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
+        agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
-        agg.data["PCE_AB"][m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
-        agg.data["PCE_BA"][m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
-        agg.data["PCE_tot"][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
+        agg["VOC_AB"].values[m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
+        agg["VOC_BA"].values[m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
+        agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
+
+        agg["PCE_AB"].values[m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
+        agg["PCE_BA"].values[m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
+        agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
-
-        dfs = [pd.DataFrame(aed.data) for aed in assig_results]
-        dfs = [df.rename(columns={"index": "link_id"}).set_index("link_id") for df in dfs]
-        df = pd.concat(dfs, axis=1)
-
-        return df
+        return pd.concat(assig_results, axis=1).rename_axis("link_id")
 
     def info(self) -> dict:
         """Returns information for the traffic assignment procedure
@@ -661,15 +702,19 @@ class TrafficAssignment(AssignmentBase):
 
         :Arguments:
             **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
-            **which_ones** (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
-            all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
-            **format** (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+
+            **which_ones** (:obj:`str`, *Optional*): {'final': Results of the final iteration, 'blended': Averaged results
+            for all iterations, 'all': Saves skims for both the final iteration and the blended ones}.
+            Default is 'final'
+
+            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-        if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
         if not project:
@@ -755,15 +800,13 @@ class TrafficAssignment(AssignmentBase):
             # Save OD_matrices
             if cls._selected_links is None:
                 continue
-            df = cls.results.get_sl_results()
             # Create Values table
-            df = pd.DataFrame(df.data)
+            df = cls.results.get_sl_results()
             # Remap the dataframe names to add the prefix classname for each class
             cls_cols = {x: cls._id + "_" + x if (x != "index") else "link_id" for x in df.columns}
             df.rename(columns=cls_cols, inplace=True)
-            df.set_index("link_id", inplace=True)
             class_flows.append(df)
-        return pd.concat(class_flows, axis=1)
+        return pd.concat(class_flows, axis=1).rename_axis("link_id")
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
@@ -772,7 +815,8 @@ class TrafficAssignment(AssignmentBase):
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to. Note the traffic class
-            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
             Defaults to the active project
         """
 
@@ -862,7 +906,7 @@ class TransitAssignment(AssignmentBase):
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER transit classes have been added
 
-            Inherited from :obj:`AssignmentResultsBase`
+        Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
@@ -870,9 +914,9 @@ class TransitAssignment(AssignmentBase):
         if not self.classes:
             raise RuntimeError("You need load transit classes before overwriting the number of cores")
 
-        self.cores = cores
+        self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(cores)
+            c.results.set_cores(self.cores)
 
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
@@ -924,8 +968,11 @@ class TransitAssignment(AssignmentBase):
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table to hold this assignment result
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
 
         df = self.results()
@@ -953,12 +1000,10 @@ class TransitAssignment(AssignmentBase):
         """Prepares the assignment results as a Pandas DataFrame
 
         :Returns:
-            **DataFrame** (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on *link_id*
         """
         assig_results = [
-            pd.DataFrame(cls.results.get_load_results().data)
-            .rename(columns={"volume": cls._id + "_volume", "index": "link_id"})
-            .set_index("link_id")
+            pd.DataFrame(cls.results.get_load_results()).rename(columns={"volume": cls._id + "_volume"})
             for cls in self.classes
         ]
 

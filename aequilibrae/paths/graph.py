@@ -3,13 +3,34 @@ import uuid
 from abc import ABC
 from datetime import datetime
 from os.path import join
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
+import dataclasses
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.graph_building import build_compressed_graph
+from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 from aequilibrae.context import get_logger
+
+
+@dataclasses.dataclass
+class NetworkGraphIndices:
+    network_ab_idx: np.array
+    network_ba_idx: np.array
+    graph_ab_idx: np.array
+    graph_ba_idx: np.array
+
+
+def _get_graph_to_network_mapping(lids, direcs):
+    num_uncompressed_links = int(np.unique(lids).shape[0])
+    indexing = np.zeros(int(lids.max()) + 1, np.uint64)
+    indexing[np.unique(lids)[:]] = np.arange(num_uncompressed_links)
+
+    graph_ab_idx = direcs > 0
+    graph_ba_idx = direcs < 0
+    network_ab_idx = indexing[lids[graph_ab_idx]]
+    network_ba_idx = indexing[lids[graph_ba_idx]]
+    return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
 
 
 class GraphBase(ABC):  # noqa: B024
@@ -21,11 +42,12 @@ class GraphBase(ABC):  # noqa: B024
         - dead end removal.
 
     Link contraction creates a topological equivalent graph by contracting sequences of links between nodes
-    with degrees of two. This compresses long streams of links, such as along highways or curved roads, into single links.
+    with degrees of two. This compresses long streams of links, such as along highways or curved roads, into
+    single links.
 
-    Dead end removal attempts to remove dead ends and fish spines from the network. It does this based on the observation
-    that in a graph with non-negative weights a dead end will over ever appear in the results of a short(est) path if the
-    origin or destination is present within that dead end.
+    Dead end removal attempts to remove dead ends and fish spines from the network. It does this based on the
+    observation that in a graph with non-negative weights a dead end will only ever appear in the results of a
+    short(est) path if the origin or destination is present within that dead end.
 
     Dead end removal is applied before link contraction and does not create a strictly topological equivalent graph,
     however, all centroids are preserved.
@@ -95,6 +117,9 @@ class GraphBase(ABC):  # noqa: B024
 
         self.dead_end_links = np.array([])
 
+        self.compressed_link_network_mapping_idx = None
+        self.compressed_link_network_mapping_data = None
+
         # Randomly generate a unique Graph ID randomly
         self._id = uuid.uuid4().hex
 
@@ -112,7 +137,7 @@ class GraphBase(ABC):  # noqa: B024
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: Optional[np.ndarray]) -> None:
+    def prepare_graph(self, centroids: Optional[np.ndarray] = None) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -166,6 +191,11 @@ class GraphBase(ABC):  # noqa: B024
         if self.centroids.shape[0]:
             self.__build_compressed_graph()
             self.compact_num_links = self.compact_graph.shape[0]
+
+        # The cache property should be recalculated when the graph has been re-prepared
+        self.compressed_link_network_mapping_idx = None
+        self.compressed_link_network_mapping_data = None
+        self.network_compressed_node_mapping = None
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)
@@ -237,12 +267,60 @@ class GraphBase(ABC):  # noqa: B024
         if nans:
             self.logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
 
-        df.loc[:, "b_node"] = df.b_node.values.astype(self.__integer_type)
-        df.loc[:, "id"] = df.id.values.astype(self.__integer_type)
-        df.loc[:, "link_id"] = df.link_id.values.astype(self.__integer_type)
+        df["link_id"] = df["link_id"].astype(self.__integer_type)
+        df["b_node"] = df.b_node.values.astype(self.__integer_type)
+        df["id"] = df.id.values.astype(self.__integer_type)
         df["direction"] = df.direction.values.astype(np.int8)
 
         return all_nodes, num_nodes, nodes_to_indices, fs, df
+
+    def compute_path(
+        self,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
+    ):
+        """
+        Returns the results from path computation result holder.
+
+        :Arguments:
+            **origin** (:obj:`int`): origin for the path
+
+            **destination** (:obj:`int`): destination for the path
+
+            **early_exit** (:obj:`bool`): stop constructing the shortest path tree once the destination is found.
+            Doing so may cause subsequent calls to ``update_trace`` to recompute the tree. Default is ``False``.
+
+            **a_star** (:obj:`bool`): whether or not to use A* over Dijkstra's algorithm.
+            When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
+
+            **heuristic** (:obj:`str`): heuristic to use if ``a_star`` is enabled. Default is ``None``.
+        """
+        from aequilibrae.paths import PathResults
+
+        res = PathResults()
+        res.prepare(self)
+        res.compute_path(origin, destination, early_exit, a_star, heuristic)
+
+        return res
+
+    def compute_skims(self, cores: Union[int, None] = None):
+        """
+        Returns the results from network skimming result holder.
+
+        :Arguments:
+            **cores** (:obj:`Union[int, None]`): number of cores (threads) to be used in computation
+        """
+        from aequilibrae.paths import NetworkSkimming
+
+        skimmer = NetworkSkimming(self)
+        if cores:
+            skimmer.set_cores(cores)
+        skimmer.execute()
+
+        return skimmer
 
     def exclude_links(self, links: list) -> None:
         """
@@ -311,18 +389,22 @@ class GraphBase(ABC):  # noqa: B024
         :Arguments:
             **cost_field** (:obj:`str`): Field name. Must be numeric
         """
-        if cost_field in self.graph.columns:
-            self.cost_field = cost_field
+        if cost_field not in self.graph.columns:
+            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
+
+        self.cost_field = cost_field
+
+        # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
+        if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
             df = self.__graph_groupby.sum(numeric_only=True)[[cost_field]].reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
-            if self.graph[cost_field].dtype == self.__float_type:
-                self.cost = np.array(self.graph[cost_field].values, copy=True)
-            else:
-                self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
-                self.logger.warning("Cost field with wrong type. Converting to float64")
+
+        if self.graph[cost_field].dtype == self.__float_type:
+            self.cost = np.array(self.graph[cost_field].values, copy=True)
         else:
-            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
+            self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
+            self.logger.warning("Cost field with wrong type. Converting to float64")
 
         self.__build_derived_properties()
 
@@ -330,7 +412,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         Sets the list of skims to be computed
 
-        Skimming with A* may produce results that differ from tradditional Dijkstra's due to its use a heuristic.
+        Skimming with A* may produce results that differ from traditional Dijkstra's due to its use a heuristic.
 
         :Arguments:
             **skim_fields** (:obj:`list`): Fields must be numeric
@@ -369,7 +451,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         Chooses whether we want to block paths to go through centroids or not.
 
-        Default value is True
+        Default value is ``True``
 
         :Arguments:
             **block_centroid_flows** (:obj:`bool`): Blocking or not
@@ -387,7 +469,7 @@ class GraphBase(ABC):  # noqa: B024
         Saves graph to disk
 
         :Arguments:
-            **filename** (:obj:`str`): Path to file. Usual file extension is *aeg*
+            **filename** (:obj:`str`): Path to file. Usual file extension is 'aeg'
         """
         mygraph = {}
         mygraph["description"] = self.description
@@ -484,13 +566,13 @@ class GraphBase(ABC):  # noqa: B024
                 self.logger.warning("Could not convert {} - {}".format(new_type, verr.__str__()))
         if isinstance(new_type, int):
             def_type = int
-            if current_type == float:
+            if current_type is float:
                 def_type = float
-            elif current_type == str:
+            elif current_type is str:
                 def_type = str
         elif isinstance(new_type, float):
             def_type = float
-            if current_type == str:
+            if current_type is str:
                 def_type = str
         elif isinstance(new_type, str):
             def_type = str
@@ -504,6 +586,36 @@ class GraphBase(ABC):  # noqa: B024
         self.graph.to_feather(graph_path)
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
+
+    def create_compressed_link_network_mapping(self):
+        """
+        Create three arrays providing a mapping of compressed ID to link ID.
+
+        Uses sparse compression. Index 'idx' by the by compressed ID and compressed ID + 1, the
+        network IDs are then in the range ``idx[id]:idx[id + 1]``.
+
+        Links not in the compressed graph are not contained within the 'data' array.
+
+        .. code-block:: python
+
+            >>> project = create_example(project_path)
+
+            >>> project.network.build_graphs()
+
+            >>> graph = project.network.graphs['c']
+            >>> graph.prepare_graph(np.arange(1,25))
+
+            >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()
+
+        :Returns:
+            **idx** (:obj:`np.array`): index array for ``data``
+
+            **data** (:obj:`np.array`): array of link ids
+
+            **node_mapping**: (:obj:`np.array`): array of node_mapping ids
+        """
+
+        return create_compressed_link_network_mapping(self)
 
 
 class Graph(GraphBase):

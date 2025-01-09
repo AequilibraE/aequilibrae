@@ -10,37 +10,29 @@ detach them in order to use OSMNx as a dependency or submodule
 For the original work, please see https://github.com/gboeing/osmnx
 """
 
+import gc
 import logging
-import time
 import re
-from typing import List
+import time
+from typing import List, Dict
 
+import pandas as pd
 import requests
 from shapely import Polygon
 
-from .osm_params import http_headers, memory
-from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
-from aequilibrae.utils import WorkerThread
-import gc
-import importlib.util as iutil
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
+from aequilibrae.parameters import Parameters
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from .osm_params import http_headers, memory
 
 
 class OSMDownloader(WorkerThread):
-    if pyqt:
-        downloading = pyqtSignal(object)
-
-    def __emit_all(self, *args):
-        if pyqt:
-            self.downloading.emit(*args)
+    signal = SIGNAL(object)
 
     def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
+
         self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
@@ -50,6 +42,9 @@ class OSMDownloader(WorkerThread):
         self.overpass_endpoint = par["overpass_endpoint"]
         self.timeout = par["timeout"]
         self.sleeptime = par["sleeptime"]
+        self._nodes = []
+        self._links = []
+        self.data: Dict[str, pd.DataFrame] = {"nodes": pd.DataFrame([]), "links": pd.DataFrame([])}
 
     def doWork(self):
         infrastructure = 'way["highway"]'
@@ -57,16 +52,11 @@ class OSMDownloader(WorkerThread):
             "{memory}[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        self.__emit_all(["maxValue", len(self.polygons)])
-        self.__emit_all(["Value", 0])
         m = ""
         if memory > 0:
             m = f"[maxsize: {memory}]"
-        for counter, poly in enumerate(self.polygons):
-            msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
-            self.logger.debug(msg)
-            self.__emit_all(["Value", counter])
-            self.__emit_all(["text", msg])
+        msg = f"Total polygons: {len(self.polygons)}"
+        for poly in simple_progress(self.polygons, self.signal, msg):
             west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
@@ -80,11 +70,26 @@ class OSMDownloader(WorkerThread):
             )
             json = self.overpass_request(data={"data": query_str}, timeout=self.timeout)
             if json["elements"]:
-                self.json.extend(json["elements"])
-            del json
+                for tag, lst in [("node", self._nodes), ("way", self._links)]:
+                    df = pd.DataFrame([item for item in json["elements"] if item["type"] == tag])
+                    if tag == "node":
+                        df = df.assign(is_centroid=0, modes="", link_types="", node_id=0)
+                    lst.append(df)
+                del json
+                gc.collect()
+
+        self.signal.emit(["set_text", "Downloading finished. Processing data"])
+        for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
+            df = pd.DataFrame([])
+            if len(lst) > 0:
+                df = pd.concat(lst, ignore_index=True).drop_duplicates(subset=["id"]).drop(columns=["type"])
+            if table != "links":
+                df = df.drop(columns=["tags"], errors="ignore")
+            self.data[table] = df.rename(columns={"id": "osm_id"}, errors="ignore")
+            lst.clear()
             gc.collect()
-        self.__emit_all(["Value", len(self.polygons)])
-        self.__emit_all(["FinishedDownloading", 0])
+
+        self.signal.emit(["finished"])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """Send a request to the Overpass API via HTTP POST and return the JSON response.

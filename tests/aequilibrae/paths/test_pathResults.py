@@ -96,12 +96,13 @@ class TestPathResults(TestCase):
                 self.assertEqual(list(self.r.milepost), [0, 4, 9], "Path computation failed. Wrong milepost results")
 
     def test_compute_with_skimming(self):
-        for early_exit, a_star in product([True, False], repeat=2):
-            with self.subTest(early_exit=early_exit, a_star=a_star):
+        # Skimming for A* disabled
+        for early_exit in (True, False):
+            with self.subTest(early_exit=early_exit):
                 r = PathResults()
                 self.g.set_skimming("free_flow_time")
                 r.prepare(self.g)
-                r.compute_path(origin, dest, early_exit=early_exit, a_star=a_star)
+                r.compute_path(origin, dest, early_exit=early_exit)
                 self.assertEqual(r.milepost[-1], r.skims[dest], "Skims computed wrong when computing path")
 
     def test_update_trace(self):

@@ -37,7 +37,7 @@ class Stop(BasicPTElement):
         self.srid = -1
         self.geo: Optional[Point] = None
         self.route_type: Optional[int] = None
-        self.___map_matching_id__: Dict[Any, Any] = {}
+        self.__map_matching_id__: Dict[Any, Any] = {}
         self.__moved_map_matching__ = 0
 
         for key, value in zip(headers, record):
@@ -56,7 +56,7 @@ class Stop(BasicPTElement):
         """Saves Transit Stop to the database"""
 
         sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
-                                    parent_station, description, street, fare_zone_id, transit_zone, route_type, geometry)
+                                    parent_station, description, street, zone_id, transit_fare_zone, route_type, geometry)
                  values (?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data

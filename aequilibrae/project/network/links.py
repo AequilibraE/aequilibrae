@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-import pandas as pd
+import geopandas as gpd
 import shapely.wkb
 
 from aequilibrae.project.basic_table import BasicTable
@@ -17,11 +17,9 @@ class Links(BasicTable):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path)
 
-        >>> proj = Project.from_path("/tmp/test_project")
-
-        >>> all_links = proj.network.links
+        >>> all_links = project.network.links
 
         # We can just get one link in specific
         >>> link = all_links.get(1)
@@ -40,6 +38,7 @@ class Links(BasicTable):
         self.__table_type__ = "links"
         self.__fields = []
         self.__items = {}
+        self.__data = None
 
         if self.sql == "":
             self.refresh_fields()
@@ -107,10 +106,11 @@ class Links(BasicTable):
         return link
 
     def delete(self, link_id: int) -> None:
-        """Removes the link with **link_id** from the project
+        """Removes the link with link_id from the project
 
         :Arguments:
-            **link_id** (:obj:`int`): Id of a link to delete"""
+            **link_id** (:obj:`int`): Id of a link to delete
+        """
         d = 1
         link_id = int(link_id)
         if link_id in self.__items:
@@ -134,11 +134,11 @@ class Links(BasicTable):
         self.__fields = deepcopy(tl.fields)
 
     @property
-    def data(self) -> pd.DataFrame:
-        """Returns all links data as a Pandas dataFrame
+    def data(self) -> gpd.GeoDataFrame:
+        """Returns all links data as a Pandas DataFrame
 
         :Returns:
-            **table** (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
+            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
         """
         dl = DataLoader(self.project.path_to_file, "links")
         return dl.load_table()

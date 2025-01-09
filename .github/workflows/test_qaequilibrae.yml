@@ -1,0 +1,19 @@
+name: Test QAequilibraE
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  trigger-event:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Triggers test run on QAequilibraE
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          repository: aequilibrae/qaequilibrae
+          event-type: custom-event
+          client-payload: '{"ref": "develop"}'

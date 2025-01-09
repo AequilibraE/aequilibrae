@@ -21,7 +21,7 @@ class Link:
 
     def __init__(self, srid) -> None:
         """
-        :Args:
+        :Arguments:
             *srid* (:obj:`int`): srid of our working database
         """
 

@@ -10,14 +10,13 @@ class SkimResults:
 
     .. code-block:: python
 
-          >>> from aequilibrae import Project
           >>> from aequilibrae.paths.results import SkimResults
 
-          >>> proj = Project.from_path("/tmp/test_project")
-          >>> proj.network.build_graphs()
+          >>> project = create_example(project_path)
+          >>> project.network.build_graphs()
 
           # Mode c is car in this project
-          >>> car_graph = proj.network.graphs['c']
+          >>> car_graph = project.network.graphs['c']
 
           # minimize travel time
           >>> car_graph.set_graph('free_flow_time')
@@ -28,7 +27,7 @@ class SkimResults:
           >>> res = SkimResults()
           >>> res.prepare(car_graph)
 
-          >>> res.skims.export('/tmp/test_project/matrix.aem')
+          >>> res.skims.export(os.path.join(project_path, "skim_matrices.aem"))
     """
 
     def __init__(self):

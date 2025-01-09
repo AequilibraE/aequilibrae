@@ -138,7 +138,6 @@ network:
     - pedestrian
     - bridleway
     - elevator
-    - motor
     - trunk
     - tertiary
     - service
@@ -149,84 +148,116 @@ network:
     - abandoned
     - platform
     - unclassified
+    - via_ferrata
+    - busway
     modes:
       bicycle:
         link_types:
-        - primary
-        - primary_link
-        - secondary
         - secondary_link
-        - tertiary
+        - trail
+        - cycleway
+        - trunk_link
+        - secondary
+        - escape
+        - track
+        - road
+        - primary
+        - residential
+        - footway
+        - primary_link
+        - unclassified
         - tertiary_link
         - living_street
-        - residential
-        - cycleway
-        - corridor
         - pedestrian
-        - path
-        - track
-        - trail
+        - elevator
+        - tertiary
+        - service
+        - proposed
+        - construction
         - unclassified
         mode_filter:
           bicycle: 'no'
         unknown_tags: true
       car:
         link_types:
-        - motor
-        - motorway
-        - trunk
-        - primary
-        - secondary
-        - tertiary
-        - unclassified
-        - residential
-        - motorway_link
-        - trunk_link
-        - primary_link
         - secondary_link
-        - tertiary_link
-        - living_street
-        - service
+        - trunk_link
+        - secondary
         - escape
         - road
+        - motorway_link
+        - primary
+        - residential
+        - motorway
+        - primary_link
+        - unclassified
+        - tertiary_link
+        - living_street
+        - pedestrian
+        - bridleway
+        - trunk
+        - tertiary
+        - service
+        - construction
+        - unclassified
         mode_filter:
           motor_vehicle: 'no'
         unknown_tags: true
       transit:
         link_types:
-        - motor
-        - motorway
-        - trunk
-        - primary
-        - secondary
-        - tertiary
-        - unclassified
-        - residential
-        - motorway_link
-        - trunk_link
-        - primary_link
         - secondary_link
-        - tertiary_link
-        - living_street
-        - service
+        - trunk_link
+        - secondary
         - escape
         - road
+        - motorway_link
+        - primary
+        - residential
+        - motorway
+        - primary_link
+        - unclassified
+        - tertiary_link
+        - living_street
+        - pedestrian
+        - bridleway
+        - trunk
+        - tertiary
+        - service
+        - construction
+        - unclassified
         - bus_guideway
+        - busway
         unknown_tags: true
       walk:
         link_types:
-        - cycleway
-        - footway
-        - steps
-        - corridor
-        - pedestrian
-        - elevator
+        - secondary_link
         - escalator
-        - path
-        - track
         - trail
-        - bridleway
+        - cycleway
+        - path
+        - trunk_link
+        - secondary
+        - escape
+        - track
+        - road
+        - primary
+        - corridor
+        - residential
+        - footway
+        - primary_link
         - unclassified
+        - tertiary_link
+        - living_street
+        - pedestrian
+        - bridleway
+        - elevator
+        - tertiary
+        - service
+        - steps
+        - proposed
+        - construction
+        - unclassified
+        - via_ferrata
         mode_filter:
           pedestrian: 'no'
         unknown_tags: true

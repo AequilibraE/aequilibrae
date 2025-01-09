@@ -12,8 +12,10 @@ def create_example(path: str, from_model="sioux_falls") -> Project:
 
     :Arguments:
         **path** (:obj:`str`): Path where to create a new model. must be a non-existing folder/directory.
-        **from_model** (:obj:`str`, `Optional`): Example to create from *sioux_falls*, *nauru* or *coquimbo*.
+
+        **from_model** (:obj:`str`, *Optional*): Example to create from *sioux_falls*, *nauru* or *coquimbo*.
         Defaults to *sioux_falls*
+
     :Returns:
         **project** (:obj:`Project`): Aequilibrae Project handle (open)
 

@@ -68,11 +68,9 @@ class TrafficClass(TransportClassBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-        >>> from aequilibrae.matrix import AequilibraeMatrix
         >>> from aequilibrae.paths import TrafficClass
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
@@ -82,7 +80,6 @@ class TrafficClass(TransportClassBase):
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = AequilibraeMatrix()
         >>> demand = proj_matrices.get_matrix("demand_omx")
         >>> demand.computational_view(['matrix'])
 
@@ -128,6 +125,7 @@ class TrafficClass(TransportClassBase):
 
         :Arguments:
              **field_name** (:obj:`str`): Name of the graph field with fixed costs for this class
+
              **multiplier** (:obj:`Union[float, int]`): Multiplier for the fixed cost. Defaults to 1 if not set
         """
         if field_name not in self.graph.graph.columns:
@@ -159,7 +157,7 @@ class TrafficClass(TransportClassBase):
 
         :Arguments:
             **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
-             Link IDs and directions to be used in select link analysis"""
+            Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
         for name, link_set in links.items():
             if len(name.split(" ")) != 1:
