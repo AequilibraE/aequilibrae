@@ -16,7 +16,6 @@ from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.qgis_utils import inside_qgis
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
@@ -79,7 +78,7 @@ class OVMBuilder(WorkerThread):
         # Concatenate the resulting DataFrames into a final GeoDataFrame
         links_gdf = pd.concat((df.dropna(axis=1, how="all") for df in result_dfs), ignore_index=True)
 
-        # adding neccassary columns for aequilibrea data frame
+        # adding necessary columns for aequilibrae data frame
         links_gdf["link_id"] = pd.Series(list(range(1, len(links_gdf) + 1)))
         links_gdf["ogc_fid"] = pd.Series(list(range(1, len(links_gdf) + 1)))
         links_gdf["geometry"] = [
@@ -125,7 +124,7 @@ class OVMBuilder(WorkerThread):
         links_gdf = links_gdf[link_order]
         links_gdf.to_parquet(output_file_link)
 
-        # For goemetry to work in the sql
+        # For geometry to work in the sql
         links_gdf = pd.DataFrame(links_gdf)
         links_gdf["geometry"] = links_gdf["geometry"].apply(lambda x: x.wkb)
 
@@ -217,7 +216,7 @@ class OVMBuilder(WorkerThread):
 
     def create_node_ids(self, data_frame: gpd.GeoDataFrame) -> pd.Series:
         """
-        Creates node_ids as well as the self.nodes and self.node_ids dictories
+        Creates node_ids as well as the self.nodes and self.node_ids directories
         """
         node_ids = []
         data_frame["node_id"] = 1

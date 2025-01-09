@@ -18,8 +18,6 @@ from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
-
-# from aequilibrae.project.network.ovm_builder import OVMBuilder
 from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
@@ -129,10 +127,10 @@ class Network(WorkerThread):
         place_name: str = None,
         data_source: Path = None,
         output_dir: Path = None,
-        modes: list = None,
+        modes=("car", "transit", "bicycle", "walk"),
     ) -> None:
         """
-        Downloads the network from Open-Street Maps
+        Downloads the network from Overture Maps
 
         :Arguments:
             **west** (:obj:`float`, Optional): West most coordinate of the download bounding box
@@ -141,35 +139,25 @@ class Network(WorkerThread):
 
             **east** (:obj:`float`, Optional): East most coordinate of the download bounding box
 
+            **north** (:obj:`float`, Optional): North most coordinate of the download bounding box
+
             **place_name** (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
             required
 
-            **modes** (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
-            file
+            **data_source**
 
-        .. code-block:: python
+            **output_dir**
 
-            >>> from aequilibrae import Project
-
-            >>> p = Project()
-            >>> p.new("/tmp/new_project")
-
-            # Save the parameters to disk
-            >>> par.write_back()
-
-            # Now we can import the network for any place we want
-            # p.network.create_from_ovm(place_name="my_beautiful_hometown")
-
-            >>> p.close()
+            **modes** (:obj:`tuple`, *Optional*): List of all modes to be downloaded. Defaults to the modes in the
+            parameter file
         """
 
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OVM network into a brand new model file")
 
-        curr = self.conn.cursor()
-        curr.execute("""ALTER TABLE links ADD COLUMN ovm_id integer""")
-        curr.execute("""ALTER TABLE nodes ADD COLUMN ovm_id integer""")
-        self.conn.commit()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            conn.execute("""ALTER TABLE links ADD COLUMN ovm_id integer""")
+            conn.execute("""ALTER TABLE nodes ADD COLUMN ovm_id integer""")
 
         if isinstance(modes, (tuple, list)):
             modes = list(modes)
@@ -194,16 +182,11 @@ class Network(WorkerThread):
                     self.logger.info(i)
 
         self.logger.info("Downloading data")
-        self.downloader = OVMDownloader(modes, self.source, logger=self.logger)
-        if inside_qgis:
-            self.downloader.downloading.connect(self.signal_handler)
-        segments_gdf, connectors_gdf = self.downloader.downloadTransportation(bbox, data_source, output_dir)
+        self.downloader = OVMDownloader(modes, output_dir, self.logger)
+        segments_gdf, connectors_gdf = self.downloader.download_transportation(bbox, data_source, output_dir)
 
         self.logger.info("Building Network")
-        self.builder = OVMBuilder(segments_gdf, connectors_gdf, self.source, project=self.project)
-
-        if inside_qgis:
-            self.builder.building.connect(self.signal_handler)
+        self.builder = OVMBuilder(segments_gdf, connectors_gdf, output_dir, project=self.project)
 
         self.builder.doWork(output_dir)
         self.logger.info("Network built successfully")

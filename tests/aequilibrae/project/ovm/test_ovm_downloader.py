@@ -10,7 +10,7 @@ def test_download():
         o = OVMDownloader(["car"], output_dir)
 
         box1 = [148.713909, -20.272261, 148.7206475, -20.2702697]
-        gdf_link, gdf_node = o.downloadTransportation(bbox=box1, data_source=data_dir, output_dir=output_dir)
+        gdf_link, gdf_node = o.download_transportation(bbox=box1, data_source=data_dir, output_dir=output_dir)
 
         for t in ["segment", "connector"]:
             output_dir = Path(output_dir)

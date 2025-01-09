@@ -12,7 +12,6 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 # from .haversine import haversine
-# from ...utils import WorkerThread
 
 DEFAULT_OVM_S3_LOCATION = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0//theme=transportation"
 
@@ -50,7 +49,7 @@ class OVMDownloader(WorkerThread):
         )
         return c
 
-    def downloadPlace(self, source, local_file_path=None):
+    def download_place(self, source, local_file_path=None):
         pth = str(self.__project_path / "new_geopackage_pla.parquet").replace("\\", "/")
 
         if source == "s3":
@@ -80,7 +79,7 @@ class OVMDownloader(WorkerThread):
         c = self.initialise_duckdb_spatial()
         c.execute(sql)
 
-    def downloadTransportation(self, bbox: list, data_source: Union[str, Path], output_dir: Union[str, Path]):
+    def download_transportation(self, bbox: list, data_source: Union[str, Path], output_dir: Union[str, Path]):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
         output_dir = Path(output_dir) / "theme=transportation"
 
