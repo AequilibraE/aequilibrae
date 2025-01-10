@@ -120,10 +120,7 @@ class Network(WorkerThread):
 
     def create_from_ovm(
         self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
+        model_area: Optional[Polygon] = None,
         place_name: str = None,
         data_source: Path = None,
         output_dir: Path = None,
@@ -166,20 +163,20 @@ class Network(WorkerThread):
         else:
             raise ValueError("'modes' needs to be string or list/tuple of string")
 
-        if place_name is None:
-            if min(east, west) < -180 or max(east, west) > 180 or min(north, south) < -90 or max(north, south) > 90:
-                raise ValueError("Coordinates out of bounds")
-            bbox = [west, south, east, north]
-        else:
-            bbox, report = placegetter(place_name)
-            west, south, east, north = bbox
-            if bbox is None:
-                msg = f'We could not find a reference for place name "{place_name}"'
-                self.logger.warning(msg)
-                return
-            for i in report:
-                if "PLACE FOUND" in i:
-                    self.logger.info(i)
+        # if place_name is None:
+        #     if min(east, west) < -180 or max(east, west) > 180 or min(north, south) < -90 or max(north, south) > 90:
+        #         raise ValueError("Coordinates out of bounds")
+        #     bbox = [west, south, east, north]
+        # else:
+        #     bbox, report = placegetter(place_name)
+        #     west, south, east, north = bbox
+        #     if bbox is None:
+        #         msg = f'We could not find a reference for place name "{place_name}"'
+        #         self.logger.warning(msg)
+        #         return
+        #     for i in report:
+        #         if "PLACE FOUND" in i:
+        #             self.logger.info(i)
 
         self.logger.info("Downloading data")
         self.downloader = OVMDownloader(modes, output_dir, self.logger)

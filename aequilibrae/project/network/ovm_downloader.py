@@ -1,63 +1,55 @@
 import logging
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 
 import duckdb
 import geopandas as gpd
-import pandas as pd
+from shapely import Polygon
 
-from aequilibrae.context import get_logger
-from aequilibrae.parameters import Parameters
+from aequilibrae.context import get_logger 
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
-# from .haversine import haversine
-
-DEFAULT_OVM_S3_LOCATION = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0//theme=transportation"
+S3_TRANSPORTATION = "s3://overturemaps-us-west-2/release/2024-12-18.0/theme=transportation"
+S3_PLACES = "s3://overturemaps-us-west-2/release/2024-12-18.0/theme=places"
 
 
 class OVMDownloader(WorkerThread):
     signal = SIGNAL(object)
 
-    def __emit_all(self, *args):
-        self.signal.emit(*args)
-
-    def __init__(self, modes: list, project_path: Union[str, Path], logger: logging.Logger = None) -> None:
+    def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
+        self.polygons = polygons
         self.filter = self.get_ovm_filter(modes)
         self.GeoDataFrame = []
-        self.__project_path = Path(project_path)
-        self.pth = str(self.__project_path).replace("\\", "/")
-        self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
 
     def initialise_duckdb_spatial(self):
         conn = duckdb.connect()
+        self.signal.emit(["set_text", "Connecting to Duck DB"])
         c = conn.cursor()
 
         c.execute(
-            """INSTALL spatial;
-                INSTALL httpfs;
-                INSTALL parquet;
             """
-        )
-        c.execute(
-            """LOAD spatial;
-            LOAD parquet;
+            INSTALL spatial;
+            INSTALL httpfs;
+            INSTALL parquet;
+            LOAD spatial;
+            LOAD httpfs;
             SET s3_region='us-west-2';
             """
         )
+
+        self.signal.emit(["set_text", "Database initialised"])
         return c
 
-    def download_place(self, source, local_file_path=None):
-        pth = str(self.__project_path / "new_geopackage_pla.parquet").replace("\\", "/")
+    def download_place(self, output_dir: Union[str, Path]):
+        xmin, ymin, xmax, ymax = self.polygons.bounds
 
-        if source == "s3":
-            data_source = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=places/type=*"
-        elif source == "local":
-            data_source = local_file_path.replace("\\", "/")
-        else:
-            raise ValueError("Invalid source. Use 's3' or provide a valid local file path.")
+        ovm_data_path = Path(output_dir) / "ovm_data"
+        ovm_data_path.mkdir(exist_ok=True)
+
+        out_places = Path(output_dir) / "ovm_data" / "places.parquet"
 
         sql = f"""
             COPY(
@@ -67,157 +59,101 @@ class OVMDownloader(WorkerThread):
                CAST(categories AS JSON) AS categories,
                CAST(brand AS JSON) AS brand,
                CAST(addresses AS JSON) AS addresses,
-               ST_GeomFromWKB(geometry) AS geom
-            FROM read_parquet('{data_source}/*', filename=true, hive_partitioning=1)
-            WHERE bbox.minx > '{self.bbox[0]}'
-                AND bbox.maxx < '{self.bbox[2]}'
-                AND bbox.miny > '{self.bbox[1]}'
-                AND bbox.maxy < '{self.bbox[3]}')
-            TO '{pth}';
+               geometry
+            FROM read_parquet('{S3_PLACES}/type=*', filename=true, hive_partitioning=1)
+            WHERE 
+                bbox.xmin > {xmin} AND 
+                bbox.xmax < {xmax} AND 
+                bbox.ymin > {ymin} AND 
+                bbox.ymax < {ymax})
+            TO '{out_places}'
+            (FORMAT 'parquet', COMPRESSION 'zstd');
             """
 
         c = self.initialise_duckdb_spatial()
         c.execute(sql)
 
-    def download_transportation(self, bbox: list, data_source: Union[str, Path], output_dir: Union[str, Path]):
-        data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
-        output_dir = Path(output_dir) / "theme=transportation"
+    def download_transportation(self, output_dir: Union[str, Path]):
+        xmin, ymin, xmax, ymax = self.polygons.bounds
 
-        output_file_link = output_dir / "type=segment" / "transportation_data_segment.parquet"
-        output_file_node = output_dir / "type=connector" / "transportation_data_connector.parquet"
-        # output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
-        output_file_link.parent.mkdir(parents=True, exist_ok=True)
-        output_file_node.parent.mkdir(parents=True, exist_ok=True)
+        # ovm_data_path = Path(self.project.project_base_path) / "ovm_data"
+        ovm_data_path = Path(output_dir) / "ovm_data"
+        ovm_data_path.mkdir(exist_ok=True)
 
-        # Uncomment to see what information is stored the parquet file
-        # sql = f"""
-        #     DESCRIBE
-        #     SELECT
-        #         road
-        #     FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
-        # """
-        # c = self.initialise_duckdb_spatial()
-        # g = c.execute(sql)
-        # print(g.df())
+        out_links = Path(output_dir) / "ovm_data" / "segments.parquet"
+        out_nodes = Path(output_dir) / "ovm_data" / "connectors.parquet"
+
+        c = self.initialise_duckdb_spatial()
 
         sql_link = f"""
             COPY (
-            SELECT
-                id AS ovm_id,
-                connectors,
-                CAST(road AS JSON) ->>'lanes' AS direction,
-                CAST(road AS JSON) ->>'class' AS link_type,
-                CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
-                CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' AS speed,
-                geometry
-            FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
-            WHERE bbox.minx > '{bbox[0]}'
-                AND bbox.maxx < '{bbox[2]}'
-                AND bbox.miny > '{bbox[1]}'
-                AND bbox.maxy < '{bbox[3]}')
-            TO '{output_file_link}'
-            (FORMAT 'parquet', COMPRESSION 'ZSTD');
+                  SELECT
+                      id AS ovm_id,
+                      class AS link_type,
+                      names.primary AS name,
+                      speed_limits[1].max_speed.value AS speed,
+                      access_restrictions[1].when.heading AS direction,
+                      geometry
+                  FROM read_parquet('{S3_TRANSPORTATION}/type=segment/*', union_by_name=True)
+                  WHERE 
+                      bbox.xmin > {xmin} AND 
+                      bbox.xmax < {xmax} AND 
+                      bbox.ymin > {ymin} AND 
+                      bbox.ymax < {ymax})
+            TO '{out_links}'
+            (FORMAT 'parquet', COMPRESSION 'zstd');
         """
-        c = self.initialise_duckdb_spatial()
         c.execute(sql_link)
 
         sql_node = f"""
             COPY (
-            SELECT
-                id AS ovm_id,
-                geometry
-            FROM read_parquet('{data_source}/type=connector/*', union_by_name=True)
-            WHERE bbox.minx > '{bbox[0]}'
-                AND bbox.maxx < '{bbox[2]}'
-                AND bbox.miny > '{bbox[1]}'
-                AND bbox.maxy < '{bbox[3]}')
-            TO '{output_file_node}'
-            (FORMAT 'parquet', COMPRESSION 'ZSTD');
+                  SELECT
+                      id AS ovm_id,
+                      geometry
+                  FROM read_parquet('{S3_TRANSPORTATION}/type=connector/*', union_by_name=True)
+                  WHERE 
+                      bbox.xmin > {xmin} AND 
+                      bbox.xmax < {xmax} AND 
+                      bbox.ymin > {ymin} AND 
+                      bbox.ymax < {ymax})
+            TO '{out_nodes}'
+            (FORMAT 'parquet', COMPRESSION 'zstd');
         """
         c.execute(sql_node)
 
-        # Creating links GeoDataFrame
-        df_link = pd.read_parquet(output_file_link)
-        geo_link = gpd.GeoSeries.from_wkb(df_link.geometry, crs=4326)
-        gdf_link = gpd.GeoDataFrame(df_link, geometry=geo_link)
+        self.signal.emit(["set_text", "Downloaded connectors and segments"])
 
-        # Creating nodes GeoDataFrame
-        df_node = pd.read_parquet(output_file_node)
-        geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
-        gdf_node = gpd.GeoDataFrame(df_node, geometry=geo_node)
+        links = gpd.read_parquet(out_links)
+        nodes = gpd.read_parquet(out_nodes)
+        return links, nodes
 
-        return gdf_link, gdf_node
 
-    def get_ovm_filter(self, modes: list) -> str:
-        """
-        loosely adapted from http://www.github.com/gboeing/osmnx
-        """
+    # def get_ovm_filter(self, modes: list) -> str:
+    #     """
+    #     loosely adapted from http://www.github.com/gboeing/osmnx
+    #     """
 
-        p = Parameters().parameters["network"]["ovm"]
-        all_tags = p["all_link_types"]
+    #     p = Parameters().parameters["network"]["ovm"]
+    #     all_tags = p["all_link_types"]
 
-        p = p["modes"]
-        all_modes = list(p.keys())
+    #     p = p["modes"]
+    #     all_modes = list(p.keys())
 
-        tags_to_keep = []
-        for m in modes:
-            if m not in all_modes:
-                raise ValueError(f"Mode {m} not listed in the parameters file")
-            tags_to_keep += p[m]["link_types"]
-        tags_to_keep = list(set(tags_to_keep))
+    #     tags_to_keep = []
+    #     for m in modes:
+    #         if m not in all_modes:
+    #             raise ValueError(f"Mode {m} not listed in the parameters file")
+    #         tags_to_keep += p[m]["link_types"]
+    #     tags_to_keep = list(set(tags_to_keep))
 
-        # Default to remove
-        service = '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]'
-        access = '["access"!~"private"]'
+    #     # Default to remove
+    #     service = '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]'
+    #     access = '["access"!~"private"]'
 
-        filtered = [x for x in all_tags if x not in tags_to_keep]
-        filtered = "|".join(filtered)
+    #     filtered = [x for x in all_tags if x not in tags_to_keep]
+    #     filtered = "|".join(filtered)
 
-        filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
+    #     filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
-        return filter
+    #     return filter
 
-    def _download_test_data(self, data_source: Union[str, Path]):
-        """This method only used to seed/bootstrap a local copy of a small test data set which should be commited to version control"""
-        airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621]
-        # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
-        data_source = data_source.replace("\\", "/")
-
-        for t in ["segment", "connector"]:
-            (
-                Path(__file__).parent.parent.parent.parent
-                / "tests"
-                / "data"
-                / "overture"
-                / "theme=transportation"
-                / f"type={t}"
-            ).mkdir(parents=True, exist_ok=True)
-            pth1 = (
-                Path(__file__).parent.parent.parent.parent
-                / "tests"
-                / "data"
-                / "overture"
-                / "theme=transportation"
-                / f"type={t}"
-                / f"airlie_beach_transportation_{t}.parquet"
-            )
-            sql = f"""
-                COPY (
-                SELECT
-                    *
-                FROM read_parquet('{data_source}/type={t}/*', union_by_name=True)
-                WHERE bbox.minx > '{airlie_bbox[0]}'
-                    AND bbox.maxx < '{airlie_bbox[2]}'
-                    AND bbox.miny > '{airlie_bbox[1]}'
-                    AND bbox.maxy < '{airlie_bbox[3]}')
-                TO '{pth1}'
-                (FORMAT 'parquet', COMPRESSION 'ZSTD');
-            """
-            c = self.initialise_duckdb_spatial()
-            c.execute(sql)
-
-            df = pd.read_parquet(Path(pth1))
-            geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
-            gdf = gpd.GeoDataFrame(df, geometry=geo)
-            gdf.to_parquet(Path(pth1))
-        # return gdf
