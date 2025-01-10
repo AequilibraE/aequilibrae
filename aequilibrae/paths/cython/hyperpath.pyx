@@ -211,10 +211,12 @@ cdef void compute_SF_in_parallel(
     cnp.float64_t[::1] skim_col_view,
     cnp.float64_t[::1] u_i_vec_view,
     cnp.float64_t[::1] skim_i_vec_view,
+    cnp.float64_t[:, ::1] nd_array,
 ) noexcept nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     if output_travel_time:
         with gil:
+            print(nd_array.shape)
             assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
     cdef:
         cnp.uint32_t *thread_demand_origins
@@ -239,6 +241,12 @@ cdef void compute_SF_in_parallel(
         
         cnp.float64_t *skim_i_vec_out = <cnp.float64_t *> malloc(num_threads * sizeof(cnp.float64_t) * vertex_count)
 
+        #### n-d skim variables
+
+        # cdef cnp.float64_t **arr = <cnp.float64_t **>malloc(rows * sizeof(cnp.float64_t *))
+        # for i in range(rows):
+        #     arr[i] = <cnp.float64_t *>malloc(cols * sizeof(cnp.float64_t))
+           
         int i  # openmp on windows requires iterator variable have signed type
         size_t j, destination_vertex_index
         size_t k
@@ -251,6 +259,7 @@ cdef void compute_SF_in_parallel(
         thread_edge_volume  = &edge_volume[threadid() * edge_count]
         thread_u_i_vec = &u_i_vec_out[threadid() * vertex_count]
         thread_skim_i_vec = &skim_i_vec_out[threadid() * vertex_count]
+
 
         # if output_travel_time and threadid() == 0:
         #     thread_u_i_vec  = u_i_vec_out
@@ -325,14 +334,20 @@ cdef void compute_SF_in_parallel(
         for j in range(edge_count):
             edge_volume_view[j] += edge_volume[i * edge_count + j]
 
-        for k in range(vertex_count):
-            u_i_vec_view[k] += u_i_vec_out[i * vertex_count + k]
-            skim_i_vec_view[k] += skim_i_vec_out[i * vertex_count + k]
+    if output_travel_time:
+        for i in range(num_threads):
+            for k in range(vertex_count):
+                u_i_vec_view[k] += u_i_vec_out[i * vertex_count + k]
+                skim_i_vec_view[k] += skim_i_vec_out[i * vertex_count + k]
 
     free(u_i_vec_out)
     free(skim_i_vec_out)        
     free(edge_volume)
     
+    # for i in range(rows):
+    #     free(arr[i])
+    # free(arr)
+
     #return u_i_vec_out
 
 
@@ -509,6 +524,7 @@ cdef void _SF_in_first_pass_full(
         skim_i = skim_i_vec[tail_vert_idx]
         skim_j = skim_j_vec[edge_idx]
 
+
         if u_i >= u_j_c_a:
 
             f_i = f_i_vec[tail_vert_idx]
@@ -533,6 +549,26 @@ cdef void _SF_in_first_pass_full(
             skim_i_new = (beta_skim + f_a * skim_j) / (f_i + f_a)
             skim_i_vec[tail_vert_idx] = skim_i_new
 
+            with gil:
+                print('tail_vert_idx', tail_vert_idx)
+                print('edge_idx', edge_idx)
+
+                # print('beta', beta)
+                # print('u_i', u_i)
+                # print('u_j_c_a', u_j_c_a)
+                # print('u_i_new', u_i_new)
+
+                print('beta_skim', beta_skim)
+                print('skim_i', skim_i)
+                print('skim_j', skim_j)
+                print('skim_i_new', skim_i_new)
+
+                print('f_a', f_a)
+                print('f_i', f_i)
+                print('f_a + f_i', f_i + f_a)
+                print('')
+
+            
             # update f_i
             f_i_vec[tail_vert_idx] = f_i + f_a
 
@@ -555,8 +591,7 @@ cdef void _SF_in_first_pass_full(
 
                 # u_j of current edge = u_i of outgoing edge
                 u_j_c_a = u_i_new + c_a_vec[edge_idx]
-
-                skim_j = skim_i_new
+                skim_j = skim_i_new + skim_col_vec[edge_idx]
 
                 if edge_state == NOT_IN_HEAP:
 

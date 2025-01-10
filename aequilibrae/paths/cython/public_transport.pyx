@@ -81,6 +81,8 @@ class HyperpathGenerating:
             self._skim_cols = self._edges[skim_cols].values.reshape(self._trav_time.shape[0],).astype(DATATYPE_PY)
         else:
             self._skim_cols = np.zeros(self._trav_time.shape[0], dtype=DATATYPE_PY)
+        self._nd_array = self._edges[[trav_time, freq] + skim_cols].values.astype(DATATYPE_PY)
+        self._nd_array = self._nd_array.copy(order='C')
 
     def run(self, origin, destination, volume, return_inf=False):
         # column storing the resulting edge volumes
@@ -128,7 +130,8 @@ class HyperpathGenerating:
             1,  # Single destination so no reason to parallelise
             self._skim_cols[:],
             self.u_i_vec,
-            self.skim_i_vec
+            self.skim_i_vec,
+            self._nd_array[:,:]
         )
 
         # if u_i_vec != NULL:
