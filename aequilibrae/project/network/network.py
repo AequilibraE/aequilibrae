@@ -122,28 +122,17 @@ class Network(WorkerThread):
         self,
         model_area: Optional[Polygon] = None,
         place_name: str = None,
-        data_source: Path = None,
-        output_dir: Path = None,
         modes=("car", "transit", "bicycle", "walk"),
     ) -> None:
         """
         Downloads the network from Overture Maps
 
         :Arguments:
-            **west** (:obj:`float`, Optional): West most coordinate of the download bounding box
-
-            **south** (:obj:`float`, Optional): South most coordinate of the download bounding box
-
-            **east** (:obj:`float`, Optional): East most coordinate of the download bounding box
-
-            **north** (:obj:`float`, Optional): North most coordinate of the download bounding box
+            **model_area** (:obj:`Polygon`, *Optional*): Polygon for which the network will be downloaded.
+            If not provided, a place name would be required
 
             **place_name** (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
             required
-
-            **data_source**
-
-            **output_dir**
 
             **modes** (:obj:`tuple`, *Optional*): List of all modes to be downloaded. Defaults to the modes in the
             parameter file
@@ -163,29 +152,35 @@ class Network(WorkerThread):
         else:
             raise ValueError("'modes' needs to be string or list/tuple of string")
 
-        # if place_name is None:
-        #     if min(east, west) < -180 or max(east, west) > 180 or min(north, south) < -90 or max(north, south) > 90:
-        #         raise ValueError("Coordinates out of bounds")
-        #     bbox = [west, south, east, north]
-        # else:
-        #     bbox, report = placegetter(place_name)
-        #     west, south, east, north = bbox
-        #     if bbox is None:
-        #         msg = f'We could not find a reference for place name "{place_name}"'
-        #         self.logger.warning(msg)
-        #         return
-        #     for i in report:
-        #         if "PLACE FOUND" in i:
-        #             self.logger.info(i)
+        if place_name is None:
+            if (
+                model_area.bounds[0] < -180
+                or model_area.bounds[2] > 180
+                or model_area.bounds[1] < -90
+                or model_area.bounds[3] > 90
+            ):
+                raise ValueError("Coordinates out of bounds. Polygon must be in WGS84")
+        else:
+            # clean = False
+            bbox, report = placegetter(place_name)
+            if bbox is None:
+                msg = f'We could not find a reference for place name "{place_name}"'
+                self.logger.warning(msg)
+                return
+            for i in report:
+                if "PLACE FOUND" in i:
+                    self.logger.info(i)
+            model_area = box(*bbox)
 
         self.logger.info("Downloading data")
-        self.downloader = OVMDownloader(modes, output_dir, self.logger)
-        segments_gdf, connectors_gdf = self.downloader.download_transportation(bbox, data_source, output_dir)
+        downloader = OVMDownloader(model_area, modes, self.logger)
+        downloader.signal = self.signal
+        downloader.doWork()
 
         self.logger.info("Building Network")
-        self.builder = OVMBuilder(segments_gdf, connectors_gdf, output_dir, project=self.project)
+        builder = OVMBuilder(downloader.data, project=self.project)
 
-        self.builder.doWork(output_dir)
+        builder.doWork()
         self.logger.info("Network built successfully")
 
     def create_from_osm(

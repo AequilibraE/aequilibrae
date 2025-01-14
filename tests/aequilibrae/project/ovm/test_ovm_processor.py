@@ -172,7 +172,7 @@ def test_link_lanes():
         print(links)
         o = OVMBuilder(links, node_df, project_path=output_dir / "project", project=project)
         o.create_node_ids(node_df)
-        o._worksetup()
+        o.__filter_data()
         link_gdf = o.formatting(links, node_df, output_dir)
         print(link_gdf)
         return link_gdf

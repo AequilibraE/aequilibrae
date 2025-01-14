@@ -1,5 +1,5 @@
+import gc
 import json
-import logging
 import string
 from pathlib import Path
 from typing import Union
@@ -8,71 +8,65 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import shapely
+from shapely import Polygon
 
 from aequilibrae.context import get_active_project
-from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class OVMBuilder(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(
-        self,
-        gdf_segments: gpd.GeoDataFrame,
-        gdf_connectors: gpd.GeoDataFrame,
-        project_path: Union[str, Path],
-        logger: logging.Logger = None,
-        node_start=10000,
-        project=None,
-    ) -> None:
+    def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
         WorkerThread.__init__(self, None)
+        
+        project.logger.info("Preparing Overture Maps builder")
+        self.signal.emit(["set_text", "Preparing Overture Maps builder"])
+
         self.project = project or get_active_project()
-        self.logger = logger or get_logger()
-        self.node_start = node_start
+        self.logger = self.project.logger
+        self.path = self.project.project_base_path
+        self.node_start = 10_000
+        self.model_area = model_area
         self.report = []
-        self.conn = None
-        self.GeoDataFrame = []
-        self.nodes = {}
-        self.node_ids = {}
-        self.links_gdf = gdf_segments
-        self.nodes_gdf = gdf_connectors
-        self.__link_types = None  # type: LinkTypes
-        self.__model_link_types = []
-        self.__model_link_type_ids = []
-        self.__link_type_quick_reference = {}
-        self.__project_path = Path(project_path)
-        self.pth = str(self.__project_path).replace("\\", "/")
+        self.clean = clean
 
-    def __emit_all(self, *args):
-        self.signal.emit(*args)
+        self.nodes_df = data["nodes"]
+        self.node_df.loc[:, "node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
+        gc.collect()
+        self.links_df = data["links"]
 
-    def doWork(self, output_dir: Path):
-        self.conn = connect_spatialite(self.pth)
-        self.curr = self.conn.cursor()
-        self._worksetup()
-        self.formatting(self.links_gdf, self.nodes_gdf, output_dir)
-        self.__emit_all(["finished_threaded_procedure", 0])
+    def doWork(self):
+        self.formatting(self.links_gdf, self.nodes_gdf)
 
-    def formatting(self, links_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, output_dir: Path):
-        output_dir = Path(output_dir)
-        output_file_link = output_dir / "type=segment" / "transportation_data_segment.parquet"
-        output_file_node = output_dir / "type=connector" / "transportation_data_connector.parquet"
+
+        with commit_and_close(connect_spatialite(self.path)) as conn:
+            self.__update_table_structure(conn)
+            self.__filter_data()
+
+            self.__do_clean(conn)
+
+        self.signal.emit(["finished", 0])
+
+
+    def formatting(self, links_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame):
 
         links_gdf = links_gdf.copy()
         links_gdf["name"] = links_gdf["name"].apply(lambda x: json.loads(x)[0]["value"] if x else None)
 
         nodes_gdf = nodes_gdf.copy()
-        nodes_gdf["node_id"] = self.create_node_ids(nodes_gdf)
+        # nodes_gdf["node_id"] = self.create_node_ids(nodes_gdf)
         nodes_gdf["ogc_fid"] = pd.Series(list(range(1, len(nodes_gdf) + 1)))
         nodes_gdf["is_centroid"] = 0
 
         # Iterate over rows using iterrows()
+        # Iterate over rows might not be a good idea..
         result_dfs = [self.split_connectors(row) for _, row in links_gdf.iterrows()]
 
         # Concatenate the resulting DataFrames into a final GeoDataFrame
@@ -122,7 +116,6 @@ class OVMBuilder(WorkerThread):
                 links_gdf[element] = None
 
         links_gdf = links_gdf[link_order]
-        links_gdf.to_parquet(output_file_link)
 
         # For geometry to work in the sql
         links_gdf = pd.DataFrame(links_gdf)
@@ -131,13 +124,11 @@ class OVMBuilder(WorkerThread):
         node_order = ["ogc_fid", "node_id", "is_centroid", "modes", "link_types", "ovm_id", "geometry"]
         nodes_gdf = nodes_gdf[node_order]
 
-        nodes_gdf.to_parquet(output_file_node)
-
         self.__update_table_structure()
         field_names = ",".join(fields)
 
         self.logger.info("Adding network nodes")
-        self.__emit_all(["text", "Adding network nodes"])
+        self.signal.emit(["set_text", "Adding network nodes"])
 
         node_df = pd.DataFrame(
             nodes_gdf[["node_id", "is_centroid", "modes", "link_types", "ovm_id"]]
@@ -156,7 +147,7 @@ class OVMBuilder(WorkerThread):
         insert_qry = """INSERT INTO "links" ({}, geometry) VALUES({}, GeomFromWKB(?, 4326))"""
         sql = insert_qry.format(field_names, ",".join(["?"] * (len(link_order) - 1)))
         self.logger.info("Adding network links")
-        self.__emit_all(["text", "Adding network links"])
+        self.signal.emit(["set_text", "Adding network links"])
         try:
             self.curr.executemany(sql, all_attrs)
         except Exception as e:
@@ -168,12 +159,19 @@ class OVMBuilder(WorkerThread):
         del links_gdf
         self.curr.close()
 
-    def _worksetup(self):
-        self.__link_types = self.project.network.link_types
-        lts = self.__link_types.all_types()
-        for lt_id, lt in lts.items():
-            self.__model_link_types.append(lt.link_type)
-            self.__model_link_type_ids.append(lt_id)
+    def __filter_data(self):
+        # subclass NOT IN ("parking_aisle", "driveway")
+        self.links_df = self.links_df[~self.links_df["subclass"].isin(["parking_aisle", "driveway"])]
+
+        # access = '["access"!~"private"]'
+        rest = self.links_df.explode("access_restrictions")
+        rest = rest[~rest["access_restrictions"].isna()].reset_index(names="idx")
+        rest = pd.json_normalize(rest["access_restrictions"].tolist()).set_index(rest.idx)
+
+        private_segments = rest[rest["when.recognized"].fillna("").str.join('|').str.contains('as_private')]
+        private_segments = private_segments.index.tolist()
+
+        self.links_df.drop(index=private_segments, inplace=True)
 
     def __repair_link_type(self, link_type: str) -> str:
         original_link_type = link_type
@@ -214,29 +212,29 @@ class OVMBuilder(WorkerThread):
         self.__link_type_quick_reference[original_link_type.lower()] = link_type
         return link_type
 
-    def create_node_ids(self, data_frame: gpd.GeoDataFrame) -> pd.Series:
-        """
-        Creates node_ids as well as the self.nodes and self.node_ids directories
-        """
-        node_ids = []
-        data_frame["node_id"] = 1
-        for i in range(len(data_frame)):
-            node_count = i + self.node_start
-            node_ids.append(node_count)
-            self.node_ids[node_count] = {
-                "ovm_id": data_frame["ovm_id"][i],
-                "lat": data_frame["geometry"][i].y,
-                "lon": data_frame["geometry"][i].x,
-                "coord": (data_frame["geometry"][i].x, data_frame["geometry"][i].y),
-            }
-            self.nodes[data_frame["ovm_id"][i]] = {
-                "lat": data_frame["geometry"][i].y,
-                "lon": data_frame["geometry"][i].x,
-                "coord": (data_frame["geometry"][i].x, data_frame["geometry"][i].y),
-                "node_id": node_count,
-            }
-        data_frame["node_id"] = pd.Series(node_ids)
-        return data_frame["node_id"]
+    # def create_node_ids(self, data_frame: gpd.GeoDataFrame) -> pd.Series:
+    #     """
+    #     Creates node_ids as well as the self.nodes and self.node_ids directories
+    #     """
+    #     node_ids = []
+    #     data_frame["node_id"] = 1
+    #     for i in range(len(data_frame)):
+    #         node_count = i + self.node_start
+    #         node_ids.append(node_count)
+    #         self.node_ids[node_count] = {
+    #             "ovm_id": data_frame["ovm_id"][i],
+    #             "lat": data_frame["geometry"][i].y,
+    #             "lon": data_frame["geometry"][i].x,
+    #             "coord": (data_frame["geometry"][i].x, data_frame["geometry"][i].y),
+    #         }
+    #         self.nodes[data_frame["ovm_id"][i]] = {
+    #             "lat": data_frame["geometry"][i].y,
+    #             "lon": data_frame["geometry"][i].x,
+    #             "coord": (data_frame["geometry"][i].x, data_frame["geometry"][i].y),
+    #             "node_id": node_count,
+    #         }
+    #     data_frame["node_id"] = pd.Series(node_ids)
+    #     return data_frame["node_id"]
 
     def modes_per_link_type(self):
         p = Parameters(self.project)
@@ -336,16 +334,15 @@ class OVMBuilder(WorkerThread):
                 adjusted_speed = round(sum(new_list), 2)
         return adjusted_speed
 
-    def __update_table_structure(self):
-        curr = self.conn.cursor()
-        curr.execute("pragma table_info(Links)")
-        structure = curr.fetchall()
+    ######## TABLE STRUCTURE UPDATING ########
+    def __update_table_structure(self, conn):
+        structure = conn.execute("pragma table_info(Links)").fetchall()
         has_fields = [x[1].lower() for x in structure]
         fields = [field.lower() for field in self.get_link_fields()] + ["ovm_id"]
         for field in [f for f in fields if f not in has_fields]:
             ltype = self.get_link_field_type(field).upper()
-            curr.execute(f"Alter table Links add column {field} {ltype}")
-        self.conn.commit()
+            conn.execute(f"Alter table Links add column {field} {ltype}")
+        conn.commit()
 
     @staticmethod
     def get_link_fields():
@@ -417,3 +414,15 @@ class OVMBuilder(WorkerThread):
                             new_list.append(direction)
 
         return check_numbers(lst=new_list)
+
+    def __do_clean(self, conn):
+        if not self.clean:
+            conn.execute("VACUUM;")
+            return
+        self.logger.info("Cleaning up the network down to the selected area")
+        links = gpd.GeoDataFrame.from_postgis("SELECT link_id, asBinary(geometry) AS geom FROM links", conn, crs=4326)
+        existing_link_ids = gpd.sjoin(links, self.model_area, how="left").dropna().link_id.to_numpy()
+        to_delete = [[x] for x in links[~links.link_id.isin(existing_link_ids)].link_id]
+        conn.executemany("DELETE FROM links WHERE link_id = ?", to_delete)
+        conn.commit()
+        conn.execute("VACUUM;")
