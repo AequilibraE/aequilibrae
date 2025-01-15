@@ -199,7 +199,7 @@ cdef class RouteChoiceSet:
         """
         cdef:
             long long origin, dest
-            size_t i
+            long int i
 
         if select_links is None:
             select_links = {}
@@ -228,7 +228,7 @@ cdef class RouteChoiceSet:
             unsigned int c_max_depth = max_depth
             unsigned int c_max_misses = max_misses
             unsigned int c_seed = seed
-            unsigned int c_cores = cores if cores > 0 else omp_get_max_threads()
+            long int c_cores = cores if cores > 0 else omp_get_max_threads()
 
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
             double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
@@ -284,7 +284,7 @@ cdef class RouteChoiceSet:
             with nogil, parallel(num_threads=c_cores):
                 route_set = new RouteSet_t()
                 thread_id = threadid()
-                for i in prange(demand.ods.size(), schedule="guided"):
+                for i in prange(<long int>demand.ods.size(), schedule="guided"):
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
 
