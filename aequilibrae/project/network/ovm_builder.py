@@ -45,7 +45,6 @@ class OVMBuilder(WorkerThread):
     def doWork(self):
         self.formatting(self.links_gdf, self.nodes_gdf)
 
-
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
             self.__filter_data()
@@ -161,6 +160,7 @@ class OVMBuilder(WorkerThread):
 
     def __filter_data(self):
         # subclass NOT IN ("parking_aisle", "driveway")
+        # Other OSM classes are not available in Overture Maps
         self.links_df = self.links_df[~self.links_df["subclass"].isin(["parking_aisle", "driveway"])]
 
         # access = '["access"!~"private"]'
