@@ -181,6 +181,62 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count) noexcep
     return rs_indptr, rs_indices, rs_data
 
 
+cdef cnp.float64_t **allocate_2d_array(int n):
+    """
+    Allocates memory for a 2D array of doubles with size nxn.
+
+    Args:
+        n: The size of each dimension.
+
+    Returns:
+        A pointer to the allocated 2D array.
+    """
+
+    cdef cnp.float64_t **array = <cnp.float64_t **>malloc(n * sizeof(cnp.float64_t *))
+    if not array:
+        raise MemoryError("Failed to allocate memory for 2D array.")
+
+    for i in range(n):
+        array[i] = <cnp.float64_t *>malloc(n * sizeof(cnp.float64_t))
+        if not array[i]:
+            # Free previously allocated rows
+            for j in range(i):
+                free(array[j])
+            free(array)
+            raise MemoryError("Failed to allocate memory for row.")
+
+    return array
+
+cdef void free_2d_array(cnp.float64_t **array, int n):
+    """
+    Frees the memory allocated for a 2D array.
+
+    Args:
+        array: The 2D array to free.
+        n: The size of each dimension.
+    """
+
+    for i in range(n):
+        free(array[i])
+    free(array)
+
+cdef void add_vector_to_column(cnp.float64_t **array, cnp.float64_t *vector, int n, int col_index):
+    """
+    Adds a vector to a specific column of the 2D array.
+
+    Args:
+        array: The 2D array.
+        vector: The vector to add.
+        n: The size of each dimension.
+        col_index: The index of the column to modify (0-based).
+    """
+
+    if col_index < 0 or col_index >= n:
+        raise ValueError("Invalid column index.")
+
+    for i in range(n):
+        array[i][col_index] += vector[i] 
+
 # Both boundscheck(False) and initializedcheck(False) are required for this function to operate,
 # without them the threads appear to enter a deadlock due to the shared edge_volume array. However
 # the indexing on that array and its slices should never collide.
@@ -200,7 +256,7 @@ cdef void compute_SF_in_parallel(
     cnp.uint32_t[::1] tail_view,
     cnp.uint32_t[::1] head_view,
     cnp.uint32_t[:] d_vert_ids_view, # destination vertices
-    cnp.uint32_t[:] destination_vertex_indices_view, # in public_transport.run case, same as d_vert_ids_view
+    cnp.uint32_t[:] destination_vertex_indices_view, # in public_transport.run case, same as d_vert_ids_view in .assign are the unique destination values
     cnp.uint32_t[::1] o_vert_ids_view, # origin vertices
     cnp.float64_t[::1] demand_vls_view, # volume
     cnp.float64_t[::1] edge_volume_view,
@@ -211,12 +267,21 @@ cdef void compute_SF_in_parallel(
     cnp.float64_t[::1] skim_col_view,
     cnp.float64_t[::1] u_i_vec_view,
     cnp.float64_t[::1] skim_i_vec_view,
-    cnp.float64_t[:, ::1] nd_array,
+    cnp.float64_t[:, ::1] nd_skim_col_view,
+    cnp.float64_t[:, ::1] nd_skim_i_vec_view,
+    cnp.float64_t[:, ::1] skim_u_i,
+    cnp.uint32_t[::1] centroids,
+    cnp.uint32_t[::1] centroids_idx_pos,
 ) noexcept nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     if output_travel_time:
         with gil:
-            print(nd_array.shape)
+            print('n-d skim variables:')
+            print(nd_skim_col_view.shape)
+            print(nd_skim_i_vec_view.shape)
+            print('skim_u_i:')
+            print(skim_u_i.shape)
+            print('')
             assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
     cdef:
         cnp.uint32_t *thread_demand_origins
@@ -232,6 +297,11 @@ cdef void compute_SF_in_parallel(
         cnp.uint32_t *thread_edge_indices
         cnp.float64_t *thread_skim_i_vec
 
+        #cnp.float64_t *u_i_centroids
+
+        # cnp.uint32_t r
+        # cnp.float64_t *thread_nd_skim_i_vec
+
         # This is a shared buffer, all threads will write into separate slices depending on their threadid.
         # When writing all threads must increment!
         cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
@@ -241,12 +311,16 @@ cdef void compute_SF_in_parallel(
         
         cnp.float64_t *skim_i_vec_out = <cnp.float64_t *> malloc(num_threads * sizeof(cnp.float64_t) * vertex_count)
 
+        # Allocate memory for the 2D array
+        # cdef cnp.float64_t **skim_u_i_mat = allocate_2d_array(centroids.shape[0])
+
         #### n-d skim variables
 
-        # cdef cnp.float64_t **arr = <cnp.float64_t **>malloc(rows * sizeof(cnp.float64_t *))
-        # for i in range(rows):
-        #     arr[i] = <cnp.float64_t *>malloc(cols * sizeof(cnp.float64_t))
-           
+        # cdef cnp.float64_t **nd_skim_i_vec_out = <cnp.float64_t **>malloc(num_threads * sizeof(cnp.float64_t *)) 
+        
+        # for r in range(nd_skim_i_vec_view.shape[0]):
+        #     nd_skim_i_vec_out[r] = <cnp.float64_t *>malloc(nd_skim_i_vec_view.shape[1] * sizeof(cnp.float64_t))
+        
         int i  # openmp on windows requires iterator variable have signed type
         size_t j, destination_vertex_index
         size_t k
@@ -260,6 +334,7 @@ cdef void compute_SF_in_parallel(
         thread_u_i_vec = &u_i_vec_out[threadid() * vertex_count]
         thread_skim_i_vec = &skim_i_vec_out[threadid() * vertex_count]
 
+        #u_i_centroids = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * centroids.shape[0])
 
         # if output_travel_time and threadid() == 0:
         #     thread_u_i_vec  = u_i_vec_out
@@ -311,6 +386,10 @@ cdef void compute_SF_in_parallel(
                 skim_col_view,
                 thread_skim_i_vec,
                 thread_skim_j_vec,
+                skim_u_i,
+                centroids,
+                centroids_idx_pos,
+                output_travel_time
             )
 
         free(thread_demand_origins)
@@ -339,10 +418,18 @@ cdef void compute_SF_in_parallel(
             for k in range(vertex_count):
                 u_i_vec_view[k] += u_i_vec_out[i * vertex_count + k]
                 skim_i_vec_view[k] += skim_i_vec_out[i * vertex_count + k]
+    
+    # for i in  range(num_threads): # columns
+    #     for k in range(skim_u_i.shape[0]): # squared matrix
+    #         if (i == k): continue
+    #         else: 
+    #             skim_u_i[i,k] = u_i_vec_out[i * k] # if origin is 0
+    #             skim_u_i[k,i] = u_i_vec_out[i * k] # if origin is 0
 
     free(u_i_vec_out)
     free(skim_i_vec_out)        
     free(edge_volume)
+    #free(nd_skim_i_vec_out)
     
     # for i in range(rows):
     #     free(arr[i])
@@ -377,6 +464,10 @@ cdef void compute_SF_in(
     cnp.float64_t[::1] skim_col_vec,
     cnp.float64_t *skim_i_vec, # for each thread
     cnp.float64_t *skim_j_vec, # for each thread
+    cnp.float64_t[:, ::1] skim_u_i,
+    cnp.uint32_t[::1] centroids,
+    cnp.uint32_t[::1] centroids_idx_pos,
+    bint output_travel_time,
 ) noexcept nogil:
 
     cdef:
@@ -400,8 +491,6 @@ cdef void compute_SF_in(
         skim_j_vec[i] = 0.0
 
 
-
-
     # first pass #
     # ---------- #
     _SF_in_first_pass_full(
@@ -420,6 +509,10 @@ cdef void compute_SF_in(
         skim_j_vec # for each thread
     )
 
+    if not output_travel_time:
+        for i in range(centroids.shape[0]):
+            skim_u_i[i][centroids_idx_pos[dest_vert_index]] = u_i_vec[centroids[i]]
+
     # second pass #
     # ----------- #
 
@@ -427,8 +520,8 @@ cdef void compute_SF_in(
     # also we compute the min travel time from all the origin vertices
     u_r = DATATYPE_INF
     for i in range(demand_size):
-        vert_idx = demand_indices[i]
-        v_i_vec[<size_t>vert_idx] = demand_values[i]
+        vert_idx = demand_indices[i] # origin vertix id
+        v_i_vec[<size_t>vert_idx] = demand_values[i] 
         u_i = u_i_vec[<size_t>vert_idx]
         if u_i < u_r:
             u_r = u_i
@@ -454,9 +547,10 @@ cdef void compute_SF_in(
         # The items corresponding to edges that are in the hyperpath have a 
         # negative transformed value.
         for i in range(<size_t>edge_count):
-            if h_a_vec[i] == 0:
+            if h_a_vec[i] == 0: # if the edge is not on the hyperpath
                 u_j_c_a_vec[i] = 1.0
-        
+
+
         argsort(u_j_c_a_vec, edge_indices, edge_count)
 
         _SF_in_second_pass(
@@ -549,24 +643,24 @@ cdef void _SF_in_first_pass_full(
             skim_i_new = (beta_skim + f_a * skim_j) / (f_i + f_a)
             skim_i_vec[tail_vert_idx] = skim_i_new
 
-            with gil:
-                print('tail_vert_idx', tail_vert_idx)
-                print('edge_idx', edge_idx)
+            # with gil:
+                # print('tail_vert_idx', tail_vert_idx)
+                # print('edge_idx', edge_idx)
 
                 # print('beta', beta)
                 # print('u_i', u_i)
                 # print('u_j_c_a', u_j_c_a)
                 # print('u_i_new', u_i_new)
 
-                print('beta_skim', beta_skim)
-                print('skim_i', skim_i)
-                print('skim_j', skim_j)
-                print('skim_i_new', skim_i_new)
+                # print('beta_skim', beta_skim)
+                # print('skim_i', skim_i)
+                # print('skim_j', skim_j)
+                # print('skim_i_new', skim_i_new)
 
-                print('f_a', f_a)
-                print('f_i', f_i)
-                print('f_a + f_i', f_i + f_a)
-                print('')
+                # print('f_a', f_a)
+                # print('f_i', f_i)
+                # print('f_a + f_i', f_i + f_a)
+                # print('')
 
             
             # update f_i

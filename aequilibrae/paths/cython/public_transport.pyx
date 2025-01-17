@@ -38,15 +38,18 @@ class HyperpathGenerating:
 
 
     def __init__(self, edges, tail="tail", head="head", trav_time="trav_time", freq="freq",
-                                                                check_edges=False, skim_cols = None):
+                                                                check_edges=False,
+                                                                skim_cols = None,
+                                                                centroids = None):
 
         if skim_cols is None or not isinstance(skim_cols, list):
             skim_cols = []
+            centroids = np.array([0])
 
         # load the edges
         if check_edges:
             self._check_edges(edges, tail, head, trav_time, freq, skim_cols)
-        self._edges = edges[[tail, head, trav_time, freq]+skim_cols].copy(deep=True)
+        self._edges = edges[list(set([tail, head, trav_time, freq]+skim_cols))].copy(deep=True)
         self.edge_count = len(self._edges)
 
         # remove inf values if any, and values close to zero
@@ -77,12 +80,58 @@ class HyperpathGenerating:
         self._freq = self._edges[freq].values.astype(DATATYPE_PY)
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
-        if skim_cols:
-            self._skim_cols = self._edges[skim_cols].values.reshape(self._trav_time.shape[0],).astype(DATATYPE_PY)
+
+
+        self._skim_cols_names = skim_cols
+        if self._skim_cols_names:
+            self._skim_cols = self._edges.loc[:,skim_cols].values.reshape(self._trav_time.shape[0],).astype(DATATYPE_PY)
         else:
             self._skim_cols = np.zeros(self._trav_time.shape[0], dtype=DATATYPE_PY)
-        self._nd_array = self._edges[[trav_time, freq] + skim_cols].values.astype(DATATYPE_PY)
-        self._nd_array = self._nd_array.copy(order='C')
+
+        self._nd_skim_cols = self._edges[[trav_time, freq] + skim_cols].values.astype(DATATYPE_PY)
+        self._nd_skim_cols = self._nd_skim_cols.copy(order='C')
+
+        self._centroids = centroids.astype(np.uint32)
+        self._centroids_idx = np.array(range(len(self._centroids)))
+        self._centroids_idx_pos = np.zeros_like(np.array(list(range(self._centroids[-1]+1))))
+        for i in self._centroids_idx:
+            self._centroids_idx_pos[self._centroids[i]] = i
+        self._centroids_idx_pos = self._centroids_idx_pos.astype(np.uint32)
+
+    def _update_od_values(self, origin_column: np.array, destination_column: np.array,
+                                demand_column: np.array):
+            
+        # get all O-D combinations between centroids
+        n = len(self._centroids)
+        origin_values = np.repeat(self._centroids, n)
+        destination_values = np.tile(self._centroids, n)
+
+        check_bool = origin_values != destination_values
+        centroids_origin_column = origin_values[check_bool]
+        centroids_destination_column = destination_values[check_bool]
+
+        # Find O-D pairs that are not in origin_column and destination_column
+
+        mapping = dict(zip(origin_column, destination_column))
+
+        non_matching_origin = []
+        non_matching_destination = []
+        for i, val1 in enumerate(centroids_origin_column):
+            val2 = centroids_destination_column[i]
+            # assumes the destination and origin arrays are a subset of the centroids array (must happen by definition of centroid)
+            if val1 not in origin_column or centroids_destination_column[i] != mapping[val1]:
+                non_matching_origin.append(val1)
+                non_matching_destination.append(val2)
+                
+        non_matching_origin = np.array(non_matching_origin)
+        non_matching_destination = np.array(non_matching_destination)
+        non_matching_demand = np.zeros_like(non_matching_origin)
+
+        origin_column = np.concatenate((origin_column, non_matching_origin), axis = 0) 
+        destination_column =  np.concatenate((destination_column, non_matching_destination), axis = 0) 
+        demand_column = np.concatenate((demand_column, non_matching_demand), axis = 0) 
+
+        return origin_column, destination_column, demand_column
 
     def run(self, origin, destination, volume, return_inf=False):
         # column storing the resulting edge volumes
@@ -90,6 +139,8 @@ class HyperpathGenerating:
         #self.u_i_vec = None
         self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
         self.skim_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
+
+        self.nd_skim_i_vec = np.zeros((self.vertex_count, self._nd_skim_cols.shape[1]), dtype=DATATYPE_PY)
 
         # input check
         if type(origin) is not list:
@@ -109,6 +160,10 @@ class HyperpathGenerating:
         demand_vls = np.array(volume, dtype=DATATYPE_PY)
 
         destination_vertex_indices = d_vert_ids  # Only one index allowed so must be unique
+
+        self.skim_u_i = pd.DataFrame(0.0, index=self._centroids.tolist(), columns=self._centroids.tolist())
+
+        print(self.skim_u_i)
 
         #cdef cnp.float64_t *u_i_vec
         # u_i_vec = compute_SF_in_parallel(...)
@@ -131,7 +186,11 @@ class HyperpathGenerating:
             self._skim_cols[:],
             self.u_i_vec,
             self.skim_i_vec,
-            self._nd_array[:,:]
+            self._nd_skim_cols[:,:],
+            self.nd_skim_i_vec[:,:],
+            self.skim_u_i.values,
+            self._centroids[:],
+            self._centroids_idx_pos[:]
         )
 
         # if u_i_vec != NULL:
@@ -178,64 +237,93 @@ class HyperpathGenerating:
             if edges[col].min() < 0.0:
                 raise ValueError(f"column '{col}' should be nonnegative")
 
-    # def assign(
-    #     self,
-    #     origin_column,
-    #     destination_column,
-    #     demand_column,
-    #     check_demand=False,
-    #     threads=None
-    # ):
-    #     """
-    #     Assigns demand to the edges of the graph.
+    def assign(
+        self,
+        origin_column,
+        destination_column,
+        demand_column,
+        check_demand=False,
+        threads=None
+    ):
+        """
+        Assigns demand to the edges of the graph.
 
-    #     Assumes the ``*_column`` arguments are provided as numpy arrays that form a COO sprase matrix.
+        Assumes the ``*_column`` arguments are provided as numpy arrays that form a COO sprase matrix.
 
-    #     :Arguments:
-    #         **origin_column** (:obj:`np.ndarray`): The column for the origin vertices (*Optional*, default is "orig_vert_idx").
+        :Arguments:
+            **origin_column** (:obj:`np.ndarray`): The column for the origin vertices (*Optional*, default is "orig_vert_idx").
 
-    #         **destination_column** (:obj:`np.ndarray`): The column or the destination vertices (*Optional*, default is "dest_vert_idx").
+            **destination_column** (:obj:`np.ndarray`): The column or the destination vertices (*Optional*, default is "dest_vert_idx").
 
-    #         **demand_column** (:obj:`np.ndarray`): The column for the demand values (*Optional*, default is "demand").
+            **demand_column** (:obj:`np.ndarray`): The column for the demand values (*Optional*, default is "demand").
 
-    #         **check_demand** (:obj:`bool`): If True, check the validity of the demand data (*Optional*, default is ``False``).
+            **check_demand** (:obj:`bool`): If True, check the validity of the demand data (*Optional*, default is ``False``).
 
-    #         **threads** (:obj:`int`):The number of threads to use for computation (*Optional*, default is 0, using all available threads).
-    #     """
+            **threads** (:obj:`int`):The number of threads to use for computation (*Optional*, default is 0, using all available threads).
+        
+            **skim_cols** (:obj:`list[str]`): Skimming Columns (*Optional*, default is []).
+        
+            **centroids** (:obj:`np.ndarray`): The array with centroids vertex id's.
+        """
 
-    #     # check the input demand paramater
-    #     if check_demand:
-    #         self._check_demand(origin_column, destination_column, demand_column)
+        if self._skim_cols_names:
+            origin_column, destination_column, demand_column = self._update_od_values(origin_column,
+                                                                destination_column, demand_column)
+        self.origin_column = origin_column.astype(np.uint32)
+        self.destination_column = destination_column.astype(np.uint32)
+        self.demand_column =  demand_column.astype(DATATYPE_PY)
+        # check the input demand paramater
+        if check_demand:
+            self._check_demand(origin_column, destination_column, demand_column)
 
-    #     if threads is None:
-    #         threads = 0  # Default to all threads
+        if threads is None:
+            threads = 0  # Default to all threads
 
-    #     # initialize the column storing the resulting edge volumes
-    #     self._edges["volume"] = 0.0
+        # initialize the column storing the resulting edge volumes
+        self._edges["volume"] = 0.0
 
-    #     # travel time is computed but not saved into an array in the following
-    #     self.u_i_vec = None
+        # travel time is computed but not saved into an array in the following
+        #self.u_i_vec = None
+        
+        self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
+        self.skim_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
 
-    #     # get the list of all destinations
-    #     destination_vertex_indices = np.unique(destination_column)
+        self.nd_skim_i_vec = np.zeros((self.vertex_count, self._nd_skim_cols.shape[1]), dtype=DATATYPE_PY)
 
-    #     compute_SF_in_parallel(
-    #         self._indptr[:],
-    #         self._edge_idx[:],
-    #         self._trav_time[:],
-    #         self._freq[:],
-    #         self._tail[:],
-    #         self._head[:],
-    #         destination_column[:],
-    #         destination_vertex_indices[:],
-    #         origin_column[:],
-    #         demand_column[:],
-    #         self._edges["volume"].values,
-    #         False,
-    #         self.vertex_count,
-    #         self._edges["volume"].shape[0],
-    #         (multiprocessing.cpu_count() if threads < 1 else threads)
-    #     )
+        # get the list of all destinations
+        destination_vertex_indices = np.unique(self.destination_column)
+
+        self.skim_u_i = pd.DataFrame(0.0, index=self._centroids.tolist(), columns=self._centroids.tolist())
+
+        #print(self.skim_u_i)
+
+        compute_SF_in_parallel(
+            self._indptr[:],
+            self._edge_idx[:],
+            self._trav_time[:],
+            self._freq[:],
+            self._tail[:],
+            self._head[:],
+            self.destination_column[:],
+            destination_vertex_indices[:],
+            self.origin_column[:],
+            self.demand_column[:],
+            self._edges["volume"].values,
+            False,
+            self.vertex_count,
+            self._edges["volume"].shape[0],
+            (multiprocessing.cpu_count() if threads < 1 else threads),
+                        self._skim_cols[:],
+            self.u_i_vec,
+            self.skim_i_vec,
+            self._nd_skim_cols[:,:],
+            self.nd_skim_i_vec[:,:],
+            self.skim_u_i.values,
+            self._centroids[:],
+            self._centroids_idx_pos[:]
+        )
+
+        print(self.skim_u_i.values)
 
     def _check_demand(self, origin_column, destination_column, demand_column):
         for col, col_name in zip([origin_column, destination_column, demand_column], ["origin", "destination", "demand"]):

@@ -1,0 +1,388 @@
+assignment:
+  equilibrium:
+    maximum_iterations: 250
+    rgap: 0.0001
+distribution:
+  gravity:
+    max error: 0.0001
+    max iterations: 100
+    max trip length: -1
+  ipf:
+    balancing tolerance: 0.001
+    convergence level: 0.0001
+    max iterations: 5000
+network:
+  gmns:
+    critical_dist: 2
+    link:
+      equivalency:
+        a_node: from_node_id
+        b_node: to_node_id
+        capacity: capacity
+        direction: directed
+        distance: length
+        geometry: geometry
+        lanes: lanes
+        link_id: link_id
+        link_type: facility_type
+        modes: allowed_uses
+        name: name
+        speed: free_speed
+      fields:
+        allowed_uses:
+          description: Set of allowed uses
+          required: false
+          type: text
+        bike_facility:
+          description: Type of bicycle accommodation
+          required: false
+          type: text
+        capacity:
+          description: Capacity (veh / hr / lane)
+          required: false
+          type: numeric
+        dir_flag:
+          description: Shapepoints direction
+          required: false
+          type: integer
+        directed:
+          description: Whether the link is directed (travel only occurs from the from_node
+            to the to_node) or undirected.
+          required: true
+          type: integer
+        facility_type:
+          description: Facility type (e.g., freeway, arterial, etc.)
+          required: false
+          type: text
+        free_speed:
+          description: Free flow speed in long_length units per hour
+          required: false
+          type: numeric
+        from_node_id:
+          description: Foreign key (Nodes table)
+          required: true
+          type: integer
+        geometry:
+          description: Link geometry, in well-known text (WKT) format.
+          required: false
+          type: text
+        geometry_id:
+          description: Foreign key from geometry table
+          required: false
+          type: integer
+        grade:
+          description: Percent grade of the link
+          required: false
+          type: integer
+        jurisdiction:
+          description: Owner/operator of the link
+          required: false
+          type: text
+        lanes:
+          description: Number of lanes in the direction of travel
+          required: false
+          type: inetger
+        length:
+          description: GMNS length in long_length units
+          required: false
+          type: numeric
+        link_id:
+          description: Primary key
+          required: true
+          type: integer
+        name:
+          description: Name
+          required: false
+          type: text
+        parent_link_id:
+          description: The parent of this link
+          required: false
+          type: integer
+        parking:
+          description: Type of parking
+          required: false
+          type: text
+        ped_facility:
+          description: Type of pedestrian accommodation
+          required: false
+          type: text
+        row_width:
+          description: Width of the entire right-of-way (both directions)
+          required: false
+          type: numeric
+        to_node_id:
+          description: Foreign key (Nodes table)
+          required: true
+          type: integer
+        toll:
+          description: Toll in currency units
+          required: false
+          type: numeric
+    node:
+      equivalency:
+        node_id: node_id
+      fields:
+        ctrl_type:
+          description: From GMNS ControlType_Set
+          required: false
+          type: text
+        name:
+          description: Node name
+          required: false
+          type: text
+        node_id:
+          description: Unique key
+          required: true
+          type: integer
+        node_type:
+          description: What it represents
+          required: false
+          type: text
+        parent_node_id:
+          description: The parent of this node
+          required: false
+          type: integer
+        x_coord:
+          description: Coordinate system specified in GMNS config file
+          required: true
+          type: numeric
+        y_coord:
+          description: Coordinate system specified in GMNS config file
+          required: true
+          type: numeric
+        z_coord:
+          description: Altitude in short length units
+          required: false
+          type: numeric
+        zone_id:
+          description: TAZ or city, or census tract
+          required: false
+          type: integer
+    use_definition:
+      equivalency:
+        mode_name: use
+      fields:
+        description:
+          description: A longer description of the mode
+          required: false
+          type: text
+        pce:
+          description: Passenger car equivalents, used for capacity calculations (0
+            for non-travel uses)
+          required: true
+          type: numeric
+        persons_per_vehicle:
+          description: Average persons per vehicle. Used to compute person-based performance
+            measures (0 for non-travel uses)
+          required: true
+          type: numeric
+        special_conditions:
+          description: Treatment of these special conditions may be needed in a future
+            version of GMNS
+          required: false
+          type: text
+        use:
+          description: Short name of the vehicle
+          required: true
+          type: text
+  links:
+    fields:
+      one-way:
+      - link_id:
+          description: Link ID. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - a_node:
+          description: Node of origin of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - b_node:
+          description: Node of destinaiton of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - direction:
+          description: Direction of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - distance:
+          description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
+          type: numeric
+      - modes:
+          description: Set of modes allowed in this link. THIS FIELD CANNOT BE CHANGED
+          type: text
+      - link_type:
+          description: Classification of link (local, arterial, etc). THIS FIELD CANNOT
+            BE CHANGED
+          osm_source: highway
+          type: varchar
+      - name:
+          description: name
+          osm_source: name
+          type: text
+      two-way:
+      - lanes:
+          description: lanes
+          osm_behaviour: divide
+          osm_source: lanes
+          type: integer
+      - capacity:
+          description: capacity
+          type: numeric
+      - speed:
+          description: speed
+          osm_behaviour: copy
+          osm_source: maxspeed
+          type: numeric
+    link_types:
+    - centroid_connector:
+        description: VIRTUAL centroid connectors only
+        lane_capacity: 10000
+        lanes: 10
+        link_type_id: z
+    - default:
+        description: Default link type. Due to lack of information
+        lane_capacity: 900
+        lanes: 2
+        link_type_id: y
+  modes:
+  - car:
+      description: All motorized vehicles
+      letter: c
+  - transit:
+      description: All links capable of supporting transit-vehicles
+      letter: t
+  - walk:
+      description: Linkes where walking is permitted
+      letter: w
+  - bicycle:
+      description: All Bicycles
+      letter: b
+  nodes:
+    fields:
+    - node_id:
+        description: node_id. THIS FIELD CANNOT BE CHANGED
+        type: integer
+    - is_centroid:
+        description: is_centroid
+        type: integer
+  osm:
+    all_link_types:
+    - secondary_link
+    - escalator
+    - trail
+    - cycleway
+    - path
+    - trunk_link
+    - secondary
+    - escape
+    - track
+    - road
+    - motorway_link
+    - primary
+    - corridor
+    - residential
+    - footway
+    - motorway
+    - primary_link
+    - unclassified
+    - bus_guideway
+    - tertiary_link
+    - living_street
+    - pedestrian
+    - bridleway
+    - elevator
+    - motor
+    - trunk
+    - tertiary
+    - service
+    - steps
+    - proposed
+    - raceway
+    - construction
+    - abandoned
+    - platform
+    - unclassified
+    modes:
+      bicycle:
+        link_types:
+        - cycleway
+        - corridor
+        - pedestrian
+        - path
+        - track
+        - trail
+        - unclassified
+        mode_filter:
+          bicycle: 'no'
+        unknown_tags: true
+      car:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - motorway_link
+        - trunk_link
+        - primary_link
+        - secondary_link
+        - tertiary_link
+        - living_street
+        - service
+        - escape
+        - road
+        mode_filter:
+          motor_vehicle: 'no'
+        unknown_tags: true
+      transit:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - motorway_link
+        - trunk_link
+        - primary_link
+        - secondary_link
+        - tertiary_link
+        - living_street
+        - service
+        - escape
+        - road
+        - bus_guideway
+        unknown_tags: true
+      walk:
+        link_types:
+        - cycleway
+        - footway
+        - steps
+        - corridor
+        - pedestrian
+        - elevator
+        - escalator
+        - path
+        - track
+        - trail
+        - bridleway
+        - unclassified
+        mode_filter:
+          pedestrian: 'no'
+        unknown_tags: true
+osm:
+  accept_language: en
+  max_attempts: 50
+  max_query_area_size: 2500000000
+  nominatim_endpoint: https://nominatim.openstreetmap.org/
+  overpass_endpoint: https://lz4.overpass-api.de/api/interpreter
+  sleeptime: 5
+  timeout: 540
+system:
+  cpus: 0
+  default_directory: C:\
+  logging: true
+  logging_directory: C:\Users\renat\AppData\Local\Temp\d65023f642ac4071a39b2fbf93a76424
+  spatialite_path: C:\mod_spatialite-NG-win-amd64
+  temp directory: /temp
