@@ -297,6 +297,8 @@ cdef void compute_SF_in_parallel(
         cnp.uint32_t *thread_edge_indices
         cnp.float64_t *thread_skim_i_vec
 
+        #cnp.float64_t *dest_u_i
+
         #cnp.float64_t *u_i_centroids
 
         # cnp.uint32_t r
@@ -356,6 +358,9 @@ cdef void compute_SF_in_parallel(
         for i in prange(destination_vertex_indices_view.shape[0]):
             destination_vertex_index = destination_vertex_indices_view[i]
 
+            # dest_u_i = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * centroids.shape[0])
+            # dest_u_i = &skim_u_i[centroids_idx_pos[destination_vertex_index]][0] 
+
             demand_size = 0
             for j in range(d_vert_ids_view.shape[0]):
                 if d_vert_ids_view[j] == destination_vertex_index:
@@ -386,11 +391,14 @@ cdef void compute_SF_in_parallel(
                 skim_col_view,
                 thread_skim_i_vec,
                 thread_skim_j_vec,
+                #dest_u_i,
                 skim_u_i,
                 centroids,
                 centroids_idx_pos,
                 output_travel_time
             )
+
+            # free(dest_u_i)
 
         free(thread_demand_origins)
         free(thread_demand_values)
@@ -465,6 +473,7 @@ cdef void compute_SF_in(
     cnp.float64_t *skim_i_vec, # for each thread
     cnp.float64_t *skim_j_vec, # for each thread
     cnp.float64_t[:, ::1] skim_u_i,
+    #cnp.float64_t *dest_u_i,
     cnp.uint32_t[::1] centroids,
     cnp.uint32_t[::1] centroids_idx_pos,
     bint output_travel_time,
@@ -475,6 +484,7 @@ cdef void compute_SF_in(
         DATATYPE_t u_r, v_a_new, v_i, u_i
         size_t i, h_a_count
         cnp.uint32_t vert_idx 
+        int cent_dest
 
     # initialization
     for i in range(vertex_count):
@@ -508,10 +518,12 @@ cdef void compute_SF_in(
         skim_i_vec, # for each thread
         skim_j_vec # for each thread
     )
-
+    cent_dest = centroids_idx_pos[dest_vert_index]
     if not output_travel_time:
         for i in range(centroids.shape[0]):
-            skim_u_i[i][centroids_idx_pos[dest_vert_index]] = u_i_vec[centroids[i]]
+            #dest_u_i[i] = u_i_vec[centroids[i]]
+            skim_u_i[cent_dest][i] = u_i_vec[centroids[i]]
+
 
     # second pass #
     # ----------- #

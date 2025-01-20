@@ -323,6 +323,7 @@ class HyperpathGenerating:
             self._centroids_idx_pos[:]
         )
 
+        self.skim_u_i = self.skim_u_i.transpose()
         print(self.skim_u_i.values)
 
     def _check_demand(self, origin_column, destination_column, demand_column):
