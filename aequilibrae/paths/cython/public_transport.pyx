@@ -43,11 +43,12 @@ class HyperpathGenerating:
                                                                 centroids = None):
 
         self._skimming = True
+        if isinstance(skim_cols, tuple):
+            skim_cols = list(skim_cols)
+
         if skim_cols is None or not isinstance(skim_cols, list):
             skim_cols = []
             self._skimming = False
-        elif isinstance(skim_cols, tuple):
-            skim_cols = list(skim_cols)
 
         # load the edges
         if check_edges:

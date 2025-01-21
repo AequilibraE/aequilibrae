@@ -134,6 +134,15 @@ class AssignmentBase(ABC):
             if c.graph.graph[field].values.min() <= 0:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
+    def _check_skimming_fields(self, skimming_fields: list[str]) -> None:
+        """Throws expection if field is invalid."""
+
+        if isinstance(skimming_fields, tuple):
+            skimming_fields = list(skimming_fields)
+
+        if skimming_fields is None or not isinstance(skimming_fields, list):
+            raise TypeError("Skimming Fields should be defined on a list or tuple")
+
     def set_time_field(self, time_field: str) -> None:
         self._check_field(time_field)
         c = self.classes[0]
@@ -883,6 +892,8 @@ class TransitAssignment(AssignmentBase):
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self._config["Skimming Fields"] = None
+
     def set_algorithm(self, algorithm: str):
         """
         Chooses the assignment algorithm. Currently only 'optimal-strategies' is available.
@@ -1041,3 +1052,18 @@ class TransitAssignment(AssignmentBase):
         """
         self._check_field(frequency_field)
         self._config["Frequency field"] = frequency_field
+
+    def set_skimming_fields(self, skimming_fields: list[str]) -> None:
+        """
+        Sets the graph field that contains the frequency -> e.g. 'freq'
+
+        :Arguments:
+            **frequency_field** (:obj:`str`): Field name
+        """
+
+        self._check_skimming_fields(skimming_fields)
+
+        for field in skimming_fields:
+            self._check_field(field)
+
+        self._config["Skimming Fields"] = skimming_fields

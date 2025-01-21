@@ -210,12 +210,10 @@ class TrafficClass(TransportClassBase):
 
 class TransitClass(TransportClassBase):
     def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix,
-                 matrix_core: str = None, skim_matrices: dict[np.array] = None):
+                 matrix_core: str = None):
         super().__init__(name, graph, matrix)
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()
-
-        self.skim_matrices = skim_matrices
 
         if len(matrix.view_names) == 1:
             self.matrix_core = matrix.view_names[0]

@@ -24,7 +24,7 @@ class OptimalStrategies:
                 tail="b_node",
                 trav_time=assig_spec._config["Time field"],
                 freq=assig_spec._config["Frequency field"],
-                skim_cols=["trav_time"],
+                skim_cols=assig_spec._config["Skimming Fields"],
                 # skim_cols=list(cls.skim_matrices.keys())
                 centroids=cls.graph.centroids
             )
