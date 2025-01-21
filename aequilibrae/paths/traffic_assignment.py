@@ -1009,6 +1009,19 @@ class TransitAssignment(AssignmentBase):
 
         return pd.concat(assig_results, axis=1)
 
+    def get_skim_results(self) -> pd.DataFrame:
+        """Prepares the assignment results as a Pandas DataFrame
+
+        :Returns:
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on *link_id*
+        """
+        assig_results = [
+            cls.results.get_load_skim_results()
+            for cls in self.classes
+        ]
+
+        return assig_results
+
     def set_time_field(self, time_field: str) -> None:
         """
         Sets the graph field that contains free flow travel time -> e.g. 'trav_time'

@@ -42,9 +42,12 @@ class HyperpathGenerating:
                                                                 skim_cols = None,
                                                                 centroids = None):
 
+        self._skimming = True
         if skim_cols is None or not isinstance(skim_cols, list):
             skim_cols = []
-            centroids = np.array([0])
+            self._skimming = False
+        elif isinstance(skim_cols, tuple):
+            skim_cols = list(skim_cols)
 
         # load the edges
         if check_edges:
@@ -81,22 +84,25 @@ class HyperpathGenerating:
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
 
-
-        self._skim_cols_names = skim_cols
-        if self._skim_cols_names:
+        if self._skimming:
             self._skim_cols = self._edges.loc[:,skim_cols].values.reshape(self._trav_time.shape[0],).astype(DATATYPE_PY)
+            
+            self._centroids = centroids.astype(np.uint32)
+            self._centroids_idx = np.array(range(len(self._centroids)))
+            self._centroids_idx_pos = np.zeros_like(np.array(list(range(self._centroids[-1]+1))))
+            for i in self._centroids_idx:
+                self._centroids_idx_pos[self._centroids[i]] = i
+            self._centroids_idx_pos = self._centroids_idx_pos.astype(np.uint32)
+        
         else:
-            self._skim_cols = np.zeros(self._trav_time.shape[0], dtype=DATATYPE_PY)
+            self._skim_cols = np.zeros_like(self._trav_time, dtype=DATATYPE_PY)
 
-        self._nd_skim_cols = self._edges[[trav_time, freq] + skim_cols].values.astype(DATATYPE_PY)
-        self._nd_skim_cols = self._nd_skim_cols.copy(order='C')
+            self._centroids = np.array([0], dtype=np.uint32)
+            self._centroids_idx_pos = np.array([0], dtype=np.uint32)
 
-        self._centroids = centroids.astype(np.uint32)
-        self._centroids_idx = np.array(range(len(self._centroids)))
-        self._centroids_idx_pos = np.zeros_like(np.array(list(range(self._centroids[-1]+1))))
-        for i in self._centroids_idx:
-            self._centroids_idx_pos[self._centroids[i]] = i
-        self._centroids_idx_pos = self._centroids_idx_pos.astype(np.uint32)
+        # self._nd_skim_cols = self._edges[[trav_time, freq] + skim_cols].values.astype(DATATYPE_PY)
+        # self._nd_skim_cols = self._nd_skim_cols.copy(order='C')
+
 
     def _update_od_values(self, origin_column: np.array, destination_column: np.array,
                                 demand_column: np.array):
@@ -140,7 +146,7 @@ class HyperpathGenerating:
         self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
         self.skim_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
 
-        self.nd_skim_i_vec = np.zeros((self.vertex_count, self._nd_skim_cols.shape[1]), dtype=DATATYPE_PY)
+        #self.nd_skim_i_vec = np.zeros((self.vertex_count, self._nd_skim_cols.shape[1]), dtype=DATATYPE_PY)
 
         # input check
         if type(origin) is not list:
@@ -160,10 +166,9 @@ class HyperpathGenerating:
         demand_vls = np.array(volume, dtype=DATATYPE_PY)
 
         destination_vertex_indices = d_vert_ids  # Only one index allowed so must be unique
+        assert destination_vertex_indices.shape[0] == 1, "To output travel time there must only be one destination"
 
         self.skim_u_i = pd.DataFrame(0.0, index=self._centroids.tolist(), columns=self._centroids.tolist())
-
-        print(self.skim_u_i)
 
         #cdef cnp.float64_t *u_i_vec
         # u_i_vec = compute_SF_in_parallel(...)
@@ -179,18 +184,18 @@ class HyperpathGenerating:
             o_vert_ids[:],
             demand_vls[:],
             self._edges["volume"].values,
-            True,
             self.vertex_count,
             self._edges["volume"].shape[0],
             1,  # Single destination so no reason to parallelise
             self._skim_cols[:],
             self.u_i_vec,
             self.skim_i_vec,
-            self._nd_skim_cols[:,:],
-            self.nd_skim_i_vec[:,:],
+            # self._nd_skim_cols[:,:],
+            # self.nd_skim_i_vec[:,:],
             self.skim_u_i.values,
             self._centroids[:],
-            self._centroids_idx_pos[:]
+            self._centroids_idx_pos[:],
+            False
         )
 
         # if u_i_vec != NULL:
@@ -266,7 +271,7 @@ class HyperpathGenerating:
             **centroids** (:obj:`np.ndarray`): The array with centroids vertex id's.
         """
 
-        if self._skim_cols_names:
+        if self._skimming:
             origin_column, destination_column, demand_column = self._update_od_values(origin_column,
                                                                 destination_column, demand_column)
         self.origin_column = origin_column.astype(np.uint32)
@@ -284,18 +289,15 @@ class HyperpathGenerating:
 
         # travel time is computed but not saved into an array in the following
         #self.u_i_vec = None
-        
         self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
         self.skim_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
 
-        self.nd_skim_i_vec = np.zeros((self.vertex_count, self._nd_skim_cols.shape[1]), dtype=DATATYPE_PY)
+        #self.nd_skim_i_vec = np.zeros((self.vertex_count, self._nd_skim_cols.shape[1]), dtype=DATATYPE_PY)
 
         # get the list of all destinations
         destination_vertex_indices = np.unique(self.destination_column)
 
         self.skim_u_i = pd.DataFrame(0.0, index=self._centroids.tolist(), columns=self._centroids.tolist())
-
-        #print(self.skim_u_i)
 
         compute_SF_in_parallel(
             self._indptr[:],
@@ -309,22 +311,21 @@ class HyperpathGenerating:
             self.origin_column[:],
             self.demand_column[:],
             self._edges["volume"].values,
-            False,
             self.vertex_count,
             self._edges["volume"].shape[0],
             (multiprocessing.cpu_count() if threads < 1 else threads),
                         self._skim_cols[:],
             self.u_i_vec,
             self.skim_i_vec,
-            self._nd_skim_cols[:,:],
-            self.nd_skim_i_vec[:,:],
+            # self._nd_skim_cols[:,:],
+            # self.nd_skim_i_vec[:,:],
             self.skim_u_i.values,
             self._centroids[:],
-            self._centroids_idx_pos[:]
+            self._centroids_idx_pos[:],
+            self._skimming
         )
 
         self.skim_u_i = self.skim_u_i.transpose()
-        print(self.skim_u_i.values)
 
     def _check_demand(self, origin_column, destination_column, demand_column):
         for col, col_name in zip([origin_column, destination_column, demand_column], ["origin", "destination", "demand"]):

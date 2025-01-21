@@ -1,4 +1,0 @@
-2025-01-13 10:50:00,086;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations
-2025-01-13 10:50:00,287;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations
-2025-01-13 10:50:00,434;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations
-2025-01-13 10:50:00,593;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations

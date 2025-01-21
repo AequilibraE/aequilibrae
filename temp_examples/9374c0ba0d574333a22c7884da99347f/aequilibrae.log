@@ -1,9 +1,0 @@
-2025-01-14 02:53:20,790;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations
-2025-01-14 02:53:20,940;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations
-2025-01-14 02:53:21,086;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations
-2025-01-14 02:53:21,220;WARNING ; Field(s) speed, travel_time, capacity, osm_id, lanes has(ve) at least one NaN value. Check your computations
-2025-01-14 02:53:41,154;INFO ; Transit Class specification
-2025-01-14 02:53:41,154;INFO ; {'pt': {'Graph': "{'period_id': 1, 'projected_crs': 'EPSG:3857', 'seed': 124, 'geometry_noise': True, 'noise_coef': 1e-05, 'with_inner_stop_transfers': False, 'with_outer_stop_transfers': False, 'with_walking_edges': False, 'distance_upper_bound': inf, 'blocking_centroid_flows': False, 'connector_method': 'overlapping_regions', 'max_connectors_per_zone': -1}", 'Matrix': "{'Source': '', 'Number of centroids': 133, 'Matrix cores': ['pt'], 'Matrix totals': {'pt': 17689.0}}"}}
-2025-01-14 02:53:41,154;INFO ; Transit Assignment specification
-2025-01-14 02:53:41,154;INFO ; {'Time field': 'trav_time', 'Frequency field': 'freq', 'Algorithm': 'optimal-strategies'}
-2025-01-14 02:53:41,154;INFO ; Executing S&F assignment  for pt

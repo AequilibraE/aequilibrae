@@ -260,29 +260,23 @@ cdef void compute_SF_in_parallel(
     cnp.uint32_t[::1] o_vert_ids_view, # origin vertices
     cnp.float64_t[::1] demand_vls_view, # volume
     cnp.float64_t[::1] edge_volume_view,
-    bint output_travel_time,
     size_t vertex_count,
     size_t edge_count,
     int num_threads,
     cnp.float64_t[::1] skim_col_view,
     cnp.float64_t[::1] u_i_vec_view,
     cnp.float64_t[::1] skim_i_vec_view,
-    cnp.float64_t[:, ::1] nd_skim_col_view,
-    cnp.float64_t[:, ::1] nd_skim_i_vec_view,
+    # cnp.float64_t[:, ::1] nd_skim_col_view,
+    # cnp.float64_t[:, ::1] nd_skim_i_vec_view,
     cnp.float64_t[:, ::1] skim_u_i,
     cnp.uint32_t[::1] centroids,
     cnp.uint32_t[::1] centroids_idx_pos,
+    bint skimming,
 ) noexcept nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
-    if output_travel_time:
-        with gil:
-            print('n-d skim variables:')
-            print(nd_skim_col_view.shape)
-            print(nd_skim_i_vec_view.shape)
-            print('skim_u_i:')
-            print(skim_u_i.shape)
-            print('')
-            assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
+    # if output_travel_time:
+    #     with gil:
+    #         assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
     cdef:
         cnp.uint32_t *thread_demand_origins
         cnp.float64_t *thread_demand_values
@@ -297,13 +291,6 @@ cdef void compute_SF_in_parallel(
         cnp.uint32_t *thread_edge_indices
         cnp.float64_t *thread_skim_i_vec
 
-        #cnp.float64_t *dest_u_i
-
-        #cnp.float64_t *u_i_centroids
-
-        # cnp.uint32_t r
-        # cnp.float64_t *thread_nd_skim_i_vec
-
         # This is a shared buffer, all threads will write into separate slices depending on their threadid.
         # When writing all threads must increment!
         cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
@@ -312,9 +299,6 @@ cdef void compute_SF_in_parallel(
         cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(num_threads * sizeof(cnp.float64_t) * vertex_count)
         
         cnp.float64_t *skim_i_vec_out = <cnp.float64_t *> malloc(num_threads * sizeof(cnp.float64_t) * vertex_count)
-
-        # Allocate memory for the 2D array
-        # cdef cnp.float64_t **skim_u_i_mat = allocate_2d_array(centroids.shape[0])
 
         #### n-d skim variables
 
@@ -336,17 +320,6 @@ cdef void compute_SF_in_parallel(
         thread_u_i_vec = &u_i_vec_out[threadid() * vertex_count]
         thread_skim_i_vec = &skim_i_vec_out[threadid() * vertex_count]
 
-        #u_i_centroids = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * centroids.shape[0])
-
-        # if output_travel_time and threadid() == 0:
-        #     thread_u_i_vec  = u_i_vec_out
-        #     ### skim_col ###
-        #     thread_skim_i_vec  = skim_i_vec_out 
-        # else:
-        #     thread_u_i_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-        #     ### skim_col ###
-        #     thread_skim_i_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-
         thread_f_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
         thread_u_j_c_a_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * edge_count)
         thread_v_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
@@ -357,9 +330,6 @@ cdef void compute_SF_in_parallel(
 
         for i in prange(destination_vertex_indices_view.shape[0]):
             destination_vertex_index = destination_vertex_indices_view[i]
-
-            # dest_u_i = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * centroids.shape[0])
-            # dest_u_i = &skim_u_i[centroids_idx_pos[destination_vertex_index]][0] 
 
             demand_size = 0
             for j in range(d_vert_ids_view.shape[0]):
@@ -395,20 +365,11 @@ cdef void compute_SF_in_parallel(
                 skim_u_i,
                 centroids,
                 centroids_idx_pos,
-                output_travel_time
+                skimming
             )
-
-            # free(dest_u_i)
 
         free(thread_demand_origins)
         free(thread_demand_values)
-
-        # if output_travel_time and threadid() == 0:
-        #     pass
-        # else:
-        #     free(thread_u_i_vec)
-        #     free(thread_skim_i_vec)
-
         free(thread_f_i_vec)
         free(thread_u_j_c_a_vec)
         free(thread_v_i_vec)
@@ -421,29 +382,15 @@ cdef void compute_SF_in_parallel(
         for j in range(edge_count):
             edge_volume_view[j] += edge_volume[i * edge_count + j]
 
-    if output_travel_time:
+    if d_vert_ids_view.shape[0] == 1:
         for i in range(num_threads):
             for k in range(vertex_count):
                 u_i_vec_view[k] += u_i_vec_out[i * vertex_count + k]
                 skim_i_vec_view[k] += skim_i_vec_out[i * vertex_count + k]
-    
-    # for i in  range(num_threads): # columns
-    #     for k in range(skim_u_i.shape[0]): # squared matrix
-    #         if (i == k): continue
-    #         else: 
-    #             skim_u_i[i,k] = u_i_vec_out[i * k] # if origin is 0
-    #             skim_u_i[k,i] = u_i_vec_out[i * k] # if origin is 0
 
     free(u_i_vec_out)
     free(skim_i_vec_out)        
     free(edge_volume)
-    #free(nd_skim_i_vec_out)
-    
-    # for i in range(rows):
-    #     free(arr[i])
-    # free(arr)
-
-    #return u_i_vec_out
 
 
 @cython.boundscheck(False)
@@ -476,7 +423,7 @@ cdef void compute_SF_in(
     #cnp.float64_t *dest_u_i,
     cnp.uint32_t[::1] centroids,
     cnp.uint32_t[::1] centroids_idx_pos,
-    bint output_travel_time,
+    bint skimming,
 ) noexcept nogil:
 
     cdef:
@@ -519,7 +466,7 @@ cdef void compute_SF_in(
         skim_j_vec # for each thread
     )
     cent_dest = centroids_idx_pos[dest_vert_index]
-    if not output_travel_time:
+    if skimming:
         for i in range(centroids.shape[0]):
             #dest_u_i[i] = u_i_vec[centroids[i]]
             skim_u_i[cent_dest][i] = u_i_vec[centroids[i]]
