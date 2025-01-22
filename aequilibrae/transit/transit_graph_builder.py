@@ -341,7 +341,7 @@ class TransitGraphBuilder:
         tt.dropna(how="any", inplace=True)
         tt[["last_departure", "last_trip_id", "last_pattern_id"]] = tt[
             ["last_departure", "last_trip_id", "last_pattern_id"]
-        ].astype(int)
+        ].astype(np.uint64)
 
         tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "trav_time"] = np.nan
         tt.dropna(subset="trav_time", inplace=True)
