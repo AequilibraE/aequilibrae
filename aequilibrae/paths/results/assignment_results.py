@@ -347,4 +347,4 @@ class TransitAssignmentResults(AssignmentResultsBase):
         if hasattr(self, "skim_results"):
             return self.skim_results
         else:
-            raise ValueError("Transit assignment has not been executed yet")
+            raise ValueError("Skimming was not executed")

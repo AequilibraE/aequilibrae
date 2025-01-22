@@ -52,7 +52,8 @@ class OptimalStrategies:
 
             hyperpath.assign(**self.__demand_cols[cls_id], threads=self.__assig_spec.cores)
             self.__results[cls_id].link_loads = hyperpath._edges["volume"].values
-            self.__results[cls_id].skim_results = hyperpath.skim_u_i
+            if hyperpath._skimming:
+                self.__results[cls_id].skim_results = {hyperpath._skim_cols_names[0]: hyperpath.skim_u_i}
 
     # def run(self, origin=None, destination=None, volume=None):
     #     for cls_id, hyperpath in self.__classes.items():

@@ -87,7 +87,8 @@ class HyperpathGenerating:
 
         if self._skimming:
             self._skim_cols = self._edges.loc[:,skim_cols].values.reshape(self._trav_time.shape[0],).astype(DATATYPE_PY)
-            
+            self._skim_cols_names = skim_cols
+
             self._centroids = centroids.astype(np.uint32)
             self._centroids_idx = np.array(range(len(self._centroids)))
             self._centroids_idx_pos = np.zeros_like(np.array(list(range(self._centroids[-1]+1))))
@@ -101,9 +102,16 @@ class HyperpathGenerating:
             self._centroids = np.array([0], dtype=np.uint32)
             self._centroids_idx_pos = np.array([0], dtype=np.uint32)
 
+
+
         # self._nd_skim_cols = self._edges[[trav_time, freq] + skim_cols].values.astype(DATATYPE_PY)
         # self._nd_skim_cols = self._nd_skim_cols.copy(order='C')
 
+    def drop_attribute(self, attr_name: str):
+        try:
+            delattr(self, attr_name)
+        except AttributeError:
+            print(f"Attribute '{attr_name}' does not exist.")
 
     def _update_od_values(self, origin_column: np.array, destination_column: np.array,
                                 demand_column: np.array):
@@ -199,6 +207,8 @@ class HyperpathGenerating:
             False
         )
 
+        self.drop_attribute('skim_u_i')
+        self.drop_attribute('skim_i_vec')
         # if u_i_vec != NULL:
         #     self.u_i_vec = np.asarray(<cnp.float64_t[:self.vertex_count]> u_i_vec)
 
@@ -326,7 +336,11 @@ class HyperpathGenerating:
             self._skimming
         )
 
-        self.skim_u_i = self.skim_u_i.transpose()
+        if self._skimming:
+            self.skim_u_i = self.skim_u_i.transpose()
+        else:
+            self.drop_attribute('skim_u_i')
+            self.drop_attribute('skim_i_vec')
 
     def _check_demand(self, origin_column, destination_column, demand_column):
         for col, col_name in zip([origin_column, destination_column, demand_column], ["origin", "destination", "demand"]):
