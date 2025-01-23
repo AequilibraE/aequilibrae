@@ -11,8 +11,7 @@ from aequilibrae.context import get_logger
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
-S3_TRANSPORTATION = "s3://overturemaps-us-west-2/release/2024-12-18.0/theme=transportation"
-S3_PLACES = "s3://overturemaps-us-west-2/release/2024-12-18.0/theme=places"
+S3_OVERTURE = "s3://overturemaps-us-west-2/release/2025-01-22.0"
 
 
 class OVMDownloader(WorkerThread):
@@ -62,13 +61,15 @@ class OVMDownloader(WorkerThread):
         sql = f"""
             COPY(
             SELECT
-               id,
-               CAST(names AS JSON) AS name,
-               CAST(categories AS JSON) AS categories,
-               CAST(brand AS JSON) AS brand,
-               CAST(addresses AS JSON) AS addresses,
-               geometry
-            FROM read_parquet('{S3_PLACES}/type=*', filename=true, hive_partitioning=1)
+                id as ovm_id,
+                sources[1].dataset as source,
+                names.primary as name,
+                categories.primary as primary_categories,
+                categories.alternate as alternate_categories,
+                confidence,
+                addresses[1].freeform as addresses,
+                ST_AsText(geometry) as geometry
+            FROM read_parquet('{S3_OVERTURE}/theme=places/*/*')
             WHERE 
                 bbox.xmin > {xmin} AND 
                 bbox.xmax < {xmax} AND 
@@ -90,19 +91,21 @@ class OVMDownloader(WorkerThread):
         sql_link = f"""
             COPY (
                   SELECT
-                      id AS ovm_id,
-                      class AS link_type,
-                      names.primary AS name,
-                      speed_limits[1].max_speed.value AS max_speed,
-                      speed_limits[2].max_speed.unit AS speed_unit,
-                      access_restrictions[1].when.heading AS restrict_direction,
-                      geometry
-                  FROM read_parquet('{S3_TRANSPORTATION}/type=segment/*', union_by_name=True)
+                    id as ovm_id,
+                    connectors,
+                    names.primary as name,
+                    class,
+                    subclass,
+                    access_restrictions,
+                    speed_limits,
+                    prohibited_transitions,
+                    geometry
+                  FROM read_parquet('{S3_OVERTURE}/theme=transportation/type=segment/*')
                   WHERE 
-                      bbox.xmin > {xmin} AND 
-                      bbox.xmax < {xmax} AND 
-                      bbox.ymin > {ymin} AND 
-                      bbox.ymax < {ymax})
+                    bbox.xmin > {xmin} AND 
+                    bbox.xmax < {xmax} AND 
+                    bbox.ymin > {ymin} AND 
+                    bbox.ymax < {ymax})
             TO '{out_links}'
             (FORMAT 'parquet', COMPRESSION 'zstd');
         """
@@ -112,14 +115,14 @@ class OVMDownloader(WorkerThread):
         sql_node = f"""
             COPY (
                   SELECT
-                      id AS ovm_id,
-                      geometry
-                  FROM read_parquet('{S3_TRANSPORTATION}/type=connector/*', union_by_name=True)
+                    id AS ovm_id,
+                    geometry
+                  FROM read_parquet('{S3_OVERTURE}/theme=transportation/type=connector/*')
                   WHERE 
-                      bbox.xmin > {xmin} AND 
-                      bbox.xmax < {xmax} AND 
-                      bbox.ymin > {ymin} AND 
-                      bbox.ymax < {ymax})
+                    bbox.xmin > {xmin} AND 
+                    bbox.xmax < {xmax} AND 
+                    bbox.ymin > {ymin} AND 
+                    bbox.ymax < {ymax})
             TO '{out_nodes}'
             (FORMAT 'parquet', COMPRESSION 'zstd');
         """
@@ -129,15 +132,3 @@ class OVMDownloader(WorkerThread):
 
         self.data["links"] = gpd.read_parquet(out_links)
         self.data["nodes"] = gpd.read_parquet(out_nodes)
-
-    def get_ovm_filter(self, modes: list) -> str:
-        """
-        Analogous to get_osm_filter
-        """
-
-        # subclass != parking_aisle|driveway
-        # access_restrictions[1].when.recognized[0] != as_private
-        
-        # I'm not sure about the modes and the parameters set (see project notes)
-        
-        pass
