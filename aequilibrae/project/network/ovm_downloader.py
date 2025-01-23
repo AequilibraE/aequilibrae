@@ -101,11 +101,12 @@ class OVMDownloader(WorkerThread):
                     prohibited_transitions,
                     geometry
                   FROM read_parquet('{S3_OVERTURE}/theme=transportation/type=segment/*')
-                  WHERE 
-                    bbox.xmin > {xmin} AND 
+                  WHERE
+                    (subclass NOT IN ('parking_aisle', 'driveway') OR subclass IS NULL) AND 
+                    (bbox.xmin > {xmin} AND 
                     bbox.xmax < {xmax} AND 
                     bbox.ymin > {ymin} AND 
-                    bbox.ymax < {ymax})
+                    bbox.ymax < {ymax}))
             TO '{out_links}'
             (FORMAT 'parquet', COMPRESSION 'zstd');
         """
