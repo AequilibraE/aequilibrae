@@ -17,11 +17,10 @@ S3_OVERTURE = "s3://overturemaps-us-west-2/release/2025-01-22.0"
 class OVMDownloader(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None, project: Union[str, Path] = None):
+    def __init__(self, polygons: List[Polygon], logger: logging.Logger = None, project: Union[str, Path] = None):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.polygons = polygons
-        self.filter = self.get_ovm_filter(modes)
         self.data: Dict[str, gpd.GeoDataFrame] = {"nodes": gpd.GeoDataFrame([]), "links": gpd.GeoDataFrame([])}
         self.project = project or get_active_project()
 

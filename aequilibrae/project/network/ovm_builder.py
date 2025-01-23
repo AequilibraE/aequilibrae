@@ -1,20 +1,13 @@
 import gc
-import json
-import string
-from pathlib import Path
-from typing import Union
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from shapely.ops import split
 from pyproj import Geod
 from shapely.geometry import Polygon, Point
+from shapely.ops import split
 
 from aequilibrae.context import get_active_project
-from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.haversine import haversine
-from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -24,6 +17,8 @@ MIN_SEGMENT_LENGTH = 0.01
 POINT_PRECISION = 7
 
 
+# TODO: update link_types and nodes, dump data into project_database.
+# Export restrictions and similar
 class OVMBuilder(WorkerThread):
     signal = SIGNAL(object)
 
@@ -41,7 +36,7 @@ class OVMBuilder(WorkerThread):
         self.report = []
         self.clean = clean
 
-        self.nodes_df = data["nodes"]
+        self.node_df = data["nodes"]
         self.node_df.loc[:, "node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
         gc.collect()
 
@@ -50,27 +45,16 @@ class OVMBuilder(WorkerThread):
 
         self.__geod = Geod(ellps="WGS84")
         self.segment_data = []
-        self.split_point = []
+        self.split_points = []
 
     def doWork(self):
 
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
-            self.filter_data()
             self.get_segment_data()
             self.__do_clean(conn)
 
         self.signal.emit(["finished", 0])
-
-    def filter_data(self):
-        rest = self.links_df.explode("access_restrictions")
-        rest = rest[~rest["access_restrictions"].isna()].reset_index(names="idx")
-        rest = pd.json_normalize(rest["access_restrictions"].tolist()).set_index(rest.idx)
-
-        private_segments = rest[rest["when.recognized"].fillna("").str.join("|").str.contains("as_private")]
-        private_segments = private_segments.index.tolist()
-
-        self.links_df.drop(index=private_segments, inplace=True)
 
     def __get_all_break_points(self, segment_id):
         segment_points = set(self.sub_segments.loc[self.sub_segments["idx"] == segment_id, "ref"])
@@ -148,13 +132,23 @@ class OVMBuilder(WorkerThread):
         restrictions[["ref_from", "ref_to"]] = restrictions["between"].apply(pd.Series)
         restrictions["ref_from"] = restrictions["ref_from"].fillna(0.0)
         restrictions["ref_to"] = restrictions["ref_to"].fillna(1.0)
-        return restrictions.drop("between", axis=1, inplace=True)
+        restrictions.drop("between", axis=1, inplace=True)
+
+        
+        private_segments = restrictions[restrictions["recognized"].fillna("").str.join("|").str.contains("as_private")]
+        private_segments = private_segments.index.tolist()
+
+        self.links_df = self.links_df[~self.links_df["idx"].isin(private_segments)]
+        
+        print(f"Removing {len(private_segments)} private links")
+
+        return restrictions[~restrictions["idx"].isin(private_segments)]
 
     def __get_speed_limits(self):
         # Filter by segments with speed limits
         speed = self.links_df[self.links_df["speed_limits"].notna()].explode("speed_limits")
         speed = pd.json_normalize(speed["speed_limits"].tolist()).set_index([speed.idx])
-        speed = speed.fillna(np.nan).reset_index().drop("when", axis=1)
+        speed = speed.reset_index().drop("when", axis=1)
 
         # Rename columns
         c = ["idx", "min_speed", "variable_max_speed", "between", "max_speed_value", "max_speed_unit"]
@@ -175,32 +169,38 @@ class OVMBuilder(WorkerThread):
         speed[["ref_from", "ref_to"]] = speed["between"].apply(pd.Series)
         speed["ref_from"] = speed["ref_from"].fillna(0.0)
         speed["ref_to"] = speed["ref_to"].fillna(1.0)
-        return speed.drop("between", axis=1, inplace=True)
+        speed.drop("between", axis=1, inplace=True)
+        return speed
 
     def __get_sub_segments(self):
         sub_segments = self.links_df[["idx", "connectors"]].explode("connectors")
         sub_segments = pd.json_normalize(sub_segments["connectors"].tolist()).set_index([sub_segments.idx])
         sub_segments = sub_segments.reset_index().rename(columns={"connector_id": "connector", "at": "ref"})
 
-        sub_segments = sub_segments.merge(self.nodes_df, on="connector", how="right")
+        sub_segments = sub_segments.merge(self.node_df, on="connector", how="right")
         return gpd.GeoDataFrame(sub_segments, geometry=sub_segments.geometry)
 
     def __find_reference_geometry(self):
         """Contains code pieces borrowed
         from https://github.com/OvertureMaps/transportation-splitter/blob/main/transportation_splitter.py"""
 
-        restrictions = self.__get_access_restrictions()
-        speed = self.__get_speed_limits()
+        self.restrictions = self.__get_access_restrictions()
+        self.speed = self.__get_speed_limits()
+
+        self.links_df.set_index("idx", inplace=True)
 
         counter = 1
 
-        l = [np.nan for i in range(restrictions.shape[1])]
+        l = [np.nan for i in range(self.restrictions.shape[1])]
         l[-2:] = [0.0, 1.0]
 
-        s = [np.nan for i in range(speed.shape[1])]
+        s = [np.nan for i in range(self.speed.shape[1])]
         s[-2:] = [0.0, 1.0]
 
         for seg in self.links_df.index:
+            if seg % 1000 == 0:
+                print(f"Breaking links ---> {seg} / {self.links_df.shape[0]}")
+    
             result_data = []
 
             geometry = self.links_df.loc[seg].geometry
@@ -239,7 +239,7 @@ class OVMBuilder(WorkerThread):
                     target_length -= subsegment_length
                     coord_idx += 1
 
-                split_lon, split_lat, _ = self.geod.fwd(
+                split_lon, split_lat, _ = self.__geod.fwd(
                     lon1, lat1, forward_az, target_length, return_back_azimuth=False
                 )
                 point_geometry = self.__round_point(Point(split_lon, split_lat), POINT_PRECISION)
@@ -253,12 +253,12 @@ class OVMBuilder(WorkerThread):
                 result_data.append({"idx": seg, "ref_from": lr, "ref_to": self.__linear_references[idx + 1]})
 
             result_data = pd.DataFrame(result_data)
-            rest = restrictions[restrictions["idx"] == seg].copy()
+            rest = self.restrictions[self.restrictions["idx"] == seg].copy()
             if rest.shape[0] == 0:
                 l[0] = seg
                 rest.loc[0] = l
 
-            sl = speed[speed["idx"] == seg].copy()
+            sl = self.speed[self.speed["idx"] == seg].copy()
             if sl.shape[0] == 0:
                 s[0] = seg
                 sl.loc[0] = s
@@ -267,14 +267,13 @@ class OVMBuilder(WorkerThread):
             self.segment_data.append(df)
 
     def get_segment_data(self):
-        sub_segments = self.__get_sub_segments()
-        self.links_df.set_index("idx", inplace=True)
+        self.sub_segments = self.__get_sub_segments()
 
         self.__find_reference_geometry()
 
         split_points = pd.DataFrame(self.split_points)
 
-        sub_segments = pd.concat([sub_segments, split_points], ignore_index=True).sort_values(["idx", "ref"])
+        sub_segments = pd.concat([self.sub_segments, split_points], ignore_index=True).sort_values(["idx", "ref"])
         sub_segments.reset_index(drop=True, inplace=True)
 
         segment_data = pd.concat(self.segment_data)
@@ -297,6 +296,8 @@ class OVMBuilder(WorkerThread):
         sub_segments = sub_segments.drop_duplicates("connector").set_index("connector")
 
         for idx, row in segment_data.iterrows():
+            if idx % 1000 == 0:
+                print(f"Building segments ---> {idx} / {segment_data.shape[0]}")
 
             res = split(self.links_df.loc[row["idx"]].geometry, sub_segments.loc[row["connector_to"]].geometry)
             res = split([geom for geom in res.geoms][0], sub_segments.loc[row["connector_from"]].geometry)
