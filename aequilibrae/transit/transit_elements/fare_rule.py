@@ -33,7 +33,7 @@ class FareRule:
         """Adds fare information."""
         for key, value in zip(headers, record):
             if key not in self.__dict__.keys():
-                raise KeyError(f"{key} field in Routes.txt is unknown field for that file on GTFS")
+                raise KeyError(f"{key} field in fare_rules.txt is unknown field for that file on GTFS")
 
             key = "fare" if key == "fare_id" else key
             key = "route" if key == "route_id" else key
@@ -41,7 +41,7 @@ class FareRule:
 
     def save_to_database(self, conn: Connection) -> None:
         """Saves Fare rules to the database"""
-        self.contains = None if len(self.contains) == 0 else self.contains
+        self.contains = None if len(self.contains) == 0 else int(self.contains)
         data = [self.fare_id, self.route_id, self.origin_id, self.destination_id, self.contains]
         if not self.__exists():
             logger.warning(f"Transit Fare rule with data {data} was not added")
@@ -52,4 +52,4 @@ class FareRule:
         conn.commit()
 
     def __exists(self):
-        return min(self.fare_id, self.route_id or 0, self.origin_id, self.destination_id) >= 0
+        return min(self.fare_id, self.route_id or 0, self.origin_id or 0, self.destination_id or 0) >= 0
