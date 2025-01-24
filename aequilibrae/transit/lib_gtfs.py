@@ -241,7 +241,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             zone_ids1 = [x.origin for x in self.gtfs_data.fare_rules]
             zone_ids2 = [x.destination for x in self.gtfs_data.fare_rules]
-            zone_ids = sorted(list(set(zone_ids1) | set(zone_ids2)))
+            zone_ids = sorted(set(zone_ids1) | set(zone_ids2))
 
             zones = [[x, self.gtfs_data.agency.agency_id] for x in zone_ids]
             if zones:
