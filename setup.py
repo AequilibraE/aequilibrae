@@ -8,6 +8,7 @@ from Cython.Build import cythonize
 from setuptools import Extension
 from setuptools import setup, find_packages
 from setuptools.discovery import FlatLayoutPackageFinder
+from multiprocessing import cpu_count
 
 # When updating the version, one must also update the docs/source/_static/switcher.json file
 version = 1.1
@@ -153,5 +154,6 @@ if __name__ == "__main__":
                 ext_mod_sparse_matrix,
             ],
             compiler_directives={"language_level": "3str"},
+            nthreads=min(60, cpu_count()),  # Windows does not do well with more than 60 threads
         ),
     )
