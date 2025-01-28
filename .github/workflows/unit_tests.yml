@@ -17,17 +17,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install uv
-          uv pip install -r requirements.txt
-          uv pip install -r tests/requirements_tests.txt
+          python -m uv pip install -r requirements.txt
+          python -m uv pip install -r tests/requirements_tests.txt
 
       - name: Lint with ruff
         run: |
-          uv venv
           ruff .
 
       - name: Check code format with Black
         run: |
-          uv venv
           black --check .
 
   testing:
