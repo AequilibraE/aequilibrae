@@ -190,6 +190,13 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
         :link-type: url
         :text-align: center
 
+    .. grid-item-card:: 1.1.5
+        :link:  https://www.aequilibrae.com/docs/python/V.1.1.5/
+        :link-type: url
+        :text-align: center
+
+.. grid::
+
     .. grid-item-card:: Upcoming version
         :link:  https://www.aequilibrae.com/latest/python/index.html
         :link-type: url

@@ -1,7 +1,3 @@
-import tempfile
-import os
-import glob
-import sys
 from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
