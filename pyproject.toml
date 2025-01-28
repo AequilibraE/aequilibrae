@@ -92,7 +92,7 @@ manylinux-pypy_aarch64-image = "manylinux_2_28"
 archs = ["auto"]
 build = ["cp310-*", "cp311-*", "cp312-*"]
 repair-wheel-command = [
-  "auditwheel repair -w {dest_dir} {wheel} --exclude libarrow.so.1900 --exclude libarrow_python.so"
+  "auditwheel repair -w {dest_dir} {wheel} --exclude libarrow.so.1700 --exclude libarrow_python.so"
 ]
 
 [tool.cibuildwheel.macos]
