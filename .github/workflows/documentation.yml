@@ -26,17 +26,15 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc 
         sudo apt-get install latexmk texlive-xetex texlive-latex-extra fonts-freefont-otf xindy
-        python -m pip install --upgrade pip
         pip install uv
-        uv venv
-        uv pip install wheel openmatrix pytest
-        uv pip install -r requirements.txt
-        uv pip install -r docs/requirements-docs.txt
+        python -m uv pip install wheel openmatrix pytest
+        python -m uv pip install -r requirements.txt
+        python -m uv pip install -r docs/requirements-docs.txt
 
     - name: Compile library
       run: |
         python setup.py build_ext --inplace
-        uv pip install .
+        pip install .
 
     - name: Check history of versions
       run: |
