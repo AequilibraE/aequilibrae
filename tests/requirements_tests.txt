@@ -1,6 +1,7 @@
 setuptools
 codecov
 pytest
+pytest-xdist
 pytest-cov
 pytest-subtests
 coveralls
