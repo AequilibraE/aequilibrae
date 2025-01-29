@@ -389,9 +389,10 @@ class GMNSBuilder:
                 for line in uses
             ]
             groups_dict = dict(zip(self.uses_df.use_group.map(str.upper), uses))
-            resolved_groups = resolve_recusive_dict(groups_dict)
         else:
             groups_dict = {}
+
+        resolved_groups = resolve_recusive_dict(groups_dict)
 
         modes_list = [
             pattern.sub(lambda x: "_" + char_replaces[x.group()], s).replace("+", "").replace("-", "_")
