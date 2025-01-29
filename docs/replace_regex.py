@@ -16,6 +16,8 @@ def replace_regex(event):
         for file in files:
             if file.endswith((".drawio", ".txt", ".omx", ".png")):
                 continue
+            if file in ["version_history.rst"]:
+                continue
             full_path = os.path.join(root, file)
             with open(full_path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as s:
                 content = s.read().decode("utf-8")
