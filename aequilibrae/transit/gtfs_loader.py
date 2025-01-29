@@ -232,8 +232,6 @@ class GTFSReader(WorkerThread):
             if fr.route in self.routes:
                 fr.route_id = self.routes[fr.route].route_id
             fr.agency_id = self.agency.agency_id
-            fr.origin_id = int(fr.origin) if len(fr.origin) > 0 else None
-            fr.destination_id = int(fr.destination) if len(fr.destination) > 0 else None
             self.fare_rules.append(fr)
 
     def __load_shapes_table(self):
@@ -441,7 +439,6 @@ class GTFSReader(WorkerThread):
             s.agency = self.agency.agency
             s.srid = self.srid
             s.get_node_id()
-            s.zone_id = int(s.zone) if len(s.zone) > 0 else None
             self.stops[s.stop_id] = s
 
     def __load_routes_table(self):

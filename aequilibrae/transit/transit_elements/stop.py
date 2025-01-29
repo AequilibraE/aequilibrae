@@ -76,7 +76,7 @@ class Stop(BasicPTElement):
             self.stop_desc,
             self.stop_street,
             self.taz,
-            self.zone_id,
+            self.zone,
             int(self.route_type),
             self.geo.wkb,
             self.srid,
