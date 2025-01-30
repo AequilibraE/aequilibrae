@@ -1,4 +1,6 @@
 import gc
+import string
+from typing import Tuple
 
 import geopandas as gpd
 import numpy as np
@@ -12,6 +14,7 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.project.project_creation import remove_triggers, add_triggers
 
 MIN_SEGMENT_LENGTH = 0.01
 POINT_PRECISION = 7
@@ -48,14 +51,28 @@ class OVMBuilder(WorkerThread):
         self.__geod = Geod(ellps="WGS84")
         self.segment_data = []
         self.split_points = []
+        self.__all_ltp = {}
 
     def doWork(self):
 
         self.__restrictions = self.access_restrictions()
         self.__speed = self.speed_limits()
 
+        self.get_nodes_data()
+        self.find_break_point_coord()
+
+        self.__data = self.split_segments()
+
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
+
+            self.importing_network(conn)
+
+            self.logger.info("Cleaning things up")
+            conn.execute(
+                "DELETE FROM nodes WHERE node_id NOT IN (SELECT a_node FROM links union all SELECT b_node FROM links)"
+            )
+            conn.commit()
             self.__do_clean(conn)
 
         self.signal.emit(["finished", 0])
@@ -167,7 +184,7 @@ class OVMBuilder(WorkerThread):
         sub_segments = sub_segments.reset_index().rename(columns={"connector_id": "connector", "at": "ref"})
         self.__sub_segments = self.node_df.join(sub_segments.set_index("connector"), on="connector")
 
-    def get_all_break_points(self, segment_id):
+    def __get_all_break_points(self, segment_id):
         # Obtém os break points e os pontos que são parte do segmento original
         segment_pts = self.__sub_segments[self.__sub_segments["idx"] == segment_id]["ref"].values.flatten()
         restriction_pts = self.__restrictions[self.__restrictions["idx"] == segment_id][
@@ -177,16 +194,16 @@ class OVMBuilder(WorkerThread):
 
         return sorted(set(segment_pts)), sorted(set(segment_pts) | set(restriction_pts) | set(speed_pts))
 
-    def get_length(self, line_geometry):
+    def __get_length(self, line_geometry):
         """Returns segment length"""
 
         return self.__geod.geometry_length(line_geometry)
 
-    def round_point(self, point: Point, precision: int) -> Point:
+    def __round_point(self, point: Point, precision: int) -> Point:
         """Borrowed from https://github.com/OvertureMaps/transportation-splitter"""
         return Point(round(point.x, precision), round(point.y, precision))
 
-    def merge_dataframes(linear_references, df_a, df_b, df_c):
+    def __merge_dataframes(linear_references, df_a, df_b, df_c):
 
         result = pd.DataFrame()
         final_result = pd.DataFrame()
@@ -220,8 +237,6 @@ class OVMBuilder(WorkerThread):
     def find_break_point_coord(self):
 
         counter = 1
-        split_points = []
-        all_data = []
         max_link = self.links_df["idx"].values.max()
 
         for e, seg in enumerate(self.links_df.idx):
@@ -232,8 +247,8 @@ class OVMBuilder(WorkerThread):
 
             geometry = self.links_df[self.links_df["idx"] == seg].geometry.values[0]
 
-            connector_reference, linear_references = self.get_all_break_points(seg)
-            segment_length = self.get_length(geometry)
+            connector_reference, linear_references = self.__get_all_break_points(seg)
+            segment_length = self.__get_length(geometry)
 
             # Vamos ajustar as referências
             remove = []
@@ -269,10 +284,10 @@ class OVMBuilder(WorkerThread):
                 split_lon, split_lat, _ = self.__geod.fwd(
                     lon1, lat1, forward_az, target_length, return_back_azimuth=False
                 )
-                point_geometry = self.round_point(Point(split_lon, split_lat), POINT_PRECISION)
+                point_geometry = self.__round_point(Point(split_lon, split_lat), POINT_PRECISION)
 
                 if lr not in connector_reference:
-                    split_points.append(
+                    self.split_points.append(
                         {"idx": seg, "ref": lr, "connector": f"connector_{counter}", "geometry": point_geometry}
                     )
                     counter += 1
@@ -288,8 +303,158 @@ class OVMBuilder(WorkerThread):
             if sl.shape[0] == 0:
                 sl.loc[0] = [seg, None, None, 0.0, 1.0]
 
-            df = self.merge_dataframes(linear_references, rest, sl, result_data)
-            all_data.append(df)
+            df = self.__merge_dataframes(linear_references, rest, sl, result_data)
+            self.segment_data.append(df)
+
+    def split_segments(self):
+        split_points = pd.DataFrame(self.split_points)
+        split_points = gpd.GeoDataFrame(split_points, geometry=split_points["geometry"], crs=self.links_df.crs)
+
+        max_node = self.node_df["node_id"].max() + 1
+        split_points["node_id"] = np.arange(max_node, max_node + split_points.shape[0])
+
+        self.__sub_segments = pd.concat([self.__sub_segments, split_points], ignore_index=True)
+        self.__sub_segments.sort_values(["link_id", "ref"], inplace=True)
+
+        data = pd.concat(self.segment_data)
+
+        use_cols = ["link_id", "ref", "node_id", "connector"]
+        data = data.merge(
+            self.__sub_segments[use_cols], left_on=["link_id", "ref_from"], right_on=["link_id", "ref"], how="left"
+        )
+        data = data.merge(
+            self.__sub_segments[use_cols], left_on=["link_id", "ref_to"], right_on=["link_id", "ref"], how="left"
+        )
+        data = data.drop(columns=["ref_x", "ref_y"]).rename(
+            columns={
+                "node_id_x": "a_node",
+                "node_id_y": "b_node",
+                "connector_x": "connector_from",
+                "connector_y": "connector_to",
+            }
+        )
+        data.insert(data.shape[1], "split_geom", None)
+
+        self.__sub_segments = self.__sub_segments.drop_duplicates("connector").set_index("connector")
+
+        for idx, row in data.iterrows():
+            if idx % 1000 == 0:
+                print(f"Splitting geometries ---> {idx} / {data.shape[0]}")
+
+            geometry = self.links_df.loc[self.links_df["link_id"] == row["link_id"]].geometry.values[0]
+            res = split(geometry, self.__sub_segments.loc[row["connector_to"]].geometry)
+            res = split([geom for geom in res.geoms][0], self.__sub_segments.loc[row["connector_from"]].geometry)
+
+            geo = [geom for geom in res.geoms]
+            if len(geo) > 1:
+                data.at[idx, "split_geom"] = geo[1]
+            else:
+                data.at[idx, "split_geom"] = geo[0]
+
+        data.loc[(data.direction >= 0), "speed_ab"] = data["value"]
+        data.loc[(data.direction <= 0), "speed_ba"] = data["value"]
+
+        data = data.merge(
+            self.links_df[["ovm_id", "subclass", "access_restrictions", "speed_limits", "link_id"]], on="link_id"
+        )
+
+        cols = ["ref_from", "ref_to", "value", "unit", "connector_from", "connector_to"]
+        data = data.drop(cols, axis=1).rename({"split_geom": "geometry", "subclass": "link_type"}, axis=1)
+
+        data["link_id"] = data.index + 1
+        data["access_restrictions"] = data["access_restrictions"].apply(lambda x: str(x) if pd.notna(x) else None)
+        data["speed_limits"] = data["speed_limits"].apply(lambda x: str(x) if pd.notna(x) else None)
+        data["geometry"] = data["geometry"].astype(str)
+        data.loc[data["link_type"].isna(), "link_type"] = ""
+
+        return data
+
+    def __define_link_type(self, link_type: str) -> Tuple[str, str]:
+        proj_link_types = self.project.network.link_types
+        original_link_type = link_type
+        link_type = "".join([x for x in link_type if x in string.ascii_letters + "_"]).lower()
+
+        split = link_type.split("_")
+        for i, piece in enumerate(split[1:]):
+            if piece in ["link", "segment", "stretch"]:
+                link_type = "_".join(split[0 : i + 1])
+
+        if len(self.__all_ltp) >= 51:
+            link_type = "aggregate_link_type"
+
+        if len(link_type) == 0:
+            link_type = "empty"
+
+        if link_type in self.__all_ltp:
+            lt = proj_link_types.get_by_name(link_type)
+            if original_link_type not in lt.description:
+                lt.description += f", {original_link_type}"
+                lt.save()
+            self.__all_ltp[link_type] = lt.link_type_id
+            return [lt.link_type_id, link_type]
+
+        letter = link_type[0]
+        if letter in self.__all_ltp.values():
+            letter = letter.upper()
+            if letter in self.__all_ltp.values():
+                for letter in string.ascii_letters:
+                    if letter not in self.__all_ltp.values():
+                        break
+        lt = proj_link_types.new(letter)
+        lt.link_type = link_type
+        lt.description = f"Link types from Overture Maps: {original_link_type}"
+        lt.save()
+        self.__all_ltp[link_type] = letter
+        return [letter, link_type]
+
+    def importing_network(self, conn):
+        # Add nodes
+        self.__sub_segments["is_centroid"] = 0
+        self.__sub_segments["modes"] = None
+        self.__sub_segments["link_types"] = None
+        self.__sub_segments["lon"] = self.__sub_segments.geometry.x
+        self.__sub_segments["lat"] = self.__sub_segments.geometry.y
+
+        sub_segments = self.sub_segments.rename({"connector": "ovm_id"}, axis=1)
+
+        cols = ["node_id", "ovm_id", "is_centroid", "modes", "link_types", "lon", "lat"]
+        insert_qry = f"INSERT INTO nodes ({','.join(cols[:-2])}, geometry) VALUES(?,?,?,?,?, MakePoint(?,?, 4326))"
+
+        # ???????????
+        remove_triggers(conn, self.logger, "network")
+
+        conn.executemany(insert_qry, sub_segments[cols].to_records(index=False))
+
+        del self.node_df
+        gc.collect()
+
+        add_triggers(conn, self.logger, "network")
+
+        # Add missing link_types
+        all_ltp = pd.read_sql("SELECT link_type, link_type_id FROM link_types", conn)
+        self.__all_ltp = dict(all_ltp.to_records(index=False))
+
+        for lt in self.__data["link_type"].unique():
+            self.__define_link_type(lt)
+
+        # Add links
+        for col in ["ovm_id", "access_restrictions", "speed_limits"]:
+            conn.execute(f"Alter table Links add column {col} TEXT")
+
+        self.__data.loc[self.__data["link_type"] == "", "link_type"] = "empty"
+
+        insert_qry = "INSERT INTO links ({}, geometry) VALUES({}, GeomFromText(?, 4326))"
+        cols_no_geo = self.__data.columns.tolist()
+        cols_no_geo.remove("geometry")
+        insert_qry = insert_qry.format(", ".join(cols_no_geo), ", ".join(["?"] * len(cols_no_geo)))
+
+        cols = cols_no_geo + ["geometry"]
+        links_df = self.__data[cols].to_records(index=False)
+
+        del self.links_df
+        gc.collect()
+
+        conn.executemany(insert_qry, links_df)
 
     ######## TABLE STRUCTURE UPDATING ########
     def __update_table_structure(self, conn):
