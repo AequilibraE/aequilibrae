@@ -38,10 +38,12 @@ class OVMBuilder(WorkerThread):
 
         self.node_df = data["nodes"]
         self.node_df.loc[:, "node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
+        self.node_df = self.node_df.rename(columns={"ovm_id": "connector"})
         gc.collect()
 
         self.links_df = data["links"]
         self.links_df["idx"] = self.links_df.index + 1
+        self.links_df["subclass"] = self.links_df["subclass"].fillna(self.links_df["class"])
 
         self.__geod = Geod(ellps="WGS84")
         self.segment_data = []
@@ -49,33 +51,142 @@ class OVMBuilder(WorkerThread):
 
     def doWork(self):
 
+        self.__restrictions = self.access_restrictions()
+        self.__speed = self.speed_limits()
+
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
-            self.get_segment_data()
             self.__do_clean(conn)
 
         self.signal.emit(["finished", 0])
 
-    def __get_all_break_points(self, segment_id):
-        segment_points = set(self.sub_segments.loc[self.sub_segments["idx"] == segment_id, "ref"])
-        restriction_points = set(
-            self.restrictions.loc[self.restrictions["idx"] == segment_id, ["ref_from", "ref_to"]].to_numpy().flatten()
+    def access_restrictions(self):
+        restrictions = self.links_df[self.links_df["access_restrictions"].notna()].explode("access_restrictions")
+        restrictions = pd.json_normalize(restrictions["access_restrictions"].tolist()).set_index(restrictions.link_id)
+        restrictions.reset_index(inplace=True)
+
+        cols = [x.split(".") for x in restrictions.columns]
+        cols = [x[0] if len(x) == 1 else x[1] for x in cols]
+
+        restrictions.columns = cols
+
+        # Remove private links
+        filt = restrictions[restrictions["recognized"].fillna("").str.join("|").str.contains("as_private")]
+        filt = filt["idx"].tolist()
+
+        # Remove private segments
+        restrictions = restrictions[~restrictions["idx"].isin(filt)]
+        self.links_df = self.links_df[~self.links_df["idx"].isin(filt)]
+
+        # Ignore cases when 'during' and 'vehicle' are not none
+        restrictions = restrictions[(restrictions["during"].isna()) & (restrictions["vehicle"].isna())]
+
+        # We'll ignore designated road sections
+        designated = restrictions[restrictions["access_type"] == "designated"].copy()
+        restrictions.drop(designated.index, inplace=True)
+
+        # We'll focus only on deniability.
+        allowed = restrictions[restrictions["access_type"] == "allowed"].copy()
+        restrictions.drop(allowed.index, inplace=True)
+
+        dupes = restrictions[
+            (restrictions["access_type"].notna()) & (restrictions["heading"].isna()) & (restrictions["mode"].isna())
+        ].copy()
+        restrictions.drop(dupes.index, inplace=True)
+
+        # Keep selected modes, only
+        restrictions["mode"] = (
+            restrictions["mode"]
+            .str.join("|")
+            .str.replace("foot", "w")
+            .str.replace("bicycle", "b")
+            .str.replace("bus", "t")
+            .str.replace("car", "c")
+            .str.replace("motor_vehicle", "ct")
+            .str.replace("|", "")
         )
-        speed_points = set(self.speed.loc[self.speed["idx"] == segment_id, ["ref_from", "ref_to"]].to_numpy().flatten())
 
-        segment_break_points = sorted(segment_points)
-        all_break_points = sorted(segment_points | restriction_points | speed_points)
+        pat = "|".join(["motorcycle", "hgv", "hov", "emergency"])
 
-        return segment_break_points, all_break_points
+        other_modes = restrictions[restrictions["mode"].str.contains(pat, case=False, na=False)].copy()
+        restrictions.drop(other_modes.index, inplace=True)
 
-    def __get_length(self, line_geometry):
+        # We remove mode specific restrictions
+        mode_specific = restrictions[(restrictions["heading"].notna()) & (restrictions["mode"].notna())].copy()
+        restrictions.drop(mode_specific.index, inplace=True)
+
+        restrictions[["ref_from", "ref_to"]] = restrictions["between"].apply(pd.Series)
+        restrictions["ref_from"] = restrictions["ref_from"].fillna(0.0)
+        restrictions["ref_to"] = restrictions["ref_to"].fillna(1.0)
+
+        link_ids = restrictions.link_id.unique()
+        assemble = pd.DataFrame([("bctw", 0) for i in link_ids], columns=["modes", "direction"], index=link_ids)
+
+        for idx, row in restrictions.iterrows():
+            if row["heading"] == "backward":
+                assemble.at[row["idx"], "direction"] = 1
+            elif row["heading"] == "forward":
+                assemble.at[row["idx"], "direction"] = -1
+
+            if row["mode"] is not None:
+                for m in row["mode"]:
+                    assemble.at[row["idx"], "modes"] = assemble.loc[row["idx"], "modes"].replace(m, "")
+
+        mode_direction = restrictions.join(assemble, on="idx")
+
+        cols = ["idx", "ref_from", "ref_to", "modes", "direction"]
+        mode_direction = mode_direction[cols]
+
+        # Remove duplicated direction and mode references for the same link
+        mode_direction.drop_duplicates(["idx", "ref_from", "ref_to", "modes", "direction"], inplace=True)
+
+        return mode_direction
+
+    def speed_limits(self):
+
+        speed = self.links_df[self.links_df["speed_limits"].notna()].explode("speed_limits")
+        speed = pd.json_normalize(speed["speed_limits"].tolist()).set_index([speed.link_id])
+        speed.reset_index(inplace=True)
+
+        cols = [x.split(".") for x in speed.columns]
+        cols = [x[0] if len(x) == 1 else x[1] for x in cols]
+
+        speed.columns = cols
+
+        speed[["ref_from", "ref_to"]] = speed["between"].apply(pd.Series)
+        speed["ref_from"] = speed["ref_from"].fillna(0.0)
+        speed["ref_to"] = speed["ref_to"].fillna(1.0)
+
+        cols = ["idx", "value", "unit", "ref_from", "ref_to"]
+        return speed[cols]
+
+    def get_nodes_data(self):
+
+        sub_segments = self.links_df[["idx", "connectors"]].explode("connectors")
+        sub_segments = pd.json_normalize(sub_segments["connectors"].tolist()).set_index([sub_segments.link_id])
+        sub_segments = sub_segments.reset_index().rename(columns={"connector_id": "connector", "at": "ref"})
+        self.__sub_segments = self.node_df.join(sub_segments.set_index("connector"), on="connector")
+
+    def get_all_break_points(self, segment_id):
+        # Obtém os break points e os pontos que são parte do segmento original
+        segment_pts = self.__sub_segments[self.__sub_segments["idx"] == segment_id]["ref"].values.flatten()
+        restriction_pts = self.__restrictions[self.__restrictions["idx"] == segment_id][
+            ["ref_from", "ref_to"]
+        ].values.flatten()
+        speed_pts = self.__speed[self.__speed["idx"] == segment_id][["ref_from", "ref_to"]].values.flatten()
+
+        return sorted(set(segment_pts)), sorted(set(segment_pts) | set(restriction_pts) | set(speed_pts))
+
+    def get_length(self, line_geometry):
+        """Returns segment length"""
+
         return self.__geod.geometry_length(line_geometry)
 
-    def __round_point(self, point: Point, precision: int) -> Point:
-        """Borrowed from https://github.com/OvertureMaps/transportation-splitter/blob/main/transportation_splitter.py"""
+    def round_point(self, point: Point, precision: int) -> Point:
+        """Borrowed from https://github.com/OvertureMaps/transportation-splitter"""
         return Point(round(point.x, precision), round(point.y, precision))
 
-    def merge_dataframes(self, df_a, df_b, df_c):
+    def merge_dataframes(linear_references, df_a, df_b, df_c):
 
         result = pd.DataFrame()
         final_result = pd.DataFrame()
@@ -87,19 +198,15 @@ class OVMBuilder(WorkerThread):
 
                 if start < end:
                     new_row = {**row_a.to_dict(), **row_b.to_dict()}
-                    if start not in self.__linear_references:
-                        start = min(self.__linear_references, key=lambda x: abs(x - start))
-                    if end not in self.__linear_references:
-                        end = min(self.__linear_references, key=lambda x: abs(x - end))
+                    if start not in linear_references:
+                        start = min(linear_references, key=lambda x: abs(x - start))
+                    if end not in linear_references:
+                        end = min(linear_references, key=lambda x: abs(x - end))
                     new_row.update({"ref_from": start, "ref_to": end})
                     result = pd.concat([result, pd.DataFrame([new_row])], ignore_index=True)
 
         for _, row_result in result.iterrows():
-            idx = row_result["idx"]
-            mask_c = df_c["idx"] == idx
-            df_c_filtered = df_c[mask_c]
-
-            for _, row_c in df_c_filtered.iterrows():
+            for _, row_c in df_c.iterrows():
                 start = max(row_result["ref_from"], row_c["ref_from"])
                 end = min(row_result["ref_to"], row_c["ref_to"])
 
@@ -108,125 +215,45 @@ class OVMBuilder(WorkerThread):
                     new_row.update({"ref_from": start, "ref_to": end})
                     final_result = pd.concat([final_result, pd.DataFrame([new_row])], ignore_index=True)
 
-        return final_result.sort_values(["idx", "ref_from"]).reset_index(drop=True)
+        return final_result.sort_values(["link_id", "ref_from"])
 
-    def __get_access_restrictions(self):
-        # Filter by restrictions
-        restrictions = self.links_df[self.links_df["access_restrictions"].notna()].explode("access_restrictions")
-        restrictions = pd.json_normalize(restrictions["access_restrictions"].tolist()).set_index(restrictions.idx)
-        restrictions.reset_index(inplace=True)
-
-        # Get vehicle information if exists
-        vehicles = restrictions[restrictions["when.vehicle"].notna()].explode("when.vehicle")
-        vehicles = pd.json_normalize(vehicles["when.vehicle"].tolist()).set_index(vehicles.index)
-
-        # Rename columns
-        c = ["idx", "access_type", "between", "during", "heading", "using", "recognized", "mode"]
-        restrictions = restrictions.join(vehicles).fillna(np.nan).reset_index(drop=True)
-        restrictions.drop(["when", "when.vehicle"], axis=1, inplace=True)
-        if vehicles.shape[1] > 0:
-            c.extend(["vehicle_dimension", "vehicle_comparison", "vehicle_value", "vehicle_value_unit"])
-        restrictions.columns = c
-
-        # Get references from/to restrictions
-        restrictions[["ref_from", "ref_to"]] = restrictions["between"].apply(pd.Series)
-        restrictions["ref_from"] = restrictions["ref_from"].fillna(0.0)
-        restrictions["ref_to"] = restrictions["ref_to"].fillna(1.0)
-        restrictions.drop("between", axis=1, inplace=True)
-
-        
-        private_segments = restrictions[restrictions["recognized"].fillna("").str.join("|").str.contains("as_private")]
-        private_segments = private_segments.index.tolist()
-
-        self.links_df = self.links_df[~self.links_df["idx"].isin(private_segments)]
-        
-        print(f"Removing {len(private_segments)} private links")
-
-        return restrictions[~restrictions["idx"].isin(private_segments)]
-
-    def __get_speed_limits(self):
-        # Filter by segments with speed limits
-        speed = self.links_df[self.links_df["speed_limits"].notna()].explode("speed_limits")
-        speed = pd.json_normalize(speed["speed_limits"].tolist()).set_index([speed.idx])
-        speed = speed.reset_index().drop("when", axis=1)
-
-        # Rename columns
-        c = ["idx", "min_speed", "variable_max_speed", "between", "max_speed_value", "max_speed_unit"]
-        if speed.shape[1] > 6:
-            c.extend(
-                [
-                    "speed_during",
-                    "speed_when_heading",
-                    "speed_when_using",
-                    "speed_when_recognized",
-                    "speed_when_mode",
-                    "speed_when_vehicle",
-                ]
-            )
-        speed.columns = c
-
-        # Get references from/to speed limits
-        speed[["ref_from", "ref_to"]] = speed["between"].apply(pd.Series)
-        speed["ref_from"] = speed["ref_from"].fillna(0.0)
-        speed["ref_to"] = speed["ref_to"].fillna(1.0)
-        speed.drop("between", axis=1, inplace=True)
-        return speed
-
-    def __get_sub_segments(self):
-        sub_segments = self.links_df[["idx", "connectors"]].explode("connectors")
-        sub_segments = pd.json_normalize(sub_segments["connectors"].tolist()).set_index([sub_segments.idx])
-        sub_segments = sub_segments.reset_index().rename(columns={"connector_id": "connector", "at": "ref"})
-
-        sub_segments = sub_segments.merge(self.node_df, on="connector", how="right")
-        return gpd.GeoDataFrame(sub_segments, geometry=sub_segments.geometry)
-
-    def __find_reference_geometry(self):
-        """Contains code pieces borrowed
-        from https://github.com/OvertureMaps/transportation-splitter/blob/main/transportation_splitter.py"""
-
-        self.restrictions = self.__get_access_restrictions()
-        self.speed = self.__get_speed_limits()
-
-        self.links_df.set_index("idx", inplace=True)
+    def find_break_point_coord(self):
 
         counter = 1
+        split_points = []
+        all_data = []
+        max_link = self.links_df["idx"].values.max()
 
-        l = [np.nan for i in range(self.restrictions.shape[1])]
-        l[-2:] = [0.0, 1.0]
+        for e, seg in enumerate(self.links_df.idx):
+            if e % 1000 == 0:
+                print(f"Finding break points --> {e} / {max_link}")
 
-        s = [np.nan for i in range(self.speed.shape[1])]
-        s[-2:] = [0.0, 1.0]
-
-        for seg in self.links_df.index:
-            if seg % 1000 == 0:
-                print(f"Breaking links ---> {seg} / {self.links_df.shape[0]}")
-    
             result_data = []
 
-            geometry = self.links_df.loc[seg].geometry
+            geometry = self.links_df[self.links_df["idx"] == seg].geometry.values[0]
 
-            # Parte 1 - Retornar todos os break points
-            connector_reference, self.__linear_references = self.__get_all_break_points(seg)
-            segment_length = self.__get_length(geometry)
+            connector_reference, linear_references = self.get_all_break_points(seg)
+            segment_length = self.get_length(geometry)
 
             # Vamos ajustar as referências
             remove = []
-            for idx, lr in enumerate(self.__linear_references[:-1]):
-                if (self.__linear_references[idx + 1] - lr) < MIN_SEGMENT_LENGTH:
+            for idx, lr in enumerate(linear_references[:-1]):
+                if (linear_references[idx + 1] - lr) < MIN_SEGMENT_LENGTH:
                     if lr in connector_reference:
-                        remove.append(self.__linear_references[idx + 1])
+                        remove.append(linear_references[idx + 1])
                     else:
                         remove.append(lr)
 
-            # Remove duplicated connectors
+            # Remove um dos novos conectores que tecnicamente é igual aos existentes.
+            # É melhor usar o que já está de acordo com a base de dados.
             for e in list(set(remove)):
-                self.__linear_references.remove(e)
+                linear_references.remove(e)
 
             coords = np.array(geometry.coords)
 
             # Vamos procurar o ponto ao qual correspondem as frações de segmento que são diferentes de 0 ou 1.
             # Essas obviamente correspondem aos conectores já existentes.
-            for idx, lr in enumerate(self.__linear_references[:-1]):
+            for idx, lr in enumerate(linear_references[:-1]):
 
                 target_length = lr * segment_length
                 coord_idx = 0
@@ -242,73 +269,27 @@ class OVMBuilder(WorkerThread):
                 split_lon, split_lat, _ = self.__geod.fwd(
                     lon1, lat1, forward_az, target_length, return_back_azimuth=False
                 )
-                point_geometry = self.__round_point(Point(split_lon, split_lat), POINT_PRECISION)
+                point_geometry = self.round_point(Point(split_lon, split_lat), POINT_PRECISION)
 
                 if lr not in connector_reference:
-                    self.split_points.append(
+                    split_points.append(
                         {"idx": seg, "ref": lr, "connector": f"connector_{counter}", "geometry": point_geometry}
                     )
                     counter += 1
 
-                result_data.append({"idx": seg, "ref_from": lr, "ref_to": self.__linear_references[idx + 1]})
+                result_data.append({"idx": seg, "ref_from": lr, "ref_to": linear_references[idx + 1]})
 
             result_data = pd.DataFrame(result_data)
-            rest = self.restrictions[self.restrictions["idx"] == seg].copy()
+            rest = self.__restrictions[self.__restrictions["idx"] == seg].copy()
             if rest.shape[0] == 0:
-                l[0] = seg
-                rest.loc[0] = l
+                rest.loc[0] = [seg, 0.0, 1.0, "bctw", 0]
 
-            sl = self.speed[self.speed["idx"] == seg].copy()
+            sl = self.__speed[self.__speed["idx"] == seg].copy()
             if sl.shape[0] == 0:
-                s[0] = seg
-                sl.loc[0] = s
+                sl.loc[0] = [seg, None, None, 0.0, 1.0]
 
-            df = self.merge_dataframes(rest, sl, result_data)
-            self.segment_data.append(df)
-
-    def get_segment_data(self):
-        self.sub_segments = self.__get_sub_segments()
-
-        self.__find_reference_geometry()
-
-        split_points = pd.DataFrame(self.split_points)
-
-        sub_segments = pd.concat([self.sub_segments, split_points], ignore_index=True).sort_values(["idx", "ref"])
-        sub_segments.reset_index(drop=True, inplace=True)
-
-        segment_data = pd.concat(self.segment_data)
-        segment_data = segment_data.merge(
-            sub_segments[["idx", "ref", "connector"]],
-            left_on=["idx", "ref_from"],
-            right_on=["idx", "ref"],
-            how="left",
-        )
-        segment_data = segment_data.merge(
-            sub_segments[["idx", "ref", "connector"]],
-            left_on=["idx", "ref_to"],
-            right_on=["idx", "ref"],
-            how="left",
-        )
-        segment_data.drop(columns=["ref_x", "ref_y"], inplace=True)
-        segment_data.rename(columns={"connector_x": "connector_from", "connector_y": "connector_to"}, inplace=True)
-        segment_data.insert(segment_data.shape[1], "split_geom", None)
-
-        sub_segments = sub_segments.drop_duplicates("connector").set_index("connector")
-
-        for idx, row in segment_data.iterrows():
-            if idx % 1000 == 0:
-                print(f"Building segments ---> {idx} / {segment_data.shape[0]}")
-
-            res = split(self.links_df.loc[row["idx"]].geometry, sub_segments.loc[row["connector_to"]].geometry)
-            res = split([geom for geom in res.geoms][0], sub_segments.loc[row["connector_from"]].geometry)
-
-            geo = [geom for geom in res.geoms]
-            if len(geo) > 1:
-                segment_data.at[idx, "split_geom"] = geo[1]
-            else:
-                segment_data.at[idx, "split_geom"] = geo[0]
-
-        self.data = segment_data
+            df = self.merge_dataframes(linear_references, rest, sl, result_data)
+            all_data.append(df)
 
     ######## TABLE STRUCTURE UPDATING ########
     def __update_table_structure(self, conn):
