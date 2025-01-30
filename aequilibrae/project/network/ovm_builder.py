@@ -449,12 +449,19 @@ class OVMBuilder(WorkerThread):
 
     ######## TABLE STRUCTURE UPDATING ########
     def __update_table_structure(self, conn):
-        structure = conn.execute("pragma table_info(Links)").fetchall()
-        has_fields = [x[1].lower() for x in structure]
+        links_structure = conn.execute("pragma table_info(Links)").fetchall()
+        has_links_fields = [x[1].lower() for x in links_structure]
         fields = ["ovm_id", "access_restrictions", "speed_limits"]
-        for field in [f for f in fields if f not in has_fields]:
+        for field in [f for f in fields if f not in has_links_fields]:
             ltype = self.get_link_field_type(field).upper()
             conn.execute(f"Alter table Links add column {field} {ltype}")
+
+        nodes_structure = conn.execute("pragma table_info(Nodes)").fetchall()
+        has_nodes_fields = [x[1].lower() for x in nodes_structure]
+        if "ovm_id" not in has_nodes_fields:
+            ltype = self.get_link_field_type(field).upper()
+            conn.execute(f"Alter table Nodes add column ovm_id {ltype}")
+
         conn.commit()
 
     def __do_clean(self, conn):
@@ -472,18 +479,6 @@ class OVMBuilder(WorkerThread):
     @staticmethod
     def get_link_field_type(field_name):
         p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
         ovm = p.parameters["network"]["ovm"]["fields"]
 
-        if field_name in ["ovm_id", "access_restrictions", "speed_limits"]:
-            return ovm[field_name]["type"]
-
-        if field_name[-3:].lower() in ["_ab", "_ba"]:
-            field_name = field_name[:-3]
-            for tp in fields["two-way"]:
-                if field_name in tp:
-                    return tp[field_name]["type"]
-        else:
-            for tp in fields["one-way"]:
-                if field_name in tp:
-                    return tp[field_name]["type"]
+        return ovm[field_name]["type"]
