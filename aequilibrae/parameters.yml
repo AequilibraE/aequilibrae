@@ -262,71 +262,16 @@ network:
           pedestrian: 'no'
         unknown_tags: true
   ovm:
-    all_link_types:
-    - bridleway
-    - cycleway 
-    - driveway
-    - footway
-    - livingStreet
-    - motorway
-    - parkingAisle
-    - pedestrian
-    - primary
-    - residential
-    - secondary
-    - steps
-    - tertiary
-    - track
-    - trunk
-    - unclassified
-    - unknown
-    modes:
-      bicycle:
-        link_types:
-        - primary
-        - secondary
-        - tertiary
-        - livingStreet
-        - parkingAisle
-        - residential
-        - cycleway
-        - pedestrian
-        - track
-        - unclassified
-        unknown_tags: true
-      car:
-        link_types:
-        - motorway
-        - trunk
-        - primary
-        - secondary
-        - tertiary
-        - unclassified
-        - residential
-        - livingStreet
-        - parkingAisle
-        unknown_tags: true
-      transit:
-        link_types:
-        - motorway
-        - trunk
-        - primary
-        - secondary
-        - tertiary
-        - unclassified
-        - residential
-        - livingStreet
-        unknown_tags: true
-      walk:
-        link_types:
-        - cycleway
-        - footway
-        - steps
-        - pedestrian
-        - track
-        - bridleway
-        - unclassified
-        unknown_tags: true
+    fields:
+      ovm_id:
+        description: OVM ID for the element
+        type: text
+      access_restrictions:
+        description: all access_restriction data for the element
+        type: text
+      speed_limits:
+        description: all speed_limits data for the element
+        type: text
   gmns:
     critical_dist: 2
     node:

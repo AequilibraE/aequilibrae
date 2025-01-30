@@ -69,10 +69,10 @@ class OVMDownloader(WorkerThread):
                 addresses[1].freeform as addresses,
                 ST_AsText(geometry) as geometry
             FROM read_parquet('{S3_OVERTURE}/theme=places/*/*')
-            WHERE 
-                bbox.xmin > {xmin} AND 
-                bbox.xmax < {xmax} AND 
-                bbox.ymin > {ymin} AND 
+            WHERE
+                bbox.xmin > {xmin} AND
+                bbox.xmax < {xmax} AND
+                bbox.ymin > {ymin} AND
                 bbox.ymax < {ymax})
             TO '{out_places}'
             (FORMAT 'parquet', COMPRESSION 'zstd');
@@ -101,10 +101,10 @@ class OVMDownloader(WorkerThread):
                     geometry
                   FROM read_parquet('{S3_OVERTURE}/theme=transportation/type=segment/*')
                   WHERE
-                    (subclass NOT IN ('parking_aisle', 'driveway') OR subclass IS NULL) AND 
-                    (bbox.xmin > {xmin} AND 
-                    bbox.xmax < {xmax} AND 
-                    bbox.ymin > {ymin} AND 
+                    (subclass NOT IN ('parking_aisle', 'driveway') OR subclass IS NULL) AND
+                    (bbox.xmin > {xmin} AND
+                    bbox.xmax < {xmax} AND
+                    bbox.ymin > {ymin} AND
                     bbox.ymax < {ymax}))
             TO '{out_links}'
             (FORMAT 'parquet', COMPRESSION 'zstd');
@@ -118,10 +118,10 @@ class OVMDownloader(WorkerThread):
                     id AS ovm_id,
                     geometry
                   FROM read_parquet('{S3_OVERTURE}/theme=transportation/type=connector/*')
-                  WHERE 
-                    bbox.xmin > {xmin} AND 
-                    bbox.xmax < {xmax} AND 
-                    bbox.ymin > {ymin} AND 
+                  WHERE
+                    bbox.xmin > {xmin} AND
+                    bbox.xmax < {xmax} AND
+                    bbox.ymin > {ymin} AND
                     bbox.ymax < {ymax})
             TO '{out_nodes}'
             (FORMAT 'parquet', COMPRESSION 'zstd');
