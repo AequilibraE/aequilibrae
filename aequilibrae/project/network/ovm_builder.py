@@ -60,8 +60,7 @@ class OVMBuilder(WorkerThread):
 
         self.get_nodes_data()
         self.find_break_point_coord()
-
-        self._data = self.split_segments()
+        self.split_segments()
 
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
@@ -78,12 +77,7 @@ class OVMBuilder(WorkerThread):
         self.signal.emit(["finished", 0])
 
     def access_restrictions(self):
-        restrictions = self.links_df[self.links_df["access_restrictions"].notna()].copy()
-        
-        # if restrictions.shape[0] == 0:
-        #     return 
-    
-        restrictions = restrictions.explode("access_restrictions")
+        restrictions = self.links_df[self.links_df["access_restrictions"].notna()].explode("access_restrictions")
         restrictions = pd.json_normalize(restrictions["access_restrictions"].tolist()).set_index(restrictions.idx)
         restrictions.reset_index(inplace=True)
 
@@ -93,84 +87,62 @@ class OVMBuilder(WorkerThread):
         restrictions.columns = cols
 
         # Remove private links
-        if "recognized" in cols:
-            filt = restrictions[restrictions["recognized"].fillna("").str.join("|").str.contains("as_private")]
-            filt = filt["idx"].tolist()
+        filt = restrictions[restrictions["recognized"].fillna("").str.join("|").str.contains("as_private")]
+        filt = filt["idx"].tolist()
 
-            restrictions = restrictions[~restrictions["idx"].isin(filt)]
-            self.links_df = self.links_df[~self.links_df["idx"].isin(filt)]
+        restrictions = restrictions[~restrictions["idx"].isin(filt)]
+        self.links_df = self.links_df[~self.links_df["idx"].isin(filt)]
 
-        # Ignore cases when 'during' and 'vehicle' are not none
-        restrictions = restrictions[(restrictions["during"].isna()) & (restrictions["vehicle"].isna())]
-
-        # We'll ignore designated road sections
-        designated = restrictions[restrictions["access_type"] == "designated"].copy()
-        restrictions.drop(designated.index, inplace=True)
-
-        # We'll focus only on deniability.
-        allowed = restrictions[restrictions["access_type"] == "allowed"].copy()
-        restrictions.drop(allowed.index, inplace=True)
-
-        dupes = restrictions[
-            (restrictions["access_type"].notna()) & (restrictions["heading"].isna()) & (restrictions["mode"].isna())
-        ].copy()
-        restrictions.drop(dupes.index, inplace=True)
-
-        # Keep selected modes, only
         restrictions["mode"] = (
-            restrictions["mode"]
-            .str.join("|")
-            .str.replace("foot", "w")
-            .str.replace("bicycle", "b")
-            .str.replace("bus", "t")
-            .str.replace("car", "c")
-            .str.replace("motor_vehicle", "ct")
-            .str.replace("|", "")
-        )
-
-        pat = "|".join(["motorcycle", "hgv", "hov", "emergency"])
-
-        other_modes = restrictions[restrictions["mode"].str.contains(pat, case=False, na=False)].copy()
-        restrictions.drop(other_modes.index, inplace=True)
-
-        # We remove mode specific restrictions
-        mode_specific = restrictions[(restrictions["heading"].notna()) & (restrictions["mode"].notna())].copy()
-        restrictions.drop(mode_specific.index, inplace=True)
-
+                restrictions["mode"]
+                .str.join("|")
+                .str.replace("foot", "w")
+                .str.replace("bicycle", "b")
+                .str.replace("bus", "t")
+                .str.replace("car", "c")
+                .str.replace("motor_vehicle", "ct")
+            )
+        
         restrictions[["ref_from", "ref_to"]] = restrictions["between"].apply(pd.Series)
         restrictions["ref_from"] = restrictions["ref_from"].fillna(0.0)
         restrictions["ref_to"] = restrictions["ref_to"].fillna(1.0)
 
-        link_ids = restrictions.idx.unique()
-        assemble = pd.DataFrame([("bctw", 0) for i in link_ids], columns=["modes", "direction"], index=link_ids)
+        head = {"backward": 1, "forward": -1}
 
+        restricts = {}
         for _, row in restrictions.iterrows():
-            if row["heading"] == "backward":
-                assemble.at[row["idx"], "direction"] = 1
-            elif row["heading"] == "forward":
-                assemble.at[row["idx"], "direction"] = -1
+            key = (row["idx"], row["ref_from"], row["ref_to"])
+            if key not in restricts:
+                restricts[key] = {"direction": 0, "modes": ""}
 
-            if row["mode"] is not None:
-                for m in row["mode"]:
-                    assemble.at[row["idx"], "modes"] = assemble.loc[row["idx"], "modes"].replace(m, "")
+            if row["heading"] in ["backward", "forward"]:
+                if not restricts[key]["direction"]:
+                    restricts[key]["direction"] = head[row["heading"]]
 
-        mode_direction = restrictions.join(assemble, on="idx")
+            m = "bctw"
+            if isinstance(row["mode"], str):
+                for mode in row["mode"].split("|"):
+                    if mode in ["motorcycle", "hov", "hgv", "emergency"]:
+                        restricts[key]["modes"] += "h"
+                        continue
+                    if row["access_type"] in ["allowed", "designated"]:
+                        restricts[key]["modes"] += mode
+                    elif row["access_type"] in ["denied"]:
+                        if len(restricts[key]["modes"]) > 0:
+                            restricts[key]["modes"] = restricts[key]["modes"].replace(mode, "")
+                        else:
+                            restricts[key]["modes"] = m.replace(mode, "")
 
-        cols = ["idx", "ref_from", "ref_to", "modes", "direction"]
-        mode_direction = mode_direction[cols]
-
-        # Remove duplicated direction and mode references for the same link
-        mode_direction.drop_duplicates(["idx", "ref_from", "ref_to", "modes", "direction"], inplace=True)
-
-        return mode_direction
+        rests = pd.DataFrame(restricts).transpose().reset_index(names=["idx", "ref_from", "ref_to"])
+        rests = rests[(rests["direction"].notna()) | (rests["modes"].notna())]
+        rests.loc[rests["modes"] == "", "modes"] = "bctw"
+        rests["modes"] = rests["modes"].str.replace("h", "")
+        rests.loc[rests["modes"] == "", "modes"] = None
+        
+        return rests[rests["modes"].notna()]
 
     def speed_limits(self):
-        speed = self.links_df[self.links_df["speed_limits"].notna()].copy()
-
-        # if speed.shape[0]:
-        #     return
-        
-        speed = speed.explode("speed_limits")
+        speed = self.links_df[self.links_df["speed_limits"].notna()].explode("speed_limits")
         speed = pd.json_normalize(speed["speed_limits"].tolist()).set_index([speed.idx])
         speed.reset_index(inplace=True)
 
@@ -249,7 +221,7 @@ class OVMBuilder(WorkerThread):
         max_link = self.links_df["idx"].values.max()
 
         for e, seg in enumerate(self.links_df.idx):
-            if e % 500 == 0:
+            if e % 1000 == 0:
                 print(f"Finding break points --> {e} / {max_link}")
 
             result_data = []
@@ -306,7 +278,7 @@ class OVMBuilder(WorkerThread):
             result_data = pd.DataFrame(result_data)
             rest = self._restrictions[self._restrictions["idx"] == seg].copy()
             if rest.shape[0] == 0:
-                rest.loc[0] = [seg, 0.0, 1.0, "bctw", 0]
+                rest.loc[0] = [seg, 0.0, 1.0, 0, "bctw"]
 
             sl = self._speed[self._speed["idx"] == seg].copy()
             if sl.shape[0] == 0:
@@ -325,14 +297,14 @@ class OVMBuilder(WorkerThread):
         self.__sub_segments = pd.concat([self.__sub_segments, split_points], ignore_index=True)
         self.__sub_segments.sort_values(["idx", "ref"], inplace=True)
 
-        data = pd.concat(self.segment_data)
+        self._data = pd.concat(self.segment_data)
 
         use_cols = ["idx", "ref", "node_id", "connector"]
-        data = data.merge(
+        self._data = self._data.merge(
             self.__sub_segments[use_cols], left_on=["idx", "ref_from"], right_on=["idx", "ref"], how="left"
         )
-        data = data.merge(self.__sub_segments[use_cols], left_on=["idx", "ref_to"], right_on=["idx", "ref"], how="left")
-        data = data.drop(columns=["ref_x", "ref_y"]).rename(
+        self._data = self._data.merge(self.__sub_segments[use_cols], left_on=["idx", "ref_to"], right_on=["idx", "ref"], how="left")
+        self._data = self._data.drop(columns=["ref_x", "ref_y"]).rename(
             columns={
                 "node_id_x": "a_node",
                 "node_id_y": "b_node",
@@ -340,13 +312,13 @@ class OVMBuilder(WorkerThread):
                 "connector_y": "connector_to",
             }
         )
-        data.insert(data.shape[1], "split_geom", None)
+        self._data.insert(self._data.shape[1], "split_geom", None)
 
         self.__sub_segments = self.__sub_segments.drop_duplicates("connector").set_index("connector")
 
-        for idx, row in data.iterrows():
+        for idx, row in self._data.iterrows():
             if idx % 1000 == 0:
-                print(f"Splitting geometries --> {idx} / {data.shape[0]}")
+                print(f"Splitting geometries --> {idx} / {self._data.shape[0]}")
 
             geometry = self.links_df.loc[self.links_df["idx"] == row["idx"]].geometry.values[0]
             res = split(geometry, self.__sub_segments.loc[row["connector_to"]].geometry)
@@ -354,25 +326,34 @@ class OVMBuilder(WorkerThread):
 
             geo = list(res.geoms)
             if len(geo) > 1:
-                data.at[idx, "split_geom"] = geo[1]
+                self._data.at[idx, "split_geom"] = geo[1]
             else:
-                data.at[idx, "split_geom"] = geo[0]
+                self._data.at[idx, "split_geom"] = geo[0]
 
-        data.loc[(data.direction >= 0), "speed_ab"] = data["value"]
-        data.loc[(data.direction <= 0), "speed_ba"] = data["value"]
+        self._data.loc[(self._data.direction >= 0), "speed_ab"] = self._data["value"]
+        self._data.loc[(self._data.direction <= 0), "speed_ba"] = self._data["value"]
 
-        data = data.merge(self.links_df[["ovm_id", "subclass", "access_restrictions", "speed_limits", "idx"]], on="idx")
+        self._data = self._data.merge(self.links_df[["ovm_id", "subclass", "access_restrictions", "speed_limits", "idx"]], on="idx")
 
         cols = ["ref_from", "ref_to", "value", "unit", "connector_from", "connector_to", "idx"]
-        data = data.drop(cols, axis=1).rename({"split_geom": "geometry", "subclass": "link_type"}, axis=1)
+        self._data = self._data.drop(cols, axis=1).rename({"split_geom": "geometry", "subclass": "link_type"}, axis=1)
 
-        data["link_id"] = data.index + 1
-        data.loc[data["access_restrictions"].notna(), "access_restrictions"] = data["access_restrictions"].astype(str)
-        data.loc[data["speed_limits"].notna(), "speed_limits"] = data["speed_limits"].astype(str)
-        data["geometry"] = data["geometry"].astype(str)
-        data["link_type"] = data["link_type"].fillna("")
+        self._data["link_id"] = self._data.index + 1
+        self._data.loc[self._data["access_restrictions"].notna(), "access_restrictions"] = self._data["access_restrictions"].astype(str)
+        self._data.loc[self._data["speed_limits"].notna(), "speed_limits"] = self._data["speed_limits"].astype(str)
+        self._data["geometry"] = self._data["geometry"].astype(str)
+        self._data["link_type"] = self._data["link_type"].fillna("")
+        self._data["direction"] = self._data["direction"].fillna(0)
 
-        return data
+        def normalize_string(s):
+            s = ''.join(sorted(set(s)))
+            if set(s).issubset({'b', 'c', 't', 'w'}):
+                return s
+            else:
+                return None
+        
+        self._data.loc[self._data["modes"].notna(), "modes"] = self._data['modes'].apply(normalize_string)
+        self._data.loc[self._data["modes"].isna(), "modes"] = "bctw"
 
     def __define_link_type(self, link_type: str) -> Tuple[str, str]:
         proj_link_types = self.project.network.link_types
