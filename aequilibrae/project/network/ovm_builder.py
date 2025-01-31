@@ -16,6 +16,7 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.project.network.osm.model_area_gridding import geometry_grid
 
 MIN_SEGMENT_LENGTH = 0.01
 POINT_PRECISION = 7
@@ -34,7 +35,7 @@ class OVMBuilder(WorkerThread):
         self.logger = self.project.logger
         self.path = self.project.path_to_file
         self.node_start = 10_000
-        self.model_area = model_area
+        self.model_area = geometry_grid(model_area, 4326)
         self.report = []
         self.clean = clean
 
@@ -54,13 +55,13 @@ class OVMBuilder(WorkerThread):
 
     def doWork(self):
 
-        self.__restrictions = self.access_restrictions()
-        self.__speed = self.speed_limits()
+        self._restrictions = self.access_restrictions()
+        self._speed = self.speed_limits()
 
         self.get_nodes_data()
         self.find_break_point_coord()
 
-        self.__data = self.split_segments()
+        self._data = self.split_segments()
 
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
@@ -77,7 +78,12 @@ class OVMBuilder(WorkerThread):
         self.signal.emit(["finished", 0])
 
     def access_restrictions(self):
-        restrictions = self.links_df[self.links_df["access_restrictions"].notna()].explode("access_restrictions")
+        restrictions = self.links_df[self.links_df["access_restrictions"].notna()].copy()
+        
+        # if restrictions.shape[0] == 0:
+        #     return 
+    
+        restrictions = restrictions.explode("access_restrictions")
         restrictions = pd.json_normalize(restrictions["access_restrictions"].tolist()).set_index(restrictions.idx)
         restrictions.reset_index(inplace=True)
 
@@ -87,12 +93,12 @@ class OVMBuilder(WorkerThread):
         restrictions.columns = cols
 
         # Remove private links
-        filt = restrictions[restrictions["recognized"].fillna("").str.join("|").str.contains("as_private")]
-        filt = filt["idx"].tolist()
+        if "recognized" in cols:
+            filt = restrictions[restrictions["recognized"].fillna("").str.join("|").str.contains("as_private")]
+            filt = filt["idx"].tolist()
 
-        # Remove private segments
-        restrictions = restrictions[~restrictions["idx"].isin(filt)]
-        self.links_df = self.links_df[~self.links_df["idx"].isin(filt)]
+            restrictions = restrictions[~restrictions["idx"].isin(filt)]
+            self.links_df = self.links_df[~self.links_df["idx"].isin(filt)]
 
         # Ignore cases when 'during' and 'vehicle' are not none
         restrictions = restrictions[(restrictions["during"].isna()) & (restrictions["vehicle"].isna())]
@@ -138,7 +144,7 @@ class OVMBuilder(WorkerThread):
         link_ids = restrictions.idx.unique()
         assemble = pd.DataFrame([("bctw", 0) for i in link_ids], columns=["modes", "direction"], index=link_ids)
 
-        for idx, row in restrictions.iterrows():
+        for _, row in restrictions.iterrows():
             if row["heading"] == "backward":
                 assemble.at[row["idx"], "direction"] = 1
             elif row["heading"] == "forward":
@@ -159,8 +165,12 @@ class OVMBuilder(WorkerThread):
         return mode_direction
 
     def speed_limits(self):
+        speed = self.links_df[self.links_df["speed_limits"].notna()].copy()
 
-        speed = self.links_df[self.links_df["speed_limits"].notna()].explode("speed_limits")
+        # if speed.shape[0]:
+        #     return
+        
+        speed = speed.explode("speed_limits")
         speed = pd.json_normalize(speed["speed_limits"].tolist()).set_index([speed.idx])
         speed.reset_index(inplace=True)
 
@@ -186,10 +196,10 @@ class OVMBuilder(WorkerThread):
     def __get_all_break_points(self, segment_id):
         # Obtém os break points e os pontos que são parte do segmento original
         segment_pts = self.__sub_segments[self.__sub_segments["idx"] == segment_id]["ref"].values.flatten()
-        restriction_pts = self.__restrictions[self.__restrictions["idx"] == segment_id][
+        restriction_pts = self._restrictions[self._restrictions["idx"] == segment_id][
             ["ref_from", "ref_to"]
         ].values.flatten()
-        speed_pts = self.__speed[self.__speed["idx"] == segment_id][["ref_from", "ref_to"]].values.flatten()
+        speed_pts = self._speed[self._speed["idx"] == segment_id][["ref_from", "ref_to"]].values.flatten()
 
         return sorted(set(segment_pts)), sorted(set(segment_pts) | set(restriction_pts) | set(speed_pts))
 
@@ -239,7 +249,7 @@ class OVMBuilder(WorkerThread):
         max_link = self.links_df["idx"].values.max()
 
         for e, seg in enumerate(self.links_df.idx):
-            if e % 1000 == 0:
+            if e % 500 == 0:
                 print(f"Finding break points --> {e} / {max_link}")
 
             result_data = []
@@ -294,11 +304,11 @@ class OVMBuilder(WorkerThread):
                 result_data.append({"idx": seg, "ref_from": lr, "ref_to": linear_references[idx + 1]})
 
             result_data = pd.DataFrame(result_data)
-            rest = self.__restrictions[self.__restrictions["idx"] == seg].copy()
+            rest = self._restrictions[self._restrictions["idx"] == seg].copy()
             if rest.shape[0] == 0:
                 rest.loc[0] = [seg, 0.0, 1.0, "bctw", 0]
 
-            sl = self.__speed[self.__speed["idx"] == seg].copy()
+            sl = self._speed[self._speed["idx"] == seg].copy()
             if sl.shape[0] == 0:
                 sl.loc[0] = [seg, None, None, 0.0, 1.0]
 
@@ -336,7 +346,7 @@ class OVMBuilder(WorkerThread):
 
         for idx, row in data.iterrows():
             if idx % 1000 == 0:
-                print(f"Splitting geometries ---> {idx} / {data.shape[0]}")
+                print(f"Splitting geometries --> {idx} / {data.shape[0]}")
 
             geometry = self.links_df.loc[self.links_df["idx"] == row["idx"]].geometry.values[0]
             res = split(geometry, self.__sub_segments.loc[row["connector_to"]].geometry)
@@ -353,7 +363,7 @@ class OVMBuilder(WorkerThread):
 
         data = data.merge(self.links_df[["ovm_id", "subclass", "access_restrictions", "speed_limits", "idx"]], on="idx")
 
-        cols = ["ref_from", "ref_to", "value", "unit", "connector_from", "connector_to"]
+        cols = ["ref_from", "ref_to", "value", "unit", "connector_from", "connector_to", "idx"]
         data = data.drop(cols, axis=1).rename({"split_geom": "geometry", "subclass": "link_type"}, axis=1)
 
         data["link_id"] = data.index + 1
@@ -428,19 +438,19 @@ class OVMBuilder(WorkerThread):
         all_ltp = pd.read_sql("SELECT link_type, link_type_id FROM link_types", conn)
         self.__all_ltp = dict(all_ltp.to_records(index=False))
 
-        for lt in self.__data["link_type"].unique():
+        for lt in self._data["link_type"].unique():
             self.__define_link_type(lt)
 
         # Add links
-        self.__data.loc[self.__data["link_type"] == "", "link_type"] = "empty"
+        self._data.loc[self._data["link_type"] == "", "link_type"] = "empty"
 
         insert_qry = "INSERT INTO links ({}, geometry) VALUES({}, GeomFromText(?, 4326))"
-        cols_no_geo = self.__data.columns.tolist()
+        cols_no_geo = self._data.columns.tolist()
         cols_no_geo.remove("geometry")
         insert_qry = insert_qry.format(", ".join(cols_no_geo), ", ".join(["?"] * len(cols_no_geo)))
 
         cols = cols_no_geo + ["geometry"]
-        links_df = self.__data[cols].to_records(index=False)
+        links_df = self._data[cols].to_records(index=False)
 
         del self.links_df
         gc.collect()
@@ -459,7 +469,7 @@ class OVMBuilder(WorkerThread):
         nodes_structure = conn.execute("pragma table_info(Nodes)").fetchall()
         has_nodes_fields = [x[1].lower() for x in nodes_structure]
         if "ovm_id" not in has_nodes_fields:
-            ltype = self.get_link_field_type(field).upper()
+            ltype = self.get_link_field_type("ovm_id").upper()
             conn.execute(f"Alter table Nodes add column ovm_id {ltype}")
 
         conn.commit()
