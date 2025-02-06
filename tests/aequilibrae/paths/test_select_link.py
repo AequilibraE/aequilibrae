@@ -67,7 +67,7 @@ class TestSelectLink(TestCase):
                 link_loading,
                 err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
-        
+
         # Test if files are saved in the right place
         self.assignment.save_select_link_results("select_link_analysis")
 
