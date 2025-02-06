@@ -834,7 +834,7 @@ class TrafficAssignment(AssignmentBase):
         data = [
             table_name,
             "select link",
-            self.procedure_id,
+            f"{self.procedure_id}_sl",
             str(report),
             self.procedure_date,
             self.description,
@@ -847,16 +847,20 @@ class TrafficAssignment(AssignmentBase):
         conn.commit()
         conn.close()
 
-    def save_select_link_matrices(self, file_name: str) -> None:
+    def save_select_link_matrices(self, file_name: str, project=None) -> None:
         """
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
         """
+        if not project:
+            project = self.project or get_active_project()
+
+        file_path = str(Path(file_name).with_suffix(".omx"))
 
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
                 continue
-            cls.results.select_link_od.export(str(Path(file_name).with_suffix(".omx")))
+            cls.results.select_link_od.export(path.join(project.project_base_path, "matrices", file_path))
 
     def save_select_link_results(self, name: str) -> None:
         """
