@@ -847,20 +847,50 @@ class TrafficAssignment(AssignmentBase):
         conn.commit()
         conn.close()
 
-    def save_select_link_matrices(self, file_name: str, project=None) -> None:
+    def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
         """
         if not project:
             project = self.project or get_active_project()
 
-        file_path = str(Path(file_name).with_suffix(".omx"))
+        mats = project.matrices
 
         for cls in self.classes:
-            # Save OD_matrices
+            file_name = f"{matrix_name}_{cls._id}.omx"
+
+            export_name = path.join(mats.fldr, file_name)
+
+            if path.isfile(export_name):
+                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
+
+            if mats.check_exists(matrix_name):
+                raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
+
             if cls._selected_links is None:
                 continue
-            cls.results.select_link_od.export(path.join(project.project_base_path, "matrices", file_path))
+
+            res = cls.results.select_link_od
+            num_zones = self.classes[0].graph.centroids.shape[0]
+
+            kwargs = {
+                "file_name": AequilibraeMatrix().random_name(),
+                "zones": num_zones,
+                "matrix_names": res.names,
+                "memory_only": False,
+            }
+
+            # Create the matrix to manipulate
+            out_skims = AequilibraeMatrix()
+            out_skims.create_empty(**kwargs)
+
+            out_skims.index[:] = self.classes[0].graph.centroids[:]
+            out_skims.description = f"Select link matrix from procedure ID {self.procedure_id}_sl. Class name {cls._id}"
+
+            for mat in res.names:
+                out_skims.matrix[mat][:, :] = res.get_matrix(mat).reshape((num_zones, num_zones))
+
+            out_skims.export(export_name)
 
     def save_select_link_results(self, name: str) -> None:
         """
