@@ -73,7 +73,14 @@ class TestSelectLink(TestCase):
 
         matrices = self.project.matrices
         matrices.update_database()
-        assert f"select_link_analysis_{self.assignclass._id}.omx" in matrices.list()["file_name"].tolist()
+        assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
+
+        # Test if matrices are with the correct shape and are not empty
+        sla = matrices.get_matrix("select_link_analysis_omx")
+        num_zones = self.assignment.classes[0].graph.num_zones
+        for mat in sla.names:
+            m = sla.get_matrix(mat)
+            assert m.sum() > 0 and m.shape == (num_zones, num_zones)
 
         pth = Path(self.project.project_base_path)
         conn = sqlite3.connect(pth / "results_database.sqlite")
