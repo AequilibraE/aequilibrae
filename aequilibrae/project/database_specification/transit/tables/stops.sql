@@ -23,7 +23,7 @@
 --@ 
 --@ **street** identifies the address of a stop
 --@ 
---@ **zone_id** identifies the TAZ for a stop
+--@ **zone_id** identifies the model zone for a stop
 --@ 
 --@ **transit_fare_zone** identifies the transit fare zone for a stop
 --@ 

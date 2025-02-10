@@ -4,7 +4,6 @@ import sqlite3
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from pathlib import Path
 from typing import List, Dict, Union
 from uuid import uuid4
 
@@ -810,8 +809,7 @@ class TrafficAssignment(AssignmentBase):
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
-        Saves the select link link flows for all classes into the results database. Additionally, it exports
-        the OD matrices into OMX format.
+        Saves the select link link flows for all classes into the results database.
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to. Note the traffic class
@@ -834,7 +832,7 @@ class TrafficAssignment(AssignmentBase):
         data = [
             table_name,
             "select link",
-            self.procedure_id,
+            f"{self.procedure_id}_sl",
             str(report),
             self.procedure_date,
             self.description,
@@ -847,28 +845,64 @@ class TrafficAssignment(AssignmentBase):
         conn.commit()
         conn.close()
 
-    def save_select_link_matrices(self, file_name: str) -> None:
+    def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
+        into OMX format.
+
+        :Arguments:
+            **name** (:obj:`str`): name of the matrices
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
+        if not project:
+            project = self.project or get_active_project()
+
+        mats = project.matrices
+
+        file_name = f"{matrix_name}.omx"
+
+        export_name = path.join(mats.fldr, file_name)
+
+        if path.isfile(export_name):
+            raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
+
+        if mats.check_exists(matrix_name):
+            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
+
+        names = [f"{key}_{cls._id}" for cls in self.classes for key in cls._selected_links.keys()]
+
+        kwargs = {
+            "file_name": AequilibraeMatrix().random_name(),
+            "zones": self.classes[0].graph.centroids.shape[0],
+            "matrix_names": names,
+            "memory_only": False,
+        }
+
+        # Create the matrix to manipulate
+        out_skims = AequilibraeMatrix()
+        out_skims.create_empty(**kwargs)
+
+        out_skims.index[:] = self.classes[0].graph.centroids[:]
 
         for cls in self.classes:
-            # Save OD_matrices
             if cls._selected_links is None:
                 continue
-            cls.results.select_link_od.export(str(Path(file_name).with_suffix(".omx")))
+
+            res = cls.results.select_link_od
+
+            for mat in res.names:
+                out_skims.matrix[f"{mat}_{cls._id}"][:, :] = res.get_matrix(mat)[:, :, 0]
+
+        out_skims.matrices.flush()  # Make sure that all data went to the disk
+        out_skims.description = f"Select link matrix from procedure ID {self.procedure_id}_sl."
+
+        out_skims.export(export_name)
 
     def save_select_link_results(self, name: str) -> None:
         """
         Saves both the Select Link matrices and flow results at the same time, using the same name.
-
-        .. note::
-            Note the Select Link matrices will have _SL_matrices.omx appended to the end for ease of identification.
-            e.g. save_select_link_results("Car") will result in the following names for the flows and matrices:
-            Select Link Flows: inserts the select link flows for each class into the database with the table name:
-            Car
-            Select Link Matrices (only exports to OMX format):
-            Car.omx
 
         :Arguments:
             **name** (:obj:`str`): name of the matrices

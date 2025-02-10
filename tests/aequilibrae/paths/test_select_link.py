@@ -2,10 +2,12 @@ import os
 import uuid
 import zipfile
 from os.path import join, dirname
+from pathlib import Path
 from tempfile import gettempdir
 from unittest import TestCase
 import pandas as pd
 import numpy as np
+import sqlite3
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathResults
 from aequilibrae.matrix import AequilibraeMatrix
@@ -65,6 +67,25 @@ class TestSelectLink(TestCase):
                 link_loading,
                 err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
+
+        # Test if files are saved in the right place
+        self.assignment.save_select_link_results("select_link_analysis")
+
+        matrices = self.project.matrices
+        matrices.update_database()
+        assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
+
+        # Test if matrices are with the correct shape and are not empty
+        sla = matrices.get_matrix("select_link_analysis_omx")
+        num_zones = self.assignment.classes[0].graph.num_zones
+        for mat in sla.names:
+            m = sla.get_matrix(mat)
+            assert m.sum() > 0 and m.shape == (num_zones, num_zones)
+
+        pth = Path(self.project.project_base_path)
+        conn = sqlite3.connect(pth / "results_database.sqlite")
+        results = [x[0] for x in conn.execute("SELECT name FROM sqlite_master WHERE type ='table'").fetchall()]
+        assert "select_link_analysis" in results
 
     def test_equals_demand_one_origin(self):
         """

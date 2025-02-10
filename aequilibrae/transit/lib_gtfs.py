@@ -239,12 +239,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 link.save_to_database(conn, commit=False)
             conn.commit()
 
-            self.__outside_zones = 0
-            zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
-            zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
-            zone_ids = {**zone_ids1, **zone_ids2}
+            zone_ids1 = [x.origin for x in self.gtfs_data.fare_rules]
+            zone_ids2 = [x.destination for x in self.gtfs_data.fare_rules]
+            zone_ids = sorted(set(zone_ids1) | set(zone_ids2))
 
-            zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
+            zones = [[x, self.gtfs_data.agency.agency_id] for x in zone_ids]
             if zones:
                 sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
@@ -257,8 +256,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 fare_rule.save_to_database(conn)
 
             for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 12/12)"):
-                if stop.zone in zone_ids:
-                    stop.zone_id = zone_ids[stop.zone]
                 if self.__has_taz:
                     closest_zone = self.project.zoning.get_closest_zone(stop.geo)
                     if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
