@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 from setuptools.discovery import FlatLayoutPackageFinder
 from multiprocessing import cpu_count
 
-# When updating the version, one must also update the docs/source/_static/switcher.json file
+# When updating the version, one must also update the docs/source/useful_links/version_history.rst file
 version = 1.2
 minor_version = 0
 
