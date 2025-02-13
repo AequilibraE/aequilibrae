@@ -137,7 +137,7 @@ class GraphBase(ABC):  # noqa: B024
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: Optional[np.ndarray] = None) -> None:
+    def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -150,6 +150,7 @@ class GraphBase(ABC):  # noqa: B024
 
         :Arguments:
             **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
+            **remove_dead_ends** (:obj:`bool`): Whether or not to remove dead ends from the graph. (*Optional*, default is "True").
         """
         self.__network_error_checking__()
 
@@ -189,7 +190,7 @@ class GraphBase(ABC):  # noqa: B024
         self.__build_derived_properties()
 
         if self.centroids.shape[0]:
-            self.__build_compressed_graph()
+            self.__build_compressed_graph(remove_dead_ends)
             self.compact_num_links = self.compact_graph.shape[0]
 
         # The cache property should be recalculated when the graph has been re-prepared
@@ -197,8 +198,8 @@ class GraphBase(ABC):  # noqa: B024
         self.compressed_link_network_mapping_data = None
         self.network_compressed_node_mapping = None
 
-    def __build_compressed_graph(self):
-        build_compressed_graph(self)
+    def __build_compressed_graph(self, remove_dead_ends):
+        build_compressed_graph(self, remove_dead_ends)
 
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
