@@ -253,7 +253,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
         if graph.dead_end_links.shape[0]:
             df = df[~df.link_id.isin(graph.dead_end_links)]
-
+    else:
+        graph.dead_end_links = np.array([], dtype=np.int64)
     # Build link index
     link_id_max = df.link_id.max()
 

@@ -115,7 +115,7 @@ class GraphBase(ABC):  # noqa: B024
 
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
-        self.dead_end_links = np.array([])
+        self.dead_end_links = np.array([], dtype=np.int64)
 
         self.compressed_link_network_mapping_idx = None
         self.compressed_link_network_mapping_data = None
