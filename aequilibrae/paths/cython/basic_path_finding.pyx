@@ -32,41 +32,20 @@ cpdef void network_loading(long classes,
     cdef long long i, j, predecessor, connector, node
     cdef long long zones = demand.shape[0]
     cdef long long N = node_load.shape[0]
-# Traditional loading, without cascading
-#    for i in range(zones):
-#        node = i
-#        predecessor = pred[node]
-#        connector = conn[node]
-#        while predecessor >= 0:
-#            for j in range(classes):
-#                link_loads[connector, j] += demand[i, j]
-#
-#            predecessor = pred[predecessor]
-#            connector = conn[predecessor]
+    cdef double value
+    cdef size_t offset, col, core
+    # Traditional loading, without cascading
+    for i in range(zones):
+        node = i
 
-    # Clean the node load array
-    for i in range(N):
-        node_load[i] = 0
-
-    # Loads the demand to the centroids
-    for j in range(classes):
-        for i in range(zones):
-            if not isnan(demand[i, j]):
-                node_load[i, j] = demand[i, j]
-
-    # Recursively cascades to the origin
-    for i in range(found, 0, -1):
-        node = reached_first[i]
-
-        # captures how we got to that node
         predecessor = pred[node]
         connector = conn[node]
+        while predecessor >= 0:
+            for j in range(classes):
+                link_loads[connector, j] += demand[i, j]
 
-        # loads the flow to the links for each class
-        for j in range(classes):
-            link_loads[connector, j] += node_load[node, j]
-            # Cascades the load from the node to their predecessor
-            node_load[predecessor, j] += node_load[node, j]
+            connector = conn[predecessor]
+            predecessor = pred[predecessor]
 
 
 @cython.wraparound(False)
