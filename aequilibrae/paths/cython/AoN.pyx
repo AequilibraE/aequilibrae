@@ -44,15 +44,20 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # Destination set
     cdef long long nnz_destinations = 0
     cdef unsigned char [:] destinations
-    if skims == 0:
-        tmp = np.zeros(nodes, dtype=bool)
+
+    tmp = np.zeros(nodes, dtype=bool)
+    if not skims:
         nonzero = matrix.matrix_view[origin_index, :, :].sum(axis=1).nonzero()[0]
         tmp[nonzero] = True
-
-        destinations = tmp
         nnz_destinations = len(nonzero)
+    else:
+        tmp[graph.nodes_to_indices[graph.centroids]] = True
+        nnz_destinations = zones
 
-    # If theres no demand, disable early exit
+    destinations = tmp
+
+    # If there's no demand, disable early exit. We could let this fall through an immediately exit the path finding, but
+    # this case should never happen in assignment so this is a little more flexible.
     if nnz_destinations == 0:
         destinations = np.array([], dtype=bool)
         nnz_destinations = -1
