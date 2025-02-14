@@ -10,9 +10,8 @@ requires = ["setuptools", "numpy<1.99", "cython", "pyarrow==17.0.0", "wheel"]
 
 
 [tool.ruff]
-
-select = ["B", "C", "E", "F", "W"]
-ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
+lint.select = ["B", "C", "E", "F", "W"]
+lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
 exclude = [
     ".idea",
     "__pycache__",
@@ -50,10 +49,10 @@ exclude = [
     ".venv312",
 ]
 line-length = 120
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py39"
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 20
 
 [tool.cibuildwheel]
