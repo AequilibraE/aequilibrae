@@ -157,16 +157,14 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             sl_network_loading(link_list, demand_view, predecessors_view, conn_view, link_loads_view, sl_od_matrix_view,
                                sl_link_loading_view, has_flow_mask, classes)
         else:
-            # do ONLY regular loading (via cascade assignment)
-            network_loading(classes,
-                            demand_view,
-                            predecessors_view,
-                            conn_view,
-                            link_loads_view,
-                            no_path_view,
-                            reached_first_view,
-                            node_load_view,
-                            w)
+            # do ONLY regular loading
+            network_loading(
+                classes,
+                demand_view,
+                predecessors_view,
+                conn_view,
+                link_loads_view
+            )
 
     if result.save_path_file:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)

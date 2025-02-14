@@ -19,21 +19,16 @@ include 'pq_4ary_heap.pyx'
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn off bounds-checking for entire function
-cpdef void network_loading(long classes,
-                           double[:, :] demand,
-                           long long [:] pred,
-                           long long [:] conn,
-                           double[:, :] link_loads,
-                           long long [:] no_path,
-                           long long [:] reached_first,
-                           double [:, :] node_load,
-                           long found) noexcept nogil:
-
+cpdef void network_loading(
+    long classes,
+    double[:, :] demand,
+    long long [:] pred,
+    long long [:] conn,
+    double[:, :] link_loads
+) noexcept nogil:
     cdef long long i, j, predecessor, connector, node
     cdef long long zones = demand.shape[0]
-    cdef long long N = node_load.shape[0]
-    cdef double value
-    cdef size_t offset, col, core
+
     # Traditional loading, without cascading
     for i in range(zones):
         node = i
