@@ -7,8 +7,6 @@ from typing import Union
 
 import pandas as pd
 
-from aequilibrae.utils.spatialite_utils import connect_spatialite
-
 
 def list_tables_in_db(conn: Connection):
     sql = "SELECT name FROM sqlite_master WHERE type ='table'"
@@ -35,6 +33,7 @@ class commit_and_close:
 
             **missing_ok** (:obj:`bool`): Boolean indicating that the db is not expected to exist yet
         """
+        from aequilibrae.utils.spatialite_utils import connect_spatialite
 
         def get_conn() -> sqlite3.Connection:
             if spatial:
