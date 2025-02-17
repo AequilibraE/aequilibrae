@@ -43,6 +43,7 @@ class TestGraph(TestCase):
         graph = self.project.network.graphs["c"]
         graph.prepare_graph()
         graph.set_graph("distance")
+        graph.set_skimming("distance")
 
     def test_set_graph(self):
         self.graph.set_graph(cost_field="distance")
