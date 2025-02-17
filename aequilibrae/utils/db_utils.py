@@ -1,3 +1,4 @@
+import sqlite3
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -5,6 +6,8 @@ from sqlite3 import Connection, connect
 from typing import Union
 
 import pandas as pd
+
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 def list_tables_in_db(conn: Connection):
@@ -22,7 +25,7 @@ def safe_connect(filepath: PathLike, missing_ok=False):
 class commit_and_close:
     """A context manager for sqlite connections which closes and commits."""
 
-    def __init__(self, db: Union[str, Path, Connection], commit: bool = True, missing_ok: bool = False):
+    def __init__(self, db: Union[str, Path, Connection], commit: bool = True, missing_ok: bool = False, spatial=False):
         """
         :Arguments:
 
@@ -32,9 +35,18 @@ class commit_and_close:
 
             **missing_ok** (:obj:`bool`): Boolean indicating that the db is not expected to exist yet
         """
-        if isinstance(db, str) or isinstance(db, Path):
-            db = safe_connect(db, missing_ok)
-        self.conn = db
+
+        def get_conn() -> sqlite3.Connection:
+            if spatial:
+                if not isinstance(db, (str, PathLike)):
+                    raise Exception("You must provide a database path to connect to spatialite")
+                return connect_spatialite(db, missing_ok)
+            elif isinstance(db, (str, PathLike)):
+                return safe_connect(db, missing_ok)
+            else:
+                return db
+
+        self.conn = get_conn()
         self.commit = commit
 
     def __enter__(self):
@@ -49,9 +61,9 @@ class commit_and_close:
         self.conn.close()
 
 
-def read_and_close(filepath):
+def read_and_close(filepath, spatial=False):
     """A context manager for sqlite connections (alias for `commit_and_close(db,commit=False))`."""
-    return commit_and_close(filepath, commit=False)
+    return commit_and_close(filepath, commit=False, spatial=spatial)
 
 
 def read_sql(sql, filepath, **kwargs):
