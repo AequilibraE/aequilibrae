@@ -35,17 +35,14 @@ class commit_and_close:
         """
         from aequilibrae.utils.spatialite_utils import connect_spatialite
 
-        def get_conn() -> sqlite3.Connection:
-            if spatial:
-                if not isinstance(db, (str, PathLike)):
-                    raise Exception("You must provide a database path to connect to spatialite")
-                return connect_spatialite(db, missing_ok)
-            elif isinstance(db, (str, PathLike)):
-                return safe_connect(db, missing_ok)
-            else:
-                return db
-
-        self.conn = get_conn()
+        if spatial:
+            if not isinstance(db, (str, PathLike)):
+                raise Exception("You must provide a database path to connect to spatialite")
+            self.conn = connect_spatialite(db, missing_ok)
+        elif isinstance(db, (str, PathLike)):
+            self.conn = safe_connect(db, missing_ok)
+        else:
+            self.conn = db
         self.commit = commit
 
     def __enter__(self):
