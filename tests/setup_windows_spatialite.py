@@ -36,4 +36,4 @@ if "WINDOWS" in platform.platform().upper():
         target_dir = Path(root) / d / "x64" / "DLLs"
         if (target_dir / file).exists():
             zipfile.ZipFile(zip_path64).extractall(target_dir)
-            print(f"Replaces {d}")
+            print(f"Replaces {target_dir / file}")
