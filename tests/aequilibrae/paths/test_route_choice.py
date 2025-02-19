@@ -500,9 +500,7 @@ class TestRouteChoice(TestCase):
         conn.close()
 
         matrices = AequilibraeMatrix()
-        matrices.create_from_omx(
-            (pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx")
-        )
+        matrices.create_from_omx((pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx"))
         matrices.computational_view()
 
         for sl_name, v in self.rc.get_select_link_od_matrix_results().items():
