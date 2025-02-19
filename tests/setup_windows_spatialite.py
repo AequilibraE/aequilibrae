@@ -33,10 +33,7 @@ if "WINDOWS" in platform.platform().upper():
     root = "C:/hostedtoolcache/windows/Python/"
     file = "sqlite3.dll"
     for d in listdir(root):
-        direc = Path(d)
-        if direc.is_dir():
-            print(d)
-        target_dir = direc / "x64" / "DLLs"
+        target_dir = Path(root) / d / "x64" / "DLLs"
         if (target_dir / file).exists():
             zipfile.ZipFile(zip_path64).extractall(target_dir)
             print(f"Replaces {d}")
