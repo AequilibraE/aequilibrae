@@ -27,8 +27,8 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt install libsqlite3-mod-spatialite
-        sudo apt install -y libspatialite-dev
-        sudo apt install latexmk fonts-freefont-otf xindy pandoc
+        sudo apt install -y libspatialite-dev pandoc
+        sudo apt install -y latexmk fonts-freefont-otf xindy
         pip install uv
         python -m uv pip install wheel openmatrix pytest
         python -m uv pip install -r requirements.txt
