@@ -153,6 +153,7 @@ html_theme_options = {
         "image_dark": "_static/large_icon.png",
         "link": "https://www.aequilibrae.com/latest/home.html",
     },
+    "collapse_navigation": True,
 }
 
 # The name for this set of Sphinx documents. If None, it defaults to
