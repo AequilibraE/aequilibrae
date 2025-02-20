@@ -28,7 +28,7 @@ jobs:
         sudo apt-get update
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev pandoc
-        sudo apt install -y latexmk fonts-freefont-otf xindy
+        sudo apt install -y latexmk texlive-xetex fonts-freefont-otf xindy
         pip install uv
         python -m uv pip install wheel openmatrix pytest
         python -m uv pip install -r requirements.txt
@@ -69,7 +69,10 @@ jobs:
     - name: Build documentation
       run: |
         jupyter nbconvert --to rst docs/source/distribution_procedures/IPF_benchmark.ipynb
-        sphinx-build -M latexpdf docs/source docs/source/_static -D plot_gallery=False
+        sphinx-build -b latex docs/source docs/source/_static/latex -D plot_gallery=False
+        cd docs/source/_static/latex
+        LATEXMKOPTS="-xelatex" make all-pdf
+        cd ../../../..
         cp large_icon.png docs/source/_static/large_icon.png
         sphinx-build -M html docs/source docs/build
         python -m zipfile -c AequilibraE.zip docs/build
