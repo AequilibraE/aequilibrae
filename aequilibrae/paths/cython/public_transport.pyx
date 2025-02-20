@@ -34,11 +34,17 @@ class HyperpathGenerating:
     """
 
 
-    def __init__(self, edges, tail="tail", head="head", trav_time="trav_time", freq="freq",
-                                                                check_edges=False,
-                                                                skim_cols = None,
-                                                                centroids = None):
-
+    def __init__(
+            self,
+            edges,
+            tail="tail",
+            head="head",
+            trav_time="trav_time",
+            freq="freq",
+            check_edges=False,
+            skim_cols = None,
+            centroids = None
+    ):
         skim_cols = self.check_skim_cols(skim_cols)
 
         edges, skim_cols = self.compute_skim_cols(skim_cols, edges, trav_time)

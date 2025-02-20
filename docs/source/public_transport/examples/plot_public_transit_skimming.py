@@ -10,7 +10,7 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
 # %%
 # .. admonition:: References
-# 
+#
 #   * :doc:`../../public_transport`
 
 # %%
@@ -23,7 +23,7 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 #     * :func:`aequilibrae.paths.TransitAssignment`
 #     * :func:`aequilibrae.matrix.AequilibraeMatrix`
 
-# %% 
+# %%
 # Imports for example construction
 from os.path import join
 from tempfile import gettempdir
@@ -54,17 +54,17 @@ data = Transit(project)
 # %%
 # Graph building
 # --------------
-# Let's build the transit network. We'll disable ``outer_stop_transfers`` and ``walking_edges`` 
+# Let's build the transit network. We'll disable ``outer_stop_transfers`` and ``walking_edges``
 # because Coquimbo doesn't have any parent stations.
-# 
+#
 # For the OD connections we'll use the ``overlapping_regions`` method and create some accurate line geometry later.
-# Creating the graph should only take a moment. By default zoning information is pulled from the project network. 
-# If you have your own zoning information add it using ``graph.add_zones(zones)`` then ``graph.create_graph()``. 
+# Creating the graph should only take a moment. By default zoning information is pulled from the project network.
+# If you have your own zoning information add it using ``graph.add_zones(zones)`` then ``graph.create_graph()``.
 
 graph = data.create_graph(
-    with_outer_stop_transfers=False, 
-    with_walking_edges=False, 
-    blocking_centroid_flows=False, 
+    with_outer_stop_transfers=False,
+    with_walking_edges=False,
+    blocking_centroid_flows=False,
     connector_method="overlapping_regions"
 )
 

@@ -1,8 +1,8 @@
-""" 
+"""
 An implementation of Spiess and Florian's hyperpath generating algorithm.
 
-reference: Spiess, H. and Florian, M. (1989). Optimal strategies: A new 
-assignment model for transit networks. Transportation Research Part B 23(2), 
+reference: Spiess, H. and Florian, M. (1989). Optimal strategies: A new
+assignment model for transit networks. Transportation Research Part B 23(2),
 83-102.
 """
 
@@ -27,9 +27,9 @@ cdef DATATYPE_t INF_FREQ = 1.0e+20
 INF_FREQ_PY = INF_FREQ
 
 # smallest frequency
-# WARNING: this must be small but not too small 
+# WARNING: this must be small but not too small
 # 1 / MIN_FREQ << DATATYPE_INF
-cdef DATATYPE_t MIN_FREQ 
+cdef DATATYPE_t MIN_FREQ
 MIN_FREQ = 1.0 / INF_FREQ
 MIN_FREQ_PY =  MIN_FREQ
 
@@ -62,7 +62,7 @@ include 'pq_4ary_heap.pyx'  # priority queue
 cdef void _coo_tocsc_uint32(
     cnp.uint32_t [::1] Ai,
     cnp.uint32_t [::1] Aj,
-    cnp.uint32_t [::1] Ax,   
+    cnp.uint32_t [::1] Ax,
     cnp.uint32_t [::1] Bp,
     cnp.uint32_t [::1] Bi,
     cnp.uint32_t [::1] Bx) noexcept nogil:
@@ -110,19 +110,19 @@ cdef void argsort(cnp.float64_t *data, cnp.uint32_t *order, size_t n) noexcept n
 
     # Allocate index tracking array.
     cdef IndexedElement *order_struct = <IndexedElement *> malloc(n * sizeof(IndexedElement))
-    
+
     # Copy data into index tracking array.
     for i in range(n):
         order_struct[i].index = i
         order_struct[i].value = data[i]
-        
+
     # Sort index tracking array.
     qsort(<void *> order_struct, n, sizeof(IndexedElement), _compare)
-    
+
     # Copy indices from index tracking array to output array.
     for i in range(n):
         order[i] = <cnp.uint32_t>order_struct[i].index
-        
+
     # Free index tracking array.
     free(order_struct)
 
@@ -181,16 +181,16 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count) noexcep
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
 cdef void compute_SF_in_parallel(
-    cnp.uint32_t[::1] indptr_view, # column csc format
-    cnp.uint32_t[::1] edge_idx_view, 
+    cnp.uint32_t[::1] indptr_view,  # column csc format
+    cnp.uint32_t[::1] edge_idx_view,
     cnp.float64_t[::1] trav_time_view,
     cnp.float64_t[::1] freq_view,
     cnp.uint32_t[::1] tail_view,
     cnp.uint32_t[::1] head_view,
-    cnp.uint32_t[:] d_vert_ids_view, # destination vertices
-    cnp.uint32_t[:] destination_vertex_indices_view, # in public_transport.run case, same as d_vert_ids_view in .assign are the unique destination values
-    cnp.uint32_t[::1] o_vert_ids_view, # origin vertices
-    cnp.float64_t[::1] demand_vls_view, # volume
+    cnp.uint32_t[:] d_vert_ids_view,  # destination vertices
+    cnp.uint32_t[:] destination_vertex_indices_view,  # in public_transport.run case, same as d_vert_ids_view in .assign are the unique destination values
+    cnp.uint32_t[::1] o_vert_ids_view,  # origin vertices
+    cnp.float64_t[::1] demand_vls_view,  # volume
     cnp.float64_t[::1] edge_volume_view,
     size_t vertex_count,
     size_t edge_count,
@@ -205,11 +205,6 @@ cdef void compute_SF_in_parallel(
     size_t n_skim_cols,
 ) noexcept nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
-
-    with gil:
-        if skimming:
-            print(f'skim_matrix shape: {skim_matrix.shape}')
-            #print(f'skim_col_vec {skim_col_view.shape}')
     cdef:
         cnp.uint32_t *thread_demand_origins
         cnp.float64_t *thread_demand_values
@@ -230,9 +225,8 @@ cdef void compute_SF_in_parallel(
         # When writing all threads must increment!
         cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
 
-        # We malloc this memory here, then use it as the 0th thread's thread_u_i_vec to allow us to return it
         cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(num_threads * sizeof(cnp.float64_t) * vertex_count)
-        
+
         cnp.float64_t *skim_i_vec_out = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * vertex_count * n_skim_cols)
 
         int i  # openmp on windows requires iterator variable have signed type
@@ -245,7 +239,7 @@ cdef void compute_SF_in_parallel(
         # we can safely read and write without collisions.
         thread_edge_volume  = &edge_volume[threadid() * edge_count]
         thread_u_i_vec = &u_i_vec_out[threadid() * vertex_count]
-        
+
         thread_skim_i_vec = &skim_i_vec_out[threadid() * vertex_count * n_skim_cols]
 
         thread_f_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
@@ -358,7 +352,7 @@ cdef void compute_SF_in(
         size_t edge_count = <size_t>tail_indices.shape[0]
         DATATYPE_t u_r, v_a_new, v_i, u_i
         size_t i, j, h_a_count
-        cnp.uint32_t vert_idx 
+        cnp.uint32_t vert_idx
         int cent_dest
 
     # initialization
@@ -384,7 +378,7 @@ cdef void compute_SF_in(
         csc_edge_idx,
         c_a_vec,
         f_a_vec,
-        tail_indices, 
+        tail_indices,
         u_i_vec,
         f_i_vec,
         u_j_c_a_vec,
@@ -423,7 +417,7 @@ cdef void compute_SF_in(
     u_r = DATATYPE_INF
     for i in range(demand_size):
         vert_idx = demand_indices[i] # origin vertix id
-        v_i_vec[<size_t>vert_idx] = demand_values[i] 
+        v_i_vec[<size_t>vert_idx] = demand_values[i]
         u_i = u_i_vec[<size_t>vert_idx]
         if u_i < u_r:
             u_r = u_i
@@ -471,7 +465,7 @@ cdef void compute_SF_in(
 @cython.cdivision(True)
 @cython.initializedcheck(False)
 cdef void _SF_in_first_pass_full(
-    cnp.uint32_t[::1] csc_indptr, 
+    cnp.uint32_t[::1] csc_indptr,
     cnp.uint32_t[::1] csc_edge_idx,
     cnp.float64_t[::1] c_a_vec, # travel time
     cnp.float64_t[::1] f_a_vec, # freq
@@ -500,13 +494,13 @@ cdef void _SF_in_first_pass_full(
         cnp.float64_t *skim_i_new_vec = <cnp.float64_t *> malloc(n_skim_cols * sizeof(cnp.float64_t))
         cnp.float64_t *skim_j_new_vec = <cnp.float64_t *> malloc(n_skim_cols * sizeof(cnp.float64_t))
 
-    # initialization of the heap elements 
+    # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
     init_heap(&pqueue, <size_t>edge_count)
 
-    # only the incoming edges of the target vertex are inserted into the 
+    # only the incoming edges of the target vertex are inserted into the
     # priority queue
-    for i in range(<size_t>csc_indptr[<size_t>dest_vert_index], 
+    for i in range(<size_t>csc_indptr[<size_t>dest_vert_index],
         <size_t>csc_indptr[<size_t>(dest_vert_index + 1)]):
         edge_idx = csc_edge_idx[i]
         insert(&pqueue, edge_idx, c_a_vec[edge_idx])
@@ -536,13 +530,13 @@ cdef void _SF_in_first_pass_full(
             # update u_i
             f_a = f_a_vec[edge_idx]
 
-            u_i_new = (beta + f_a * u_j_c_a) / (f_i + f_a) 
+            u_i_new = (beta + f_a * u_j_c_a) / (f_i + f_a)
             u_i_vec[tail_vert_idx] = u_i_new
 
             for j in range(<size_t>n_skim_cols):
 
                 skim_i = skim_i_vec[tail_vert_idx + j * vertex_count]
-                skim_j = skim_j_vec[edge_idx + j * edge_count] 
+                skim_j = skim_j_vec[edge_idx + j * edge_count]
 
                 if (u_i < DATATYPE_INF) | (f_i > 0.0):
                     beta_skim = f_i * skim_i
@@ -553,7 +547,7 @@ cdef void _SF_in_first_pass_full(
 
                 skim_i_vec[tail_vert_idx  + j * vertex_count] = skim_i_new
                 skim_i_new_vec[j] = skim_i_new
-   
+
             # update f_i
             f_i_vec[tail_vert_idx] = f_i + f_a
 
@@ -568,7 +562,7 @@ cdef void _SF_in_first_pass_full(
                 skim_i_new_vec[j] = skim_i_new
 
         # loop on incoming edges
-        for i in range(<size_t>csc_indptr[tail_vert_idx], 
+        for i in range(<size_t>csc_indptr[tail_vert_idx],
             <size_t>csc_indptr[tail_vert_idx + 1]):
 
             edge_idx = csc_edge_idx[i]
@@ -585,7 +579,7 @@ cdef void _SF_in_first_pass_full(
                 if edge_state == NOT_IN_HEAP:
 
                     insert(&pqueue, edge_idx, u_j_c_a)
-                    u_j_c_a_vec[edge_idx] = u_j_c_a 
+                    u_j_c_a_vec[edge_idx] = u_j_c_a
                     for j in range(<size_t>n_skim_cols):
                         skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
 

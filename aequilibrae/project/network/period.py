@@ -26,7 +26,7 @@ class Period(SafeClass):
         self._table = "periods"
 
     def __repr__(self):
-        return str(self.__dict__)
+        return f"{self.__class__.__name__}(period_id={self.period_id})"
 
     def save(self):
         """Saves period to database"""
