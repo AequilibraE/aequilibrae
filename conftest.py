@@ -13,6 +13,7 @@ import numpy as np
 from shapely.geometry import Polygon
 
 from aequilibrae import Project
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
@@ -110,6 +111,8 @@ def doctest_fixtures(doctest_namespace, create_path, tmp_path_factory):
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
     doctest_namespace["create_example"] = create_example
     doctest_namespace["Project"] = Project
+    doctest_namespace["Transit"] = Transit
+    doctest_namespace["AequilibraeMatrix"] = AequilibraeMatrix
 
     doctest_namespace["os"] = os
     doctest_namespace["pd"] = pd

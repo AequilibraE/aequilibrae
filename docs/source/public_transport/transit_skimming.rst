@@ -7,43 +7,80 @@ structure of the :ref:`transit_graph`, so we recommend reading that section firs
 As it is the case with traffic graphs, it is possible to perform skimming on any field of the transit
 graph, so the effort consists basically of defining consistent fields for skimming.
 
-.. code-block:: python
+.. doctest::
+
+    >>> from aequilibrae.paths import TransitAssignment, TransitClass
+
+    >>> project = create_example(project_path, "coquimbo")
+    >>> data = Transit(project)
+
+    >>> graph = data.create_graph(
+    ...     with_outer_stop_transfers=False,
+    ...     with_walking_edges=False,
+    ...     blocking_centroid_flows=False,
+    ...     connector_method="overlapping_regions",
+    ... )
+    >>> project.network.build_graphs()
+
+    >>> graph.create_line_geometry(method="direct", graph="c")
+    
+    >>> transit_graph = graph.to_transit_graph()
+
+    # We mock a demand matrix
+    >>> num_zones = len(transit_graph.centroids)
+
+    >>> mat = AequilibraeMatrix()
+    >>> mat.create_empty(zones=num_zones, matrix_names=["pt"], memory_only=True)
+    >>> mat.index = transit_graph.centroids[:]
+    >>> mat.matrices[:, :, 0] = np.full((num_zones, num_zones), 1.0)
+    >>> mat.computational_view()
 
     # We can add fields to our graph
     >>> transit_graph.graph["boardings"] = transit_graph.graph["link_type"].apply(lambda x: 1 if x == "boarding" else 0)
 
     >>> transit_graph.graph["in_vehicle_trav_time"] = np.where(
-            transit_graph.graph["link_type"].isin(["on-board", "dwell"]), 0, transit_graph.graph["trav_time"]
-        )
+    ...     transit_graph.graph["link_type"].isin(["on-board", "dwell"]), 0, transit_graph.graph["trav_time"]
+    ... )
 
     >>> transit_graph.graph["egress_trav_time"] = np.where(
-            transit_graph.graph["link_type"] != "egress_connector", 0, transit_graph.graph["trav_time"]
-        )
+    ...     transit_graph.graph["link_type"] != "egress_connector", 0, transit_graph.graph["trav_time"]
+    ... )
 
     >>> transit_graph.graph["access_trav_time"] = np.where(
-            transit_graph.graph["link_type"] != "access_connector", 0, transit_graph.graph["trav_time"]
-        )
+    ...     transit_graph.graph["link_type"] != "access_connector", 0, transit_graph.graph["trav_time"]
+    ... )
 
     >>> skim_cols = ["trav_time", "boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
+
+    >>> assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
+    
+    >>> assig = TransitAssignment()
+    >>> assig.add_class(assigclass)
+    >>> assig.set_time_field("trav_time")
+    >>> assig.set_frequency_field("freq")
+
+    >>> assig.set_skimming_fields(skim_cols) # Skimming must be set after a transit assignment class is added
+
+    >>> assig.set_algorithm("os")
+    >>> assigclass.set_demand_matrix_core("pt")
+
+    >>> assig.execute() # doctest: +SKIP
+
+    >>> project.close()
+
 
 More sophisticated skimming is also possible, such as skimming related to specific routes and/or modes. In this case,
 the logit persists, and it is necessary to define fields that represent the desired skimming metrics. One example is
 skimming travel time in rail only.
 
-.. code-block:: python
+.. doctest::
 
     >>> transit_graph.graph["rail_trav_time"] = np.where(
-            transit_graph.graph["link_type"].isin(["on-board", "dwell"]), 0, transit_graph.graph["trav_time"]
-        )
+    ...      transit_graph.graph["link_type"].isin(["on-board", "dwell"]), 0, transit_graph.graph["trav_time"]
+    ... ) # doctest: +SKIP
 
-    >>> all_routes = transit.get_table("routes")
-    >>> rail_ids = all_routes.query("route_type in [1, 2]").route_id.to_numpy()
+    >>> all_routes = transit.get_table("routes") # doctest: +SKIP
+    >>> rail_ids = all_routes.query("route_type in [1, 2]").route_id.to_numpy() # doctest: +SKIP
 
     # Assign zero travel time to all non-rail links
-    >>> transit_graph.graph.loc[~transit_graph.graph.line_id.isin(rail_ids),"rail_trav_time"] =0
-
-    >>> assig = TransitAssignment()
-
-    # Skimming must be set after a transit assignment class is added
-    >>> #assig.add_class(assigclass)
-    >>> assig.set_skimming_fields(skim_cols[:i])
+    >>> transit_graph.graph.loc[~transit_graph.graph.line_id.isin(rail_ids),"rail_trav_time"] =0 # doctest: +SKIP
