@@ -95,61 +95,52 @@ res.path
 res.milepost
 
 # %%
-# Additionally we could also provide ``early_exit=True`` or ``a_star=True`` to ``compute_path``
-# to adjust its path finding behaviour. Providing ``early_exit=True`` will allow the path finding 
-# to quit once it's discovered the destination, this means it will perform better for ODs that are 
-# topographically close. However, exiting early may cause subsequent calls to ``update_trace``
-# to recompute the tree in cases where it usually wouldn't. ``a_star=True`` has precedence of ``early_exit=True``.
+# Additionally, you can also provide ``early_exit=True`` or ``a_star=True`` to `compute_path` to 
+# adjust its path-finding behavior.
+# 
+# Providing ``early_exit=True`` allows you to quit the path-finding procedure once it discovers 
+# the destination. This setup works better for topographically close origin-destination pairs. 
+# However, exiting early may cause subsequent calls to ``update_trace`` to recompute the tree 
+# in cases where it typically wouldn't.
 res = graph.compute_path(32343, 22041, early_exit=True)
 
 # %%
-# If you'd prefer to find a potentially non-optimal path to the destination faster provide 
-# ``a_star=True`` to use `A*` with a heuristic. 
-# With this method ``update_trace`` will always recompute the path.
+# If you prefer to find a potentially non-optimal path to the destination faster, 
+# provide ``a_star=True`` to use `A*` with a heuristic. This method always recomputes the 
+# path's nodes, links, skims, and mileposts with ``update_trace``. 
+# Note that a_star takes precedence over early_exit.
 res = graph.compute_path(32343, 22041, a_star=True)
 
 # %%
-# By default a equirectangular heuristic is used. We can view the available heuristics via
+# If you are using `a_star`, it is possible to use different heuristics to compute the path. 
+# By default, an equirectangular heuristic is used, and we can view the available heuristics via:
 res.get_heuristics()
 
 # %%
-# If you'd like the more accurate, but slower, but more accurate haversine heuristic you can set it using
+# If you prefer a more accurate but slower heuristic, you can choose "haversine", by setting:
 res = graph.compute_path(32343, 22041, a_star=True, heuristic="haversine")
 
 # %%
-# If we want to compute the path for a different destination and the same origin, we can just do this.
-# It is way faster when you have large networks.
-# Here we'll adjust our path to the University of La Serena. 
-# Our previous early exit and `A*` settings will persist with calls to ``update_trace``. 
-# If you'd like to adjust them for subsequent path re-computations set the ``res.early_exit`` 
-# and ``res.a_star`` attributes.
+# Suppose you want to adjust the path to the University of La Serena instead of Fort Lambert. 
+# It is possible to adjust the existing path computation for this alteration. The following code 
+# allows both `early_exit` and `A*` settings to persist when calling ``update_trace``. If you’d 
+# like to adjust them for subsequent path re-computations set the ``res.early_exit`` and 
+# ``res.a_star`` attributes. Notice that this procedure is much faster when you have large networks.
+
 res.a_star = False
 res.update_trace(73131)
 
-# %%
 res.path_nodes
 
 # %%
 # If you want to show the path in Python.
 # 
 # We do NOT recommend this, though... It is very slow for real networks.
-import matplotlib.pyplot as plt
-from shapely.ops import linemerge
+links = project.network.links.data.set_index("link_id")
+links = links.loc[res.path]
 
 # %%
-links = project.network.links
-
-# We plot the entire network
-curr = project.conn.cursor()
-curr.execute("Select link_id from links;")
-
-for lid in curr.fetchall():
-    geo = links.get(lid[0]).geometry
-    plt.plot(*geo.xy, color="red")
-
-path_geometry = linemerge(links.get(lid).geometry for lid in res.path)
-plt.plot(*path_geometry.xy, color="blue", linestyle="dashed", linewidth=2)
-plt.show()
+links.explore(color="blue", style_kwds={'weight':5})
 
 # %%
 project.close()
