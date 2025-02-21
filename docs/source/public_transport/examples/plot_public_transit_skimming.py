@@ -111,6 +111,7 @@ assig.add_class(assigclass)
 # Set assignment
 assig.set_time_field("trav_time")
 assig.set_frequency_field("freq")
+assig.set_skimming_fields(["boardings"])
 assig.set_algorithm("os")
 assigclass.set_demand_matrix_core("pt")
 

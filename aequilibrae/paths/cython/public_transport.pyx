@@ -349,7 +349,7 @@ class HyperpathGenerating:
         skim_cols = self._skim_cols_names
         if self._is_travel_time:
             skim_cols = [self._trav_time_name] + skim_cols
-            n_skim_cols = n_skim_cols + 1 # n_skim_cols += 1
+            n_skim_cols = n_skim_cols + 1
 
         self.skim_matrix = np.zeros((n_centroids, n_centroids, n_skim_cols))
 
