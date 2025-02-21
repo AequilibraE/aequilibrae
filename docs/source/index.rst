@@ -13,7 +13,7 @@
 Python
 ======
 
-**Download documentation**: :download:`HTML <https://www.aequilibrae.com/latest/aequilibrae.zip>` | :download:`PDF <_static/latex/aequilibrae.pdf>`
+**Download documentation**: :download:`HTML <https://www.aequilibrae.com/latest/python/aequilibrae.zip>` | :download:`PDF <_static/latex/aequilibrae.pdf>`
 
 **Previous versions**: documentation for all AequilibraE's versions are available 
 :doc:`here <useful_links/version_history>`.
