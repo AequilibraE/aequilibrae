@@ -127,7 +127,7 @@ cdef void argsort(cnp.float64_t *data, cnp.uint32_t *order, size_t n) noexcept n
     free(order_struct)
 
 
-cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count) noexcept :
+cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
     """
     Convert an edge dataframe in COO format into CSC format.
 

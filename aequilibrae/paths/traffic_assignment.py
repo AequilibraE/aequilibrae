@@ -1075,10 +1075,15 @@ class TransitAssignment(AssignmentBase):
 
     def set_skimming_fields(self, skimming_fields: list[str] = None) -> None:
         """
-        Sets the graph field that contains the frequency -> e.g. 'freq'
+        Sets the skimming fields for the transit assignment.
+
+        Also accepts predefined skimming fields 'boardings', 'in_vehicle_trav_time', 'egress_trav_time',
+        'access_trav_time' and 'waiting_time'.
+
+        Provide no argument to disable.
 
         :Arguments:
-            **frequency_field** (:obj:`str`): Field name
+            **skimming_fields** (:obj:`list[str]`): Optional list of field names, or predefined skimming type.
         """
 
         if skimming_fields:
