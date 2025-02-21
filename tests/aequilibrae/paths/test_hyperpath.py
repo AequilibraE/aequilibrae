@@ -469,20 +469,12 @@ class TestHyperPath(TestCase):
         columns = ["boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
         for col in columns:
             with self.subTest(col=col):
-                hp = HyperpathGenerating(
-                    self.edges,
-                    skim_cols=[col],
-                    centroids=self.centroids
-                )
+                hp = HyperpathGenerating(self.edges, skim_cols=[col], centroids=self.centroids)
 
                 self.assertIn(col, hp._edges.columns, "requested column missing from edges")
 
         with self.subTest(col=col):
-            hp = HyperpathGenerating(
-                self.edges,
-                skim_cols=["waiting_time"],
-                centroids=self.centroids
-            )
+            hp = HyperpathGenerating(self.edges, skim_cols=["waiting_time"], centroids=self.centroids)
 
             self.assertNotIn("waiting_time", hp._edges.columns, "waiting time isn't a real column")
             self.assertNotIn("boardings", hp._edges.columns, "boardings isn't required for waiting time skims")
@@ -497,9 +489,7 @@ class TestHyperPath(TestCase):
         self._setUp(network="SF")
 
         hp = HyperpathGenerating(
-            self.edges,
-            skim_cols=["boardings", "transfers", "waiting_time"],
-            centroids=self.centroids
+            self.edges, skim_cols=["boardings", "transfers", "waiting_time"], centroids=self.centroids
         )
 
         hp.assign(
@@ -521,7 +511,11 @@ class TestHyperPath(TestCase):
         np.testing.assert_allclose(mats["boardings"], np.array([[0, 1], [0, 0]]))
 
         # Some routes transfer
-        np.testing.assert_allclose(mats["transfers"], np.array([[0, 0.5], [0, 0]]))   # Why is this 0.5 not 0.66?
+        np.testing.assert_allclose(mats["transfers"], np.array([[0, 0.5], [0, 0]]))  # Why is this 0.5 not 0.66?
 
-        np.testing.assert_allclose(mats["in_vehicle_trav_time"], np.array([[0, 27.75 * 60.0 - mats["waiting_time"][0, 1]], [0, 0]]))
-        np.testing.assert_allclose(mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [max, 0]]))
+        np.testing.assert_allclose(
+            mats["in_vehicle_trav_time"], np.array([[0, 27.75 * 60.0 - mats["waiting_time"][0, 1]], [0, 0]])
+        )
+        np.testing.assert_allclose(
+            mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [max, 0]])
+        )
