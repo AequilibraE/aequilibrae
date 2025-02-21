@@ -242,7 +242,7 @@ g.head()
 # Here we'll quickly visualise what our sub-area is looking like.
 # We'll plot the polygon from our zoning system and the links that it cuts.
 map = inner_links.explore(color="red", style_kwds={"weight": 4})
-subarea_zone.add_to(m)
+subarea_zone.add_to(map)
 map
 
 # %%
