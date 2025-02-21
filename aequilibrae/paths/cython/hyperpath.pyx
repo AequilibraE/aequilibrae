@@ -232,7 +232,7 @@ cdef void compute_SF_in_parallel(
         int i  # openmp on windows requires iterator variable have signed type
         size_t k, j, destination_vertex_index
 
-    with parallel(num_threads=num_threads):
+    with parallel(num_threads=min(num_threads, d_vert_ids_view.shape[0])):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
         thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
@@ -298,6 +298,7 @@ cdef void compute_SF_in_parallel(
         free(thread_v_i_vec)
         free(thread_h_a_vec)
         free(thread_edge_indices)
+        free(thread_skim_j_vec)
 
     # Accumulate results into output buffer. This could parallelised over the output indexes but
     # the lose of spacial locality may not be worth it.
@@ -362,7 +363,7 @@ cdef void compute_SF_in(
         v_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
-    for i in range(vertex_count*n_skim_cols):
+    for i in range(vertex_count * n_skim_cols):
         skim_i_vec[i] = 0.0
 
     for i in range(edge_count):
@@ -436,11 +437,11 @@ cdef void compute_SF_in(
             h_a_count += <size_t>h_a_vec[i]
 
         # Sort the links with decreasing order of u_j + c_a.
-        # Because the sort function sorts in increasing order, we sort a 
-        # transformed array, multiplied by -1, and set the items 
-        # corresponding to edges that are not in the hyperpath to a 
+        # Because the sort function sorts in increasing order, we sort a
+        # transformed array, multiplied by -1, and set the items
+        # corresponding to edges that are not in the hyperpath to a
         # positive value (they will be at the end of the sorted array).
-        # The items corresponding to edges that are in the hyperpath have a 
+        # The items corresponding to edges that are in the hyperpath have a
         # negative transformed value.
         for i in range(<size_t>edge_count):
             if h_a_vec[i] == 0: # if the edge is not on the hyperpath
@@ -591,6 +592,8 @@ cdef void _SF_in_first_pass_full(
                         skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
 
     free_heap(&pqueue)
+    free(skim_i_new_vec)
+    free(skim_j_new_vec)
 
 
 @cython.boundscheck(False)
