@@ -118,6 +118,9 @@ assigclass.set_demand_matrix_core("pt")
 # Perform the assignment for the transit classes added
 assig.execute()
 
+# We can use the get_skim_results() method to retrieve the skims
+assig.get_skim_results()["pt"].matrix["boardings"].sum()
+
 # %%
 # Saving results
 # --------------

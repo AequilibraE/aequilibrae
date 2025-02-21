@@ -141,6 +141,14 @@ class AssignmentBase(ABC):
         self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
 
+    def get_skim_results(self) -> list:
+        """Prepares the assignment skim results for all classes
+
+        :Returns:
+            **skim list** (:obj:`list`): Lists of all skims with the results for each class
+        """
+        return {cls._id: cls.results.skims for cls in self.classes}
+
 
 class TrafficAssignment(AssignmentBase):
     """Traffic assignment class.
@@ -1044,14 +1052,6 @@ class TransitAssignment(AssignmentBase):
         ]
 
         return pd.concat(assig_results, axis=1)
-
-    def get_skim_results(self) -> list:
-        """Prepares the assignment skim results for all classes
-
-        :Returns:
-            **skim list** (:obj:`list`): Lists of all skims with the results for each class
-        """
-        return [cls.results.get_load_skim_results() for cls in self.classes]
 
     def set_time_field(self, time_field: str) -> None:
         """

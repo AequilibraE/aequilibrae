@@ -232,7 +232,7 @@ cdef void compute_SF_in_parallel(
         int i  # openmp on windows requires iterator variable have signed type
         size_t k, j, destination_vertex_index
 
-    with parallel(num_threads=min(num_threads, d_vert_ids_view.shape[0])):
+    with parallel(num_threads=min(num_threads, centroids.shape[0] if skimming else d_vert_ids_view.shape[0])):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
         thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
