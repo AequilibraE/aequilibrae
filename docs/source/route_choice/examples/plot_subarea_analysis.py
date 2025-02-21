@@ -1,11 +1,11 @@
 """
 .. _example_usage_sub_area_analysis:
 
-Route Choice with sub-area analysis
-===================================
+Route Choice with automated sub-area analysis
+=============================================
 
-In this example, we show how to perform sub-area analysis using route choice assignment, for a city in La Serena
-Metropolitan Area in Chile.
+In this example, we show how to perform sub-area analysis using route choice assignment, 
+for a city in La Serena Metropolitan Area in Chile.
 
 .. admonition:: References
  
@@ -19,15 +19,14 @@ Metropolitan Area in Chile.
     * :func:`aequilibrae.paths.SubAreaAnalysis`
     * :func:`aequilibrae.matrix.AequilibraeMatrix`
 """
+
 # %%
 
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
-import itertools
 
-import pandas as pd
 import numpy as np
 import folium
 
@@ -164,73 +163,53 @@ rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=Fal
 rc.execute(perform_assignment=True)
 
 # %%
-# And plot the link loads for easy viewing
-subarea_zone = folium.Polygon(
-    locations=[(x[1], x[0]) for x in zones.unary_union.boundary.coords],
-    fill_color="blue",
-    fill_opacity=0.5,
-    fill=True,
-    stroke=False,
-)
-
-def plot_results(link_loads):
-    link_loads = link_loads[link_loads.tot > 0]
-    max_load = link_loads["tot"].max()
-    links = project.network.links.data
-    loaded_links = links.merge(link_loads, on="link_id", how="inner")
-
-    loads_lyr = folium.FeatureGroup("link_loads")
-
-    # Maximum thickness we would like is probably a 10, so let's make sure we don't go over that
-    factor = 10 / max_load
-
-    # Let's create the layers
-    for _, rec in loaded_links.iterrows():
-        points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
-        points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-        # we need to take from x/y to lat/long
-        points = [[x[1], x[0]] for x in eval(points)]
-        _ = folium.vector_layers.PolyLine(
-            points,
-            tooltip=f"link_id: {rec.link_id}, Flow: {rec.tot:.3f}",
-            color="red",
-            weight=factor * rec.tot,
-        ).add_to(loads_lyr)
-    long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
-
-    map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
-    loads_lyr.add_to(map_osm)
-    folium.LayerControl().add_to(map_osm)
-    return map_osm
-
-
-map = plot_results(rc.get_load_results()["demand"])
-subarea_zone.add_to(map)
-map
-
-# %%
-# Sub-area further preparation
-# ````````````````````````````
-
-# %%
-# We take the union of this GeoDataFrame as our polygon.
+# Let's take the union of the zones GeoDataFrame as a polygon
 poly = zones.union_all()
 poly
 
 # %%
+# And plot the link loads for easy viewing
+subarea_zone = folium.Polygon(
+    locations=[(x[1], x[0]) for x in poly.boundary.coords],
+    fill_color="blue",
+    fill_opacity=0.1,
+    fill=True,
+    weight=1,
+)
+
+# %%
+# Prepare our data for plotting
+loads = rc.get_load_results()["demand"]
+link_loads = loads[loads.tot > 0]
+max_load = link_loads["tot"].max()
+links = project.network.links.data
+loaded_links = links.merge(link_loads, on="link_id", how="inner")
+factor = 10 / max_load
+
+# %%
+m = loaded_links.explore(
+    color="red",
+    style_kwds={
+        "style_function": lambda x: {
+            "weight": x["properties"]["tot"] * factor,
+        }
+    },
+)
+
+subarea_zone.add_to(m)
+m
+
+# %%
+# Sub-area further preparation
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # It's useful later on to know which links from the network cross our polygon.
 links = project.network.links.data
 inner_links = links[links.crosses(poly.boundary)].sort_index()
 inner_links.head()
 
 # %%
-# As well as which nodes are interior.
-nodes = project.network.nodes.data.set_index("node_id")
-inside_nodes = nodes.sjoin(zones, how="inner").sort_index()
-inside_nodes.head()
-
-# %%
-# Here we filter those network links to graph links, dropping any dead ends and creating a `link_id, dir` multi-index.
+# Let's filter those network links to graph links, dropping any dead ends and creating a `link_id`,
+# `dir` multi-index.
 g = (
     graph.graph.set_index("link_id")
     .loc[inner_links.link_id]
@@ -241,28 +220,8 @@ g = (
 g.head()
 
 # %%
-# Sub-area visualisation
-# ``````````````````````
-
-# %%
-# Here we'll quickly visualise what out sub-area is looking like. We'll plot the polygon from our zoning system and the
-# links that it cuts.
-points = [(link_id, list(x.coords)) for link_id, x in zip(inner_links.link_id, inner_links.geometry)]
-subarea_layer = folium.FeatureGroup("Cut links")
-
-for link_id, line in points:
-    _ = folium.vector_layers.PolyLine(
-        [(x[1], x[0]) for x in line],
-        tooltip=f"link_id: {link_id}",
-        color="red",
-    ).add_to(subarea_layer)
-
-long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
-
-map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
-
-subarea_zone.add_to(map_osm)
-
-subarea_layer.add_to(map_osm)
-_ = folium.LayerControl().add_to(map_osm)
-map_osm
+# Here we'll quickly visualise what our sub-area is looking like.
+# We'll plot the polygon from our zoning system and the links that it cuts.
+m = inner_links.explore(color="red", style_kwds={"weight": 4})
+subarea_zone.add_to(m)
+m
