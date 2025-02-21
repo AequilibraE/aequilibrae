@@ -386,6 +386,7 @@ class TestHyperPath(TestCase):
 
         elif network == "SF":
             self.edges, self.demand = create_SF_network(dwell_time=dwell_time)
+            self.centroids = np.array([0, 12])
 
         else:
             raise KeyError(f'Unknown network type "{network}"')
@@ -471,7 +472,7 @@ class TestHyperPath(TestCase):
                 hp = HyperpathGenerating(
                     self.edges,
                     skim_cols=[col],
-                    centroids=np.array([0, 12])
+                    centroids=self.centroids
                 )
 
                 self.assertIn(col, hp._edges.columns, "requested column missing from edges")
@@ -480,7 +481,7 @@ class TestHyperPath(TestCase):
             hp = HyperpathGenerating(
                 self.edges,
                 skim_cols=["waiting_time"],
-                centroids=np.array([0, 12])
+                centroids=self.centroids
             )
 
             self.assertNotIn("waiting_time", hp._edges.columns, "waiting time isn't a real column")
@@ -498,7 +499,7 @@ class TestHyperPath(TestCase):
         hp = HyperpathGenerating(
             self.edges,
             skim_cols=["boardings", "transfers", "waiting_time"],
-            centroids=np.array([0, 12])
+            centroids=self.centroids
         )
 
         hp.assign(

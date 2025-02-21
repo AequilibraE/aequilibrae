@@ -173,12 +173,6 @@ class HyperpathGenerating:
 
         return skim_cols
 
-    def drop_attribute(self, attr_name: str):
-        try:
-            delattr(self, attr_name)
-        except AttributeError:
-            print(f"Attribute '{attr_name}' does not exist.")
-
     def _update_od_values(self, origin_column: np.array, destination_column: np.array,
                                 demand_column: np.array):
 
@@ -201,60 +195,13 @@ class HyperpathGenerating:
 
         return centroids_origin_column, centroids_destination_column, centroids_demand
 
-    def run(self, origin, destination, volume, return_inf=False):
-        # column storing the resulting edge volumes
-        self._edges["volume"] = 0.0
-        self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
-
-        # input check
-        if type(origin) is not list:
-            origin = [origin]
-        if type(volume) is not list:
-            volume = [volume]
-        assert len(origin) == len(volume)
-
-        for i, item in enumerate(origin):
-            self._check_vertex_idx(item)
-            self._check_volume(volume[i])
-        self._check_vertex_idx(destination)
-        assert isinstance(return_inf, bool)
-
-        o_vert_ids = np.array(origin, dtype=np.uint32)
-        d_vert_ids = np.array([destination], dtype=np.uint32)
-        demand_vls = np.array(volume, dtype=DATATYPE_PY)
-
-        destination_vertex_indices = d_vert_ids  # Only one index allowed so must be unique
-        assert destination_vertex_indices.shape[0] == 1, "To output travel time there must only be one destination"
-
-        n_centroids = self._centroids.shape[0]
-        self.skim_matrix = np.zeros((n_centroids, n_centroids, 1))
-
-        compute_SF_in_parallel(
-            self._indptr[:],
-            self._edge_idx[:],
-            self._trav_time[:],
-            self._freq[:],
-            self._tail[:],
-            self._head[:],
-            d_vert_ids[:],
-            destination_vertex_indices[:],
-            o_vert_ids[:],
-            demand_vls[:],
-            self._edges["volume"].values,
-            self.vertex_count,
-            self._edges["volume"].shape[0],
-            1,  # Single destination so no reason to parallelise
-            self._skim_cols[:,:],
-            self.u_i_vec,
-            self.skim_matrix,
-            self._centroids[:],
-            self._centroids_idx_pos[:],
-            False,
-            self._is_travel_time,
-            0
+    def run(self, origin, destination, volume):
+        self.assign(
+            np.array([origin]),
+            np.array([destination]),
+            np.array([volume]),
+            threads=1
         )
-
-        self.drop_attribute('skim_matrix')
 
     def _check_vertex_idx(self, idx):
         assert isinstance(idx, int)
@@ -399,7 +346,7 @@ class HyperpathGenerating:
             self.skim_matrix.matrices[:, :, :] = arr.transpose(1, 2, 0)[:, :, :]
 
         else:
-            self.drop_attribute('skim_matrix')
+            self.skim_matrix = None
 
     def _check_demand(self, origin_column, destination_column, demand_column):
         for col, col_name in zip([origin_column, destination_column, demand_column], ["origin", "destination", "demand"]):
