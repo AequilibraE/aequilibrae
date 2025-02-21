@@ -393,3 +393,6 @@ rc.execute(perform_assignment=True)
 map = plot_results(rc.get_load_results()["demand"])
 subarea_zone.add_to(map)
 map
+
+# %%
+project.close()
