@@ -117,48 +117,53 @@ class HyperpathGenerating:
             self._is_travel_time = False
 
 
-    def compute_skim_cols(self, skim_cols: list, edges: pd.DataFrame, trav_time: str):
+    def compute_skim_cols(self, skim_cols, edges: pd.DataFrame, trav_time: str):
 
         self._get_waiting_time = False
-        edges_cols = edges.columns.tolist()
+        edges_cols = set(edges.columns)
+        skim_cols = set(skim_cols)
 
-        link_type_values = {
-            'boardings': 'boarding',
-            'transfers': 'transfer',
-            'in_vehicle_trav_time': ['on-board', 'dwell'],
-            'egress_trav_time': 'egress_connector',
-            'access_trav_time': 'access_connector'
+        discerete_link_types = {
+            "boardings": "boarding",
+            "alightings": "alighting",
+            "inner_transfers": "inner_transfer",
+            "outer_transfers": "outer_transfer",
+            "transfers": ["inner_transfer", "outer_transfer"],
         }
 
-        if any(item in skim_cols for item in link_type_values) and 'link_type' not in edges_cols:
+        contig_link_types = {
+            "on_board_trav_time": "on-board",
+            "dwelling_time": "dwell",
+            "egress_trav_time": "egress_connector",
+            "access_trav_time": "access_connector",
+            "walking_trav_time": "walking",
+            "transfer_time": ["inner_transfer", "outer_transfer"],
+            "in_vehicle_trav_time": ["on-board", "dwell"],
+        }
+
+        if any(item in skim_cols for item in discerete_link_types.keys() | contig_link_types.keys()) and "link_type" not in edges_cols:
             raise ValueError("predefined skimming type requested but 'link_type' column not present on the graph")
 
-        if 'boardings' in skim_cols and 'boardings' not in edges_cols:
-            edges['boardings'] = edges['link_type'].apply(lambda x: 1 if x == link_type_values['boardings'] else 0)
+        for name, col in discerete_link_types.items():
+            if name in skim_cols and name not in edges_cols:
+                if isinstance(col, list):
+                    edges[name] = np.where(edges["link_type"].isin(col), 1, 0)
+                else:
+                    edges[name] = np.where(edges["link_type"] == col, 1, 0)
 
-        if 'transfers' in skim_cols and 'transfers' not in edges_cols:
-            edges['transfers'] = edges['link_type'].apply(lambda x: 1 if x == link_type_values['transfers'] else 0)
-
-        if 'waiting_time' in skim_cols and 'waiting_time' not in edges_cols:
-            edges['in_vehicle_trav_time'] = np.where(~edges['link_type'].isin(link_type_values['in_vehicle_trav_time']), 0, edges[trav_time])
-            edges['egress_trav_time'] = np.where(edges['link_type'] != link_type_values['egress_trav_time'], 0, edges[trav_time])
-            edges['access_trav_time'] = np.where(edges['link_type'] != link_type_values['access_trav_time'], 0, edges[trav_time])
-
-            skim_cols.remove('waiting_time')
-            skim_cols = list(set(skim_cols + [trav_time, 'in_vehicle_trav_time', 'egress_trav_time', 'access_trav_time']))
+        if "waiting_time" in skim_cols and "waiting_time" not in edges_cols:
+            skim_cols.remove("waiting_time")
+            skim_cols = skim_cols | set([trav_time, "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"])
             self._get_waiting_time = True
 
-        else:
-            if 'in_vehicle_trav_time' in skim_cols and 'in_vehicle_trav_time' not in edges_cols:
-                edges['in_vehicle_trav_time'] = np.where(~edges['link_type'].isin(link_type_values['in_vehicle_trav_time']), 0, edges[trav_time])
+        for name, col in contig_link_types.items():
+            if name in skim_cols and name not in edges_cols:
+                if isinstance(col, list):
+                    edges[name] = np.where(edges["link_type"].isin(col), edges[trav_time], 0)
+                else:
+                    edges[name] = np.where(edges["link_type"] == col, edges[trav_time], 0)
 
-            if 'egress_trav_time' in skim_cols and 'egress_trav_time' not in edges_cols:
-                edges['egress_trav_time'] = np.where(edges['link_type'] != link_type_values['egress_trav_time'], 0, edges[trav_time])
-
-            if 'access_trav_time' in skim_cols and 'access_trav_time' not in edges_cols:
-                edges['access_trav_time'] = np.where(edges['link_type'] != link_type_values['access_trav_time'], 0, edges[trav_time])
-
-        return edges, skim_cols
+        return edges, list(skim_cols)
 
 
     def check_skim_cols(self, skim_cols: Union(list[str], tuple[str], set(str))):

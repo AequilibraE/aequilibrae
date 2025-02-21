@@ -84,3 +84,10 @@ skimming travel time in rail only.
 
     # Assign zero travel time to all non-rail links
     >>> transit_graph.graph.loc[~transit_graph.graph.line_id.isin(rail_ids),"rail_trav_time"] =0 # doctest: +SKIP
+
+For typical use cases, `set_skimming_fields` also accepts a set of predefined fields which are defined based on the
+auto-generated link types. These include:
+  - discrete: `'boardings'`, `'alightings'`, `'inner_transfers'`, `'outer_transfers'`, and `'transfers'`.
+  - continuous: `'trav_time'`, `'on_board_trav_time'`, `'dwelling_time'`, `'egress_trav_time'`, `'access_trav_time'`,
+    `'walking_trav_time'`, `'transfer_time'`, `'in_vehicle_trav_time'`, and `'waiting_time'`.
+

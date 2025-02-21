@@ -1077,8 +1077,10 @@ class TransitAssignment(AssignmentBase):
         """
         Sets the skimming fields for the transit assignment.
 
-        Also accepts predefined skimming fields 'boardings', 'transfers', 'in_vehicle_trav_time', 'egress_trav_time',
-        'access_trav_time' and 'waiting_time'.
+        Also accepts predefined skimming fields:
+            - discrete: 'boardings', 'alightings', 'inner_transfers', 'outer_transfers', and 'transfers'.
+            - continuous: 'trav_time', 'on_board_trav_time', 'dwelling_time', 'egress_trav_time', 'access_trav_time',
+              'walking_trav_time', 'transfer_time', 'in_vehicle_trav_time', and 'waiting_time'.
 
         Provide no argument to disable.
 

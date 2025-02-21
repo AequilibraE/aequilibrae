@@ -165,7 +165,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line3_freq)
     trav_time.append(dwell_time)
     vol.append(0.0)
-    link_type.append("transfer")
+    link_type.append("inner_transfer")
 
     # edge 7
     # stop X : to line 2
@@ -235,7 +235,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line3_freq)
     trav_time.append(dwell_time)
     vol.append(0.0833333333333)
-    link_type.append("transfer")
+    link_type.append("inner_transfer")
 
     # edge 14
     # stop Y : from line 2 to line 4
@@ -245,7 +245,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line4_freq)
     trav_time.append(dwell_time)
     vol.append(0.4166666666666)
-    link_type.append("transfer")
+    link_type.append("inner_transfer")
 
     # edge 15
     # stop Y : from line 3 to line 4
@@ -255,7 +255,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line4_freq)
     trav_time.append(dwell_time)
     vol.append(0.0)
-    link_type.append("transfer")
+    link_type.append("inner_transfer")
 
     # edge 16
     # stop Y : in line 3
@@ -519,3 +519,21 @@ class TestHyperPath(TestCase):
         np.testing.assert_allclose(
             mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [max, 0]])
         )
+
+    def test_SF_skimming_02(self):
+        self._setUp(network="SF")
+
+        hp = HyperpathGenerating(
+            self.edges, skim_cols=["boardings", "alightings"], centroids=self.centroids
+        )
+
+        hp.assign(
+            self.demand["origin_vertex_id"].values.astype(np.uint32),
+            self.demand["destination_vertex_id"].values.astype(np.uint32),
+            self.demand["demand"].values.astype(np.float64),
+            check_demand=True,
+        )
+        mats = hp.skim_matrix.matrix
+
+        # Only board once
+        np.testing.assert_allclose(mats["boardings"], mats["alightings"])
