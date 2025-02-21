@@ -206,7 +206,7 @@ def plot_results(link_loads):
 
 
 # %%
-# Ans plot our data!
+# And plot our data!
 map = plot_results(rc.get_load_results()["demand"])
 subarea_zone.add_to(map)
 map

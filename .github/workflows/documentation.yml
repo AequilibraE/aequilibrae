@@ -75,8 +75,7 @@ jobs:
         cd ../../../..
         cp large_icon.png docs/source/_static/large_icon.png
         sphinx-build -M html docs/source docs/build
-        python -m zipfile -c AequilibraE.zip docs/build
-        cp AequilibraE.zip docs/source/_static
+        python -m zipfile -c docs/build/html/aequilibrae.zip docs/build/html
 
     - name: Upload python to DEV on S3
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
