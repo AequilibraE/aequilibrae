@@ -11,6 +11,8 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # %%
 # .. admonition:: References
 #
+#   WE HIGHLY RECOMMEND YOU READ THE DOCUMENTATION ON SKIMMING BEFORE PROCEEDING
+#
 #   * :doc:`../../public_transport`
 
 # %%
@@ -38,7 +40,7 @@ from aequilibrae.transit import Transit
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.create_example import create_example
 
-# sphinx_gallery_thumbnail_path = '../source/_images/transit/hyperpath_bell_n_10_alpha_100d0.png'
+# sphinx_gallery_thumbnail_path = '../source/_images/transit/skimming.png'
 
 # %%
 
@@ -111,7 +113,7 @@ assig.add_class(assigclass)
 # Set assignment
 assig.set_time_field("trav_time")
 assig.set_frequency_field("freq")
-assig.set_skimming_fields(["boardings"])
+assig.set_skimming_fields(["trav_time", "boardings", "freq", "trav_cost"])
 assig.set_algorithm("os")
 assigclass.set_demand_matrix_core("pt")
 
