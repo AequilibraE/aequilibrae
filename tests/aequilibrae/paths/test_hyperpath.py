@@ -523,9 +523,7 @@ class TestHyperPath(TestCase):
     def test_SF_skimming_02(self):
         self._setUp(network="SF")
 
-        hp = HyperpathGenerating(
-            self.edges, skim_cols=["boardings", "alightings"], centroids=self.centroids
-        )
+        hp = HyperpathGenerating(self.edges, skim_cols=["boardings", "alightings"], centroids=self.centroids)
 
         hp.assign(
             self.demand["origin_vertex_id"].values.astype(np.uint32),
