@@ -20,7 +20,7 @@ class Ipf:
 
         >>> from aequilibrae.distribution import Ipf
 
-        >>> project = Project.from_path(coquimbo_project)
+        >>> project = create_example(project_path)
 
         >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
