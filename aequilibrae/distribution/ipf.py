@@ -19,10 +19,8 @@ class Ipf:
     .. code-block:: python
 
         >>> from aequilibrae.distribution import Ipf
-        >>> import pandas as pd
-        >>> import numpy as np
 
-        >>> project = create_example(project_path)
+        >>> project = Project.from_path(coquimbo_project)
 
         >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
