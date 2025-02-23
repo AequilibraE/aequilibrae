@@ -1,4 +1,4 @@
-Transit skimming
+from venv import createTransit skimming
 ================
 
 Transit skimming in AequilibraE is incredibly flexible, but more sophisticated use requires a good
@@ -16,7 +16,7 @@ defined based on the auto-generated link types. These include:
 
     >>> from aequilibrae.paths import TransitAssignment, TransitClass
 
-    >>> project = Project.from_path(coquimbo_project)
+    >>> project = create_example("coquimbo")
     >>> data = Transit(project)
 
     >>> graph = data.create_graph(
@@ -69,7 +69,7 @@ One example is skimming travel time in rail only.
 
     >>> from aequilibrae.paths import TransitAssignment, TransitClass
 
-    >>> project = Project.from_path(coquimbo_project)
+    >>> project = create_example("coquimbo")
     >>> data = Transit(project)
 
     >>> graph = data.create_graph(

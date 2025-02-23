@@ -88,12 +88,9 @@ def create_path(tmp_path):
     return tmp_path / uuid.uuid4().hex
 
 
-@pytest.fixture
-def coquimbo_project() -> str:
-    coquimbo_project = create_example(Path(gettempdir()) / uuid.uuid4().hex, "coquimbo")
-    pth = coquimbo_project.project_base_path
-    coquimbo_project.close()
-    return pth
+@pytest.fixture(scope="session")
+def coquimbo_project():
+    return create_example(Path(gettempdir()) / uuid.uuid4().hex, "coquimbo")
 
 
 @pytest.fixture
@@ -117,7 +114,7 @@ def transit_conn(create_gtfs_project):
 @pytest.fixture(autouse=True)
 def doctest_fixtures(doctest_namespace, create_path, tmp_path_factory):
     doctest_namespace["project_path"] = str(create_path)
-    doctest_namespace["coquimbo_project"] = str(coquimbo_project)
+    doctest_namespace["coquimbo_project"] = coquimbo_project
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
     doctest_namespace["create_example"] = create_example
     doctest_namespace["Project"] = Project
