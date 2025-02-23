@@ -65,4 +65,4 @@ jobs:
         python setup.py build_ext -j 4 --inplace
 
     - name: Runs test
-      run: python -m pytest
+      run: python -m pytest --durations=50
