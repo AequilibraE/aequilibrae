@@ -19,8 +19,6 @@ class Ipf:
     .. code-block:: python
 
         >>> from aequilibrae.distribution import Ipf
-        >>> import pandas as pd
-        >>> import numpy as np
 
         >>> project = create_example(project_path)
 

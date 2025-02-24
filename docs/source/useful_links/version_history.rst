@@ -205,11 +205,9 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
     .. grid-item:: 
 
     .. grid-item-card:: Upcoming version
-        :link:  https://www.aequilibrae.com/latest/python/index.html
+        :link:  https://www.aequilibrae.com/develop/python/index.html
         :link-type: url
         :text-align: center
-
-    
 
 This documentation correspond to software version:
 
@@ -222,4 +220,4 @@ This documentation correspond to software version:
 
 .. 
     When updating this page, be careful with the alignment when adding new cards. if you have less than
-    three cards in the same line, add a "transparent" card using "..grid-item::" without directives.
+    three cards in the same line, add a "transparent" card using ".. grid-item::" without directives.

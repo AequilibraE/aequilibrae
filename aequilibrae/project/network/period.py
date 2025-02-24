@@ -25,6 +25,9 @@ class Period(SafeClass):
         self.__fields = list(dataset.keys())
         self._table = "periods"
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(period_id={self.period_id})"
+
     def save(self):
         """Saves period to database"""
 

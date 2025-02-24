@@ -1,16 +1,17 @@
+import dataclasses
 import pickle
 import uuid
+import warnings
 from abc import ABC
 from datetime import datetime
 from os.path import join
-from typing import List, Tuple, Optional, Union
-import dataclasses
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 from aequilibrae.context import get_logger
+from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 
 @dataclasses.dataclass
@@ -115,7 +116,7 @@ class GraphBase(ABC):  # noqa: B024
 
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
-        self.dead_end_links = np.array([])
+        self.dead_end_links = np.array([], dtype=np.int64)
 
         self.compressed_link_network_mapping_idx = None
         self.compressed_link_network_mapping_data = None
@@ -137,7 +138,7 @@ class GraphBase(ABC):  # noqa: B024
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: Optional[np.ndarray] = None) -> None:
+    def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -150,6 +151,7 @@ class GraphBase(ABC):  # noqa: B024
 
         :Arguments:
             **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
+            **remove_dead_ends** (:obj:`bool`): Whether or not to remove dead ends from the graph. (*Optional*, default is "True").
         """
         self.__network_error_checking__()
 
@@ -189,7 +191,7 @@ class GraphBase(ABC):  # noqa: B024
         self.__build_derived_properties()
 
         if self.centroids.shape[0]:
-            self.__build_compressed_graph()
+            self.__build_compressed_graph(remove_dead_ends)
             self.compact_num_links = self.compact_graph.shape[0]
 
         # The cache property should be recalculated when the graph has been re-prepared
@@ -197,8 +199,8 @@ class GraphBase(ABC):  # noqa: B024
         self.compressed_link_network_mapping_data = None
         self.network_compressed_node_mapping = None
 
-    def __build_compressed_graph(self):
-        build_compressed_graph(self)
+    def __build_compressed_graph(self, remove_dead_ends):
+        build_compressed_graph(self, remove_dead_ends)
 
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
@@ -240,6 +242,8 @@ class GraphBase(ABC):  # noqa: B024
 
         # Now we take care of centroids
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
+        if not np.isin(centroids, nodes, assume_unique=True).all():
+            warnings.warn("Found centroids not present in the graph!")
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
         all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
@@ -431,10 +435,11 @@ class GraphBase(ABC):  # noqa: B024
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
-        self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
-        df = self.__graph_groupby.sum(numeric_only=True)[skim_fields].reset_index()
-        for i, skm in enumerate(skim_fields):
-            self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
+        if self.centroids.shape[0]:
+            self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
+            df = self.__graph_groupby.sum(numeric_only=True)[skim_fields].reset_index()
+            for i, skm in enumerate(skim_fields):
+                self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]

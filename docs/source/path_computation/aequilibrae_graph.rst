@@ -116,3 +116,15 @@ not blocking flows through "centroids".**
         Class documentation
     * :func:`aequilibrae.paths.TransitGraph`
         Class documentation
+
+
+Topological simplification
+---------------------------
+
+When using the AequilibraE graph to perform topological simplification of the graph,
+the user should be explicit in not removing dead ends from the graph, as that will
+result in simplification beyond pure topological simplification.
+
+.. code-block:: python
+
+    >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32), remove_dead_ends=False)

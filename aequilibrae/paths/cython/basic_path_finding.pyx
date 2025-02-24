@@ -19,54 +19,28 @@ include 'pq_4ary_heap.pyx'
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn off bounds-checking for entire function
-cpdef void network_loading(long classes,
-                           double[:, :] demand,
-                           long long [:] pred,
-                           long long [:] conn,
-                           double[:, :] link_loads,
-                           long long [:] no_path,
-                           long long [:] reached_first,
-                           double [:, :] node_load,
-                           long found) noexcept nogil:
-
+cpdef void network_loading(
+    long classes,
+    double[:, :] demand,
+    long long [:] pred,
+    long long [:] conn,
+    double[:, :] link_loads
+) noexcept nogil:
     cdef long long i, j, predecessor, connector, node
     cdef long long zones = demand.shape[0]
-    cdef long long N = node_load.shape[0]
-# Traditional loading, without cascading
-#    for i in range(zones):
-#        node = i
-#        predecessor = pred[node]
-#        connector = conn[node]
-#        while predecessor >= 0:
-#            for j in range(classes):
-#                link_loads[connector, j] += demand[i, j]
-#
-#            predecessor = pred[predecessor]
-#            connector = conn[predecessor]
 
-    # Clean the node load array
-    for i in range(N):
-        node_load[i] = 0
+    # Traditional loading, without cascading
+    for i in range(zones):
+        node = i
 
-    # Loads the demand to the centroids
-    for j in range(classes):
-        for i in range(zones):
-            if not isnan(demand[i, j]):
-                node_load[i, j] = demand[i, j]
-
-    # Recursively cascades to the origin
-    for i in range(found, 0, -1):
-        node = reached_first[i]
-
-        # captures how we got to that node
         predecessor = pred[node]
         connector = conn[node]
+        while predecessor >= 0:
+            for j in range(classes):
+                link_loads[connector, j] += demand[i, j]
 
-        # loads the flow to the links for each class
-        for j in range(classes):
-            link_loads[connector, j] += node_load[node, j]
-            # Cascades the load from the node to their predecessor
-            node_load[predecessor, j] += node_load[node, j]
+            connector = conn[predecessor]
+            predecessor = pred[predecessor]
 
 
 @cython.wraparound(False)
@@ -296,23 +270,19 @@ cpdef void skim_multiple_fields(long origin,
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn of bounds-checking for entire function
-cpdef int path_finding(long origin,
-                       unsigned char [:] destinations,
-                       long long destination_count,
-                       double[:] graph_costs,
-                       long long [:] csr_indices,
-                       long long [:] graph_fs,
-                       long long [:] pred,
-                       long long [:] ids,
-                       long long [:] connectors,
-                       long long [:] reached_first) noexcept nogil:
-
+cpdef int path_finding(
+    long origin,
+    unsigned char [:] destinations,
+    long long destination_count,
+    double[:] graph_costs,
+    long long [:] csr_indices,
+    long long [:] graph_fs,
+    long long [:] pred,
+    long long [:] ids,
+    long long [:] connectors,
+    long long [:] reached_first
+) noexcept nogil:
     cdef unsigned int M = pred.shape[0]
-
-    if destination_count == 0:
-        with gil:
-            raise ValueError("destination_count must be either -1 (for all destination), or > 0")
-
     cdef:
         size_t tail_vert_idx, head_vert_idx, idx  # indices
         DTYPE_t tail_vert_val, head_vert_val  # vertex travel times

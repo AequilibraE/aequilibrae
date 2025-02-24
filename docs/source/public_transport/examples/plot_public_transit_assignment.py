@@ -1,11 +1,11 @@
 """
-.. _example_gtfs_import_and_asssignment:
+.. _example_transit_asssignment:
 
 Public transport assignment with Optimal Strategies
 ===================================================
 
-In this example, we import a GTFS feed to our model, create a public transport network, create project match connectors, and perform a Spiess & Florian assignment. `Click here <https://doi.org/10.1016/0191-2615(89)90034-9>`_ 
-to check out the article.
+In this example, perform a Spiess & Florian assignment. `Click here <https://doi.org/10.1016/0191-2615(89)90034-9>`_
+to check out the paper.
 
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """

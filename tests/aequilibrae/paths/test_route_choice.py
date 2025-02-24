@@ -499,13 +499,13 @@ class TestRouteChoice(TestCase):
                     pd.testing.assert_frame_equal(df2, df)
         conn.close()
 
-        matrices = Sparse.from_disk(
-            (pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx")
-        )
+        matrices = AequilibraeMatrix()
+        matrices.create_from_omx((pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx"))
+        matrices.computational_view()
 
         for sl_name, v in self.rc.get_select_link_od_matrix_results().items():
             for demand_name, matrix in v.items():
-                np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name].toarray())
+                np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices.matrix[sl_name + "_" + demand_name])
 
     def test_round_trip(self):
         self.rc.add_demand(self.mat)

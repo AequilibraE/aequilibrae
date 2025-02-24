@@ -118,7 +118,7 @@ class AssignmentBase(ABC):
 
         self.classes.append(transport_class)
 
-    def _check_field(self, field: str) -> None:
+    def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws expection if field is invalid."""
         if not self.classes:
             raise ValueError("You need add at least one transport class first")
@@ -130,7 +130,7 @@ class AssignmentBase(ABC):
             if np.any(np.isnan(c.graph.graph[field].values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            if c.graph.graph[field].values.min() <= 0:
+            if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
     def set_time_field(self, time_field: str) -> None:
@@ -140,6 +140,14 @@ class AssignmentBase(ABC):
         self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
+
+    def get_skim_results(self) -> list:
+        """Prepares the assignment skim results for all classes
+
+        :Returns:
+            **skim list** (:obj:`list`): Lists of all skims with the results for each class
+        """
+        return {cls._id: cls.results.skims for cls in self.classes}
 
 
 class TrafficAssignment(AssignmentBase):
@@ -917,6 +925,8 @@ class TransitAssignment(AssignmentBase):
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self._config["Skimming Fields"] = None
+
     def set_algorithm(self, algorithm: str):
         """
         Chooses the assignment algorithm. Currently only 'optimal-strategies' is available.
@@ -1062,3 +1072,27 @@ class TransitAssignment(AssignmentBase):
         """
         self._check_field(frequency_field)
         self._config["Frequency field"] = frequency_field
+
+    def set_skimming_fields(self, skimming_fields: list[str] = None) -> None:
+        """
+        Sets the skimming fields for the transit assignment.
+
+        Also accepts predefined skimming fields:
+            - discrete: 'boardings', 'alightings', 'inner_transfers', 'outer_transfers', and 'transfers'.
+            - continuous: 'trav_time', 'on_board_trav_time', 'dwelling_time', 'egress_trav_time', 'access_trav_time',
+              'walking_trav_time', 'transfer_time', 'in_vehicle_trav_time', and 'waiting_time'.
+
+        Provide no argument to disable.
+
+        :Arguments:
+            **skimming_fields** (:obj:`list[str]`): Optional list of field names, or predefined skimming type.
+        """
+
+        if skimming_fields:
+            if isinstance(skimming_fields, (tuple, set)):
+                skimming_fields = list(skimming_fields)
+
+            if not isinstance(skimming_fields, list):
+                raise TypeError("Skimming Fields should be defined on a list, tuple or set")
+
+        self._config["Skimming Fields"] = skimming_fields

@@ -221,12 +221,10 @@ cdef void _back_fill(long long[:] links_index, long long max_node) noexcept:
         links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
 
 
-def build_compressed_graph(graph):
+def build_compressed_graph(graph, remove_dead_ends=True):
     # General notes:
     # Anything that uses graph.network is operating on the **mixed** graph. This graph has both directed and undirected edges
     # Anything that uses graph.graph is operating on the **directed** graph. This graph has only directed edges, they may be backwards but they are directed
-
-    burnt_links = np.full(len(graph.graph), False, dtype=bool)
 
     directed_node_max = max(graph.graph.a_node.values.max(), graph.graph.b_node.values.max())
     in_degree = np.bincount(graph.graph.b_node.values, minlength=directed_node_max + 1)
@@ -237,23 +235,26 @@ def build_compressed_graph(graph):
     out_degree[centroid_idx] = -1
     del centroid_idx
 
-    _remove_dead_ends(
-        graph.fs,
-        graph.all_nodes,
-        graph.nodes_to_indices,
-        graph.graph.a_node.values,
-        graph.graph.b_node.values,
-        graph.graph.direction.values,
-        in_degree,
-        out_degree,
-        burnt_links,
-    )
-
-    graph.dead_end_links = graph.graph.link_id.values[burnt_links]  # Perhaps filter to unique link_ids? There'll be duplicates in here
     df = pd.DataFrame(graph.network, copy=True)
-    if graph.dead_end_links.shape[0]:
-        df = df[~df.link_id.isin(graph.dead_end_links)]
+    if remove_dead_ends:
+        burnt_links = np.full(len(graph.graph), False, dtype=bool)
+        _remove_dead_ends(
+            graph.fs,
+            graph.all_nodes,
+            graph.nodes_to_indices,
+            graph.graph.a_node.values,
+            graph.graph.b_node.values,
+            graph.graph.direction.values,
+            in_degree,
+            out_degree,
+            burnt_links,
+        )
+        graph.dead_end_links = graph.graph.link_id.values[burnt_links]  # Perhaps filter to unique link_ids? There'll be duplicates in here
 
+        if graph.dead_end_links.shape[0]:
+            df = df[~df.link_id.isin(graph.dead_end_links)]
+    else:
+        graph.dead_end_links = np.array([], dtype=np.int64)
     # Build link index
     link_id_max = df.link_id.max()
 

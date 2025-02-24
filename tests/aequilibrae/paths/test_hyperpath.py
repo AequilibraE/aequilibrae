@@ -59,6 +59,8 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     boarding_time = board_alight_ratio * dwell_time
     alighting_time = board_alight_ratio * dwell_time
 
+    # When referencing the paper, the delta times below are halved, they are
+    # doubled before the function returns.
     line1_freq = 1.0 / (60.0 * 12.0)
     line2_freq = 1.0 / (60.0 * 12.0)
     line3_freq = 1.0 / (60.0 * 30.0)
@@ -93,6 +95,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     trav_time = []
     freq = []
     vol = []
+    link_type = []
 
     # edge 0
     # stop A : to line 1
@@ -102,6 +105,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line1_freq)
     trav_time.append(boarding_time)
     vol.append(0.5)
+    link_type.append("boarding")
 
     # edge 1
     # stop A : to line 2
@@ -111,6 +115,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line2_freq)
     trav_time.append(boarding_time)
     vol.append(0.5)
+    link_type.append("boarding")
 
     # edge 2
     # line 1 : first segment
@@ -120,6 +125,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(25.0 * 60.0)
     vol.append(0.5)
+    link_type.append("on-board")
 
     # edge 3
     # line 2 : first segment
@@ -129,6 +135,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(7.0 * 60.0)
     vol.append(0.5)
+    link_type.append("on-board")
 
     # edge 4
     # stop X : from line 2
@@ -138,6 +145,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(alighting_time)
     vol.append(0.0)
+    link_type.append("alighting")
 
     # edge 5
     # stop X : in line 2
@@ -147,6 +155,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(dwell_time)
     vol.append(0.5)
+    link_type.append("dwell")
 
     # edge 6
     # stop X : from line 2 to line 3
@@ -156,6 +165,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line3_freq)
     trav_time.append(dwell_time)
     vol.append(0.0)
+    link_type.append("inner_transfer")
 
     # edge 7
     # stop X : to line 2
@@ -165,6 +175,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line2_freq)
     trav_time.append(boarding_time)
     vol.append(0.0)
+    link_type.append("boarding")
 
     # edge 8
     # stop X : to line 3
@@ -174,6 +185,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line3_freq)
     trav_time.append(boarding_time)
     vol.append(0.0)
+    link_type.append("boarding")
 
     # edge 9
     # line 2 : second segment
@@ -183,6 +195,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(6.0 * 60.0)
     vol.append(0.5)
+    link_type.append("on-board")
 
     # edge 10
     # line 3 : first segment
@@ -192,6 +205,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(4.0 * 60.0)
     vol.append(0.0)
+    link_type.append("on-board")
 
     # edge 11
     # stop Y : from line 3
@@ -201,6 +215,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(alighting_time)
     vol.append(0.0)
+    link_type.append("alighting")
 
     # edge 12
     # stop Y : from line 2
@@ -210,6 +225,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(alighting_time)
     vol.append(0.0)
+    link_type.append("alighting")
 
     # edge 13
     # stop Y : from line 2 to line 3
@@ -219,6 +235,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line3_freq)
     trav_time.append(dwell_time)
     vol.append(0.0833333333333)
+    link_type.append("inner_transfer")
 
     # edge 14
     # stop Y : from line 2 to line 4
@@ -228,6 +245,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line4_freq)
     trav_time.append(dwell_time)
     vol.append(0.4166666666666)
+    link_type.append("inner_transfer")
 
     # edge 15
     # stop Y : from line 3 to line 4
@@ -237,6 +255,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line4_freq)
     trav_time.append(dwell_time)
     vol.append(0.0)
+    link_type.append("inner_transfer")
 
     # edge 16
     # stop Y : in line 3
@@ -246,6 +265,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(dwell_time)
     vol.append(0.0)
+    link_type.append("dwell")
 
     # edge 17
     # stop Y : to line 3
@@ -255,6 +275,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line3_freq)
     trav_time.append(boarding_time)
     vol.append(0.0)
+    link_type.append("boarding")
 
     # edge 18
     # stop Y : to line 4
@@ -264,6 +285,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(line4_freq)
     trav_time.append(boarding_time)
     vol.append(0.0)
+    link_type.append("boarding")
 
     # edge 19
     # line 3 : second segment
@@ -273,6 +295,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(4.0 * 60.0)
     vol.append(0.0833333333333)
+    link_type.append("on-board")
 
     # edge 20
     # line 4 : first segment
@@ -282,38 +305,43 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     freq.append(np.inf)
     trav_time.append(10.0 * 60.0)
     vol.append(0.4166666666666)
+    link_type.append("on-board")
 
     # edge 21
-    # stop Y : from line 1
+    # stop B : from line 1
     # alighting edge
     tail.append(15)
     head.append(12)
     freq.append(np.inf)
     trav_time.append(alighting_time)
     vol.append(0.5)
+    link_type.append("alighting")
 
     # edge 22
-    # stop Y : from line 3
+    # stop B : from line 3
     # alighting edge
     tail.append(14)
     head.append(12)
     freq.append(np.inf)
     trav_time.append(alighting_time)
     vol.append(0.0833333333333)
+    link_type.append("alighting")
 
     # edge 23
-    # stop Y : from line 4
-    # alighting edge
+    # stop B : from line 4
+    # alighting edge (paper has this edge in the wrong direction)
     tail.append(13)
     head.append(12)
     freq.append(np.inf)
     trav_time.append(alighting_time)
     vol.append(0.4166666666666)
+    link_type.append("alighting")
 
     edges = pd.DataFrame(
         data={
             "tail": tail,
             "head": head,
+            "link_type": link_type,
             "trav_time": trav_time,
             "freq": freq,
             "volume_ref": vol,
@@ -328,7 +356,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
 
 
 class TestHyperPath(TestCase):
-    def _setUp(self, network="bell", n=10, alpha=10.0, seed=124) -> None:
+    def _setUp(self, network="bell", n=10, alpha=10.0, dwell_time=0.0, seed=124) -> None:
         """
         Use our own setup method to allow specifying args for network creation
         """
@@ -357,7 +385,8 @@ class TestHyperPath(TestCase):
             )
 
         elif network == "SF":
-            self.edges, self.demand = create_SF_network(dwell_time=0.0)
+            self.edges, self.demand = create_SF_network(dwell_time=dwell_time)
+            self.centroids = np.array([0, 12])
 
         else:
             raise KeyError(f'Unknown network type "{network}"')
@@ -375,7 +404,6 @@ class TestHyperPath(TestCase):
 
         hp = HyperpathGenerating(self.edges)
 
-        # breakpoint()
         results = []
         for threads in [1, 2, 4]:
             hp.assign(
@@ -434,3 +462,76 @@ class TestHyperPath(TestCase):
         )
 
         np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
+
+    def test_skimming_cols(self):
+        self._setUp(network="SF", dwell_time=10.0)
+
+        columns = ["boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
+        for col in columns:
+            with self.subTest(col=col):
+                hp = HyperpathGenerating(self.edges, skim_cols=[col], centroids=self.centroids)
+
+                self.assertIn(col, hp._edges.columns, "requested column missing from edges")
+
+        with self.subTest(col=col):
+            hp = HyperpathGenerating(self.edges, skim_cols=["waiting_time"], centroids=self.centroids)
+
+            self.assertNotIn("waiting_time", hp._edges.columns, "waiting time isn't a real column")
+            self.assertNotIn("boardings", hp._edges.columns, "boardings isn't required for waiting time skims")
+
+            for col in ["in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]:
+                self.assertIn(col, hp._edges.columns, "waiting time requires all other skimming columns")
+
+        for col in columns:
+            self.assertNotIn(col, self.edges.columns, "don't modify the users dataframe")
+
+    def test_SF_skimming_01(self):
+        self._setUp(network="SF")
+
+        hp = HyperpathGenerating(
+            self.edges, skim_cols=["boardings", "transfers", "waiting_time"], centroids=self.centroids
+        )
+
+        hp.assign(
+            self.demand["origin_vertex_id"].values.astype(np.uint32),
+            self.demand["destination_vertex_id"].values.astype(np.uint32),
+            self.demand["demand"].values.astype(np.float64),
+            check_demand=True,
+        )
+        mats = hp.skim_matrix.matrix
+        max = np.finfo("float").max
+
+        np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [max, 0]]))  # travel time from paper
+
+        # No access or egress links in the network
+        np.testing.assert_allclose(mats["access_trav_time"], np.array([[0, 0], [0, 0]]))
+        np.testing.assert_allclose(mats["egress_trav_time"], np.array([[0, 0], [0, 0]]))
+
+        # Only board once
+        np.testing.assert_allclose(mats["boardings"], np.array([[0, 1], [0, 0]]))
+
+        # Some routes transfer
+        np.testing.assert_allclose(mats["transfers"], np.array([[0, 0.5], [0, 0]]))  # Why is this 0.5 not 0.66?
+
+        np.testing.assert_allclose(
+            mats["in_vehicle_trav_time"], np.array([[0, 27.75 * 60.0 - mats["waiting_time"][0, 1]], [0, 0]])
+        )
+        np.testing.assert_allclose(
+            mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [max, 0]])
+        )
+
+    def test_SF_skimming_02(self):
+        self._setUp(network="SF")
+
+        hp = HyperpathGenerating(self.edges, skim_cols=["boardings", "alightings"], centroids=self.centroids)
+
+        hp.assign(
+            self.demand["origin_vertex_id"].values.astype(np.uint32),
+            self.demand["destination_vertex_id"].values.astype(np.uint32),
+            self.demand["demand"].values.astype(np.float64),
+            check_demand=True,
+        )
+        mats = hp.skim_matrix.matrix
+
+        # Only board once
+        np.testing.assert_allclose(mats["boardings"], mats["alightings"])

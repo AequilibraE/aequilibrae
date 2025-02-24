@@ -4,6 +4,7 @@
 
 import os
 import uuid
+from pathlib import Path
 from shutil import copytree
 
 import pytest
@@ -13,11 +14,12 @@ import numpy as np
 from shapely.geometry import Polygon
 
 from aequilibrae import Project
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
-
+from tempfile import gettempdir
 from tests.data import siouxfalls_project
 
 DEFAULT_PROJECT = siouxfalls_project
@@ -86,6 +88,11 @@ def create_path(tmp_path):
     return tmp_path / uuid.uuid4().hex
 
 
+@pytest.fixture(scope="session")
+def coquimbo_project():
+    return create_example(Path(gettempdir()) / uuid.uuid4().hex, "coquimbo")
+
+
 @pytest.fixture
 def create_gtfs_project(create_path):
     prj = create_example(create_path, "coquimbo")
@@ -107,9 +114,12 @@ def transit_conn(create_gtfs_project):
 @pytest.fixture(autouse=True)
 def doctest_fixtures(doctest_namespace, create_path, tmp_path_factory):
     doctest_namespace["project_path"] = str(create_path)
+    doctest_namespace["coquimbo_project"] = coquimbo_project
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
     doctest_namespace["create_example"] = create_example
     doctest_namespace["Project"] = Project
+    doctest_namespace["Transit"] = Transit
+    doctest_namespace["AequilibraeMatrix"] = AequilibraeMatrix
 
     doctest_namespace["os"] = os
     doctest_namespace["pd"] = pd

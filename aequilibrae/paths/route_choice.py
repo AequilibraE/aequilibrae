@@ -13,6 +13,7 @@ from functools import cached_property
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import openmatrix as omx
 import pyarrow.dataset
 import scipy
 from aequilibrae.context import get_active_project
@@ -61,6 +62,7 @@ class RouteChoice:
 
         self.where: Optional[pathlib.Path] = None
         self.save_path_files: bool = False
+        self.index_name = "route_choice_sl_index"
 
         self._config = {}
         self._selected_links = {}
@@ -588,9 +590,13 @@ class RouteChoice:
             project=project,
         )
 
+        path = (pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx")
         for sl_name, v in self.get_select_link_od_matrix_results().items():
             for demand_name, mat in v.items():
-                mat.to_disk(
-                    (pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx"),
-                    sl_name + "_" + demand_name,
-                )
+                mat.to_disk(path, sl_name + "_" + demand_name)
+
+        file = omx.open_file(path, "a")
+        try:
+            file.create_mapping(self.index_name, self.graph.centroids)
+        finally:
+            file.close()

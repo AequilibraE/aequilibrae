@@ -41,11 +41,33 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] demand_view = matrix.matrix_view[origin_index, :, :]
     classes = matrix.matrix_view.shape[2]
 
+    # Destination set
+    cdef long long nnz_destinations = 0
+    cdef unsigned char [:] destinations
+
+    tmp = np.zeros(nodes, dtype=bool)
+    if not skims:
+        nonzero = matrix.matrix_view[origin_index, :, :].sum(axis=1).nonzero()[0]
+        tmp[nonzero] = True
+        nnz_destinations = len(nonzero)
+    else:
+        tmp[graph.nodes_to_indices[graph.centroids]] = True
+        nnz_destinations = zones
+
+    destinations = tmp
+
+    # If there's no demand, disable early exit. We could let this fall through an immediately exit the path finding, but
+    # this case should never happen in assignment so this is a little more flexible.
+    if nnz_destinations == 0:
+        destinations = np.array([], dtype=bool)
+        nnz_destinations = -1
+
     # views from the graph
     cdef long long [:] graph_fs_view = graph.compact_fs
     cdef double [:] g_view = graph.compact_cost
     cdef long long [:] ids_graph_view = graph.compact_graph.id.values
     cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
+    cdef long long [:] nodes_to_indices = graph.compact_nodes_to_indices
 
     if skims > 0:
         gskim = graph.compact_skims
@@ -100,9 +122,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         link_list = aux_result.select_links[:, :]  # Read only, don't need to slice on curr_thread
         select_link = True
 
-    # Destination set
-    cdef unsigned char [:] destinations = aux_result.destinations[curr_thread, :]
-
     # Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids:  # Unblocks the centroid if that is the case
@@ -116,7 +135,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
         w = path_finding(origin_index,
                          destinations,
-                         zones,
+                         -1 if skims > 0 else nnz_destinations,
                          g_view,
                          b_nodes_view,
                          graph_fs_view,
@@ -157,16 +176,14 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             sl_network_loading(link_list, demand_view, predecessors_view, conn_view, link_loads_view, sl_od_matrix_view,
                                sl_link_loading_view, has_flow_mask, classes)
         else:
-            # do ONLY regular loading (via cascade assignment)
-            network_loading(classes,
-                            demand_view,
-                            predecessors_view,
-                            conn_view,
-                            link_loads_view,
-                            no_path_view,
-                            reached_first_view,
-                            node_load_view,
-                            w)
+            # do ONLY regular loading
+            network_loading(
+                classes,
+                demand_view,
+                predecessors_view,
+                conn_view,
+                link_loads_view
+            )
 
     if result.save_path_file:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
@@ -440,7 +457,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
 
     # Destination set
-    cdef unsigned char [:] destinations = aux_result.destinations[curr_thread, :]
+    cdef unsigned char [:] destinations = np.array([], dtype=bool)
 
     # Now we do all procedures with NO GIL
     with nogil:
@@ -454,7 +471,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                                     original_b_nodes_view)
         w = path_finding(origin_index,
                          destinations,
-                         zones,  # destination index to disable early exit
+                         -1,  # destination index to disable early exit
                          g_view,
                          b_nodes_view,
                          graph_fs_view,

@@ -10,6 +10,8 @@ class OptimalStrategies:
 
         self.__assig_spec = assig_spec  # type: TransitAssignment
         self.__logger = assig_spec.logger
+
+    def execute(self):
         self.__classes = {}
         self.__results = {}
         self.__demand_cols = {}
@@ -22,14 +24,17 @@ class OptimalStrategies:
                 cls.graph.graph,
                 head="a_node",
                 tail="b_node",
-                trav_time=assig_spec._config["Time field"],
-                freq=assig_spec._config["Frequency field"],
+                trav_time=self.__assig_spec._config["Time field"],
+                freq=self.__assig_spec._config["Frequency field"],
+                skim_cols=self.__assig_spec._config["Skimming Fields"],
+                centroids=cls.graph.centroids,
             )
 
             demand = sparse.coo_matrix(cls.matrix.matrix[cls.matrix_core], dtype=np.float64)
 
-            # Since the aeq matrix indexes based on centroids, and the transit graph can make the destinction between origins and destinations,
-            # We need to translate the index of the cols in to the destination node_ids for the assignment
+            # Since the aeq matrix indexes based on centroids, and the transit graph can make the distinction between
+            # origins and destinations, We need to translate the index of the cols in to the destination node_ids for
+            # the assignment
             if len(cls.graph.od_node_mapping.columns) == 2:
                 o_vert_ids = cls.graph.od_node_mapping.iloc[demand.row]["node_id"].values.astype(np.uint32)
                 d_vert_ids = cls.graph.od_node_mapping.iloc[demand.col]["node_id"].values.astype(np.uint32)
@@ -43,16 +48,10 @@ class OptimalStrategies:
                 "demand_column": demand.data,
             }
 
-    def execute(self):
         for cls_id, hyperpath in self.__classes.items():
             self.__logger.info(f"Executing S&F assignment  for {cls_id}")
 
             hyperpath.assign(**self.__demand_cols[cls_id], threads=self.__assig_spec.cores)
             self.__results[cls_id].link_loads = hyperpath._edges["volume"].values
-
-    # def run(self, origin=None, destination=None, volume=None):
-    #     for cls_id, hyperpath in self.__classes.items():
-    #         self.__logger.info(f"Executing S&F single run for {cls_id}")
-
-    #         hyperpath.run(origin, destination, volume)
-    #         self.__results[cls_id].link_loads.data["volume"] = hyperpath._edges["volume"].values
+            if hyperpath._skimming:
+                self.__results[cls_id].skims = hyperpath.skim_matrix
