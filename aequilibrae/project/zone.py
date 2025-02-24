@@ -122,6 +122,8 @@ class Zone(SafeClass):
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
+            proj_nodes=self.project.network.nodes.data,
+            links=self.project.network.links,
             network=self.project.network,
             conn_=conn,
             delimiting_area=area,

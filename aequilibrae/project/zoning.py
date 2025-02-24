@@ -9,9 +9,11 @@ from shapely import union_all
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
+from aequilibrae.project.network.connector_creation import connector_creation
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.geo_index import GeoIndex
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -98,6 +100,55 @@ class Zoning(BasicTable):
     def save(self):
         for item in self.__items.values():
             item.save()
+
+    def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True):
+        """Adds centroid connectors for the desired mode to the network file
+
+        Centroid connectors are created by connecting each zone centroid to one or more nodes selected from
+        all those that satisfy the mode and link_types criteria and are inside the zone.
+
+        The selection of the nodes that will be connected is done simply by searching for the node closest to each
+        zone centroid, or the N closest nodes to the centroid.
+
+        If fewer candidates than required connectors are found, all candidates are connected.
+
+        CENTOIDS THAT ARE CURRENTLY CONNECTED ARE SKIPPED ALTOGETHER
+
+        :Arguments:
+            **mode_id** (:obj:`str`): Mode ID we are trying to connect
+
+            **link_types** (:obj:`str`, *Optional*): String with all the link type IDs that can be considered.
+            eg: yCdR. Defaults to ALL link types
+
+            **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
+
+            **limit_to_zone** (:obj:`bool`): Limits the search for nodes inside the zone. Defaults to ``True``.
+        """
+
+        proj_nodes = self.project.network.nodes.data
+        links = self.project.network.links
+
+        _centroids = proj_nodes.reset_index().query("is_centroid == 1", engine="python").node_id.to_numpy()
+        link_data = links.data
+        centroid_conn = link_data.query("a_node in @_centroids and modes.str.contains(@mode_id)", engine="python")
+
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+            for zone_id in simple_progress(self.__items.keys(), SIGNAL(object), "Connecting zones"):
+                if zone_id in centroid_conn.a_node.to_numpy():
+                    continue
+                zone = self.__items[zone_id]
+                area = zone.geometry if limit_to_zone else None
+                connector_creation(
+                    zone_id=zone_id,
+                    mode_id=mode_id,
+                    link_types=link_types,
+                    connectors=connectors,
+                    proj_nodes=proj_nodes,
+                    links=links,
+                    network=self.project.network,
+                    conn_=conn,
+                    delimiting_area=area,
+                )
 
     def get_closest_zone(self, geometry: Union[Point, LineString, MultiLineString]) -> int:
         """Returns the zone in which the given geometry is located.

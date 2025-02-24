@@ -11,6 +11,8 @@ def connector_creation(
     zone_id: int,
     mode_id: str,
     network,
+    proj_nodes,
+    links,
     link_types="",
     connectors=1,
     conn_: Optional[Connection] = None,
@@ -29,8 +31,6 @@ def connector_creation(
         if conn.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
             logger.warning("Mode is already connected")
             return
-
-    proj_nodes = network.nodes.data
 
     centroid = proj_nodes.query("node_id == @zone_id")  # type: gpd.GeoDataFrame
     centroid = centroid.rename(columns={"node_id": "zone_id"})[["zone_id", "geometry"]]
@@ -52,7 +52,6 @@ def connector_creation(
     joined = joined.nsmallest(connectors, "distance_connector")
 
     centr_geo = centroid.geometry.values[0]
-    links = network.links
     for _, rec in joined.iterrows():
         link = links.new()
         link.geometry = LineString([centr_geo, rec.geometry])
