@@ -3,6 +3,7 @@ from os.path import join, realpath
 from typing import Union, Dict
 
 import geopandas as gpd
+import pandas as pd
 import shapely.wkb
 from shapely.geometry import Point, Polygon, LineString, MultiLineString
 from shapely import union_all
@@ -100,6 +101,28 @@ class Zoning(BasicTable):
     def save(self):
         for item in self.__items.values():
             item.save()
+
+    def add_centroids(self, robust=True):
+        """Adds automatic centroids to the network file. It adds centroids to all zones that do not have one
+            Centroid is added to the geographic centroid of the zone.
+
+        :Arguments:
+            **robust** (:obj:`bool`, *Optional*): Moves the centroid location around to avoid node conflict.
+            Defaults to ``True``.
+        """
+        i = 0
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+            existing_centroids = pd.read_sql("SELECT node_id from Nodes where is_centroid = 1", conn).node_id.to_numpy()
+            for zone_id in simple_progress(self.__items.keys(), SIGNAL(object), "Connecting zones"):
+                if zone_id in existing_centroids:
+                    continue
+                zone = self.__items[zone_id]
+                zone.add_centroid(zone.geometry.centroid, robust)
+                i += 1
+        if i > 0:
+            self.project.logger.info(f"{i} new centroids added to the network")
+        else:
+            self.project.logger.info("No new centroids added to the network")
 
     def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True):
         """Adds centroid connectors for the desired mode to the network file
