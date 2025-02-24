@@ -16,7 +16,7 @@ defined based on the auto-generated link types. These include:
 
     >>> from aequilibrae.paths import TransitAssignment, TransitClass
 
-    >>> project = create_example("coquimbo")
+    >>> project = create_example(project_path, "coquimbo")
     >>> data = Transit(project)
 
     >>> graph = data.create_graph(
@@ -69,7 +69,7 @@ One example is skimming travel time in rail only.
 
     >>> from aequilibrae.paths import TransitAssignment, TransitClass
 
-    >>> project = create_example("coquimbo")
+    >>> project = create_example(f"{project_path}v2", "coquimbo")
     >>> data = Transit(project)
 
     >>> graph = data.create_graph(
@@ -122,3 +122,4 @@ One example is skimming travel time in rail only.
 
     >>> assig.execute() # doctest: +SKIP
 
+    >>> project.close()
