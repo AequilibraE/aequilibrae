@@ -112,7 +112,7 @@ class Zoning(BasicTable):
 
         If fewer candidates than required connectors are found, all candidates are connected.
 
-        CENTOIDS THAT ARE CURRENTLY CONNECTED ARE SKIPPED ALTOGETHER
+        CENTROIDS THAT ARE CURRENTLY CONNECTED ARE SKIPPED ALTOGETHER
 
         :Arguments:
             **mode_id** (:obj:`str`): Mode ID we are trying to connect
@@ -128,14 +128,19 @@ class Zoning(BasicTable):
         proj_nodes = self.project.network.nodes.data
         links = self.project.network.links
 
-        _centroids = proj_nodes.reset_index().query("is_centroid == 1", engine="python").node_id.to_numpy()
+        centroids = proj_nodes.reset_index().query("is_centroid == 1", engine="python").node_id.to_numpy()
         link_data = links.data
-        centroid_conn = link_data.query("a_node in @_centroids and modes.str.contains(@mode_id)", engine="python")
+        centroid_conn = link_data.query("a_node in @centroids and modes.str.contains(@mode_id)", engine="python")
+        connected_centroids = centroid_conn.a_node.to_numpy()
 
         with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             for zone_id in simple_progress(self.__items.keys(), SIGNAL(object), "Connecting zones"):
-                if zone_id in centroid_conn.a_node.to_numpy():
+                if zone_id in connected_centroids:
                     continue
+                if zone_id not in centroids:
+                    self.project.logger.warning(f"Centroid  for zone {zone_id} does not exist. Please create it first")
+                    continue
+
                 zone = self.__items[zone_id]
                 area = zone.geometry if limit_to_zone else None
                 connector_creation(

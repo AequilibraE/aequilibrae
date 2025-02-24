@@ -1,7 +1,9 @@
+import warnings
 from sqlite3 import Connection
 from typing import Optional
 
 from shapely.geometry import LineString, Polygon
+
 from aequilibrae.utils.db_utils import commit_and_close
 
 INFINITE_CAPACITY = 99999
@@ -20,6 +22,8 @@ def connector_creation(
 ):
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
+
+    warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
 
     with conn_ or commit_and_close(network.project.path_to_file) as conn:
         logger = network.project.logger
@@ -61,6 +65,6 @@ def connector_creation(
         link.name = f"centroid connector zone {zone_id}"
         link.capacity_ab = INFINITE_CAPACITY
         link.capacity_ba = INFINITE_CAPACITY
-        link.save()
+        link.save(conn_)
     if not joined.empty:
         logger.warning(f"{joined.shape[0]} new centroid connectors for mode {mode_id} added for centroid {zone_id}")
