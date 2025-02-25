@@ -157,9 +157,8 @@ class Zoning(BasicTable):
         connected_centroids = centroid_conn.a_node.to_numpy()
 
         with commit_and_close(self.project.path_to_file, spatial=True) as conn:
-            for zone_id in simple_progress(self.__items.keys(), SIGNAL(object), "Connecting zones"):
-                if zone_id in connected_centroids:
-                    continue
+            zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
+            for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
                 if zone_id not in centroids:
                     self.project.logger.warning(f"Centroid  for zone {zone_id} does not exist. Please create it first")
                     continue
