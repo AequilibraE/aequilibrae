@@ -1346,23 +1346,20 @@ class TransitGraphBuilder:
         """
         duplicated = self.vertices.geometry.duplicated()
 
-        if not robust and not duplicated.empty:
+        if not robust and duplicated.any():
             warnings.warn(
-                "Duplicated geometry was detected but robust was disabled, verticies that share the same geometry will not be saved.",
+                "Duplicated geometry was detected but robust was disabled, vertices that share the same geometry will not be saved.",
                 warnings.RuntimeWarning,
             )
 
-        if robust and not duplicated.empty:
+        if robust and duplicated.any():
             df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
             self.vertices.loc[df.index, "geometry"] = df.geometry
 
-        # The below query is formatted to line the columns up The order of the tuples should be the same
-        # as the order of the columns.
-        #
-        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
-        #     the index and following fields being the column values.
-        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
         with self.pt_conn as conn:
+            if conn.execute("SELECT node_id FROM nodes LIMIT 1;").fetchall():
+                raise ValueError("cannot save nodes into a database with existing nodes")
+
             conn.executemany(
                 f"""\
                 INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
@@ -1387,6 +1384,9 @@ class TransitGraphBuilder:
             self.create_line_geometry()
 
         with self.pt_conn as conn:
+            if conn.execute("SELECT link_id FROM links LIMIT 1;").fetchall():
+                raise ValueError("cannot save links into a database with existing links")
+
             # In order to save the line strings from connector project matching we need to disable some smart node creation.
             # It will be restored to its previous value once we are done here.
             val = conn.execute(
