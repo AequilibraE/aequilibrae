@@ -596,17 +596,16 @@ class TransitGraphBuilder:
 
         # reset index and copy it to column
         self.vertices.reset_index(drop=True, inplace=True)
-        self.vertices.index.name = "index"
         self.vertices["node_id"] = self.vertices.index + 1
         self.vertices = self.vertices[SF_VERTEX_COLS]
         self.create_od_node_mapping()
 
         # data types
         self.vertices.node_id = self.vertices.node_id.astype(int)
-        self.vertices["node_type"] = self.vertices["node_type"].astype("category")
+        self.vertices["node_type"] = self.vertices["node_type"]
         self.vertices.stop_id = self.vertices.stop_id.fillna("").astype(str)
         self.vertices.line_id = self.vertices.line_id.fillna("").astype(str)
-        self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int32")
+        self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int64")
         self.vertices.taz_id = self.vertices.taz_id.fillna("").astype(str)
 
     def _create_on_board_edges(self):
@@ -1150,7 +1149,6 @@ class TransitGraphBuilder:
 
         # reset index and copy it to column
         self.edges.reset_index(drop=True, inplace=True)
-        self.edges.index.name = "index"
         self.edges["link_id"] = self.edges.index + 1
         for col in SF_EDGE_COLS:
             if col not in self.edges:
@@ -1158,12 +1156,12 @@ class TransitGraphBuilder:
         self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
-        self.edges["link_type"] = self.edges["link_type"].astype("category")
+        self.edges["link_type"] = self.edges["link_type"]
         self.edges.line_id = self.edges.line_id.fillna("").astype(str)
         self.edges.stop_id = self.edges.stop_id.fillna("").astype(str)
-        self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1).astype("int32")
-        self.edges.b_node = self.edges.b_node.astype("int32")
-        self.edges.a_node = self.edges.a_node.astype("int32")
+        self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1).astype("int64")
+        self.edges.b_node = self.edges.b_node.astype("int64")
+        self.edges.a_node = self.edges.a_node.astype("int64")
         self.edges.trav_time = self.edges.trav_time.astype(float)
         self.edges.freq = self.edges.freq.astype(float)
         self.edges.o_line_id = self.edges.o_line_id.fillna("").astype(str)
@@ -1483,6 +1481,7 @@ class TransitGraphBuilder:
             sql=f"SELECT {','.join(SF_EDGE_COLS)} FROM links;",
             con=public_transport_conn,
         )
+        graph.edges.direction = graph.edges.direction.astype("int8")
 
         return graph
 
