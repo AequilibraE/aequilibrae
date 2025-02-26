@@ -93,17 +93,69 @@ class Transit(WorkerThread):
             initialize_tables(self, "transit")
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
+        """
+        Create a transit graph from an existing GTFS import.
+
+        All arguments are forwarded to 'TransitGraphBuilder'.
+
+        A 'period_id' may be specified to select a time period. By default, a whole day is used. See
+        'project.network.Periods' for more details.
+        """
         period_id = kwargs.get("period_id", self.periods.default_period.period_id)
         graph = TransitGraphBuilder(self.pt_con, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
         return graph
 
-    def save_graphs(self, period_ids: List[int] = None):
+    def save_graphs(self, period_ids: List[int] = None, force: bool = False, suppress_warning: bool = False):
+        """
+        Save the previously build transit graphs to the 'public_transport.sqlite' database. Saving may be filtered
+        by 'period_id'.
+
+        NOTE: Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release.
+
+        :Arguments:
+            **period_ids** (:obj:`int`): List of periods of to save. Defaults to 'project.network.periods.default_period.period_id'.
+            **force** (:obj:`bool`): Remove the existing graphs before saving the 'period_ids' graphs. Default 'False'.
+            **suppress_warning** (:obj:`bool`): Suppress the warning about single transit graph support. Default 'False'.
+
+        """
         # TODO: Support multiple graph saving
-        warnings.warn(
-            "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release."
-        )
+        if not suppress_warning:
+            warnings.warn(
+                "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release."
+            )
+
+        if period_ids is None:
+            period_ids = [self.periods.default_period.period_id]
+
+        if len(period_ids) > 1:
+            raise ValueError("Multiple graphs can currently be saved.")
+
+        if force:
+            self.remove_graphs(period_ids, suppress_warning=suppress_warning)
+
+        for period_id in period_ids:
+            self.graphs[period_id].save()
+
+    def remove_graphs(self, period_ids: List[int] = None, suppress_warning: bool = False):
+        """
+        Remove the previously saved transit graphs from the 'public_transport.sqlite' database. Removing may be filtered
+        by 'period_id'.
+
+        NOTE: Currently only a single transit graph can be removed at once. Multiple graph support is plan for a future release.
+
+        :Arguments:
+            **period_ids** (:obj:`int`): List of periods of to save. Defaults to 'project.network.periods.default_period.period_id'.
+            **suppress_warning** (:obj:`bool`): Suppress the warning about single transit graph support. Default 'False'.
+
+        """
+        # TODO: Support multiple graph saving
+        if not suppress_warning:
+            warnings.warn(
+                "Currently only a single transit graph removed at once. Multiple graph support is plan for a future release."
+            )
+
         if period_ids is None:
             period_ids = [self.periods.default_period.period_id]
 
@@ -111,13 +163,25 @@ class Transit(WorkerThread):
             raise ValueError("Multiple graphs can currently be saved.")
 
         for period_id in period_ids:
-            self.graphs[period_id].save()
+            TransitGraphBuilder.remove(self.pt_con, period_id)
 
-    def load(self, period_ids: List[int] = None):
+    def load(self, period_ids: List[int] = None, suppress_warning: bool = False):
+        """
+        Load the previously saved transit graphs from the 'public_transport.sqlite' database. Loading may be filtered
+        by 'period_id'.
+
+        NOTE: Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release.
+
+        :Arguments:
+            **period_ids** (:obj:`int`): List of periods of to save. Defaults to 'project.network.periods.default_period.period_id'.
+            **suppress_warning** (:obj:`bool`): Suppress the warning about single transit graph support. Default 'False'.
+
+        """
         # TODO: Support multiple graph loading
-        warnings.warn(
-            "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release. `period_ids` argument is currently ignored."
-        )
+        if not suppress_warning:
+            warnings.warn(
+                "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release. `period_ids` argument is currently ignored."
+            )
 
         if period_ids is None:
             period_ids = [self.periods.default_period.period_id]

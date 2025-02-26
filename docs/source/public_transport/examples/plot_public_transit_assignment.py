@@ -98,6 +98,11 @@ data.save_graphs()
 data.load()
 
 # %%
+# We can also remove the previously saved graphs.
+
+# data.remove_graphs()
+
+# %%
 # Links and nodes are stored in a similar manner to the 'project_database.sqlite' database.
 # 
 # Reading back into AequilibraE

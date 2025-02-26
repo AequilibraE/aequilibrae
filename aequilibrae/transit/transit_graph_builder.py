@@ -1370,6 +1370,19 @@ class TransitGraphBuilder:
                 ),
             )
 
+    @staticmethod
+    def remove_vertices(pt_conn: sqlite3.Connection, period_id: int = None):
+        """
+        Remove a transit graph's vertices from the public transport database specified by it's 'period_id'.
+
+        :Arguments:
+            **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+            **period_id** (:obj:`int`): Unused argument. Support for multiple periods is planned.
+
+        """
+        with pt_conn as conn:
+            conn.execute("DELETE FROM nodes")
+
     def save_edges(self, recreate_line_geometry=False):
         """
         Save the contents of self.edges to the public transport database.
@@ -1403,21 +1416,56 @@ class TransitGraphBuilder:
 
             conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
 
+    @staticmethod
+    def remove_edges(pt_conn: sqlite3.Connection, period_id: int = None):
+        """
+        Remove a transit graph's edges from the public transport database specified by it's 'period_id'.
+
+        :Arguments:
+            **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+            **period_id** (:obj:`int`): Unused argument. Support for multiple periods is planned.
+
+        """
+        with pt_conn as conn:
+            conn.execute("DELETE FROM links")
+
     def save_config(self):
         with self.project_conn as conn:
             sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
             conn.execute(sql, [self.period_id, json.dumps(self.config)])
 
+    @staticmethod
+    def remove_config(conn: sqlite3.Connection, period_id: int):
+        """
+        Remove a transit graph configuration from the project database specified by it's 'period_id'.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): Connection to the ``project.sqlite`` database.
+            **period_id** (:obj:`int`): 'period_id' key for the 'transit_graph_configs' table.
+
+        """
+        with conn as conn:
+            sql = "DELETE FROM transit_graph_configs WHERE period_id = ?"
+            conn.execute(sql, [period_id])
+
     def save(self, robust=True):
         """Save the current graph to the public transport database.
 
+        Within the database nodes may not exist at the exact same point in space, provide ``robust=True`` to move the nodes slightly.
+
         :Arguments:
-           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
+            **robust** (:obj:`bool`): Whether to move stack nodes slightly before saving. Defaults to ``True``.
         """
         self.create_additional_db_fields()
         self.save_vertices(robust=robust)
         self.save_edges()
         self.save_config()
+
+    @classmethod
+    def remove(cls, pt_conn: sqlite3.Connection, period_id: int):
+        cls.remove_edges(pt_conn, period_id)
+        cls.remove_vertices(pt_conn, period_id)
+        cls.remove_config(database_connection("project_database"), period_id)
 
     def to_transit_graph(self) -> TransitGraph:
         """Create an AequilibraE ``TransitGraph`` object from an SF graph builder."""
@@ -1462,23 +1510,26 @@ class TransitGraphBuilder:
            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the 'public_transport.sqlite' database.
         """
         project_conn = database_connection("project_database")
-        config = json.loads(
-            project_conn.execute(
-                "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]
-            ).fetchone()[0]
-        )
+        config = project_conn.execute(
+            "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]
+        ).fetchone()
+
+        if config is None:
+            raise ValueError(f"no transit graph configuration found for 'period_id={period_id}'")
+
+        config = json.loads(config[0])
         config.update(kwargs)
 
         graph = cls(public_transport_conn, **config)
 
         # FIXME Load specific period_id graph from dynamic table
         graph.vertices = pd.read_sql_query(
-            sql=f"SELECT {','.join(SF_VERTEX_COLS)} FROM nodes;",
+            sql=f"SELECT {','.join(SF_VERTEX_COLS[:-1])}, ST_asBinary(\"geometry\") as geometry FROM nodes;",
             con=public_transport_conn,
         )
 
         graph.edges = pd.read_sql_query(
-            sql=f"SELECT {','.join(SF_EDGE_COLS)} FROM links;",
+            sql=f"SELECT {','.join(SF_EDGE_COLS)}, ST_asBinary(\"geometry\") as geometry FROM links;",
             con=public_transport_conn,
         )
         graph.edges.direction = graph.edges.direction.astype("int8")
