@@ -93,8 +93,7 @@ class Transit(WorkerThread):
             initialize_tables(self, "transit")
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
-        period_id = kwargs.get("period_id", self.periods.default_period.period_id)
-        kwargs.pop("period_id", None)
+        period_id = kwargs.pop("period_id", self.periods.default_period.period_id)
         graph = TransitGraphBuilder(self.pt_con, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
