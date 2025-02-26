@@ -44,9 +44,13 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
 
 def _connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False):
     conn = safe_connect(path_to_file, missing_ok)
+    load_spatialite_extension(conn)
+    return conn
+
+
+def load_spatialite_extension(conn: Connection):
     conn.enable_load_extension(True)
     conn.load_extension("mod_spatialite")
-    return conn
 
 
 def is_spatialite(conn):
