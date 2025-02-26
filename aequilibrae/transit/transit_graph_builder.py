@@ -18,6 +18,8 @@ import pyproj
 import shapely
 import shapely.ops
 import json
+import sqlite3
+
 from aequilibrae.utils.geo_utils import haversine
 from aequilibrae.project.database_connection import database_connection
 from scipy.spatial import KDTree, minkowski_distance
@@ -94,7 +96,7 @@ class TransitGraphBuilder:
 
     def __init__(
         self,
-        public_transport_conn,
+        public_transport_conn: sqlite3.Connection,
         period_id: int = 1,
         time_margin: int = 0,
         projected_crs: str = "EPSG:3857",
@@ -110,11 +112,8 @@ class TransitGraphBuilder:
         connector_method: str = "nearest_neighbour",
         max_connectors_per_zone: int = -1,
     ):
-        self.pt_conn = public_transport_conn  # sqlite connection
-        self.pt_conn.enable_load_extension(True)
-        self.pt_conn.load_extension("mod_spatialite")
-
-        self.project_conn = database_connection("project_database")
+        self.pt_conn = public_transport_conn
+        self.project_conn: sqlite3.Connection = database_connection("project_database")
 
         self.period_id = period_id
         start, end = self.project_conn.execute(
@@ -1320,24 +1319,23 @@ class TransitGraphBuilder:
         # This graph requires some additional tables and fields in order to store all our information.
         # Currently it mimics what we are storing in the df
 
-        self.pt_conn.executemany(
-            """
-            INSERT OR IGNORE INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
-            """,
-            [
-                ("on-board", "o", "From boarding to alighting"),
-                ("boarding", "b", "From stop to boarding"),
-                ("alighting", "a", "From alighting to stop"),
-                ("dwell", "d", "From alighting to boarding"),
-                ("access_connector", "A", ""),
-                ("egress_connector", "e", ""),
-                ("inner_transfer", "t", "Transfer edge within station, from alighting to boarding"),
-                ("outer_transfer", "T", "Transfer edge outside of a station, from alighting to boarding"),
-                ("walking", "w", "Walking, from stop or walking to stop or walking"),
-            ],
-        )
-
-        self.pt_conn.commit()
+        with self.pt_conn as conn:
+            conn.executemany(
+                """
+                INSERT OR IGNORE INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
+                """,
+                [
+                    ("on-board", "o", "From boarding to alighting"),
+                    ("boarding", "b", "From stop to boarding"),
+                    ("alighting", "a", "From alighting to stop"),
+                    ("dwell", "d", "From alighting to boarding"),
+                    ("access_connector", "A", ""),
+                    ("egress_connector", "e", ""),
+                    ("inner_transfer", "t", "Transfer edge within station, from alighting to boarding"),
+                    ("outer_transfer", "T", "Transfer edge outside of a station, from alighting to boarding"),
+                    ("walking", "w", "Walking, from stop or walking to stop or walking"),
+                ],
+            )
 
     def save_vertices(self, robust=True):
         """
@@ -1366,17 +1364,16 @@ class TransitGraphBuilder:
         #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
         #     the index and following fields being the column values.
         # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
-        self.pt_conn.executemany(
-            f"""\
-            INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
-            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
-            """,
-            (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
-                index=False, name=None
-            ),
-        )
-
-        self.pt_conn.commit()
+        with self.pt_conn as conn:
+            conn.executemany(
+                f"""\
+                INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
+                VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
+                """,
+                (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
+                    index=False, name=None
+                ),
+            )
 
     def save_edges(self, recreate_line_geometry=False):
         """
@@ -1391,27 +1388,27 @@ class TransitGraphBuilder:
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
-        # In order to save the line strings from connector project matching we need to disable some smart node creation.
-        # It will be restored to its previous value once we are done here.
-        val = self.pt_conn.execute(
-            "SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'"
-        ).fetchone()[0]
-        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
-        self.pt_conn.executemany(
-            f"""\
-            INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
-            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
-            """,
-            self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
-        )
+        with self.pt_conn as conn:
+            # In order to save the line strings from connector project matching we need to disable some smart node creation.
+            # It will be restored to its previous value once we are done here.
+            val = conn.execute(
+                "SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'"
+            ).fetchone()[0]
+            conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
+            conn.executemany(
+                f"""\
+                INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
+                VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
+                """,
+                self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
+            )
 
-        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
-        self.pt_conn.commit()
+            conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
 
     def save_config(self):
-        sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
-        self.project_conn.execute(sql, [self.period_id, json.dumps(self.config)])
-        self.project_conn.commit()
+        with self.project_conn as conn:
+            sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
+            conn.execute(sql, [self.period_id, json.dumps(self.config)])
 
     def save(self, robust=True):
         """Save the current graph to the public transport database.
