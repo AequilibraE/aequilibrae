@@ -601,8 +601,7 @@ class TransitGraphBuilder:
         self.create_od_node_mapping()
 
         # data types
-        self.vertices.node_id = self.vertices.node_id.astype(int)
-        self.vertices["node_type"] = self.vertices["node_type"]
+        self.vertices.node_id = self.vertices.node_id.astype("int64")
         self.vertices.stop_id = self.vertices.stop_id.fillna("").astype(str)
         self.vertices.line_id = self.vertices.line_id.fillna("").astype(str)
         self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int64")
@@ -1156,7 +1155,6 @@ class TransitGraphBuilder:
         self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
-        self.edges["link_type"] = self.edges["link_type"]
         self.edges.line_id = self.edges.line_id.fillna("").astype(str)
         self.edges.stop_id = self.edges.stop_id.fillna("").astype(str)
         self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1).astype("int64")
@@ -1525,11 +1523,18 @@ class TransitGraphBuilder:
             sql=f"SELECT {','.join(SF_VERTEX_COLS[:-1])}, ST_asBinary(\"geometry\") as geometry FROM nodes;",
             con=public_transport_conn,
         )
+        graph.vertices.node_id = graph.vertices.node_id.astype("int64")
+        graph.vertices.line_seg_idx = graph.vertices.line_seg_idx.astype("int64")
 
         graph.edges = pd.read_sql_query(
             sql=f"SELECT {','.join(SF_EDGE_COLS)}, ST_asBinary(\"geometry\") as geometry FROM links;",
             con=public_transport_conn,
         )
+        graph.edges.line_id = graph.edges.line_id.fillna("").astype(str)
+        graph.edges.stop_id = graph.edges.stop_id.fillna("").astype(str)
+        graph.edges.line_seg_idx = graph.edges.line_seg_idx.astype("int64")
+        graph.edges.b_node = graph.edges.b_node.astype("int64")
+        graph.edges.a_node = graph.edges.a_node.astype("int64")
         graph.edges.direction = graph.edges.direction.astype("int8")
 
         return graph
