@@ -170,4 +170,3 @@ class TestTransitGraphBuilder(TestCase):
 
             with self.assertRaises(ValueError):
                 self.data.load(suppress_warning=True)
-
