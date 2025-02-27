@@ -101,7 +101,8 @@ class Transit(WorkerThread):
         A 'period_id' may be specified to select a time period. By default, a whole day is used. See
         'project.network.Periods' for more details.
         """
-        period_id = kwargs.get("period_id", self.periods.default_period.period_id)
+        period_id = kwargs.pop("period_id", self.periods.default_period.period_id)
+
         graph = TransitGraphBuilder(self.pt_con, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
