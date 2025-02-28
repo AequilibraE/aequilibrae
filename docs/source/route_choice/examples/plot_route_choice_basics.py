@@ -26,6 +26,7 @@ Serena Metropolitan Area in Chile.
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
+
 from aequilibrae.utils.create_example import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_route_choice_assignment.png'
@@ -133,24 +134,14 @@ def plot_results(link_loads):
     # Maximum thickness we would like is probably a 10, so let's make sure we don't go over that
     factor = 10 / max_load
 
-    # Let's create the layers
-    for _, rec in loaded_links.iterrows():
-        points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
-        points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-        # we need to take from x/y to lat/long
-        points = [[x[1], x[0]] for x in eval(points)]
-        _ = folium.vector_layers.PolyLine(
-            points,
-            tooltip=f"link_id: {rec.link_id}, Flow: {rec.tot:.3f}",
-            color="red",
-            weight=factor * rec.tot,
-        ).add_to(loads_lyr)
-    long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
-
-    map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
-    loads_lyr.add_to(map_osm)
-    folium.LayerControl().add_to(map_osm)
-    return map_osm
+    return loaded_links.explore(
+        color="red",
+        style_kwds={
+            "style_function": lambda x: {
+                "weight": x["properties"]["tot"] * factor,
+            }
+        },
+    )
 
 # %%
 # Route Choice class

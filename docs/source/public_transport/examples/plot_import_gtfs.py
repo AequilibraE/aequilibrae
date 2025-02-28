@@ -24,9 +24,10 @@ from os.path import join
 from tempfile import gettempdir
 
 import folium
+import geopandas as gpd
 import pandas as pd
-from aequilibrae.project.database_connection import database_connection
 
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
@@ -36,6 +37,7 @@ from aequilibrae.utils.create_example import create_example
 
 # Let's create an empty project on an arbitrary folder.
 fldr = join(gettempdir(), uuid4().hex)
+
 project = create_example(fldr, "coquimbo")
 
 # %%
@@ -75,56 +77,22 @@ transit.save_to_disk()
 # Now we will plot one of the route's patterns we just imported
 conn = database_connection("transit")
 
-links = pd.read_sql("SELECT pattern_id, ST_AsText(geometry) geom FROM routes;", con=conn)
-
+patterns = pd.read_sql("SELECT pattern_id, ST_AsText(geometry) geom FROM routes;", con=conn)
 stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=conn)
 
 # %%
-gtfs_links = folium.FeatureGroup("links")
-gtfs_stops = folium.FeatureGroup("stops")
-
-layers = [gtfs_links, gtfs_stops]
-
-# %%
-pattern_colors = ["#146DB3", "#EB9719"]
+# We turn the patterns and stops DataFrames into GeoDataFrames so we can plot them more easily.
+patterns = gpd.GeoDataFrame(patterns, geometry=gpd.GeoSeries.from_wkt(patterns["geom"]), crs=4326)
+stops = gpd.GeoDataFrame(stops, geometry=gpd.GeoSeries.from_xy(stops["X"], stops["Y"]), crs=4326)
 
 # %%
-for i, row in links.iterrows():
-    points = row.geom.replace("MULTILINESTRING", "").replace("(", "").replace(")", "").split(", ")
-    points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-    points = [[x[1], x[0]] for x in eval(points)]
+# And plot out data!
 
-    _ = folium.vector_layers.PolyLine(
-        points,
-        popup=f"<b>pattern_id: {row.pattern_id}</b>",
-        color=pattern_colors[i],
-        weight=5,
-    ).add_to(gtfs_links)
+map = patterns.explore(color=["#146DB3", "#EB9719"], style_kwds={"weight": 4}, name="links")
+map = stops.explore(m=map, color="black", style_kwds={"radius": 2, "fillOpacity": 1.0}, name="stops")
 
-for i, row in stops.iterrows():
-    point = (row.Y, row.X)
-
-    _ = folium.vector_layers.CircleMarker(
-        point,
-        popup=f"<b>stop_id: {row.stop_id}</b>",
-        color="black",
-        radius=2,
-        fill=True,
-        fillColor="black",
-        fillOpacity=1.0,
-    ).add_to(gtfs_stops)
-
-# %%
-# Let's create the map!
-map_osm = folium.Map(location=[-29.93, -71.29], zoom_start=13)
-
-# add all layers
-for layer in layers:
-    layer.add_to(map_osm)
-
-# And add layer control before we display it
-folium.LayerControl().add_to(map_osm)
-map_osm
+folium.LayerControl().add_to(map)
+map
 
 # %%
 project.close()

@@ -24,6 +24,8 @@ a city in La Serena Metropolitan Area in Chile.
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
+
+import folium
 import numpy as np
 from aequilibrae.utils.create_example import create_example
 
@@ -94,66 +96,33 @@ choice_set = rc.get_results().to_pandas()
 
 # %%
 # Now we will plot the paths we just created for the second OD pair
-import folium
 
-# %%
-# Let's create a separate for each route so we can visualize one at a time
-rlyr1 = folium.FeatureGroup("route 1")
-rlyr2 = folium.FeatureGroup("route 2")
-rlyr3 = folium.FeatureGroup("route 3")
-rlyr4 = folium.FeatureGroup("route 4")
-rlyr5 = folium.FeatureGroup("route 5")
-od_lyr = folium.FeatureGroup("Origin and Destination")
-layers = [rlyr1, rlyr2, rlyr3, rlyr4, rlyr5]
-
-# %%
 # We get the data we will use for the plot: links, nodes and the route choice set
-links = project.network.links.data
-nodes = project.network.nodes.data
-
 plot_routes = choice_set[(choice_set["origin id"] == 77011)]["route set"].values
 
-# Let's create the layers
-colors = ["red", "blue", "green", "purple", "orange"]
-for i, route in enumerate(plot_routes):
-    rt = links[links.link_id.isin(route)]
-    routes_layer = layers[i]
-    for wkt in rt.geometry.to_wkt().values:
-        points = wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
-        points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-        # we need to take from x/y to lat/long
-        points = [[x[1], x[0]] for x in eval(points)]
+links = project.network.links.data
 
-        _ = folium.vector_layers.PolyLine(points, color=colors[i], weight=4).add_to(routes_layer)
+# For ease of plot, we create a GeoDataFrame for each route in the choice set
+route_1 = links[links.link_id.isin(plot_routes[0])]
+route_2 = links[links.link_id.isin(plot_routes[1])]
+route_3 = links[links.link_id.isin(plot_routes[2])]
+route_4 = links[links.link_id.isin(plot_routes[3])]
+route_5 = links[links.link_id.isin(plot_routes[4])]
 
-# Creates the points for both origin and destination
-for i, row in nodes[nodes.node_id.isin((77011, 74089))].iterrows():
-    point = (row.geometry.y, row.geometry.x)
-
-    _ = folium.vector_layers.CircleMarker(
-        point,
-        popup=f"<b>link_id: {row.node_id}</b>",
-        color="red",
-        radius=5,
-        fill=True,
-        fillColor="red",
-        fillOpacity=1.0,
-    ).add_to(od_lyr)
+nodes = project.network.nodes.data
+nodes = nodes[nodes["node_id"].isin([77011, 74089])]
 
 # %%
-# It is worthwhile to notice that using distance as the cost function, the routes are not the fastest ones as the
-# freeway does not get used
+map = route_1.explore(color="red", style_kwds={"weight": 3}, name="route_1")
+map = route_2.explore(m=map, color="blue", style_kwds={"weight": 3}, name="route_2")
+map = route_3.explore(m=map, color="green", style_kwds={"weight": 3}, name="route_3")
+map = route_4.explore(m=map, color="purple", style_kwds={"weight": 3}, name="route_4")
+map = route_5.explore(m=map, color="orange", style_kwds={"weight": 3}, name="route_5")
 
-# %%
-# Create the map and center it in the correct place
-long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
+map = nodes.explore(m=map, color="black", style_kwds={"radius": 5, "fillOpacity": 1.0}, name="network_nodes")
 
-map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
-for routes_layer in layers:
-    routes_layer.add_to(map_osm)
-od_lyr.add_to(map_osm)
-folium.LayerControl().add_to(map_osm)
-map_osm
+folium.LayerControl().add_to(map)
+map
 
 # %%
 project.close()
