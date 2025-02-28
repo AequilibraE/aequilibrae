@@ -22,9 +22,9 @@ class SubAreaAnalysis:
         """
         Construct a sub-area matrix from a provided sub-area GeoDataFrame using route choice.
 
-        This class aims to provide a semi-automated method for constructing the sub-area matrix. 
-        The user should provide the Graph object, demand matrix, and a GeoDataFrame whose geometry 
-        union represents the desired sub-area. Perform a route choice assignment, then call the 
+        This class aims to provide a semi-automated method for constructing the sub-area matrix.
+        The user should provide the Graph object, demand matrix, and a GeoDataFrame whose geometry
+        union represents the desired sub-area. Perform a route choice assignment, then call the
         ``post_process`` method to obtain a sub-area matrix.
 
         Check how to run sub-area analysis :ref:`here <example_usage_sub_area_analysis>`.
@@ -32,10 +32,10 @@ class SubAreaAnalysis:
         :Arguments:
             **graph** (:obj:`Graph`): AequilibraE graph object to use
 
-            **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union 
+            **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union
             represents the sub-area.
 
-            **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to 
+            **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
@@ -70,11 +70,11 @@ class SubAreaAnalysis:
         Apply the necessary post processing to the route choice assignment select link results.
 
         :Arguments:
-            **demand_cols** (*Optional*: :obj:`[list[str]]`): If provided, only construct the 
+            **demand_cols** (*Optional*: :obj:`[list[str]]`): If provided, only construct the
             sub-area matrix for these demand matrices.
 
         :Returns:
-            **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area 
+            **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area
             demand matrix.
         """
 
