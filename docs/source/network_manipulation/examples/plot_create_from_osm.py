@@ -4,7 +4,8 @@
 Create project from OpenStreetMap
 =================================
 
-In this example, we show how to create an empty project and populate it with a network from OpenStreetMap.
+In this example, we show how to create an empty project and populate it with a network from 
+OpenStreetMap.
 
 This time we will use GeoPandas to visualize the network.
 """
@@ -25,8 +26,8 @@ This time we will use GeoPandas to visualize the network.
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
+
 from aequilibrae import Project
-import folium
 # sphinx_gallery_thumbnail_path = '../source/_images/nauru.png'
 
 # %%
@@ -38,8 +39,8 @@ project = Project()
 project.new(fldr)
 
 # %%
-# Now we can download the network from any place in the world (as long as you have memory for all the download
-# and data wrangling that will be done).
+# Now we can download the network from any place in the world (as long as you have memory for 
+# all the download and data wrangling that will be done).
 
 # %%
 # We can create from a bounding box or a named place.
@@ -58,9 +59,7 @@ links = project.network.links.data
 
 # %%
 # Let's plot our network!
-map_osm = links.explore(color="blue", weight=10, tooltip="link_type", popup="link_id", name="links")
-folium.LayerControl().add_to(map_osm)
-map_osm
+links.explore(color="blue", style_kwds={"weight": 2}, tooltip="link_type")
 
 # %%
 project.close()

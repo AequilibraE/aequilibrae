@@ -42,7 +42,8 @@ The source files of this network are publicly available in the
 from uuid import uuid4
 from os.path import join
 from tempfile import gettempdir
-from aequilibrae.project import Project
+
+from aequilibrae import Project
 from aequilibrae.parameters import Parameters
 import folium
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_import_from_gmns.png'
@@ -96,59 +97,11 @@ links = project.network.links.data
 nodes = project.network.nodes.data
 
 # %%
-# We create our Folium layers
-network_links = folium.FeatureGroup("links")
-network_nodes = folium.FeatureGroup("nodes")
-layers = [network_links, network_nodes]
+map = links.explore(color="black", style_kwds={"weight": 2}, tool_tip="link_type", name="links")
+map = nodes.explore(m=map, color="red", style_kwds={"radius": 5, "fillOpacity": 1.0}, name="nodes")
 
-# %%
-# We do some Python magic to transform this dataset into the format required by Folium
-# We are only getting link_id and link_type into the map, but we could get other pieces of info as well
-for i, row in links.iterrows():
-    points = row.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
-    points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-    # we need to take from x/y to lat/long
-    points = [[x[1], x[0]] for x in eval(points)]
-
-    _ = folium.vector_layers.PolyLine(
-        points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="black", weight=2
-    ).add_to(network_links)
-
-# %%
-# And now we get the nodes
-
-for i, row in nodes.iterrows():
-    point = (row.geometry.y, row.geometry.x)
-
-    _ = folium.vector_layers.CircleMarker(
-        point,
-        popup=f"<b>link_id: {row.node_id}</b>",
-        tooltip=f"{row.modes}",
-        color="red",
-        radius=5,
-        fill=True,
-        fillColor="red",
-        fillOpacity=1.0,
-    ).add_to(network_nodes)
-
-# %%
-# We get the center of the region
-curr = project.conn.cursor()
-curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
-long, lat = curr.fetchone()
-
-# %%
-
-# We create the map
-map_gmns = folium.Map(location=[lat, long], zoom_start=17)
-
-# Add all layers
-for layer in layers:
-    layer.add_to(map_gmns)
-
-# And Add layer control before we display it
-folium.LayerControl().add_to(map_gmns)
-map_gmns
+folium.LayerControl().add_to(map) # Add a layer control button to our map
+map
 
 # %%
 project.close()

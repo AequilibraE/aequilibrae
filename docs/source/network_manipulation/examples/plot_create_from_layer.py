@@ -35,7 +35,6 @@ from tempfile import gettempdir
 from os.path import join
 from shapely.wkt import loads as load_wkt
 import pandas as pd
-import folium
 
 from aequilibrae import Project
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_from_layer.png'
@@ -151,9 +150,7 @@ links = project.network.links.data
 
 # %%
 # Let's plot our network!
-map_osm = links.explore(color="blue", weight=10, tooltip="link_type", popup="link_id", name="links")
-folium.LayerControl().add_to(map_osm)
-map_osm
+links.explore(color="blue", style_kwds={"weight": 2}, tooltip="link_type")
 
 # %%
 project.close()
