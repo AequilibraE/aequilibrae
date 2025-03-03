@@ -38,7 +38,9 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
 
         return qgis.utils.spatialite_connect(path_to_file)
 
-    ensure_spatialite_binaries()
+    if os.environ.get("AEQ_ENSURE_SPATIALITE", "YES") != "NO":
+        ensure_spatialite_binaries()
+
     return _connect_spatialite(path_to_file, missing_ok)
 
 
@@ -55,6 +57,14 @@ def load_spatialite_extension(conn: Connection):
 
 def is_spatialite(conn):
     return has_table(conn, "geometry_columns")
+
+
+def set_known_spatialite_folder(spatialite_folder: os.PathLike):
+    directory = str(spatialite_folder)
+    if directory not in os.environ["PATH"]:
+        os.environ["PATH"] = directory + os.pathsep + os.environ["PATH"]
+    if "PROJ_LIB" not in os.environ:
+        os.environ["PROJ_LIB"] = directory
 
 
 def ensure_spatialite_binaries(directory: Optional[os.PathLike] = None) -> None:
