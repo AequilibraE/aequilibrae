@@ -76,11 +76,7 @@ def ensure_spatialite_binaries(directory: Optional[os.PathLike] = None) -> None:
     if not _dll_already_exists(directory):
         _download_and_extract_spatialite(directory)
 
-    # Update path and proj_lib env vars
-    if directory not in os.environ["PATH"]:
-        os.environ["PATH"] = directory + os.pathsep + os.environ["PATH"]
-    if "PROJ_LIB" not in os.environ:
-        os.environ["PROJ_LIB"] = directory
+    set_known_spatialite_folder(directory)
 
     try:
         # We need to have the proj.db file in place.
