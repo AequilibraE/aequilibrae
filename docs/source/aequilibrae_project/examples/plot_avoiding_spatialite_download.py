@@ -30,18 +30,7 @@ from aequilibrae.utils.spatialite_utils import set_known_spatialite_folder, ensu
 
 # First we prevent Windows from downloading spatialite binaries during this session
 # THIS VALUE MUST BE UPPER CASE TO BE EFFECTIVE
-os.environ["AEQ_ENSURE_SPATIALITE"] = "NO"
-
-
-# We can also tell AequilibraE where to find spatialite in your system
-# You can permanently set Spatialite in your system by following the instructions in this
-# blog post: https://www.xl-optim.com/spatialite-and-python-in-2020/
-set_known_spatialite_folder(".")
-
-# Or we can simply tell AequilibraE to download the binaries to a specific folder
-# and set it up for use
-desired_spatialite_folder = join(gettempdir(), "spatialite")
-ensure_spatialite_binaries(desired_spatialite_folder)
+os.environ["AEQ_SPATIALITE_DIR"] = r"C:\path\to\existing\download"
 
 
 # %%

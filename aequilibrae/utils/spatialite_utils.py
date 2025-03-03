@@ -38,8 +38,7 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
 
         return qgis.utils.spatialite_connect(path_to_file)
 
-    if os.environ.get("AEQ_ENSURE_SPATIALITE", "YES") != "NO":
-        ensure_spatialite_binaries()
+    ensure_spatialite_binaries()
 
     return _connect_spatialite(path_to_file, missing_ok)
 
@@ -67,13 +66,14 @@ def set_known_spatialite_folder(spatialite_folder: os.PathLike):
         os.environ["PROJ_LIB"] = directory
 
 
-def ensure_spatialite_binaries(directory: Optional[os.PathLike] = None) -> None:
+def ensure_spatialite_binaries() -> None:
     if is_not_windows():
         return
 
-    directory = directory or gettempdir()
+    directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
 
     if not _dll_already_exists(directory):
+        global_logger.info(f"mod_spatialite.dll not found in {directory} attempting to download")
         _download_and_extract_spatialite(directory)
 
     set_known_spatialite_folder(directory)
