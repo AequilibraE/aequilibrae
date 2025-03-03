@@ -124,7 +124,8 @@ cdef class RouteChoiceSetResults:
             schema=self.psl_schema if self.perform_assignment else self.schema,
             use_threads=True,
             existing_data_behavior="overwrite_or_ignore",
-            file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
+            file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}"),
+            compression="zstd",
         )
 
     @classmethod

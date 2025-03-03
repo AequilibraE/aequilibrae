@@ -20,6 +20,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 
 
@@ -347,7 +348,7 @@ class RouteChoice:
         if self.where is None:
             results = self.__rc.get_results()
         else:
-            results = self.__rc.results.read_dataset(self.where)
+            results = RouteChoiceSetResults.read_dataset(self.where)
 
         return results
 
