@@ -20,7 +20,6 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
 class Transit(WorkerThread):
-
     transit = SIGNAL(object)
     default_capacities = {
         0: [150, 300],  # Tram, Streetcar, Light rail

@@ -185,7 +185,7 @@ def main():
         for project_name in args["projects"]:
             no_sl = final.query(f"Project == '{project_name}' and Select_Link == False")["Minimum_Runtime"]
             sl = final.query(f"Project == '{project_name}' and Select_Link == True")["Minimum_Runtime"]
-            df = pd.DataFrame({"Project": [project_name], "Runtime_%_Increase": [((sl - no_sl) / no_sl * 100)]})
+            df = pd.DataFrame({"Project": [project_name], "Runtime_%_Increase": [(sl - no_sl) / no_sl * 100]})
             ratios.append(df)
         final_ratio = pd.concat(ratios) if len(ratios) != 1 else ratios[0]
 

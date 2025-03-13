@@ -33,7 +33,7 @@ class SafeClass:
         markers = ",".join(["?"] * len(up_keys)) + ",GeomFromWKB(?, ?)"
         up_keys.append("geometry")
         data.extend([self.geometry.wkb, self.__srid__])
-        sql = f'Insert into {self._table} ({",".join(up_keys)}) values({markers})'
+        sql = f"Insert into {self._table} ({','.join(up_keys)}) values({markers})"
         return data, sql
 
     def connect_db(self):

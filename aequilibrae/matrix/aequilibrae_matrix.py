@@ -230,7 +230,7 @@ class AequilibraeMatrix(object):
                 if isinstance(ind_name, str):
                     if len(ind_name) > INDEX_NAME_MAX_LENGTH:
                         raise ValueError(
-                            "Index names need to be be shorter " "than {}: {}".format(INDEX_NAME_MAX_LENGTH, ind_name)
+                            "Index names need to be be shorter than {}: {}".format(INDEX_NAME_MAX_LENGTH, ind_name)
                         )
                 else:
                     raise ValueError("Index names need to be strings: " + str(ind_name))

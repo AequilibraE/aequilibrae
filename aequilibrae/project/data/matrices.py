@@ -49,7 +49,7 @@ class Matrices:
             remove = [nm for nm, file in mats if not isfile(join(self.fldr, file))]
 
             if remove:
-                self.logger.warning(f'Matrix records not found in disk cleaned from database: {",".join(remove)}')
+                self.logger.warning(f"Matrix records not found in disk cleaned from database: {','.join(remove)}")
 
                 remove = [[x] for x in remove]
                 conn.executemany("DELETE from matrices where name=?;", remove)
@@ -63,7 +63,7 @@ class Matrices:
         new_files = [x for x in new_files if os.path.splitext(x.lower())[1] in [".omx", ".aem"]]
 
         if new_files:
-            self.logger.warning(f'New matrix found on disk. Added to the database: {",".join(new_files)}')
+            self.logger.warning(f"New matrix found on disk. Added to the database: {','.join(new_files)}")
 
         for fl in new_files:
             mat = AequilibraeMatrix()

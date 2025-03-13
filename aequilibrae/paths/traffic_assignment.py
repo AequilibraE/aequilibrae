@@ -501,12 +501,10 @@ class TrafficAssignment(AssignmentBase):
         missing = expected - set(preload.columns)
         additional = set(preload.columns) - expected
         if missing:
-            raise ValueError(
-                f"Input preload dataframe is missing columns: {missing}\n" f"expected columns are {expected}"
-            )
+            raise ValueError(f"Input preload dataframe is missing columns: {missing}\nexpected columns are {expected}")
         elif additional:
             raise ValueError(
-                f"Input preload dataframe has additional columns: {additional}\n" f"expected columns are {expected}"
+                f"Input preload dataframe has additional columns: {additional}\nexpected columns are {expected}"
             )
 
         # Reject empty preloads

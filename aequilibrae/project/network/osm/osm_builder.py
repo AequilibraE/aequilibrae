@@ -74,7 +74,6 @@ class OSMBuilder(WorkerThread):
         self.links_df.set_index(["osm_id"], inplace=True)
 
         for idx, link in simple_progress(self.links_df.iterrows(), self.signal, "Adding network links"):
-
             # How can I link have less than two points?
             if not isinstance(link["nodes"], list):
                 self.logger.debug(f"OSM link/feature {idx} does not have a list of nodes.")

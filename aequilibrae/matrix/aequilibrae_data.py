@@ -219,7 +219,7 @@ class AequilibraeData(object):
                 fi += ", " + f + " REAL"
                 qm += ", ?"
 
-            c.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")" "")
+            c.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")")
             c.execute("BEGIN TRANSACTION")
             c.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data)
             c.execute("END TRANSACTION")

@@ -13,16 +13,13 @@ import time
 
 
 def run_example(from_model, zones):
-
     examples_dir = "temp_examples"
     time_results = []
 
     for n_zones in zones:
-
         path = join(examples_dir, f"{from_model}_{n_zones}")
 
         if os.path.isdir(path):
-
             project = Project.from_path(path)
 
         else:
@@ -88,7 +85,6 @@ def run_example(from_model, zones):
 
         print(f"centroids: {transit_graph.centroids.shape[0]}")
         for i in range(0, len(skim_cols)):
-
             assig = TransitAssignment()
             assig.add_class(assigclass)
             assig.set_time_field("trav_time")

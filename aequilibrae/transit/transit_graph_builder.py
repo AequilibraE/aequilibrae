@@ -1520,14 +1520,14 @@ class TransitGraphBuilder:
 
         # FIXME Load specific period_id graph from dynamic table
         graph.vertices = pd.read_sql_query(
-            sql=f"SELECT {','.join(SF_VERTEX_COLS[:-1])}, ST_asBinary(\"geometry\") as geometry FROM nodes;",
+            sql=f'SELECT {",".join(SF_VERTEX_COLS[:-1])}, ST_asBinary("geometry") as geometry FROM nodes;',
             con=public_transport_conn,
         )
         graph.vertices.node_id = graph.vertices.node_id.astype("int64")
         graph.vertices.line_seg_idx = graph.vertices.line_seg_idx.astype("int64")
 
         graph.edges = pd.read_sql_query(
-            sql=f"SELECT {','.join(SF_EDGE_COLS)}, ST_asBinary(\"geometry\") as geometry FROM links;",
+            sql=f'SELECT {",".join(SF_EDGE_COLS)}, ST_asBinary("geometry") as geometry FROM links;',
             con=public_transport_conn,
         )
         graph.edges.line_id = graph.edges.line_id.fillna("").astype(str)
