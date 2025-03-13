@@ -1,5 +1,6 @@
 """
-Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull <francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
+Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull
+<francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
 """
 
 """
@@ -9,7 +10,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
-from libc.math cimport isnan, INFINITY, sin, cos, asin, sqrt, pi
+from libc.math cimport INFINITY, sin, cos, asin, sqrt, pi
 from libc.string cimport memset
 from libc.stdlib cimport malloc, free
 
@@ -46,8 +47,10 @@ cpdef void network_loading(
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef void _copy_skims(double[:, :] skim_matrix,  # Skim matrix_procedures computed from one origin to all nodes
-                      double[:, :] final_skim_matrix) noexcept nogil:  # Skim matrix_procedures computed for one origin to all other centroids only
+cdef void _copy_skims(
+    double[:, :] skim_matrix,  # Skim matrix_procedures computed from one origin to all nodes
+    double[:, :] final_skim_matrix
+) noexcept nogil:  # Skim matrix_procedures computed for one origin to all other centroids only
 
     cdef long i, j
     cdef long N = final_skim_matrix.shape[0]
@@ -258,13 +261,13 @@ cpdef void skim_multiple_fields(long origin,
             final_skims[i, j] = node_skims[i, j]
 
 
-# ###########################################################################################################################
-#############################################################################################################################
+# ######################################################################################################################
+########################################################################################################################
 # Original Dijkstra implementation by François Pacull, taken from https://github.com/Edsger-dev/priority_queues
 # Old Numpy Buffers were replaces with latest memory views interface to allow for the release of the GIL
 # Path tracking arrays and skim arrays were also added to it
-#############################################################################################################################
-# ###########################################################################################################################
+########################################################################################################################
+# ######################################################################################################################
 
 
 @cython.wraparound(False)

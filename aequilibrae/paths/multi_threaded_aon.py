@@ -13,8 +13,6 @@ class MultiThreadedAoN:
         self.connectors = np.array([])
         # Temporary results for assignment. Necessary for parallelization
         self.temp_link_loads = np.array([])
-        # Temporary nodes for assignment. Necessary for cascading
-        self.temp_node_loads = np.array([])
         #  holds the b_nodes in case of flows through centroid connectors are blocked
         self.temp_b_nodes = np.array([])
         # Temporary array which stores whether a link is accessed in a path for Select Link Analysis functionality
@@ -60,7 +58,6 @@ class MultiThreadedAoN:
         self.reached_first = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         self.connectors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         self.temp_link_loads = np.zeros((results.cores, results.links + 1, results.classes["number"]), dtype=ftype)
-        self.temp_node_loads = np.zeros((results.cores, results.compact_nodes, results.classes["number"]), dtype=ftype)
         self.temp_b_nodes = np.zeros((results.cores, graph.compact_graph.b_node.shape[0]), dtype=itype)
 
         for i in range(results.cores):

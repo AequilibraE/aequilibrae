@@ -8,7 +8,15 @@ from libc.stdlib cimport calloc, free
 from libc.string cimport memset
 
 
-def ipf_core(seed_matrix, target_productions, target_attractions, max_iterations=200, tolerance=0.001, cores = 0, warn=True):
+def ipf_core(
+        seed_matrix,
+        target_productions,
+        target_attractions,
+        max_iterations=200,
+        tolerance=0.001,
+        cores = 0,
+        warn=True
+):
     assert target_attractions.shape[0] == seed_matrix.shape[1]
     assert target_productions.shape[0] == seed_matrix.shape[0]
 
@@ -39,9 +47,31 @@ def ipf_core(seed_matrix, target_productions, target_attractions, max_iterations
 
     # This uses a Cython fused type cython.floating to defer to the float or double method without duplicated code
     if seed_matrix.dtype == np.float32:
-        iter, err = _fratar[float](seed_matrix, prod_tot, prod_tgt, prod_factor, attr_tot, attr_tgt, attr_factor, max_iter, toler, cpus)
+        iter, err = _fratar[float](
+            seed_matrix,
+            prod_tot,
+            prod_tgt,
+            prod_factor,
+            attr_tot,
+            attr_tgt,
+            attr_factor,
+            max_iter,
+            toler,
+            cpus
+        )
     else:
-        iter, err = _fratar[double](seed_matrix, prod_tot, prod_tgt, prod_factor, attr_tot, attr_tgt, attr_factor, max_iter, toler, cpus)
+        iter, err = _fratar[double](
+            seed_matrix,
+            prod_tot,
+            prod_tgt,
+            prod_factor,
+            attr_tot,
+            attr_tgt,
+            attr_factor,
+            max_iter,
+            toler,
+            cpus
+        )
 
     if err > tolerance and warn:
         warnings.warn(f"Could not reach convergence in {iter} iterations: {err}")

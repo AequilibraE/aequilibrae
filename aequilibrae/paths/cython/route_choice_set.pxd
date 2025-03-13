@@ -40,7 +40,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] thread_reached_first,
-        unsigned char [:] thread_destinations        
+        unsigned char [:] thread_destinations
     ) noexcept nogil
 
     cdef void bfsle(
@@ -56,7 +56,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
-        unsigned char [:] thread_destinations,        
+        unsigned char [:] thread_destinations,
         double penatly,
         unsigned int seed
     ) noexcept nogil

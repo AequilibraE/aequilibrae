@@ -4,7 +4,7 @@ cimport numpy as np
 cimport cython
 
 from libcpp.queue cimport queue
-import time
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -23,7 +23,7 @@ cdef void _remove_dead_ends(
 ) noexcept nogil:
     cdef:
         long long b_node
-        Py_ssize_t node_idx, incoming, outgoing
+        Py_ssize_t node_idx, incoming
 
         queue[long long] Q
 
@@ -33,14 +33,12 @@ cdef void _remove_dead_ends(
     #     - nodes for which all out going links point to the same node and has the same number of back links.
     #       This is a generalisation of dead-ends formed by a node with a single bidirectional link to another
     #
-    # Removal: At nodes of interest we begin a Breadth First Search (BFS) for links we can remove. It's uncommon for the BFS to extend far as the stopping
-    # criteria and conditions for expansion are very similar, often this just searches along a line.
-    # For removal the node must have "no choices", that is, all outgoing edges point to the same node *and* all incoming edges can be account for as
-    # from that same node.
+    # Removal: At nodes of interest we begin a Breadth First Search (BFS) for links we can remove. It's uncommon for the
+    # BFS to extend far as the stopping criteria and conditions for expansion are very similar, often this just searches
+    # along a line.  For removal the node must have "no choices", that is, all outgoing edges point to the same node
+    # *and* all incoming edges can be account for as from that same node.
     # The criteria for expansion is that there are no incoming edges *and* all outgoing edges point to the same node.
     for starting_node_idx in range(all_nodes.shape[0]):
-        node = all_nodes[starting_node_idx]
-
         Q.push(starting_node_idx)
         while not Q.empty():
             node_idx = Q.front()
@@ -52,12 +50,12 @@ cdef void _remove_dead_ends(
             elif in_degree[node_idx] == 0 and out_degree[node_idx] == 0:
                 continue
             elif in_degree[node_idx] > 0 and out_degree[node_idx] == 0:
-                # All incoming or all outgoing edges, since there's no way to either leave, or get to this node all the attached
-                # edges are of no use. However we have no (current) means to remove these edges, a transpose of the graph would be required to
-                # avoid individual lookups.
+                # All incoming or all outgoing edges, since there's no way to either leave, or get to this node all the
+                # attached edges are of no use. However we have no (current) means to remove these edges, a transpose of
+                # the graph would be required to avoid individual lookups.
                 continue
 
-            ### Expansion
+            # ### Expansion
             if in_degree[node_idx] == 0 and out_degree[node_idx] > 0:
                 for link_idx in range(graph_fs[node_idx], graph_fs[node_idx + 1]):
                     if not burnt_links[link_idx]:
@@ -68,22 +66,24 @@ cdef void _remove_dead_ends(
                         Q.push(b_nodes[link_idx])
                 continue
 
-            ### Propagation
-            # We now know that the node we are looking at has a mix of incoming and outgoing edges, i.e. in_degree[node] > 0 and out_degree[node] > 0
-            # That implies that this node is reachable from some other node. We now need to assess if this node would ever be considered in pathfinding.
-            # To be considered, there needs to be some form of real choice, i.e. there needs to be multiple ways to leave a new node. If the only way
-            # to leave this node is back the way we came then the cost of the path
+            # ### Propagation
+            # We now know that the node we are looking at has a mix of incoming and outgoing edges, i.e. in_degree[node]
+            # > 0 and out_degree[node] > 0 That implies that this node is reachable from some other node. We now need to
+            # assess if this node would ever be considered in pathfinding.  To be considered, there needs to be some
+            # form of real choice, i.e. there needs to be multiple ways to leave a new node. If the only way to leave
+            # this node is back the way we came then the cost of the path
             #     ... -> pre -> node -> pre -> ...
             # is greater than that of
             #     ... -> pre -> ...
             # so we can remove this link to node. This is because negative cost cycles are disallowed in path finding.
             #
-            # We don't remove the case where there is only one new node that could be used to leave as it is handled in the graph compression.
-            # It would however, be possible to handle that here as well.
+            # We don't remove the case where there is only one new node that could be used to leave as it is handled in
+            # the graph compression.  It would however, be possible to handle that here as well.
 
-            # If all the outgoing edges are to the same node *and* all incoming edges come from that node, then there is no real choice and the
-            # link should be removed. This is primarily to catch nodes who are only connected to a single other node via a bidirectional link but can
-            # handle the case where multiple links point between the same pair of nodes with perhaps, different, but still non-negative costs.
+            # If all the outgoing edges are to the same node *and* all incoming edges come from that node, then there is
+            # no real choice and the link should be removed. This is primarily to catch nodes who are only connected to
+            # a single other node via a bidirectional link but can handle the case where multiple links point between
+            # the same pair of nodes with perhaps, different, but still non-negative costs.
 
             # Lets first find a link that isn't burnt. Then check that every link after this one points to the same node
             b_node = -1
@@ -94,10 +94,12 @@ cdef void _remove_dead_ends(
                 if b_node == -1:
                     b_node = b_nodes[link_idx]
                 elif b_node != b_nodes[link_idx]:
-                    # We've found a link to a different node, that means we have some other way to leave and we can't remove this node.
+                    # We've found a link to a different node, that means we have some other way to leave and we can't
+                    # remove this node.
                     break
             else:
-                # We now know all outgoing edges point to the same node. Lets now check that all incoming edges are accounted for
+                # We now know all outgoing edges point to the same node. Lets now check that all incoming edges are
+                # accounted for
                 incoming = in_degree[node_idx]
                 for link_idx in range(graph_fs[b_node], graph_fs[b_node + 1]):
                     # Incoming degree has already been decremented, when a link was burnt
@@ -105,7 +107,8 @@ cdef void _remove_dead_ends(
                         incoming -= 1
 
                 if incoming != 0:
-                    # Not all incoming edges are accounted for, there is some other node that links to this one. From where we don't know.
+                    # Not all incoming edges are accounted for, there is some other node that links to this one. From
+                    # where we don't know.
                     continue
 
                 # All incoming edges are accounted for, this node is of interest.
@@ -127,26 +130,28 @@ cdef void _remove_dead_ends(
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef long long _build_compressed_graph(long long[:] link_idx,
-                                  long long[:] links_index,
-                                  long long[:] link_edge,
-                                  long long[:] a_nodes,
-                                  long long[:] b_nodes,
-                                  signed char[:] directions,
-                                  long long link_id_max,
-                                  long long[:] simplified_links,
-                                  signed char[:] simplified_directions,
-                                  long long[:] counts,
-                                  long long[:] all_links,
-                                  long long[:] compressed_dir,
-                                  long long[:] compressed_a_node,
-                                  long long[:] compressed_b_node) noexcept nogil:
+cdef long long _build_compressed_graph(
+    long long[:] link_idx,
+    long long[:] links_index,
+    long long[:] link_edge,
+    long long[:] a_nodes,
+    long long[:] b_nodes,
+    signed char[:] directions,
+    long long link_id_max,
+    long long[:] simplified_links,
+    signed char[:] simplified_directions,
+    long long[:] counts,
+    long long[:] all_links,
+    long long[:] compressed_dir,
+    long long[:] compressed_a_node,
+    long long[:] compressed_b_node
+) noexcept nogil:
     cdef:
         long long slink = 0
-        long long pre_link, n, first_node, lnk, lidx, a_node, b_node
+        long long pre_link, n, first_node, lidx, a_node, b_node
         bint ab_dir, ba_dir
         long drc
-        Py_ssize_t i, k
+        Py_ssize_t k
 
     # For each link we have marked for examining
     for pre_link in link_edge:
@@ -223,8 +228,9 @@ cdef void _back_fill(long long[:] links_index, long long max_node) noexcept:
 
 def build_compressed_graph(graph, remove_dead_ends=True):
     # General notes:
-    # Anything that uses graph.network is operating on the **mixed** graph. This graph has both directed and undirected edges
-    # Anything that uses graph.graph is operating on the **directed** graph. This graph has only directed edges, they may be backwards but they are directed
+    # Anything that uses graph.network is operating on the **mixed** graph. This graph has both directed and undirected
+    # edges. Anything that uses graph.graph is operating on the **directed** graph. This graph has only directed edges,
+    # they may be backwards but they are directed
 
     directed_node_max = max(graph.graph.a_node.values.max(), graph.graph.b_node.values.max())
     in_degree = np.bincount(graph.graph.b_node.values, minlength=directed_node_max + 1)
@@ -249,7 +255,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
             out_degree,
             burnt_links,
         )
-        graph.dead_end_links = graph.graph.link_id.values[burnt_links]  # Perhaps filter to unique link_ids? There'll be duplicates in here
+        # Perhaps filter to unique link_ids? There'll be duplicates in here
+        graph.dead_end_links = graph.graph.link_id.values[burnt_links]
 
         if graph.dead_end_links.shape[0]:
             df = df[~df.link_id.isin(graph.dead_end_links)]
@@ -263,7 +270,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     nodes = np.hstack([df.a_node.values, df.b_node.values])
     links = np.hstack([df.link_id.values, df.link_id.values])
-    counts = np.bincount(nodes)  # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
+    # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
+    counts = np.bincount(nodes)
 
     idx = np.argsort(nodes)
     all_nodes = nodes[idx]
@@ -283,7 +291,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     counts[graph.centroids] = 999
 
     degree_two = (counts == 2).astype(np.uint8)
-    # Reorder and sum the degree two nodes by how they appear in the network, finds how a particular node is connected, resulting values are
+    # Reorder and sum the degree two nodes by how they appear in the network, finds how a particular node is connected,
+    # resulting values are
     # 0: This node is not of degree one. We're not interested in this case.
     # 1: This node is of degree one AND, has either incoming or outgoing flow. We can remove these these.
     link_edge = df.link_id.values[
@@ -382,7 +391,9 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     # If will refer all the links that have no correlation to an element beyond the last link
     # This element will always be zero during assignment
-    graph.graph.__compressed_id__ = graph.graph.__compressed_id__.fillna(graph.compact_graph.id.max() + 1).astype(np.int64)
+    graph.graph.__compressed_id__ = graph.graph.__compressed_id__.fillna(
+        graph.compact_graph.id.max() + 1
+    ).astype(np.int64)
 
 
 @cython.embedsignature(True)
@@ -409,8 +420,6 @@ def create_compressed_link_network_mapping(graph):
         np.uint32_t[:] data
         np.int32_t[:] node_mapping
         np.int64_t[:, :] dups
-
-    start_tiem = time.time()
 
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
     # bother redoing sorting it.
@@ -457,7 +466,8 @@ def create_compressed_link_network_mapping(graph):
             # we do this assuming the `a` array is sorted.
             j = 0
 
-            # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a simple lookup
+            # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a
+            # simple lookup
             a_node = x = a[np.isin(a, b, invert=True, assume_unique=True)][0]
             while True:
                 tmp = a.searchsorted(x)

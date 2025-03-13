@@ -4,7 +4,6 @@ from multiprocessing.dummy import Pool as ThreadPool
 import cython
 import numpy as np
 import pandas as pd
-from libcpp.vector cimport vector
 
 from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 
@@ -16,9 +15,6 @@ def connectivity_multi_threaded(tester):
 
     aux_result = MultiThreadedPaths()
     aux_result.prepare_(graph, cores, graph.compact_num_nodes + 1)
-
-    cdef:
-        long zones = graph.num_zones
 
     pool = ThreadPool(cores)
     all_threads = {"count": 0, "run": 0}
