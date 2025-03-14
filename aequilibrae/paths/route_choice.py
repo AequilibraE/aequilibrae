@@ -352,10 +352,12 @@ class RouteChoice:
         self.logger.info(self._config)
 
     def get_results(self) -> Union[pa.Table, pa.dataset.Dataset]:
-        """Returns the results of the route choice procedure
+        """
+        Returns the results of the route choice procedure
 
-        Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).
-        Represents paths from ``origin`` to ``destination``.
+        Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).  Represents paths from
+        ``origin`` to ``destination``. When the link id in the route set is positive it represents the ab direction,
+        while negative represents the ba direction.
 
         If ``save_routes`` was specified then a Pyarrow dataset is returned. The caller is
         responsible for reading this dataset.

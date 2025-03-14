@@ -120,6 +120,7 @@ class GraphBase(ABC):  # noqa: B024
 
         self.compressed_link_network_mapping_idx = None
         self.compressed_link_network_mapping_data = None
+        self.network_compressed_node_mapping = None
 
         # Randomly generate a unique Graph ID randomly
         self._id = uuid.uuid4().hex
@@ -600,6 +601,10 @@ class GraphBase(ABC):  # noqa: B024
         network IDs are then in the range ``idx[id]:idx[id + 1]``.
 
         Links not in the compressed graph are not contained within the 'data' array.
+
+        'node_mapping' provides an easy way to check if a node index is present within the compressed graph. If the
+        value is -1 then the node has been removed, either by compression of dead end link removal. If the value is
+        greater than or equal to 0, then that value is the compressed node index.
 
         .. code-block:: python
 

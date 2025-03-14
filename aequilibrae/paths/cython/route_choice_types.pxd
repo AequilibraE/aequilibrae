@@ -115,6 +115,16 @@ cdef extern from "arrow/builder.h" namespace "arrow" nogil:
         )
         libpa.CStatus AppendValues(const uint32_t *values, int64_t length, const uint8_t *valid_bytes = nullptr)
 
+    cdef cppclass CInt64Builder" arrow::Int64Builder"(libpa.CArrayBuilder):
+        CInt64Builder(libpa.CMemoryPool* pool)
+        libpa.CStatus Append(const int64_t value)
+        libpa.CStatus AppendValues(const vector[int64_t] &values)
+        libpa.CStatus AppendValues(
+            vector[int64_t].const_reverse_iterator values_begin,
+            vector[int64_t].const_reverse_iterator values_end
+        )
+        libpa.CStatus AppendValues(const int64_t *values, int64_t length, const uint8_t *valid_bytes = nullptr)
+
     cdef cppclass CDoubleBuilder" arrow::DoubleBuilder"(libpa.CArrayBuilder):
         CDoubleBuilder(libpa.CMemoryPool* pool)
         libpa.CStatus Append(const double value)

@@ -6,6 +6,7 @@ from aequilibrae.paths.cython.route_choice_link_loading_results cimport LinkLoad
 from libcpp.vector cimport vector
 
 from aequilibrae.paths.cython.route_choice_types cimport RouteSet_t
+from libc.stdint cimport *
 
 
 cdef class RouteChoiceSet:
@@ -26,7 +27,7 @@ cdef class RouteChoiceSet:
         bint a_star
 
         unsigned int [:] mapping_idx
-        unsigned int [:] mapping_data
+        int64_t [::] mapping_data
 
         readonly RouteChoiceSetResults results
         readonly LinkLoadingResults ll_results

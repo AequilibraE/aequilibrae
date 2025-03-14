@@ -24,7 +24,7 @@ cdef class RouteChoiceSetResults:
     provides method to perform an assignment and link loading.
     """
 
-    route_set_dtype = pa.list_(pa.uint32())
+    route_set_dtype = pa.list_(pa.int64())
 
     schema = pa.schema([
         pa.field("origin id", pa.uint32(), nullable=False),
@@ -50,7 +50,7 @@ cdef class RouteChoiceSetResults:
             num_links: int,
             double[:] cost_view,
             unsigned int [:] mapping_idx,
-            unsigned int [:] mapping_data,
+            int64_t [::] mapping_data,
             store_results: bool = True,
             perform_assignment: bool = True,
     ):
@@ -474,7 +474,7 @@ cdef class RouteChoiceSetResults:
             # Custom imports, these are declared in route_choice.pxd *not* libarrow.  We have to use new here because
             # Cython doesn't support passing arguments to the default constructor as it implicitly constructs them and
             # Pyarrow only exposes the single constructor in Cython.
-            CUInt32Builder *path_builder = new CUInt32Builder(pool)
+            CInt64Builder *path_builder = new CInt64Builder(pool)
             CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
             CBooleanBuilder *mask_col = <CBooleanBuilder *>nullptr
             CDoubleBuilder *path_overlap_col = <CDoubleBuilder *>nullptr

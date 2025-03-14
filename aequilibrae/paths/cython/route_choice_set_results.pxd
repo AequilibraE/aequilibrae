@@ -3,6 +3,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
     RouteVec_t,
     RouteSet_t,
     CUInt32Builder,
+    CInt64Builder,
     CDoubleBuilder,
     CBooleanBuilder
 )
@@ -10,6 +11,8 @@ from aequilibrae.paths.cython.route_choice_types cimport (
 from libcpp.vector cimport vector
 from libcpp.memory cimport shared_ptr
 from libcpp cimport bool
+from libc.stdint cimport *
+
 
 cdef class RouteChoiceSetResults:
     cdef:
@@ -20,7 +23,7 @@ cdef class RouteChoiceSetResults:
         double beta
         double[:] cost_view
         unsigned int [:] mapping_idx
-        unsigned int [:] mapping_data
+        int64_t [::] mapping_data
 
         vector[shared_ptr[RouteVec_t]] __route_vecs
         vector[vector[long long] *] __link_union_set

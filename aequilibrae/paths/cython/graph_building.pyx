@@ -413,13 +413,15 @@ def create_compressed_link_network_mapping(graph):
         )
 
     cdef:
-        long long i, j, a_node, x, b_node, tmp, compressed_id, dup_idx
+        long long i, j, a_node, x, b_node, tmp, compressed_id, non_duplicated_idx
         long long[:] b
         long long[:] values
+        signed char[:] directions
         np.uint32_t[:] idx
-        np.uint32_t[:] data
+        np.int64_t[::] data
         np.int32_t[:] node_mapping
-        np.int64_t[:, :] dups
+        np.int64_t[:, :] non_duplicated
+        signed char direction
 
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
     # bother redoing sorting it.
@@ -427,19 +429,19 @@ def create_compressed_link_network_mapping(graph):
     # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`,
     # we skip them.
     filtered = graph.graph[graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1]
-    filtered = filtered[["__compressed_id__", "a_node", "b_node", "link_id"]]
+    filtered = filtered[["__compressed_id__", "a_node", "b_node", "link_id", "direction"]]
     duplicated = filtered.__compressed_id__.duplicated(keep=False)
     gb = filtered[duplicated].groupby(by="__compressed_id__", sort=True)
 
     idx = np.zeros(graph.compact_num_links + 1, dtype=np.uint32)
-    data = np.zeros(len(filtered), dtype=np.uint32)
+    data = np.zeros(len(filtered), dtype=np.int64)
     node_mapping = np.full(graph.num_nodes, -1, dtype=np.int32)
 
     compact_a_nodes = graph.compact_graph["a_node"].to_numpy()
     compact_b_nodes = graph.compact_graph["b_node"].to_numpy()
 
-    dup_idx = 0
-    dups = filtered[~duplicated].sort_values(by="__compressed_id__").to_numpy()
+    non_duplicated_idx = 0
+    non_duplicated = filtered[~duplicated].sort_values(by="__compressed_id__").to_numpy()
 
     i = 0
     # This should be possible to parallelise, each thread gets a segment of the bincount below, they compute their
@@ -449,16 +451,17 @@ def create_compressed_link_network_mapping(graph):
         # We separate the easy un-compressible link path from the compressible link path
         # gb.get_group and those sorted searches are rather slow
         if count == 1:
-            compressed_id, a_node, b_node, link_id = dups[dup_idx]
-            dup_idx += 1
+            compressed_id, a_node, b_node, link_id, direction = non_duplicated[non_duplicated_idx]
+            non_duplicated_idx += 1
             idx[compressed_id] = i
-            data[i] = link_id
+            data[i] = link_id * direction
             node_mapping[a_node] = compact_a_nodes[compressed_id]
             node_mapping[b_node] = compact_b_nodes[compressed_id]
         else:
             df = gb.get_group(compressed_id)
             idx[compressed_id] = i
             values = df.link_id.to_numpy()
+            directions = df.direction.to_numpy()
             a = df.a_node.to_numpy()
             b = df.b_node.to_numpy()
 
@@ -473,7 +476,7 @@ def create_compressed_link_network_mapping(graph):
                 tmp = a.searchsorted(x)
                 if tmp < len(a) and a[tmp] == x:
                     x = b[tmp]
-                    data[i + j] = values[tmp]
+                    data[i + j] = values[tmp] * directions[tmp]
                 else:
                     break
                 j += 1
