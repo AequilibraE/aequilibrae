@@ -19,7 +19,7 @@ Python
 :doc:`here <useful_links/version_history>`.
 
 **Useful links**: :doc:`useful_links/installation` | :doc:`useful_links/api` | 
-:doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history`
+:doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history` | :doc:`_auto_examples/index`
 
 |
 
@@ -35,7 +35,7 @@ Python
 
       Get to know the structure of an AequilibraE project
       +++
-      :doc:`aequilibrae_project/_auto_examples/index`
+      :doc:`_auto_examples/aequilibrae_project/index`
 
   .. grid-item-card::
       :text-align: center
@@ -57,7 +57,7 @@ Python
 
       Create and edit networks and models
       +++
-      :doc:`network_manipulation/_auto_examples/index`
+      :doc:`_auto_examples/network_manipulation/index`
 
 .. grid::
 
@@ -71,7 +71,7 @@ Python
 
     Calibrate and apply gravity models and perform IPF
     +++
-    :doc:`distribution_procedures/_auto_examples/index`
+    :doc:`_auto_examples/distribution_procedures/index`
 
   .. grid-item-card::
     :text-align: center
@@ -83,7 +83,7 @@ Python
 
     Create skim matrices and compute the shortest path
     +++
-    :doc:`path_computation/_auto_examples/index`
+    :doc:`_auto_examples/path_computation/index`
 
   .. grid-item-card::
     :text-align: center
@@ -95,7 +95,7 @@ Python
 
     Run traffic allocation.
     +++
-    :doc:`traffic_assignment/_auto_examples/index`
+    :doc:`_auto_examples/traffic_assignment/index`
 
 .. grid::
 
@@ -109,7 +109,7 @@ Python
 
     Add a transit feed or run transit assignment
     +++
-    :doc:`public_transport/_auto_examples/index`
+    :doc:`_auto_examples/public_transport/index`
 
   .. grid-item-card::
     :text-align: center
@@ -121,7 +121,7 @@ Python
 
     Explore the route choice models.
     +++
-    :doc:`route_choice/_auto_examples/index`
+    :doc:`_auto_examples/route_choice/index`
 
   .. grid-item-card::
     :text-align: center
@@ -133,7 +133,7 @@ Python
 
     Explore other applcations of AequilibraE!
     +++
-    :doc:`other_applications/_auto_examples/index`
+    :doc:`_auto_examples/other_applications/index`
 
 .. toctree::
    :hidden:

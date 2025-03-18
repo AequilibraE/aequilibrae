@@ -15,7 +15,7 @@ traditional path-size logit.
 
     route_choice/choice_set_generation
     route_choice/path_size_logit
-    route_choice/_auto_examples/index
+    _auto_examples/route_choice/index
 
 References
 ----------

@@ -8,4 +8,4 @@ subject.
    :caption: Other Applications
    :maxdepth: 2
 
-   other_applications/_auto_examples/index
+   _auto_examples/other_applications/index

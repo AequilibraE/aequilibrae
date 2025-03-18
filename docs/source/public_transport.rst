@@ -35,7 +35,7 @@ Transit assignment models aim to answer questions such as:
    public_transport/transit_graph
    public_transport/hyperpath_routing
    public_transport/transit_skimming
-   public_transport/_auto_examples/index
+   _auto_examples/public_transport/index
 
 References
 ----------
