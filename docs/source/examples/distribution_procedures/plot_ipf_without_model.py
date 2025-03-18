@@ -20,7 +20,7 @@ The data used in this example comes from Table 5.6 in
 # .. admonition:: References
 #
 #   * :ref:`all_about_aeq_matrices`
-#   * :doc:`../IPF_benchmark`
+#   * :doc:`../../distribution_procedures/IPF_benchmark`
 
 # %%
 # .. seealso::
