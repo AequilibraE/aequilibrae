@@ -8,7 +8,6 @@ from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.link import Link
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Links(BasicTable):
@@ -117,7 +116,7 @@ class Links(BasicTable):
             link = self.__items.pop(link_id)  # type: Link
             link.delete()
         else:
-            with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            with commit_and_close(self.project.path_to_file, spatial=True) as conn:
                 d = conn.execute("Delete from Links where link_id=?", [link_id]).rowcount
         if d:
             self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
@@ -127,7 +126,7 @@ class Links(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             self.__max_id = conn.execute("select coalesce(max(link_id),0) from Links").fetchone()[0]
             tl.load_structure(conn, "links")
         self.sql = tl.sql
@@ -160,7 +159,7 @@ class Links(BasicTable):
         raise ValueError(f"Link {link_id} does not exist in the model")
 
     def __link_data(self, link_id: int) -> dict:
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
             return dict(zip(self.__fields, data))
