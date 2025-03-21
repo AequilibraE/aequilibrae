@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from numpy.lib.format import open_memmap
 
+from aequilibrae.utils.db_utils import commit_and_close
+
 MEMORY = 1
 DISK = 0
 data_export_types = ["aed", "csv", "sqlite"]
@@ -208,23 +210,20 @@ class AequilibraeData(object):
             np.savetxt(file_name, data[np.newaxis, :][0], delimiter=",", fmt=fmt, header=",".join(headers), comments="")
 
         elif file_type.lower() in [".sqlite", ".sqlite3", ".db"]:
-            # Connecting to the database file
-            conn = sqlite3.connect(file_name)
-            c = conn.cursor()
-            # Creating the table, but before deletes if the table exists
-            c.execute("""DROP TABLE IF EXISTS """ + table_name)
-            fi = ""
-            qm = "?"
-            for f in headers[1:]:
-                fi += ", " + f + " REAL"
-                qm += ", ?"
+            with commit_and_close(file_name, missing_ok=True) as conn:
+                c = conn.cursor()
+                # Creating the table, but before deletes if the table exists
+                c.execute("""DROP TABLE IF EXISTS """ + table_name)
+                fi = ""
+                qm = "?"
+                for f in headers[1:]:
+                    fi += ", " + f + " REAL"
+                    qm += ", ?"
 
-            c.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")")
-            c.execute("BEGIN TRANSACTION")
-            c.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data)
-            c.execute("END TRANSACTION")
-            conn.commit()
-            conn.close()
+                c.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")")
+                c.execute("BEGIN TRANSACTION")
+                c.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data)
+                c.execute("END TRANSACTION")
 
     @staticmethod
     def random_name():

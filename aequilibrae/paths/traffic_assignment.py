@@ -582,16 +582,14 @@ class TrafficAssignment(AssignmentBase):
         with commit_and_close(res_path, missing_ok=True) as conn:
             df.to_sql(table_name, conn)
 
-        conn = project.connect()
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
         data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
-        conn.execute(
-            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                            description) Values(?,?,?,?,?,?)""",
-            data,
-        )
-        conn.commit()
-        conn.close()
+        with commit_and_close(project.path_to_file) as conn:
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                                description) Values(?,?,?,?,?,?)""",
+                data,
+            )
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
