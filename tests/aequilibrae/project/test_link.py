@@ -1,14 +1,14 @@
-from unittest import TestCase
-from shapely.ops import substring
-from copy import copy, deepcopy
 import os
-from shutil import copytree, rmtree
 import uuid
 from random import randint, random
+from shutil import copytree, rmtree
 from tempfile import gettempdir
+from unittest import TestCase
+
+from shapely.ops import substring
+
 from aequilibrae.project import Project
 from aequilibrae.utils.db_utils import read_and_close
-
 from ...data import siouxfalls_project
 
 

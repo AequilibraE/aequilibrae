@@ -7,6 +7,7 @@ from tempfile import gettempdir
 from unittest import TestCase
 
 from aequilibrae.project import Project
+from aequilibrae.utils.db_utils import read_and_close
 from ...data import siouxfalls_project
 
 
@@ -20,11 +21,9 @@ class TestLinks(TestCase):
         self.project = Project()
         self.project.open(self.proj_dir)
         self.network = self.project.network
-        self.curr = self.project.conn.cursor()
 
     def tearDown(self) -> None:
         self.project.close()
-        del self.curr
         try:
             rmtree(self.proj_dir)
         except Exception as e:
@@ -42,8 +41,8 @@ class TestLinks(TestCase):
         links = self.network.links
         new_link = links.new()
 
-        self.curr.execute("Select max(link_id) + 1 from Links")
-        id = self.curr.fetchone()[0]
+        with read_and_close(self.project.path_to_file) as conn:
+            id = conn.execute("Select max(link_id) + 1 from Links").fetchone()[0]
         self.assertEqual(new_link.link_id, id, "Did not populate new link ID properly")
         self.assertEqual(new_link.geometry, None, "Did not populate new geometry properly")
 
@@ -71,12 +70,12 @@ class TestLinks(TestCase):
 
         _ = links.get(10)
 
-        self.curr.execute("Select count(*) from Links")
-        tot = self.curr.fetchone()[0]
-        links.delete(10)
-        links.delete(11)
-        self.curr.execute("Select count(*) from Links")
-        tot2 = self.curr.fetchone()[0]
+        with read_and_close(self.project.path_to_file) as conn:
+            tot = conn.execute("Select count(*) from Links").fetchone()[0]
+            links.delete(10)
+            links.delete(11)
+            tot2 = conn.execute("Select count(*) from Links").fetchone()[0]
+
         self.assertEqual(tot, tot2 + 2, "Did not delete the link properly")
 
         with self.assertRaises(ValueError):
@@ -90,8 +89,8 @@ class TestLinks(TestCase):
         f_editor = links.fields
 
         fields = sorted(f_editor.all_fields())
-        self.curr.execute("pragma table_info(links)")
-        dt = self.curr.fetchall()
+        with read_and_close(self.project.path_to_file) as conn:
+            dt = conn.execute("pragma table_info(links)").fetchall()
 
         actual_fields = sorted({x[1].replace("_ab", "").replace("_ba", "") for x in dt if x[1] != "ogc_fid"})
         self.assertEqual(fields, actual_fields, "Table editor is weird for table links")

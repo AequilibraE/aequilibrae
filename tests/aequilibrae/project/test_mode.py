@@ -3,6 +3,7 @@ import string
 from unittest import TestCase
 
 from aequilibrae.project.network.mode import Mode
+from aequilibrae.utils.db_utils import read_and_close
 from tests.models_for_test import ModelsTest
 
 
@@ -10,7 +11,6 @@ class TestMode(TestCase):
     def setUp(self) -> None:
         tm = ModelsTest()
         self.proj = tm.no_triggers()
-        self.curr = self.proj.conn.cursor()
 
         letters = [random.choice(string.ascii_letters + "_") for x in range(20)]
         self.random_string = "".join(letters)
@@ -34,19 +34,17 @@ class TestMode(TestCase):
             m.mode_id = "test my description"
 
     def test_save(self):
-        self.curr.execute("select mode_id from 'modes'")
+        with read_and_close(self.proj.path_to_file) as conn:
+            letter = random.choice([x[0] for x in conn.execute("select mode_id from 'modes'").fetchall()])
 
-        letter = random.choice([x[0] for x in self.curr.fetchall()])
-        m = Mode(letter, self.proj)
-        m.mode_name = self.random_string
-        m.description = self.random_string[::-1]
-        m.save()
+            m = Mode(letter, self.proj)
+            m.mode_name = self.random_string
+            m.description = self.random_string[::-1]
+            m.save()
 
-        self.curr.execute(f'select description, mode_name from modes where mode_id="{letter}"')
-
-        desc, mname = self.curr.fetchone()
-        self.assertEqual(desc, self.random_string[::-1], "Didn't save the mode description correctly")
-        self.assertEqual(mname, self.random_string, "Didn't save the mode name correctly")
+            desc, mname = conn.execute(f'select description, mode_name from modes where mode_id="{letter}"').fetchone()
+            self.assertEqual(desc, self.random_string[::-1], "Didn't save the mode description correctly")
+            self.assertEqual(mname, self.random_string, "Didn't save the mode name correctly")
 
     def test_empty(self):
         a = Mode("k", self.proj)

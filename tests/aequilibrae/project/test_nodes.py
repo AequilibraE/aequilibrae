@@ -10,6 +10,7 @@ import shapely.wkb
 from shapely.geometry import Point
 
 from aequilibrae.project import Project
+from aequilibrae.utils.db_utils import read_and_close
 from ...data import siouxfalls_project
 
 _TestLoader.sortTestMethodsUsing = None
@@ -25,11 +26,9 @@ class TestNodes(TestCase):
         self.project = Project()
         self.project.open(self.proj_dir)
         self.network = self.project.network
-        self.curr = self.project.conn.cursor()
 
     def tearDown(self) -> None:
         self.project.close()
-        del self.curr
         try:
             rmtree(self.proj_dir)
         except Exception as e:
@@ -64,8 +63,11 @@ class TestNodes(TestCase):
         nodes.save()
         for nd, crd in zip(chosen, coords):
             x, y = crd
-            self.curr.execute("Select is_centroid, asBinary(geometry) from nodes where node_id=?;", [nd])
-            flag, wkb = self.curr.fetchone()
+
+            with read_and_close(self.project.path_to_file, spatial=True) as conn:
+                sql = f"Select is_centroid, asBinary(geometry) from nodes where node_id={nd};"
+                flag, wkb = conn.execute(sql).fetchone()
+
             self.assertEqual(flag, 0, "Saving of is_centroid failed")
 
             geo = shapely.wkb.loads(wkb)
@@ -77,8 +79,8 @@ class TestNodes(TestCase):
         f_editor = nodes.fields
 
         fields = sorted(f_editor.all_fields())
-        self.curr.execute("pragma table_info(nodes)")
-        dt = self.curr.fetchall()
+        with read_and_close(self.project.path_to_file) as conn:
+            dt = conn.execute("pragma table_info(nodes)").fetchall()
 
         actual_fields = sorted({x[1] for x in dt if x[1] != "ogc_fid"})
         self.assertEqual(fields, actual_fields, "Table editor is weird for table nodes")
