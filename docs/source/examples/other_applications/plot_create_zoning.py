@@ -108,13 +108,9 @@ zone_side = sqrt(2 * sqrt(3) * zone_area / 9)
 extent = network.extent()
 
 # %%
-curr = project.conn.cursor()
 b = extent.bounds
-curr.execute(
-    "select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))",
-    [extent.wkb, zone_side, Point(b[2], b[3]).wkb],
-)
-grid = curr.fetchone()[0]
+sql = "select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))"
+grid = project.conn.execute(sql, [extent.wkb, zone_side, Point(b[2], b[3]).wkb]).fetchone()[0]
 grid = shapely.wkb.loads(grid)
 
 # %%

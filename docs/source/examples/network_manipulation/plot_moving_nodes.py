@@ -56,11 +56,9 @@ node.save()
 # Let's refresh the links in memory for usage
 links.refresh()
 
-curr = project.conn.cursor()
-curr.execute("Select link_id from links;")
+link_ids = project.conn.execute("Select link_id from links;").fetchall()
 
-# We plot the entire network.
-for lid in curr.fetchall():
+for lid in link_ids:
     geo = links.get(lid[0]).geometry
     plt.plot(*geo.xy, color="blue")
 

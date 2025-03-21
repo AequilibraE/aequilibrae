@@ -63,18 +63,16 @@ links.refresh()
 # We do NOT recommend this, though.... It is very slow for real networks.
 
 # We plot the entire network.
-curr = project.conn.cursor()
-curr.execute("Select link_id from links;")
+link_ids = project.conn.execute("Select link_id from links;").fetchall()
 
-for lid in curr.fetchall():
+for lid in link_ids:
     geo = links.get(lid[0]).geometry
     plt.plot(*geo.xy, color="blue")
 
 all_nodes = project.network.nodes
-curr = project.conn.cursor()
-curr.execute("Select node_id from nodes;")
+node_ids = project.conn.execute("Select node_id from nodes;").fetchall()
 
-for nid in curr.fetchall():
+for nid in node_ids:
     geo = all_nodes.get(nid[0]).geometry
     plt.plot(*geo.xy, "o", color="black")
 
