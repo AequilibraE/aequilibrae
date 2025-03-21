@@ -22,10 +22,8 @@ class TestNetwork_skimming(TestCase):
 
         self.project = create_example(self.proj_dir)
         self.network = self.project.network
-        self.curr = self.project.conn.cursor()
 
     def tearDown(self) -> None:
-        del self.curr
         try:
             rmtree(self.proj_dir)
         except Exception as e:
