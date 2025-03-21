@@ -16,7 +16,6 @@ from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
 
 
@@ -47,7 +46,7 @@ class OSMBuilder(WorkerThread):
         self.links_df = data["links"]
 
     def doWork(self):
-        with commit_and_close(connect_spatialite(self.path)) as conn:
+        with commit_and_close(self.path, spatial=True) as conn:
             self.__update_table_structure(conn)
             self.importing_network(conn)
 

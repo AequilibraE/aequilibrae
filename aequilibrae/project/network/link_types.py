@@ -4,7 +4,6 @@ from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class LinkTypes:
@@ -62,7 +61,7 @@ class LinkTypes:
         self.logger = net.project.logger
 
         tl = TableLoader()
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             link_types_list = tl.load_table(conn, "link_types")
         existing_list = [lt["link_type_id"] for lt in link_types_list]
 
