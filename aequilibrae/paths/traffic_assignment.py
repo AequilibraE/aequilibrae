@@ -20,6 +20,7 @@ from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.utils.core_setter import set_cores
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class AssignmentBase(ABC):
@@ -576,9 +577,10 @@ class TrafficAssignment(AssignmentBase):
 
         if not project:
             project = self.project or get_active_project()
-        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn)
-        conn.close()
+
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
+            df.to_sql(table_name, conn)
 
         conn = project.connect()
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
@@ -827,13 +829,13 @@ class TrafficAssignment(AssignmentBase):
         if not project:
             project = self.project or get_active_project()
         df = self.select_link_flows()
-        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn)
-        conn.close()
-        # Create description table
 
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
+            df.to_sql(table_name, conn)
+
+        # Create description table
         self.description = f"Select link analysis from {self.procedure_id}"
-        conn = project.connect()
         report = {}
         data = [
             table_name,
@@ -843,13 +845,12 @@ class TrafficAssignment(AssignmentBase):
             self.procedure_date,
             self.description,
         ]
-        conn.execute(
-            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+        with commit_and_close(self.project.path_to_file) as conn:
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                             description) Values(?,?,?,?,?,?)""",
-            data,
-        )
-        conn.commit()
-        conn.close()
+                data,
+            )
 
     def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
@@ -1023,20 +1024,19 @@ class TransitAssignment(AssignmentBase):
 
         if not project:
             project = project or get_active_project()
-        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn)
-        conn.close()
 
-        conn = database_connection("transit", project.project_base_path)
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
+            df.to_sql(table_name, conn)
+
         report = {"setup": self.info()}
         data = [table_name, "transit assignment", self.procedure_id, str(report), self.procedure_date, self.description]
-        conn.execute(
-            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+        with commit_and_close(path.join(project.project_base_path, "public_transport.sqlite")) as conn:
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                             description) Values(?,?,?,?,?,?)""",
-            data,
-        )
-        conn.commit()
-        conn.close()
+                data,
+            )
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame

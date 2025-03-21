@@ -3,6 +3,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from aequilibrae.context import get_active_project
+from aequilibrae.utils.db_utils import read_and_close
 
 
 # TODO: let's make it optional to keep path files in memory, although this can get out of control very quickly it should
@@ -35,9 +36,9 @@ class AssignmentResultsTable(object):
         self.procedure_report = self._parse_procedure_report()
 
     def _read_assignment_results(self) -> pd.DataFrame:
-        conn = self.project.connect()
-        results_df = pd.read_sql("SELECT * FROM 'results'", conn)
-        conn.close()
+        with read_and_close(self.project.path_to_file) as conn:
+            results_df = pd.read_sql("SELECT * FROM 'results'", conn)
+
         res = results_df.loc[results_df.table_name == self.table_name]
         assert len(res) == 1, f"Found {len(res)} assignment result with this table name, need exactly one"
         return res

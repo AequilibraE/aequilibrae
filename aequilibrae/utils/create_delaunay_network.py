@@ -9,6 +9,7 @@ from scipy.spatial import Delaunay
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
+from aequilibrae.utils.db_utils import commit_and_close
 
 DELAUNAY_TABLE = "delaunay_network"
 
@@ -129,6 +130,6 @@ class DelaunayAnalysis:
             cols.extend([f"{x}_ab", f"{x}_ba", f"{x}_tot"])
         df = ta.results()[cols]
 
-        conn = sqlite3.connect(join(self.project.project_base_path, "results_database.sqlite"))
-        df.to_sql(result_name, conn)
-        conn.close()
+        res_path = join(self.project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
+            df.to_sql(result_name, conn)
