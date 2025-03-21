@@ -211,19 +211,18 @@ class AequilibraeData(object):
 
         elif file_type.lower() in [".sqlite", ".sqlite3", ".db"]:
             with commit_and_close(file_name, missing_ok=True) as conn:
-                c = conn.cursor()
                 # Creating the table, but before deletes if the table exists
-                c.execute("""DROP TABLE IF EXISTS """ + table_name)
+                conn.execute("""DROP TABLE IF EXISTS """ + table_name)
                 fi = ""
                 qm = "?"
                 for f in headers[1:]:
                     fi += ", " + f + " REAL"
                     qm += ", ?"
 
-                c.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")")
-                c.execute("BEGIN TRANSACTION")
-                c.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data)
-                c.execute("END TRANSACTION")
+                conn.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")")
+                conn.execute("BEGIN TRANSACTION")
+                conn.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data)
+                conn.execute("END TRANSACTION")
 
     @staticmethod
     def random_name():

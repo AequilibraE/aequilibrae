@@ -5,6 +5,7 @@ from unittest import TestCase
 from warnings import warn
 
 from tests.models_for_test import ModelsTest
+from aequilibrae.utils.db_utils import commit_and_close, read_and_close
 
 
 class TestProject(TestCase):

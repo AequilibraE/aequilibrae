@@ -1,13 +1,16 @@
-from unittest import TestCase
-from tempfile import gettempdir
 import os
+import sqlite3
 import uuid
 from shutil import copytree
-import sqlite3
+from tempfile import gettempdir
+from unittest import TestCase
+
+from shapely.geometry import LineString, Point
+
 from aequilibrae.project import Project
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
+from aequilibrae.utils.db_utils import commit_and_close
 from ...data import siouxfalls_project
-from shapely.geometry import LineString, Point
 
 
 class TestNetworkTriggers(TestCase):
@@ -44,50 +47,50 @@ class TestNetworkTriggers(TestCase):
     def test_add_regular_link(self):
         # Add a regular link to see if it fails when creating it
         # It happened at some point
-        curr = self.siouxfalls.conn.cursor()
         data = [123456, "c", "default", LineString([Point(0, 0), Point(1, 1)]).wkb]
-
         sql = "insert into links (link_id, modes, link_type, geometry) Values(?,?,?,GeomFromWKB(?, 4326));"
-        curr.execute(sql, data)
-        self.siouxfalls.conn.commit()
+
+        with commit_and_close(self.siouxfalls.path_to_file, spatial=True) as conn:
+            conn.execute(sql, data)
 
     def test_add_regular_node_change_centroid_id(self):
         # Add a regular link to see if it fails when creating it
         # It happened at some point
-        curr = self.siouxfalls.conn.cursor()
         network = self.siouxfalls.network
         nodes = network.count_nodes()
 
         data = [987654, 1, Point(0, 0).wkb]
 
-        sql = "insert into nodes (node_id, is_centroid, geometry) Values(?,?,GeomFromWKB(?, 4326));"
-        curr.execute(sql, data)
-        self.siouxfalls.conn.commit()
+        with commit_and_close(self.siouxfalls.path_to_file, spatial=True) as conn:
+            sql = "insert into nodes (node_id, is_centroid, geometry) Values(?,?,GeomFromWKB(?, 4326));"
+            conn.execute(sql, data)
+        
         self.assertEqual(nodes + 1, network.count_nodes(), "Failed to insert node")
 
-        curr.execute("Update nodes set is_centroid=0 where node_id=?", data[:1])
-        self.siouxfalls.conn.commit()
+        with commit_and_close(self.siouxfalls.path_to_file, spatial=True) as conn:
+            conn.execute("Update nodes set is_centroid=0 where node_id=?", data[:1])
+        
         self.assertEqual(nodes, network.count_nodes(), "Failed to delete node when changing centroid flag")
 
     def test_link_direction(self):
-        curr = self.siouxfalls.conn.cursor()
         network = self.siouxfalls.network
         links = network.count_links()
 
-        sql = "UPDATE links SET direction=-2 WHERE link_id=1;"
-        with self.assertRaises(sqlite3.IntegrityError):
-            curr.execute(sql)
+        with commit_and_close(self.siouxfalls.path_to_file, spatial=True) as conn:
+            sql = "UPDATE links SET direction=-2 WHERE link_id=1;"
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute(sql)
 
-        data = [987654, 2, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb]
-        sql = "insert into links (link_id, direction, modes, link_type, geometry) Values(?,?,?,?,GeomFromWKB(?, 4326));"
-        with self.assertRaises(sqlite3.IntegrityError):
-            curr.execute(sql, data)
+            data = [987654, 2, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb]
+            sql = "insert into links (link_id, direction, modes, link_type, geometry) Values(?,?,?,?,GeomFromWKB(?, 4326));"
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute(sql, data)
 
-        data = [
-            (987654, -1, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb),
-            (876543, 0, "c", "default", LineString([Point(1, 0), Point(1, 1)]).wkb),
-            (765432, 1, "c", "default", LineString([Point(1, 1), Point(0, 1)]).wkb),
-        ]
-        curr.executemany(sql, data)
-        self.siouxfalls.conn.commit()
+            data = [
+                (987654, -1, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb),
+                (876543, 0, "c", "default", LineString([Point(1, 0), Point(1, 1)]).wkb),
+                (765432, 1, "c", "default", LineString([Point(1, 1), Point(0, 1)]).wkb),
+            ]
+            conn.executemany(sql, data)
+
         self.assertEqual(network.count_links(), links + 3, "Failed when adding new links to the project.")
