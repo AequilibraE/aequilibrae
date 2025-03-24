@@ -10,7 +10,6 @@ import pandas as pd
 
 from aequilibrae.parameters import Parameters
 from aequilibrae.project import Project
-from aequilibrae.utils.db_utils import read_and_close
 from ...data import siouxfalls_project
 
 

@@ -7,7 +7,6 @@ from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.node import Node
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class Nodes(BasicTable):

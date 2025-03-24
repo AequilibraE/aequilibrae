@@ -6,7 +6,6 @@ import pandas as pd
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class Matrices:

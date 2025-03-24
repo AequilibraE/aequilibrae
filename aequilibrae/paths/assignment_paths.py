@@ -3,7 +3,6 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from aequilibrae.context import get_active_project
-from aequilibrae.utils.db_utils import read_and_close
 
 
 # TODO: let's make it optional to keep path files in memory, although this can get out of control very quickly it should

@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import sqlite3
+from contextlib import contextmanager
 
 from aequilibrae import global_logger
 from aequilibrae.log import Log
@@ -16,7 +17,6 @@ from aequilibrae.log import get_log_handler
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.transit.transit import Transit
-from aequilibrae.utils.db_proxy import DBProxy
 from aequilibrae.utils.db_utils import commit_and_close
 
 
@@ -74,8 +74,10 @@ class Project:
         clean(self)
 
     @property
+    @contextmanager
     def db_connection(self):
-        return DBProxy(commit_and_close(self.path_to_file, spatial=True))
+        with commit_and_close(self.path_to_file, spatial=True) as conn:
+            yield conn
 
     def new(self, project_path: str) -> None:
         """Creates a new project

@@ -28,7 +28,6 @@ from shapely.geometry import Point
 from aequilibrae.paths import PathResults
 from aequilibrae.context import get_active_project
 from aequilibrae.paths import TransitGraph
-from aequilibrae.utils.db_utils import read_and_close
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [

@@ -87,10 +87,11 @@ graph.set_skimming("distance")
 
 # %%
 # Get the nodes that are part of the car network
-missing_nodes = [
-    x[0] for x in project.db_connection.execute(f"Select node_id from nodes where instr(modes, '{mode}')").fetchall()
-]
-missing_nodes = np.array(missing_nodes)
+with project.db_connection as conn:
+    missing_nodes = [
+        x[0] for x in conn.execute(f"Select node_id from nodes where instr(modes, '{mode}')").fetchall()
+    ]
+    missing_nodes = np.array(missing_nodes)
 
 # %%
 # And prepare the path computation structure

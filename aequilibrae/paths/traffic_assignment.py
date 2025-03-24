@@ -1,6 +1,5 @@
 import logging
 import socket
-import sqlite3
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
@@ -18,7 +17,6 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.db_utils import commit_and_close
 
