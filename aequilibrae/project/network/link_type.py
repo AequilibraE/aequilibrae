@@ -1,6 +1,5 @@
 import string
 from .safe_class import SafeClass
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class LinkType(SafeClass):

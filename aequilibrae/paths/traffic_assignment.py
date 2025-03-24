@@ -584,7 +584,7 @@ class TrafficAssignment(AssignmentBase):
 
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
         data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
-        with commit_and_close(project.path_to_file) as conn:
+        with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                 description) Values(?,?,?,?,?,?)""",
@@ -843,7 +843,7 @@ class TrafficAssignment(AssignmentBase):
             self.procedure_date,
             self.description,
         ]
-        with commit_and_close(self.project.path_to_file) as conn:
+        with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                             description) Values(?,?,?,?,?,?)""",

@@ -2,7 +2,6 @@ import shapely.wkb
 from shapely.geometry import Polygon
 
 from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class BasicTable:

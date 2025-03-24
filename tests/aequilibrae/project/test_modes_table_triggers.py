@@ -4,7 +4,7 @@ from random import choice
 from unittest import TestCase
 from warnings import warn
 
-from aequilibrae.utils.db_utils import commit_and_close, read_and_close
+from aequilibrae.utils.db_utils import read_and_close
 from tests.models_for_test import ModelsTest
 
 

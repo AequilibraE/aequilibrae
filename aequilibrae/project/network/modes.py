@@ -2,7 +2,6 @@ from sqlite3 import IntegrityError
 
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.mode import Mode
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class Modes:

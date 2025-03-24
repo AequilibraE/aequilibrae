@@ -3,7 +3,6 @@ from os.path import isfile, join
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.project.network.safe_class import SafeClass
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class MatrixRecord(SafeClass):

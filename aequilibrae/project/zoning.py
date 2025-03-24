@@ -12,7 +12,6 @@ from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
-from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.geo_index import GeoIndex
 
 

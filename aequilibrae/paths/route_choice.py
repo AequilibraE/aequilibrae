@@ -558,7 +558,7 @@ class RouteChoice:
         with commit_and_close(res_path, missing_ok=True) as conn:
             df.to_sql(table_name, conn, index=True)
 
-        with commit_and_close(self.project.path_to_file) as conn:
+        with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                 description) Values(?,?,?,?,?,?)""",

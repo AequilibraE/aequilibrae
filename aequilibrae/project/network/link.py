@@ -1,7 +1,6 @@
 from typing import Union
 
 from aequilibrae.project.network.mode import Mode
-from aequilibrae.utils.db_utils import commit_and_close
 from .safe_class import SafeClass
 
 

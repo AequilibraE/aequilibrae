@@ -6,7 +6,6 @@ from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.period import Period
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class Periods(BasicTable):
@@ -64,7 +63,7 @@ class Periods(BasicTable):
             else:
                 self.__items[period.period_id] = self.__items.pop(period_id)
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             data = conn.execute(f"{self.sql} where period_id=?", [period_id]).fetchone()
         if data:
             data = dict(zip(self.__fields, data))
@@ -77,7 +76,7 @@ class Periods(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             tl.load_structure(conn, "periods")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
@@ -101,7 +100,7 @@ class Periods(BasicTable):
             **description** (:obj:`str`): Optional human readable description of the time period e.g. '1pm - 5pm'
         """
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             dt = conn.execute("SELECT COUNT(*) FROM periods WHERE period_id=?", [period_id]).fetchone()[0]
         if dt > 0:
             raise Exception("period_id already exists. Failed to create it")

@@ -3,7 +3,6 @@ from sqlite3 import IntegrityError
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class LinkTypes:

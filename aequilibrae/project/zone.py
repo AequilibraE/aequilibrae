@@ -4,7 +4,6 @@ from typing import Optional
 
 from shapely.geometry import Point, MultiPolygon
 
-from aequilibrae.utils.db_utils import commit_and_close
 from .network.connector_creation import connector_creation
 from .network.safe_class import SafeClass
 

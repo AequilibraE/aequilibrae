@@ -1,6 +1,5 @@
 import gc
 import string
-from math import floor
 from pathlib import Path
 from typing import List, Tuple
 
@@ -13,7 +12,7 @@ from shapely.geometry import Polygon
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
-from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
+from aequilibrae.utils.db_utils import commit_and_close, list_columns
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .model_area_gridding import geometry_grid

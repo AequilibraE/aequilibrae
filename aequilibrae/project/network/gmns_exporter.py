@@ -3,7 +3,6 @@ from os.path import join
 import pandas as pd
 
 from aequilibrae.parameters import Parameters
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class GMNSExporter:

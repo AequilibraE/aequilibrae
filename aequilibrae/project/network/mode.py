@@ -1,7 +1,5 @@
 import string
 
-from aequilibrae.utils.db_utils import commit_and_close
-
 
 class Mode:
     """A mode object represents a single record in the *modes* table"""

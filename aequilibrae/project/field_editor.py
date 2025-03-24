@@ -2,8 +2,6 @@ import re
 import string
 from typing import List
 
-from aequilibrae.utils.db_utils import commit_and_close
-
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
 

@@ -61,7 +61,7 @@ class Nodes(BasicTable):
             else:
                 self.__items[node.node_id] = self.__items.pop(node_id)
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             data = conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
         if data:
             data = dict(zip(self.__fields, data))
@@ -74,7 +74,7 @@ class Nodes(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             tl.load_structure(conn, "nodes")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
@@ -91,8 +91,7 @@ class Nodes(BasicTable):
         :Arguments:
             **node_id** (:obj:`int`): ID of the centroid to be created
         """
-
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             ct = conn.execute("select count(*) from nodes where node_id=?", [node_id]).fetchone()[0]
         if ct > 0:
             raise Exception("Node_id already exists. Failed to create it")
@@ -125,7 +124,7 @@ class Nodes(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             df = pd.read_sql("SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", conn)
         return df
 
