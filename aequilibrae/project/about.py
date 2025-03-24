@@ -30,7 +30,7 @@ class About:
         self.__path_to_file = project.path_to_file
         self.logger = project.logger
 
-        with commit_and_close(self.__path_to_file, spatial=True) as conn:
+        with project.db_connection as conn:
             if self.__has_about(conn):
                 self.__load(conn)
 

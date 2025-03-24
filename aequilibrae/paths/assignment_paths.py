@@ -36,8 +36,7 @@ class AssignmentResultsTable(object):
         self.procedure_report = self._parse_procedure_report()
 
     def _read_assignment_results(self) -> pd.DataFrame:
-        with read_and_close(self.project.path_to_file) as conn:
-            results_df = pd.read_sql("SELECT * FROM 'results'", conn)
+        results_df = pd.read_sql("SELECT * FROM 'results'", self.project.db_connection)
 
         res = results_df.loc[results_df.table_name == self.table_name]
         assert len(res) == 1, f"Found {len(res)} assignment result with this table name, need exactly one"

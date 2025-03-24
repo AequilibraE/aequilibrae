@@ -180,7 +180,7 @@ class OSMBuilder(WorkerThread):
         list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = []
         # Initialize link types
-        with read_and_close(self.project.path_to_file) as conn:
+        with self.project.db_connection as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
             for df in simple_progress(list_dfs, self.signal, "Processing chunks"):
                 if "tags" in df.columns:

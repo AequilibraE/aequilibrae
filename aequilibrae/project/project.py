@@ -2,15 +2,12 @@ import logging
 import os
 import shutil
 import sqlite3
-import warnings
-from contextlib import contextmanager
 
 from aequilibrae import global_logger
 from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
@@ -19,6 +16,7 @@ from aequilibrae.log import get_log_handler
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.transit.transit import Transit
+from aequilibrae.utils.db_proxy import DBProxy
 from aequilibrae.utils.db_utils import commit_and_close
 
 
@@ -76,10 +74,8 @@ class Project:
         clean(self)
 
     @property
-    @contextmanager
     def db_connection(self):
-        with commit_and_close(self.path_to_file, spatial=True) as conn:
-            yield conn
+        return DBProxy(commit_and_close(self.path_to_file, spatial=True))
 
     def new(self, project_path: str) -> None:
         """Creates a new project
@@ -129,9 +125,6 @@ class Project:
 
         finally:
             self.deactivate()
-
-    # def connect(self):
-    #     return database_connection("network", self.project_base_path)
 
     def activate(self):
         activate_project(self)

@@ -56,7 +56,7 @@ node.save()
 # Let's refresh the links in memory for usage
 links.refresh()
 
-link_ids = project.conn.execute("Select link_id from links;").fetchall()
+link_ids = project.db_connection.execute("Select link_id from links;").fetchall()
 
 for lid in link_ids:
     geo = links.get(lid[0]).geometry

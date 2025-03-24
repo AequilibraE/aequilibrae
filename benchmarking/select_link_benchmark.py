@@ -57,9 +57,8 @@ def arkansas(path: str):
         nd.save()
     net.build_graphs(modes=["c"])
     car_graph = net.graphs["c"]
-    with read_and_close(proj.path_to_file) as conn:
-        sql = "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
-        exclude_from_passenger = [x[0] for x in conn.execute(sql).fetchall()]
+    sql = "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
+    exclude_from_passenger = [x[0] for x in proj.db_connection.execute(sql).fetchall()]
     graph = car_graph
     set1 = graph.network[(graph.network.builtyear > 2010) | (graph.network.removedyear < 2010)].link_id.to_list()
     set2 = graph.network[(graph.network.mode_code < 10) | (graph.network.mode_code > 11)].link_id.to_list()
