@@ -34,7 +34,7 @@ class TestNetwork(TestCase):
         self.project.new(self.proj_path2)
         self.project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
 
-        with read_and_close(self.project.path_to_file) as conn:
+        with self.project.db_connection as conn:
             lks = conn.execute("""select count(*) from links""").fetchone()[0]
 
             osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]

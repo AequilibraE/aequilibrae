@@ -21,7 +21,7 @@ class Matrices:
         self.fldr = os.path.join(project.project_base_path, "matrices")
 
         tl = TableLoader()
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             matrices_list = tl.load_table(conn, "matrices")
         self.__fields = list(tl.fields)
         if matrices_list:
@@ -43,7 +43,7 @@ class Matrices:
     def clear_database(self) -> None:
         """Removes records from the matrices database that do not exist in disk"""
 
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             mats = conn.execute("Select name, file_name from matrices;").fetchall()
 
             remove = [nm for nm, file in mats if not isfile(join(self.fldr, file))]
@@ -99,7 +99,7 @@ class Matrices:
             else:
                 return "file missing"
 
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             df = pd.read_sql_query("Select * from matrices;", conn)
             df = df.assign(status="")
             df.status = df.file_name.apply(check_if_exists)

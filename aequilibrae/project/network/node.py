@@ -40,22 +40,20 @@ class Node(SafeClass):
 
     def save(self):
         """Saves node to database"""
-        conn = self.connect_db()
+        with self.project.db_connection as conn:
 
-        if self.node_id != self.__original__["node_id"]:
-            raise ValueError("One cannot change the node_id")
+            if self.node_id != self.__original__["node_id"]:
+                raise ValueError("One cannot change the node_id")
 
-        if self.__new:
-            data, sql = self._save_new_with_geometry()
-        else:
-            data, sql = self.__save_existing_node()
+            if self.__new:
+                data, sql = self._save_new_with_geometry()
+            else:
+                data, sql = self.__save_existing_node()
 
-        if data:
-            conn.execute(sql, data)
+            if data:
+                conn.execute(sql, data)
 
-        conn.commit()
-        conn.close()
-        self.__new = False
+            self.__new = False
 
     def data_fields(self) -> list:
         """lists all data fields for the node, as available in the database
@@ -80,12 +78,9 @@ class Node(SafeClass):
             self._logger.warning("This is already the node number")
             return
 
-        conn = self.connect_db()
-        try:
+        with self.project.db_connection as conn:
             conn.execute("Update Nodes set node_id=? where node_id=?", [new_id, self.node_id])
-        finally:
-            conn.commit()
-            conn.close()
+
         self._logger.info(f"Node {self.node_id} was renumbered to {new_id}")
         self.__dict__["node_id"] = new_id
         self.__original__["node_id"] = new_id

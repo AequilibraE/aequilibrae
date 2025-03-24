@@ -35,6 +35,3 @@ class SafeClass:
         data.extend([self.geometry.wkb, self.__srid__])
         sql = f"Insert into {self._table} ({','.join(up_keys)}) values({markers})"
         return data, sql
-
-    def connect_db(self):
-        return self.project.connect()

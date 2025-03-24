@@ -53,7 +53,7 @@ class Link(SafeClass):
 
     def delete(self):
         """Deletes link from database"""
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             conn.execute(f'DELETE FROM links where link_id="{self.link_id}"')
         self.__stil_exists = False
 
@@ -63,7 +63,7 @@ class Link(SafeClass):
         data, sql = self._save_new_with_geometry() if self.__new else self.__save_existing_link()
 
         if data:
-            with commit_and_close(self.connect_db()) as conn:
+            with self.project.db_connection as conn:
                 conn.execute(sql, data)
 
         self.__new = False

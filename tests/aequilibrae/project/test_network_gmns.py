@@ -50,7 +50,7 @@ class TestNetwork(TestCase):
         gmns_node_df = pd.read_csv(node_file)
         gmns_link_df = pd.read_csv(link_file)
 
-        with read_and_close(self.project.path_to_file) as conn:
+        with self.project.db_connection as conn:
             nd_ct = conn.execute("""select count(*) from nodes""").fetchone()[0]
 
             if nd_ct != gmns_node_df.shape[0]:

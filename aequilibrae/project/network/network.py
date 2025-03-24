@@ -59,7 +59,7 @@ class Network(WorkerThread):
             :obj:`list`: List of all fields that can be skimmed
         """
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
         ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
@@ -109,7 +109,7 @@ class Network(WorkerThread):
             :obj:`list`: List of all modes
         """
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
@@ -150,7 +150,7 @@ class Network(WorkerThread):
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
             conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
 
@@ -294,7 +294,7 @@ class Network(WorkerThread):
         """
         from aequilibrae.paths import Graph
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             if fields is None:
                 field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
@@ -402,7 +402,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -412,12 +412,12 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c

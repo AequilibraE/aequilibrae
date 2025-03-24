@@ -38,7 +38,8 @@ class TestFieldEditor:
     @pytest.fixture
     def attribute_count(self, table, table_name):
         qry = f'select count(*) from "attributes_documentation" where name_table="{table_name}"'
-        return table.project.conn.execute(qry).fetchone()[0]
+        with table.project.db_connection as conn:
+            return conn.execute(qry).fetchone()[0]
 
     def test_building(self, table, attribute_count):
         assert attribute_count == len(table._original_values), "Meta table populated with the wrong number of elements"
@@ -63,7 +64,6 @@ class TestFieldEditor:
         project = table.project
         new_attribute = "new_attribute"
         table.add(new_attribute, "some description")
-        project.conn.commit()
 
         with read_and_close(project.path_to_file) as conn:
             sql = f'select count(*) from "attributes_documentation" where name_table="{table_name}"'

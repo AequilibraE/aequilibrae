@@ -314,7 +314,8 @@ class OSMBuilder(WorkerThread):
                 if f"{field}_backward" in df:
                     fld = pd.to_numeric(df[f"{field}_backward"], errors="coerce")
                     df.loc[fld > 0, f"{field}_ba"] = fld[fld > 0]
-        cols = list_columns(self.project.conn, "links") + ["nodes"]
+        with self.project.db_connection as conn:
+            cols = list_columns(conn, "links") + ["nodes"]
         return df[[x for x in cols if x in df.columns]]
 
     ######## TABLE STRUCTURE UPDATING ########

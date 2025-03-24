@@ -61,7 +61,7 @@ class LinkTypes:
         self.logger = net.project.logger
 
         tl = TableLoader()
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self.project.db_connection as conn:
             link_types_list = tl.load_table(conn, "link_types")
         existing_list = [lt["link_type_id"] for lt in link_types_list]
 

@@ -20,7 +20,7 @@ class BasicTable:
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the layer.
         """
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             data = conn.execute(f'Select ST_asBinary(GetLayerExtent("{self.__table_type__}"))').fetchone()[0]
         return shapely.wkb.loads(data)
 

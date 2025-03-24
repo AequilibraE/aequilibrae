@@ -13,18 +13,18 @@ class TestProject(TestCase):
         tm = ModelsTest()
         self.proj = tm.no_triggers()
 
-        with commit_and_close(self.proj.path_to_file) as conn:
+        with self.proj.db_connection as conn:
             # Modes to add
             sql = "INSERT INTO modes (mode_name, mode_id) VALUES (?, ?);"
             for mid in ["p", "l", "g", "x", "y", "d", "k", "a", "r", "n", "m"]:
                 conn.execute(sql, [f"mode_{mid}", mid])
 
-        self.rtree = True
-        try:
-            self.proj.conn.execute("SELECT rtreecheck('idx_nodes_geometry');")
-        except Exception as e:
-            self.rtree = False
-            warn(f"RTREE not available --> {e.args}")
+            self.rtree = True
+            try:
+                conn.execute("SELECT rtreecheck('idx_nodes_geometry');")
+            except Exception as e:
+                self.rtree = False
+                warn(f"RTREE not available --> {e.args}")
 
         root = os.path.dirname(os.path.realpath(__file__)).replace("tests", "")
         qry_file = os.path.join(root, "database_specification/network/triggers/modes_table_triggers.sql")

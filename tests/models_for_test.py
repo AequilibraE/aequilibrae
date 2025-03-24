@@ -24,14 +24,14 @@ class ModelsTest:
         if not self.path_no_trigger.exists():
             proj = Project()
             proj.new(str(self.path_no_trigger))
-            remove_triggers(proj.conn, proj.logger, db_type="network")
-            tables = ["link_types", "nodes", "links"]
-            with read_and_close(join(no_triggers_project, "project_database.sqlite")) as conn:
+            with proj.db_connection as conn:
+                remove_triggers(conn, proj.logger, db_type="network")
+                tables = ["link_types", "nodes", "links"]
                 for tbl in tables:
                     df = pd.read_sql(f"Select * from {tbl}", conn)
-                    cols = pd.read_sql(f"Select * from {tbl}", proj.conn).columns
+                    cols = pd.read_sql(f"Select * from {tbl}", conn).columns
                     columns = [col for col in df.columns if col in cols]
-                    df[columns].to_sql(tbl, proj.conn, if_exists="append", index=False)
+                    df[columns].to_sql(tbl, conn, if_exists="append", index=False)
 
     def no_triggers(self) -> Project:
         self.__create_no_triggers()
