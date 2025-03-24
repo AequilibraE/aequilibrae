@@ -18,6 +18,7 @@ from aequilibrae.log import get_log_handler
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.transit.transit import Transit
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class Project:
@@ -75,6 +76,11 @@ class Project:
         self.__load_objects()
         global_logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
+
+    @property
+    def db_connection(self):
+        with commit_and_close(self.path_to_file, spatial=True) as conn:
+            yield conn
 
     def new(self, project_path: str) -> None:
         """Creates a new project

@@ -59,14 +59,15 @@ mode = "c"
 # We need to create the graph, but before that, we need to have at least one centroid in our network.
 
 # We get an arbitrary node to set as centroid and allow for the construction of graphs
-centroid_count = project.conn.execute("select count(*) from nodes where is_centroid=1").fetchone()[0]
+with project.db_connection as conn:
+    centroid_count = conn.execute("select count(*) from nodes where is_centroid=1").fetchone()[0]
 
-if centroid_count == 0:
-    arbitrary_node = project.conn.execute("select node_id from nodes limit 1").fetchone()[0]
-    nodes = project.network.nodes
-    nd = nodes.get(arbitrary_node)
-    nd.is_centroid = 1
-    nd.save()
+    if centroid_count == 0:
+        arbitrary_node = conn.execute("select node_id from nodes limit 1").fetchone()[0]
+        nodes = project.network.nodes
+        nd = nodes.get(arbitrary_node)
+        nd.is_centroid = 1
+        nd.save()
 
 network = project.network
 network.build_graphs(modes=[mode])
@@ -87,7 +88,7 @@ graph.set_skimming("distance")
 # %%
 # Get the nodes that are part of the car network
 missing_nodes = [
-    x[0] for x in project.conn.execute(f"Select node_id from nodes where instr(modes, '{mode}')").fetchall()
+    x[0] for x in project.db_connection.execute(f"Select node_id from nodes where instr(modes, '{mode}')").fetchall()
 ]
 missing_nodes = np.array(missing_nodes)
 
