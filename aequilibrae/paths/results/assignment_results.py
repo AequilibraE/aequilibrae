@@ -11,9 +11,7 @@ from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_t
 
 """
 TO-DO:
-1. Create a file type for memory-mapped path files
-   Same idea of the AequilibraEData container, but using the format.memmap from NumPy
-2. Make the writing to SQL faster by disabling all checks before the actual writing
+1. Make the writing to SQL faster by disabling all checks before the actual writing
 """
 
 
