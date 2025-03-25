@@ -61,21 +61,14 @@ links.refresh()
 # Because each link is unidirectional, you can no longer go from node 1 to node 2, obviously.
 #
 # We do NOT recommend this, though.... It is very slow for real networks.
-# 
-# Let's plot the entire network. We begin by using the appropriate context manager to retrieve
-# links and node IDs.
-with project.db_connection as conn:
-    link_ids = conn.execute("Select link_id from links;").fetchall()
-    node_ids = conn.execute("Select node_id from nodes;").fetchall()
-
+link_ids = links.data["link_id"].values.tolist()
 for lid in link_ids:
-    geo = links.get(lid[0]).geometry
+    geo = links.get(lid).geometry
     plt.plot(*geo.xy, color="blue")
 
-
-
+node_ids = all_nodes.data["node_id"].values.tolist()
 for nid in node_ids:
-    geo = all_nodes.get(nid[0]).geometry
+    geo = all_nodes.get(nid).geometry
     plt.plot(*geo.xy, "o", color="black")
 
 plt.show()

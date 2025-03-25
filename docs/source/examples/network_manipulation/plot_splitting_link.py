@@ -83,18 +83,14 @@ plt.show()
 # Or we plot the entire network
 plt.clf()
 
-with project.db_connection as conn:
-    link_ids = conn.execute("Select link_id from links;").fetchall()
-    node_ids = conn.execute("Select node_id from nodes;").fetchall()
-
+link_ids = links.data["link_id"].values.tolist()
 for lid in link_ids:
-    geo = links.get(lid[0]).geometry
+    geo = links.get(lid).geometry
     plt.plot(*geo.xy, color="blue")
 
-all_nodes = project.network.nodes
-
+node_ids = all_nodes.data["node_id"].values.tolist()
 for nid in node_ids:
-    geo = all_nodes.get(nid[0]).geometry
+    geo = all_nodes.get(nid).geometry
     plt.plot(*geo.xy, "o", color="black")
 
 plt.show()

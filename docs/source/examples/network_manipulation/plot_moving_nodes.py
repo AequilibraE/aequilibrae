@@ -56,6 +56,8 @@ node.save()
 # Let's refresh the links in memory for usage
 links.refresh()
 
+# %%
+# Let's access our links data using a context manager instead of directly accessing the DataFrame.
 with project.db_connection as conn:
     link_ids = conn.execute("Select link_id from links;").fetchall()
 

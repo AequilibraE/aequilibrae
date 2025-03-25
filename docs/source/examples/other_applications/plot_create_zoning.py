@@ -112,7 +112,7 @@ b = extent.bounds
 sql = "select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))"
 with project.db_connection as conn:
     grid = conn.execute(sql, [extent.wkb, zone_side, Point(b[2], b[3]).wkb]).fetchone()[0]
-grid = shapely.wkb.loads(grid)
+    grid = shapely.wkb.loads(grid)
 
 # %%
 # Since we used the bounding box, we have way more zones than we wanted, so we clean them
