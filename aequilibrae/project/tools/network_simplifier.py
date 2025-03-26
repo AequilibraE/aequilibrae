@@ -212,6 +212,7 @@ class NetworkSimplifier(WorkerThread):
                 conn.execute("UPDATE nodes SET geometry=GeomFromWKB(?, ?) WHERE node_id=?", [wkb, srid, link.b_node])
                 conn.commit()
 
+        self.link_layer = self.network.links.data
         self.project.logger.warning(f"{len(links)} links collapsed into nodes")
 
     # TODO: What else do we need to add here? I removed the part of the code related to Polaris, but
