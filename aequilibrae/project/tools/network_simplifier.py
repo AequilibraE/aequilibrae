@@ -1,8 +1,6 @@
-import logging
 import warnings
 from copy import deepcopy
 from math import ceil
-from os import PathLike
 from typing import List
 
 import numpy as np
@@ -34,9 +32,10 @@ class NetworkSimplifier(WorkerThread):
         Simplifies the network by merging links that are shorter than a given threshold
 
         Args:
-            *maximum_allowable_link_length* (:obj:`float`): Maximum length for output links (meters)
+            **graph** (:obj:`Graph`): AequilibraE graph
 
-            *max_speed_ratio* (:obj:`float`): Maximum ratio between the fastest and slowest speed for a link to be considered for simplification
+            **max_speed_ratio** (:obj:`float`): Maximum ratio between the fastest and slowest speed
+            for a link to be considered for simplification
         """
         self.graph = graph
 
@@ -61,7 +60,7 @@ class NetworkSimplifier(WorkerThread):
         self.signal.emit(["start", link_set_df.shape[0], "Simplifying links"])
 
         counter = 0
-        for _, rec in link_set_df[:1].iterrows():
+        for _, rec in link_set_df.iterrows():
             counter += 1
             self.signal.emit(["update", counter, "Simplifying links"])
             compressed_id = rec.__compressed_id__
@@ -131,18 +130,17 @@ class NetworkSimplifier(WorkerThread):
                 new_links.append(data)
             links_to_delete.extend(candidates.index.tolist())
 
-        logging.info(f"{len(links_to_delete):,} links will be removed")
-        logging.info(f"{len(new_links):,} links will be added")
+        self.signal.emit(["finished"])
+
+        self.project.logger.info(f"{len(links_to_delete):,} links will be removed")
+        self.project.logger.info(f"{len(new_links):,} links will be added")
         if new_links:
             self.__execute_link_deletion_and_addition(new_links, links_to_delete)
 
-        logging.warning("Network has been rebuilt. You should run this tool's rebuild network method")
+        self.project.logger.warning("Network has been rebuilt. You should run this tool's rebuild network method")
 
     def __process_link_fields(self, candidates, link_sequence, max_speed_ratio):
-        lnk = candidates.loc[link_sequence[0]]
-        start_node = (
-            lnk.a_node if candidates.query("a_node==@lnk.a_node or b_node==@lnk.b_node").shape[0] == 1 else lnk.b_node
-        )
+        start_node = candidates.loc[link_sequence[0]]["a_node"]
         longest_link_id = candidates.sort_values("distance", ascending=False).index[0]
         speed_ab, speed_ba, geos, lanes_ab, lanes_ba = [], [], [], [], []
         longest_link, longest_direction = None, None
@@ -190,42 +188,39 @@ class NetworkSimplifier(WorkerThread):
         new_layer.refresh()
         new_dist = new_layer.data.geometry.length.sum()
 
-        logging.warning(f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}")
+        self.project.logger.warning(
+            f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}"
+        )
         self.link_layer = new_layer.data
 
-    # TODO:
+    # TODO: What else do we need to add here?
     def collapse_links_into_nodes(self, links: List[int]):
-        srid = self.link_layer.crs
-        target_links = self.link_layer.query("link in @links")
-        with commit_and_close(self.network_file, spatial=True) as conn:
+        """
+        Collapses links into nodes, adjusting the network in the neighborhood.
+
+        Args:
+            **links** (:obj:`List[int]`): List containing link IDs to be collapsed.
+        """
+        srid = self.link_layer.crs.to_epsg()
+        target_links = self.link_layer.query("link_id in @links")
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             for _, link in target_links.iterrows():
-                wkb = link.geo.interpolate(0.5, normalized=True).wkb
-                conn.execute("DELETE FROM Link WHERE link=?", [link.link])
+                wkb = link.geometry.interpolate(0.5, normalized=True).wkb
+                conn.execute("DELETE FROM links WHERE link_id=?", [link.link_id])
                 conn.commit()
-                conn.execute("UPDATE Node set geo=GeomFromWKB(?, ?) where node=?", [wkb, srid, link.node_a])
-                conn.execute("UPDATE Node set geo=GeomFromWKB(?, ?) where node=?", [wkb, srid, link.node_b])
+                conn.execute("UPDATE nodes SET geometry=GeomFromWKB(?, ?) WHERE node_id=?", [wkb, srid, link.a_node])
+                conn.execute("UPDATE nodes SET geometry=GeomFromWKB(?, ?) WHERE node_id=?", [wkb, srid, link.b_node])
                 conn.commit()
 
-        logging.warning(f"{len(links)} links collapsed into nodes")
+        self.project.logger.warning(f"{len(links)} links collapsed into nodes")
 
-    # TODO:
+    # TODO: What else do we need to add here? I removed the part of the code related to Polaris, but
+    # I don't know if there's anything else to add here.
     def rebuild_network(self):
         """Rebuilds the network elements that would have to be rebuilt after massive network simplification"""
 
-        # from polaris.network.network import Network
+        self.network.links.refresh()
+        self.network.nodes.refresh()
 
-        # net = Network.from_file(self.network_file, False)
-        # net.active.build()
-        # net.tools.rebuild_location_links()
-        # net.tools.rebuild_intersections()
-        # net.geo_consistency.update_link_association()
-        # net.geo_consistency.update_zone_association()
-        # with commit_and_close(self.network_file, spatial=True) as conn:
-        #     conn.execute("DELETE FROM Editing_Table")
-
-        # with commit_and_close(self.network_file, spatial=True) as conn:
-        #     conn.execute("VACUUM")
-        # net.checker.errors.clear()
-        # net.checker.critical()
-        # if len(net.checker.errors):
-        #     logging.error(f"Errors found after rebuilding the network. {net.checker.errors}")
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+            conn.execute("VACUUM")
