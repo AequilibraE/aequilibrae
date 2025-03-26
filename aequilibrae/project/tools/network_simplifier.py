@@ -24,7 +24,7 @@ class NetworkSimplifier(WorkerThread):
     def __init__(self, project=None) -> None:
 
         self.project = project or get_active_project()
-        self.network = project.network
+        self.network = self.project.network
         self.link_layer = self.network.links.data
 
         warnings.warn("This will alter your database in place. Make sure you have a backup.")
@@ -58,12 +58,12 @@ class NetworkSimplifier(WorkerThread):
 
         links_to_delete, new_links = [], []
         max_link_id = self.link_layer.link_id.max() + 1
-        # self.signal.emit(["start", link_set_df.shape[0], "Simplifying links"])
+        self.signal.emit(["start", link_set_df.shape[0], "Simplifying links"])
 
         counter = 0
-        for idx, rec in link_set_df[:2].iterrows():
+        for _, rec in link_set_df[:1].iterrows():
             counter += 1
-            # self.signal.emit(["update", idx, "Simplifying links"])
+            self.signal.emit(["update", counter, "Simplifying links"])
             compressed_id = rec.__compressed_id__
 
             # We got to the group of links where AequilibraE can no longer compress
@@ -74,20 +74,19 @@ class NetworkSimplifier(WorkerThread):
             if len(link_sequence) < 2:
                 continue
 
-            link_sequence = [abs(x) for x in link_sequence]  # Does this make sense?
+            link_sequence = [abs(x) for x in link_sequence]
             self.link_sequence = [x for x in link_sequence if x not in centroid_connectors]
             self.candidates = self.link_layer.query("link_id in @link_sequence").set_index("link_id")
 
             if self.candidates.shape[0] <= 1:
                 continue
 
-            # To merge, all links have to have the same number of lanes, and functional class
+            # To merge, all links have to have the same number of lanes and link type
             breaker = self.candidates["link_type"].nunique() > 1
             if breaker:
                 continue
 
-            # We build the geometry sequence
-            # We also build speeds, capacities
+            # We build the geometry sequence, speeds, and capacities
             candidates, geos, long_dir, long_lnk = self.__process_link_fields(
                 self.candidates, self.link_sequence, max_speed_ratio
             )
@@ -114,13 +113,14 @@ class NetworkSimplifier(WorkerThread):
                     field2 = field.replace("ab", "ba") if "ab" in field else field.replace("ba", "ab")
                     main_data[field2] = metric
 
-            # If that link is in the opposite direction, we need to swap lanes, as we would have swapped the geometry as well
+            # If that link is in the opposite direction, we need to swap lanes,
+            # as we would have swapped the geometry as well
             if long_dir == -1:
                 main_data["lanes_ab"], main_data["lanes_ba"] = main_data["lanes_ba"], main_data["lanes_ab"]
 
             for i in range(break_into):
                 data = deepcopy(main_data)
-                data["link"] = max_link_id
+                data["link_id"] = max_link_id
 
                 sub_geo = substring(new_geo, i / break_into, (i + 1.0) / break_into, normalized=True)
                 if sub_geo.length < 0.000001:
@@ -130,7 +130,6 @@ class NetworkSimplifier(WorkerThread):
                 max_link_id += 1
                 new_links.append(data)
             links_to_delete.extend(candidates.index.tolist())
-            print(links_to_delete, new_links)
 
         logging.info(f"{len(links_to_delete):,} links will be removed")
         logging.info(f"{len(new_links):,} links will be added")
@@ -140,7 +139,6 @@ class NetworkSimplifier(WorkerThread):
         logging.warning("Network has been rebuilt. You should run this tool's rebuild network method")
 
     def __process_link_fields(self, candidates, link_sequence, max_speed_ratio):
-        candidates = candidates.loc[link_sequence]
         lnk = candidates.loc[link_sequence[0]]
         start_node = (
             lnk.a_node if candidates.query("a_node==@lnk.a_node or b_node==@lnk.b_node").shape[0] == 1 else lnk.b_node
@@ -175,31 +173,59 @@ class NetworkSimplifier(WorkerThread):
 
     def __execute_link_deletion_and_addition(self, new_links, links_to_delete):
         df = pd.DataFrame(new_links)
-        df.drop(columns=["node_a", "node_b"], inplace=True)
+        df = df.drop(columns=["a_node", "b_node", "geometry", "ogc_fid"]).rename({"geo": "geometry"}, axis=1)
         cols = list(df.columns)
-        cols.remove("geo")
-        cols.append("geo")
         df = df[cols]
         data = df.assign(srid=self.link_layer.crs.to_epsg()).to_records(index=False)
 
-        sql = f"INSERT INTO Link({','.join(df.columns)}) VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
-        with commit_and_close(self.project, spatial=True) as conn:
+        sql = f"INSERT INTO links({','.join(df.columns)}) VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
+        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             conn.executemany(sql, data)
-            conn.executemany("DELETE FROM Link WHERE link=?", [[x] for x in links_to_delete])
+            conn.executemany("DELETE FROM links WHERE link_id=?", [[x] for x in links_to_delete])
             conn.commit()
 
         # Validate that we kept distances the same
         old_dist = self.link_layer.geometry.length.sum()
-        self.dtc.refresh_cache()
-        new_layer = self.dtc.get("Link")
-        new_dist = new_layer.geometry.length.sum()
+        new_layer = self.network.links
+        new_layer.refresh()
+        new_dist = new_layer.data.geometry.length.sum()
 
         logging.warning(f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}")
-        self.link_layer = new_layer
+        self.link_layer = new_layer.data
 
+    # TODO:
     def collapse_links_into_nodes(self, links: List[int]):
-        pass
+        srid = self.link_layer.crs
+        target_links = self.link_layer.query("link in @links")
+        with commit_and_close(self.network_file, spatial=True) as conn:
+            for _, link in target_links.iterrows():
+                wkb = link.geo.interpolate(0.5, normalized=True).wkb
+                conn.execute("DELETE FROM Link WHERE link=?", [link.link])
+                conn.commit()
+                conn.execute("UPDATE Node set geo=GeomFromWKB(?, ?) where node=?", [wkb, srid, link.node_a])
+                conn.execute("UPDATE Node set geo=GeomFromWKB(?, ?) where node=?", [wkb, srid, link.node_b])
+                conn.commit()
 
+        logging.warning(f"{len(links)} links collapsed into nodes")
+
+    # TODO:
     def rebuild_network(self):
         """Rebuilds the network elements that would have to be rebuilt after massive network simplification"""
-        pass
+
+        # from polaris.network.network import Network
+
+        # net = Network.from_file(self.network_file, False)
+        # net.active.build()
+        # net.tools.rebuild_location_links()
+        # net.tools.rebuild_intersections()
+        # net.geo_consistency.update_link_association()
+        # net.geo_consistency.update_zone_association()
+        # with commit_and_close(self.network_file, spatial=True) as conn:
+        #     conn.execute("DELETE FROM Editing_Table")
+
+        # with commit_and_close(self.network_file, spatial=True) as conn:
+        #     conn.execute("VACUUM")
+        # net.checker.errors.clear()
+        # net.checker.critical()
+        # if len(net.checker.errors):
+        #     logging.error(f"Errors found after rebuilding the network. {net.checker.errors}")
