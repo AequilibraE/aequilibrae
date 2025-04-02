@@ -398,7 +398,7 @@ class GMNSBuilder:
             for s in modes_list
         ]
 
-        with commit_and_close(self.__pth_file, spatial=True) as conn:
+        with commit_and_close(self.__path_to_file) as conn:
             existing_modes = dict(conn.execute("select mode_name, mode_id from modes").fetchall())
 
         # Invert the resolved_groups dictionary, we're interested in which use_groups contain our "use"

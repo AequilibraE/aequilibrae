@@ -76,7 +76,7 @@ class About:
         if has_forbidden:
             raise ValueError(f"{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _")
 
-        with commit_and_close(self.__path_to_file, spatial=True) as conn:
+        with commit_and_close(self.__path_to_file) as conn:
             conn.execute("INSERT INTO 'about' (infoname) VALUES(?)", [info_field])
         self.__characteristics.append(info_field)
         self.__original[info_field] = None
@@ -91,7 +91,7 @@ class About:
             >>> project.about.description = 'This is the example project. Do not use for forecast'
             >>> project.about.write_back()
         """
-        with commit_and_close(self.__path_to_file, spatial=True) as conn:
+        with commit_and_close(self.__path_to_file) as conn:
             for k in self.__characteristics:
                 v = self.__dict__[k]
                 if v != self.__original[k]:
