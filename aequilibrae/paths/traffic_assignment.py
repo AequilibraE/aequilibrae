@@ -4,7 +4,7 @@ import sqlite3
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -537,6 +537,27 @@ class TrafficAssignment(AssignmentBase):
     # def get_spec(self) -> dict:
     #     """Gets the entire specification of the assignment"""
     #     return deepcopy(self.__dict__)
+
+    def skim_congested(self, skim_fields=None, return_matrices=False) -> Optional[dict]:
+        """
+        Skims the congested network. The user can add a list of skims to be computed, which
+        will be added to the congested time and the assignment cost from the last iteration of
+        the assignment.
+
+        The matrices are always stored internally in the AequilibraE objects to be saved to the
+        project if needed. If return_matrices is set to True, the matrices are also returned.
+
+        :Arguments:
+            **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
+            **return_matrices** (:obj:`Bool`): Returns a dictionary with skims. Defaults to False.
+        """
+        data = {}
+        for assig_class in self.classes:
+            skimmer = assig_class.skim_congested(skim_fields)
+            assig_class._aon_results.skims = skimmer.results.skims
+            data[assig_class._id] = skimmer.results.skims
+        if return_matrices:
+            return data
 
     def __validate_parameters(self, kwargs) -> bool:
         if self.vdf == "":
