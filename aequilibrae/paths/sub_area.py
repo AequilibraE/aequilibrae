@@ -122,14 +122,17 @@ class SubAreaAnalysis:
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if not o_inside and not d_inside:
-                        through[(self.graph.all_nodes[link1.a_node], self.graph.all_nodes[link2.b_node]) + original_ods] += load
+                        through[
+                            (self.graph.all_nodes[link1.a_node], self.graph.all_nodes[link2.b_node]) + original_ods
+                        ] += load
 
             sub_area_demand.append(
                 pd.DataFrame(
                     list(entered.values()) + list(exited.values()) + list(through.values()),
                     index=pd.MultiIndex.from_tuples(
                         list(entered.keys()) + list(exited.keys()) + list(through.keys()),
-                        names=["origin id", "destination id"] + (["original origin id", "original destination id"] if keep_original_ods else []),
+                        names=["origin id", "destination id"]
+                        + (["original origin id", "original destination id"] if keep_original_ods else []),
                     ),
                     columns=[col],
                 )
@@ -145,7 +148,9 @@ class SubAreaAnalysis:
         interior = self.rc.demand.df.loc[interior]
         if keep_original_ods:
             # We need to duplicate the interior ODs if we're "keeping the originals"
-            interior.index = pd.MultiIndex.from_tuples((x + x for x in interior.index), names=self.sub_area_demand.index.names)
+            interior.index = pd.MultiIndex.from_tuples(
+                (x + x for x in interior.index), names=self.sub_area_demand.index.names
+            )
 
         self.sub_area_demand = pd.concat([self.sub_area_demand, interior]).sort_index()
         return self.sub_area_demand
