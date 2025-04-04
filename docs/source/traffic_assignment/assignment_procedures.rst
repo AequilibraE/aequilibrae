@@ -156,7 +156,7 @@ for easy identification.
 
 .. doctest::
 
-  >>> assig.set_skimming_fields(["distance"])
+  >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
   >>> assig.execute() # doctest: +SKIP
   >>> assig.save_skims() # doctest: +SKIP
 
