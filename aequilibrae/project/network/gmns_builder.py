@@ -55,7 +55,7 @@ class GMNSBuilder:
         self.nodes = net.nodes
         self.link_types = net.link_types
         self.modes = net.modes
-        self.__pth_file = net.project.path_to_file
+        self.__path_file = net.project.path_to_file
 
         self.link_df = pd.read_csv(link_path).fillna("")
         self.node_df = pd.read_csv(node_path).fillna("")
@@ -398,7 +398,7 @@ class GMNSBuilder:
             for s in modes_list
         ]
 
-        with commit_and_close(self.__path_to_file) as conn:
+        with commit_and_close(self.__path_file) as conn:
             existing_modes = dict(conn.execute("select mode_name, mode_id from modes").fetchall())
 
         # Invert the resolved_groups dictionary, we're interested in which use_groups contain our "use"
@@ -526,7 +526,7 @@ class GMNSBuilder:
         )
         n_params_list = aeq_nodes_df.to_records(index=False)
 
-        with commit_and_close(self.__pth_file, spatial=True) as conn:
+        with commit_and_close(self.__path_file, spatial=True) as conn:
             conn.executemany(n_query, n_params_list)
 
             l_query = "insert into links(" + ", ".join(list(links_fields.keys())) + ")"
