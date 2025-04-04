@@ -147,7 +147,7 @@ zones.head()
 # choice assignment results to construct the desired demand matrix as a DataFrame. If we were interested in the original
 # origin and destination IDs for each entry we could use `subarea.post_process(keep_original_ods=True)` instead. This
 # will attach the true ODs from the select link OD matrix as part of the index. However, this will create a
-# significantly larger matrix, but more flexible matrix.
+# significantly larger, but more flexible matrix.
 from aequilibrae.paths import SubAreaAnalysis
 
 subarea = SubAreaAnalysis(graph, zones, mat)
