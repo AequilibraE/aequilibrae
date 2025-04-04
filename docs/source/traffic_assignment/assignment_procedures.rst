@@ -154,11 +154,11 @@ The user can select the fields they want to skim, as well save the skims to disk
 at the end of the assignment procedure, where skims are tagged with suffixes *"_final"* and *"_blended"*
 for easy identification.
 
-.. doctest::
+::
 
   >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
   >>> assig.execute() # doctest: +SKIP
-  >>> assig.save_skims() # doctest: +SKIP
+  >>> assig.save_skims("one_matrix_name")
 
 
 Assigning sparse matrices
@@ -183,7 +183,7 @@ of zones and over 100 iterations of assignment.
 
   >>> assig.execute()
   >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
-  >>> assig.save_skims()
+  >>> assig.save_skims("another_matrix_name")
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment
 cost from the last iteration of the assignment by default. These matrices are named *__congested_time__*
