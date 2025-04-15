@@ -2,6 +2,8 @@ import logging
 import os
 import shutil
 import sqlite3
+import functools
+import warnings
 from contextlib import contextmanager
 
 from aequilibrae import global_logger
@@ -18,6 +20,7 @@ from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.model_run_utils import import_directory_as_module
 
 
 class Project:
@@ -157,6 +160,24 @@ class Project:
     @property
     def parameters(self) -> dict:
         return self.project_parameters.parameters
+
+    @property
+    def entry_points(self):
+        entry_points = self.parameters["entry_points"]
+        module = import_directory_as_module(os.path.join(self.project_base_path, "entry_points"), "aequilibrae.entry_points")
+
+        sentinal = object()
+        for name, kwargs in entry_points.items():
+            attr = getattr(module, name, sentinal)
+            if attr is sentinal:
+                continue
+            elif not callable(attr):
+                raise RuntimeError(f"found entry point '{name}' in module but it is not callable")
+
+            func = functools.partial(attr, **kwargs)
+            setattr(module, name, func)
+
+        return module
 
     def check_file_indices(self) -> None:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""
