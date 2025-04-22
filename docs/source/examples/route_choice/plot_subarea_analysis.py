@@ -142,10 +142,12 @@ zones.head()
 # Automated sub-area analysis
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# We first construct out ``SubAreaAnalysis`` object from the graph, zones, and matrix we previously
-# constructed, then configure the route choice assignment and execute it. From there the ``post_process``
-# method is able to use the route choice assignment results to construct the desired demand matrix
-# as a DataFrame.
+# We first construct out ``SubAreaAnalysis`` object from the graph, zones, and matrix we previously constructed, then
+# configure the route choice assignment and execute it. From there the ``post_process`` method is able to use the route
+# choice assignment results to construct the desired demand matrix as a DataFrame. If we were interested in the original
+# origin and destination IDs for each entry we could use `subarea.post_process(keep_original_ods=True)` instead. This
+# will attach the true ODs from the select link OD matrix as part of the index. However, this will create a
+# significantly larger, but more flexible matrix.
 from aequilibrae.paths import SubAreaAnalysis
 
 subarea = SubAreaAnalysis(graph, zones, mat)

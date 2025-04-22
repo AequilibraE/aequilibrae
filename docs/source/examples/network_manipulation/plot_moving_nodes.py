@@ -56,11 +56,12 @@ node.save()
 # Let's refresh the links in memory for usage
 links.refresh()
 
-curr = project.conn.cursor()
-curr.execute("Select link_id from links;")
+# %%
+# Let's access our links data using a context manager instead of directly accessing the DataFrame.
+with project.db_connection as conn:
+    link_ids = conn.execute("Select link_id from links;").fetchall()
 
-# We plot the entire network.
-for lid in curr.fetchall():
+for lid in link_ids:
     geo = links.get(lid[0]).geometry
     plt.plot(*geo.xy, color="blue")
 

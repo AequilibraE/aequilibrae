@@ -17,8 +17,9 @@ class TestNetworkTriggers(TestCase):
         copytree(siouxfalls_project, self.proj_path)
         self.siouxfalls = Project()
         self.siouxfalls.open(self.proj_path)
-        remove_triggers(self.siouxfalls.conn, self.siouxfalls.logger, db_type="network")
-        add_triggers(self.siouxfalls.conn, self.siouxfalls.logger, db_type="network")
+        with self.siouxfalls.db_connection as conn:
+            remove_triggers(conn, self.siouxfalls.logger, db_type="network")
+            add_triggers(conn, self.siouxfalls.logger, db_type="network")
 
     def tearDown(self) -> None:
         self.siouxfalls.close()
@@ -44,50 +45,48 @@ class TestNetworkTriggers(TestCase):
     def test_add_regular_link(self):
         # Add a regular link to see if it fails when creating it
         # It happened at some point
-        curr = self.siouxfalls.conn.cursor()
-        data = [123456, "c", "default", LineString([Point(0, 0), Point(1, 1)]).wkb]
-
-        sql = "insert into links (link_id, modes, link_type, geometry) Values(?,?,?,GeomFromWKB(?, 4326));"
-        curr.execute(sql, data)
-        self.siouxfalls.conn.commit()
+        with self.siouxfalls.db_connection as conn:
+            data = [123456, "c", "default", LineString([Point(0, 0), Point(1, 1)]).wkb]
+            sql = "insert into links (link_id, modes, link_type, geometry) Values(?,?,?,GeomFromWKB(?, 4326));"
+            conn.execute(sql, data)
 
     def test_add_regular_node_change_centroid_id(self):
         # Add a regular link to see if it fails when creating it
         # It happened at some point
-        curr = self.siouxfalls.conn.cursor()
         network = self.siouxfalls.network
         nodes = network.count_nodes()
 
         data = [987654, 1, Point(0, 0).wkb]
 
-        sql = "insert into nodes (node_id, is_centroid, geometry) Values(?,?,GeomFromWKB(?, 4326));"
-        curr.execute(sql, data)
-        self.siouxfalls.conn.commit()
-        self.assertEqual(nodes + 1, network.count_nodes(), "Failed to insert node")
+        with self.siouxfalls.db_connection as conn:
+            sql = "insert into nodes (node_id, is_centroid, geometry) Values(?,?,GeomFromWKB(?, 4326));"
+            conn.execute(sql, data)
+            conn.commit()
+            self.assertEqual(nodes + 1, network.count_nodes(), "Failed to insert node")
 
-        curr.execute("Update nodes set is_centroid=0 where node_id=?", data[:1])
-        self.siouxfalls.conn.commit()
-        self.assertEqual(nodes, network.count_nodes(), "Failed to delete node when changing centroid flag")
+            conn.execute("Update nodes set is_centroid=0 where node_id=?", data[:1])
+            conn.commit()
+            self.assertEqual(nodes, network.count_nodes(), "Failed to delete node when changing centroid flag")
 
     def test_link_direction(self):
-        curr = self.siouxfalls.conn.cursor()
         network = self.siouxfalls.network
         links = network.count_links()
 
-        sql = "UPDATE links SET direction=-2 WHERE link_id=1;"
-        with self.assertRaises(sqlite3.IntegrityError):
-            curr.execute(sql)
+        with self.siouxfalls.db_connection as conn:
+            sql = "UPDATE links SET direction=-2 WHERE link_id=1;"
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute(sql)
 
-        data = [987654, 2, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb]
-        sql = "insert into links (link_id, direction, modes, link_type, geometry) Values(?,?,?,?,GeomFromWKB(?, 4326));"
-        with self.assertRaises(sqlite3.IntegrityError):
-            curr.execute(sql, data)
+            data = [987654, 2, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb]
+            sql = "insert into links (link_id, direction, modes, link_type, geometry) Values(?,?,?,?,GeomFromWKB(?, 4326));"
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute(sql, data)
 
-        data = [
-            (987654, -1, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb),
-            (876543, 0, "c", "default", LineString([Point(1, 0), Point(1, 1)]).wkb),
-            (765432, 1, "c", "default", LineString([Point(1, 1), Point(0, 1)]).wkb),
-        ]
-        curr.executemany(sql, data)
-        self.siouxfalls.conn.commit()
-        self.assertEqual(network.count_links(), links + 3, "Failed when adding new links to the project.")
+            data = [
+                (987654, -1, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb),
+                (876543, 0, "c", "default", LineString([Point(1, 0), Point(1, 1)]).wkb),
+                (765432, 1, "c", "default", LineString([Point(1, 1), Point(0, 1)]).wkb),
+            ]
+            conn.executemany(sql, data)
+            conn.commit()
+            self.assertEqual(network.count_links(), links + 3, "Failed when adding new links to the project.")

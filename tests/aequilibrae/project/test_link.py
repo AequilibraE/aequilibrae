@@ -1,13 +1,14 @@
-from unittest import TestCase
-from shapely.ops import substring
-from copy import copy, deepcopy
 import os
-from shutil import copytree, rmtree
 import uuid
 from random import randint, random
+from shutil import copytree, rmtree
 from tempfile import gettempdir
-from aequilibrae.project import Project
+from unittest import TestCase
 
+from shapely.ops import substring
+
+from aequilibrae.project import Project
+from aequilibrae.utils.db_utils import read_and_close
 from ...data import siouxfalls_project
 
 
@@ -21,7 +22,6 @@ class TestLink(TestCase):
         self.project = Project()
         self.project.open(self.proj_dir)
         self.network = self.project.network
-        self.curr = self.project.conn.cursor()
 
         self.links = self.network.links
         self.modes = self.network.modes
@@ -30,7 +30,6 @@ class TestLink(TestCase):
 
     def tearDown(self) -> None:
         self.project.close()
-        del self.curr
         try:
             rmtree(self.proj_dir)
         except Exception as e:
@@ -42,9 +41,10 @@ class TestLink(TestCase):
         with self.assertRaises(Exception):
             _ = self.links.get(self.lid)
 
-        self.curr.execute("Select count(*) from links where link_id=?", [self.lid])
+        with read_and_close(self.project.path_to_file) as conn:
+            lid = conn.execute(f"Select count(*) from links where link_id={self.lid}").fetchone()[0]
 
-        self.assertEqual(0, self.curr.fetchone()[0], f"Failed to delete link {self.lid}")
+        self.assertEqual(0, lid, f"Failed to delete link {self.lid}")
 
     def test_save(self):
         self.link.save()
@@ -117,14 +117,14 @@ class TestLink(TestCase):
         self.assertEqual(link2.data_fields(), self.link.data_fields(), "Different links have different data fields")
 
         fields = sorted(link2.data_fields())
-        self.curr.execute("pragma table_info(links)")
-        dt = self.curr.fetchall()
+
+        with read_and_close(self.project.path_to_file) as conn:
+            dt = conn.execute("pragma table_info(links)").fetchall()
 
         data_fields = sorted([x[1] for x in dt if x[1] != "ogc_fid"])
 
         self.assertEqual(sorted(fields), sorted(data_fields), "Link has unexpected set of fields")
 
     def __check_mode(self):
-        sql = "Select modes from links where link_id=?"
-        self.curr.execute(sql, [self.lid])
-        return self.curr.fetchone()[0]
+        with read_and_close(self.project.path_to_file) as conn:
+            return conn.execute(f"Select modes from links where link_id={self.lid}").fetchone()[0]

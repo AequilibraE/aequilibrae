@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict
 from collections.abc import Hashable
+from os import path
 from uuid import uuid4
 from functools import cached_property
 
@@ -22,6 +23,7 @@ from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class RouteChoice:
@@ -552,19 +554,16 @@ class RouteChoice:
         ]
 
         # sqlite3 context managers only commit, they don't close, oh well
-        conn = sqlite3.connect(pathlib.Path(project.project_base_path) / "results_database.sqlite")
-        with conn:
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
             df.to_sql(table_name, conn, index=True)
-        conn.close()
 
-        conn = project.connect()
-        with conn:
+        with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                 description) Values(?,?,?,?,?,?)""",
                 data,
             )
-        conn.close()
 
     def save_link_flows(self, table_name: str, project=None) -> None:
         """

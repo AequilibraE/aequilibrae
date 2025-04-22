@@ -47,7 +47,8 @@ class GravityApplication:
 
         # We create the vectors we will use
         >>> query = "SELECT zone_id, population, employment FROM zones;"
-        >>> df = pd.read_sql(query, project.conn)
+        >>> with project.db_connection as conn:
+        ...     df = pd.read_sql(query, conn)
         >>> df.sort_values(by="zone_id", inplace=True)
         >>> df.set_index("zone_id", inplace=True)
 

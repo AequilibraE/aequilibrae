@@ -4,7 +4,6 @@ from typing import Optional
 
 from shapely.geometry import Point, MultiPolygon
 
-from aequilibrae.utils.db_utils import commit_and_close
 from .network.connector_creation import connector_creation
 from .network.safe_class import SafeClass
 
@@ -23,7 +22,7 @@ class Zone(SafeClass):
 
     def delete(self):
         """Removes the zone from the database"""
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             conn.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
         self.__zoning._remove_zone(self.zone_id)
         del self
@@ -34,7 +33,7 @@ class Zone(SafeClass):
         if self.zone_id != self.__original__["zone_id"]:
             raise ValueError("One cannot change the zone_id")
 
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             if conn.execute(f'select count(*) from zones where zone_id="{self.zone_id}"').fetchone()[0] == 0:
                 data = [self.zone_id, self.geometry.wkb]
                 conn.execute("Insert into zones (zone_id, geometry) values(?, ST_Multi(GeomFromWKB(?, 4326)))", data)
@@ -64,7 +63,7 @@ class Zone(SafeClass):
         # This is VERY small in real-world terms (between zero and 11cm)
         shift = 0.000001
 
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             if conn.execute("select count(*) from nodes where node_id=?", [self.zone_id]).fetchone()[0] > 0:
                 self.project.logger.warning("Centroid already exists. Failed to create it")
                 return
@@ -134,7 +133,7 @@ class Zone(SafeClass):
             **mode_id** (:obj:`str`): Mode ID we are trying to disconnect from this zone
         """
 
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             data = [self.zone_id, mode_id]
             row_count = conn.execute("Delete from links where a_node=? and modes=?", data).rowcount
 

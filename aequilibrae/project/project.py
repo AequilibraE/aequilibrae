@@ -2,14 +2,13 @@ import logging
 import os
 import shutil
 import sqlite3
-import warnings
+from contextlib import contextmanager
 
 from aequilibrae import global_logger
 from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
@@ -18,6 +17,7 @@ from aequilibrae.log import get_log_handler
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.transit.transit import Transit
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class Project:
@@ -40,7 +40,6 @@ class Project:
         self.path_to_file: str = None
         self.project_base_path = ""
         self.source: str = None
-        self.conn: sqlite3.Connection = None
         self.network: Network = None
         self.about: About = None
         self.logger: logging.Logger = None
@@ -70,11 +69,15 @@ class Project:
         self.__setup_logger()
         self.activate()
 
-        self.conn = self.connect()
-
         self.__load_objects()
         global_logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
+
+    @property
+    @contextmanager
+    def db_connection(self):
+        with commit_and_close(self.path_to_file, spatial=True) as conn:
+            yield conn
 
     def new(self, project_path: str) -> None:
         """Creates a new project
@@ -108,9 +111,9 @@ class Project:
             return
 
         try:
-            self.conn.commit()
+            with self.project.db_connection as conn:
+                conn.commit()
             clean(self)
-            self.conn.close()
             for obj in [self.parameters, self.network]:
                 del obj
 
@@ -124,9 +127,6 @@ class Project:
 
         finally:
             self.deactivate()
-
-    def connect(self):
-        return database_connection("network", self.project_base_path)
 
     def activate(self):
         activate_project(self)
@@ -169,16 +169,14 @@ class Project:
     def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
 
-        self.conn = self.connect()
-
         # Write parameters to the project folder
         p = self.project_parameters
         p.parameters["system"]["logging_directory"] = self.project_base_path
         p.write_back()
 
         # Create actual tables
-        self.conn.execute("PRAGMA foreign_keys = ON;")
-        self.conn.commit()
+        with self.db_connection as conn:
+            conn.execute("PRAGMA foreign_keys = ON;")
         initialize_tables(self, "network")
 
     def __setup_logger(self):

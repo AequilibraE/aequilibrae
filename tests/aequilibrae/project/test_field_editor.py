@@ -1,7 +1,9 @@
 from pathlib import Path
 
 import pytest
+
 from aequilibrae.project.field_editor import FieldEditor
+from aequilibrae.utils.db_utils import read_and_close
 
 
 class TestFieldEditor:
@@ -36,7 +38,8 @@ class TestFieldEditor:
     @pytest.fixture
     def attribute_count(self, table, table_name):
         qry = f'select count(*) from "attributes_documentation" where name_table="{table_name}"'
-        return table.project.conn.execute(qry).fetchone()[0]
+        with table.project.db_connection as conn:
+            return conn.execute(qry).fetchone()[0]
 
     def test_building(self, table, attribute_count):
         assert attribute_count == len(table._original_values), "Meta table populated with the wrong number of elements"
@@ -61,16 +64,15 @@ class TestFieldEditor:
         project = table.project
         new_attribute = "new_attribute"
         table.add(new_attribute, "some description")
-        project.conn.commit()
-        curr = project.conn.cursor()
-        curr.execute(f'select count(*) from "attributes_documentation" where name_table="{table_name}"')
-        q2 = curr.fetchone()[0]
-        assert q2 == attribute_count + 1, "Adding element did not work"
 
-        result = curr.execute(
-            f'select "{new_attribute}" from "attributes_documentation" where name_table="{table_name}"'
-        ).fetchone()[0]
-        assert result == new_attribute
+        with read_and_close(project.path_to_file) as conn:
+            sql = f'select count(*) from "attributes_documentation" where name_table="{table_name}"'
+            q2 = conn.execute(sql).fetchone()[0]
+            assert q2 == attribute_count + 1, "Adding element did not work"
+
+            sql = f'select "{new_attribute}" from "attributes_documentation" where name_table="{table_name}"'
+            result = conn.execute(sql).fetchone()[0]
+            assert result == new_attribute
 
     # Here we override the `table_name` fixture. This fixture is not directly used in the test but
     # given as input for the `table` fixture, which we do consume here. This way we change the

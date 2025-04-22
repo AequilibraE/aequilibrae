@@ -70,7 +70,8 @@ existing_types = [ltype.link_type for ltype in lt_dict.values()]
 # %%
 # We could also get it directly from the project database
 # 
-# existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]
+# with project.db_connection as conn:
+#   existing_types = [x[0] for x in conn.execute('Select link_type from link_types')]
 
 # %%
 # We add the link types that do not exist yet.

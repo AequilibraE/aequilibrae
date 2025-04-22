@@ -3,6 +3,7 @@ import string
 from sqlite3 import IntegrityError
 from unittest import TestCase
 
+from aequilibrae.utils.db_utils import read_and_close
 from tests.models_for_test import ModelsTest
 
 
@@ -10,7 +11,6 @@ class TestLinkType(TestCase):
     def setUp(self) -> None:
         tm = ModelsTest()
         self.proj = tm.no_triggers()
-        self.curr = self.proj.conn.cursor()
 
         letters = [random.choice(string.ascii_letters + "_") for x in range(20)]
         self.random_string = "".join(letters)
@@ -45,8 +45,9 @@ class TestLinkType(TestCase):
         newt.description = self.random_string[::-1]
         newt.save()
 
-        self.curr.execute('select description, link_type from link_types where link_type_id="Z"')
+        with read_and_close(self.proj.path_to_file) as conn:
+            sql = 'select description, link_type from link_types where link_type_id="Z"'
+            desc, mname = conn.execute(sql).fetchone()
 
-        desc, mname = self.curr.fetchone()
         self.assertEqual(desc, self.random_string[::-1], "Didn't save the mode description correctly")
         self.assertEqual(mname, self.random_string, "Didn't save the mode name correctly")
