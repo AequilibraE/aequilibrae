@@ -14,7 +14,7 @@ from aequilibrae.project.data import Matrices
 from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
-from aequilibrae.reference_files import spatialite_database
+from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.log import get_log_handler
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
@@ -189,6 +189,9 @@ class Project:
 
     def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
+
+        os.mkdir(os.path.join(self.project_base_path, "entry_points"))
+        shutil.copyfile(demo_init_py, os.path.join(self.project_base_path, "entry_points", "__init__.py"))
 
         # Write parameters to the project folder
         p = self.project_parameters

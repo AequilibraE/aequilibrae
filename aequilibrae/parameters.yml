@@ -1,7 +1,6 @@
 entry_points:
-  func1:
-    kwarg1: "something"
-    kwarg2: 100
+  example_function_with_kwargs:
+    arg1: "parameters.yml argument"
 assignment:
   equilibrium:
     maximum_iterations: 250
