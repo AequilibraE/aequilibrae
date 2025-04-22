@@ -1,17 +1,15 @@
 import zipfile
-import os
-from os.path import dirname, join
 from pathlib import Path
 from typing import List
 
 from aequilibrae.project import Project
 
 
-def create_example(path: os.PathLike, from_model="sioux_falls") -> Project:
+def create_example(path: str, from_model="sioux_falls") -> Project:
     """Copies an example model to a new project project and returns the project handle
 
     :Arguments:
-        **path** (:obj:`str`): Path where to create a new model. must be a non-existing folder/directory.
+        **path** (:obj:`str`): Path where to create a new model. Must be a non-existing folder/directory.
 
         **from_model** (:obj:`str`, *Optional*): Example to create from *sioux_falls*, *nauru* or *coquimbo*.
         Defaults to *sioux_falls*
@@ -31,7 +29,7 @@ def create_example(path: os.PathLike, from_model="sioux_falls") -> Project:
     pth.mkdir(parents=True, exist_ok=True)
     zipfile.ZipFile(source).extractall(pth)
     proj = Project()
-    proj.open(str(pth))
+    proj.open(path)
     return proj
 
 

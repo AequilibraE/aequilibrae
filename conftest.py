@@ -4,13 +4,12 @@
 
 import os
 import uuid
-from pathlib import Path
 from shutil import copytree
+from tempfile import gettempdir
 
-import pytest
-
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 from shapely.geometry import Polygon
 
 from aequilibrae import Project
@@ -19,7 +18,6 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
-from tempfile import gettempdir
 from tests.data import siouxfalls_project
 
 DEFAULT_PROJECT = siouxfalls_project
@@ -90,7 +88,8 @@ def create_path(tmp_path):
 
 @pytest.fixture(scope="session")
 def coquimbo_project():
-    return create_example(Path(gettempdir()) / uuid.uuid4().hex, "coquimbo")
+    folder = os.path.join(gettempdir(), uuid.uuid4().hex)
+    return create_example(folder, "coquimbo")
 
 
 @pytest.fixture

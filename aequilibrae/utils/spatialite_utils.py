@@ -7,7 +7,7 @@ from os.path import join, basename
 from pathlib import Path
 from sqlite3 import Connection, register_adapter
 from tempfile import gettempdir
-from typing import Optional
+from typing import Union
 from zipfile import ZipFile
 
 import numpy as np
@@ -32,7 +32,7 @@ def is_not_windows():
     return os.name != "nt"
 
 
-def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> Connection:
+def connect_spatialite(path_to_file: Union[os.PathLike, str], missing_ok: bool = False) -> Connection:
     if inside_qgis:
         import qgis
 
