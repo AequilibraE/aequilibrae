@@ -36,7 +36,7 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
     if inside_qgis:
         import qgis
 
-        return qgis.utils.spatialite_connect(path_to_file)
+        return qgis.utils.spatialite_connect(str(path_to_file))
 
     ensure_spatialite_binaries()
 
