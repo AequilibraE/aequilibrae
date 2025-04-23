@@ -46,13 +46,11 @@ class GravityCalibration:
         >>> gravity.model.save(os.path.join(project_path, 'dist_expo_model.mod'))
     """
 
-    def __init__(self, parameters: Parameters, project=None, **kwargs):
+    def __init__(self, project=None, **kwargs):
         """
         Instantiates the Gravity calibration problem
 
         :Arguments:
-            **parameters** (:obj:`Parameters`): Convergence parameters.
-
             **matrix** (:obj:`AequilibraeMatrix`): Seed/base trip matrix
 
             **impedance** (:obj:`AequilibraeMatrix`): Impedance matrix to be used
@@ -61,6 +59,8 @@ class GravityCalibration:
 
             **project** (:obj:`Project`, *Optional*): The Project to connect to.
             By default, uses the currently active project
+
+            **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
 
             **nan_as_zero** (:obj:`bool`, *Optional*): If Nan values should be treated as zero. Defaults to ``True``
 
@@ -75,10 +75,7 @@ class GravityCalibration:
 
         self.project = project
         self.__required_parameters = ["max trip length", "max iterations", "max error"]
-
-        para = parameters["distribution"]["ipf"].copy()
-        para.update(parameters["distribution"]["gravity"])
-        self.parameters = para
+        self.parameters = kwargs.get("parameters", self.__get_parameters())
 
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
         self.matrix = kwargs.get("matrix")  # type: AequilibraeMatrix
@@ -260,3 +257,9 @@ class GravityCalibration:
         return np.nansum(self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :]) / np.nansum(
             self.result_matrix.gravity[:, :]
         )
+
+    def __get_parameters(self):
+        par = Parameters().parameters
+        para = par["distribution"]["ipf"].copy()
+        para.update(par["distribution"]["gravity"])
+        return para
