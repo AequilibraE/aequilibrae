@@ -12,6 +12,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 
 
 class GravityApplication:
@@ -76,11 +77,13 @@ class GravityApplication:
         >>> gravity.output.export(os.path.join(project_path, 'matrices/gravity_omx.omx'))
     """
 
-    def __init__(self, project=None, **kwargs):
+    def __init__(self, parameters: Parameters, project=None, **kwargs):
         """
         Instantiates the IPF problem
 
         :Arguments:
+            **parameters** (:obj:`Parameters`): Convergence parameters.
+
             **model** (:obj:`SyntheticGravityModel`): Synthetic gravity model to apply
 
             **impedance** (:obj:`AequilibraeMatrix`): Impedance matrix to be used
@@ -96,8 +99,6 @@ class GravityApplication:
 
             **core_name** (:obj:`str`, *Optional*): Name for the output matrix core. Defaults to "gravity"
 
-            **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
-
             **nan_as_zero** (:obj:`bool`, *Optional*): If NaN values should be treated as zero. Defaults to ``True``
 
         :Results:
@@ -112,7 +113,9 @@ class GravityApplication:
         self.__required_parameters = ["max trip length"]
         self.__required_model = ["function", "parameters"]
 
-        self.parameters = kwargs.get("parameters", self.__get_parameters())
+        para = parameters["distribution"]["ipf"].copy()
+        para.update(parameters["distribution"]["gravity"])
+        self.parameters = para
 
         self.vectors = kwargs.get("vectors")
         self.rows_ = kwargs.get("row_field", None)
@@ -163,6 +166,7 @@ class GravityApplication:
 
         # And adjust with a fratar
         self.__ipf = Ipf(
+            parameters=self.parameters,
             matrix=self.output,
             vectors=self.vectors,
             column_field=self.cols_,

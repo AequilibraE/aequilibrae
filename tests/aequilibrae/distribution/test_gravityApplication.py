@@ -49,6 +49,12 @@ def test_gravity_application():
         "vectors": vectors,
         "row_field": "rows",
         "column_field": "columns",
+        "parameters": {
+            "distribution": {
+                "gravity": {"max error": 0.0001, "max iterations": 100, "max trip length": -1},
+                "ipf": {"balancing tolerance": 0.001, "convergence level": 0.0001, "max iterations": 5000},
+            },
+        }
     }
 
     models = [("EXPO", model_expo), ("POWER", model_power), ("GAMMA", model_gamma)]

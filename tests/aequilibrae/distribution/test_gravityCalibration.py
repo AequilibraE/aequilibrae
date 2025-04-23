@@ -36,7 +36,12 @@ matrix.computational_view(["base_matrix"])
 
 class TestGravityCalibration(TestCase):
     def test_calibrate(self):
-        par = Parameters()
+        par = {
+            "distribution": {
+                "gravity": {"max error": 0.0001, "max iterations": 100, "max trip length": -1},
+                "ipf": {"balancing tolerance": 0.001, "convergence level": 0.0001, "max iterations": 5000},
+            },
+        }
 
         args = {"impedance": impedance, "matrix": matrix, "function": "power", "nan_to_zero": False}
 

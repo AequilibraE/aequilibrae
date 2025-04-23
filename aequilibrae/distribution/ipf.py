@@ -11,6 +11,7 @@ from aequilibrae.distribution.ipf_core import ipf_core
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
+from aequilibrae.parameters import Parameters
 
 
 class Ipf:
@@ -30,11 +31,14 @@ class Ipf:
         >>> vectors["productions"] = matrix.rows()
         >>> vectors["attractions"] = matrix.columns()
 
-        >>> ipf_args = {"matrix": matrix,
+        >>> ipf_args = {
+        ...             "matrix": matrix,
         ...             "vectors": vectors,
         ...             "row_field": "productions",
         ...             "column_field": "attractions",
-        ...             "nan_as_zero": False}
+        ...             "nan_as_zero": False,
+        ...             "parameters": {"balancing tolerance": 0.001, "convergence level": 0.0001, "max iterations": 5000},
+        ...        }
 
         >>> fratar = Ipf(**ipf_args)
         >>> fratar.fit()
@@ -43,11 +47,13 @@ class Ipf:
         >>> fratar.output.export(os.path.join(my_folder_path, "to_omx_output.omx"))
     """
 
-    def __init__(self, project=None, **kwargs):
+    def __init__(self, parameters: Parameters, project=None, **kwargs):
         """
         Instantiates the IPF problem
 
         :Arguments:
+            **parameters** (:obj:`Parameters`): Convergence parameters.
+
             **matrix** (:obj:`AequilibraeMatrix`): Seed Matrix
 
             **vectors** (:obj:`pd.DataFrame`): Dataframe with the vectors to be used for the IPF
@@ -55,8 +61,6 @@ class Ipf:
             **row_field** (:obj:`str`): Field name that contains the data for the row totals
 
             **column_field** (:obj:`str`): Field name that contains the data for the column totals
-
-            **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
 
             **nan_as_zero** (:obj:`bool`, *Optional*): If Nan values should be treated as zero. Defaults to ``True``
 
@@ -68,7 +72,7 @@ class Ipf:
             **error** (:obj:`str`): Error description
         """
         self.cpus = 0
-        self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
+        self.parameters = parameters
 
         # Seed matrix
         self.matrix = kwargs.get("matrix", None)  # type: AequilibraeMatrix
@@ -229,11 +233,3 @@ class Ipf:
         f = np.divide(targets, marginals)  # We compute the factors
         f[f == np.NINF] = 1  # And treat the errors
         return f
-
-    def __get_parameters(self, model):
-        path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        with open(path + "/parameters.yml", "r") as yml:
-            path = yaml.safe_load(yml)
-
-        self.cpus = int(path["system"]["cpus"])
-        return path["distribution"][model]
