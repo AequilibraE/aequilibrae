@@ -30,6 +30,7 @@ from os.path import join
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
 
+# sphinx_gallery_thumbnail_path = '../source/_images/plot_net_simplifier.png'
 # %%
 # Let's use the Nauru example project for display
 
