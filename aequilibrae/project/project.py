@@ -162,17 +162,17 @@ class Project:
         return self.project_parameters.parameters
 
     @property
-    def entry_points(self):
-        entry_points = self.parameters["entry_points"]
-        module = import_directory_as_module(os.path.join(self.project_base_path, "entry_points"), "aequilibrae.entry_points")
+    def run(self):
+        entry_points = self.parameters["run"]
+        module = import_directory_as_module(os.path.join(self.project_base_path, "run"), "aequilibrae.run")
 
         sentinal = object()
         for name, kwargs in entry_points.items():
-            attr = getattr(module, name, sentinal)
+            attr = getattr(module, name)
             if attr is sentinal:
-                continue
+                raise RuntimeError(f"expected to find callable '{name}' in the run module but didn't")
             elif not callable(attr):
-                raise RuntimeError(f"found entry point '{name}' in module but it is not callable")
+                raise RuntimeError(f"found symbol '{name}' in the run module but it is not callable")
 
             func = functools.partial(attr, **kwargs)
             setattr(module, name, func)
@@ -190,8 +190,8 @@ class Project:
     def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
 
-        os.mkdir(os.path.join(self.project_base_path, "entry_points"))
-        shutil.copyfile(demo_init_py, os.path.join(self.project_base_path, "entry_points", "__init__.py"))
+        os.mkdir(os.path.join(self.project_base_path, "run"))
+        shutil.copyfile(demo_init_py, os.path.join(self.project_base_path, "run", "__init__.py"))
 
         # Write parameters to the project folder
         p = self.project_parameters

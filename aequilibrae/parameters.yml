@@ -1,19 +1,6 @@
-entry_points:
+run:
   example_function_with_kwargs:
     arg1: "parameters.yml argument"
-assignment:
-  equilibrium:
-    maximum_iterations: 250
-    rgap: 0.0001
-distribution:
-  gravity:
-    max error: 0.0001
-    max iterations: 100
-    max trip length: -1
-  ipf:
-    balancing tolerance: 0.001
-    convergence level: 0.0001
-    max iterations: 5000
 network:
   links:
     fields:
