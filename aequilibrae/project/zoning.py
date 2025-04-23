@@ -103,7 +103,7 @@ class Zoning(BasicTable):
 
     def add_centroids(self, robust=True):
         """Adds automatic centroids to the network file. It adds centroids to all zones that do not have one
-            Centroid is added to the geographic centroid of the zone.
+        Centroid is added to the geographic centroid of the zone.
 
         :Arguments:
             **robust** (:obj:`bool`, *Optional*): Moves the centroid location around to avoid node conflict.
@@ -159,7 +159,7 @@ class Zoning(BasicTable):
             zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
             for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
                 if zone_id not in centroids:
-                    self.project.logger.warning(f"Centroid  for zone {zone_id} does not exist. Please create it first")
+                    self.project.logger.warning(f"Centroid for zone {zone_id} does not exist. Please create it first.")
                     continue
 
                 zone = self.__items[zone_id]
@@ -179,8 +179,8 @@ class Zoning(BasicTable):
     def get_closest_zone(self, geometry: Union[Point, LineString, MultiLineString]) -> int:
         """Returns the zone in which the given geometry is located.
 
-            If the geometry is not fully enclosed by any zone, the zone closest to
-            the geometry is returned
+        If the geometry is not fully enclosed by any zone, the zone closest to
+        the geometry is returned
 
         :Arguments:
             **geometry** (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
