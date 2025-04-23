@@ -1,10 +1,10 @@
 """
-.. _plot_network_simplification:
+.. _plot_network_simplifier:
 
-Network simplification
-======================
+Network simplifier
+==================
 
-In this example we use Nauru network to show how one can simplify the network, 
+In this example we use Nauru network to show how one can simplify the network,
 merging short links into longer ones or turning links into nodes, and saving
 theses changes into the project.
 
@@ -18,8 +18,11 @@ We use Folium to visualize the resulting network.
 #     * :func:`aequilibrae.project.tools.network_simplifcation`
 
 # %%
+
 # Imports
 
+import branca
+import folium
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -28,7 +31,6 @@ from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
 
 # %%
-
 # Let's use the Nauru example project for display
 
 fldr = join(gettempdir(), uuid4().hex)
@@ -40,7 +42,7 @@ project = create_example(fldr, "nauru")
 # we have to create a centroid from an arbitrary node, otherwise we cannot create a graph.
 
 nodes = project.network.nodes
-centroid_count = nodes.data.query('is_centroid == 1').shape[0]
+centroid_count = nodes.data.query("is_centroid == 1").shape[0]
 
 if centroid_count == 0:
     arbitrary_node = nodes.data["node_id"][0]
@@ -49,9 +51,11 @@ if centroid_count == 0:
     nd.save()
 
 # %%
-    
+
 # Let's analyze the mode car or 'c' in our model
 mode = "c"
+
+# %%
 
 # Let's set the graph for computation
 network = project.network
@@ -77,17 +81,33 @@ nodes_before = project.network.nodes.data
 print("This project initially has {} links and {} nodes".format(links_before.shape[0], nodes_before.shape[0]))
 
 # %%
-# Let's call the `NetworkSimplifier` class
+# Let's call the ``NetworkSimplifier`` class. Any changes made to the database using this class
+# are permanent. Make sure you have a backup if necessary.
 net = NetworkSimplifier()
 
+# %%
 # When we choose to simplify the network, we pass a graph object to the function,
-# and the output of this operation is 
+# and the output of this operation is
 
 net.simplify(graph)
 net.rebuild_network()
 
 # %%
-# Let's plot the previous and actual networks
+# Let's plot the previous and actual networks!
+
+links_after = net.network.links.data
+nodes_after = net.network.nodes.data
+
+# %%
+map = folium.Map(location=[-0.508371, 166.931142], zoom_start=17)
+map = links_before.explore(m=map, color="black", style_kwds={"weight": 4}, name="links_before")
+map = links_after.explore(m=map, color="yellow", style_kwds={"weight": 2}, name="links_after")
+
+map = nodes_before.explore(m=map, color="red", style_kwds={"radius": 0.8, "fillOpacity": 1.0}, name="nodes_before")
+map = nodes_after.explore(m=map, color="blue", style_kwds={"radius": 2, "fillOpacity": 1.0}, name="nodes_after")
+
+folium.LayerControl().add_to(map)  # Add a layer control button to our map
+map
 
 # %%
 # Differently we can simplify the network by collapsing links into nodes.
@@ -97,7 +117,30 @@ net.collapse_links_into_nodes([903])
 net.rebuild_network()
 
 # %%
-# Let's plot the network once again and check the modifications.
+# Let's plot the network once again and check the modifications!
 
+links_after = net.network.links.data
+nodes_after = net.network.nodes.data
+
+# %%
+fig = branca.element.Figure()
+
+subplot1 = fig.add_subplot(1, 2, 1)
+subplot2 = fig.add_subplot(1, 2, 2)
+
+map1 = folium.Map(location=[-0.509363, 166.928563], zoom_start=18)
+map1 = links_before.explore(m=map1, color="black", style_kwds={"weight": 2}, name="links_before")
+map1 = nodes_before.explore(m=map1, color="red", style_kwds={"radius": 3, "fillOpacity": 1.0}, name="nodes_before")
+folium.LayerControl().add_to(map1)
+
+map2 = folium.Map(location=[-0.509363, 166.928563], zoom_start=18)
+map2 = links_after.explore(m=map2, color="yellow", style_kwds={"weight": 2}, name="links_after")
+map2 = nodes_after.explore(m=map2, color="blue", style_kwds={"radius": 3, "fillOpacity": 1.0}, name="nodes_after")
+folium.LayerControl().add_to(map2)
+
+subplot1.add_child(map1)
+subplot2.add_child(map2)
+
+fig
 # %%
 project.close()

@@ -193,7 +193,6 @@ class NetworkSimplifier(WorkerThread):
         )
         self.link_layer = new_layer.data
 
-    # TODO: What else do we need to add here?
     def collapse_links_into_nodes(self, links: List[int]):
         """
         Collapses links into nodes, adjusting the network in the neighborhood.
@@ -215,8 +214,6 @@ class NetworkSimplifier(WorkerThread):
         self.link_layer = self.network.links.data
         self.project.logger.warning(f"{len(links)} links collapsed into nodes")
 
-    # TODO: What else do we need to add here? I removed the part of the code related to Polaris, but
-    # I don't know if there's anything else to add here.
     def rebuild_network(self):
         """Rebuilds the network elements that would have to be rebuilt after massive network simplification"""
 
