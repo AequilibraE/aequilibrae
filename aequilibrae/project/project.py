@@ -163,6 +163,12 @@ class Project:
 
     @property
     def run(self):
+        """
+        Load and return the AequilibraE run module with the default arguments from `parameters.yml` partially
+        applied.
+
+        Refer to `self.project_base_path/run/__init__.py` doc string for documentation.
+        """
         entry_points = self.parameters["run"]
         module = import_directory_as_module(os.path.join(self.project_base_path, "run"), "aequilibrae.run")
 
