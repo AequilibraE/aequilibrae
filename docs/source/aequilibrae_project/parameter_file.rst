@@ -24,6 +24,38 @@ module.
 This can be used to define model entry points or functions that should be stored adjacent to the
 model itself.
 
+.. _parameters_assignment:
+
+Assignment
+----------
+
+The assignment section of the parameter file is the smallest one, and it
+contains only the convergence criteria for assignment in terms of the maximum number
+of iterations and target Relative Gap.
+
+.. image:: ../_images/parameters_assignment_example.png
+    :align: center
+    :scale: 80 %
+    :alt: Assignment example
+
+Although these parameters are required to exist in the parameters file, one can
+override them during the assignment, as detailed in :ref:`convergence_criteria`.
+
+.. _parameters_distribution:
+
+Distribution
+------------
+
+The distribution section of the parameter file is also fairly short, as it
+contains only the parameters for number of maximum iterations, convergence level
+and maximum trip length to be applied in Iterative Proportional Fitting and
+synthetic gravity models, as shown below.
+
+.. image:: ../_images/parameters_distribution_example.png
+    :align: center
+    :scale: 80 %
+    :alt: Distribution example
+
 .. _parameters_network:
 
 Network
