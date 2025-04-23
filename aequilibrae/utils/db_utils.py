@@ -33,16 +33,21 @@ class commit_and_close:
 
             **missing_ok** (:obj:`bool`): Boolean indicating that the db is not expected to exist yet
         """
-        from aequilibrae.utils.spatialite_utils import connect_spatialite
+        from aequilibrae.utils.spatialite_utils import connect_spatialite, load_spatialite_extension
 
         if spatial:
-            if not isinstance(db, (str, PathLike)):
+            if isinstance(db, Connection):
+                load_spatialite_extension(db)
+                self.conn = db
+            elif not isinstance(db, (str, PathLike)):
                 raise Exception("You must provide a database path to connect to spatialite")
-            self.conn = connect_spatialite(db, missing_ok)
+            else:
+                self.conn = connect_spatialite(db, missing_ok)
         elif isinstance(db, (str, PathLike)):
             self.conn = safe_connect(db, missing_ok)
         else:
             self.conn = db
+
         self.commit = commit
 
     def __enter__(self):

@@ -39,9 +39,9 @@ from libc.math cimport INFINITY
 include "parameters.pxi"
 
 cdef enum ElementState:
-   SCANNED
-   NOT_IN_HEAP
-   IN_HEAP
+    SCANNED
+    NOT_IN_HEAP
+    IN_HEAP
 
 cdef struct Element:
     DTYPE_t key

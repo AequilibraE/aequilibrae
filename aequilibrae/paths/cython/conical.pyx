@@ -1,6 +1,7 @@
 from libc.math cimport pow, sqrt
 from cython.parallel import prange
 
+
 def conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
     cdef int c = cores
 
@@ -12,6 +13,7 @@ def conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
     cdef double [:] beta_view = beta
 
     conical_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
+
 
 def delta_conical(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
     cdef int c = cores
@@ -25,16 +27,19 @@ def delta_conical(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
 
     dconical_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
+
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void conical_cython(double[:] congested_time,
-                        double[:] link_flows,
-                        double [:] capacity,
-                        double [:] fftime,
-                        double[:] alpha,
-                        double [:] beta,
-                        int cores) noexcept:
+cpdef void conical_cython(
+    double[:] congested_time,
+    double[:] link_flows,
+    double [:] capacity,
+    double [:] fftime,
+    double[:] alpha,
+    double [:] beta,
+    int cores
+) noexcept:
     cdef long long i
     cdef long long l = congested_time.shape[0]
 
@@ -48,16 +53,19 @@ cpdef void conical_cython(double[:] congested_time,
         else:
             congested_time[i] = fftime[i]
 
+
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void dconical_cython(double[:] deltaresult,
-                       double[:] link_flows,
-                       double [:] capacity,
-                       double [:] fftime,
-                       double[:] alpha,
-                       double [:] beta,
-                       int cores) noexcept:
+cpdef void dconical_cython(
+    double[:] deltaresult,
+    double[:] link_flows,
+    double [:] capacity,
+    double [:] fftime,
+    double[:] alpha,
+    double [:] beta,
+    int cores
+) noexcept:
     cdef long long i
     cdef long long l = deltaresult.shape[0]
 

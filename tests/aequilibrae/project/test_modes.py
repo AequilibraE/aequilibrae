@@ -1,13 +1,15 @@
-from unittest import TestCase
 import os
-from shutil import copytree, rmtree
-import uuid
 import random
 import string
 import tempfile
+import uuid
+from shutil import copytree
 from sqlite3 import IntegrityError
+from unittest import TestCase
+
 from aequilibrae import Project
 from aequilibrae.project.network.mode import Mode
+from aequilibrae.utils.db_utils import read_and_close
 from ...data import siouxfalls_project
 
 
@@ -18,7 +20,6 @@ class TestModes(TestCase):
         copytree(siouxfalls_project, self.temp_proj_folder)
         self.proj = Project()
         self.proj.open(self.temp_proj_folder)
-        self.curr = self.proj.conn.cursor()
 
     def tearDown(self) -> None:
         self.proj.close()
@@ -30,8 +31,10 @@ class TestModes(TestCase):
         new_mode.mode_name = name
         self.proj.network.modes.add(new_mode)
 
-        self.curr.execute('select mode_name from modes where mode_id="F"')
-        self.assertEqual(self.curr.fetchone()[0], name, "Could not save the mode properly to the database")
+        with read_and_close(self.proj.path_to_file) as conn:
+            mode = conn.execute('select mode_name from modes where mode_id="F"').fetchone()[0]
+
+        self.assertEqual(mode, name, "Could not save the mode properly to the database")
 
     def test_drop(self):
         self.proj.network.modes.delete("b")

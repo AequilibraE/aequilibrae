@@ -1,5 +1,4 @@
-"""Convenience functions for working with geospatial data.
-"""
+"""Convenience functions for working with geospatial data."""
 
 import numpy as np
 

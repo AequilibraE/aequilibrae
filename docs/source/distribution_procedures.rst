@@ -13,7 +13,7 @@ as well as present a benchmark validation for the IPF procedure and some usage e
 
     distribution_procedures/classes
     distribution_procedures/IPF_benchmark
-    distribution_procedures/_auto_examples/index
+    _auto_examples/distribution_procedures/index
 
 
 References

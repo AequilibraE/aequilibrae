@@ -14,9 +14,6 @@
 
 [![Windows builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml)
 
-[![QAequilibraE artifacts](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml)
-
-
 AequilibraE is a fully-featured Open-Source transportation modeling package and
 the first comprehensive package of its kind for the Python ecosystem, and is 
 released under an extremely permissive and business-friendly license.

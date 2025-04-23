@@ -21,11 +21,14 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+        architecture: x64
+  
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc 
-        sudo apt-get install latexmk texlive-xetex texlive-latex-extra fonts-freefont-otf xindy
+        sudo apt install libsqlite3-mod-spatialite
+        sudo apt install -y libspatialite-dev pandoc
+        sudo apt install -y latexmk texlive-xetex fonts-freefont-otf xindy
         pip install uv
         python -m uv pip install wheel openmatrix pytest
         python -m uv pip install -r requirements.txt
@@ -34,7 +37,7 @@ jobs:
     - name: Compile library
       run: |
         python setup.py build_ext -j 4 --inplace
-        pip install .
+        python -m uv pip install .
 
     - name: Check history of versions
       run: |
@@ -67,13 +70,14 @@ jobs:
     - name: Build documentation
       run: |
         jupyter nbconvert --to rst docs/source/distribution_procedures/IPF_benchmark.ipynb
-        sphinx-build -M latexpdf docs/source docs/source/_static -D plot_gallery=False
-        sphinx-build -D plot_gallery=False -b html docs/source docs/build
-        python -m zipfile -c AequilibraE.zip docs/build
-        cp AequilibraE.zip docs/source/_static
+        sphinx-build -b latex docs/source docs/source/_static/latex -D plot_gallery=False
+        cd docs/source/_static/latex
+        LATEXMKOPTS="-xelatex" make all-pdf
+        cd ../../../..
         cp large_icon.png docs/source/_static/large_icon.png
-        cd docs
-        make html
+        sphinx-build -M html docs/source docs/build
+        python -m zipfile -c aequilibrae.zip docs/build/html
+        cp aequilibrae.zip docs/build/html/aequilibrae.zip
 
     - name: Upload python to DEV on S3
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}

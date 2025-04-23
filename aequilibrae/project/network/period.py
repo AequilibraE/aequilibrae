@@ -1,6 +1,4 @@
 from .safe_class import SafeClass
-from ...utils.db_utils import commit_and_close
-from ...utils.spatialite_utils import connect_spatialite
 
 
 class Period(SafeClass):
@@ -31,7 +29,7 @@ class Period(SafeClass):
     def save(self):
         """Saves period to database"""
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             if self.period_id != self.__original__["period_id"]:
                 raise ValueError("One cannot change the period_id")
 
@@ -67,7 +65,7 @@ class Period(SafeClass):
             self._logger.warning("This is already the period number")
             return
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             try:
                 conn.execute("Update periods set period_id=? where period_id=?", [new_id, self.period_id])
             finally:

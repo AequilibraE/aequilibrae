@@ -21,7 +21,7 @@ jobs:
           python -m uv pip install -r tests/requirements_tests.txt
 
       - name: Lint with ruff
-        run: ruff .
+        run: ruff check .
 
       - name: Check code format with Black
         run: black --check .

@@ -19,4 +19,4 @@ of some of these procedures and some light discussion on its motivation.
    traffic_assignment/assignment_procedures
    traffic_assignment/traffic_assignment_insights
    traffic_assignment/traffic_assignment_validation
-   traffic_assignment/_auto_examples/index
+   _auto_examples/traffic_assignment/index

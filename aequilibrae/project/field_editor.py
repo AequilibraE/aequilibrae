@@ -2,8 +2,6 @@ import re
 import string
 from typing import List
 
-from aequilibrae.utils.db_utils import commit_and_close
-
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
 
@@ -131,12 +129,12 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             dt = conn.execute(qry).fetchall()
         return dt
 
     def __run_query_commit(self, qry: str, values=None) -> None:
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             if values is None:
                 conn.execute(qry)
             else:

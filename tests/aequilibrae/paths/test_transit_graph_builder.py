@@ -1,22 +1,23 @@
-from unittest import TestCase
 import os
 import tempfile
-import numpy as np
-from aequilibrae.paths import TransitGraph
 from os.path import join
+from shutil import copytree, rmtree
+from unittest import TestCase
 from uuid import uuid4
-from aequilibrae.project import Project
-from ...data import siouxfalls_project
-from aequilibrae.paths.results import PathResults
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.transit import Transit
 
+import numpy as np
+import pandas as pd
+
+from aequilibrae.paths import TransitGraph
+from aequilibrae.paths.results import PathResults
+from aequilibrae.project import Project
+from aequilibrae.transit import Transit
+from aequilibrae.utils.create_example import create_example
 
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
 # sys.path.append(lib_path)
-from ...data import path_test, test_graph, test_network
-from shutil import copytree, rmtree
+from ...data import path_test, siouxfalls_project, test_graph, test_network
 
 
 class TestTransitGraphBuilder(TestCase):
@@ -134,3 +135,38 @@ class TestTransitGraphBuilder(TestCase):
             len(graph.edges[graph.edges.link_type == "access_connector"]),
             len(graph.edges[graph.edges.link_type == "egress_connector"]),
         )
+
+    def test_saving_loading_removing(self):
+        connector_method = "nearest_neighbour"
+        graph1 = self.data.create_graph(
+            with_outer_stop_transfers=False,
+            with_walking_edges=False,
+            blocking_centroid_flows=False,
+            connector_method=connector_method,
+        )
+
+        with self.subTest("reloading transit graph"):
+            self.data.save_graphs(suppress_warning=True)
+            self.data.load(suppress_warning=True)
+            graph2 = self.data.graphs[1]
+
+            pd.testing.assert_frame_equal(graph1.edges, graph2.edges)
+            pd.testing.assert_frame_equal(graph1.vertices, graph2.vertices)
+            self.assertDictEqual(graph1.config, graph2.config)
+
+        with self.subTest("cannot override existing graph"):
+            with self.assertRaises(ValueError):
+                self.data.save_graphs(suppress_warning=True)
+
+        with self.subTest("removing transit graph"):
+            self.data.save_graphs(suppress_warning=True, force=True)
+            self.data.remove_graphs()
+
+            links = self.data.pt_con.execute("SELECT link_id FROM links LIMIT 1;")
+            nodes = self.data.pt_con.execute("SELECT node_id FROM nodes LIMIT 1;")
+
+            self.assertListEqual(links.fetchall(), [])
+            self.assertListEqual(nodes.fetchall(), [])
+
+            with self.assertRaises(ValueError):
+                self.data.load(suppress_warning=True)

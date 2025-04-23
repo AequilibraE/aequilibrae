@@ -140,10 +140,61 @@ procedure.
 
     >>> assig.set_algorithm("bfw")
 
+Skimming while assigning
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+AequilibraE allows for skimming to be performed during assignnment, and maintains both the skimming
+of the final iteration, as well as the blended skim for all iterations.
+
+This is the case because, strictly speaking, the equilibrium travel time is the one resulting
+at the end of the last assignment iteration, while the most correct distance and toll skims, for example,
+are those resulting from the blended skim of all iterations.
+
+The user can select the fields they want to skim, as well save the skims to disk (and the project)
+at the end of the assignment procedure, where skims are tagged with suffixes *"_final"* and *"_blended"*
+for easy identification.
+
+::
+
+  >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
+  >>> assig.execute() # doctest: +SKIP
+  >>> assig.save_skims("one_matrix_name")
+
+
+Assigning sparse matrices
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Modern Activity-Based models (and even some trip-based and tour-based ones) result on incredibly sparse
+demand matrices, which opens up a significant opportunity to save time during assignment by using early-exiting
+during the path-computation phase of assignment.
+
+AequilibraE is capable of leveraging this opportunity, and it does so automatically whenever the user
+**does NOT set skimming for the assignment or any individual traffic class graphs**.
+
+In this case, AequilibraE has a convenient method to skim the final iteration of the assignment
+as it had been computed during the assignment itself. This method call requires a new iteration
+of path computation to be made, but assignments with highly sparse matrices and more than 10 iterations
+would still experience a significant speedup, which comes at the cost of not having blended skims
+as a sub-product of the assignment.
+
+Time savings of up to 40% should be achievable in cases of micro-simulated ABMs with a large number
+of zones and over 100 iterations of assignment.
+
+::
+
+  >>> assig.execute()
+  >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
+  >>> assig.save_skims("another_matrix_name")
+
+The list of fields defined by the user for skimming is added to the congested time and the assignment
+cost from the last iteration of the assignment by default. These matrices are named *__congested_time__*
+and *__assignment_cost__* respectively.
+
+See the the example :ref:`example_assign_sparse` for a more practical explanation of this feature.
+
 Volume-delay function
 ~~~~~~~~~~~~~~~~~~~~~
 
-For now, the only VDF functions available in AequilibraE are
+For now, the VDF functions available in AequilibraE are
 
 * BPR [1]_
 
@@ -186,6 +237,7 @@ To create a preload for public transport vehicles operating between 8 AM to 10 A
 
     # Add the preload to the assignment
     >>> assig.add_preload(preload, 'PT_vehicles') # doctest: +SKIP
+
 
 Executing an Assignment
 -----------------------

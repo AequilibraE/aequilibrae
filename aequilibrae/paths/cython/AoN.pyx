@@ -67,7 +67,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:] g_view = graph.compact_cost
     cdef long long [:] ids_graph_view = graph.compact_graph.id.values
     cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
-    cdef long long [:] nodes_to_indices = graph.compact_nodes_to_indices
 
     if skims > 0:
         gskim = graph.compact_skims
@@ -82,15 +81,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] skim_matrix_view = tskim
     cdef double [:, :] final_skim_matrices_view = fskm
 
-    # views from the result object
-    cdef long long [:] no_path_view = result.no_path[origin_index, :]
-
     # views from the aux-result object
     cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
     cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
     cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
     cdef double [:, :] link_loads_view = aux_result.temp_link_loads[curr_thread, :, :]
-    cdef double [:, :] node_load_view = aux_result.temp_node_loads[curr_thread, :, :]
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
 
     # path saving file paths
@@ -186,7 +181,16 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             )
 
     if result.save_path_file:
-        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
+        save_path_file(
+            origin_index,
+            links,
+            zones,
+            predecessors_view,
+            conn_view,
+            path_file_base,
+            path_index_file_base,
+            write_feather
+        )
     return origin
 
 
@@ -198,7 +202,7 @@ def path_computation(origin, destination, graph, results):
     :param skimming: if we will skim for all nodes or not
     """
     cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
-    cdef long i, j, skims, a, block_flows_through_centroids
+    cdef long skims, block_flows_through_centroids
     cdef bint early_exit_bint = results.early_exit
 
     results.origin = origin
@@ -354,9 +358,10 @@ def update_path_trace(results, destination, graph):
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
-    :param early_exit: Exit Dijkstra's once the destination has been found if the shortest path tree must be reconstructed.
+    :param early_exit: Exit Dijkstra's once the destination has been found if the shortest path tree must be
+        reconstructed.
     """
-    cdef p, origin_index, dest_index, connector
+    cdef long long p, origin_index, dest_index, connector
 
     results.destination = destination
     if destination == results.origin:
@@ -368,17 +373,17 @@ def update_path_trace(results, destination, graph):
         results.milepost = None
         results.path_nodes = None
 
-        # If the predecessor is -1 and early exit was enabled we cannot differentiate between
-        # an unreachable node and one we just didn't see yet. We need to recompute the tree with the new destination
-        # If `a_star` was enabled then the stored tree has no guarantees and may not be useful due to the heuristic used
-        # TODO: revisit with heuristic specific reuse logic
+        # If the predecessor is -1 and early exit was enabled we cannot differentiate between an unreachable node and
+        # one we just didn't see yet. We need to recompute the tree with the new destination If `a_star` was enabled
+        # then the stored tree has no guarantees and may not be useful due to the heuristic used TODO: revisit with
+        # heuristic specific reuse logic
         if results.predecessors[dest_index] == -1 and results._early_exit or results._a_star:
             results.compute_path(results.origin, destination, early_exit=results.early_exit, a_star=results.a_star)
 
-        # By the invariant hypothesis presented at https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Proof_of_correctness
-        # Dijkstra's algorithm produces the shortest path tree for all scanned nodes. That is if a node was scanned,
-        # its shortest path has been found, even if we exited early. As the un-scanned nodes are marked as unreachable this
-        # invariant holds.
+        # By the invariant hypothesis presented at
+        # https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Proof_of_correctness Dijkstra's algorithm produces the
+        # shortest path tree for all scanned nodes. That is if a node was scanned, its shortest path has been found,
+        # even if we exited early. As the un-scanned nodes are marked as unreachable this invariant holds.
         if results.predecessors[dest_index] >= 0:
             all_connectors = []
             link_directions = []
@@ -413,8 +418,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     :param results:
     :return:
     """
-    cdef long long nodes, orig, origin_index, i, block_flows_through_centroids, skims, zones, b
-    #We transform the python variables in Cython variables
+    cdef long long nodes, orig, origin_index, block_flows_through_centroids, skims, zones, b
+    # We transform the python variables in Cython variables
     orig = origin
     origin_index = graph.compact_nodes_to_indices[orig]
 
@@ -491,7 +496,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                              reached_first_view,
                              w,
                              final_skim_matrices_view)
-        if block_flows_through_centroids: # Unblocks the centroid if that is the case
+        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
             b = 1
             blocking_centroid_flows(b,
                                     origin_index,

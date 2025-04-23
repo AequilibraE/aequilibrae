@@ -1,4 +1,4 @@
-from venv import createTransit skimming
+Transit skimming
 ================
 
 Transit skimming in AequilibraE is incredibly flexible, but more sophisticated use requires a good

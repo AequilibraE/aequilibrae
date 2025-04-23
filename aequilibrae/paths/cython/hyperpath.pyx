@@ -12,7 +12,6 @@ cimport numpy as cnp
 
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
-from libc.string cimport memset
 
 ctypedef cnp.float64_t DATATYPE_t
 DATATYPE_PY = np.float64
@@ -31,7 +30,7 @@ INF_FREQ_PY = INF_FREQ
 # 1 / MIN_FREQ << DATATYPE_INF
 cdef DATATYPE_t MIN_FREQ
 MIN_FREQ = 1.0 / INF_FREQ
-MIN_FREQ_PY =  MIN_FREQ
+MIN_FREQ_PY = MIN_FREQ
 
 # a very small time interval
 cdef DATATYPE_t A_VERY_SMALL_TIME_INTERVAL
@@ -40,8 +39,7 @@ A_VERY_SMALL_TIME_INTERVAL_PY = A_VERY_SMALL_TIME_INTERVAL
 
 cdef extern from "stdlib.h":
     ctypedef void const_void "const void"
-    void qsort(void *base, int nmemb, int size,
-            int(*compar)(const_void *, const_void *)) noexcept nogil
+    void qsort(void *base, int nmemb, int size, int(*compar)(const_void *, const_void *)) noexcept nogil
 
 cdef struct IndexedElement:
     size_t index
@@ -49,8 +47,10 @@ cdef struct IndexedElement:
 
 cdef int _compare(const_void *a, const_void *b) noexcept:
     cdef DATATYPE_t v = (<IndexedElement*> a).value-(<IndexedElement*> b).value
-    if v < 0: return -1
-    if v >= 0: return 1
+    if v < 0:
+        return -1
+    else:
+        return 1
 
 include 'pq_4ary_heap.pyx'  # priority queue
 
@@ -65,7 +65,8 @@ cdef void _coo_tocsc_uint32(
     cnp.uint32_t [::1] Ax,
     cnp.uint32_t [::1] Bp,
     cnp.uint32_t [::1] Bi,
-    cnp.uint32_t [::1] Bx) noexcept nogil:
+    cnp.uint32_t [::1] Bx
+) noexcept nogil:
 
     cdef:
         size_t i, col, dest
@@ -188,7 +189,8 @@ cdef void compute_SF_in_parallel(
     cnp.uint32_t[::1] tail_view,
     cnp.uint32_t[::1] head_view,
     cnp.uint32_t[:] d_vert_ids_view,  # destination vertices
-    cnp.uint32_t[:] destination_vertex_indices_view,  # in public_transport.run case, same as d_vert_ids_view in .assign are the unique destination values
+    # in public_transport.run case, same as d_vert_ids_view in .assign are the unique destination values
+    cnp.uint32_t[:] destination_vertex_indices_view,
     cnp.uint32_t[::1] o_vert_ids_view,  # origin vertices
     cnp.float64_t[::1] demand_vls_view,  # volume
     cnp.float64_t[::1] edge_volume_view,
@@ -227,7 +229,8 @@ cdef void compute_SF_in_parallel(
 
         cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(num_threads * sizeof(cnp.float64_t) * vertex_count)
 
-        cnp.float64_t *skim_i_vec_out = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * vertex_count * n_skim_cols)
+        cnp.float64_t *skim_i_vec_out = <cnp.float64_t *> calloc(
+            num_threads, sizeof(cnp.float64_t) * vertex_count * n_skim_cols)
 
         int i  # openmp on windows requires iterator variable have signed type
         size_t k, j, destination_vertex_index
@@ -258,7 +261,8 @@ cdef void compute_SF_in_parallel(
                 if d_vert_ids_view[j] == destination_vertex_index:
                     thread_demand_origins[demand_size] = o_vert_ids_view[j]
                     thread_demand_values[demand_size] = demand_vls_view[j]
-                    demand_size = demand_size + 1  # demand_size += 1 is not allowed as cython believes this is a reduction
+                    # demand_size += 1 is not allowed as cython believes this is a reduction
+                    demand_size = demand_size + 1
 
             # S&F
             compute_SF_in(
@@ -322,8 +326,8 @@ cdef void compute_SF_in_parallel(
 cdef void compute_SF_in(
     cnp.uint32_t[::1] csc_indptr,
     cnp.uint32_t[::1] csc_edge_idx,
-    cnp.float64_t[::1] c_a_vec, # travel time
-    cnp.float64_t[::1] f_a_vec, # freq
+    cnp.float64_t[::1] c_a_vec,  # travel time
+    cnp.float64_t[::1] f_a_vec,  # freq
     cnp.uint32_t[::1] tail_indices,
     cnp.uint32_t[::1] head_indices,
     cnp.uint32_t *demand_indices,
@@ -351,7 +355,7 @@ cdef void compute_SF_in(
 
     cdef:
         size_t edge_count = <size_t>tail_indices.shape[0]
-        DATATYPE_t u_r, v_a_new, v_i, u_i
+        DATATYPE_t u_r, u_i
         size_t i, j, h_a_count
         cnp.uint32_t vert_idx
         int cent_dest
@@ -370,7 +374,6 @@ cdef void compute_SF_in(
         # v_a_vec[i] = 0.0
         u_j_c_a_vec[i] = DATATYPE_INF
         h_a_vec[i] = 0
-
 
     # first pass #
     # ---------- #
@@ -417,7 +420,7 @@ cdef void compute_SF_in(
     # also we compute the min travel time from all the origin vertices
     u_r = DATATYPE_INF
     for i in range(demand_size):
-        vert_idx = demand_indices[i] # origin vertix id
+        vert_idx = demand_indices[i]  # origin vertex id
         v_i_vec[<size_t>vert_idx] = demand_values[i]
         u_i = u_i_vec[<size_t>vert_idx]
         if u_i < u_r:
@@ -444,7 +447,7 @@ cdef void compute_SF_in(
         # The items corresponding to edges that are in the hyperpath have a
         # negative transformed value.
         for i in range(<size_t>edge_count):
-            if h_a_vec[i] == 0: # if the edge is not on the hyperpath
+            if h_a_vec[i] == 0:  # if the edge is not on the hyperpath
                 u_j_c_a_vec[i] = 1.0
 
         argsort(u_j_c_a_vec, edge_indices, edge_count)
@@ -460,6 +463,7 @@ cdef void compute_SF_in(
             h_a_count
         )
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(False)
@@ -468,8 +472,8 @@ cdef void compute_SF_in(
 cdef void _SF_in_first_pass_full(
     cnp.uint32_t[::1] csc_indptr,
     cnp.uint32_t[::1] csc_edge_idx,
-    cnp.float64_t[::1] c_a_vec, # travel time
-    cnp.float64_t[::1] f_a_vec, # freq
+    cnp.float64_t[::1] c_a_vec,  # travel time
+    cnp.float64_t[::1] f_a_vec,  # freq
     cnp.uint32_t[::1] tail_indices,
     cnp.float64_t *u_i_vec,
     cnp.float64_t *f_i_vec,
@@ -501,8 +505,7 @@ cdef void _SF_in_first_pass_full(
 
     # only the incoming edges of the target vertex are inserted into the
     # priority queue
-    for i in range(<size_t>csc_indptr[<size_t>dest_vert_index],
-        <size_t>csc_indptr[<size_t>(dest_vert_index + 1)]):
+    for i in range(<size_t>csc_indptr[<size_t>dest_vert_index], <size_t>csc_indptr[<size_t>(dest_vert_index + 1)]):
         edge_idx = csc_edge_idx[i]
         insert(&pqueue, edge_idx, c_a_vec[edge_idx])
         u_j_c_a_vec[edge_idx] = c_a_vec[edge_idx]
@@ -563,8 +566,7 @@ cdef void _SF_in_first_pass_full(
                 skim_i_new_vec[j] = skim_i_new
 
         # loop on incoming edges
-        for i in range(<size_t>csc_indptr[tail_vert_idx],
-            <size_t>csc_indptr[tail_vert_idx + 1]):
+        for i in range(<size_t>csc_indptr[tail_vert_idx], <size_t>csc_indptr[tail_vert_idx + 1]):
 
             edge_idx = csc_edge_idx[i]
             edge_state = pqueue.Elements[edge_idx].state

@@ -15,6 +15,7 @@ include 'hyperpath.pyx'
 
 from typing import Union
 
+
 class HyperpathGenerating:
     """A class for hyperpath generation.
 
@@ -32,7 +33,6 @@ class HyperpathGenerating:
 
         **check_edges** (:obj:`bool`): If True, check the validity of the edges (*Optional*, default is False).
     """
-
 
     def __init__(
             self,
@@ -92,7 +92,7 @@ class HyperpathGenerating:
             if not skim_cols:
                 self._skim_cols = np.zeros((self._trav_time.shape[0], 1), dtype=DATATYPE_PY)
             else:
-                self._skim_cols = self._edges.loc[:,skim_cols].values.astype(DATATYPE_PY)
+                self._skim_cols = self._edges.loc[:, skim_cols].values.astype(DATATYPE_PY)
                 self._skim_cols = self._skim_cols.copy(order='C')
 
             self._skim_cols_names = skim_cols
@@ -107,7 +107,7 @@ class HyperpathGenerating:
             self._centroids_idx_pos = self._centroids_idx_pos.astype(np.uint32)
 
         else:
-            self._skim_cols = np.zeros((self._trav_time.shape[0],1), dtype=DATATYPE_PY)
+            self._skim_cols = np.zeros((self._trav_time.shape[0], 1), dtype=DATATYPE_PY)
 
             self._skim_cols_names = []
 
@@ -116,9 +116,7 @@ class HyperpathGenerating:
 
             self._is_travel_time = False
 
-
     def compute_skim_cols(self, skim_cols, edges: pd.DataFrame, trav_time: str):
-
         self._get_waiting_time = False
         edges_cols = set(edges.columns)
         skim_cols = set(skim_cols)
@@ -141,7 +139,9 @@ class HyperpathGenerating:
             "in_vehicle_trav_time": ["on-board", "dwell"],
         }
 
-        if any(item in skim_cols for item in discerete_link_types.keys() | contig_link_types.keys()) and "link_type" not in edges_cols:
+        if any(
+                item in skim_cols for item in discerete_link_types.keys() | contig_link_types.keys()
+        ) and "link_type" not in edges_cols:
             raise ValueError("predefined skimming type requested but 'link_type' column not present on the graph")
 
         for name, col in discerete_link_types.items():
@@ -165,11 +165,9 @@ class HyperpathGenerating:
 
         return edges, list(skim_cols)
 
-
     def check_skim_cols(self, skim_cols: Union(list[str], tuple[str], set(str))):
-
         self._skimming = True
-        if isinstance(skim_cols, (tuple,set)):
+        if isinstance(skim_cols, (tuple, set)):
             skim_cols = list(skim_cols)
 
         if not skim_cols or not isinstance(skim_cols, list):
@@ -178,8 +176,7 @@ class HyperpathGenerating:
 
         return skim_cols
 
-    def _update_od_values(self, origin_column: np.array, destination_column: np.array,
-                                demand_column: np.array):
+    def _update_od_values(self, origin_column: np.array, destination_column: np.array, demand_column: np.array):
 
         # get all O-D combinations between centroids
         n = len(self._centroids)
@@ -191,8 +188,10 @@ class HyperpathGenerating:
         centroids_origin_column = origin_values[check_bool]
         centroids_destination_column = destination_values[check_bool]
 
-        not_included = ~np.logical_and(np.isin(centroids_origin_column, origin_column),
-        np.isin(centroids_destination_column, destination_column)) # the combinations of centroids that are not in
+        not_included = ~np.logical_and(
+            np.isin(centroids_origin_column, origin_column),
+            np.isin(centroids_destination_column, destination_column)
+        )  # the combinations of centroids that are not in
 
         centroids_demand = np.concatenate((demand_column, np.zeros_like(centroids_origin_column[not_included])))
         centroids_origin_column = np.concatenate((origin_column, centroids_origin_column[not_included]))
@@ -262,25 +261,32 @@ class HyperpathGenerating:
         Assumes the ``*_column`` arguments are provided as numpy arrays that form a COO sprase matrix.
 
         :Arguments:
-            **origin_column** (:obj:`np.ndarray`): The column for the origin vertices (*Optional*, default is "orig_vert_idx").
+            **origin_column** (:obj:`np.ndarray`): The column for the origin vertices (*Optional*, default is
+              "orig_vert_idx").
 
-            **destination_column** (:obj:`np.ndarray`): The column or the destination vertices (*Optional*, default is "dest_vert_idx").
+            **destination_column** (:obj:`np.ndarray`): The column or the destination vertices (*Optional*, default is
+              "dest_vert_idx").
 
             **demand_column** (:obj:`np.ndarray`): The column for the demand values (*Optional*, default is "demand").
 
-            **check_demand** (:obj:`bool`): If True, check the validity of the demand data (*Optional*, default is ``False``).
+            **check_demand** (:obj:`bool`): If True, check the validity of the demand data (*Optional*, default is
+              ``False``).
 
-            **threads** (:obj:`int`):The number of threads to use for computation (*Optional*, default is 0, using all available threads).
+            **threads** (:obj:`int`):The number of threads to use for computation (*Optional*, default is 0, using all
+        available threads).
         """
 
         if self._skimming:
-            origin_column, destination_column, demand_column = self._update_od_values(origin_column,
-                                                                destination_column, demand_column)
+            origin_column, destination_column, demand_column = self._update_od_values(
+                origin_column,
+                destination_column,
+                demand_column
+            )
 
         self.origin_column = origin_column.astype(np.uint32)
         self.destination_column = destination_column.astype(np.uint32)
-        self.demand_column =  demand_column.astype(DATATYPE_PY)
-        # check the input demand paramater
+        self.demand_column = demand_column.astype(DATATYPE_PY)
+        # check the input demand parameter
         if check_demand:
             self._check_demand(origin_column, destination_column, demand_column)
 
@@ -332,7 +338,7 @@ class HyperpathGenerating:
 
         if self._skimming:
 
-            self.skim_matrix = self.skim_matrix.transpose(2,1,0)
+            self.skim_matrix = self.skim_matrix.transpose(2, 1, 0)
             arr = self.skim_matrix.copy()
             if self._get_waiting_time:
                 skim_matrix_dict = {}
@@ -340,7 +346,12 @@ class HyperpathGenerating:
 
                     skim_matrix_dict[skim_cols[i]] = arr[i]
 
-                skim_matrix_dict['waiting_time'] = skim_matrix_dict['trav_time']  - skim_matrix_dict['in_vehicle_trav_time'] - skim_matrix_dict['egress_trav_time'] - skim_matrix_dict['access_trav_time']
+                skim_matrix_dict['waiting_time'] = (
+                    skim_matrix_dict['trav_time']
+                    - skim_matrix_dict['in_vehicle_trav_time']
+                    - skim_matrix_dict['egress_trav_time']
+                    - skim_matrix_dict['access_trav_time']
+                )
                 skim_cols = skim_cols + ['waiting_time']
                 arr = np.concatenate((arr, np.expand_dims(skim_matrix_dict['waiting_time'], axis=0)), axis=0)
 
@@ -354,7 +365,10 @@ class HyperpathGenerating:
             self.skim_matrix = None
 
     def _check_demand(self, origin_column, destination_column, demand_column):
-        for col, col_name in zip([origin_column, destination_column, demand_column], ["origin", "destination", "demand"]):
+        for col, col_name in zip(
+                [origin_column, destination_column, demand_column],
+                ["origin", "destination", "demand"]
+        ):
             if not isinstance(col, (np.ndarray, np.generic)):
                 raise TypeError(f"{col_name} should be a numpy array")
 
@@ -366,10 +380,10 @@ class HyperpathGenerating:
                 raise TypeError(f"column '{col_name}' should be of np.uint32")
 
         if not demand_column.dtype == np.float64:
-            raise TypeError(f"demand column should be of np.float64 type")
+            raise TypeError("demand column should be of np.float64 type")
 
         if demand_column.min() < 0.0:
-            raise ValueError(f"demand column should be nonnegative")
+            raise ValueError("demand column should be nonnegative")
 
     def info(self) -> dict:
         info = {
@@ -381,7 +395,8 @@ class HyperpathGenerating:
         return info
 
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
-        """Saves the assignment results to results_database.sqlite
+        """
+        Saves the assignment results to results_database.sqlite
 
         Method fails if table exists
 
@@ -390,7 +405,8 @@ class HyperpathGenerating:
 
             **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
 
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to. Defaults to the active project
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to. Defaults to the active
+              project
         """
 
         df = self._edges

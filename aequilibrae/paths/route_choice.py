@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict
 from collections.abc import Hashable
+from os import path
 from uuid import uuid4
 from functools import cached_property
 
@@ -20,7 +21,9 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class RouteChoice:
@@ -79,53 +82,60 @@ class RouteChoice:
         return d
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
-        """Chooses the assignment algorithm and set parameters.
-        Options for algorithm are, 'bfsle' for breadth first search with link removal, or
-        'link-penalisation'/'link-penalization'.
+        """
+        Chooses the assignment algorithm and set its parameters.
+
+        Options for algorithm are 'bfsle' for breadth first search with link removal, or
+        'link-penalisation'/'link-penalization'. 'lp' is also accepted as an alternative
+        to 'link-penalisation'
 
         BFSLE implementation based on "Route choice sets for very high-resolution data" by
         Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
         `DOI: 10.1080/18128602.2012.671383 <https://doi.org/10.1080/18128602.2012.671383>`_.
 
-        'lp' is also accepted as an alternative to 'link-penalisation'
-
         Setting the parameters for the route choice:
 
-        ``seed`` is a BFSLE specific parameters.
+        * ``seed`` is a BFSLE specific parameters.
 
-        Setting ``max_depth`` or ``max_misses``, while not required, is strongly recommended to prevent runaway
-        algorithms.
+        * Although not required, setting ``max_depth`` or ``max_misses``, is strongly
+          recommended to prevent runaway algorithms.
 
-        ``max_misses`` is the maximum amount of duplicate routes found per OD pair. If it is exceeded then the route set
-        if returned with fewer than ``max_routes``. It has a default value of ``100``.
+        * ``max_misses`` is the maximum amount of duplicate routes found per OD pair. If a set
+          of routes is returned in a case where ``max_misses`` is exceeded, the number of routes
+          may be fewer than ``max_routes``. Assumes a default value of 100.
 
-        - When using **BFSLE** ``max_depth`` corresponds to the maximum height of the graph of graphs. It's value is
-          largely dependent on the size of the paths within the network. For very small networks a value of ``10``
-          is a recommended starting point. For large networks a good starting value is ``5``. Increase the value
-          until the number of desired routes is being consistently returned. If it is exceeded then the route set
-          if returned with fewer than ``max_routes``.
+        * When using **BFSLE** ``max_depth`` corresponds to the maximum height of the graph.
+          It's value is largely dependent on the size of the paths within the network. For
+          very small networks a value of 10 is a recommended starting point. For large networks
+          a good starting value is 5. Increase the value until the number of desired routes is
+          being consistently returned. If a set of routes is returned in a case where
+          ``max_depth`` is exceeded, the number of routes may be fewer than ``max_routes``.
 
-        - When using **LP**, ``max_depth`` corresponds to the maximum number of iterations performed. While not
-          enforced,
-          it should be higher than ``max_routes``. It's value is dependent on the magnitude of the cost field,
-          specifically it's related to the log base ``penalty`` of the ratio of costs between two alternative routes.
-          If it is exceeded then the route set if returned with fewer than ``max_routes``.
+        * When using **LP**, ``max_depth`` corresponds to the maximum number of iterations
+          performed. While not enforced, it should be higher than ``max_routes``. It's value is
+          dependent on the magnitude of the cost field, specifically if it's related to the log
+          base ``penalty`` of the ratio of costs between two alternative routes. If a set of
+          routes is returned in a case where ``max_depth`` is exceeded, the number of routes
+          may be fewer than ``max_routes``.
 
-        Additionally BFSLE has the option to incorporate link penalisation. Every link in all routes found at a depth
-        are penalised with the ``penalty`` factor for the next depth. So at a depth of ``0`` no links are penalised nor
-        removed. At depth ``1``, all links found at depth 0 are penalised, then the links marked for removal are removed.
-        All links in the routes found at depth ``1`` are then penalised for the next depth. The penalisation compounds.
-        Pass set ``penalty=1.0`` to disable.
+        * Additionally BFSLE has the option to incorporate link penalisation. Every link in all
+          routes found at a depth are penalised with the penalty factor for the next depth. So at
+          a depth of 0 no links are penalised nor removed. At depth 1, all links found at depth 0
+          are penalised, then the links marked for removal are removed. All links in the routes
+          found at depth 1 are then penalised for the next depth. The penalisation compounds.
+          Set ``penalty=1.0`` to disable.
 
-        When performing an assignment, ``cutoff_prob`` can be provided to exclude routes from the path-sized logit model.
-        The ``cutoff_prob`` is used to compute an inverse binary logit and obtain a max difference in utilities. If a
-        paths total cost is greater than the minimum cost path in the route set plus the max difference, the route is
-        excluded from the PSL calculations. The route is still returned, but with a probability of 0.0.
+        * When performing an assignment, ``cutoff_prob`` can be provided to exclude routes from
+          the path-sized logit model. The ``cutoff_prob`` is used to compute an inverse binary
+          logit and obtain a max difference in utilities. If a paths total cost is greater than
+          the minimum cost path in the route set plus the max difference, the route is excluded
+          from the PSL calculations. The route is still returned, but with a probability of 0.0.
 
-        The ``cutoff_prob`` should be in the range :math:`[0, 1]`. It is then rescaled internally to :math:`[0.5, 1]` as probabilities
-        below ``0.5`` produce negative differences in utilities because the choice is between two routes only, one of
-        which is the shortest path. A higher ``cutoff_prob`` includes less routes. A value of ``1.0`` will only include
-        the minimum cost route. A value of ``0.0`` includes all routes.
+        * The ``cutoff_prob`` should be in the range :math:`[0, 1]`. It is then rescaled
+          internally to :math:`[0.5, 1]` as probabilities below 0.5 produce negative differences
+          in utilities because the choice is between two routes only, one of which is the
+          shortest path. A higher ``cutoff_prob`` includes less routes. A value of 1.0 will only
+          include the minimum cost route. A value of 0.0 includes all routes.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
@@ -175,8 +185,8 @@ class RouteChoice:
 
         .. warning:
 
-            Enabling route saving will disable in memory results. Viewing the results will read the results
-            from disk first.
+            Enabling route saving will disable in memory results. Viewing the results will read
+            the results from disk first.
 
         :Arguments:
             **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
@@ -193,9 +203,10 @@ class RouteChoice:
         Add demand DataFrame or matrix for the assignment.
 
         :Arguments:
-            **demand** (:obj:`Union[pd.DataFrame, AequilibraeMatrix]`): Demand to add to assignment. If the supplied
-            demand is a DataFrame, it should have a 2-level MultiIndex of Origin and Destination node IDs. If an
-            AequilibraE Matrix is supplied node IDs will be inferred from the index. Demand values should be either
+            **demand** (:obj:`Union[pd.DataFrame, AequilibraeMatrix]`): Demand to add to
+            assignment. If the supplied demand is a DataFrame, it should have a 2-level
+            MultiIndex of Origin and Destination node IDs. If an AequilibraE Matrix is
+            supplied node IDs will be inferred from the index. Demand values should be either
             ``float32``s or ``float64``s.
 
             **fill** (:obj:`float`): Value to fill any ``NaN``s with.
@@ -212,10 +223,11 @@ class RouteChoice:
         Prepare OD pairs for batch computation.
 
         :Arguments:
-            **nodes** (:obj:`Union[list[int], list[tuple[int, int]]]`): List of node IDs to operate on. If a 1D list is
-            provided, OD pairs are taken to be all pair permutations of the list. If a list of pairs is provided
-            OD pairs are taken as is. All node IDs must be present in the compressed graph. To make a node ID
-            always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
+            **nodes** (:obj:`Union[list[int], list[tuple[int, int]]]`): List of node IDs to
+            operate on. If a 1D list is provided, OD pairs are taken to be all pair
+            permutations of the list. If a list of pairs is provided OD pairs are taken as is.
+            All node IDs must be present in the compressed graph. To make a node ID always appear
+            in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
             If ``None`` is provided, all OD pairs with non-zero flows will be used.
         """
         if nodes is not None and not self.demand.no_demand():
@@ -244,12 +256,13 @@ class RouteChoice:
 
     def execute_single(self, origin: int, destination: int, demand: float = 0.0) -> List[Tuple[int]]:
         """
-        Generate route choice sets between `origin` and `destination`, potentially performing an assignment.
+        Generate route choice sets between origin and destination, potentially performing an
+        assignment.
 
         Does not require preparation.
 
-        Node IDs must be present in the compressed graph. To make a node ID always appear in the compressed
-        graph add it as a centroid.
+        Node IDs must be present in the compressed graph. To make a node ID always appear in
+        the compressed graph add it as a centroid.
 
         :Arguments:
             **origin** (:obj:`int`): Origin node ID.
@@ -279,12 +292,14 @@ class RouteChoice:
 
     def execute(self, perform_assignment: bool = True) -> None:
         """
-        Generate route choice sets between the previously supplied nodes, potentially performing an assignment.
+        Generate route choice sets between the previously supplied nodes, potentially performing
+        an assignment.
 
         To access results see ``RouteChoice.get_results()``.
 
         :Arguments:
-            **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Defaults to ``False``.
+            **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment.
+            Defaults to ``False``.
         """
         if self.demand.df.index.empty:
             logging.warning("There is no demand or pairs of OD pairs to compute Route choice for.")
@@ -306,11 +321,17 @@ class RouteChoice:
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
 
-        Dictionary contains keys 'Algorithm', 'Matrix totals', 'Computer name', 'Procedure ID', 'Parameters', and
-        'Select links'.
+        Dictionary contains keys:
 
-        The classes key is also a dictionary with all the user classes per transit class and their respective
-        matrix totals.
+        * Algorithm,
+        * Matrix totals
+        * Computer name
+        * Procedure ID
+        * Parameters
+        * Select links
+
+        The classes key is also a dictionary with all the user classes per transit class and
+        their respective matrix totals.
 
         :Returns:
             **info** (:obj:`dict`): Dictionary with summary information
@@ -333,13 +354,15 @@ class RouteChoice:
         self.logger.info(self._config)
 
     def get_results(self) -> Union[pa.Table, pa.dataset.Dataset]:
-        """Returns the results of the route choice procedure
+        """
+        Returns the results of the route choice procedure
 
-        Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).
-        Represents paths from ``origin`` to ``destination``.
+        Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).  Represents paths from
+        ``origin`` to ``destination``. When the link id in the route set is positive it represents the ab direction,
+        while negative represents the ba direction.
 
-        If ``save_routes`` was specified then a Pyarrow dataset is returned. The caller is responsible for reading this
-        dataset.
+        If ``save_routes`` was specified then a Pyarrow dataset is returned. The caller is
+        responsible for reading this dataset.
 
         :Returns:
             **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
@@ -347,7 +370,7 @@ class RouteChoice:
         if self.where is None:
             results = self.__rc.get_results()
         else:
-            results = self.__rc.results.read_dataset(self.where)
+            results = RouteChoiceSetResults.read_dataset(self.where)
 
         return results
 
@@ -356,8 +379,9 @@ class RouteChoice:
         Translates the link loading results from the graph format into the network format.
 
         :Returns:
-            **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`): A tuple of link loading
-            results as DataFrames. Columns are the matrix name concatenated direction.
+            **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`): A tuple
+            of link loading results as DataFrames. Columns are the matrix name concatenated
+            direction.
         """
 
         if self.demand.no_demand():
@@ -395,19 +419,21 @@ class RouteChoice:
         self, links: Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]], link_loading=True
     ):
         """
-        Set the selected links. Checks if the links and directions are valid. Supports **OR** and **AND** sets of links.
+        Set the selected links. Checks if the links and directions are valid. Supports **OR** and
+        **AND** sets of links.
 
-        Dictionary values should be a list of either a single ``(link_id, direction)`` tuple or a list of
-        ``(link_id, dirirection)``.
+        Dictionary values should be a list of either a single ``(link_id, direction)`` tuple or a
+        list of ``(link_id, dirirection)``.
 
-        The elements of the first list represent the **AND** sets, together they are OR'ed. If any of these sets is
-        satisfied the link are loaded as appropriate.
+        The elements of the first list represent the **AND** sets, together they are OR'ed. If any
+        of these sets is satisfied the link are loaded as appropriate.
 
-        The **AND** sets are comprised of either a single ``(link_id, direction)`` tuple or a list of
-        ``(link_id, direction)``. The single tuple represents an **AND** set with a single element.
+        The **AND** sets are comprised of either a single ``(link_id, direction)`` tuple or a list
+        of ``(link_id, direction)``. The single tuple represents an **AND** set with a single
+        element.
 
-        All links and directions in an **AND** set must appear in any order within a route for it to be considered
-        satisfied.
+        All links and directions in an **AND** set must appear in any order within a route for it
+        to be considered satisfied.
 
         Supply ``links=None`` to disable select link analysis.
 
@@ -415,8 +441,8 @@ class RouteChoice:
             **links** (:obj:`Union[None, Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
             Name of link set and link IDs and directions to be used in select link analysis.
 
-            **link_loading** (:obj:`bool`): Enable select link loading. If disabled only OD matrix results are
-            available.
+            **link_loading** (:obj:`bool`): Enable select link loading. If disabled only OD matrix
+            results are available.
 
         """
         self._selected_links = {}
@@ -479,8 +505,9 @@ class RouteChoice:
         Get the select link loading results.
 
         :Returns:
-            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`): Select link loading results as DataFrames.
-            Columns are the matrix name concatenated with the select link set and direction.
+            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`): Select link loading results
+            as DataFrames. Columns are the matrix name concatenated with the select link set
+            and direction.
         """
 
         if self.demand.no_demand():
@@ -505,8 +532,9 @@ class RouteChoice:
         Get the select link OD matrix results as a sparse matrix.
 
         :Returns:
-            **select link OD matrix results** (:obj:`Dict[str, Dict[str, scipy.sparse.coo_matrix]]`): Returns a dict of
-            select link set names to a dict of demand column names to a sparse OD matrix
+            **select link OD matrix results** (:obj:`Dict[str, Dict[str, scipy.sparse.coo_matrix]]`):
+            Returns a dict of select link set names to a dict of demand column names to a sparse OD
+            matrix
         """
 
         if self.demand.no_demand():
@@ -526,19 +554,16 @@ class RouteChoice:
         ]
 
         # sqlite3 context managers only commit, they don't close, oh well
-        conn = sqlite3.connect(pathlib.Path(project.project_base_path) / "results_database.sqlite")
-        with conn:
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
             df.to_sql(table_name, conn, index=True)
-        conn.close()
 
-        conn = project.connect()
-        with conn:
+        with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                 description) Values(?,?,?,?,?,?)""",
                 data,
             )
-        conn.close()
 
     def save_link_flows(self, table_name: str, project=None) -> None:
         """
@@ -566,8 +591,8 @@ class RouteChoice:
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
-        Saves the select link link flows for all classes into the results database. Additionally, it exports
-        the OD matrices into OMX format.
+        Saves the select link link flows for all classes into the results database. Additionally,
+        it exports the OD matrices into OMX format.
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to and the name of the

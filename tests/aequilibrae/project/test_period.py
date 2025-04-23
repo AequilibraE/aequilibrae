@@ -71,7 +71,8 @@ class TestPeriod(TestCase):
         period = periods.get(1)
 
         fields = sorted(period.data_fields())
-        dt = self.project.conn.execute("pragma table_info(periods)").fetchall()
+        with self.project.db_connection as conn:
+            dt = conn.execute("pragma table_info(periods)").fetchall()
 
         actual_fields = sorted([x[1] for x in dt if x[1] != "ogc_fid"])
 

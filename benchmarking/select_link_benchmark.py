@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 import sqlite3
+import sys
+import timeit
+import warnings
+from argparse import ArgumentParser
 from copy import deepcopy
 from os.path import join
 from pathlib import Path
-from argparse import ArgumentParser
-import sys
-import timeit
-import pandas as pd
-import warnings
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+import pandas as pd
 
 from aequilibrae import Project, TrafficAssignment, TrafficClass  # noqa: E402
+from aequilibrae.utils.db_utils import read_and_close
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 def aequilibrae_init(proj_path: str, cost: str):
@@ -48,7 +50,6 @@ def arkansas(path: str):
     proj = Project()
     proj.open(path)
     net = proj.network
-    curr = proj.conn.cursor()
     nodes = net.nodes  # These centroids are not in the matrices, so we turn them off
     for n in [4701, 4702, 4703]:
         nd = nodes.get(n)
@@ -56,8 +57,9 @@ def arkansas(path: str):
         nd.save()
     net.build_graphs(modes=["c"])
     car_graph = net.graphs["c"]
-    exclude_from_passenger = [x[0] for x in curr.fetchall()]
-    curr.execute("select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')")
+    with proj.db_connection as conn:
+        sql = "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
+        exclude_from_passenger = [x[0] for x in conn.execute(sql).fetchall()]
     graph = car_graph
     set1 = graph.network[(graph.network.builtyear > 2010) | (graph.network.removedyear < 2010)].link_id.to_list()
     set2 = graph.network[(graph.network.mode_code < 10) | (graph.network.mode_code > 11)].link_id.to_list()
@@ -185,7 +187,7 @@ def main():
         for project_name in args["projects"]:
             no_sl = final.query(f"Project == '{project_name}' and Select_Link == False")["Minimum_Runtime"]
             sl = final.query(f"Project == '{project_name}' and Select_Link == True")["Minimum_Runtime"]
-            df = pd.DataFrame({"Project": [project_name], "Runtime_%_Increase": [((sl - no_sl) / no_sl * 100)]})
+            df = pd.DataFrame({"Project": [project_name], "Runtime_%_Increase": [(sl - no_sl) / no_sl * 100]})
             ratios.append(df)
         final_ratio = pd.concat(ratios) if len(ratios) != 1 else ratios[0]
 

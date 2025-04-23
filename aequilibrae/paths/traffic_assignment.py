@@ -1,10 +1,9 @@
 import logging
 import socket
-import sqlite3
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -18,8 +17,8 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.utils.core_setter import set_cores
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class AssignmentBase(ABC):
@@ -501,12 +500,10 @@ class TrafficAssignment(AssignmentBase):
         missing = expected - set(preload.columns)
         additional = set(preload.columns) - expected
         if missing:
-            raise ValueError(
-                f"Input preload dataframe is missing columns: {missing}\n" f"expected columns are {expected}"
-            )
+            raise ValueError(f"Input preload dataframe is missing columns: {missing}\nexpected columns are {expected}")
         elif additional:
             raise ValueError(
-                f"Input preload dataframe has additional columns: {additional}\n" f"expected columns are {expected}"
+                f"Input preload dataframe has additional columns: {additional}\nexpected columns are {expected}"
             )
 
         # Reject empty preloads
@@ -539,6 +536,27 @@ class TrafficAssignment(AssignmentBase):
     # def get_spec(self) -> dict:
     #     """Gets the entire specification of the assignment"""
     #     return deepcopy(self.__dict__)
+
+    def skim_congested(self, skim_fields=None, return_matrices=False) -> Optional[dict]:
+        """
+        Skims the congested network. The user can add a list of skims to be computed, which
+        will be added to the congested time and the assignment cost from the last iteration of
+        the assignment.
+
+        The matrices are always stored internally in the AequilibraE objects to be saved to the
+        project if needed. If return_matrices is set to True, the matrices are also returned.
+
+        :Arguments:
+            **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
+            **return_matrices** (:obj:`Bool`): Returns a dictionary with skims. Defaults to False.
+        """
+        data = {}
+        for assig_class in self.classes:
+            skimmer = assig_class.skim_congested(skim_fields)
+            assig_class._aon_results.skims = skimmer.results.skims
+            data[assig_class._id] = skimmer.results.skims
+        if return_matrices:
+            return data
 
     def __validate_parameters(self, kwargs) -> bool:
         if self.vdf == "":
@@ -578,20 +596,19 @@ class TrafficAssignment(AssignmentBase):
 
         if not project:
             project = self.project or get_active_project()
-        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn)
-        conn.close()
 
-        conn = project.connect()
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
+            df.to_sql(table_name, conn)
+
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
         data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
-        conn.execute(
-            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                            description) Values(?,?,?,?,?,?)""",
-            data,
-        )
-        conn.commit()
-        conn.close()
+        with self.project.db_connection as conn:
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                                description) Values(?,?,?,?,?,?)""",
+                data,
+            )
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -829,13 +846,13 @@ class TrafficAssignment(AssignmentBase):
         if not project:
             project = self.project or get_active_project()
         df = self.select_link_flows()
-        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn)
-        conn.close()
-        # Create description table
 
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
+            df.to_sql(table_name, conn)
+
+        # Create description table
         self.description = f"Select link analysis from {self.procedure_id}"
-        conn = project.connect()
         report = {}
         data = [
             table_name,
@@ -845,13 +862,12 @@ class TrafficAssignment(AssignmentBase):
             self.procedure_date,
             self.description,
         ]
-        conn.execute(
-            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+        with self.project.db_connection as conn:
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                             description) Values(?,?,?,?,?,?)""",
-            data,
-        )
-        conn.commit()
-        conn.close()
+                data,
+            )
 
     def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
@@ -1025,20 +1041,19 @@ class TransitAssignment(AssignmentBase):
 
         if not project:
             project = project or get_active_project()
-        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn)
-        conn.close()
 
-        conn = database_connection("transit", project.project_base_path)
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
+            df.to_sql(table_name, conn)
+
         report = {"setup": self.info()}
         data = [table_name, "transit assignment", self.procedure_id, str(report), self.procedure_date, self.description]
-        conn.execute(
-            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+        with commit_and_close(path.join(project.project_base_path, "public_transport.sqlite")) as conn:
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                             description) Values(?,?,?,?,?,?)""",
-            data,
-        )
-        conn.commit()
-        conn.close()
+                data,
+            )
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame

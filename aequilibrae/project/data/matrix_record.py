@@ -3,7 +3,6 @@ from os.path import isfile, join
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.project.network.safe_class import SafeClass
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class MatrixRecord(SafeClass):
@@ -16,7 +15,7 @@ class MatrixRecord(SafeClass):
 
     def save(self):
         """Saves matrix record to the project database"""
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             sql = "select count(*) from matrices where name=?"
 
             if conn.execute(sql, [self.name]).fetchone()[0] == 0:
@@ -32,7 +31,7 @@ class MatrixRecord(SafeClass):
 
     def delete(self):
         """Deletes this matrix record and the underlying data from disk"""
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             conn.execute("DELETE FROM matrices where name=?", [self.name])
 
         if isfile(join(self.fldr, self.file_name)):
@@ -58,7 +57,7 @@ class MatrixRecord(SafeClass):
         return mat
 
     def __setattr__(self, instance, value) -> None:
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             sql = f"Select count(*) from matrices where LOWER({instance})=?"
             qry_value = sum(conn.execute(sql, [str(value).lower()]).fetchone())
             if qry_value > 0:

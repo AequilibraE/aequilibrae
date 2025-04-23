@@ -12,4 +12,4 @@ for network clean up are presented.
 
    network_manipulation/import_and_export_network
    network_manipulation/dealing_with_geometries
-   network_manipulation/_auto_examples/index
+   _auto_examples/network_manipulation/index

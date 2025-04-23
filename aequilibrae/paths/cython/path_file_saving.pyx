@@ -16,9 +16,10 @@ import numpy as np
 cimport numpy as np
 np.import_array()
 
+
 @cython.wraparound(False)
 @cython.embedsignature(True)
-@cython.boundscheck(False) # turn of bounds-checking for entire function
+@cython.boundscheck(False)  # turn of bounds-checking for entire function
 cpdef void save_path_file(long origin_index,
                           long num_links,
                           long zones,
@@ -28,7 +29,7 @@ cpdef void save_path_file(long origin_index,
                           string index_file,
                           bint write_feather) noexcept:
 
-    cdef long long class_, node, predecessor, connector, ctr
+    cdef long long node, predecessor, connector
     cdef vector[long long] path_data
     # could make this an ndarray and not do the conversion, we know the size of the index array is zones
     cdef vector[long long] size_of_path_arrays
@@ -48,7 +49,7 @@ cpdef void save_path_file(long origin_index,
             connector = conn[node]
             path_data.push_back(connector)
             while predecessor != -1:
-                connector = conn[predecessor] # connector has to be looked up BEFORE predecessor update
+                connector = conn[predecessor]  # connector has to be looked up BEFORE predecessor update
                 predecessor = pred[predecessor]
                 if (predecessor != -1) and (connector != -1):
                     path_data.push_back(connector)
