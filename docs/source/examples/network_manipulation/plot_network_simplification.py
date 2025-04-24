@@ -10,16 +10,15 @@ theses changes into the project.
 
 We use Folium to visualize the resulting network.
 """
-
 # %%
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.project.tools.network_simplifier`
+
 # %%
 
 # Imports
-
 import branca
 import folium
 from uuid import uuid4
@@ -28,8 +27,8 @@ from os.path import join
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
-
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_net_simplifier.png'
+
 # %%
 # Let's use the Nauru example project for display
 
@@ -99,16 +98,25 @@ links_after = net.network.links.data
 nodes_after = net.network.nodes.data
 
 # %%
-map = folium.Map(location=[-0.508371, 166.931142], zoom_start=17)
-map = links_before.explore(m=map, color="black", style_kwds={"weight": 4}, name="links_before")
-map = links_after.explore(m=map, color="yellow", style_kwds={"weight": 2}, name="links_after")
+fig = branca.element.Figure()
 
-map = nodes_before.explore(m=map, color="red", style_kwds={"radius": 0.8, "fillOpacity": 1.0}, name="nodes_before")
-map = nodes_after.explore(m=map, color="blue", style_kwds={"radius": 2, "fillOpacity": 1.0}, name="nodes_after")
+subplot1 = fig.add_subplot(1, 2, 1)
+subplot2 = fig.add_subplot(1, 2, 2)
 
-folium.LayerControl().add_to(map)  # Add a layer control button to our map
-map
+map1 = folium.Map(location=[-0.508371, 166.931142], zoom_start=17)
+map1 = links_before.explore(m=map1, color="black", style_kwds={"weight": 2}, name="links_before")
+map1 = nodes_before.explore(m=map1, color="red", style_kwds={"radius": 3, "fillOpacity": 1.0}, name="nodes_before")
+folium.LayerControl().add_to(map1)
 
+map2 = folium.Map(location=[-0.508371, 166.931142], zoom_start=17)
+map2 = links_after.explore(m=map2, color="black", style_kwds={"weight": 2}, name="links_after")
+map2 = nodes_after.explore(m=map2, color="blue", style_kwds={"radius": 3, "fillOpacity": 1.0}, name="nodes_after")
+folium.LayerControl().add_to(map2)
+
+subplot1.add_child(map1)
+subplot2.add_child(map2)
+
+fig
 # %%
 # Differently we can simplify the network by collapsing links into nodes.
 # Notice that this operation modifies the network in the neighborhood.
@@ -134,7 +142,7 @@ map1 = nodes_before.explore(m=map1, color="red", style_kwds={"radius": 3, "fillO
 folium.LayerControl().add_to(map1)
 
 map2 = folium.Map(location=[-0.509363, 166.928563], zoom_start=18)
-map2 = links_after.explore(m=map2, color="yellow", style_kwds={"weight": 2}, name="links_after")
+map2 = links_after.explore(m=map2, color="black", style_kwds={"weight": 2}, name="links_after")
 map2 = nodes_after.explore(m=map2, color="blue", style_kwds={"radius": 3, "fillOpacity": 1.0}, name="nodes_after")
 folium.LayerControl().add_to(map2)
 
