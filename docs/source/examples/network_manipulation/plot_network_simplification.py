@@ -10,11 +10,12 @@ theses changes into the project.
 
 We use Folium to visualize the resulting network.
 """
+
 # %%
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.tools.network_simplifier`
+#     * :func:`aequilibrae.project.tools.network_simplifier.NetworkSimplifier`
 
 # %%
 
@@ -27,6 +28,7 @@ from os.path import join
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
+
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_net_simplifier.png'
 
 # %%

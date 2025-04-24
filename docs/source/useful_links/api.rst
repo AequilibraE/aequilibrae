@@ -40,7 +40,7 @@ Project Tools
 .. autosummary::
    :toctree: _generated/
 
-   NetworkSimplifier
+   network_simplifier.NetworkSimplifier
 
 Network Data
 ------------

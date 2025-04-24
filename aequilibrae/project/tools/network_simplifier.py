@@ -31,11 +31,11 @@ class NetworkSimplifier(WorkerThread):
         """
         Simplifies the network by merging links that are shorter than a given threshold
 
-        Args:
+        :Arguments:
             **graph** (:obj:`Graph`): AequilibraE graph
 
-            **max_speed_ratio** (:obj:`float`): Maximum ratio between the fastest and slowest speed
-            for a link to be considered for simplification
+            **max_speed_ratio** (:obj:`float`, *Optional*): Maximum ratio between the fastest
+            and slowest speed for a link to be considered for simplification.
         """
         self.graph = graph
 
@@ -197,7 +197,7 @@ class NetworkSimplifier(WorkerThread):
         """
         Collapses links into nodes, adjusting the network in the neighborhood.
 
-        Args:
+        :Arguments:
             **links** (:obj:`List[int]`): List containing link IDs to be collapsed.
         """
         srid = self.link_layer.crs.to_epsg()
