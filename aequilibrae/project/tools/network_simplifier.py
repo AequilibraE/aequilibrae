@@ -106,7 +106,7 @@ class NetworkSimplifier(WorkerThread):
             # Some values we will bring from the weighted average
             for field in ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]:
                 metric = (candidates[field] * candidates["distance"]).sum() / candidates["distance"].sum()
-                if long_dir == 1 or field in ["grade"]:
+                if long_dir == 1:
                     main_data[field] = metric
                 else:
                     field2 = field.replace("ab", "ba") if "ab" in field else field.replace("ba", "ab")
