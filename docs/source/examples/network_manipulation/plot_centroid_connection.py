@@ -100,3 +100,7 @@ nodes.explore(m=map, color="red", style_kwds={"radius": 3, "fillOpacity": 1.0}, 
 folium.LayerControl().add_to(map)
 
 map
+
+# %%
+project.close()
+
