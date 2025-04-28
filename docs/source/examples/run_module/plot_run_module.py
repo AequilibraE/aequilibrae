@@ -7,16 +7,16 @@ Run module
 In this example we demonstrate how to use AequilibraE's run module using Sioux Falls example.
 """
 # %%
-# %%
 # .. admonition:: References
 # 
 #   * :doc:`../../run_module`
+#   * :ref:`parameters_run`
 
 # %%
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.run`
+#     * :attr:`aequilibrae.project.Project.run`
 
 # %%
 

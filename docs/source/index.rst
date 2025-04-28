@@ -45,7 +45,7 @@ Python
 
           :doc:`AequilibraE run module <run_module>`
 
-      Easily run an AequilibraE model
+      Easily run AequilibraE
       +++
       :doc:`_auto_examples/run_module/index`
 

@@ -163,8 +163,8 @@ class Project:
     @property
     def run(self):
         """
-        Load and return the AequilibraE run module with the default arguments from ``parameters.yml`` partially
-        applied.
+        Load and return the AequilibraE run module with the default arguments from
+        ``parameters.yml`` partially applied.
 
         Refer to ``run/__init__.py`` file within the project folder for documentation.
         """

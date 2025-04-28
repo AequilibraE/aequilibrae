@@ -14,7 +14,7 @@ We use Folium to visualize the resulting network.
 # %%
 # .. admonition:: References
 # 
-#   * :doc:`../../project_components`
+#   * :doc:`../../aequilibrae_project/project_components`
 
 # %%
 # .. seealso::
