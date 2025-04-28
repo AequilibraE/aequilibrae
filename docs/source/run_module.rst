@@ -10,9 +10,9 @@ couple model parameters and methods to run models to the model itself.
 ``run/__init__.py``
 -------------------
 
-The ``run`` module is a standard Python module that is dynamically imported when the
+The run module is a standard Python module that is dynamically imported when the
 ``project.run`` property is accessed. Objects named within ``parameters.yml`` under the ``run``
-heading will have their arguments partially applied via `functools.partial` and will replace
+heading will have their arguments partially applied via ``functools.partial`` and will replace
 the objects within the module.
 
 Not all objects within the module must be named ``parameters.yml``. If an object is named within
@@ -27,3 +27,9 @@ Functions should use the ``get_active_project()`` function to obtain a reference
 project.
 
 State within the module should be avoided as the file may be run multiple times.
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Run module
+
+    _auto_examples/run_module/index
