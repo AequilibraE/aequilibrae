@@ -109,4 +109,5 @@ In the following sections, we present the structure of each component of an Aequ
    aequilibrae_project/run_module
    aequilibrae_project/transit_database
    aequilibrae_project/transit_database/data_model/datamodel
+   aequilibrae_project/project_componets
    _auto_examples/aequilibrae_project/index

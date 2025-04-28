@@ -43,9 +43,9 @@ Python
 
       .. rst-class:: big-font 
 
-          :doc:`AeqeuilibraE run module <run_module>`
+          :doc:`AequilibraE run module <run_module>`
 
-      Run 
+      Easily run an AequilibraE model
       +++
       :doc:`_auto_examples/run_module/index`
 

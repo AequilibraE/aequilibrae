@@ -11,9 +11,9 @@ Run
 ---
 
 The run section of the parameter file defines the default keyword arguments for the callable objects
-in the :ref:`run_module`. Each subsection names a callable symbol within the `run/__init__.py`
-module, if the symbol does not exist a `RuntimeError` will be raised when `project.run` is
-accessed. The arguments are applied via `functools.partial` and replace the objects within the
+in the :ref:`run_module`. Each subsection names a callable symbol within the ``run/__init__.py``
+module, if the symbol does not exist a ``RuntimeError`` will be raised when ``project.run`` is
+accessed. The arguments are applied via ``functools.partial`` and replace the objects within the
 module.
 
 .. image:: ../_images/parameters_run_example.png
