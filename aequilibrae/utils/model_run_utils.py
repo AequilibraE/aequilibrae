@@ -9,7 +9,7 @@ def import_directory_as_module(directory_path: pathlib.Path, module_name):
 
     :Arguments:
         **directory_path** (:obj:`pathlib.Path`): Path object pointing to the directory
-        
+
         **module_name**: Name to give the imported module
 
     :Returns:
