@@ -1,23 +1,23 @@
+import functools
 import logging
 import os
 import shutil
 import sqlite3
-import functools
-import warnings
 from contextlib import contextmanager
+from pathlib import Path
 
 from aequilibrae import global_logger
+from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.log import Log
+from aequilibrae.log import get_log_handler
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices
-from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.project.network import Network
-from aequilibrae.project.zoning import Zoning
-from aequilibrae.reference_files import spatialite_database, demo_init_py
-from aequilibrae.log import get_log_handler
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
+from aequilibrae.project.zoning import Zoning
+from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.model_run_utils import import_directory_as_module
@@ -41,7 +41,7 @@ class Project:
 
     def __init__(self):
         self.path_to_file: str = None
-        self.project_base_path = ""
+        self.project_base_path = Path()
         self.source: str = None
         self.network: Network = None
         self.about: About = None
@@ -63,10 +63,10 @@ class Project:
             not exist, it will fail.
         """
 
-        file_name = os.path.join(project_path, "project_database.sqlite")
-        if not os.path.isfile(file_name):
+        self.project_base_path = Path(project_path)
+        file_name = self.project_base_path / "project_database.sqlite"
+        if not file_name.is_file() or not file_name.exists():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-        self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
         self.__setup_logger()
@@ -89,15 +89,15 @@ class Project:
             **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
-        self.project_base_path = project_path
-        self.path_to_file = os.path.join(self.project_base_path, "project_database.sqlite")
+        self.project_base_path = Path(project_path)
+        self.path_to_file = self.project_base_path / "project_database.sqlite"
         self.source = self.path_to_file
 
         if os.path.isdir(project_path):
             raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
 
         # We create the project folder and create the base file
-        os.mkdir(self.project_base_path)
+        self.project_base_path.mkdir(parents=True, exist_ok=True)
 
         self.__setup_logger()
         self.activate()
@@ -145,9 +145,8 @@ class Project:
         return Log(self.project_base_path)
 
     def __load_objects(self):
-        matrix_folder = os.path.join(self.project_base_path, "matrices")
-        if not os.path.isdir(matrix_folder):
-            os.mkdir(matrix_folder)
+        matrix_folder = self.project_base_path / "matrices"
+        matrix_folder.mkdir(parents=True, exist_ok=True)
 
         self.network = Network(self)
         self.about = About(self)
@@ -170,8 +169,7 @@ class Project:
         Refer to `self.project_base_path/run/__init__.py` doc string for documentation.
         """
         entry_points = self.parameters["run"]
-        module = import_directory_as_module(os.path.join(self.project_base_path, "run"), "aequilibrae.run")
-
+        module = import_directory_as_module(self.project_base_path / "run", "aequilibrae.run")
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
@@ -195,13 +193,13 @@ class Project:
 
     def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
-
-        os.mkdir(os.path.join(self.project_base_path, "run"))
-        shutil.copyfile(demo_init_py, os.path.join(self.project_base_path, "run", "__init__.py"))
+        pth = self.project_base_path / "run"
+        pth.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(demo_init_py, pth / "__init__.py")
 
         # Write parameters to the project folder
         p = self.project_parameters
-        p.parameters["system"]["logging_directory"] = self.project_base_path
+        p.parameters["system"]["logging_directory"] = str(self.project_base_path)
         p.write_back()
 
         # Create actual tables
@@ -218,5 +216,4 @@ class Project:
         do_log = par["system"]["logging"]
 
         if do_log:
-            log_file = os.path.join(self.project_base_path, "aequilibrae.log")
-            self.logger.addHandler(get_log_handler(log_file))
+            self.logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
