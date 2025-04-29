@@ -37,7 +37,7 @@ project = create_example(folder)
 
 # %%
 # First, let's check the matrix information using ``matrix_summary()``. This method
-# provides us useful information such as the matrix total, mininum and maximum values
+# provides us useful information such as the matrix total, minimum and maximum values
 # in the array, and the number of non-empty pairs in the matrix.
 #
 # Notice that the matrix summary is presented for each matrix core.
