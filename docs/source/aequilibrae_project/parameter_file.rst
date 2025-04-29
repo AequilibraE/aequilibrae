@@ -5,6 +5,25 @@ Parameters YAML File
 
 The parameter file holds the parameters information for a certain portion of the software.
 
+.. _parameters_run:
+
+Run
+---
+
+The run section of the parameter file defines the default keyword arguments for the callable objects
+in the :ref:`run_module`. Each subsection names a callable symbol within the ``run/__init__.py``
+module, if the symbol does not exist a ``RuntimeError`` will be raised when ``project.run`` is
+accessed. The arguments are applied via ``functools.partial`` and replace the objects within the
+module.
+
+.. image:: ../_images/parameters_run_example.png
+    :align: center
+    :scale: 80 %
+    :alt: Run example
+
+This can be used to define model entry points or functions that should be stored adjacent to the
+model itself.
+
 .. _parameters_assignment:
 
 Assignment
@@ -43,9 +62,9 @@ Network
 -------
 
 There are four groups of parameters under the network section: *links*, *nodes*,
-*OSM*, and *GMNS*. The first are basically responsible for the design of the network 
+*OSM*, and *GMNS*. The first are basically responsible for the design of the network
 to be created in case a new project/network is to bre created from scratch, and for
-now each one of these groups contains only a single group of parameters called 
+now each one of these groups contains only a single group of parameters called
 *fields*.
 
 Link Fields
@@ -140,8 +159,8 @@ The **GMNS** group of parameters has four specifications: **critical_dist**, **l
 
 **critical_dist** is a numeric threshold for the distance.
 
-Under the keys **links**, **nodes**, and **use_definition** there are the fields 
-*equivalency* and *fields*. They represent the equivalency between GMNS and 
+Under the keys **links**, **nodes**, and **use_definition** there are the fields
+*equivalency* and *fields*. They represent the equivalency between GMNS and
 AequilibraE data fields and data types for each field.
 
 .. _parameters_system:

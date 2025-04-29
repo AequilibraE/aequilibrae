@@ -34,6 +34,14 @@ Project Objects
 
    Zone
 
+Project Tools
+~~~~~~~~~~~~~
+.. currentmodule:: aequilibrae.project.tools
+.. autosummary::
+   :toctree: _generated/
+
+   network_simplifier.NetworkSimplifier
+
 Network Data
 ------------
 .. currentmodule:: aequilibrae.project.network

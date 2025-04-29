@@ -1,8 +1,5 @@
-import os
-import tempfile
 import logging
-
-from aequilibrae.parameters import Parameters
+from pathlib import Path
 
 
 class Log:
@@ -22,8 +19,8 @@ class Log:
         >>> log.clear()
     """
 
-    def __init__(self, project_base_path: str):
-        self.log_file_path = os.path.join(project_base_path, "aequilibrae.log")
+    def __init__(self, project_base_path: Path):
+        self.log_file_path = project_base_path / "aequilibrae.log"
 
     def contents(self) -> list:
         """Returns contents of log file
@@ -48,9 +45,9 @@ def _setup_logger():
     return logger
 
 
-def get_log_handler(log_file: str, ensure_file_exists=True):
+def get_log_handler(log_file: Path, ensure_file_exists=True):
     """Return a log handler that writes to the given log_file"""
-    if os.path.exists(log_file) and not os.path.isfile(log_file):
+    if log_file.exists() and not log_file.is_file():
         raise FileExistsError(f"{log_file} is not a valid file")
 
     if ensure_file_exists:

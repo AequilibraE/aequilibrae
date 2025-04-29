@@ -43,9 +43,11 @@ Python
 
       .. rst-class:: big-font 
 
-          :doc:`Project Components <project_components>`
+          :doc:`AequilibraE run module <run_module>`
 
-      Get to know the components of each AequilibraE project
+      Easily run AequilibraE
+      +++
+      :doc:`_auto_examples/run_module/index`
 
   .. grid-item-card::
       :text-align: center

@@ -1,3 +1,6 @@
+run:
+  example_function_with_kwargs:
+    arg1: "parameters.yml argument"
 assignment:
   equilibrium:
     maximum_iterations: 250
@@ -22,7 +25,7 @@ network:
           description: Node of origin of the link. THIS FIELD CANNOT BE CHANGED
           type: integer
       - b_node:
-          description: Node of destinaiton of the link. THIS FIELD CANNOT BE CHANGED
+          description: Node of destination of the link. THIS FIELD CANNOT BE CHANGED
           type: integer
       - direction:
           description: Direction of the link. THIS FIELD CANNOT BE CHANGED
@@ -99,7 +102,7 @@ network:
       description: All links capable of supporting transit-vehicles
       letter: t
   - walk:
-      description: Linkes where walking is permitted
+      description: Links where walking is permitted
       letter: w
   - bicycle:
       description: All Bicycles
@@ -431,13 +434,13 @@ network:
       equivalency:
         mode_name: use
 osm:
-    overpass_endpoint: http://overpass-api.de/api
-    nominatim_endpoint: https://nominatim.openstreetmap.org/
-    accept_language: "en"
-    max_attempts: 50
-    timeout: 540
-    max_query_area_size: 2500000000
-    sleeptime: 5
+  overpass_endpoint: http://overpass-api.de/api
+  nominatim_endpoint: https://nominatim.openstreetmap.org/
+  accept_language: "en"
+  max_attempts: 50
+  timeout: 540
+  max_query_area_size: 2500000000
+  sleeptime: 5
 
 system:
   cpus: 0
