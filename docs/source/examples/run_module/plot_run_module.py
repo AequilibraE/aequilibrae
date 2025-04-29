@@ -127,7 +127,6 @@ project.run.results_summary()
 import sqlite3
 import pandas as pd
 import geopandas as gpd
-import matplotlib.pyplot as plt
 
 # %%
 # Let's retrieve the results
@@ -149,13 +148,11 @@ max_vol = df.matrix_tot.max()
 
 # %%
 # And finally plot the data
-fig, ax = plt.subplots(figsize=(3, 5))
-df.plot(ax=ax, linewidth=5 * df["matrix_tot"] / max_vol, color="blue")
-plt.show()
+df.plot(linewidth=5 * df["matrix_tot"] / max_vol, color="blue")
 
 # %%
 project.close()
 
 # %%
-# Graph image credits to
+# Pipeline image credits to
 # `Data-pipeline icons created by Vectors Tank - Flaticon <https://www.flaticon.com/free-icons/data-pipeline>`_
