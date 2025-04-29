@@ -1,4 +1,3 @@
-import warnings
 from sqlite3 import Connection
 from typing import Optional
 
@@ -22,8 +21,6 @@ def connector_creation(
 ):
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
-
-    warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
 
     with conn_ or commit_and_close(network.project.path_to_file) as conn:
         logger = network.project.logger

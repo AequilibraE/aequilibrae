@@ -1,6 +1,7 @@
 from copy import deepcopy
 from os.path import join, realpath
 from typing import Union, Dict
+import warnings
 
 import geopandas as gpd
 import pandas as pd
@@ -155,7 +156,11 @@ class Zoning(BasicTable):
         centroid_conn = link_data.query("a_node in @centroids and modes.str.contains(@mode_id)", engine="python")
         connected_centroids = centroid_conn.a_node.to_numpy()
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with (
+            commit_and_close(self.project.path_to_file, spatial=True) as conn,
+            warnings.catch_warnings(),
+        ):
+            warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
             zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
             for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
                 if zone_id not in centroids:
