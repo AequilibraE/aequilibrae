@@ -22,7 +22,7 @@ def connector_creation(
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    with conn_ or commit_and_close(network.project.path_to_file) as conn:
+    with conn_ or network.project.db_connection as conn:
         logger = network.project.logger
         if sum(conn.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone()) == 0:
             logger.warning("This centroid does not exist. Please create it first")
@@ -52,16 +52,26 @@ def connector_creation(
     joined = nodes[["node_id", "geometry"]].sjoin_nearest(centroid, distance_col="distance_connector")
     joined = joined.nsmallest(connectors, "distance_connector")
 
-    centr_geo = centroid.geometry.values[0]
-    for _, rec in joined.iterrows():
-        link = links.new()
-        link.geometry = LineString([centr_geo, rec.geometry])
-        link.modes = mode_id
-        link.direction = 0
-        link.link_type = "centroid_connector"
-        link.name = f"centroid connector zone {zone_id}"
-        link.capacity_ab = INFINITE_CAPACITY
-        link.capacity_ba = INFINITE_CAPACITY
+    # Check if link with a/b nodes exists to avoid unnecessary repetition
+    sql = """(a_node==@zone_id | b_node==@zone_id) & (a_node==@joined.node_id.values[0] | b_node==@joined.node_id.values[0]) & link_type=='centroid_connector'"""
+    link_exist = links.data.query(sql)
+    if link_exist.empty:
+        centr_geo = centroid.geometry.values[0]
+        for _, rec in joined.iterrows():
+            link = links.new()
+            link.geometry = LineString([centr_geo, rec.geometry])
+            link.modes = mode_id
+            link.direction = 0
+            link.link_type = "centroid_connector"
+            link.name = f"centroid connector zone {zone_id}"
+            link.capacity_ab = INFINITE_CAPACITY
+            link.capacity_ba = INFINITE_CAPACITY
+            link.save(conn_)
+        if not joined.empty:
+            logger.warning(f"{joined.shape[0]} new centroid connectors for mode {mode_id} added for centroid {zone_id}")
+    else:
+        link = links.get(link_exist.link_id.values[0])
+        link.add_mode(mode_id)
         link.save(conn_)
-    if not joined.empty:
-        logger.warning(f"{joined.shape[0]} new centroid connectors for mode {mode_id} added for centroid {zone_id}")
+
+        logger.warning(f"New mode {mode_id} added for centroid {zone_id}")
