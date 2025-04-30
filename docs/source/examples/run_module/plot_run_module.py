@@ -6,9 +6,10 @@ Run module
 
 In this example we demonstrate how to use AequilibraE's run module using Sioux Falls example.
 """
+
 # %%
 # .. admonition:: References
-# 
+#
 #   * :doc:`../../run_module`
 #   * :ref:`parameters_run`
 
@@ -27,6 +28,7 @@ from os.path import join
 
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.create_example import create_example
+# sphinx_gallery_thumbnail_path = '../source/_images/data_pipeline.png'
 
 # %%
 
@@ -120,4 +122,37 @@ project.run.create_delaunay()
 project.run.results_summary()
 
 # %%
+# Let's check what our Delaunay lines look like!
+
+import sqlite3
+import pandas as pd
+import geopandas as gpd
+
+# %%
+# Let's retrieve the results
+res_path = join(project.project_base_path, "results_database.sqlite")
+conn = sqlite3.connect(res_path)
+
+results = pd.read_sql("SELECT * FROM my_run_module_example", conn).set_index("link_id")
+
+# %%
+with project.db_connection as conn:
+    links = gpd.read_postgis(
+        "SELECT link_id, st_asBinary(geometry) geometry FROM delaunay_network", conn, geom_col="geometry", crs=4326
+    )
+links.set_index("link_id", inplace=True)
+
+# %%
+df = links.join(results)
+max_vol = df.matrix_tot.max()
+
+# %%
+# And finally plot the data
+df.plot(linewidth=5 * df["matrix_tot"] / max_vol, color="blue")
+
+# %%
 project.close()
+
+# %%
+# Pipeline image credits to
+# `Data-pipeline icons created by Vectors Tank - Flaticon <https://www.flaticon.com/free-icons/data-pipeline>`_
