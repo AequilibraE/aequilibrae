@@ -140,20 +140,20 @@ class TestZone(TestCase):
         zone1 = zones.get(1)
         zone1.add_centroid(None)
 
-        with read_and_close(self.proj.path_to_file) as conn:
-            zone1.connect_mode("c")
+        with self.proj.db_connection as conn:
+            zone1.connect_mode(mode_id="c", conn=conn)
 
             cnt = conn.execute("Select count(*) from links where a_node=?", [1]).fetchone()[0]
             self.assertIsNot(0, cnt, "failed to add connectors")
 
-            zone1.connect_mode("t")
+            zone1.connect_mode(mode_id="t", conn=conn)
             sql = """Select count(*) from links where a_node=? and instr(modes,'t')>0"""
             cnt = conn.execute(sql, [1]).fetchone()[0]
             self.assertIsNot(0, cnt, "failed to add connectors for mode t")
 
             # Cannot connect a centroid that does not exist
             zone2 = zones.get(2)
-            zone2.connect_mode("c", conn=conn)
+            zone2.connect_mode(mode_id="c", conn=conn)
 
     def test_disconnect_mode(self):
         self.__change_project()
@@ -161,15 +161,16 @@ class TestZone(TestCase):
         zone1 = zones.get(1)
         zone1.add_centroid(None)
 
-        with read_and_close(self.proj.path_to_file) as conn:
-            zone1.connect_mode("c")
-            zone1.connect_mode("w")
+        with self.proj.db_connection as conn:
+            zone1.connect_mode(mode_id="c", conn=conn)
+            zone1.connect_mode(mode_id="w", conn=conn)
+
             tot = conn.execute("""select COUNT(*) from links where a_node=1""").fetchone()[0]
             conn.execute("""Update links set modes = modes || 'w' where instr(modes,'w')=0""")
 
         zone1.disconnect_mode("w")
 
-        with read_and_close(self.proj.path_to_file, spatial=True) as conn:
+        with self.proj.db_connection as conn:
             cnt = conn.execute("""select COUNT(*) from links where a_node=1""").fetchone()[0]
             self.assertIsNot(tot, cnt, "failed to delete links")
 
