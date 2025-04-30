@@ -1,8 +1,7 @@
 from aequilibrae.utils.qgis_utils import inside_qgis
 
 if inside_qgis:
-    from PyQt5.QtCore import QThread
-    from PyQt5.QtCore import pyqtSignal
+    from qgis.PyQt.QtCore import pyqtSignal, QThread
 
     class WorkerThread(QThread):
         if inside_qgis:

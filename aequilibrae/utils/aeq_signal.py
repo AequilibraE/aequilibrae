@@ -6,7 +6,7 @@ def noop(_):
 
 
 if inside_qgis:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL  # type: ignore
+    from qgis.PyQt.QtCore import pyqtSignal as SIGNAL  # type: ignore
 
     noop(SIGNAL.__class__)  # This should be no-op but it stops PyCharm from "optimising" the above import
 else:

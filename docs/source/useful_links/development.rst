@@ -209,7 +209,7 @@ Working with progress bars
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 From version 1.1.0, AequilibraE is capable of displaying progress bars in Jupyter Notebooks using 
-`TQDM <https://tqdm.github.io/>`_. For the companion QGIS plugin, `PyQt5 <https://doc.qt.io/qtforpython-5/>`_
+`TQDM <https://tqdm.github.io/>`_. For the companion QGIS plugin, `PyQt6 <https://doc.qt.io/qtforpython-6/index.html>`_
 is used to emit messages in progress bars.
  
 AequilibraE provides a wrapper class `SIGNAL` that will use the appropriate underlying mechanism to display 
