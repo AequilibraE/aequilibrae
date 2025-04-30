@@ -62,7 +62,7 @@ class Link(SafeClass):
         data, sql = self._save_new_with_geometry() if self.__new else self.__save_existing_link()
 
         if data:
-            with conn_ or self.project.db_connection as conn:
+            with conn or self.project.db_connection as conn:
                 conn.execute(sql, data)
 
         self.__new = False
