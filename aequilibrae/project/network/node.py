@@ -151,7 +151,7 @@ class Node(SafeClass):
             link_types=link_types,
             connectors=connectors,
             network=self.project.network,
-            conn_=conn,
+            conn=conn,
             delimiting_area=area,
             proj_nodes=self.project.network.nodes.data,
             links=self.project.network.links,

@@ -177,7 +177,7 @@ class Zoning(BasicTable):
                     proj_nodes=proj_nodes,
                     links=links,
                     network=self.project.network,
-                    conn_=conn,
+                    conn=conn,
                     delimiting_area=area,
                 )
 
