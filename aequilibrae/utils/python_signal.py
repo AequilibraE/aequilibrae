@@ -78,7 +78,9 @@ class PythonSignal:  # type: ignore
 
             # Create a new bar with the given capacity
             desc = str(val[2]).ljust(50)
-            self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=desc, position=self.position)
+            self.pbar = tqdm(
+                total=val[1], colour=self.color, leave=False, desc=desc, position=self.position, mininterval=0.1
+            )
 
         elif action == "update":
             self.pbar.update(val[1] - self.pbar.n)
