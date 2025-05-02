@@ -144,6 +144,9 @@ cdef class RouteChoiceSetResults:
         for route in route_set:
             route_vec.emplace_back(route)
 
+        # We now drop all references to those raw pointers. The unique pointers now own those vectors.
+        route_set.clear()
+
     cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil:
         """
         Return either a new empty RouteSet_t, or the RouteSet_t (initially empty) corresponding to a OD pair index.
@@ -346,7 +349,7 @@ cdef class RouteChoiceSetResults:
         while union_iter != link_union.cend():
             count = 0
             link = d(union_iter)
-            while link == d(union_iter) and union_iter != link_union.cend():
+            while union_iter != link_union.cend() and link == d(union_iter):
                 count = count + 1
                 inc(union_iter)
 
@@ -490,17 +493,20 @@ cdef class RouteChoiceSetResults:
 
             int offset = 0
             size_t network_link_begin, network_link_end, link
+            bool have_assignment_results = self.perform_assignment and self.store_results
 
         # Origins, Destination, Route set, [Cost for route, Mask, Path_Overlap for route, Probability for route]
-        columns.resize(len(self.psl_schema) if self.perform_assignment else len(self.schema))
+        columns.resize(len(self.psl_schema) if have_assignment_results else len(self.schema))
 
-        if self.perform_assignment:
+        if have_assignment_results:
             cost_col = new CDoubleBuilder(pool)
             mask_col = new CBooleanBuilder(pool)
             path_overlap_col = new CDoubleBuilder(pool)
             prob_col = new CDoubleBuilder(pool)
 
             for i in range(self.demand.ods.size()):
+                if not d(self.__route_vecs[i]).size():  # If there's no routes to add just skip these.
+                    continue
                 cost_col.AppendValues(d(self.__cost_set[i]))
                 mask_col.AppendValues(d(self.__mask_set[i]))
                 path_overlap_col.AppendValues(d(self.__path_overlap_set[i]))
@@ -546,14 +552,14 @@ cdef class RouteChoiceSetResults:
         d_col.Finish(&columns[1])
         columns[2] = d(route_set_results)
 
-        if self.perform_assignment:
+        if have_assignment_results:
             cost_col.Finish(&columns[3])
             mask_col.Finish(&columns[4])
             path_overlap_col.Finish(&columns[5])
             prob_col.Finish(&columns[6])
 
         cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(
-            self.psl_schema if self.perform_assignment else self.schema
+            self.psl_schema if have_assignment_results else self.schema
         )
         cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(schema, columns)
 
@@ -562,7 +568,7 @@ cdef class RouteChoiceSetResults:
         del o_col
         del d_col
 
-        if self.perform_assignment:
+        if have_assignment_results:
             del cost_col
             del mask_col
             del path_overlap_col

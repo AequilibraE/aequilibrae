@@ -342,8 +342,6 @@ cdef class RouteChoiceSet:
                     # routes. This is done to simplify memory management later on.
                     route_vec = self.results.get_route_vec(i)
                     RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
-                    # We now drop all references to those raw pointers. The unique pointers now own those vectors.
-                    route_set.clear()
 
                     if path_size_logit:
                         prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
