@@ -496,6 +496,7 @@ cdef class RouteChoiceSet:
             if queue.size() + route_set.size() >= max_routes:
                 shuffle(queue.begin(), queue.end(), rng)
 
+            next_queue.clear()
             for banned in queue:
                 if lp:
                     # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link
@@ -553,20 +554,23 @@ cdef class RouteChoiceSet:
                         new_banned = new unordered_set[long long](d(banned))
                         new_banned.insert(connector)
                         # If we've already seen this set of removed links before we already know what the path is and
-                        # its in our route set
+                        # its in our route set.
                         if removed_links.find(new_banned) != removed_links.end():
                             del new_banned
                         else:
                             next_queue.push_back(new_banned)
 
-                    # The deduplication of routes occurs here
+                    # The de-duplication of routes occurs here
                     status = route_set.insert(vec)
-                    miss_count = miss_count + (not status.second)
+                    if not status.second:
+                        del vec  # If the insertion failed, free this vector, we already have one that is equal to it
+                        miss_count = miss_count + 1
+
                     if miss_count > max_misses or route_set.size() >= max_routes:
-                        break
+                        break  # This condition will be hit again at the start of the loop, we just don't want to
+                               # iterate over the rest of the things in queue when we know there is not more space.
 
             queue.swap(next_queue)
-            next_queue.clear()
 
             if lp:
                 # Update the penalised_cost vector, since next_penalised_cost is always the one updated we just need to
@@ -577,7 +581,14 @@ cdef class RouteChoiceSet:
         for banned in queue:
             del banned
 
-        # We should also free all the sets in removed_links, we don't be needing them
+        # We should also free all the sets in next_queue, we don't be needing them.  We remove next_queue before
+        # removed_links because we just swapped it with queue, and removed_links contains a subset of those that were
+        # added to queue (pre-swap). It may share elements so we make sure to erase them from the set before freeing
+        # them to avoid a use-after free.
+        for banned in next_queue:
+            removed_links.erase(banned)
+            del banned
+
         for banned in removed_links:
             del banned
 
