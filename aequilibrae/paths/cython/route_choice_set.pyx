@@ -145,7 +145,7 @@ cdef class RouteChoiceSet:
         self.batched(demand_coo, {}, *args, **kwargs)
         where = kwargs.get("where", None)
         if where is not None:
-            schema = self.psl_schema if kwargs.get("path_size_logit", False) else self.schema
+            schema = RouteChoiceSetResults.psl_schema if kwargs.get("path_size_logit", False) else RouteChoiceSetResults.schema
             results = pa.dataset.dataset(
                 where, format="parquet", partitioning=pa.dataset.HivePartitioning(schema)
             ).to_table()
