@@ -27,17 +27,19 @@ import pandas as pd
 """This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen, 'Route
 Choice Sets for Very High-Resolution Data'.  https://doi.org/10.1080/18128602.2012.671383
 
-A rough overview of the algorithm is as follows.  1. Prepare the initial graph, this is depth 0 with no links removed.
-    2. Find a short path, P. If P is not empty add P to the path set.  3. For all links p in P, remove p from E,
-    compounding with the previously removed links.  4. De-duplicate the sub-graphs, we only care about unique
-    sub-graphs.  5. Go to 2.
+A rough overview of the algorithm is as follows.
+    1. Prepare the initial graph, this is depth 0 with no links removed.
+    2. Find a short path, P. If P is not empty add P to the path set.
+    3. For all links p in P, remove p from E, compounding with the previously removed links.
+    4. De-duplicate the sub-graphs, we only care about unique sub-graphs.
+    5. Go to 2.
 
 Details: The general idea of the algorithm is pretty simple, as is the implementation. The caveats here is that there is
 a lot of cpp interop and memory management. A description of the purpose of variables is in order:
 
 route_set: See route_choice.pxd for full type signature. It's an unordered set (hash set) of pointers to vectors of link
 IDs. It uses a custom hashing function and comparator. The hashing function is defined in a string that in inlined
-directly into the output ccp. This is done allow declaring of the `()` operator, which is required and AFAIK not
+directly into the output cpp. This is done allow declaring of the `()` operator, which is required and AFAIK not
 possible in Cython. The hash is designed to dereference then hash order dependent vectors. One isn't provided by
 stdlib. The comparator simply dereferences the pointer and uses the vector comparator. It's designed to store the
 outputted paths. Heap allocated (needs to be returned).
@@ -157,23 +159,23 @@ cdef class RouteChoiceSet:
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
     def batched(
-            self,
-            demand: GeneralisedCOODemand,
-            select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
-            sl_link_loading: bool = True,
-            max_routes: int = 0,
-            max_depth: int = 0,
-            max_misses: int = 100,
-            seed: int = 0,
-            cores: int = 0,
-            a_star: bool = True,
-            bfsle: bool = True,
-            penalty: float = 1.0,
-            where: Optional[str] = None,
-            store_results: bool = True,
-            path_size_logit: bool = False,
-            beta: float = 1.0,
-            cutoff_prob: float = 0.0,
+        self,
+        demand: GeneralisedCOODemand,
+        select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+        sl_link_loading: bool = True,
+        max_routes: int = 0,
+        max_depth: int = 0,
+        max_misses: int = 100,
+        seed: int = 0,
+        cores: int = 0,
+        a_star: bool = True,
+        bfsle: bool = True,
+        penalty: float = 1.0,
+        where: Optional[str] = None,
+        store_results: bool = True,
+        path_size_logit: bool = False,
+        beta: float = 1.0,
+        cutoff_prob: float = 0.0,
     ):
         """Compute the a route set for a list of OD pairs.
 
