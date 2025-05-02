@@ -47,7 +47,7 @@ class RouteChoice:
     demand_index_names = ["origin id", "destination id"]
 
     def __init__(self, graph: Graph, project=None):
-        self.parameters = self.default_parameters.copy()
+        self.parameters = {}
         self.procedure_id = None
         self.procedure_date = None
 
@@ -81,13 +81,14 @@ class RouteChoice:
         )
         return d
 
-    def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
+    def set_choice_set_generation(self, /, algorithm: str = None, **kwargs) -> None:
         """
         Chooses the assignment algorithm and set its parameters.
 
         Options for algorithm are 'bfsle' for breadth first search with link removal, or
-        'link-penalisation'/'link-penalization'. 'lp' is also accepted as an alternative
-        to 'link-penalisation'
+        'link-penalisation'/'link-penalization'. 'lp' is also accepted as an alternative to
+        'link-penalisation'. If ``algorithm`` is ``None``, none will be set, but the parameters
+        will be updated. This is useful when assigning from path-files.
 
         BFSLE implementation based on "Route choice sets for very high-resolution data" by
         Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
@@ -142,21 +143,29 @@ class RouteChoice:
 
             **kwargs** (:obj:`dict`): Dictionary with all parameters for the algorithm
         """
-        algo_dict = {i: i for i in self.all_algorithms}
-        algo_dict["lp"] = "link-penalisation"
-        algo_dict["link-penalization"] = "link-penalisation"
-        algo = algo_dict.get(algorithm.lower())
+        if algorithm is not None:
+            algo_dict = {i: i for i in self.all_algorithms}
+            algo_dict["lp"] = "link-penalisation"
+            algo_dict["link-penalization"] = "link-penalisation"
 
-        if algo is None:
-            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
+            sentinel = object()
+            algorithm = algo_dict.get(algorithm.lower(), sentinel)
 
-        defaults = self.default_parameters["generic"] | self.default_parameters[algo]
-        for key in kwargs.keys():
-            if key not in defaults:
-                raise ValueError(f"Invalid parameter `{key}` provided for algorithm `{algo}`")
+            if algorithm is sentinel:
+                raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        self.algorithm = algo
-        self._config["Algorithm"] = algo
+            defaults = self.default_parameters["generic"] | self.default_parameters[algorithm]
+            for key in kwargs.keys():
+                if key not in defaults:
+                    raise ValueError(f"Invalid parameter '{key}' provided for algorithm `{algorithm}`")
+        else:
+            defaults = self.default_parameters["generic"]
+            for key in kwargs.keys():
+                if key not in defaults:
+                    raise ValueError(f"Invalid or non-generic parameter '{key}' provided")
+
+        self.algorithm = algorithm
+        self._config["Algorithm"] = algorithm
 
         self.parameters = defaults | kwargs
 
@@ -318,6 +327,76 @@ class RouteChoice:
             **self.parameters,
         )
 
+    def execute_from_path_files(self, path_files: Union[pathlib.Path, str], recompute_psl: bool = False) -> None:
+        """
+        Perform an assignment from an existing set of path-files.
+
+        This method expects the path-files to be written by the ``self.save_path_files()`` method,
+        however any PyArrow hive dataset with the correct structure is accepted. This allows the
+        use of AequilibraE's path-sized logit, link loading, select link analysis, and assignment
+        while using externally generated routes.
+        """
+
+        # Read the dataset schema and make sure it conforms to what we want
+        ds = RouteChoiceSetResults.read_dataset(path_files)
+        required_fields = ["origin id", "destination id", "route set"] + [] if recompute_psl else ["probability"]
+        schema = RouteChoiceSetResults.schema if recompute_psl else RouteChoiceSetResults.psl_schema
+
+        try:
+            for field in required_fields:
+                if schema.field(field) != ds.schema.field(field):
+                    raise TypeError(
+                        f"schema of required field '{field}' does not match. "
+                        f"Expected {schema.field(field)}, "
+                        f"found {ds.schema.field(field)}"
+                    )
+        except KeyError as e:
+            raise KeyError(f"Column '{field}' does not exist in the path-files") from e
+
+        # Once we know it's fine, read in the table and convert it to a pandas object. This is all little easier to work
+        # with.
+        df = ds.to_table().to_pandas()
+        self.execute_from_pandas(df=df, recompute_psl=recompute_psl)
+
+    def execute_from_pandas(self, df: pd.DataFrame, recompute_psl: bool = False) -> None:
+        """
+        Perform an assignment using route sets from a Pandas DataFrame.
+
+        Requires the DataFrame contains the ``origin id``, ``destination id`` and ``route set``
+        columns. The route sets must be a list of links IDs stored as integers with the direction
+        encoded as the sign.  Additionally, when ``recompute_psl`` is ``False``, the
+        ``probability`` column must also be present.
+
+        When ``recompute_psl`` is ``True``, the path-sized logit is recomputed for each route with
+        respect to the graphs current cost field and the ``beta`` and ``cutoff_prob`` parameters.
+
+        All origin and destination IDs within the DataFrame must exist within the demand matrix.
+
+        All link IDs and directions must exist within the graph. Links must also be present within
+        the compressed graph.
+
+        If ``recompute_psl`` is ``False`` the table returned from ``self.get_results()`` will have
+        all zeros for the cost and path overlap fields, and all True for the mask field. If
+        ``recompute_psl`` is ``True`` these fields will be recalculated as required.
+        """
+
+        required_columns = ["origin id", "destination id", "route set"] + [] if recompute_psl else ["probability"]
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"provided DataFrame is missing required column '{col}'")
+
+        self.__rc.assign_from_df(
+            self.graph.graph,
+            df,
+            self.demand,
+            select_links=self._selected_links,
+            recompute_psl=recompute_psl,
+            sl_link_loading=self.sl_link_loading,
+            store_results=self.parameters["store_results"],
+            beta=self.parameters["beta"],
+            cutoff_prob=self.parameters["cutoff_prob"],
+        )
+
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
 
@@ -373,6 +452,22 @@ class RouteChoice:
             results = RouteChoiceSetResults.read_dataset(self.where)
 
         return results
+
+    def save_path_files(self, where: Optional[pathlib.Path] = None):
+        """
+        Save path-files to the directory specific.
+
+        Files will be saved as a PyArrow hive dataset partitioned by the origin ID. Existing path-files will not be
+        removed to allow incremental route choice set generation.
+
+        :Arguments:
+            **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+        """
+        where = where if where is not None else self.where
+        if where is None:
+            raise ValueError("either the 'where' argument or 'self.where' property must not None")
+
+        self.__rc.results.write(where)
 
     def get_load_results(self) -> pd.DataFrame:
         """

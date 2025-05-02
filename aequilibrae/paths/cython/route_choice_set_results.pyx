@@ -130,7 +130,7 @@ cdef class RouteChoiceSetResults:
 
     @classmethod
     def read_dataset(cls, where):
-        return pa.dataset.dataset(where, format="parquet", partitioning=pa.dataset.HivePartitioning(cls.schema))
+        return pa.dataset.dataset(where, format="parquet", partitioning=pa.dataset.HivePartitioning(cls.psl_schema))
 
     @staticmethod
     cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil:
@@ -172,7 +172,7 @@ cdef class RouteChoiceSetResults:
     cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__path_overlap_set[i] if self.store_results else make_shared[vector[double]]()
 
-    cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+    cdef shared_ptr[vector[double]] get_prob_vec(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__prob_set[i] if self.store_results else make_shared[vector[double]]()
 
     cdef shared_ptr[vector[double]] compute_result(
@@ -205,7 +205,7 @@ cdef class RouteChoiceSetResults:
         cost_vec = self.__get_cost_set(i)
         route_mask = self.__get_mask_set(i)
         path_overlap_vec = self.__get_path_overlap_set(i)
-        prob_vec = self.__get_prob_set(i)
+        prob_vec = self.get_prob_vec(i)
 
         self.compute_cost(d(cost_vec), route_set, self.cost_view)
         if self.compute_mask(d(route_mask), d(cost_vec)):

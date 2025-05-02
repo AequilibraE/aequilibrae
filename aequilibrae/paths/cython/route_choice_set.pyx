@@ -18,6 +18,7 @@ from openmp cimport omp_get_max_threads
 from libcpp.memory cimport shared_ptr
 
 from typing import Tuple
+import itertools
 
 import numpy as np
 import pyarrow as pa
@@ -381,6 +382,137 @@ cdef class RouteChoiceSet:
             self.get_link_loading(cores=c_cores)
             self.get_sl_link_loading(cores=c_cores)
             self.get_sl_od_matrices()
+
+    def assign_from_df(
+        self,
+        graph: pd.DataFrame,
+        df: pd.DataFrame,
+        demand: GeneralisedCOODemand,
+        select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+        recompute_psl: bool = False,
+        sl_link_loading: bool = True,
+        store_results: bool = True,
+        beta: float = 1.0,
+        cutoff_prob: float = 0.0,
+    ):
+        cdef:
+            long int c_cores = 1  # Single threaded only due to high python interop, this shoud be fast anyway
+            int thread_id = 0
+
+            # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
+            double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
+
+        # We need to know the indices of the demand matrix that our OD pairs correspond to
+        try:
+            od_indices = (
+                demand.df.assign(index=np.arange(len(demand.df)))
+            ).loc[
+                df[["origin id", "destination id"]].drop_duplicates().itertuples(name=None, index=False),
+                "index"
+            ].reset_index()
+        except KeyError:
+            raise KeyError("not all origin and destinations IDs from the path files are present within the demand matrix")
+
+        # We also store those indices along side the route sets themselves so it's easier to keep track
+        df = df.merge(od_indices, on=["origin id", "destination id"])
+        gb = df.groupby(by="index")
+
+        # In order to map the network link IDs to compressed links we'll use the graph
+        graph_to_compressed = graph[["link_id", "direction"]].prod(axis=1).reset_index().set_index(0)
+
+        # Now we initialise the demand matrix and prepare to insert the route sets
+        demand._initalise_col_names()
+        demand._initalise_c_data(None)
+
+        self.results = RouteChoiceSetResults(
+            demand,
+            scaled_cutoff_prob,
+            beta,
+            self.num_links,
+            self.cost_view,
+            self.mapping_idx,
+            self.mapping_data,
+            store_results=store_results,
+            perform_assignment=True,
+        )
+
+        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
+
+        cdef vector[long long] *route
+
+        # We iterate over the OD pairs in the path files
+        for od_idx, df in gb:
+            # We obtain a reference to the route vector, we then need to insert the right *compressed* link IDs
+            route_vec = self.results.get_route_vec(od_idx)
+
+            # If we are reusing the probabilities then we need to a similar thing for this
+            if not recompute_psl:
+                prob_vec = self.results.get_prob_vec(od_idx)
+
+            d(route_vec).reserve(len(df))
+            for _, row in df.iterrows():
+                # We find the indices for the compressed id that corresponds to the direction link id pair (as a
+                # product)
+                compressed_link_indices = graph_to_compressed.loc[row["route set"]]["index"].to_numpy()
+
+                route = new vector[long long]()
+                # Then use itertools.groupby to de-duplicate them without modifying the order. The order is not required
+                # for assignment but it is if we wish to output this route set again.
+                for compressed_link_id, _ in itertools.groupby(graph.__compressed_id__.iloc[compressed_link_indices]):
+                    route.push_back(compressed_link_id)
+                    # d(d(route_vec)[i]).push_back(compressed_link_id)
+
+                d(route_vec).emplace_back(route)
+                if not recompute_psl:
+                    d(prob_vec).push_back(row["probability"])
+
+            # If we are recomputing the probabilities then we do so here. This also has the side effect of recompute the
+            # cost, masking, and path overlap with new parameters
+            if recompute_psl:
+                prob_vec = self.results.compute_result(od_idx, d(route_vec), thread_id)
+
+            # We have now have both the route and probability vectors restored so we can do LL and SLL.
+            self.ll_results.link_load_single_route_set(od_idx, d(route_vec), d(prob_vec), thread_id)
+
+            origin_index = self.nodes_to_indices_view[demand.ods[od_idx].first]
+            dest_index = self.nodes_to_indices_view[demand.ods[od_idx].second]
+            self.ll_results.sl_link_load_single_route_set(
+                od_idx,
+                d(route_vec),
+                d(prob_vec),
+                origin_index,
+                dest_index,
+                thread_id
+            )
+
+        # Clean up and reduce any results from the threaded storage
+        self.ll_results.reduce_link_loading()
+        self.ll_results.reduce_sl_link_loading()
+        self.ll_results.reduce_sl_od_matrix()
+
+        self.get_link_loading(cores=c_cores)
+        self.get_sl_link_loading(cores=c_cores)
+        self.get_sl_od_matrices()
+
+        if not recompute_psl:
+            # Force the table to be constructed
+            table = self.get_results()
+
+            size = len(table)
+            schema = table.schema
+
+            # Because we're not recomputing the psl, the internal cost, mask, and path overlap vectors are empty. As a
+            # side effect of this those table columns are shorter than the others. This *seems* fine but would be
+            # unexpected for down stream users. Additionally the default values of these columns when converted to
+            # pandas are as if the columns were filled with zeros. This makes the mask column False for all routes. If a
+            # user was filtering the routes based on this mask then suddenly they'd have no routes so we fill it with
+            # True instead.
+            columns = dict(zip(table.column_names, table.columns))
+            columns["cost"] = pa.array(np.zeros(size), type=schema.field("cost").type)
+            columns["mask"] = pa.array(np.ones(size, dtype="bool"), type=schema.field("mask").type)
+            columns["path overlap"] = pa.array(np.zeros(size), type=schema.field("path overlap").type)
+
+            self.results.table = pa.Table.from_pydict(columns, schema=schema)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

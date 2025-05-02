@@ -1,6 +1,7 @@
 import importlib.util as iutil
 import platform
 from os.path import join
+import os
 
 import numpy as np
 from Cython.Distutils import build_ext
@@ -34,6 +35,13 @@ cpp_std = "/std:c++17" if is_win else "-std=c++17"
 compile_args = [cpp_std, f"{prefix}openmp"]
 compile_args += ["-Wno-unreachable-code"] if is_mac else []
 link_args = [f"{prefix}openmp"]
+
+if os.getenv("DEBUG"):
+    compile_args.extend(["-O0", "-g"])
+
+if os.getenv("ASAN"):
+    compile_args.extend(["-fsanitize=address", "-fsanitize=undefined"])
+    link_args.extend(["-fsanitize=address", "-fsanitize=undefined"])
 
 extension_args = {
     "extra_compile_args": compile_args,
