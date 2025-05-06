@@ -115,7 +115,7 @@ cdef class RouteChoiceSetResults:
                 self.__prob_set[i] = make_shared[vector[double]]()
 
     def write(self, where):
-        table = self.results.make_table_from_results()
+        table = self.make_table_from_results()
 
         logger = logging.getLogger("aequilibrae")
         pq.write_to_dataset(
