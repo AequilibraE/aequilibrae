@@ -459,7 +459,7 @@ class RouteChoice:
         if where is None:
             raise ValueError("either the 'where' argument or 'self.where' property must not None")
 
-        self.__rc.results.write(where)
+        self.__rc.write_path_files(where)
 
     def get_load_results(self) -> pd.DataFrame:
         """

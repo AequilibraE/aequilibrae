@@ -853,3 +853,15 @@ cdef class RouteChoiceSet:
             raise RuntimeError("Link loading results not computed yet")
 
         return self.ll_results.sl_od_matrices_structs_to_objects()
+
+    def write_path_files(RouteChoiceSet self, where):
+        """
+        Write the path-files to the directory specified
+
+        :Arguments:
+            **where** (:obj:`pathlib.Path`): Directory to save the dataset to.
+        """
+        if self.results is None:
+            raise RuntimeError("Route Choice results not computed yet")
+
+        self.results.write(where)

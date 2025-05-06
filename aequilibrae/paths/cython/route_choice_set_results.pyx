@@ -115,13 +115,15 @@ cdef class RouteChoiceSetResults:
                 self.__prob_set[i] = make_shared[vector[double]]()
 
     def write(self, where):
+        table = self.results.make_table_from_results()
+
         logger = logging.getLogger("aequilibrae")
         pq.write_to_dataset(
-            self.table,
+            table,
             where,
             partitioning_flavor="hive",
             partitioning=["origin id"],
-            schema=self.psl_schema if self.perform_assignment else self.schema,
+            schema=table.schema,
             use_threads=True,
             existing_data_behavior="overwrite_or_ignore",
             file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}"),
