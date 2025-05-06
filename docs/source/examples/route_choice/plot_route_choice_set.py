@@ -91,6 +91,21 @@ rc.execute(perform_assignment=True)
 choice_set = rc.get_results().to_pandas()
 
 # %%
+# If we were interested in storing the route choice result, we could also write them to disk using the ``save_path_files`` method.
+
+# rc.save_path_files(path)
+
+# %%
+# From those path files we could also preform a full assignment or select link analysis by using the ``execute_from_path_files`` method.
+
+# rc.execute_from_path_files(path)
+
+# %%
+# Or if we had externally computed route choice sets, we can use AequilibraEs assignment procedures by loading them with the ``execute_from_pandas` method.
+
+# rc.execute_from_pandas(path_files_df)
+
+# %%
 # Plotting choice sets
 # --------------------
 
