@@ -154,7 +154,7 @@ class Node(SafeClass):
             conn=conn,
             delimiting_area=area,
             proj_nodes=self.project.network.nodes.data,
-            links=self.project.network.links,
+            proj_links=self.project.network.links.data,
         )
 
     def __setattr__(self, instance, value) -> None:

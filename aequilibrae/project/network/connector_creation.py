@@ -13,7 +13,7 @@ def connector_creation(
     mode_id: str,
     network,
     proj_nodes,
-    links,
+    proj_links,
     link_types="",
     connectors=1,
     conn: Optional[Connection] = None,
@@ -54,9 +54,10 @@ def connector_creation(
 
     # Check if link with a/b nodes exists to avoid unnecessary repetition
     centr_geo = centroid.geometry.values[0]
+    links = network.links
+    query = """(a_node==@zone_id | b_node==@zone_id) & (a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"""
     for _, rec in joined.iterrows():
-        sql = """(a_node==@zone_id | b_node==@zone_id) & (a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"""
-        link_exist = links.data.query(sql)
+        link_exist = proj_links.query(query)
         if link_exist.empty:
             link = links.new()
             link.geometry = LineString([centr_geo, rec.geometry])
