@@ -64,7 +64,6 @@ class RouteChoice:
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
 
         self.where: Optional[pathlib.Path] = None
-        self.save_path_files: bool = False
         self.index_name = "route_choice_sl_index"
 
         self._config = {}
@@ -152,7 +151,9 @@ class RouteChoice:
             algorithm = algo_dict.get(algorithm.lower(), sentinel)
 
             if algorithm is sentinel:
-                raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
+                raise AttributeError(
+                    f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}"
+                )
 
             defaults = self.default_parameters["generic"] | self.default_parameters[algorithm]
             for key in kwargs.keys():
@@ -178,15 +179,6 @@ class RouteChoice:
             **cores** (:obj:`int`): Number of CPU cores to use
         """
         self.cores = cores
-
-    def set_save_path_files(self, save_it: bool) -> None:
-        """turn path saving on or off.
-
-        :Arguments:
-            **save_it** (:obj:`bool`): Boolean to indicate whether paths should be saved
-        """
-        self.save_path_files = save_it
-        raise NotImplementedError()
 
     def set_save_routes(self, where: Optional[str] = None) -> None:
         """

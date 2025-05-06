@@ -413,6 +413,10 @@ cdef class RouteChoiceSet:
         except KeyError:
             raise KeyError("not all origin and destinations IDs from the path files are present within the demand matrix")
 
+        for _, route_list in df["route set"].items():
+            if not isinstance(route_list, (list, np.ndarray)):
+                raise TypeError(f"route sets must be a list or Numpy array, found {type(route_list)}")
+
         # We also store those indices along side the route sets themselves so it's easier to keep track
         df = df.merge(od_indices, on=["origin id", "destination id"])
         gb = df.groupby(by="index")
@@ -460,7 +464,6 @@ cdef class RouteChoiceSet:
                 # for assignment but it is if we wish to output this route set again.
                 for compressed_link_id, _ in itertools.groupby(graph.__compressed_id__.iloc[compressed_link_indices]):
                     route.push_back(compressed_link_id)
-                    # d(d(route_vec)[i]).push_back(compressed_link_id)
 
                 d(route_vec).emplace_back(route)
                 if not recompute_psl:
