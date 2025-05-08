@@ -36,12 +36,17 @@ compile_args = [cpp_std, f"{prefix}openmp"]
 compile_args += ["-Wno-unreachable-code"] if is_mac else []
 link_args = [f"{prefix}openmp"]
 
-if os.getenv("DEBUG"):
+if os.getenv("AEQ_DEBUG"):
     compile_args.extend(["-O0", "-g"])
 
-if os.getenv("ASAN"):
-    compile_args.extend(["-fsanitize=address", "-fsanitize=undefined"])
-    link_args.extend(["-fsanitize=address", "-fsanitize=undefined"])
+if os.getenv("AEQ_ASAN"):
+    compile_args.append(f"{prefix}sanitize=address")
+    link_args.append(f"{prefix}sanitize=address")
+
+    if not is_win:
+        compile_args.append(f"{prefix}sanitize=undefined")
+        link_args.append(f"{prefix}sanitize=undefined")
+
 
 extension_args = {
     "extra_compile_args": compile_args,
