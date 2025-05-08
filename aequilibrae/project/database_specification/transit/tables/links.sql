@@ -40,6 +40,7 @@ CREATE TABLE if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                   -- period_start    INTEGER NOT NULL,
                                   -- period_end      INTEGER NOT NULL
                                   CHECK(TYPEOF(link_id) == 'integer')
+                                  CHECK(link_id > 0)
                                   CHECK(TYPEOF(a_node) == 'integer')
                                   CHECK(TYPEOF(b_node) == 'integer')
                                   CHECK(TYPEOF(direction) == 'integer')
