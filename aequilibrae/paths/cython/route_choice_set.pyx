@@ -406,7 +406,7 @@ cdef class RouteChoiceSet:
             warnings.warn(
                 f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}"
             )
-            
+
     def assign_from_df(
         self,
         graph: pd.DataFrame,
@@ -623,6 +623,7 @@ cdef class RouteChoiceSet:
             # Local variables, Cython doesn't allow conditional declarations
             vector[long long] *vec
             pair[RouteSet_t.iterator, bool] status
+            pair[LinkSet_t.iterator, bool] banned_status
             unsigned int miss_count = 0
             long long p, connector
 
@@ -630,6 +631,12 @@ cdef class RouteChoiceSet:
             bint lp = penalty != 1.0
             vector[double] *penalised_cost = <vector[double] *>nullptr
             vector[double] *next_penalised_cost = <vector[double] *>nullptr
+
+            # Because we can have duplicate banned link sets, the insertion may fail, in that case we free the set
+            # immediately. However, by doing so we then can't tell (without a method to track it), which sets have
+            # already been freed in the queue if we happened to early exit from it, so we use another variable to just
+            # free the remaining items in the queue.
+            bool free_remaining = False
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
@@ -656,6 +663,10 @@ cdef class RouteChoiceSet:
 
             next_queue.clear()
             for banned in queue:
+                if free_remaining:
+                    del banned
+                    continue
+
                 if lp:
                     # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link
                     # penalisation,
@@ -680,7 +691,11 @@ cdef class RouteChoiceSet:
                 )
 
                 # Mark this set of banned links as seen
-                removed_links.insert(banned)
+                banned_status = removed_links.insert(banned)
+                if not banned_status.second:
+                    # If we failed to insert this banned set then an equal set already exists within the removed links
+                    del banned
+                    banned = d(banned_status.first)
 
                 # If the destination is reachable we must build the path and readd
                 if thread_predecessors[dest_index] >= 0:
@@ -725,8 +740,9 @@ cdef class RouteChoiceSet:
                         miss_count = miss_count + 1
 
                     if miss_count > max_misses or route_set.size() >= max_routes:
-                        break  # This condition will be hit again at the start of the loop, we just don't want to
-                               # iterate over the rest of the things in queue when we know there is not more space.
+                        free_remaining = True
+                        continue  # This condition will be hit again at the start of the loop, we just don't want to
+                                  # iterate over the rest of the things in queue when we know there is not more space.
                 else:
                     pass
 
@@ -745,9 +761,6 @@ cdef class RouteChoiceSet:
         # removed_links because we just swapped it with queue, and removed_links contains a subset of those that were
         # added to queue (pre-swap). It may share elements so we make sure to erase them from the set before freeing
         # them to avoid a use-after free.
-        for banned in next_queue:
-            removed_links.erase(banned)
-            del banned
 
         for banned in removed_links:
             del banned
@@ -823,7 +836,10 @@ cdef class RouteChoiceSet:
 
                 # To prevent runaway algorithms if we find N duplicate routes we should stop
                 status = route_set.insert(vec)
-                miss_count = miss_count + (not status.second)
+                if not status.second:
+                    del vec  # If the insertion failed, free this vector, we already have one that is equal to it
+                    miss_count = miss_count + 1
+
                 if miss_count > max_misses:
                     break
             else:
