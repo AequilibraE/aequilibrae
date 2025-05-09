@@ -19,6 +19,7 @@ from libcpp.memory cimport shared_ptr
 
 from typing import Tuple
 import itertools
+import warnings
 
 import numpy as np
 import pyarrow as pa
@@ -265,9 +266,14 @@ cdef class RouteChoiceSet:
             RouteSet_t *route_set
             shared_ptr[vector[double]] prob_vec
             int thread_id
+            bint found_zero_cost
 
         demand._initalise_col_names()
         self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
+
+        # These are accessed with the gil and used for error reporting
+        zero_cost_ods: list[tuple[int]] = []
+        unreachable_ods: list[tuple[int]] = []
 
         for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
             demand._initalise_c_data(grouped_demand_df)
@@ -287,6 +293,7 @@ cdef class RouteChoiceSet:
             with nogil, parallel(num_threads=c_cores):
                 route_set = new RouteSet_t()
                 thread_id = threadid()
+                found_zero_cost = False  # Make the variable thread local
                 for i in prange(<long int>demand.ods.size(), schedule="guided"):
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
@@ -347,7 +354,7 @@ cdef class RouteChoiceSet:
                     RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
 
                     if path_size_logit:
-                        prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
+                        prob_vec = self.results.compute_result(i, d(route_vec), &found_zero_cost, thread_id)
                         self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
                         self.ll_results.sl_link_load_single_route_set(
                             i, d(route_vec),
@@ -356,6 +363,14 @@ cdef class RouteChoiceSet:
                             dest_index,
                             thread_id
                         )
+
+
+                    if d(route_vec).size() == 0 or found_zero_cost:
+                        with gil:
+                            if found_zero_cost:
+                                zero_cost_ods.append(tuple(demand.ods[i]))
+                            if d(route_vec).size() == 0:
+                                unreachable_ods.append(tuple(demand.ods[i]))
 
                     if self.block_flows_through_centroids:
                         blocking_centroid_flows(
@@ -383,6 +398,15 @@ cdef class RouteChoiceSet:
             self.get_sl_link_loading(cores=c_cores)
             self.get_sl_od_matrices()
 
+        if zero_cost_ods:
+            warnings.warn(
+                f"found zero cost routes for OD pairs, the entire route set has been masked for: {zero_cost_ods}"
+            )
+        if unreachable_ods:
+            warnings.warn(
+                f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}"
+            )
+            
     def assign_from_df(
         self,
         graph: pd.DataFrame,
@@ -439,7 +463,9 @@ cdef class RouteChoiceSet:
 
         self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
 
-        cdef vector[long long] *route
+        cdef:
+            vector[long long] *route
+            bint found_zero_cost
 
         # We iterate over the OD pairs in the path files
         for od_idx, df in gb:
@@ -469,7 +495,7 @@ cdef class RouteChoiceSet:
             # If we are recomputing the probabilities then we do so here. This also has the side effect of recompute the
             # cost, masking, and path overlap with new parameters
             if recompute_psl:
-                prob_vec = self.results.compute_result(od_idx, d(route_vec), thread_id)
+                prob_vec = self.results.compute_result(od_idx, d(route_vec), &found_zero_cost, thread_id)
 
             # We have now have both the route and probability vectors restored so we can do LL and SLL.
             self.ll_results.link_load_single_route_set(od_idx, d(route_vec), d(prob_vec), thread_id)

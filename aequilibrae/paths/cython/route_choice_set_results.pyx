@@ -14,7 +14,6 @@ import logging
 import pyarrow as pa
 import pyarrow.parquet as pq
 import cython
-import warnings
 
 
 @cython.embedsignature(True)
@@ -181,6 +180,7 @@ cdef class RouteChoiceSetResults:
         RouteChoiceSetResults self,
         size_t i,
         RouteVec_t &route_set,
+        bint *found_zero_cost,
         size_t thread_id
     ) noexcept nogil:
         """
@@ -209,13 +209,8 @@ cdef class RouteChoiceSetResults:
         path_overlap_vec = self.__get_path_overlap_set(i)
         prob_vec = self.get_prob_vec(i)
 
-        self.compute_cost(d(cost_vec), route_set, self.cost_view)
-        if self.compute_mask(d(route_mask), d(cost_vec)):
-            with gil:
-                warnings.warn(
-                    f"Zero cost route found for ({self.demand.ods[i].first}, {self.demand.ods[i].second}). "
-                    "Entire route set masked"
-                )
+        self.compute_cost(d(cost_vec), route_set, self.cost_view, found_zero_cost)
+        self.compute_mask(d(route_mask), d(cost_vec))
         self.compute_frequency(keys, counts, route_set, d(route_mask))
         self.compute_path_overlap(
             d(path_overlap_vec),
@@ -239,7 +234,8 @@ cdef class RouteChoiceSetResults:
         vector[double] &cost_vec,
         const RouteVec_t &route_set,
         const double[:]
-        cost_view
+        cost_view,
+        bint *found_zero_cost
     ) noexcept nogil:
         """Compute the cost each route."""
         cdef:
@@ -250,18 +246,21 @@ cdef class RouteChoiceSetResults:
 
         cost_vec.resize(route_set.size())
 
+        found_zero_cost[0] = False
         for i in range(route_set.size()):
             cost = 0.0
             for link in d(route_set[i]):
                 cost = cost + cost_view[link]
 
             cost_vec[i] = cost
+            if cost == 0.0:
+                found_zero_cost[0] = True
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef bool compute_mask(
+    cdef void compute_mask(
         RouteChoiceSetResults self,
         vector[bool] &route_mask,
         const vector[double] &total_cost
@@ -301,8 +300,6 @@ cdef class RouteChoiceSetResults:
             # Always include the min element. It should already be but I don't trust floating math to do this correctly.
             # But only if there actually was a min element (i.e. empty route set)
             route_mask[min - total_cost.cbegin()] = True
-
-        return found_zero_cost
 
     @cython.wraparound(False)
     @cython.embedsignature(True)

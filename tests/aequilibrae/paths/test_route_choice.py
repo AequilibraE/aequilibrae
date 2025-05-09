@@ -109,7 +109,8 @@ class TestRouteChoiceSet(TestCase):
                 self.graph.set_blocked_centroid_flows(True)
                 rc = RouteChoiceSet(self.graph)
 
-                results = rc.run(a, b, self.shape, max_routes=2, max_depth=2, **kwargs)
+                with self.assertWarns(UserWarning):
+                    results = rc.run(a, b, self.shape, max_routes=2, max_depth=2, **kwargs)
                 self.assertListEqual(results, [], "Blocked centroid flow found a path")
 
     def test_route_choice_batched(self):
@@ -333,7 +334,7 @@ class TestRouteChoiceSet(TestCase):
             ll_res = rc.get_link_loading()["all ones"]
 
             values2 = np.zeros_like(values)
-            values2[:len(df) // 2] = values[:len(df) // 2]
+            values2[: len(df) // 2] = values[: len(df) // 2]
             np.testing.assert_array_equal(
                 ll_res[links.index],
                 values2,
@@ -358,7 +359,7 @@ class TestRouteChoiceSet(TestCase):
             ll_res = rc.get_link_loading()["all ones"]
 
             values2 = np.zeros(len(links.index))
-            values2[:len(df) // 2] = 1.0
+            values2[: len(df) // 2] = 1.0
             np.testing.assert_array_equal(
                 ll_res[links.index],
                 values2,
@@ -369,9 +370,7 @@ class TestRouteChoiceSet(TestCase):
             # route per OD (and Sioux falls has no links with the same A and B nodes) there's no overlap, thus their are
             # all 1.0 for probabilities and path overlap.
             links2 = links.head(len(df) // 2)
-            np.testing.assert_array_equal(
-                results["cost"].to_numpy(), links2["distance"].to_numpy()
-            )
+            np.testing.assert_array_equal(results["cost"].to_numpy(), links2["distance"].to_numpy())
             np.testing.assert_array_equal(results["mask"].to_numpy(), True)
             np.testing.assert_array_equal(results["path overlap"].to_numpy(), 1.0)
             np.testing.assert_array_equal(results["probability"].to_numpy(), 1.0)
