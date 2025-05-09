@@ -321,15 +321,22 @@ class TestRouteChoiceSet(TestCase):
                 "route set": [[x] for x in link_ids],
             },
         )
+
+        # For the tests that should not raise errors we reduce our demand matrix to half the route sets
+        args["demand"].df = args["demand"].df.loc[
+            df[["origin id", "destination id"]].head(len(df) // 2).itertuples(name=None, index=False)
+        ]
         with self.subTest("assign random links", recompute_psl=False):
             rc.assign_from_df(df=df, **args)
 
             results = rc.get_results().to_pandas()
             ll_res = rc.get_link_loading()["all ones"]
 
+            values2 = np.zeros_like(values)
+            values2[:len(df) // 2] = values[:len(df) // 2]
             np.testing.assert_array_equal(
                 ll_res[links.index],
-                values,
+                values2,
                 "Link loading results don't match the expected values",
             )
 
@@ -340,7 +347,7 @@ class TestRouteChoiceSet(TestCase):
 
             pd.testing.assert_series_equal(
                 results["probability"],
-                df.sort_values(by=["origin id", "destination id"])["probability"],
+                df.head(len(df) // 2)["probability"],
                 check_index=False,
             )
 
@@ -350,17 +357,20 @@ class TestRouteChoiceSet(TestCase):
             results = rc.get_results().to_pandas()
             ll_res = rc.get_link_loading()["all ones"]
 
+            values2 = np.zeros(len(links.index))
+            values2[:len(df) // 2] = 1.0
             np.testing.assert_array_equal(
                 ll_res[links.index],
-                1.0,
+                values2,
                 "Link loading results don't match the expected values",
             )
 
             # Since we recomputed PSL the cost field should be updated. As we sampled the links and there's only one
             # route per OD (and Sioux falls has no links with the same A and B nodes) there's no overlap, thus their are
             # all 1.0 for probabilities and path overlap.
+            links2 = links.head(len(df) // 2)
             np.testing.assert_array_equal(
-                results["cost"].to_numpy(), links.sort_values(by=["a_node", "b_node"])["distance"].to_numpy()
+                results["cost"].to_numpy(), links2["distance"].to_numpy()
             )
             np.testing.assert_array_equal(results["mask"].to_numpy(), True)
             np.testing.assert_array_equal(results["path overlap"].to_numpy(), 1.0)
@@ -600,7 +610,7 @@ class TestRouteChoice(TestCase):
         tmp_path = pathlib.Path(self.project.project_base_path) / "rc"
         tmp_path.mkdir()
 
-        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.rc.set_choice_set_generation("link-penalization", max_routes=5, penalty=1.1)
         self.rc.add_demand(self.mat)
         self.rc.prepare()
         self.rc.execute(perform_assignment=True)

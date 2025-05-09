@@ -402,24 +402,21 @@ cdef class RouteChoiceSet:
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
             double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
-        # We need to know the indices of the demand matrix that our OD pairs correspond to
-        try:
-            od_indices = (
-                demand.df.assign(index=np.arange(len(demand.df)))
-            ).loc[
-                df[["origin id", "destination id"]].drop_duplicates().itertuples(name=None, index=False),
-                "index"
-            ].reset_index()
-        except KeyError:
-            raise KeyError("not all origin and destinations IDs from the path files are present within the demand matrix")
-
         for _, route_list in df["route set"].items():
             if not isinstance(route_list, (list, np.ndarray)):
                 raise TypeError(f"route sets must be a list or Numpy array, found {type(route_list)}")
 
+        # We want to enforce that if the demand matrix cell is non-cell for an OD pair, then at least one route exists to assign to it
+        demand_df = demand.df.assign(idx=np.arange(len(demand.df)))
+        demand_df = demand_df[demand_df.index.get_level_values(0) != demand_df.index.get_level_values(1)]
+
+        df = df.set_index(demand_df.index.names)
+        if not demand_df.index.drop_duplicates().isin(df.index).all():
+            raise KeyError("not all origin and destinations IDs from the demand matrix are present within the path files")
+
         # We also store those indices along side the route sets themselves so it's easier to keep track
-        df = df.merge(od_indices, on=["origin id", "destination id"])
-        gb = df.groupby(by="index")
+        df = demand_df[["idx"]].merge(df, how="left", left_index=True, right_index=True).reset_index()
+        gb = df.groupby(by="idx")
 
         # In order to map the network link IDs to compressed links we'll use the graph
         graph_to_compressed = graph[["link_id", "direction"]].prod(axis=1).reset_index().set_index(0)
@@ -704,6 +701,8 @@ cdef class RouteChoiceSet:
                     if miss_count > max_misses or route_set.size() >= max_routes:
                         break  # This condition will be hit again at the start of the loop, we just don't want to
                                # iterate over the rest of the things in queue when we know there is not more space.
+                else:
+                    pass
 
             queue.swap(next_queue)
 
