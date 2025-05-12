@@ -63,10 +63,6 @@ graph.set_graph("distance")
 # And will skim time and distance while we are at it
 graph.set_skimming(["travel_time", "distance"])
 
-# And we will allow paths to be computed going through other centroids/centroid connectors.
-# We recommend you to `be extremely careful` with this setting.
-graph.set_blocked_centroid_flows(False)
-
 # %%
 # Let's create a path results object from the graph and compute a path from 
 # node 32343 (near the airport) to 22041 (near Fort Lambert, overlooking Coquimbo Bay).

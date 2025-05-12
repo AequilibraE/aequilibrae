@@ -94,13 +94,6 @@ graph.prepare_graph(graph.centroids)
 graph.set_graph("utility")
 
 # %%
-# We allow flows through centroid connectors because our centroids are not really centroids.
-# If we have actual centroid connectors in the network (and more than one per centroid), then we
-# should remove them from the graph.
-graph.set_blocked_centroid_flows(False)
-graph.graph.head()
-
-# %%
 # Mock demand matrix
 # ------------------
 #
