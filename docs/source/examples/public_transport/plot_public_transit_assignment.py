@@ -77,7 +77,7 @@ periods.data
 project.network.build_graphs()
 
 # %%
-# Now we'll create the line strings for the access connectors, this step is optimal but provides more accurate distance 
+# Now we'll create the line strings for the access connectors, this step is optional but provides more accurate distance 
 # estimations and better looking geometry.
 # 
 # Because Coquimbo doesn't have many walking edges we'll match onto the ``"c"`` graph.
