@@ -1537,6 +1537,8 @@ class TransitGraphBuilder:
         graph.edges.a_node = graph.edges.a_node.astype("int64")
         graph.edges.direction = graph.edges.direction.astype("int8")
 
+        graph.create_od_node_mapping()
+
         return graph
 
     def convert_demand_matrix_from_zone_to_node_ids(

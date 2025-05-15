@@ -84,7 +84,7 @@ graph_db = TransitGraphBuilder.from_db(pt_con, project.network.periods.default_p
 graph_db.vertices.drop(columns="geometry")
 
 # To perform an assignment we need to convert the graph builder into a graph.
-transit_graph = graph.to_transit_graph()
+transit_graph = graph_db.to_transit_graph()
 
 # %%
 
