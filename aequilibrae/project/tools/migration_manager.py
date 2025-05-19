@@ -1,14 +1,14 @@
 import pathlib
 import sqlite3
 from dataclasses import dataclass
-from enum import StrEnum, auto
+from enum import Enum
 from typing import Optional
 
 from aequilibrae import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
 
 
-class MigrationStatus(StrEnum):
+class MigrationStatus(Enum):
     APPLIED: str = "APPLIED"
     MISSING: str = "MISSING"
     SKIPPED: str = "SKIPPED"
@@ -39,12 +39,12 @@ class Migration:
             if res is None:
                 conn.execute(
                     "INSERT INTO migrations (id, name, status, date) VALUES(?,?,?,CURRENT_TIMESTAMP)",
-                    (self.id, self.name, status),
+                    (self.id, self.name, status.name),
                 )
             elif force:
                 conn.execute(
                     "UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?",
-                    (status, self.name, self.id),
+                    (status.name, self.name, self.id),
                 )
 
     def mark_as_seen(self, conn: sqlite3.Connection):
