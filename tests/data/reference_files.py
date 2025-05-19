@@ -1,34 +1,35 @@
 import tempfile
-from os.path import dirname, abspath, join
+from pathlib import Path
 
-data_folder = join(dirname(dirname(abspath(__file__))), "data")
+base_dir = Path(__file__).resolve().parent.parent
+data_folder = base_dir / "data"
 
 # For the graph tests
-test_network = join(dirname(dirname(abspath(__file__))), "data", "Final_Network.shp")
-test_graph = join(dirname(dirname(abspath(__file__))), "data", "test_graph.aeg")
-path_test = tempfile.gettempdir()
-triangle_graph_blocking = join(dirname(dirname(abspath(__file__))), "data", "blocking_triangle_graph_project")
+test_network = data_folder / "Final_Network.shp"
+test_graph = data_folder / "test_graph.aeg"
+path_test = Path(tempfile.gettempdir())
+triangle_graph_blocking = data_folder / "blocking_triangle_graph_project"
 
-gtfs_folder = join(dirname(dirname(abspath(__file__))), "data/gtfs")
-gtfs_zip = join(dirname(dirname(abspath(__file__))), "data/gtfs.zip")
-gtfs_db_output = join(path_test, "test.db")
+gtfs_folder = data_folder / "gtfs"
+gtfs_zip = data_folder / "gtfs.zip"
+gtfs_db_output = path_test / "test.db"
 
 # For the skimming test
 
 
 # For the matrix test
-omx_example = join(dirname(dirname(abspath(__file__))), "data/test_omx.omx")
-no_index_omx = join(dirname(dirname(abspath(__file__))), "data/no_index.omx")
+omx_example = data_folder / "test_omx.omx"
+no_index_omx = data_folder / "no_index.omx"
 
 # For project tests
-project_file = join(dirname(dirname(abspath(__file__))), "data", "AequilibraE_Project.sqlite")
+project_file = data_folder / "AequilibraE_Project.sqlite"
 
 # For Traffic Assignment tests
-siouxfalls_project = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project")
-siouxfalls_demand = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project/matrices", "SiouxFalls.omx")
-siouxfalls_skims = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project/matrices", "sfalls_skims.omx")
+siouxfalls_project = data_folder / "SiouxFalls_project"
+siouxfalls_demand = siouxfalls_project / "matrices" / "SiouxFalls.omx"
+siouxfalls_skims = siouxfalls_project / "matrices" / "sfalls_skims.omx"
 
 #
-no_triggers_project = join(dirname(dirname(abspath(__file__))), "data/no_triggers_project")
+no_triggers_project = data_folder / "no_triggers_project"
 
-st_varent_network = join(dirname(abspath(__file__)), "St_Varent_issue307.zip")
+st_varent_network = Path(__file__).resolve().parent / "St_Varent_issue307.zip"

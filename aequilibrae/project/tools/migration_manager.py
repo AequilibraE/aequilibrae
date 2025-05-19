@@ -65,7 +65,7 @@ class Migration:
         try:
             migrate = module.migrate
         except AttributeError as e:
-            raise RuntimeError("ensure all Python migration files expose a global 'migrate' callable") from e
+            raise RuntimeError(f"'{self.name} does not expose a global 'migrate' callable") from e
 
         if not callable(migrate):
             raise RuntimeError("found 'migrate' symbol in the migration file but it is not callable")
