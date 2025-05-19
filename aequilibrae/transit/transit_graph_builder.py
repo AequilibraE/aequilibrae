@@ -46,21 +46,6 @@ SF_EDGE_COLS = [
 ]
 
 
-def shift_duplicate_geometry(df, shift=0.00001):
-    """Shift stacked geometry by some fraction of ``shift`` vertically."""
-
-    def _shift_points(group_df, shift):
-        points = shapely.from_wkb(group_df.geometry.values)
-        count = len(points)
-        for i, x in enumerate(points):
-            points[i] = shapely.Point(x.x, x.y + (i + 1) * shift / count)
-
-        group_df.geometry = shapely.to_wkb(points)
-        return group_df
-
-    return df.groupby(by="geometry", group_keys=False).apply(_shift_points, shift)
-
-
 class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
@@ -1091,6 +1076,7 @@ class TransitGraphBuilder:
 
             walking_edges["trav_time"] = distance / self.walking_speed
             walking_edges["trav_time"] *= self.walk_time_factor
+            walking_edges.loc[walking_edges["trav_time"] < self.a_tiny_time_duration, "trav_time"] = self.a_tiny_time_duration
 
             # cleanup
             walking_edges.drop(
@@ -1333,26 +1319,20 @@ class TransitGraphBuilder:
                 ],
             )
 
-    def save_vertices(self, robust=True):
+    def save_vertices(self, robust=None):
         """
         Write the vertices DataFrame to the public transport database.
 
         Within the database nodes may not exist at the exact same point in space, provide ``robust=True`` to move the nodes slightly.
 
         :Arguments:
-           **robust** (:obj:`bool`): Whether to move stack nodes slightly before saving. Defaults to ``True``.
+           **robust** (:obj:`bool`): Deprecated. No longer in use.
         """
-        duplicated = self.vertices.geometry.duplicated()
-
-        if not robust and duplicated.any():
+        if robust is not None:
             warnings.warn(
-                "Duplicated geometry was detected but robust was disabled, vertices that share the same geometry will not be saved.",
-                warnings.RuntimeWarning,
+                "the 'robust' argument is depreciated and no longer in use. Duplicate geometries are allowed within the public transport database.",
+                DeprecationWarning
             )
-
-        if robust and duplicated.any():
-            df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
-            self.vertices.loc[df.index, "geometry"] = df.geometry
 
         with self.pt_conn as conn:
             if conn.execute("SELECT node_id FROM nodes LIMIT 1;").fetchall():
@@ -1363,9 +1343,7 @@ class TransitGraphBuilder:
                 INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
                 VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
                 """,
-                (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
-                    index=False, name=None
-                ),
+                self.vertices[SF_VERTEX_COLS].itertuples(index=False, name=None),
             )
 
     @staticmethod
@@ -1447,10 +1425,8 @@ class TransitGraphBuilder:
     def save(self, robust=True):
         """Save the current graph to the public transport database.
 
-        Within the database nodes may not exist at the exact same point in space, provide ``robust=True`` to move the nodes slightly.
-
         :Arguments:
-            **robust** (:obj:`bool`): Whether to move stack nodes slightly before saving. Defaults to ``True``.
+            **robust** (:obj:`bool`): Deprecated. No longer in use.
         """
         self.create_additional_db_fields()
         self.save_vertices(robust=robust)
