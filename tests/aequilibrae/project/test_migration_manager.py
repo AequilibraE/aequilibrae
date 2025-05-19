@@ -13,8 +13,12 @@ class TestMigrationManager(TestCase):
         self.connection = sqlite3.connect(":memory:")
 
         self.migrations_file = pathlib.Path(__file__).parent.parent.parent / "data" / "mock_migrations" / "init.py"
-        self.migrations_duplicate = pathlib.Path(__file__).parent.parent.parent / "data" / "mock_migrations" / "duplicate_init.py"
-        self.migrations_negative = pathlib.Path(__file__).parent.parent.parent / "data" / "mock_migrations" / "negative_init.py"
+        self.migrations_duplicate = (
+            pathlib.Path(__file__).parent.parent.parent / "data" / "mock_migrations" / "duplicate_init.py"
+        )
+        self.migrations_negative = (
+            pathlib.Path(__file__).parent.parent.parent / "data" / "mock_migrations" / "negative_init.py"
+        )
 
     def tearDown(self):
         self.connection.close()

@@ -37,9 +37,15 @@ class Migration:
         with conn as conn:
             res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
             if res is None:
-                conn.execute("INSERT INTO migrations (id, name, status, date) VALUES(?,?,?,CURRENT_TIMESTAMP)", (self.id, self.name, status))
+                conn.execute(
+                    "INSERT INTO migrations (id, name, status, date) VALUES(?,?,?,CURRENT_TIMESTAMP)",
+                    (self.id, self.name, status),
+                )
             elif force:
-                conn.execute("UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?", (status, self.name, self.id))
+                conn.execute(
+                    "UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?",
+                    (status, self.name, self.id),
+                )
 
     def mark_as_seen(self, conn: sqlite3.Connection):
         self.mark_as(conn, MigrationStatus.MISSING, force=False)

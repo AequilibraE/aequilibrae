@@ -1,5 +1,6 @@
 def migrate(conn):
-    conn.execute("""
+    conn.execute(
+        """
     CREATE TABLE comments (
         id INTEGER PRIMARY KEY,
         post_id INTEGER NOT NULL,
@@ -9,7 +10,8 @@ def migrate(conn):
         FOREIGN KEY (post_id) REFERENCES posts(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
-    """)
+    """
+    )
 
     conn.execute("CREATE INDEX idx_comments_post_id ON comments(post_id)")
     conn.execute("CREATE INDEX idx_comments_user_id ON comments(user_id)")

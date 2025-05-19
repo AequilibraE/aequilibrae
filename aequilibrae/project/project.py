@@ -150,7 +150,7 @@ class Project:
         global_logger.info("Starting database upgrades")
         targets = [
             (MigrationManager(MigrationManager.network_migration_file), database_connection("project")),
-            (MigrationManager(MigrationManager.transit_migration_file), database_connection("transit"))
+            (MigrationManager(MigrationManager.transit_migration_file), database_connection("transit")),
         ]
 
         for mm, conn in targets:

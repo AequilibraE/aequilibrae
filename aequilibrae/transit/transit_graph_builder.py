@@ -1076,7 +1076,9 @@ class TransitGraphBuilder:
 
             walking_edges["trav_time"] = distance / self.walking_speed
             walking_edges["trav_time"] *= self.walk_time_factor
-            walking_edges.loc[walking_edges["trav_time"] < self.a_tiny_time_duration, "trav_time"] = self.a_tiny_time_duration
+            walking_edges.loc[walking_edges["trav_time"] < self.a_tiny_time_duration, "trav_time"] = (
+                self.a_tiny_time_duration
+            )
 
             # cleanup
             walking_edges.drop(
@@ -1331,7 +1333,7 @@ class TransitGraphBuilder:
         if robust is not None:
             warnings.warn(
                 "the 'robust' argument is depreciated and no longer in use. Duplicate geometries are allowed within the public transport database.",
-                DeprecationWarning
+                DeprecationWarning,
             )
 
         with self.pt_conn as conn:
