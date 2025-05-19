@@ -17,10 +17,12 @@ from aequilibrae.project.network import Network
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.zoning import Zoning
+from aequilibrae.project.tools import MigrationManager
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.model_run_utils import import_directory_as_module
+from aequilibrae.utils.model_run_utils import import_file_as_module
 
 
 class Project:
@@ -144,6 +146,23 @@ class Project:
         allows the user to read the log or clear it"""
         return Log(self.project_base_path)
 
+    def upgrade(self):
+        global_logger.info("Starting database upgrades")
+        targets = [
+            (MigrationManager(MigrationManager.network_migration_file), database_connection("project")),
+            (MigrationManager(MigrationManager.transit_migration_file), database_connection("transit"))
+        ]
+
+        for mm, conn in targets:
+            with conn as _conn:
+                mm.mark_all_as_seen(_conn)
+
+        for mm, conn in targets:
+            with conn as _conn:
+                mm.upgrade(_conn)
+            conn.close()
+        global_logger.info("Completed database upgrades")
+
     def __load_objects(self):
         matrix_folder = self.project_base_path / "matrices"
         matrix_folder.mkdir(parents=True, exist_ok=True)
@@ -169,7 +188,7 @@ class Project:
         Refer to ``run/__init__.py`` file within the project folder for documentation.
         """
         entry_points = self.parameters["run"]
-        module = import_directory_as_module(self.project_base_path / "run", "aequilibrae.run")
+        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run")
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
