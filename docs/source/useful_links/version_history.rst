@@ -5,7 +5,7 @@
 Older versions
 ==============
 
-AequilibraE has been evolving quite fast, so we recommend you upgrading to a newer version as soon as you can. 
+AequilibraE has been evolving quite fast, so we recommend you upgrading to a newer version as soon as you can.
 In the meantime, you can find the documentation for all versions since 0.5.3.
 
 .. grid::
@@ -57,7 +57,7 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
     .. grid-item-card:: 0.7.1
         :link:  https://www.aequilibrae.com/docs/python/V.0.7.1/
         :link-type: url
-        :text-align: center            
+        :text-align: center
 
 .. grid::
 
@@ -121,7 +121,7 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
         :link:  https://www.aequilibrae.com/docs/python/V.0.9.0/
         :link-type: url
         :text-align: center
-    
+
     .. grid-item-card:: 0.9.1
         :link:  https://www.aequilibrae.com/docs/python/V.0.9.1/
         :link-type: url
@@ -138,7 +138,7 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
         :link:  https://www.aequilibrae.com/docs/python/V.0.9.3/
         :link-type: url
         :text-align: center
-    
+
     .. grid-item-card:: 0.9.4
         :link:  https://www.aequilibrae.com/docs/python/V.0.9.4/
         :link-type: url
@@ -214,6 +214,11 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
 
 .. grid::
 
+    .. grid-item-card:: 1.3.2
+        :link:  https://www.aequilibrae.com/docs/python/V.1.3.2/
+        :link-type: url
+        :text-align: center
+
     .. grid-item-card:: Upcoming version
         :link:  https://www.aequilibrae.com/develop/python/index.html
         :link-type: url
@@ -228,6 +233,6 @@ This documentation correspond to software version:
     :uncommitted:
     :untracked:
 
-.. 
+..
     When updating this page, be careful with the alignment when adding new cards. if you have less than
     three cards in the same line, add a "transparent" card using ".. grid-item::" without directives.
