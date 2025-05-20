@@ -147,6 +147,14 @@ class Project:
         return Log(self.project_base_path)
 
     def upgrade(self):
+        """
+        Find and apply all applicable migrations.
+
+        All database upgrades are applied within a single transaction.
+
+        If skipping a specific migration is required, use the ``aequilbrae.project.tools.MigrationManager`` object
+        directly. Consult it's documentation page for details. Take care when skipping migrations.
+        """
         global_logger.info("Starting database upgrades")
         targets = [
             (MigrationManager(MigrationManager.network_migration_file), database_connection("project")),

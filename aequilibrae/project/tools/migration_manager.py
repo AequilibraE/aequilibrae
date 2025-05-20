@@ -27,6 +27,10 @@ class Migration:
     present. If it is present no change is made.
 
     Applying a migration will update the status to 'APPLIED' with the current timestamp.
+
+    A migration's status cannot be downgraded without force.
+
+    Migrations are identified based on their ``id`` attribute and the ``id`` field of the ``migrations`` table.
     """
 
     id: int
@@ -43,10 +47,31 @@ class Migration:
             raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
 
     def status(self, conn: sqlite3.Connection) -> MigrationStatus:
+        """
+        Query the database for this migrations status.
+
+        If the ``migrations`` table is not present all migrations are considered ``MISSING``.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+
+        :Returns:
+            **status** (:obj:`MigrationStatus`): Migration status enum.
+        """
         res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
         return MigrationStatus.MISSING if res is None else MigrationStatus[res[0]]
 
     def mark_as(self, conn: sqlite3.Connection, status: MigrationStatus, force: bool = False):
+        """
+        Update or insert this migration with the given status.
+
+        If the migration is not present in the table it will be inserted. If it is present and the new status is a
+        'upgrade' or ``force=True``, then it will be updated. Otherwise no change will be made.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+            **status** (:obj:`MigrationStatus`): Migration status enum.
+        """
         with conn as conn:
             res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
             if res is None:
@@ -65,9 +90,26 @@ class Migration:
                     )
 
     def mark_as_seen(self, conn: sqlite3.Connection):
+        """
+        Mark this migration as 'seen'.
+
+        Marking a migration as 'seen' will add it to the ``migrations`` table as ``MISSING`` if it is not already
+        present. If it is present no change is made.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+        """
         self.mark_as(conn, MigrationStatus.MISSING, force=False)
 
     def apply(self, conn: sqlite3.Connection):
+        """
+        Apply this migration.
+
+        Successful application will mark the migration as ``APPLIED``.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+        """
         logger.info(f"Applying migration '{self.name}'")
         with conn as conn:
             if self.type == "py":
@@ -99,6 +141,14 @@ class Migration:
 
 
 class MigrationManager:
+    """
+    Small utility class to manage, validate, and apply a set of ``Migration``s.
+
+    :Arguments:
+        **migration_file** (:obj:`pathlib.Path`): A path to a Python with which defines a global ``migrations`` variable
+            as a list of ``pathlib.Path`` to migrations.
+    """
+
     network_migration_file = (
         pathlib.Path(__file__).parent.parent / "database_specification" / "network" / "migrations" / "__init__.py"
     )
@@ -136,16 +186,46 @@ class MigrationManager:
             self.migrations[0].apply(conn)
 
     def status(self, conn: sqlite3.Connection) -> dict[int, MigrationStatus]:
+        """
+        Query the database for all migrations' status.
+
+        If the ``migrations`` table is not present all migrations are considered ``MISSING``.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+
+        :Returns:
+            **status** (:obj:`dict[int, MigrationStatus]`): Migration status enums by their ID.
+        """
         self.__ensure_inital_is_applied(conn)
         return {k: v.status(conn) for k, v in self.migrations.items()}
 
     def mark_all_as_seen(self, conn: sqlite3.Connection):
+        """
+        Mark all migrations as 'seen'.
+
+        Marking a migration as 'seen' will add it to the ``migrations`` table as ``MISSING`` if it is not already
+        present. If it is present no change is made.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+        """
         self.__ensure_inital_is_applied(conn)
         with conn as conn:
             for migration in self.migrations.values():
                 migration.mark_as_seen(conn)
 
     def find_applicable(self, conn: sqlite3.Connection):
+        """
+        Find all applicable migrations.
+
+        A migration is applicable if all migrations before it (ordered by ID) have been applied or skipped.
+
+        If an out-of-order migration is detected a ``RuntimeError` will raised and manual intervention will be required.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+        """
         migrations = list(self.status(conn).items())
 
         for i in range(len(migrations)):
@@ -166,6 +246,15 @@ class MigrationManager:
         return res
 
     def upgrade(self, conn: sqlite3.Connection, skip: set[int] = None):
+        """
+        Find and apply all applicable migrations.
+
+        Optionally skip some migrations. Take care when skipping migrations.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+            **skip** (:obj:`set[int]`): Set of migration IDs to skip.
+        """
         if skip is None:
             skip = set()
         migrations = self.find_applicable(conn)
