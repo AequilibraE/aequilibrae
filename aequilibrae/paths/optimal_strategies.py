@@ -30,7 +30,20 @@ class OptimalStrategies:
                 centroids=cls.graph.centroids,
             )
 
-            demand = sparse.coo_matrix(cls.matrix.matrix[cls.matrix_core], dtype=np.float64)
+            try:
+                idx = cls.matrix.view_names.index(cls.matrix_core)
+                demand = sparse.coo_matrix(
+                    (
+                        cls.matrix.matrix_view[:, :, idx]
+                        if len(cls.matrix.view_names) > 1
+                        else cls.matrix.matrix_view[:, :]
+                    ),
+                    dtype=np.float64,
+                )
+            except ValueError as e:
+                raise ValueError(
+                    f"matrix core {cls.matrix_core} not found in matrix view. Ensure the matrix is prepared and the core exists"
+                ) from e
 
             # Since the aeq matrix indexes based on centroids, and the transit graph can make the distinction between
             # origins and destinations, We need to translate the index of the cols in to the destination node_ids for
