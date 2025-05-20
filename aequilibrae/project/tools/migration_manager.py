@@ -1,21 +1,34 @@
 import pathlib
 import sqlite3
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 from typing import Optional
 
 from aequilibrae import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
 
 
-class MigrationStatus(Enum):
-    APPLIED: str = "APPLIED"
-    MISSING: str = "MISSING"
-    SKIPPED: str = "SKIPPED"
+class MigrationStatus(IntEnum):
+    MISSING: int = 1
+    SKIPPED: int = 2
+    APPLIED: int = 3
 
 
 @dataclass
 class Migration:
+    """
+    Small utility class to wrap files used for database upgrades/migrations.
+
+    Individual migrations can report their status, be marked as 'seen' or as another status, and applied. SQL migrations
+    are executed using ``sqlite3.executescript``. Python migrations are loaded as a module, they should expose a
+    ``migrate`` function which accepts an ``sqlite3.Connection`` as a single positional argument.
+
+    Marking a migration as 'seen' will add it to the ``migrations`` table as ``MISSING`` if it is not already
+    present. If it is present no change is made.
+
+    Applying a migration will update the status to 'APPLIED' with the current timestamp.
+    """
+
     id: int
     name: str
     file: pathlib.Path
@@ -31,7 +44,7 @@ class Migration:
 
     def status(self, conn: sqlite3.Connection) -> MigrationStatus:
         res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
-        return MigrationStatus.MISSING if res is None else MigrationStatus(res[0])
+        return MigrationStatus.MISSING if res is None else MigrationStatus[res[0]]
 
     def mark_as(self, conn: sqlite3.Connection, status: MigrationStatus, force: bool = False):
         with conn as conn:
@@ -41,11 +54,15 @@ class Migration:
                     "INSERT INTO migrations (id, name, status, date) VALUES(?,?,?,CURRENT_TIMESTAMP)",
                     (self.id, self.name, status.name),
                 )
-            elif force:
-                conn.execute(
-                    "UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?",
-                    (status.name, self.name, self.id),
-                )
+            else:
+                res = MigrationStatus[res[0]]
+                if force or res < status or res < status < MigrationStatus.APPLIED:
+                    # We want to allow marking the status as APPLIED if it is MISSING or SKIPPED, and as SKIPPED if it
+                    # is MISSING, or just whenever force is True
+                    conn.execute(
+                        "UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?",
+                        (status.name, self.name, self.id),
+                    )
 
     def mark_as_seen(self, conn: sqlite3.Connection):
         self.mark_as(conn, MigrationStatus.MISSING, force=False)
@@ -59,6 +76,8 @@ class Migration:
                 self._apply_sql(conn)
             else:
                 raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
+
+            self.mark_as(conn, MigrationStatus.APPLIED)
         logger.info(f"Completed migration '{self.name}'")
 
     def _apply_sql(self, conn: sqlite3.Connection):
@@ -113,9 +132,8 @@ class MigrationManager:
     def __ensure_inital_is_applied(self, conn):
         # Handle the initial migration separately, the 'migrations' table might not have been created. We implicitly
         # apply this migration all the time to ensure the table exists.
-        with conn as _conn:
-            self.migrations[0].apply(_conn)
-            self.migrations[0].mark_as(_conn, MigrationStatus.APPLIED)
+        with conn as conn:
+            self.migrations[0].apply(conn)
 
     def status(self, conn: sqlite3.Connection) -> dict[int, MigrationStatus]:
         self.__ensure_inital_is_applied(conn)
@@ -158,4 +176,3 @@ class MigrationManager:
                     migration.mark_as(conn, MigrationStatus.SKIPPED)
                 else:
                     migration.apply(conn)
-                    migration.mark_as(conn, MigrationStatus.APPLIED)

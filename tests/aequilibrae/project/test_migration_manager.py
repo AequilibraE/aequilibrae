@@ -151,6 +151,8 @@ class TestMigrationManager(TestCase):
         del manager.migrations[4]
         del manager.migrations[5]
 
+        manager.mark_all_as_seen(self.connection)
+
         # Skip migration 2
         manager.upgrade(self.connection, skip={2})
 
@@ -161,6 +163,10 @@ class TestMigrationManager(TestCase):
         self.assertEqual(status[2], MigrationStatus.SKIPPED)
         self.assertEqual(status[3], MigrationStatus.APPLIED)
 
+        # There are no applicable upgrades now
+        applicable = manager.find_applicable(self.connection)
+        self.assertListEqual(applicable, [])
+
         # Check tables were created (should have users and comments but not posts)
         tables = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         table_names = [t[0] for t in tables]
@@ -168,3 +174,10 @@ class TestMigrationManager(TestCase):
         self.assertIn("users", table_names)
         self.assertNotIn("posts", table_names)  # Was skipped
         self.assertIn("comments", table_names)
+
+        manager.migrations[2].apply(self.connection)
+        tables = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        self.assertIn("posts", [t[0] for t in tables])  # Was just applied
+
+        status = manager.status(self.connection)
+        self.assertEqual(status[2], MigrationStatus.APPLIED)
