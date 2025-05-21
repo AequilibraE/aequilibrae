@@ -72,7 +72,7 @@ class Migration:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
             **status** (:obj:`MigrationStatus`): Migration status enum.
         """
-        with conn as conn:
+        with conn:
             res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
             if res is None:
                 conn.execute(
@@ -111,7 +111,7 @@ class Migration:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
         logger.info(f"Applying migration '{self.name}'")
-        with conn as conn:
+        with conn:
             if self.type == "py":
                 self._apply_python(conn)
             elif self.type == "sql":
@@ -182,7 +182,7 @@ class MigrationManager:
     def __ensure_inital_is_applied(self, conn):
         # Handle the initial migration separately, the 'migrations' table might not have been created. We implicitly
         # apply this migration all the time to ensure the table exists.
-        with conn as conn:
+        with conn:
             self.migrations[0].apply(conn)
 
     def status(self, conn: sqlite3.Connection) -> dict[int, MigrationStatus]:
@@ -211,7 +211,7 @@ class MigrationManager:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
         self.__ensure_inital_is_applied(conn)
-        with conn as conn:
+        with conn:
             for migration in self.migrations.values():
                 migration.mark_as_seen(conn)
 
@@ -259,7 +259,7 @@ class MigrationManager:
             skip = set()
         migrations = self.find_applicable(conn)
 
-        with conn as conn:
+        with conn:
             for migration in migrations:
                 if migration.id in skip:
                     migration.mark_as(conn, MigrationStatus.SKIPPED)
