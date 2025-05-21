@@ -1429,7 +1429,7 @@ class TransitGraphBuilder:
         #     raise ValueError(f"Not all required links have been created. Link types {link_type_diff} are missing.")
 
         g = TransitGraph(config=self.config, od_node_mapping=self.od_node_mapping)
-        g.network = self.edges.copy(deep=True)
+        g.network = self.edges.drop(columns="geometry").copy(deep=True)
         g.cost = g.network.trav_time.values
         g.free_flow_time = g.network.trav_time.values
 
