@@ -19,7 +19,8 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 class NetworkSimplifier(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, project=None, parentThread=None) -> None:
+        super().__init__(parentThread)
 
         self.project = project or get_active_project()
         self.network = self.project.network
