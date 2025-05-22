@@ -254,9 +254,15 @@ class MigrationManager:
             skip = set()
         migrations = self.find_applicable(conn)
 
-        with conn:
+        iso_lvl = conn.isolation_level
+        conn.isolation_level = None
+        try:
             for migration in migrations:
-                if migration.id in skip:
-                    migration.mark_as(conn, MigrationStatus.SKIPPED)
-                else:
-                    migration.apply(conn)
+                conn.execute("BEGIN")
+                with conn:
+                    if migration.id in skip:
+                        migration.mark_as(conn, MigrationStatus.SKIPPED)
+                    else:
+                        migration.apply(conn)
+        finally:
+            conn.isolation_level = iso_lvl

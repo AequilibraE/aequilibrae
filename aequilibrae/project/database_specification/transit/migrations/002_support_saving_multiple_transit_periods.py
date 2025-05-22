@@ -84,11 +84,3 @@ def migrate(conn: sqlite3.Connection):
         add_triggers(conn, logger, "transit")
 
     logger.info("Migration successful")
-
-
-"""
-
-alter table links add column a_field integer default 123;
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','a_field', 'asdfasdf');
-
-"""
