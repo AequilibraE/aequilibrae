@@ -69,7 +69,7 @@ INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, descri
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','node_type', 'Node types of this node');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','taz_id', 'Transit assignemnt zone id');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','taz_id', 'Transit assignment zone id');
 --#
 -- INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','period_start', 'Graph start time');
 -- --#
