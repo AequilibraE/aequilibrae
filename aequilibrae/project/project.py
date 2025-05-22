@@ -161,9 +161,7 @@ class Project:
         ]
 
         if (self.project_base_path / "public_transport.sqlite").exists():
-            targets.append(
-                (MigrationManager(MigrationManager.transit_migration_file), database_connection("transit"))
-            )
+            targets.append((MigrationManager(MigrationManager.transit_migration_file), database_connection("transit")))
 
         try:
             for mm, conn in targets:

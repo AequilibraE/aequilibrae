@@ -34,9 +34,7 @@ def migrate(conn: sqlite3.Connection):
         )
     elif len(period_ids) == 0:
         if existing_links is not None:
-            raise ValueError(
-                "no period_id found in 'transit_graph_configs' cannot migrate with without period_id"
-            )
+            raise ValueError("no period_id found in 'transit_graph_configs' cannot migrate with without period_id")
         else:
             period_id = project.network.periods.default_period.period_id
     else:
@@ -64,7 +62,9 @@ def migrate(conn: sqlite3.Connection):
             conn.execute(sql)
 
         for table in ["links", "nodes"]:
-            columns = conn.execute(f"SELECT name, type FROM PRAGMA_TABLE_INFO('__old_{table}') AS table_info").fetchall()
+            columns = conn.execute(
+                f"SELECT name, type FROM PRAGMA_TABLE_INFO('__old_{table}') AS table_info"
+            ).fetchall()
             columns = {f"{x[0]}": x[1] for x in columns if x[0]}
 
             orig_columns = conn.execute(f"SELECT name, type FROM PRAGMA_TABLE_INFO('{table}') AS table_info").fetchall()
