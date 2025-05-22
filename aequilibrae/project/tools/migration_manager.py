@@ -72,22 +72,21 @@ class Migration:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
             **status** (:obj:`MigrationStatus`): Migration status enum.
         """
-        with conn:
-            res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
-            if res is None:
+        res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
+        if res is None:
+            conn.execute(
+                "INSERT INTO migrations (id, name, status, date) VALUES(?,?,?,CURRENT_TIMESTAMP)",
+                (self.id, self.name, status.name),
+            )
+        else:
+            res = MigrationStatus[res[0]]
+            if force or res < status or res < status < MigrationStatus.APPLIED:
+                # We want to allow marking the status as APPLIED if it is MISSING or SKIPPED, and as SKIPPED if it
+                # is MISSING, or just whenever force is True
                 conn.execute(
-                    "INSERT INTO migrations (id, name, status, date) VALUES(?,?,?,CURRENT_TIMESTAMP)",
-                    (self.id, self.name, status.name),
+                    "UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?",
+                    (status.name, self.name, self.id),
                 )
-            else:
-                res = MigrationStatus[res[0]]
-                if force or res < status or res < status < MigrationStatus.APPLIED:
-                    # We want to allow marking the status as APPLIED if it is MISSING or SKIPPED, and as SKIPPED if it
-                    # is MISSING, or just whenever force is True
-                    conn.execute(
-                        "UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?",
-                        (status.name, self.name, self.id),
-                    )
 
     def mark_as_seen(self, conn: sqlite3.Connection):
         """
@@ -110,16 +109,14 @@ class Migration:
         :Arguments:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
-        logger.info(f"Applying migration '{self.name}'")
-        with conn:
-            if self.type == "py":
-                self._apply_python(conn)
-            elif self.type == "sql":
-                self._apply_sql(conn)
-            else:
-                raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
+        if self.type == "py":
+            self._apply_python(conn)
+        elif self.type == "sql":
+            self._apply_sql(conn)
+        else:
+            raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
 
-            self.mark_as(conn, MigrationStatus.APPLIED)
+        self.mark_as(conn, MigrationStatus.APPLIED)
         logger.info(f"Completed migration '{self.name}'")
 
     def _apply_sql(self, conn: sqlite3.Connection):
@@ -182,8 +179,7 @@ class MigrationManager:
     def __ensure_inital_is_applied(self, conn):
         # Handle the initial migration separately, the 'migrations' table might not have been created. We implicitly
         # apply this migration all the time to ensure the table exists.
-        with conn:
-            self.migrations[0].apply(conn)
+        self.migrations[0].apply(conn)
 
     def status(self, conn: sqlite3.Connection) -> dict[int, MigrationStatus]:
         """
@@ -211,9 +207,8 @@ class MigrationManager:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
         self.__ensure_inital_is_applied(conn)
-        with conn:
-            for migration in self.migrations.values():
-                migration.mark_as_seen(conn)
+        for migration in self.migrations.values():
+            migration.mark_as_seen(conn)
 
     def find_applicable(self, conn: sqlite3.Connection):
         """
