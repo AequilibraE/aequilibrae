@@ -106,6 +106,9 @@ class Migration:
 
         Successful application will mark the migration as ``APPLIED``.
 
+        Python migrations should never use ``executescript`` as it will commit the pending transaction and place SQLite
+        in autocommit mode. If the migration then fails the database will be bad state.
+
         :Arguments:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
