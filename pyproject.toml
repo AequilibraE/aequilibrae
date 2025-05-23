@@ -1,12 +1,44 @@
+[build-system]
+requires = ["setuptools", "numpy<1.99", "cython", "wheel"]
+
+
+[project]
+authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Public policy",
+  "Intended Audience :: Urban planning",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Transportation Engineering",
+  "Topic :: Scientific/Engineering :: Transportation modeling",
+  "Topic :: Scientific/Engineering :: GIS",
+  "Topic :: Scientific/Engineering :: Visualization",
+]
+
+description = ""
+dynamic = ["version"]
+keywords = ["GIS", "Networks", "OpenStreetMap", "Routing"]
+license = { text = "MIT License" }
+maintainers = [{ name = "AequilibraE contributors" }]
+name = "osmnx"
+readme = "README.md"
+requires-python = ">=3.9" # match classifiers above and black version below
+
 [tool.black]
 line-length = 120
 target-version = ['py39', 'py310', 'py311', 'py312']
 include = '\.pyi?$'
 extend-exclude = '''docs/*'''
-
-
-[build-system]
-requires = ["setuptools", "numpy<1.99", "cython", "wheel"]
 
 
 [tool.ruff]
