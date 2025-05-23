@@ -12,8 +12,8 @@ from setuptools.discovery import FlatLayoutPackageFinder
 from multiprocessing import cpu_count
 
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
-version = 1.3
-minor_version = 2
+version = 1.4
+minor_version = 0
 
 release_version = f"{version}.{minor_version}"
 
