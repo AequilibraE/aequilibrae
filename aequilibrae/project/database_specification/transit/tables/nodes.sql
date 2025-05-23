@@ -50,7 +50,7 @@ SELECT CreateSpatialIndex( 'nodes' , 'geometry' );
 CREATE INDEX idx_node ON nodes (node_id, period_id);
 
 --#
-CREATE UNIQUE INDEX idx_period_nodes ON nodes (period_id);
+CREATE INDEX idx_period_nodes ON nodes (period_id);
 
 --#
 CREATE INDEX idx_node_is_centroid ON nodes (is_centroid);

@@ -44,6 +44,7 @@ class Transit(WorkerThread):
         """
         WorkerThread.__init__(self, None)
 
+        self.project = project
         self.project_base_path = project.project_base_path
         self.logger = logger
         self.__transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
@@ -118,7 +119,7 @@ class Transit(WorkerThread):
 
         """
         if period_ids is None:
-            period_ids = [self.periods.default_period.period_id]
+            period_ids = self.graphs.keys()
 
         if force:
             self.remove_graphs(period_ids)
@@ -126,17 +127,20 @@ class Transit(WorkerThread):
         for period_id in period_ids:
             self.graphs[period_id].save()
 
-    def remove_graphs(self, period_ids: List[int]):
+    def remove_graphs(self, period_ids: List[int], unload: bool = False):
         """
         Remove the previously saved transit graphs from the 'public_transport.sqlite' database. Removing may be filtered
         by 'period_id'.
 
         :Arguments:
             **period_ids** (:obj:`int`): List of periods of to save.
+            **unload** (:obj:`bool`): Also unload the graph.
 
         """
         for period_id in period_ids:
             TransitGraphBuilder.remove(self.pt_con, period_id)
+            if unload:
+                del self.graphs[period_id]
 
     def load(self, period_ids: List[int] = None):
         """
@@ -144,11 +148,13 @@ class Transit(WorkerThread):
         by 'period_id'.
 
         :Arguments:
-            **period_ids** (:obj:`int`): List of periods of to save. Defaults to all available periods.
+            **period_ids** (:obj:`int`): List of periods of to load. Defaults to all available graph configurations.
 
         """
         if period_ids is None:
-            period_ids = self.periods.data.period_id.to_list()
+            with self.project.db_connection as conn:
+                res = conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+            period_ids = [x[0] for x in res]
 
         for period_id in period_ids:
             self.graphs[period_id] = TransitGraphBuilder.from_db(self.pt_con, period_id)
