@@ -150,10 +150,10 @@ class MigrationManager:
     """
 
     network_migration_file = (
-        pathlib.Path(__file__).parent.parent / "database_specification" / "network" / "migrations" / "__init__.py"
+        pathlib.Path(__file__).parent.parent / "database_specification" / "network" / "migrations" / "migrations.py"
     )
     transit_migration_file = (
-        pathlib.Path(__file__).parent.parent / "database_specification" / "transit" / "migrations" / "__init__.py"
+        pathlib.Path(__file__).parent.parent / "database_specification" / "transit" / "migrations" / "migrations.py"
     )
 
     def __init__(self, migration_file: pathlib.Path):
