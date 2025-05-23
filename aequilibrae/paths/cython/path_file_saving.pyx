@@ -7,7 +7,6 @@ spec = iutil.find_spec("pyarrow")
 
 if spec is not None:
     import pyarrow as pa
-    cimport pyarrow as pa
     # need to decide or make optional which format we want
     import pyarrow.parquet as pq
     import pyarrow.feather as feather

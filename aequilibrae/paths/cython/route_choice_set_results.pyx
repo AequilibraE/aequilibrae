@@ -97,14 +97,14 @@ cdef class RouteChoiceSetResults:
         table = self.make_df_from_results()
 
         engine = pd.io.parquet.get_engine('auto').__class__
-        if (engine.__module__, engine.__name__) == ("pandas.io.parquet", "PyArrowImpl") and False:
+        if (engine.__module__, engine.__name__) == ("pandas.io.parquet", "PyArrowImpl"):
             kwargs = dict(
                 # can't provide partitioning_flavor and partition_cols through the Pandas API
                 use_threads=True,
                 existing_data_behavior="overwrite_or_ignore",
                 file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
             )
-        elif (engine.__module__, engine.__name__) == ("pandas.io.parquet", "FastParquetImpl") or True:
+        elif (engine.__module__, engine.__name__) == ("pandas.io.parquet", "FastParquetImpl"):
             logger.info("FastParquet back-end doesn't support individual partition logging, writing table now...")
             kwargs = dict(
                 file_scheme="hive",
@@ -127,7 +127,6 @@ cdef class RouteChoiceSetResults:
             compression="zstd",
             index=False,
             partition_cols=["origin id"],
-            engine="fastparquet",
             **kwargs,
         )
 
@@ -137,7 +136,7 @@ cdef class RouteChoiceSetResults:
         df["origin id"] = df["origin id"].astype(df["destination id"].dtype)
 
         # FastParquet is stupid and encodes Parquet list objects as json strings!!!
-        is_json_encoded = df["route set"].map(lambda x: isinstance(x, str))
+        is_json_encoded = df["route set"].map(lambda x: isinstance(x, (str, bytes)))
         if is_json_encoded.any():
             logger.warn("Found JSON encoded route sets. Parsing into a NumPy array...")
             if not is_json_encoded.all():
