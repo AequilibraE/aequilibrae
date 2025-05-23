@@ -322,7 +322,7 @@ class RouteChoice:
         Perform an assignment from an existing set of path-files.
 
         This method expects the path-files to be written by the ``self.save_path_files()`` method,
-        however any PyArrow hive dataset with the correct structure is accepted. This allows the
+        however any parquet hive dataset with the correct structure is accepted. This allows the
         use of AequilibraE's path-sized logit, link loading, select link analysis, and assignment
         while using externally generated routes.
         """

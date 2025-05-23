@@ -8,6 +8,5 @@ pandas
 pyproj
 rtree
 openmatrix
-pyarrow==17.0.0
 geopandas
 tqdm
