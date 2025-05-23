@@ -29,7 +29,7 @@ description = "A package for transportation modeling"
 dynamic = ["version"]
 license = { text = "Modified MIT License" }
 maintainers = [{ name = "AequilibraE contributors" }]
-name = "osmnx"
+name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
 
