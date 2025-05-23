@@ -52,6 +52,8 @@ select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
 
 --#
 CREATE UNIQUE INDEX idx_link ON links (link_id, period_id);
+
+--#
 CREATE UNIQUE INDEX idx_period_links ON links (period_id);
 
 --#
