@@ -120,9 +120,6 @@ pkg_data = {
     ],
 }
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
 if __name__ == "__main__":
     setup(
         name="aequilibrae",
@@ -133,18 +130,31 @@ if __name__ == "__main__":
         package_data=pkg_data,
         zip_safe=False,
         description="A package for transportation modeling",
-        long_description=long_description,
         author="Pedro Camargo",
         author_email="c@margo.co",
         url="https://github.com/AequilibraE/aequilibrae",
         license="See LICENSE.TXT",
         license_files=("LICENSE.TXT",),
+        readme="README.md",
         classifiers=[
-            "Programming Language :: Python",
-            "Programming Language :: Python :: 3.9",
-            "Programming Language :: Python :: 3.10",
-            "Programming Language :: Python :: 3.11",
-            "Programming Language :: Python :: 3.12",
+                    "Development Status :: 5 - Production/Stable",
+                    "Intended Audience :: Developers",
+                    "Intended Audience :: Science/Research",
+                    "Intended Audience :: Public policy",
+                    "Intended Audience :: Urban planning",
+                    "License :: OSI Approved :: MIT License",
+                    "Operating System :: OS Independent",
+                    "Programming Language :: Python",
+                    "Programming Language :: Python :: 3",
+                    "Programming Language :: Python :: 3 :: Only",
+                    "Programming Language :: Python :: 3.9",
+                    "Programming Language :: Python :: 3.10",
+                    "Programming Language :: Python :: 3.11",
+                    "Programming Language :: Python :: 3.12",
+                    "Topic :: Scientific/Engineering :: Transportation Engineering",
+                    "Topic :: Scientific/Engineering :: Transportation modeling",
+                    "Topic :: Scientific/Engineering :: GIS",
+                    "Topic :: Scientific/Engineering :: Visualization",
         ],
         cmdclass={"build_ext": build_ext},
         ext_modules=cythonize(

@@ -25,10 +25,9 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Visualization",
 ]
 
-description = ""
+description = "A package for transportation modeling",
 dynamic = ["version"]
-keywords = ["GIS", "Networks", "OpenStreetMap", "Routing"]
-license = { text = "MIT License" }
+license = { text = "Modified MIT License" }
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "osmnx"
 readme = "README.md"
