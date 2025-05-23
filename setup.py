@@ -151,10 +151,7 @@ if __name__ == "__main__":
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
             "Programming Language :: Python :: 3.12",
-            "Topic :: Scientific/Engineering :: Transportation Engineering",
-            "Topic :: Scientific/Engineering :: Transportation modeling",
-            "Topic :: Scientific/Engineering :: GIS",
-            "Topic :: Scientific/Engineering :: Visualization",
+            "Topic :: Scientific/Engineering",
         ],
         cmdclass={"build_ext": build_ext},
         ext_modules=cythonize(
