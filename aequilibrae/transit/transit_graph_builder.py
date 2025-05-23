@@ -1315,7 +1315,9 @@ class TransitGraphBuilder:
 
         with self.pt_conn as conn:
             if conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
-                raise ValueError(f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})")
+                raise ValueError(
+                    f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})"
+                )
 
             df = self.vertices[SF_VERTEX_COLS]
             df.loc[:, "period_id"] = self.period_id
