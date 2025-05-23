@@ -645,3 +645,7 @@ class TransitGraph(GraphBase):
         self._config = config
         self.od_node_mapping = od_node_mapping
         self.mode = "t"
+
+    @property
+    def config(self):
+        return self._config

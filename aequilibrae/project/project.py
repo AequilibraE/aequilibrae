@@ -158,18 +158,24 @@ class Project:
         global_logger.info("Starting database upgrades")
         targets = [
             (MigrationManager(MigrationManager.network_migration_file), database_connection("project")),
-            (MigrationManager(MigrationManager.transit_migration_file), database_connection("transit")),
         ]
 
-        for mm, conn in targets:
-            with conn as _conn:
-                mm.mark_all_as_seen(_conn)
+        if (self.project_base_path / "public_transport.sqlite").exists():
+            targets.append((MigrationManager(MigrationManager.transit_migration_file), database_connection("transit")))
 
-        for mm, conn in targets:
-            with conn as _conn:
-                mm.upgrade(_conn)
-            conn.close()
-        global_logger.info("Completed database upgrades")
+        try:
+            for mm, conn in targets:
+                with conn:
+                    mm.mark_all_as_seen(conn)
+
+            for mm, conn in targets:
+                with conn:
+                    mm.upgrade(conn)
+                    conn.execute("VACUUM")
+            global_logger.info("Completed database upgrades")
+        finally:
+            for _, conn in targets:
+                conn.close()
 
     def __load_objects(self):
         matrix_folder = self.project_base_path / "matrices"

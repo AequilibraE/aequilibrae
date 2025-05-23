@@ -146,8 +146,8 @@ class TestTransitGraphBuilder(TestCase):
         )
 
         with self.subTest("reloading transit graph"):
-            self.data.save_graphs(suppress_warning=True)
-            self.data.load(suppress_warning=True)
+            self.data.save_graphs()
+            self.data.load()
             graph2 = self.data.graphs[1]
 
             pd.testing.assert_frame_equal(graph1.edges, graph2.edges)
@@ -156,11 +156,11 @@ class TestTransitGraphBuilder(TestCase):
 
         with self.subTest("cannot override existing graph"):
             with self.assertRaises(ValueError):
-                self.data.save_graphs(suppress_warning=True)
+                self.data.save_graphs()
 
         with self.subTest("removing transit graph"):
-            self.data.save_graphs(suppress_warning=True, force=True)
-            self.data.remove_graphs()
+            self.data.save_graphs(force=True)
+            self.data.remove_graphs([1])
 
             links = self.data.pt_con.execute("SELECT link_id FROM links LIMIT 1;")
             nodes = self.data.pt_con.execute("SELECT node_id FROM nodes LIMIT 1;")
@@ -169,4 +169,26 @@ class TestTransitGraphBuilder(TestCase):
             self.assertListEqual(nodes.fetchall(), [])
 
             with self.assertRaises(ValueError):
-                self.data.load(suppress_warning=True)
+                self.data.load([1])
+
+        with self.subTest("save multiple transit graph"):
+            graph = self.data.graphs[1]
+            for i in range(10, 13):
+                self.data.periods.new_period(i, 0, 0).save()
+                graph.period_id = i
+                graph.save()
+
+            for i in range(10, 13):
+                links = self.data.pt_con.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (i,))
+                nodes = self.data.pt_con.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (i,))
+
+                self.assertEqual(len(links.fetchall()), 1)
+                self.assertEqual(len(nodes.fetchall()), 1)
+
+                self.data.load([10, 11, 12])
+                self.assertListEqual(list(self.data.graphs.keys()), [1, 10, 11, 12])
+
+        with self.subTest("remove multiple transit graph"):
+            self.data.remove_graphs([10, 11, 12], unload=True)
+            self.data.load()
+            self.assertListEqual(list(self.data.graphs.keys()), [1])

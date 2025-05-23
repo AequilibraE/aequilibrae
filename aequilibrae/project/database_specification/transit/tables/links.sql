@@ -22,7 +22,8 @@
 
 
 CREATE TABLE if not exists links (ogc_fid         INTEGER PRIMARY KEY,
-                                  link_id         INTEGER NOT NULL UNIQUE,
+                                  link_id         INTEGER NOT NULL,
+                                  period_id       INTEGER NOT NULL,
                                   a_node          INTEGER,
                                   b_node          INTEGER,
                                   direction       INTEGER NOT NULL DEFAULT 0,
@@ -36,16 +37,13 @@ CREATE TABLE if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                   freq            NUMERIC  NOT NULL,
                                   o_line_id       TEXT,
                                   d_line_id       TEXT,
-                                  transfer_id     TEXT
-                                  -- period_start    INTEGER NOT NULL,
-                                  -- period_end      INTEGER NOT NULL
+                                  transfer_id     TEXT,
                                   CHECK(TYPEOF(link_id) == 'integer')
+                                  UNIQUE(link_id, period_id) ON CONFLICT ABORT
                                   CHECK(link_id > 0)
                                   CHECK(TYPEOF(a_node) == 'integer')
                                   CHECK(TYPEOF(b_node) == 'integer')
                                   CHECK(TYPEOF(direction) == 'integer')
-                                  -- CHECK(TYPEOF(period_start) == 'integer')
-                                  -- CHECK(TYPEOF(period_end) == 'integer')
                                   CHECK(LENGTH(modes)>0)
                                   CHECK(LENGTH(direction)==1));
 
@@ -53,7 +51,10 @@ CREATE TABLE if not exists links (ogc_fid         INTEGER PRIMARY KEY,
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
 
 --#
-CREATE UNIQUE INDEX idx_link ON links (link_id);
+CREATE UNIQUE INDEX idx_link ON links (link_id, period_id);
+
+--#
+CREATE INDEX idx_period_links ON links (period_id);
 
 --#
 SELECT CreateSpatialIndex( 'links' , 'geometry' );
@@ -74,42 +75,42 @@ CREATE INDEX idx_link_link_type ON links (link_type);
 CREATE INDEX idx_links_a_node_b_node ON links (a_node, b_node);
 
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_id', 'Unique link ID');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_id', 'Unique link ID');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','a_node', 'origin node for the link');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','a_node', 'origin node for the link');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','b_node', 'destination node for the link');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','b_node', 'destination node for the link');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','direction', 'Flow direction allowed on the link');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','direction', 'Flow direction allowed on the link');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','distance', 'length of the link');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','distance', 'length of the link');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','modes', 'modes allowed on the link');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','modes', 'modes allowed on the link');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_type', 'Link type');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_type', 'Link type');
 -- --#
---  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
+--  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
 -- --#
---  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
+--  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
 -- --#
---  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
+--  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
 -- --#
---  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
+--  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_id', 'ID of the line the link belongs to');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_id', 'ID of the line the link belongs to');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','stop_id', 'ID of the stop the link belongss to ');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','stop_id', 'ID of the stop the link belongs to ');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_seg_idx', 'Line segment index');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_seg_idx', 'Line segment index');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','trav_time', 'Travel time');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','trav_time', 'Travel time');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','freq', 'Frequency of link traversal');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','freq', 'Frequency of link traversal');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','*_line_id', 'Origin/Destination line ID for transfer links');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','*_line_id', 'Origin/Destination line ID for transfer links');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','transfer_id', 'Transfer link ID');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','transfer_id', 'Transfer link ID');
 --#
--- INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_start', 'Graph start time');
+-- INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_start', 'Graph start time');
 -- --#
--- INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_end', 'Graph end period');
+-- INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_end', 'Graph end period');

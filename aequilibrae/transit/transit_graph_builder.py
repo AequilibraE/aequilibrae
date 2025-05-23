@@ -1314,29 +1314,33 @@ class TransitGraphBuilder:
             )
 
         with self.pt_conn as conn:
-            if conn.execute("SELECT node_id FROM nodes LIMIT 1;").fetchall():
-                raise ValueError("cannot save nodes into a database with existing nodes")
+            if conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
+                raise ValueError(
+                    f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})"
+                )
 
+            df = self.vertices[SF_VERTEX_COLS]
+            df.loc[:, "period_id"] = self.period_id
             conn.executemany(
                 f"""\
-                INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
-                VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
+                INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes,period_id)
+                VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",?);
                 """,
-                self.vertices[SF_VERTEX_COLS].itertuples(index=False, name=None),
+                df.itertuples(index=False, name=None),
             )
 
     @staticmethod
-    def remove_vertices(pt_conn: sqlite3.Connection, period_id: int = None):
+    def remove_vertices(pt_conn: sqlite3.Connection, period_id: int):
         """
         Remove a transit graph's vertices from the public transport database specified by it's 'period_id'.
 
         :Arguments:
             **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
-            **period_id** (:obj:`int`): Unused argument. Support for multiple periods is planned.
+            **period_id** (:obj:`int`): ``period_id`` to remove.
 
         """
         with pt_conn as conn:
-            conn.execute("DELETE FROM nodes")
+            conn.execute("DELETE FROM nodes where period_id=?", (period_id,))
 
     def save_edges(self, recreate_line_geometry=False):
         """
@@ -1352,35 +1356,31 @@ class TransitGraphBuilder:
             self.create_line_geometry()
 
         with self.pt_conn as conn:
-            if conn.execute("SELECT link_id FROM links LIMIT 1;").fetchall():
-                raise ValueError("cannot save links into a database with existing links")
+            if conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
+                raise ValueError("cannot save links into a database with existing links in the same period")
 
-            # In order to save the line strings from connector project matching we need to disable some smart node creation.
-            # It will be restored to its previous value once we are done here.
-            val = conn.execute("SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'").fetchone()[0]
-            conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
+            df = self.edges[SF_EDGE_COLS + ["geometry"]]
+            df.loc[:, "period_id"] = self.period_id
             conn.executemany(
                 f"""\
-                INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
-                VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
+                INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_id)
+                VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",?);
                 """,
-                self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
+                df.itertuples(index=False, name=None),
             )
 
-            conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
-
     @staticmethod
-    def remove_edges(pt_conn: sqlite3.Connection, period_id: int = None):
+    def remove_edges(pt_conn: sqlite3.Connection, period_id: int):
         """
         Remove a transit graph's edges from the public transport database specified by it's 'period_id'.
 
         :Arguments:
             **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
-            **period_id** (:obj:`int`): Unused argument. Support for multiple periods is planned.
+            **period_id** (:obj:`int`): ``period_id`` to remove.
 
         """
         with pt_conn as conn:
-            conn.execute("DELETE FROM links")
+            conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
 
     def save_config(self):
         with self.project_conn as conn:
@@ -1416,7 +1416,11 @@ class TransitGraphBuilder:
     def remove(cls, pt_conn: sqlite3.Connection, period_id: int):
         cls.remove_edges(pt_conn, period_id)
         cls.remove_vertices(pt_conn, period_id)
-        cls.remove_config(database_connection("project_database"), period_id)
+        try:
+            conn = database_connection("project_database")
+            cls.remove_config(conn, period_id)
+        finally:
+            conn.close()
 
     def to_transit_graph(self) -> TransitGraph:
         """Create an AequilibraE ``TransitGraph`` object from an SF graph builder."""
@@ -1461,9 +1465,12 @@ class TransitGraphBuilder:
            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the 'public_transport.sqlite' database.
         """
         project_conn = database_connection("project_database")
-        config = project_conn.execute(
-            "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]
-        ).fetchone()
+        try:
+            config = project_conn.execute(
+                "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]
+            ).fetchone()
+        finally:
+            project_conn.close()
 
         if config is None:
             raise ValueError(f"no transit graph configuration found for 'period_id={period_id}'")
@@ -1475,14 +1482,14 @@ class TransitGraphBuilder:
 
         # FIXME Load specific period_id graph from dynamic table
         graph.vertices = pd.read_sql_query(
-            sql=f'SELECT {",".join(SF_VERTEX_COLS[:-1])}, ST_asBinary("geometry") as geometry FROM nodes;',
+            sql=f'SELECT {",".join(SF_VERTEX_COLS[:-1])}, ST_asBinary("geometry") as geometry FROM nodes WHERE period_id={period_id};',
             con=public_transport_conn,
         )
         graph.vertices.node_id = graph.vertices.node_id.astype("int64")
         graph.vertices.line_seg_idx = graph.vertices.line_seg_idx.astype("int64")
 
         graph.edges = pd.read_sql_query(
-            sql=f'SELECT {",".join(SF_EDGE_COLS)}, ST_asBinary("geometry") as geometry FROM links;',
+            sql=f'SELECT {",".join(SF_EDGE_COLS)}, ST_asBinary("geometry") as geometry FROM links WHERE period_id={period_id};',
             con=public_transport_conn,
         )
         graph.edges.line_id = graph.edges.line_id.fillna("").astype(str)
