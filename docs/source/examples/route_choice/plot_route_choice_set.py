@@ -83,7 +83,7 @@ rc.set_choice_set_generation("bfsle", max_routes=5, penalty=1.05)
 rc.prepare(od_pairs_of_interest)
 rc.execute(perform_assignment=True)
 
-choice_set = rc.get_results().to_pandas()
+choice_set = rc.get_results()
 
 # %%
 # If we were interested in storing the route choice result, we could also write them to disk using the ``save_path_files`` method.

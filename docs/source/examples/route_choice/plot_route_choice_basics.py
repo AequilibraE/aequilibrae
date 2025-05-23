@@ -168,8 +168,7 @@ print(results[0])
 
 # %%
 # Because we asked it to also perform an assignment we can access the various results from that.
-# The default return is a Pyarrow Table but Pandas is nicer for viewing.
-res = rc.get_results().to_pandas()
+res = rc.get_results()
 res.head()
 
 # %%
@@ -185,7 +184,7 @@ rc.prepare()
 # %%
 # Now we can perform a batch computation with an assignment
 rc.execute(perform_assignment=True)
-res = rc.get_results().to_pandas()
+res = rc.get_results()
 res.head()
 
 # %%

@@ -20,13 +20,6 @@ release_version = f"{version}.{minor_version}"
 include_dirs = [np.get_include()]
 libraries = []
 library_dirs = []
-if iutil.find_spec("pyarrow") is not None:
-    import pyarrow as pa
-
-    pa.create_library_symlinks()
-    include_dirs.append(pa.get_include())
-    libraries.extend(pa.get_libraries())
-    library_dirs.extend(pa.get_library_dirs())
 
 is_win = "WINDOWS" in platform.platform().upper()
 is_mac = any(e in platform.platform().upper() for e in ["MACOS", "DARWIN"])

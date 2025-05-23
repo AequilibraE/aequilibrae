@@ -22,7 +22,6 @@ import itertools
 import warnings
 
 import numpy as np
-import pyarrow as pa
 import pandas as pd
 
 
@@ -147,13 +146,10 @@ cdef class RouteChoiceSet:
         self.batched(demand_coo, {}, *args, **kwargs)
         where = kwargs.get("where", None)
         if where is not None:
-            schema = RouteChoiceSetResults.psl_schema if kwargs.get("path_size_logit", False) else RouteChoiceSetResults.schema
-            results = pa.dataset.dataset(
-                where, format="parquet", partitioning=pa.dataset.HivePartitioning(schema)
-            ).to_table()
+            results = RouteChoiceSetResults.read_dataset(where)
         else:
             results = self.get_results()
-        return [tuple(x) for x in results.column("route set").to_pylist()]
+        return [tuple(x) for x in results["route set"]]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
@@ -254,8 +250,6 @@ cdef class RouteChoiceSet:
             unsigned char [:, :] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
 
             # self.a_star = a_star
-
-        pa.set_io_thread_count(c_cores)
 
         if self.a_star:
             _reached_first_matrix = np.zeros((c_cores, 1), dtype=np.int64)  # Dummy array to allow slicing
@@ -519,26 +513,6 @@ cdef class RouteChoiceSet:
         self.get_link_loading(cores=c_cores)
         self.get_sl_link_loading(cores=c_cores)
         self.get_sl_od_matrices()
-
-        if not recompute_psl:
-            # Force the table to be constructed
-            table = self.get_results()
-
-            size = len(table)
-            schema = table.schema
-
-            # Because we're not recomputing the psl, the internal cost, mask, and path overlap vectors are empty. As a
-            # side effect of this those table columns are shorter than the others. This *seems* fine but would be
-            # unexpected for down stream users. Additionally the default values of these columns when converted to
-            # pandas are as if the columns were filled with zeros. This makes the mask column False for all routes. If a
-            # user was filtering the routes based on this mask then suddenly they'd have no routes so we fill it with
-            # True instead.
-            columns = dict(zip(table.column_names, table.columns))
-            columns["cost"] = pa.array(np.zeros(size), type=schema.field("cost").type)
-            columns["mask"] = pa.array(np.ones(size, dtype="bool"), type=schema.field("mask").type)
-            columns["path overlap"] = pa.array(np.zeros(size), type=schema.field("path overlap").type)
-
-            self.results.table = pa.Table.from_pydict(columns, schema=schema)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -845,16 +819,16 @@ cdef class RouteChoiceSet:
             else:
                 break
 
-    def get_results(self):  # Cython doesn't like this type annotation... -> pa.Table:
+    def get_results(self):
         """
         :Returns:
-            **route sets** (:obj:`pyarrow.Table`): Returns a table of OD pairs to lists of link IDs for
+            **route sets** (:obj:`pa.DataFrame`): Returns a table of OD pairs to lists of link IDs for
                 each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
         """
         if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
-        return self.results.make_table_from_results()
+        return self.results.make_df_from_results()
 
     def get_link_loading(RouteChoiceSet self, cores: int = 0):
         """

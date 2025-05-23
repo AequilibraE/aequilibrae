@@ -10,11 +10,10 @@ from unittest import TestCase, skip
 
 import numpy as np
 import pandas as pd
-import pyarrow as pa
-
 from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix, GeneralisedCOODemand, Sparse
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.paths.route_choice import RouteChoice
 
 from ...data import siouxfalls_project
@@ -90,8 +89,8 @@ class TestRouteChoiceSet(TestCase):
                 rc = RouteChoiceSet(self.graph)
 
                 rc.batched(demand, max_routes=0, max_depth=3, **kwargs)
-                self.assertFalse(
-                    rc.get_results(),
+                self.assertTrue(
+                    rc.get_results().empty,
                     "Route set from self to self should be empty",
                 )
 
@@ -123,7 +122,7 @@ class TestRouteChoiceSet(TestCase):
         rc.batched(demand, max_routes=max_routes, max_depth=10, max_misses=200)
         results = rc.get_results()
 
-        gb = results.to_pandas().groupby(by="origin id")
+        gb = results.groupby(by="origin id")
         self.assertEqual(len(gb), len(nodes), "Requested number of route sets not returned")
 
         for _, row in gb:
@@ -142,7 +141,7 @@ class TestRouteChoiceSet(TestCase):
         rc.batched(demand, max_routes=max_routes, max_depth=10)
         results = rc.get_results()
 
-        gb = results.to_pandas().groupby(by="origin id")
+        gb = results.groupby(by="origin id")
         self.assertEqual(len(gb), 1, "Duplicates not dropped")
 
     def test_route_choice_exceptions(self):
@@ -170,17 +169,12 @@ class TestRouteChoiceSet(TestCase):
 
         path = join(self.project.project_base_path, "batched results")
         rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True)
-        table = rc.get_results().to_pandas()
+        table = rc.get_results()
         rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True, where=path, cores=1)
 
-        dataset = pa.dataset.dataset(
-            path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.results.schema)
-        )
-        new_table = (
-            dataset.to_table()
-            .to_pandas()
-            .sort_values(by=["origin id", "destination id", "cost"])[table.columns]
-            .reset_index(drop=True)
+        new_table = RouteChoiceSetResults.read_dataset(path)
+        new_table = new_table.sort_values(by=["origin id", "destination id", "cost"])[table.columns].reset_index(
+            drop=True
         )
 
         table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
@@ -194,7 +188,7 @@ class TestRouteChoiceSet(TestCase):
         demand = demand_from_nodes(nodes, self.graph)
         rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
-        table = rc.get_results().to_pandas()
+        table = rc.get_results()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
@@ -211,7 +205,7 @@ class TestRouteChoiceSet(TestCase):
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
         demand = demand_from_nodes(nodes, self.graph)
         rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
-        table = rc.get_results().to_pandas()
+        table = rc.get_results()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
@@ -226,14 +220,13 @@ class TestRouteChoiceSet(TestCase):
         for kwargs in [{"cutoff_prob": 0.0}, {"cutoff_prob": 0.5}, {"cutoff_prob": 1.0}]:
             with self.subTest(**kwargs):
                 rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, **kwargs)
-                table = rc.get_results().to_pandas()
+                table = rc.get_results()
 
                 gb = table.groupby(by=["origin id", "destination id"])
                 for od, df in gb:
                     self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
 
     def test_assign_from_df(self):
-
         mat = AequilibraeMatrix()
         mat.create_empty(
             memory_only=True,
@@ -330,7 +323,7 @@ class TestRouteChoiceSet(TestCase):
         with self.subTest("assign random links", recompute_psl=False):
             rc.assign_from_df(df=df, **args)
 
-            results = rc.get_results().to_pandas()
+            results = rc.get_results()
             ll_res = rc.get_link_loading()["all ones"]
 
             values2 = np.zeros_like(values)
@@ -355,7 +348,7 @@ class TestRouteChoiceSet(TestCase):
         with self.subTest("assign random links", recompute_psl=True):
             rc.assign_from_df(df=df, **(args | {"recompute_psl": True}))
 
-            results = rc.get_results().to_pandas()
+            results = rc.get_results()
             ll_res = rc.get_link_loading()["all ones"]
 
             values2 = np.zeros(len(links.index))
@@ -409,7 +402,7 @@ class TestRouteChoiceSet(TestCase):
                 rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
                 link_loads = rc.get_link_loading()
-                table = rc.get_results().to_pandas()
+                table = rc.get_results()
 
                 with self.subTest(matrix="all zeros"):
                     u = link_loads["all zeros"]
@@ -464,7 +457,7 @@ class TestRouteChoiceSet(TestCase):
                     max_depth=10,
                     path_size_logit=True,
                 )
-                table = rc.get_results().to_pandas()
+                table = rc.get_results()
 
                 # Shortest routes between 20-4, and 21-2 share links 23 and 26. Link 26 also appears in between 10-8 and
                 # 17-9 20-4 also shares 11 with 5-3
@@ -614,7 +607,7 @@ class TestRouteChoice(TestCase):
         self.rc.prepare()
         self.rc.execute(perform_assignment=True)
 
-        results = self.rc.get_results().to_pandas()
+        results = self.rc.get_results()
         ll_res = self.rc.get_load_results()
         self.rc.save_path_files(tmp_path)
 
@@ -624,7 +617,7 @@ class TestRouteChoice(TestCase):
 
         with self.subTest(recompute_psl=False):
             rc.execute_from_path_files(tmp_path, recompute_psl=False)
-            results_new = rc.get_results().to_pandas()
+            results_new = rc.get_results()
             ll_res_new = rc.get_load_results()
             pd.testing.assert_frame_equal(ll_res, ll_res_new)
             pd.testing.assert_frame_equal(
@@ -634,7 +627,7 @@ class TestRouteChoice(TestCase):
 
         with self.subTest(recompute_psl=True):
             rc.execute_from_path_files(tmp_path, recompute_psl=True)
-            results_new = rc.get_results().to_pandas()
+            results_new = rc.get_results()
             ll_res_new = rc.get_load_results()
             pd.testing.assert_frame_equal(ll_res, ll_res_new)
             pd.testing.assert_frame_equal(results, results_new)
@@ -646,7 +639,7 @@ class TestRouteChoice(TestCase):
             rc.set_choice_set_generation(store_results=True)
 
             rc.execute_from_path_files(tmp_path, recompute_psl=True)
-            results_new = rc.get_results().to_pandas()
+            results_new = rc.get_results()
             ll_res_new = rc.get_load_results()
 
             pd.testing.assert_series_equal(results["origin id"], results["origin id"])
@@ -702,11 +695,11 @@ class TestRouteChoice(TestCase):
 
         self.rc.set_save_routes(None)
         self.rc.execute(perform_assignment=True)
-        table = self.rc.get_results().to_pandas()
+        table = self.rc.get_results()
 
         self.rc.set_save_routes(path)
         self.rc.execute(perform_assignment=True)
-        table2 = self.rc.get_results().to_table().to_pandas()
+        table2 = self.rc.get_results()
 
         table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
         table2 = table2[table.columns].sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)

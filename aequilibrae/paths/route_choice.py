@@ -13,9 +13,7 @@ from functools import cached_property
 
 import numpy as np
 import pandas as pd
-import pyarrow as pa
 import openmatrix as omx
-import pyarrow.dataset
 import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
@@ -330,24 +328,30 @@ class RouteChoice:
         """
 
         # Read the dataset schema and make sure it conforms to what we want
-        ds = RouteChoiceSetResults.read_dataset(path_files)
+        df = RouteChoiceSetResults.read_dataset(path_files)
         required_fields = ["origin id", "destination id", "route set"] + [] if recompute_psl else ["probability"]
-        schema = RouteChoiceSetResults.schema if recompute_psl else RouteChoiceSetResults.psl_schema
+        schema = {
+            "destination id": "uint32",
+            "route set": "object",
+            "cost": "float64",
+            "mask": "bool",
+            "path overlap": "float64",
+            "probability": "float64",
+            "origin id": "uint32",
+        }
+        dtypes = df.dtypes
 
         try:
             for field in required_fields:
-                if schema.field(field) != ds.schema.field(field):
+                if schema[field] != dtypes.loc[field]:
                     raise TypeError(
                         f"schema of required field '{field}' does not match. "
-                        f"Expected {schema.field(field)}, "
-                        f"found {ds.schema.field(field)}"
+                        f"Expected {schema[field]}, "
+                        f"found {dtypes.loc[field]}"
                     )
         except KeyError as e:
             raise KeyError(f"Column '{field}' does not exist in the path-files") from e
 
-        # Once we know it's fine, read in the table and convert it to a pandas object. This is all little easier to work
-        # with.
-        df = ds.to_table().to_pandas()
         self.execute_from_pandas(df=df, recompute_psl=recompute_psl)
 
     def execute_from_pandas(self, df: pd.DataFrame, recompute_psl: bool = False) -> None:
@@ -424,7 +428,7 @@ class RouteChoice:
         self.logger.info("Route Choice specification")
         self.logger.info(self._config)
 
-    def get_results(self) -> Union[pa.Table, pa.dataset.Dataset]:
+    def get_results(self) -> pd.DataFrame:
         """
         Returns the results of the route choice procedure
 
@@ -432,11 +436,8 @@ class RouteChoice:
         ``origin`` to ``destination``. When the link id in the route set is positive it represents the ab direction,
         while negative represents the ba direction.
 
-        If ``save_routes`` was specified then a Pyarrow dataset is returned. The caller is
-        responsible for reading this dataset.
-
         :Returns:
-            **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
+            **results** (:obj:`pd.DataFrame`): Table with the results of the route choice procedure
         """
         if self.where is None:
             results = self.__rc.get_results()
@@ -449,7 +450,7 @@ class RouteChoice:
         """
         Save path-files to the directory specific.
 
-        Files will be saved as a PyArrow hive dataset partitioned by the origin ID. Existing path-files will not be
+        Files will be saved as a parquet hive dataset partitioned by the origin ID. Existing path-files will not be
         removed to allow incremental route choice set generation.
 
         :Arguments:

@@ -2,23 +2,18 @@ from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_types cimport (
     RouteVec_t,
     RouteSet_t,
-    CUInt32Builder,
-    CInt64Builder,
-    CDoubleBuilder,
-    CBooleanBuilder
 )
 
 from libcpp.vector cimport vector
 from libcpp.memory cimport shared_ptr
-from libcpp cimport bool
 from libc.stdint cimport *
 
 
 cdef class RouteChoiceSetResults:
     cdef:
         GeneralisedCOODemand demand
-        bool store_results
-        bool perform_assignment
+        bint store_results
+        bint perform_assignment
         double cutoff_prob
         double beta
         double[:] cost_view
@@ -28,7 +23,7 @@ cdef class RouteChoiceSetResults:
         vector[shared_ptr[RouteVec_t]] __route_vecs
         vector[vector[long long] *] __link_union_set
         vector[shared_ptr[vector[double]]] __cost_set
-        vector[shared_ptr[vector[bool]]] __mask_set
+        vector[shared_ptr[vector[bint]]] __mask_set
         vector[shared_ptr[vector[double]]] __path_overlap_set
         vector[shared_ptr[vector[double]]] __prob_set
 
@@ -39,7 +34,7 @@ cdef class RouteChoiceSetResults:
 
     cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil
-    cdef shared_ptr[vector[bool]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil
+    cdef shared_ptr[vector[bint]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] get_prob_vec(RouteChoiceSetResults self, size_t i) noexcept nogil
 
@@ -61,7 +56,7 @@ cdef class RouteChoiceSetResults:
 
     cdef void compute_mask(
         RouteChoiceSetResults self,
-        vector[bool] &route_mask,
+        vector[bint] &route_mask,
         const vector[double] &total_cost
     ) noexcept nogil
 
@@ -70,7 +65,7 @@ cdef class RouteChoiceSetResults:
         vector[long long] &keys,
         vector[long long] &counts,
         const RouteVec_t &route_set,
-        const vector[bool] &route_mask
+        const vector[bint] &route_mask
     ) noexcept nogil
 
     cdef void compute_path_overlap(
@@ -80,7 +75,7 @@ cdef class RouteChoiceSetResults:
         const vector[long long] &keys,
         const vector[long long] &counts,
         const vector[double] &total_cost,
-        const vector[bool] &route_mask,
+        const vector[bint] &route_mask,
         const double[:] cost_view
     ) noexcept nogil
 
@@ -89,9 +84,9 @@ cdef class RouteChoiceSetResults:
         vector[double] &prob_vec,
         const vector[double] &total_cost,
         const vector[double] &path_overlap_vec,
-        const vector[bool] &route_mask
+        const vector[bint] &route_mask
     ) noexcept nogil
 
-    cdef object make_table_from_results(RouteChoiceSetResults self)
+    cdef object make_df_from_results(RouteChoiceSetResults self)
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil
