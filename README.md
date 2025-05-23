@@ -4,7 +4,7 @@
 [![Documentation](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml)
 [![unit tests](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml)
 [![Code coverage](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml)
-[![Packaging](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_wheels.yml)
+[![Packaging](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_wheels.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_wheels.yml)
 
 AequilibraE is a fully-featured Open-Source transportation modeling package and
 the first comprehensive package of its kind for the Python ecosystem, and is 
