@@ -7,6 +7,7 @@ shapely
 pandas
 pyproj
 rtree
+pyarrow
 openmatrix
 geopandas
 tqdm
