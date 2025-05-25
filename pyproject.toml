@@ -23,12 +23,10 @@ classifiers = [
 
 description = "A package for transportation modeling"
 dynamic = ["version"]
-license = { text = "Modified MIT License" }
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
-
 
 license = "LicenseRef-aequilibrae"
 license-files = ["LICENSE.TXT"]
