@@ -26,7 +26,6 @@ name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
 
-license = "LicenseRef-aequilibrae"
 license-files = ["LICENSE.TXT"]
 
 dependencies = [
