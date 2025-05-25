@@ -72,8 +72,8 @@ tests = [
 "pytest-subtests",
 "coveralls",
 "ruff==0.9.10",
-"wheel",
 "black==25.1.0"
+"wheel",
 ]
 
 [tool.black]
