@@ -75,7 +75,7 @@ tests = [
 
 build=["setuptools", "numpy<1.99", "cython", "wheel"]
 
-dev = ['aequilibrae[build, test, docs]']
+dev = ['aequilibrae[build, tests, docs]']
 
 [tool.setuptools.dynamic]
 version = { attr = "aequilibrae.version" }
