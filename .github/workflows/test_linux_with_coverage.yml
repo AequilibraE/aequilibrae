@@ -9,7 +9,7 @@ jobs:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
-        python-version: [3.10]
+        python-version: [3.11]
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
@@ -18,8 +18,8 @@ jobs:
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev
         python3 -m pip install setuptools uv --upgrade
-        uv pip install .
-        uv pip install spatialite pytest pytest-cov
+        uv pip install . --system
+        uv pip install spatialite pytest pytest-cov --system
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
     - name: Compile library
       run: |
