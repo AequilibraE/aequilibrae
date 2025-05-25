@@ -26,7 +26,7 @@ name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
 
-license = ["LICENSE.TXT"]
+
 
 dependencies = [
     "numpy<1.99",
@@ -40,6 +40,9 @@ dependencies = [
     "openmatrix",
     "geopandas",
     "tqdm"]
+
+[project.license]
+file = "LICENSE.TXT"
 
 [project.optional-dependencies]
 
