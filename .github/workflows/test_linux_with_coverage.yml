@@ -17,11 +17,9 @@ jobs:
         sudo apt update
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev
-        pip3 install setuptools --upgrade
-        pip3 install -r requirements.txt
-        pip3 install spatialite
-        pip3 install pytest
-        pip3 install pytest-cov
+        python3 -m pip install setuptools uv --upgrade
+        uv pip install .
+        uv pip install spatialite pytest pytest-cov
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
     - name: Compile library
       run: |
