@@ -11,12 +11,6 @@ from setuptools import setup, find_packages
 from setuptools.discovery import FlatLayoutPackageFinder
 from multiprocessing import cpu_count
 
-# When updating the version, one must also update the docs/source/useful_links/version_history.rst file
-version = 1.4
-minor_version = 1
-
-release_version = f"{version}.{minor_version}"
-
 include_dirs = [np.get_include()]
 libraries = []
 library_dirs = []
@@ -101,58 +95,12 @@ ext_mod_coo_demand = Extension(
     **extension_args,
 )
 
-with open("requirements.txt", "r") as fl:
-    install_requirements = [x.strip() for x in fl.readlines()]
-
-pkgs = find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE)
-
-pkg_data = {
-    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
-    "aequilibrae.paths": ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"],
-    "aequilibrae.distribution": ["cython/*.pyx"],
-    "aequilibrae.matrix": ["*.pyx", "*.pxd"],
-    "aequilibrae": ["./parameters.yml", "../requirements.txt"],
-    "aequilibrae.project": [
-        "database_specification/network/tables/*.*",
-        "database_specification/network/triggers/*.*",
-        "database_specification/transit/tables/*.*",
-        "database_specification/transit/triggers/*.*",
-    ],
-}
 
 if __name__ == "__main__":
     setup(
-        name="aequilibrae",
-        version=release_version,  # noqa: F821
-        install_requires=install_requirements,
-        packages=pkgs,
+        packages=find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE),
         package_dir={"": "."},
-        package_data=pkg_data,
         zip_safe=False,
-        description="A package for transportation modeling",
-        author="Pedro Camargo",
-        author_email="c@margo.co",
-        url="https://github.com/AequilibraE/aequilibrae",
-        license="See LICENSE.TXT",
-        license_files=("LICENSE.TXT",),
-        readme="README.md",
-        classifiers=[
-            "Development Status :: 5 - Production/Stable",
-            "Intended Audience :: Developers",
-            "Intended Audience :: Science/Research",
-            "Intended Audience :: End Users/Desktop",
-            "Intended Audience :: Other Audience",
-            "License :: OSI Approved :: MIT License",
-            "Operating System :: OS Independent",
-            "Programming Language :: Python",
-            "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3 :: Only",
-            "Programming Language :: Python :: 3.9",
-            "Programming Language :: Python :: 3.10",
-            "Programming Language :: Python :: 3.11",
-            "Programming Language :: Python :: 3.12",
-            "Topic :: Scientific/Engineering",
-        ],
         cmdclass={"build_ext": build_ext},
         ext_modules=cythonize(
             [
