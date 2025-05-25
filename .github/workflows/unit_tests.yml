@@ -43,7 +43,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip setuptools uv
-        python -m uv pip install -e .[tests]
+        python -m uv pip install -e .[dev]
 
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'

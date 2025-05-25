@@ -19,8 +19,8 @@ jobs:
         sudo apt install -y libspatialite-dev
         curl -LsSf https://astral.sh/uv/install.sh | sh
         PATH="/root/.local/bin/:$PATH"
-        uv venv .venv
-        .venv/bin/activate
+        uv venv /venv_test
+        source /venv_test/bin/activate
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
     - name: Compile library
       run: |
