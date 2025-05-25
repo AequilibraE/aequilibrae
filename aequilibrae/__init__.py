@@ -21,4 +21,5 @@ from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResult
 
 from aequilibrae import paths
 
-name = "aequilibrae"
+# When updating the version, one must also update the docs/source/useful_links/version_history.rst file
+version = "1.4.2"

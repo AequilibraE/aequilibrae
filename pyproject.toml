@@ -9,7 +9,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Intended Audience :: End Users/Desktop",
     "Intended Audience :: Other Audience",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -20,9 +19,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
 ]
-
-description = "A package for transportation modeling"
 dynamic = ["version"]
+description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
@@ -72,9 +70,29 @@ tests = [
 "pytest-subtests",
 "coveralls",
 "ruff==0.9.10",
-"black==25.1.0"
+"black==25.1.0",
 "wheel",
 ]
+
+[tool.setuptools.dynamic]
+version = { attr = "aequilibrae.version" }
+
+[tool.setuptools.package-dir]
+aequilibrae = "aequilibrae"
+
+[tool.setuptools.package-data]
+    "aequilibrae.reference_files"= ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"]
+    "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
+    "aequilibrae.distribution"= ["cython/*.pyx"]
+    "aequilibrae.matrix"= ["*.pyx", "*.pxd"]
+    "aequilibrae"= ["./parameters.yml"]
+    "aequilibrae.project"= [
+        "database_specification/network/tables/*.*",
+        "database_specification/network/triggers/*.*",
+        "database_specification/transit/tables/*.*",
+        "database_specification/transit/triggers/*.*",
+    ]
+
 
 [tool.black]
 line-length = 120
