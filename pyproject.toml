@@ -43,7 +43,6 @@ dependencies = [
     "tqdm"]
 
 [project.optional-dependencies]
-hpc = ['globus_sdk']
 
 docs = [
     "enum34",
@@ -73,6 +72,10 @@ tests = [
 "black==25.1.0",
 "wheel",
 ]
+
+build=["setuptools", "numpy<1.99", "cython", "wheel"]
+
+dev = ['aequilibrae[build, test, docs]']
 
 [tool.setuptools.dynamic]
 version = { attr = "aequilibrae.version" }

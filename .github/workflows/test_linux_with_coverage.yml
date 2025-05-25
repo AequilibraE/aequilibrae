@@ -17,14 +17,16 @@ jobs:
         sudo apt update
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev
-        python3 -m pip install setuptools uv --upgrade
-        uv pip install . --system
-        uv pip install spatialite pytest pytest-cov --system
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        PATH="/root/.local/bin/:$PATH"
+        uv venv .venv
+        .venv/bin/activate
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
     - name: Compile library
       run: |
-        python3 setup.py build_ext --inplace
+        uv pip install .[dev]
+        python setup.py build_ext --inplace
 
     - name: Generate coverage report
       run: |
-        python3 -m pytest --cov=aequilibrae tests/
+        python -m pytest --cov=aequilibrae tests/
