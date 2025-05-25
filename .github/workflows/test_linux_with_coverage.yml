@@ -19,13 +19,14 @@ jobs:
         sudo apt install -y libspatialite-dev
         pip3 install uv
         uv venv ./venv_test
-        source ./venv_test/bin/activate
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
     - name: Compile library
       run: |
+        source ./venv_test/bin/activate
         uv pip install .[dev]
         python setup.py build_ext --inplace
 
     - name: Generate coverage report
       run: |
+        source ./venv_test/bin/activate
         python -m pytest --cov=aequilibrae tests/
