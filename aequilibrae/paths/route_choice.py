@@ -500,7 +500,8 @@ class RouteChoice:
             added_dfs.append(pd.DataFrame({(*k, "tot"): df[(*k, "ab")] + df[(*k, "ba")]}))
 
         df = pd.concat([df] + added_dfs, axis=1).set_index("link_id")
-        df.columns = pd.MultiIndex.from_tuples(df.columns)
+        df.columns = ["_".join(x) for x in df.columns]
+
         return df.sort_index()
 
     def set_select_links(
