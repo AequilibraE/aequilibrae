@@ -184,8 +184,8 @@ subarea_zone = folium.Polygon(
 # %%
 # We create a function to plot out link loads data more easily
 def plot_results(link_loads):
-    link_loads = link_loads[link_loads.tot > 0]
-    max_load = link_loads["tot"].max()
+    link_loads = link_loads[link_loads["demand_tot"] > 0]
+    max_load = link_loads[["demand_tot"]].max()
     links = project.network.links.data
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
     factor = 10 / max_load
@@ -194,7 +194,7 @@ def plot_results(link_loads):
         color="red",
         style_kwds={
             "style_function": lambda x: {
-                "weight": x["properties"]["tot"] * factor,
+                "weight": x["properties"]["demand_tot"] * factor,
             }
         },
     )
@@ -202,7 +202,7 @@ def plot_results(link_loads):
 
 # %%
 # And plot our data!
-map = plot_results(rc.get_load_results()["demand"])
+map = plot_results(rc.get_load_results())
 subarea_zone.add_to(map)
 map
 
@@ -297,7 +297,7 @@ rc.execute(perform_assignment=True)
 
 # %%
 # We can visualise the current links loads
-map = plot_results(rc.get_load_results()["demand"])
+map = plot_results(rc.get_load_results())
 subarea_zone.add_to(map)
 map
 
@@ -385,7 +385,7 @@ rc.execute(perform_assignment=True)
 
 # %%
 # And plot the link loads for easy viewing
-map = plot_results(rc.get_load_results()["demand"])
+map = plot_results(rc.get_load_results())
 subarea_zone.add_to(map)
 map
 
