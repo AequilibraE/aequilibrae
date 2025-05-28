@@ -243,8 +243,9 @@ class GraphBase(ABC):  # noqa: B024
 
         # Now we take care of centroids
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
-        if not np.isin(centroids, nodes, assume_unique=True).all():
-            warnings.warn("Found centroids not present in the graph!")
+        missing = np.isin(centroids, nodes, assume_unique=True)
+        if not missing.all():
+            warnings.warn("Found centroids not present in the graph!\n" + str(centroids[~missing]))
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
         all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 

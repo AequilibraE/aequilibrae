@@ -634,7 +634,7 @@ class RouteChoice:
         self.procedure_id = uuid4().hex
         data = [
             table_name,
-            "select link",
+            method_name,
             self.procedure_id,
             str(report),
             self.procedure_date,
@@ -644,6 +644,7 @@ class RouteChoice:
         # sqlite3 context managers only commit, they don't close, oh well
         res_path = path.join(project.project_base_path, "results_database.sqlite")
         with commit_and_close(res_path, missing_ok=True) as conn:
+            df.columns = ["_".join(x) for x in df.columns]
             df.to_sql(table_name, conn, index=True)
 
         with self.project.db_connection as conn:
