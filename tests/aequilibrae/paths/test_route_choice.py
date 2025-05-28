@@ -668,9 +668,6 @@ class TestRouteChoice(TestCase):
             ]:
                 with self.subTest(table=table):
                     df2 = pd.read_sql(f"select * from {table}", conn).set_index("link_id")
-                    # NOTE: Pandas to_sql serialises the columns of a multiindex as a str, to avoid annoying parsing we
-                    # use eval here.
-                    df2.columns = pd.MultiIndex.from_tuples([eval(x) for x in df2.columns])
                     pd.testing.assert_frame_equal(df2, df)
         conn.close()
 

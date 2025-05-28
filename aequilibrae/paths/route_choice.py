@@ -500,7 +500,8 @@ class RouteChoice:
             added_dfs.append(pd.DataFrame({(*k, "tot"): df[(*k, "ab")] + df[(*k, "ba")]}))
 
         df = pd.concat([df] + added_dfs, axis=1).set_index("link_id")
-        df.columns = pd.MultiIndex.from_tuples(df.columns)
+        df.columns = ["_".join(x) for x in df.columns]
+
         return df.sort_index()
 
     def set_select_links(
@@ -644,7 +645,6 @@ class RouteChoice:
         # sqlite3 context managers only commit, they don't close, oh well
         res_path = path.join(project.project_base_path, "results_database.sqlite")
         with commit_and_close(res_path, missing_ok=True) as conn:
-            df.columns = ["_".join(x) for x in df.columns]
             df.to_sql(table_name, conn, index=True)
 
         with self.project.db_connection as conn:
