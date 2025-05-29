@@ -580,22 +580,20 @@ class TestRouteChoice(TestCase):
         df = self.rc.get_load_results()
         u_sl = self.rc.get_select_link_loading_results()
 
-        pd.testing.assert_index_equal(
-            df.columns,
-            pd.MultiIndex.from_tuples([(mat_name, dir) for dir in ["ab", "ba", "tot"] for mat_name in self.mat.names]),
+        self.assertListEqual(
+            list(df.columns),
+            [f"{mat_name}_{dir}" for dir in ["ab", "ba", "tot"] for mat_name in self.mat.names],
         )
 
-        pd.testing.assert_index_equal(
-            u_sl.columns,
-            pd.MultiIndex.from_tuples(
-                [
-                    (mat_name, sl_name, dir)
-                    for sl_name in ["sl1", "sl2"]
-                    for dir in ["ab", "ba"]
-                    for mat_name in self.mat.names
-                ]
-                + [(mat_name, sl_name, "tot") for sl_name in ["sl1", "sl2"] for mat_name in self.mat.names]
-            ),
+        self.assertListEqual(
+            list(u_sl.columns),
+            [
+                f"{mat_name}_{sl_name}_{dir}"
+                for sl_name in ["sl1", "sl2"]
+                for dir in ["ab", "ba"]
+                for mat_name in self.mat.names
+            ]
+            + [f"{mat_name}_{sl_name}_tot" for sl_name in ["sl1", "sl2"] for mat_name in self.mat.names],
         )
 
     def test_execute_from_path_files(self):
