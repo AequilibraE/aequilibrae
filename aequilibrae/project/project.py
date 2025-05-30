@@ -171,7 +171,6 @@ class Project:
             for mm, conn in targets:
                 with conn:
                     mm.upgrade(conn)
-                    conn.execute("VACUUM")
             global_logger.info("Completed database upgrades")
         finally:
             for _, conn in targets:

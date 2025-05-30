@@ -3,7 +3,7 @@ import os
 import shutil
 import urllib
 import warnings
-from os.path import join, basename
+from os.path import basename, join
 from pathlib import Path
 from sqlite3 import Connection, register_adapter
 from tempfile import gettempdir
@@ -13,7 +13,7 @@ from zipfile import ZipFile
 import numpy as np
 
 from aequilibrae.log import global_logger
-from aequilibrae.utils.db_utils import has_table, safe_connect
+from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
 # Setup adapaters so that we can read/write numpy types directly to DB
@@ -36,7 +36,7 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
     if inside_qgis:
         import qgis
 
-        return qgis.utils.spatialite_connect(str(path_to_file))
+        return qgis.utils.spatialite_connect(str(path_to_file), factory=AequilibraEConnection)
 
     ensure_spatialite_binaries()
 
