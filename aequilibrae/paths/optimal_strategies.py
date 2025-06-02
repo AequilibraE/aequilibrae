@@ -20,17 +20,8 @@ class OptimalStrategies:
             cls.results.prepare(cls.graph, cls.matrix)
 
             self.__results[cls._id] = cls.results
-            self.__classes[cls._id] = HyperpathGenerating(
-                cls.graph.graph,
-                head="a_node",
-                tail="b_node",
-                trav_time=self.__assig_spec._config["Time field"],
-                freq=self.__assig_spec._config["Frequency field"],
-                skim_cols=self.__assig_spec._config["Skimming Fields"],
-                centroids=cls.graph.centroids,
-            )
-
             try:
+                # converts 0 based array with custom index to COO matrix, ignores custom index
                 idx = cls.matrix.view_names.index(cls.matrix_core)
                 demand = sparse.coo_matrix(
                     (
@@ -45,26 +36,47 @@ class OptimalStrategies:
                     f"matrix core {cls.matrix_core} not found in matrix view. Ensure the matrix is prepared and the core exists"
                 ) from e
 
+            # Take the COO matrix and lookup the index values (taz_id)
+            taz_row = cls.matrix.index[demand.row]
+            taz_col = cls.matrix.index[demand.col]
             # Since the aeq matrix indexes based on centroids, and the transit graph can make the distinction between
             # origins and destinations, We need to translate the index of the cols in to the destination node_ids for
             # the assignment
-            if len(cls.graph.od_node_mapping.columns) == 2:
-                o_vert_ids = cls.graph.od_node_mapping.iloc[demand.row]["node_id"].values.astype(np.uint32)
-                d_vert_ids = cls.graph.od_node_mapping.iloc[demand.col]["node_id"].values.astype(np.uint32)
-            else:
-                o_vert_ids = cls.graph.od_node_mapping.iloc[demand.row]["o_node_id"].values.astype(np.uint32)
-                d_vert_ids = cls.graph.od_node_mapping.iloc[demand.col]["d_node_id"].values.astype(np.uint32)
+            od_node_mapping = cls.graph.od_node_mapping.copy()
+            od_node_mapping["idx"] = od_node_mapping.index
+            od_node_mapping = od_node_mapping.set_index("taz_id")
 
+            o_key, d_key = (
+                ("node_id", "node_id") if len(cls.graph.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
+            )
+
+            # map taz_id, taz_id -> O, D, demand value triplet
             self.__demand_cols[cls._id] = {
-                "origin_column": o_vert_ids,
-                "destination_column": d_vert_ids,
+                "origin_column": od_node_mapping.loc[taz_row, o_key].to_numpy().astype(np.uint32),
+                "destination_column": od_node_mapping.loc[taz_col, d_key].values.astype(np.uint32),
                 "demand_column": demand.data,
             }
 
-        for cls_id, hyperpath in self.__classes.items():
-            self.__logger.info(f"Executing S&F assignment  for {cls_id}")
+            self.__classes[cls._id] = HyperpathGenerating(
+                cls.graph.graph,
+                head="a_node",
+                tail="b_node",
+                trav_time=self.__assig_spec._config["Time field"],
+                freq=self.__assig_spec._config["Frequency field"],
+                skim_cols=self.__assig_spec._config["Skimming Fields"],
+                o_vert_ids=od_node_mapping[o_key].to_numpy(),  # taz_id
+                d_vert_ids=od_node_mapping[d_key].to_numpy(),  # node_id for destination in the above taz_id
+                nodes_to_indices=cls.graph.nodes_to_indices,
+            )
 
-            hyperpath.assign(**self.__demand_cols[cls_id], threads=self.__assig_spec.cores)
-            self.__results[cls_id].link_loads = hyperpath._edges["volume"].values
+        for cls in self.__assig_spec.classes:
+            hyperpath = self.__classes[cls._id]
+
+            self.__logger.info(f"Executing S&F assignment  for {cls._id}")
+
+            hyperpath.assign(**self.__demand_cols[cls._id], threads=self.__assig_spec.cores)
+            self.__results[cls._id].link_loads = hyperpath._edges["volume"].values
             if hyperpath._skimming:
-                self.__results[cls_id].skims = hyperpath.skim_matrix
+                skim = hyperpath.skim_matrix
+                # skim.index = cls.graph.centroids[:]
+                self.__results[cls._id].skims = skim

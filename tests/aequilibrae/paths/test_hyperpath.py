@@ -383,13 +383,19 @@ class TestHyperPath(TestCase):
                     "demand": np.full(10, 1),
                 }
             )
+            self.centroids = self.vertices.index.to_numpy()
+            self.all_nodes = self.vertices.index.to_numpy()
 
         elif network == "SF":
             self.edges, self.demand = create_SF_network(dwell_time=dwell_time)
             self.centroids = np.array([0, 12])
+            self.all_nodes = np.unique(np.hstack((self.edges["head"].values, self.edges["tail"].values)))
 
         else:
             raise KeyError(f'Unknown network type "{network}"')
+
+        self.nodes_to_indices = np.full(self.all_nodes.max() + 1, -1, dtype="int64")
+        self.nodes_to_indices[self.all_nodes] = np.arange(len(self.all_nodes))
 
     def tearDown(self) -> None:
         try:
@@ -402,7 +408,12 @@ class TestHyperPath(TestCase):
     def test_bell_assign_parallel_agreement(self) -> None:
         self._setUp(network="bell")
 
-        hp = HyperpathGenerating(self.edges)
+        hp = HyperpathGenerating(
+            self.edges,
+            o_vert_ids=self.centroids,
+            d_vert_ids=self.centroids,
+            nodes_to_indices=self.nodes_to_indices,
+        )
 
         results = []
         for threads in [1, 2, 4]:
@@ -421,7 +432,12 @@ class TestHyperPath(TestCase):
     def test_SF_run_01(self):
         self._setUp(network="SF")
 
-        hp = HyperpathGenerating(self.edges)
+        hp = HyperpathGenerating(
+            self.edges,
+            o_vert_ids=self.centroids,
+            d_vert_ids=self.centroids,
+            nodes_to_indices=self.nodes_to_indices,
+        )
         hp.run(origin=0, destination=12, volume=1.0)
 
         np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
@@ -452,7 +468,12 @@ class TestHyperPath(TestCase):
     def test_SF_assign_01(self):
         self._setUp(network="SF")
 
-        hp = HyperpathGenerating(self.edges)
+        hp = HyperpathGenerating(
+            self.edges,
+            o_vert_ids=self.centroids,
+            d_vert_ids=self.centroids,
+            nodes_to_indices=self.nodes_to_indices,
+        )
 
         hp.assign(
             self.demand["origin_vertex_id"].values.astype(np.uint32),
@@ -469,12 +490,24 @@ class TestHyperPath(TestCase):
         columns = ["boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
         for col in columns:
             with self.subTest(col=col):
-                hp = HyperpathGenerating(self.edges, skim_cols=[col], centroids=self.centroids)
+                hp = HyperpathGenerating(
+                    self.edges,
+                    skim_cols=[col],
+                    o_vert_ids=self.centroids,
+                    d_vert_ids=self.centroids,
+                    nodes_to_indices=self.nodes_to_indices,
+                )
 
                 self.assertIn(col, hp._edges.columns, "requested column missing from edges")
 
         with self.subTest(col=col):
-            hp = HyperpathGenerating(self.edges, skim_cols=["waiting_time"], centroids=self.centroids)
+            hp = HyperpathGenerating(
+                self.edges,
+                skim_cols=["waiting_time"],
+                o_vert_ids=self.centroids,
+                d_vert_ids=self.centroids,
+                nodes_to_indices=self.nodes_to_indices,
+            )
 
             self.assertNotIn("waiting_time", hp._edges.columns, "waiting time isn't a real column")
             self.assertNotIn("boardings", hp._edges.columns, "boardings isn't required for waiting time skims")
@@ -489,7 +522,11 @@ class TestHyperPath(TestCase):
         self._setUp(network="SF")
 
         hp = HyperpathGenerating(
-            self.edges, skim_cols=["boardings", "transfers", "waiting_time"], centroids=self.centroids
+            self.edges,
+            skim_cols=["boardings", "transfers", "waiting_time"],
+            o_vert_ids=self.centroids,
+            d_vert_ids=self.centroids,
+            nodes_to_indices=self.nodes_to_indices,
         )
 
         hp.assign(
@@ -499,9 +536,8 @@ class TestHyperPath(TestCase):
             check_demand=True,
         )
         mats = hp.skim_matrix.matrix
-        max = np.finfo("float").max
 
-        np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [max, 0]]))  # travel time from paper
+        np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [0, 0]]))  # travel time from paper
 
         # No access or egress links in the network
         np.testing.assert_allclose(mats["access_trav_time"], np.array([[0, 0], [0, 0]]))
@@ -517,13 +553,19 @@ class TestHyperPath(TestCase):
             mats["in_vehicle_trav_time"], np.array([[0, 27.75 * 60.0 - mats["waiting_time"][0, 1]], [0, 0]])
         )
         np.testing.assert_allclose(
-            mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [max, 0]])
+            mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [0, 0]])
         )
 
     def test_SF_skimming_02(self):
         self._setUp(network="SF")
 
-        hp = HyperpathGenerating(self.edges, skim_cols=["boardings", "alightings"], centroids=self.centroids)
+        hp = HyperpathGenerating(
+            self.edges,
+            skim_cols=["boardings", "alightings"],
+            o_vert_ids=self.centroids,
+            d_vert_ids=self.centroids,
+            nodes_to_indices=self.nodes_to_indices,
+        )
 
         hp.assign(
             self.demand["origin_vertex_id"].values.astype(np.uint32),

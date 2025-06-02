@@ -79,3 +79,22 @@ def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file
             logger.error(msg)
             logger.info(cmd)
             raise e
+
+
+def recreate_columns(conn: Connection, logger: logging.Logger, table: str, old_table: str) -> dict[str, str]:
+    """
+    Recreate columns for a table if any were added. Returns a dict of the old column names to type
+    """
+    columns = conn.execute(f"SELECT name, type FROM PRAGMA_TABLE_INFO('{old_table}') AS table_info").fetchall()
+    columns = {f"{x[0]}": x[1] for x in columns if x[0]}
+
+    orig_columns = conn.execute(f"SELECT name, type FROM PRAGMA_TABLE_INFO('{table}') AS table_info").fetchall()
+    orig_columns = {f"{x[0]}" for x in orig_columns}
+
+    new_columns = {k: v for k, v in columns.items() if k not in orig_columns}
+    logger.info(f"Found {len(new_columns)} new columns: {list(new_columns.keys())}")
+    sql = "ALTER TABLE {} ADD COLUMN {} {};"
+    for k, v in new_columns.items():
+        conn.execute(sql.format(table, k, v))
+
+    return columns

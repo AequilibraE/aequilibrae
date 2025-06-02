@@ -18,6 +18,7 @@ class AequilibraEConnection(sqlite3.Connection):
     transaction is already in progress an RuntimeError is raised.
     When exiting with depth == 0, the normal context manager enter and exit is called.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
