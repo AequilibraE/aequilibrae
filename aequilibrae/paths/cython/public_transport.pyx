@@ -99,14 +99,21 @@ class HyperpathGenerating:
         # create a similar mapping for a destination to its origin index
         d_indices = nodes_to_indices[self._d_vert_ids]
         destination_mask = d_indices != -1
-        d_indices = d_indices[origin_mask & destination_mask]
-        self._o_indices = self._o_indices[origin_mask & destination_mask].astype("uint32")
 
-        self._od_index_to_taz_index = np.full(max(self._o_indices.max(), d_indices.max()) + 1, -1, dtype="int64")
-        tmp = np.arange(len(self._o_indices))
-        assert len(self._o_indices) == len(d_indices)
-        self._od_index_to_taz_index[self._o_indices] = tmp
+        d_indices = d_indices[origin_mask & destination_mask]
+        o_indices = self._o_indices[origin_mask & destination_mask].astype("uint32")
+
+        # We need to map each origin and destination index to the index of their respective taz_id. When centroid flow
+        # is not blocked there is only "od" nodes, thus their indices are equal. When centroid flow is blocked, the
+        # origin and destinations are unique nodes and thus have unique indices within the graph, thus there is no
+        # overlap. We mask out the ODs that are completely disconnected.
+        self._od_index_to_taz_index = np.full(max(o_indices.max(), d_indices.max()) + 1, -1, dtype="int64")
+        tmp = np.arange(len(self._o_indices))[origin_mask & destination_mask]
+        assert len(o_indices) == len(d_indices)
+        self._od_index_to_taz_index[o_indices] = tmp
         self._od_index_to_taz_index[d_indices] = tmp
+
+        self._o_indices = o_indices
 
         if self._skimming:
             self._is_travel_time = trav_time in skim_cols
