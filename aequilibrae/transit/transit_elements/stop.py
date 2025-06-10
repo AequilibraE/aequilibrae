@@ -8,7 +8,7 @@ from contextlib import closing
 
 from aequilibrae.project.database_connection import database_connection
 
-from aequilibrae.transit.constants import Constants, STOP_ID
+from aequilibrae.transit.constants import Constants
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
@@ -16,21 +16,20 @@ from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 class Stop(BasicPTElement):
     """Transit stop as read from the GTFS feed"""
 
-    def __init__(self, agency_id: int, record: tuple, headers: list):
-        self.stop = ""
+    def __init__(self, record: tuple, headers: list):
         self.stop_id = -1
+        self.stop = ""
         self.stop_code = ""
         self.stop_name = ""
         self.stop_desc = ""
         self.stop_lat: float = None
         self.stop_lon: float = None
         self.zone = ""
-        self.zone_id = None  # Corresponds to transit_fare_zone
+        self.zone_id = None
         self.stop_url = ""
         self.location_type = 0
         self.parent_station = ""
         self.stop_timezone = ""
-        self.wheelchair_boarding: int = None
 
         # Not part of GTFS
         self.taz = None
@@ -52,7 +51,6 @@ class Stop(BasicPTElement):
 
         if None not in [self.stop_lon, self.stop_lat]:
             self.geo = Point(self.stop_lon, self.stop_lat)
-        
         if len(self.zone) > 0:
             self.zone_id = int(self.zone)
 
@@ -81,7 +79,6 @@ class Stop(BasicPTElement):
             self.stop_desc,
             self.zone_id,
             self.taz,
-            self.zone,
             int(self.route_type),
             self.geo.wkb,
             self.srid,
