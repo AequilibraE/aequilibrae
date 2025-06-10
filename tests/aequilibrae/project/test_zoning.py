@@ -56,7 +56,10 @@ class TestZoning(TestCase):
         ]
         with self.proj.db_connection as conn:
             for table in tables:
-                conn.execute(f"DROP TABLE IF EXISTS {table};")
+                if table.startswith("idx_"):
+                    conn.execute(f"DROP INDEX IF EXISTS {table};")
+                else:
+                    conn.execute(f"DROP TABLE IF EXISTS {table};")
             conn.execute("DELETE FROM attributes_documentation WHERE name_table LIKE 'zones'")
 
             fields = [x[1] for x in conn.execute("PRAGMA table_info(zones);").fetchall()]
