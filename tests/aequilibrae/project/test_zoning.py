@@ -45,3 +45,28 @@ class TestZoning(TestCase):
         cov = self.zoning.coverage()
 
         self.assertTrue(isinstance(cov, Polygon), "Coverage geometry type is incorrect")
+
+    def test_create_zoning_layer(self):
+        tables = [
+            "zones",
+            "idx_zones_geometry",
+            "idx_zones_geometry_node",
+            "idx_zones_geometry_parent",
+            "idx_zones_geometry_rowid",
+        ]
+        with self.proj.db_connection as conn:
+            for table in tables:
+                conn.execute(f"DROP TABLE IF EXISTS {table};")
+            conn.execute("DELETE FROM attributes_documentation WHERE name_table LIKE 'zones'")
+
+            fields = [x[1] for x in conn.execute("PRAGMA table_info(zones);").fetchall()]
+
+        self.assertEqual(fields, [], "Zone table fields still exist")
+
+        zoning = self.proj.zoning
+        zoning.create_zoning_layer()
+
+        with self.proj.db_connection as conn:
+            fields = [x[1] for x in conn.execute("PRAGMA table_info(zones);").fetchall()]
+
+        self.assertGreater(len(fields), 0, "Zone table exists and has its fields.")
