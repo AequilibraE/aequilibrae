@@ -1,0 +1,92 @@
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    <li class="nav-item dropdown" id="dropdown-nav-item" style="display: none;">
+      <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="true"
+        aria-controls="pst-nav-more-links" id="python-button">
+        Python
+      </button>
+      <ul id="pst-nav-more-links" class="dropdown-menu" data-bs-popper="static">
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal" 
+             href="https://www.aequilibrae.com/latest/python/index.html">
+             Main menu
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal"
+            href="https://www.aequilibrae.com/latest/python/aequilibrae_project.html">
+            The AequilibraE Project
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal"
+            href="https://www.aequilibrae.com/latest/python/run_module.html">
+            Run module
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal"
+            href="https://www.aequilibrae.com/latest/python/network_manipulation.html">
+           Network manipulation
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal" href="https://www.aequilibrae.com/latest/python/distribution_procedures.html">
+            Distribution Procedures
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal" href="https://www.aequilibrae.com/latest/python/path_computation.html">
+            Path Computation
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal" href="https://www.aequilibrae.com/latest/python/static_traffic_assignment.html">
+            Traffic Assignment
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal"
+            href="https://www.aequilibrae.com/latest/python/public_transport.html">
+            Public Transport
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal" href="https://www.aequilibrae.com/latest/python/route_choice.html">
+            Route choice
+          </a>
+        </li>
+        <li class=" ">
+          <a class="nav-link dropdown-item nav-internal" href="https://www.aequilibrae.com/latest/python/other_applications.html">
+            Other Applications
+          </a>
+        </li>
+      </ul>
+    </li>
+    <li class="nav-item" id="index-nav-item" style="display: none;">
+      <a class="nav-link" href="https://www.aequilibrae.com/latest/python/index.html">Python</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="https://www.aequilibrae.com/latest/qgis/index.html">QGIS</a>
+    </li>
+  </ul>
+</nav>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const isIndex = window.location.pathname.endsWith("home.html");
+    if (isIndex) {
+      document.getElementById("index-nav-item").style.display = "block";
+    } else {
+      document.getElementById("dropdown-nav-item").style.display = "block";
+    }
+
+    const isPythonPage = window.location.pathname.endsWith("python.html");
+    const pythonButton = document.getElementById("python-button");
+    if (!isPythonPage) {
+      pythonButton.innerHTML = "<b>Python</b>";
+    }
+  });
+</script>
+
+<!-- TODO: Fix navigation links -->

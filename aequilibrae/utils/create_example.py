@@ -7,7 +7,7 @@ from typing import List
 from aequilibrae.project import Project
 
 
-def create_example(path: str, from_model="sioux_falls") -> Project:
+def create_example(path: os.PathLike, from_model="sioux_falls") -> Project:
     """Copies an example model to a new project project and returns the project handle
 
     :Arguments:
@@ -20,16 +20,18 @@ def create_example(path: str, from_model="sioux_falls") -> Project:
         **project** (:obj:`Project`): Aequilibrae Project handle (open)
 
     """
-    if os.path.isdir(path):
+    pth = Path(path)
+    if pth.is_dir() and pth.exists():
         raise FileExistsError("Cannot overwrite an existing directory")
 
-    if not os.path.isfile(join(dirname(__file__), f"../reference_files/{from_model}.zip")):
+    source = Path(__file__).parent.parent / "reference_files" / f"{from_model}.zip"
+    if not source.exists():
         raise FileExistsError("Example not found")
 
-    os.makedirs(path, exist_ok=True)
-    zipfile.ZipFile(join(dirname(__file__), f"../reference_files/{from_model}.zip")).extractall(path)
+    pth.mkdir(parents=True, exist_ok=True)
+    zipfile.ZipFile(source).extractall(pth)
     proj = Project()
-    proj.open(path)
+    proj.open(str(pth))
     return proj
 
 

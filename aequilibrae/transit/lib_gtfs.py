@@ -12,17 +12,20 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
 
 
-class GTFSRouteSystemBuilder:
-    """Container for GTFS feeds providing data retrieval for the importer"""
-
+class GTFSRouteSystemBuilder(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, network, file_path, description="", capacities=None, pces=None):  # noqa: B006
+    """Container for GTFS feeds providing data retrieval for the importer"""
+
+    def __init__(
+        self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None
+    ):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -33,6 +36,8 @@ class GTFSRouteSystemBuilder:
 
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
+        WorkerThread.__init__(self, None)
+
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
@@ -136,15 +141,12 @@ class GTFSRouteSystemBuilder:
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
-        self.signal.emit(["start", len(self.select_patterns), "Map-matching patterns"])
-        for i, pat in enumerate(self.select_patterns.values()):
-            self.signal.emit(["update", i, f"Map-matching pattern {pat.pattern_id}"])
+        for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
                 if msg is not None:
                     self.logger.warning(msg)
-        self.signal.emit(["finished"])
 
     def set_feed(self, feed_path: str) -> None:
         """Sets GTFS feed source to be used.
@@ -183,7 +185,10 @@ class GTFSRouteSystemBuilder:
         self.gtfs_data.load_data(service_date, self.description)
 
         self.logger.info("  Building data structures")
+
         self.__build_data()
+
+        self.gtfs_data.agency.service_date = self.day
 
     def doWork(self):
         """Alias for execute_import"""
@@ -206,27 +211,26 @@ class GTFSRouteSystemBuilder:
         """Saves all transit elements built in memory to disk"""
 
         with closing(database_connection("transit")) as conn:
-            for counter, (_, pattern) in enumerate(self.select_patterns.items()):
+            for pattern in simple_progress(self.select_patterns.values(), self.signal, "Saving patterns (Step: 10/12)"):
                 pattern.save_to_database(conn, commit=False)
             conn.commit()
 
             for counter, (_, agency) in enumerate(self.gtfs_data.agency.items()):
                 agency.save_to_database(conn)
 
-            for counter, trip in enumerate(self.select_trips):
+            for trip in simple_progress(self.select_trips, self.signal, "Saving trips (Step: 11/12)"):
                 trip.save_to_database(conn, commit=False)
             conn.commit()
 
-            for counter, (_, link) in enumerate(self.select_links.items()):
+            for link in simple_progress(self.select_links.values(), self.signal, "Saving links (Step: 11/12)"):
                 link.save_to_database(conn, commit=False)
             conn.commit()
 
-            self.__outside_zones = 0
-            zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
-            zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
-            zone_ids = {**zone_ids1, **zone_ids2}
+            zone_ids1 = [x.origin for x in self.gtfs_data.fare_rules]
+            zone_ids2 = [x.destination for x in self.gtfs_data.fare_rules]
+            zone_ids = sorted(set(zone_ids1) | set(zone_ids2))
 
-            zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
+            zones = [[x, self.gtfs_data.agency.agency_id] for x in zone_ids]
             if zones:
                 sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
@@ -262,7 +266,7 @@ class GTFSRouteSystemBuilder:
             frequent_agency = conn.execute(sql).fetchall()
 
             zones = []
-            for counter, (_, stop) in enumerate(self.select_stops.items()):
+            for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 12/12)"):
                 if self.__has_taz:
                     closest_zone = self.project.zoning.get_closest_zone(stop.geo)
                     if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
@@ -296,10 +300,9 @@ class GTFSRouteSystemBuilder:
         if self.__do_execute_map_matching:
             self.builds_link_graphs_with_broken_stops()
 
+        msg = f"Loading data for {self.day} (Step: 9/12) - "
         c = Constants()
-        self.signal.emit(["start", len(self.select_routes), f"Loading data for {self.day}"])
-        for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            self.signal.emit(["update", counter])
+        for route_id, route in simple_progress(self.select_routes.items(), self.signal, msg):
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
@@ -324,7 +327,6 @@ class GTFSRouteSystemBuilder:
 
             route.shape = self.__build_route_shape(patterns)
             route.pattern_id = trip.pattern_id
-        self.signal.emit(["finished"])
 
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
         self.logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")

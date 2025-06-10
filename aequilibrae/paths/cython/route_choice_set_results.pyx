@@ -1,20 +1,17 @@
 from libcpp.algorithm cimport min_element, sort, lower_bound
 from libc.math cimport INFINITY, exp, pow, log
-from libcpp cimport bool, nullptr
+from libcpp cimport nullptr
 from libcpp.memory cimport shared_ptr, make_shared
 
 from cython.operator cimport dereference as d
 from cython.operator cimport postincrement as inc
 
-cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
-cimport pyarrow as pa
-cimport pyarrow.lib as libpa
+import pandas as pd
+import numpy as np
 
-import logging
-import pyarrow as pa
-import pyarrow.parquet as pq
 import cython
-import warnings
+
+from aequilibrae.log import logger
 
 
 @cython.embedsignature(True)
@@ -24,24 +21,6 @@ cdef class RouteChoiceSetResults:
     provides method to perform an assignment and link loading.
     """
 
-    route_set_dtype = pa.list_(pa.uint32())
-
-    schema = pa.schema([
-        pa.field("origin id", pa.uint32(), nullable=False),
-        pa.field("destination id", pa.uint32(), nullable=False),
-        pa.field("route set", route_set_dtype, nullable=False),
-    ])
-
-    psl_schema = pa.schema([
-        pa.field("origin id", pa.uint32(), nullable=False),
-        pa.field("destination id", pa.uint32(), nullable=False),
-        pa.field("route set", route_set_dtype, nullable=False),
-        pa.field("cost", pa.float64(), nullable=False),
-        pa.field("mask", pa.bool_(), nullable=False),
-        pa.field("path overlap", pa.float64(), nullable=False),
-        pa.field("probability", pa.float64(), nullable=False),
-    ])
-
     def __init__(
             self,
             demand: GeneralisedCOODemand,
@@ -50,7 +29,7 @@ cdef class RouteChoiceSetResults:
             num_links: int,
             double[:] cost_view,
             unsigned int [:] mapping_idx,
-            unsigned int [:] mapping_data,
+            int64_t [::] mapping_data,
             store_results: bool = True,
             perform_assignment: bool = True,
     ):
@@ -110,26 +89,65 @@ cdef class RouteChoiceSetResults:
             self.__prob_set.resize(size)
             for i in range(size):
                 self.__cost_set[i] = make_shared[vector[double]]()
-                self.__mask_set[i] = make_shared[vector[bool]]()
+                self.__mask_set[i] = make_shared[vector[bint]]()
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
                 self.__prob_set[i] = make_shared[vector[double]]()
 
     def write(self, where):
-        logger = logging.getLogger("aequilibrae")
-        pq.write_to_dataset(
-            self.table,
-            where,
-            partitioning_flavor="hive",
-            partitioning=["origin id"],
-            schema=self.psl_schema if self.perform_assignment else self.schema,
-            use_threads=True,
-            existing_data_behavior="overwrite_or_ignore",
-            file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
+        table = self.make_df_from_results()
+
+        engine = pd.io.parquet.get_engine('auto').__class__
+        if (engine.__module__, engine.__name__) == ("pandas.io.parquet", "PyArrowImpl"):
+            kwargs = dict(
+                # can't provide partitioning_flavor and partition_cols through the Pandas API
+                use_threads=True,
+                existing_data_behavior="overwrite_or_ignore",
+                file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
+            )
+        elif (engine.__module__, engine.__name__) == ("pandas.io.parquet", "FastParquetImpl"):
+            logger.info("FastParquet back-end doesn't support individual partition logging, writing table now...")
+            kwargs = dict(
+                file_scheme="hive",
+                # no threads option
+                append=False,
+                # no visitor option
+            )
+            logger.warn(
+                "FastParquet back-end doesn't support writing a NumPy arrays as Parquet list types, converting to Python lists. "
+                "Watch out for memory consumption..."
+            )
+            table["route set"] = table["route set"].map(lambda x: x.tolist())
+        else:
+            raise RuntimeError(
+                "encountered unknown Pandas parquet engine, please report this as a bug to the AequilibraE issues page"
+            )
+
+        table.to_parquet(
+            path=where,
+            compression="zstd",
+            index=False,
+            partition_cols=["origin id"],
+            **kwargs,
         )
 
     @classmethod
     def read_dataset(cls, where):
-        return pa.dataset.dataset(where, format="parquet", partitioning=pa.dataset.HivePartitioning(cls.schema))
+        df = pd.read_parquet(where, partitioning="hive")
+        df["origin id"] = df["origin id"].astype(df["destination id"].dtype)
+
+        # FastParquet is stupid and encodes Parquet list objects as json strings!!!
+        is_json_encoded = df["route set"].map(lambda x: isinstance(x, (str, bytes)))
+        if is_json_encoded.any():
+            logger.warn("Found JSON encoded route sets. Parsing into a NumPy array...")
+            if not is_json_encoded.all():
+                raise TypeError(
+                    f"route sets must either be encoded properly as list[int64], or json lists (by FastParquet). The two cannot be mixed"
+                )
+
+            import json
+            df["route set"] = df["route set"].map(lambda x: np.array(json.loads(x), dtype="int64"))
+
+        return df
 
     @staticmethod
     cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil:
@@ -142,6 +160,9 @@ cdef class RouteChoiceSetResults:
         route_vec.reserve(route_set.size())
         for route in route_set:
             route_vec.emplace_back(route)
+
+        # We now drop all references to those raw pointers. The unique pointers now own those vectors.
+        route_set.clear()
 
     cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil:
         """
@@ -162,19 +183,20 @@ cdef class RouteChoiceSetResults:
     cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__cost_set[i] if self.store_results else make_shared[vector[double]]()
 
-    cdef shared_ptr[vector[bool]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
-        return self.__mask_set[i] if self.store_results else make_shared[vector[bool]]()
+    cdef shared_ptr[vector[bint]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+        return self.__mask_set[i] if self.store_results else make_shared[vector[bint]]()
 
     cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__path_overlap_set[i] if self.store_results else make_shared[vector[double]]()
 
-    cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+    cdef shared_ptr[vector[double]] get_prob_vec(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__prob_set[i] if self.store_results else make_shared[vector[double]]()
 
     cdef shared_ptr[vector[double]] compute_result(
         RouteChoiceSetResults self,
         size_t i,
         RouteVec_t &route_set,
+        bint *found_zero_cost,
         size_t thread_id
     ) noexcept nogil:
         """
@@ -188,7 +210,7 @@ cdef class RouteChoiceSetResults:
         """
         cdef:
             shared_ptr[vector[double]] cost_vec
-            shared_ptr[vector[bool]] route_mask
+            shared_ptr[vector[bint]] route_mask
             vector[long long] keys, counts
             shared_ptr[vector[double]] path_overlap_vec
             shared_ptr[vector[double]] prob_vec
@@ -201,15 +223,10 @@ cdef class RouteChoiceSetResults:
         cost_vec = self.__get_cost_set(i)
         route_mask = self.__get_mask_set(i)
         path_overlap_vec = self.__get_path_overlap_set(i)
-        prob_vec = self.__get_prob_set(i)
+        prob_vec = self.get_prob_vec(i)
 
-        self.compute_cost(d(cost_vec), route_set, self.cost_view)
-        if self.compute_mask(d(route_mask), d(cost_vec)):
-            with gil:
-                warnings.warn(
-                    f"Zero cost route found for ({self.demand.ods[i].first}, {self.demand.ods[i].second}). "
-                    "Entire route set masked"
-                )
+        self.compute_cost(d(cost_vec), route_set, self.cost_view, found_zero_cost)
+        self.compute_mask(d(route_mask), d(cost_vec))
         self.compute_frequency(keys, counts, route_set, d(route_mask))
         self.compute_path_overlap(
             d(path_overlap_vec),
@@ -233,7 +250,8 @@ cdef class RouteChoiceSetResults:
         vector[double] &cost_vec,
         const RouteVec_t &route_set,
         const double[:]
-        cost_view
+        cost_view,
+        bint *found_zero_cost
     ) noexcept nogil:
         """Compute the cost each route."""
         cdef:
@@ -244,20 +262,23 @@ cdef class RouteChoiceSetResults:
 
         cost_vec.resize(route_set.size())
 
+        found_zero_cost[0] = False
         for i in range(route_set.size()):
             cost = 0.0
             for link in d(route_set[i]):
                 cost = cost + cost_view[link]
 
             cost_vec[i] = cost
+            if cost == 0.0:
+                found_zero_cost[0] = True
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef bool compute_mask(
+    cdef void compute_mask(
         RouteChoiceSetResults self,
-        vector[bool] &route_mask,
+        vector[bint] &route_mask,
         const vector[double] &total_cost
     ) noexcept nogil:
         """
@@ -266,7 +287,7 @@ cdef class RouteChoiceSetResults:
         from the route set.
         """
         cdef:
-            bool found_zero_cost = False
+            bint found_zero_cost = False
             size_t i
 
             vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
@@ -296,8 +317,6 @@ cdef class RouteChoiceSetResults:
             # But only if there actually was a min element (i.e. empty route set)
             route_mask[min - total_cost.cbegin()] = True
 
-        return found_zero_cost
-
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
@@ -307,7 +326,7 @@ cdef class RouteChoiceSetResults:
         vector[long long] &keys,
         vector[long long] &counts,
         const RouteVec_t &route_set,
-        const vector[bool] &route_mask
+        const vector[bint] &route_mask
     ) noexcept nogil:
         """
         Compute a frequency map for each route with the route_mask applied.
@@ -345,7 +364,7 @@ cdef class RouteChoiceSetResults:
         while union_iter != link_union.cend():
             count = 0
             link = d(union_iter)
-            while link == d(union_iter) and union_iter != link_union.cend():
+            while union_iter != link_union.cend() and link == d(union_iter):
                 count = count + 1
                 inc(union_iter)
 
@@ -364,7 +383,7 @@ cdef class RouteChoiceSetResults:
         const vector[long long] &keys,
         const vector[long long] &counts,
         const vector[double] &total_cost,
-        const vector[bool] &route_mask,
+        const vector[bint] &route_mask,
         const double[:] cost_view
     ) noexcept nogil:
         """
@@ -415,7 +434,7 @@ cdef class RouteChoiceSetResults:
         vector[double] &prob_vec,
         const vector[double] &total_cost,
         const vector[double] &path_overlap_vec,
-        const vector[bool] &route_mask
+        const vector[bint] &route_mask
     ) noexcept nogil:
         """Compute a probability for each route in the route set based on the path overlap."""
         cdef:
@@ -448,14 +467,10 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef object make_table_from_results(RouteChoiceSetResults self):
+    cdef object make_df_from_results(RouteChoiceSetResults self):
         """
-        Construct an Arrow table from C++ stdlib structures.
+        Construct an pd.DataFrame from the C++ stdlib structures.
 
-        Note: this function directly utilises the Arrow C++ API, the Arrow Cython API is not sufficient.
-        See `route_choice_set.pxd` for Cython declarations.
-
-        Returns a shared pointer to a Arrow CTable. This should be wrapped in a Python table before use.
         Compressed link IDs are expanded to full network link IDs.
         """
 
@@ -465,109 +480,73 @@ cdef class RouteChoiceSetResults:
             raise RuntimeError("route set table construction requires `store_results` is True")
 
         cdef:
-            shared_ptr[libpa.CArray] paths
-            shared_ptr[libpa.CArray] offsets
+            size_t link, tmp, n_routes
+            bint have_assignment_results = self.perform_assignment and self.store_results
 
-            libpa.CMemoryPool *pool = libpa.c_get_memory_pool()
+        columns = {
+            "origin id": [],
+            "destination id": [],
+        }
+        route_set_col = []  # We treat this one differently when constructing it
 
-            # Custom imports, these are declared in route_choice.pxd *not* libarrow.  We have to use new here because
-            # Cython doesn't support passing arguments to the default constructor as it implicitly constructs them and
-            # Pyarrow only exposes the single constructor in Cython.
-            CUInt32Builder *path_builder = new CUInt32Builder(pool)
-            CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
-            CBooleanBuilder *mask_col = <CBooleanBuilder *>nullptr
-            CDoubleBuilder *path_overlap_col = <CDoubleBuilder *>nullptr
-            CDoubleBuilder *prob_col = <CDoubleBuilder *>nullptr
+        types = {"cost":"float64", "mask":"bool", "path overlap":"float64", "probability":"float64",
+                 "origin id":"uint32", "destination id":"uint32"}
 
-            libpa.CInt32Builder *offset_builder = new libpa.CInt32Builder(pool)  # Must be Int32 *not* UInt32
-            libpa.CUInt32Builder *o_col = new libpa.CUInt32Builder(pool)
-            libpa.CUInt32Builder *d_col = new libpa.CUInt32Builder(pool)
-            vector[shared_ptr[libpa.CArray]] columns
-            shared_ptr[libpa.CDataType] route_set_dtype = libpa.pyarrow_unwrap_data_type(self.route_set_dtype)
+        if have_assignment_results:
+            columns["cost"] = []
+            columns["mask"] = []
+            columns["path overlap"] = []
+            columns["probability"] = []
 
-            libpa.CResult[shared_ptr[libpa.CArray]] route_set_results
-
-            int offset = 0
-            size_t network_link_begin, network_link_end, link
-
-        # Origins, Destination, Route set, [Cost for route, Mask, Path_Overlap for route, Probability for route]
-        columns.resize(len(self.psl_schema) if self.perform_assignment else len(self.schema))
-
-        if self.perform_assignment:
-            cost_col = new CDoubleBuilder(pool)
-            mask_col = new CBooleanBuilder(pool)
-            path_overlap_col = new CDoubleBuilder(pool)
-            prob_col = new CDoubleBuilder(pool)
-
+        if have_assignment_results:
             for i in range(self.demand.ods.size()):
-                cost_col.AppendValues(d(self.__cost_set[i]))
-                mask_col.AppendValues(d(self.__mask_set[i]))
-                path_overlap_col.AppendValues(d(self.__path_overlap_set[i]))
-                prob_col.AppendValues(d(self.__prob_set[i]))
+                n_routes = d(self.__route_vecs[i]).size()
+                if not d(self.__route_vecs[i]).size():  # If there's no routes to add just skip these.
+                    continue
+
+                # When assigning from df, the cost, mask, and path overlap vectors may be empty
+                tmp = d(self.__cost_set[i]).size()
+                columns["cost"].append(
+                    np.asarray(<double[:tmp]>d(self.__cost_set[i]).data()) if tmp else np.zeros(n_routes, dtype="float64")
+                )
+
+                tmp = d(self.__mask_set[i]).size()
+                columns["mask"].append(
+                    np.asarray(<bint[:tmp]>d(self.__mask_set[i]).data()) if tmp else np.ones(n_routes, dtype="bool")
+                )
+
+                tmp = d(self.__path_overlap_set[i]).size()
+                columns["path overlap"].append(
+                    np.asarray(<double[:tmp]>d(self.__path_overlap_set[i]).data()) if tmp else np.zeros(n_routes, dtype="float64")
+                )
+
+                tmp = d(self.__prob_set[i]).size()
+                columns["probability"].append(
+                    np.asarray(<double[:tmp]>d(self.__prob_set[i]).data())
+                )
 
         for i in range(self.demand.ods.size()):
             route_set = self.__route_vecs[i]
+
+            columns["origin id"].append(np.full(d(route_set).size(), self.demand.ods[i].first, "uint32"))
+            columns["destination id"].append(np.full(d(route_set).size(), self.demand.ods[i].second, "uint32"))
 
             # Instead of constructing a "list of lists" style object for storing the route sets we instead will
             # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
             # (path) starts.
             for j in range(d(route_set).size()):
-                o_col.Append(self.demand.ods[i].first)
-                d_col.Append(self.demand.ods[i].second)
 
-                offset_builder.Append(offset)
-
+                links = []
                 for link in d(d(route_set)[j]):
                     # Translate the compressed link IDs in route to network link IDs, this is a 1:n mapping
-                    network_link_begin = self.mapping_idx[link]
-                    network_link_end = self.mapping_idx[link + 1]
-                    path_builder.AppendValues(
-                        &self.mapping_data[network_link_begin],
-                        network_link_end - network_link_begin
-                    )
+                    links.append(np.asarray(self.mapping_data[self.mapping_idx[link]:self.mapping_idx[link + 1]]))
 
-                    offset += network_link_end - network_link_begin
+                route_set_col.append(np.hstack(links))
 
-        path_builder.Finish(&paths)
+        columns = {k: np.hstack(v, casting="no") if len(v) else np.array([], dtype=types[k]) for k, v in columns.items()}
+        columns["route set"] = route_set_col
 
-        offset_builder.Append(offset)  # Mark the end of the array in offsets
-        offset_builder.Finish(&offsets)
-
-        route_set_results = libpa.CListArray.FromArraysAndType(
-            route_set_dtype,
-            d(offsets.get()),
-            d(paths.get()),
-            pool,
-            shared_ptr[libpa.CBuffer]()
-        )
-
-        o_col.Finish(&columns[0])
-        d_col.Finish(&columns[1])
-        columns[2] = d(route_set_results)
-
-        if self.perform_assignment:
-            cost_col.Finish(&columns[3])
-            mask_col.Finish(&columns[4])
-            path_overlap_col.Finish(&columns[5])
-            prob_col.Finish(&columns[6])
-
-        cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(
-            self.psl_schema if self.perform_assignment else self.schema
-        )
-        cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(schema, columns)
-
-        del path_builder
-        del offset_builder
-        del o_col
-        del d_col
-
-        if self.perform_assignment:
-            del cost_col
-            del mask_col
-            del path_overlap_col
-            del prob_col
-
-        self.table = libpa.pyarrow_wrap_table(table)
+        self.table = pd.DataFrame(columns)
         return self.table
 
 

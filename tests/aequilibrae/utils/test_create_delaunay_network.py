@@ -18,11 +18,12 @@ class TestDelaunayAnalysis(TestCase):
         with self.assertRaises(ValueError):
             da.create_network("nodes")
 
-        da.create_network()
-        self.assertEqual(59, self.proj.conn.execute("select count(*) from delaunay_network").fetchone()[0])
+        with self.proj.db_connection as conn:
+            da.create_network()
+            self.assertEqual(59, conn.execute("select count(*) from delaunay_network").fetchone()[0])
 
-        da.create_network("network", True)
-        self.assertEqual(62, self.proj.conn.execute("select count(*) from delaunay_network").fetchone()[0])
+            da.create_network("network", True)
+            self.assertEqual(62, conn.execute("select count(*) from delaunay_network").fetchone()[0])
 
         with self.assertRaises(ValueError):
             da.create_network()

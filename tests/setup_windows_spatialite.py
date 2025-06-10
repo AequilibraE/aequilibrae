@@ -1,9 +1,10 @@
-from tempfile import gettempdir
-import urllib.request
 import platform
+import urllib.request
 import zipfile
+from os import listdir
 from os.path import join
-from os import walk
+from pathlib import Path
+from tempfile import gettempdir
 
 pth = "https://github.com/AequilibraE/aequilibrae/releases/download/V0.6.0.post1/mod_spatialite-NG-win-amd64.zip"
 
@@ -31,10 +32,8 @@ if "WINDOWS" in platform.platform().upper():
 
     root = "C:/hostedtoolcache/windows/Python/"
     file = "sqlite3.dll"
-    for d, _, f in walk(root):
-        if file in f:
-            if "x64" in d:
-                zipfile.ZipFile(zip_path64).extractall(d)
-            else:
-                zipfile.ZipFile(zip_path86).extractall(d)
-            print(f"Replaces {d}")
+    for d in listdir(root):
+        target_dir = Path(root) / d / "x64" / "DLLs"
+        if (target_dir / file).exists():
+            zipfile.ZipFile(zip_path64).extractall(target_dir)
+            print(f"Replaces {target_dir / file}")

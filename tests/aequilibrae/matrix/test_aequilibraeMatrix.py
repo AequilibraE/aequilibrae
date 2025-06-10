@@ -163,7 +163,7 @@ class TestAequilibraeMatrix(TestCase):
     def test_copy_from_omx(self):
         temp_file = AequilibraeMatrix().random_name()
         a = AequilibraeMatrix()
-        a.create_from_omx(temp_file, omx_example)
+        a.create_from_omx(omx_path=omx_example, file_path=temp_file)
 
         omxfile = omx.open_file(omx_example, "r")
 
@@ -178,14 +178,14 @@ class TestAequilibraeMatrix(TestCase):
             self.fail("Index was not created properly")
         a.close()
         del a
-        del omxfile
+        omxfile.close()
 
     def test_copy_from_omx_long_name(self):
-        temp_file = AequilibraeMatrix().random_name()
+        temp_file = AequilibraeMatrix.random_name()
         a = AequilibraeMatrix()
 
         with self.assertRaises(ValueError):
-            a.create_from_omx(temp_file, omx_example, robust=False)
+            a.create_from_omx(omx_path=omx_example, file_path=temp_file, robust=False)
         del a
 
     def test_copy_omx_wrong_content(self):

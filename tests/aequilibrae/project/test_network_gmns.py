@@ -1,13 +1,15 @@
-from unittest import TestCase
-from tempfile import gettempdir
-from shutil import copytree
 import os
-import uuid
-import pandas as pd
-from aequilibrae.project import Project
-from aequilibrae.parameters import Parameters
-from warnings import warn
 import random
+import uuid
+from shutil import copytree
+from tempfile import gettempdir
+from unittest import TestCase
+from warnings import warn
+
+import pandas as pd
+
+from aequilibrae.parameters import Parameters
+from aequilibrae.project import Project
 from ...data import siouxfalls_project
 
 
@@ -47,22 +49,21 @@ class TestNetwork(TestCase):
         gmns_node_df = pd.read_csv(node_file)
         gmns_link_df = pd.read_csv(link_file)
 
-        curr = self.project.conn.cursor()
-        curr.execute("""select count(*) from nodes""")
-        nd_ct = curr.fetchone()[0]
+        with self.project.db_connection as conn:
+            nd_ct = conn.execute("""select count(*) from nodes""").fetchone()[0]
 
-        if nd_ct != gmns_node_df.shape[0]:
-            warn("Number of nodes created is different than expected.")
-            return
+            if nd_ct != gmns_node_df.shape[0]:
+                warn("Number of nodes created is different than expected.")
+                return
 
-        rand_lk = random.choice([x[0] for x in curr.execute("""select link_id from links""").fetchall()])
-        from_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, "from_node_id"].item()
-        to_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, "to_node_id"].item()
-        a_node = curr.execute(f"""select a_node from links where link_id = {rand_lk}""").fetchone()[0]
-        b_node = curr.execute(f"""select b_node from links where link_id = {rand_lk}""").fetchone()[0]
+            rand_lk = random.choice([x[0] for x in conn.execute("""select link_id from links""").fetchall()])
+            from_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, "from_node_id"].item()
+            to_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, "to_node_id"].item()
+            a_node = conn.execute(f"""select a_node from links where link_id = {rand_lk}""").fetchone()[0]
+            b_node = conn.execute(f"""select b_node from links where link_id = {rand_lk}""").fetchone()[0]
 
-        if from_node != a_node or to_node != b_node:
-            self.fail("At least one link is disconnected from its start/end nodes")
+            if from_node != a_node or to_node != b_node:
+                self.fail("At least one link is disconnected from its start/end nodes")
 
     def test_export_to_gmns(self):
         output_path = os.path.join(gettempdir(), uuid.uuid4().hex)

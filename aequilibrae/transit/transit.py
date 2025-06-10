@@ -1,22 +1,26 @@
 import os
 import shutil
+import sqlite3
 import warnings
-
-from aequilibrae.log import logger
 from typing import Dict, List
 
+import pandas as pd
+
+from aequilibrae.log import logger
+from aequilibrae.paths.graph import TransitGraph
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
-from aequilibrae.paths.graph import TransitGraph
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import read_and_close
-import sqlite3
-import pandas as pd
+from aequilibrae.utils.get_table import get_geo_table
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
-class Transit:
+class Transit(WorkerThread):
+    transit = SIGNAL(object)
     default_capacities = {
         0: [150, 300],  # Tram, Streetcar, Light rail
         1: [280, 560],  # Subway/metro
@@ -38,7 +42,9 @@ class Transit:
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
         """
+        WorkerThread.__init__(self, None)
 
+        self.project = project
         self.project_base_path = project.project_base_path
         self.logger = logger
         self.__transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
@@ -46,6 +52,10 @@ class Transit:
 
         self.create_transit_database()
         self.pt_con = database_connection("transit")
+
+    def get_table(self, table_name) -> pd.DataFrame:
+        with read_and_close(self.__transit_file, spatial=True) as conn:
+            return get_geo_table(table_name, conn)
 
     def new_gtfs_builder(self, file_path, description="") -> GTFSRouteSystemBuilder:
         """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
@@ -65,6 +75,9 @@ class Transit:
             capacities=self.default_capacities,
             pces=self.default_pces,
         )
+
+        gtfs.signal = self.transit
+        gtfs.gtfs_data.signal = self.transit
         return gtfs
 
     def create_transit_database(self):
@@ -74,39 +87,71 @@ class Transit:
             initialize_tables(self, "transit")
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
-        period_id = kwargs.get("period_id", self.periods.default_period.period_id)
+        """
+        Create a transit graph from an existing GTFS import.
+
+        All arguments are forwarded to 'TransitGraphBuilder'.
+
+        A 'period_id' may be specified to select a time period. By default, a whole day is used. See
+        'project.network.Periods' for more details.
+        """
+        period_id = kwargs.pop("period_id", self.periods.default_period.period_id)
+
         graph = TransitGraphBuilder(self.pt_con, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
         return graph
 
-    def save_graphs(self, period_ids: List[int] = None):
-        # TODO: Support multiple graph saving
-        warnings.warn(
-            "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release."
-        )
-        if period_ids is None:
-            period_ids = [self.periods.default_period.period_id]
+    def save_graphs(self, period_ids: List[int] = None, force: bool = False):
+        """
+        Save the previously build transit graphs to the 'public_transport.sqlite' database. Saving may be filtered
+        by 'period_id'.
 
-        if len(period_ids) > 1:
-            raise ValueError("Multiple graphs can currently be saved.")
+        :Arguments:
+            **period_ids** (:obj:`int`): List of periods of to save. Defaults to 'project.network.periods.default_period.period_id'.
+            **force** (:obj:`bool`): Remove the existing graphs before saving the 'period_ids' graphs. Default 'False'.
+
+        """
+        if period_ids is None:
+            period_ids = self.graphs.keys()
+
+        if force:
+            self.remove_graphs(period_ids)
 
         for period_id in period_ids:
             self.graphs[period_id].save()
 
+    def remove_graphs(self, period_ids: List[int], unload: bool = False):
+        """
+        Remove the previously saved transit graphs from the 'public_transport.sqlite' database. Removing may be filtered
+        by 'period_id'.
+
+        :Arguments:
+            **period_ids** (:obj:`int`): List of periods of to save.
+            **unload** (:obj:`bool`): Also unload the graph.
+
+        """
+        for period_id in period_ids:
+            TransitGraphBuilder.remove(self.pt_con, period_id)
+            if unload:
+                del self.graphs[period_id]
+
     def load(self, period_ids: List[int] = None):
-        # TODO: Support multiple graph loading
-        warnings.warn(
-            "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release. `period_ids` argument is currently ignored."
-        )
+        """
+        Load the previously saved transit graphs from the 'public_transport.sqlite' database. Loading may be filtered
+        by 'period_id'.
 
+        :Arguments:
+            **period_ids** (:obj:`int`): List of periods of to load. Defaults to all available graph configurations.
+
+        """
         if period_ids is None:
-            period_ids = [self.periods.default_period.period_id]
+            with self.project.db_connection as conn:
+                res = conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+            period_ids = [x[0] for x in res]
 
-        if len(period_ids) > 1:
-            raise ValueError("Multiple graphs can currently be loaded.")
-
-        self.graphs[period_ids[0]] = TransitGraphBuilder.from_db(self.pt_con, period_ids[0])
+        for period_id in period_ids:
+            self.graphs[period_id] = TransitGraphBuilder.from_db(self.pt_con, period_id)
 
     def build_pt_preload(self, start: int, end: int, inclusion_cond: str = "start") -> pd.DataFrame:
         """Builds a preload vector for the transit network over the specified time period

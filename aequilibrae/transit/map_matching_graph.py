@@ -18,18 +18,19 @@ from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
 from aequilibrae.transit.transit_elements import mode_correspondence
-from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.aeq_signal import simple_progress
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 GRAPH_VERSION = 1
 CONNECTOR_SPEED = 1
 
 
-class MMGraph:
+class MMGraph(WorkerThread):
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
 
-    signal = SIGNAL(object)
-
     def __init__(self, lib_gtfs):
+        WorkerThread.__init__(self, None)
+
         self.project = lib_gtfs.project
         self.stops = lib_gtfs.gtfs_data.stops
         self.lib_gtfs = lib_gtfs
@@ -49,6 +50,7 @@ class MMGraph:
         self.distance_to_project = -1
         self.df = pd.DataFrame([])
         self.logger = logger
+        self.signal = lib_gtfs.signal
 
     def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
@@ -60,6 +62,7 @@ class MMGraph:
             Defaults to 50m
         """
         self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
+
         self.mode_id = mode_id
         self.distance_to_project = distance_to_project
         self.__mode = mode_correspondence[self.mode_id]
@@ -100,34 +103,46 @@ class MMGraph:
         return self.__build_graph_from_scratch()
 
     def __build_graph_from_cache(self):
-        self.logger.info(f"Loading map-matching graph from disk for mode_id={self.mode_id}")
+        msg = f"Loading map-matching graph from disk for mode_id={self.mode_id} (Step: 8/12)"
+        self.logger.info(msg)
+        self.signal.emit(["set_text", msg])
+
         net = pd.read_csv(self.__df_file)
         centroid_corresp = pd.read_csv(self.__centroids_file)
         centroids = np.copy(centroid_corresp.centroid_id.values)
         centroid_corresp.set_index("node_id", inplace=True)
         for stop in self.stops.values():
             stop.__map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
+
         return self.__graph_from_broken_net(centroids, net)
 
     def __build_graph_from_scratch(self):
-        self.logger.info(f"Creating map-matching graph from scratch for mode_id={self.mode_id}")
+        msg = f"Creating map-matching graph from scratch for mode_id={self.mode_id} (Step: 8/12)"
+        self.logger.info(msg)
+        self.signal.emit(["set_text", msg])
+
         self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=self.df.wkt.apply(shapely.wkt.loads))
         self.df.loc[self.df.link_id < 0, "link_id"] = self.df.link_id * -1 + self.df.link_id.max() + 1
-        # We make sure all link IDs are in proper order
 
+        # We make sure all link IDs are in proper order
         self.max_link_id = self.df.link_id.max() + 1
         self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
+
         # Build initial index
         self._idx = GeoIndex()
-        for counter, (_, record) in enumerate(self.df.iterrows()):
+        msg = "Building graphs - Indexing links (Step: 8/12)"
+        for _, record in simple_progress(self.df.iterrows(), self.signal, msg):
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
+
         # We will progressively break links at stops' projection
         # But only on the right side of the link (no boarding at the opposing link's side)
         centroids = []
         self.node_corresp = []
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
-        for counter, (stop_id, stop) in enumerate(self.stops.items()):
+
+        msg = "Building graphs - Breaking links (Step: 8/12)"
+        for stop_id, stop in simple_progress(self.stops.items(), self.signal, msg):
             stop.__map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.__map_matching_id__[self.mode_id])

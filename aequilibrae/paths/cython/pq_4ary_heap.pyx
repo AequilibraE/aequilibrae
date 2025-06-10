@@ -39,9 +39,9 @@ from libc.math cimport INFINITY
 include "parameters.pxi"
 
 cdef enum ElementState:
-   SCANNED
-   NOT_IN_HEAP
-   IN_HEAP
+    SCANNED
+    NOT_IN_HEAP
+    IN_HEAP
 
 cdef struct Element:
     DTYPE_t key
@@ -243,6 +243,9 @@ cdef void _min_heapify(PriorityQueue* pqueue, size_t node_idx) noexcept nogil:
     cdef:
         size_t c1, c2, c3, c4, i = node_idx, s
         DTYPE_t val_tmp, val_min
+
+    if pqueue.size == 0:
+        return
 
     while True:
 

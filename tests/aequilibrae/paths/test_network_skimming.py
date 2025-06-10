@@ -22,10 +22,8 @@ class TestNetwork_skimming(TestCase):
 
         self.project = create_example(self.proj_dir)
         self.network = self.project.network
-        self.curr = self.project.conn.cursor()
 
     def tearDown(self) -> None:
-        del self.curr
         try:
             rmtree(self.proj_dir)
         except Exception as e:
@@ -42,7 +40,7 @@ class TestNetwork_skimming(TestCase):
         res = SkimResults()
         res.prepare(graph)
         aux_res = MultiThreadedNetworkSkimming()
-        aux_res.prepare(graph, res)
+        aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
         _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
         skm = NetworkSkimming(graph)
@@ -84,7 +82,7 @@ class TestNetwork_skimming(TestCase):
         res = SkimResults()
         res.prepare(graph)
         aux_res = MultiThreadedNetworkSkimming()
-        aux_res.prepare(graph, res)
+        aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
         _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
         skm = NetworkSkimming(graph)

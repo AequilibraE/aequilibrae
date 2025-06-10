@@ -2,10 +2,12 @@ import os
 import uuid
 import zipfile
 from os.path import join, dirname
+from pathlib import Path
 from tempfile import gettempdir
 from unittest import TestCase
 import pandas as pd
 import numpy as np
+import sqlite3
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathResults
 from aequilibrae.matrix import AequilibraeMatrix
@@ -66,6 +68,25 @@ class TestSelectLink(TestCase):
                 err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
 
+        # Test if files are saved in the right place
+        self.assignment.save_select_link_results("select_link_analysis")
+
+        matrices = self.project.matrices
+        matrices.update_database()
+        assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
+
+        # Test if matrices are with the correct shape and are not empty
+        sla = matrices.get_matrix("select_link_analysis_omx")
+        num_zones = self.assignment.classes[0].graph.num_zones
+        for mat in sla.names:
+            m = sla.get_matrix(mat)
+            assert m.sum() > 0 and m.shape == (num_zones, num_zones)
+
+        pth = Path(self.project.project_base_path)
+        conn = sqlite3.connect(pth / "results_database.sqlite")
+        results = [x[0] for x in conn.execute("SELECT name FROM sqlite_master WHERE type ='table'").fetchall()]
+        assert "select_link_analysis" in results
+
     def test_equals_demand_one_origin(self):
         """
         Test to ensure the Select Link functionality behaves as required.
@@ -96,7 +117,7 @@ class TestSelectLink(TestCase):
         Tests the functionality of Select Link when given a custom demand matrix, where only 1 OD pair has demand on it
         Confirms the OD matrix behaves, and the Link Loading is just on the path of this OD pair
         """
-        custom_demand = np.zeros((24, 24, 1))
+        custom_demand = np.zeros((24, 24, 1)).astype(float)
         custom_demand[0, 23, 0] = 1000
         self.matrix.matrix_view = custom_demand
         self.assignclass.matrix = self.matrix
@@ -137,7 +158,8 @@ class TestSelectLink(TestCase):
         """
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-        self.assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
+        with self.assertWarns(Warning):
+            self.assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
         self.assertEqual(len(self.assignclass._selected_links["test"]), 1, "Did not correctly remove duplicate link")
 
     def test_link_out_of_bounds(self):
@@ -190,8 +212,8 @@ class TestSelectLink(TestCase):
         assign.execute()
 
         # 5.receive results
-        assign_flow_res_df = assign.results().reset_index(drop=False).fillna(0)
-        select_link_flow_df = assign.select_link_flows().reset_index(drop=False).fillna(0)
+        assign_flow_res_df = assign.results().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
+        select_link_flow_df = assign.select_link_flows().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
 
         pd.testing.assert_frame_equal(
             assign_flow_res_df[["link_id", "a_ab", "a_ba", "a_tot"]],
@@ -217,8 +239,8 @@ class TestSelectLink(TestCase):
                 assignclass.set_select_links({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]})
                 assignment.execute()
 
-                assignment_results = pd.DataFrame(assignclass.results.get_load_results().data).set_index("index")
-                sl_results = pd.DataFrame(assignclass.results.get_sl_results().data).set_index("index")
+                assignment_results = assignclass.results.get_load_results()
+                sl_results = assignclass.results.get_sl_results()
 
                 self.assertAlmostEqual(
                     assignment_results["matrix_ab"].loc[1],

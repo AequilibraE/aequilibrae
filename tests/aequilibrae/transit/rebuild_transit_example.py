@@ -8,6 +8,7 @@ from pathlib import Path
 from aequilibrae import __file__ as aeq_init
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 def rebuid_coquimbo_example(dest_folder):
@@ -33,8 +34,8 @@ def rebuid_coquimbo_example(dest_folder):
 
     transit.save_to_disk()
 
-    cursor = Transit(project).pt_con.cursor()
-    cursor.execute("VACUUM;")
+    with commit_and_close(join(project.project_base_path, "public_transport.sqlite")) as conn:
+        conn.execute("VACUUM;")
 
     with ZipFile(f"{dest_folder}/coquimbo.zip", "w", compression=ZIP_DEFLATED, compresslevel=9) as zip_object:
         zip_object.write(f"{fldr}/project_database.sqlite", "project_database.sqlite")

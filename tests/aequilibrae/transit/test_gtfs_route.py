@@ -48,12 +48,9 @@ class TestRoute:
         r.populate(tuple(data.values()), list(data.keys()))
         r.shape = MultiLineString([array(((0.0, 0.0), (1.0, 2.0)))])
         r.save_to_database(transit_conn)
-        curr = transit_conn.cursor()
-        curr.execute(
-            "Select agency_id, shortname, longname, description, route_type from routes where route=?",
-            [data["route_id"]],
-        )
-        result = list(curr.fetchone())
+
+        sql = "Select agency_id, shortname, longname, description, route_type from routes where route=?"
+        result = list(transit_conn.execute(sql, [data["route_id"]]).fetchone())
         expected = [
             data["agency_id"],
             data["route_short_name"],
@@ -62,4 +59,3 @@ class TestRoute:
             data["route_type"],
         ]
         assert result == expected, "Saving route to the database failed"
-        del curr

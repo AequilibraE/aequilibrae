@@ -1,7 +1,11 @@
-.bd-main .bd-content .bd-article-container {
-    max-width: 90%;
+.bd-page-width {
+    max-width: 80%;
 }
 
-.bd-page-width {
-    max-width: 90%;
+.bd-main .bd-content .bd-article-container {
+    max-width: 80%;
+}
+
+.bd-links__title[role="heading"][aria-level="1"] {
+    display: none;
 }

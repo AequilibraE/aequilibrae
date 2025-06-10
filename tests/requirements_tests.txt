@@ -1,9 +1,0 @@
-setuptools
-codecov
-pytest
-pytest-cov
-pytest-subtests
-coveralls
-ruff==0.1.14
-wheel
-black==24.4.2

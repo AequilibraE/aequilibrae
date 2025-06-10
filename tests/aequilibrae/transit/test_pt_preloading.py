@@ -49,7 +49,6 @@ def _assignment(
     graph: Graph,
     demand: AequilibraeMatrix,
 ) -> TrafficAssignment:
-
     # Create assignment and set parameters
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])

@@ -9,7 +9,7 @@ jobs:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
-        python-version: [3.10]
+        python-version: [3.11]
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
@@ -17,16 +17,16 @@ jobs:
         sudo apt update
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev
-        pip3 install setuptools --upgrade
-        pip3 install -r requirements.txt
-        pip3 install spatialite
-        pip3 install pytest
-        pip3 install pytest-cov
+        pip3 install uv
+        uv venv ./venv_test
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
     - name: Compile library
       run: |
-        python3 setup.py build_ext --inplace
+        source ./venv_test/bin/activate
+        uv pip install .[dev]
+        python setup.py build_ext --inplace
 
     - name: Generate coverage report
       run: |
-        python3 -m pytest --cov=aequilibrae tests/
+        source ./venv_test/bin/activate
+        python -m pytest --cov=aequilibrae tests/

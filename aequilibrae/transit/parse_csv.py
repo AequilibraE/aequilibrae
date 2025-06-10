@@ -55,7 +55,7 @@ def parse_csv(file_name: str, column_order=[]):  # noqa B006
         if int(data.shape.__len__()) > 0:
             # handle the case of int data given as a float string
             for j, (_, dtype) in enumerate(new_data_dt):
-                if dtype == int:
+                if dtype is int:
                     for item in data:
                         item[j] = item[j].split(".")[0]
 

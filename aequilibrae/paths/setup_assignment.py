@@ -4,7 +4,6 @@
 
 import platform
 import numpy as np
-import pyarrow as pa
 from Cython.Build import cythonize
 
 try:
@@ -25,7 +24,7 @@ ext_modules = [
         extra_compile_args=[f"{prefix}openmp", cpp_std],  # do we want -Ofast?
         extra_link_args=[f"{prefix}openmp"],
         define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-        include_dirs=[np.get_include(), pa.get_include()],
+        include_dirs=[np.get_include()],
     )
 ]
 

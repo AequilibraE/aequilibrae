@@ -1,20 +1,20 @@
 import os
-import uuid
-import zipfile
-from os.path import join, dirname
 import pathlib
 import sqlite3
+import uuid
+import zipfile
+from os.path import dirname, join
 from tempfile import gettempdir
-from unittest import TestCase, skip
-import pandas as pd
-import numpy as np
-import pyarrow as pa
 from typing import List, Tuple
+from unittest import TestCase, skip
 
+import numpy as np
+import pandas as pd
 from aequilibrae import Project
+from aequilibrae.matrix import AequilibraeMatrix, GeneralisedCOODemand, Sparse
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.paths.route_choice import RouteChoice
-from aequilibrae.matrix import AequilibraeMatrix, Sparse, GeneralisedCOODemand
 
 from ...data import siouxfalls_project
 
@@ -89,8 +89,8 @@ class TestRouteChoiceSet(TestCase):
                 rc = RouteChoiceSet(self.graph)
 
                 rc.batched(demand, max_routes=0, max_depth=3, **kwargs)
-                self.assertFalse(
-                    rc.get_results(),
+                self.assertTrue(
+                    rc.get_results().empty,
                     "Route set from self to self should be empty",
                 )
 
@@ -108,7 +108,8 @@ class TestRouteChoiceSet(TestCase):
                 self.graph.set_blocked_centroid_flows(True)
                 rc = RouteChoiceSet(self.graph)
 
-                results = rc.run(a, b, self.shape, max_routes=2, max_depth=2, **kwargs)
+                with self.assertWarns(UserWarning):
+                    results = rc.run(a, b, self.shape, max_routes=2, max_depth=2, **kwargs)
                 self.assertListEqual(results, [], "Blocked centroid flow found a path")
 
     def test_route_choice_batched(self):
@@ -121,7 +122,7 @@ class TestRouteChoiceSet(TestCase):
         rc.batched(demand, max_routes=max_routes, max_depth=10, max_misses=200)
         results = rc.get_results()
 
-        gb = results.to_pandas().groupby(by="origin id")
+        gb = results.groupby(by="origin id")
         self.assertEqual(len(gb), len(nodes), "Requested number of route sets not returned")
 
         for _, row in gb:
@@ -140,7 +141,7 @@ class TestRouteChoiceSet(TestCase):
         rc.batched(demand, max_routes=max_routes, max_depth=10)
         results = rc.get_results()
 
-        gb = results.to_pandas().groupby(by="origin id")
+        gb = results.groupby(by="origin id")
         self.assertEqual(len(gb), 1, "Duplicates not dropped")
 
     def test_route_choice_exceptions(self):
@@ -168,17 +169,12 @@ class TestRouteChoiceSet(TestCase):
 
         path = join(self.project.project_base_path, "batched results")
         rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True)
-        table = rc.get_results().to_pandas()
+        table = rc.get_results()
         rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True, where=path, cores=1)
 
-        dataset = pa.dataset.dataset(
-            path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.results.schema)
-        )
-        new_table = (
-            dataset.to_table()
-            .to_pandas()
-            .sort_values(by=["origin id", "destination id", "cost"])[table.columns]
-            .reset_index(drop=True)
+        new_table = RouteChoiceSetResults.read_dataset(path)
+        new_table = new_table.sort_values(by=["origin id", "destination id", "cost"])[table.columns].reset_index(
+            drop=True
         )
 
         table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
@@ -192,7 +188,7 @@ class TestRouteChoiceSet(TestCase):
         demand = demand_from_nodes(nodes, self.graph)
         rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
-        table = rc.get_results().to_pandas()
+        table = rc.get_results()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
@@ -209,7 +205,7 @@ class TestRouteChoiceSet(TestCase):
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
         demand = demand_from_nodes(nodes, self.graph)
         rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
-        table = rc.get_results().to_pandas()
+        table = rc.get_results()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
@@ -224,28 +220,153 @@ class TestRouteChoiceSet(TestCase):
         for kwargs in [{"cutoff_prob": 0.0}, {"cutoff_prob": 0.5}, {"cutoff_prob": 1.0}]:
             with self.subTest(**kwargs):
                 rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, **kwargs)
-                table = rc.get_results().to_pandas()
+                table = rc.get_results()
 
                 gb = table.groupby(by=["origin id", "destination id"])
                 for od, df in gb:
                     self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
 
-    @skip("not implemented")
-    def test_path_file_link_loading(self):
-        np.random.seed(0)
+    def test_assign_from_df(self):
+        mat = AequilibraeMatrix()
+        mat.create_empty(
+            memory_only=True,
+            zones=self.graph.num_zones,
+            matrix_names=["all ones"],
+        )
+        mat.index = self.graph.centroids[:]
+        mat.computational_view()
+        mat.matrix_view[:, :] = np.full(self.shape, 1.0)
+        demand = GeneralisedCOODemand(
+            "origin id",
+            "destination id",
+            self.graph.nodes_to_indices,
+            shape=(self.graph.num_zones, self.graph.num_zones),
+        )
+        demand.add_matrix(mat)
+
         rc = RouteChoiceSet(self.graph)
-        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        demand = demand_from_nodes(nodes, self.graph)
-        demand.add_matrix(self.mat)
-        demand.df = demand.df.loc[nodes]
-        rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
-        n = self.mat.names[0]
+        args = {
+            "graph": self.graph.graph,
+            "demand": demand,
+            "select_links": {},
+            "recompute_psl": False,
+            "sl_link_loading": False,
+            "store_results": True,
+        }
 
-        ll = rc.get_link_loading()[n]
-        ll2 = rc.get_link_loading(generate_path_files=True)[n]
+        with self.subTest("failed to notice missing OD pairs"), self.assertRaises(KeyError):
+            df = pd.DataFrame(
+                {
+                    "origin id": [self.graph.centroids[0]],
+                    "destination id": [999999999],
+                    "probability": [1.0],
+                },
+            )
 
-        np.testing.assert_array_almost_equal(ll, ll2)
+            rc.assign_from_df(df=df, **args)
+
+        with self.subTest("failed to notice link missing from compressed graph"), self.assertRaises(KeyError):
+            df = pd.DataFrame(
+                {
+                    "origin id": [self.graph.centroids[0]],
+                    "destination id": [self.graph.centroids[1]],
+                    "probability": [1.0],
+                    "route set": [[999999999]],
+                },
+            )
+
+            rc.assign_from_df(df=df, **args)
+
+        with self.subTest("failed to notice with wrong direction"), self.assertRaises(KeyError):
+            df = pd.DataFrame(
+                {
+                    "origin id": [self.graph.centroids[0]],
+                    "destination id": [self.graph.centroids[1]],
+                    "probability": [1.0],
+                    "route set": [[-self.graph.graph.iloc[0].link_id]],
+                },
+            )
+
+            rc.assign_from_df(df=df, **args)
+
+        with self.subTest("route sets should be a list"), self.assertRaises(TypeError):
+            df = pd.DataFrame(
+                {
+                    "origin id": [self.graph.centroids[0]],
+                    "destination id": [self.graph.centroids[1]],
+                    "probability": [1.0],
+                    "route set": [1],
+                },
+            )
+
+            rc.assign_from_df(df=df, **args)
+
+        link_ids = self.graph.network.sample(10).link_id.to_numpy()
+        links = self.graph.network[self.graph.network.link_id.isin(link_ids)]
+        links = links.loc[links.link_id.replace({x: i for i, x in enumerate(link_ids)}).sort_values().index]
+
+        values = np.random.random(len(links))
+        df = pd.DataFrame(
+            {
+                "origin id": links.a_node.to_numpy(),
+                "destination id": links.b_node.to_numpy(),
+                "probability": values,
+                "route set": [[x] for x in link_ids],
+            },
+        )
+
+        # For the tests that should not raise errors we reduce our demand matrix to half the route sets
+        args["demand"].df = args["demand"].df.loc[
+            df[["origin id", "destination id"]].head(len(df) // 2).itertuples(name=None, index=False)
+        ]
+        with self.subTest("assign random links", recompute_psl=False):
+            rc.assign_from_df(df=df, **args)
+
+            results = rc.get_results()
+            ll_res = rc.get_link_loading()["all ones"]
+
+            values2 = np.zeros_like(values)
+            values2[: len(df) // 2] = values[: len(df) // 2]
+            np.testing.assert_array_equal(
+                ll_res[links.index],
+                values2,
+                "Link loading results don't match the expected values",
+            )
+
+            # The filled values should be the constant here, we didn't recompute PSL.
+            np.testing.assert_array_equal(results["cost"].to_numpy(), 0.0)
+            np.testing.assert_array_equal(results["mask"].to_numpy(), True)
+            np.testing.assert_array_equal(results["path overlap"].to_numpy(), 0.0)
+
+            pd.testing.assert_series_equal(
+                results["probability"],
+                df.head(len(df) // 2)["probability"],
+                check_index=False,
+            )
+
+        with self.subTest("assign random links", recompute_psl=True):
+            rc.assign_from_df(df=df, **(args | {"recompute_psl": True}))
+
+            results = rc.get_results()
+            ll_res = rc.get_link_loading()["all ones"]
+
+            values2 = np.zeros(len(links.index))
+            values2[: len(df) // 2] = 1.0
+            np.testing.assert_array_equal(
+                ll_res[links.index],
+                values2,
+                "Link loading results don't match the expected values",
+            )
+
+            # Since we recomputed PSL the cost field should be updated. As we sampled the links and there's only one
+            # route per OD (and Sioux falls has no links with the same A and B nodes) there's no overlap, thus their are
+            # all 1.0 for probabilities and path overlap.
+            links2 = links.head(len(df) // 2)
+            np.testing.assert_array_equal(results["cost"].to_numpy(), links2["distance"].to_numpy())
+            np.testing.assert_array_equal(results["mask"].to_numpy(), True)
+            np.testing.assert_array_equal(results["path overlap"].to_numpy(), 1.0)
+            np.testing.assert_array_equal(results["probability"].to_numpy(), 1.0)
 
     def test_known_results(self):
         for cost in ["distance", "free_flow_time"]:
@@ -281,7 +402,7 @@ class TestRouteChoiceSet(TestCase):
                 rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
                 link_loads = rc.get_link_loading()
-                table = rc.get_results().to_pandas()
+                table = rc.get_results()
 
                 with self.subTest(matrix="all zeros"):
                     u = link_loads["all zeros"]
@@ -336,7 +457,7 @@ class TestRouteChoiceSet(TestCase):
                     max_depth=10,
                     path_size_logit=True,
                 )
-                table = rc.get_results().to_pandas()
+                table = rc.get_results()
 
                 # Shortest routes between 20-4, and 21-2 share links 23 and 26. Link 26 also appears in between 10-8 and
                 # 17-9 20-4 also shares 11 with 5-3
@@ -374,7 +495,7 @@ class TestRouteChoice(TestCase):
 
         self.project = Project()
         self.project.open(proj_path)
-        self.project.network.build_graphs(fields=["distance"], modes=["c"])
+        self.project.network.build_graphs(fields=["distance", "free_flow_time"], modes=["c"])
         self.graph = self.project.network.graphs["c"]
         self.graph.set_graph("distance")
         self.graph.set_blocked_centroid_flows(False)
@@ -383,6 +504,10 @@ class TestRouteChoice(TestCase):
         self.mat.computational_view()
 
         self.rc = RouteChoice(self.graph)
+
+    def tearDown(self) -> None:
+        self.mat.close()
+        self.project.close()
 
     def test_prepare(self):
         with self.assertRaises(ValueError):
@@ -473,6 +598,56 @@ class TestRouteChoice(TestCase):
             ),
         )
 
+    def test_execute_from_path_files(self):
+        tmp_path = pathlib.Path(self.project.project_base_path) / "rc"
+        tmp_path.mkdir()
+
+        self.rc.set_choice_set_generation("link-penalization", max_routes=5, penalty=1.1)
+        self.rc.add_demand(self.mat)
+        self.rc.prepare()
+        self.rc.execute(perform_assignment=True)
+
+        results = self.rc.get_results()
+        ll_res = self.rc.get_load_results()
+        self.rc.save_path_files(tmp_path)
+
+        rc = RouteChoice(self.graph)
+        rc.add_demand(self.mat)
+        rc.set_choice_set_generation(store_results=True)
+
+        with self.subTest(recompute_psl=False):
+            rc.execute_from_path_files(tmp_path, recompute_psl=False)
+            results_new = rc.get_results()
+            ll_res_new = rc.get_load_results()
+            pd.testing.assert_frame_equal(ll_res, ll_res_new)
+            pd.testing.assert_frame_equal(
+                results[["origin id", "destination id", "route set", "probability"]],
+                results_new[["origin id", "destination id", "route set", "probability"]],
+            )
+
+        with self.subTest(recompute_psl=True):
+            rc.execute_from_path_files(tmp_path, recompute_psl=True)
+            results_new = rc.get_results()
+            ll_res_new = rc.get_load_results()
+            pd.testing.assert_frame_equal(ll_res, ll_res_new)
+            pd.testing.assert_frame_equal(results, results_new)
+
+        with self.subTest(recompute_psl=True, msg="change the cost field"):
+            self.graph.set_graph("free_flow_time")
+            rc = RouteChoice(self.graph)
+            rc.add_demand(self.mat)
+            rc.set_choice_set_generation(store_results=True)
+
+            rc.execute_from_path_files(tmp_path, recompute_psl=True)
+            results_new = rc.get_results()
+            ll_res_new = rc.get_load_results()
+
+            pd.testing.assert_series_equal(results["origin id"], results["origin id"])
+            pd.testing.assert_series_equal(results["destination id"], results["destination id"])
+            pd.testing.assert_series_equal(results["route set"], results["route set"])
+            pd.testing.assert_series_equal(results["path overlap"], results["path overlap"])
+            # All other fields may be different
+
     def test_saving(self):
         self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
         self.rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
@@ -499,13 +674,15 @@ class TestRouteChoice(TestCase):
                     pd.testing.assert_frame_equal(df2, df)
         conn.close()
 
-        matrices = Sparse.from_disk(
-            (pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx")
-        )
+        matrices = AequilibraeMatrix()
+        matrices.create_from_omx((pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx"))
+        matrices.computational_view()
 
         for sl_name, v in self.rc.get_select_link_od_matrix_results().items():
             for demand_name, matrix in v.items():
-                np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name].toarray())
+                np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices.matrix[sl_name + "_" + demand_name])
+
+        matrices.close()
 
     def test_round_trip(self):
         self.rc.add_demand(self.mat)
@@ -518,11 +695,11 @@ class TestRouteChoice(TestCase):
 
         self.rc.set_save_routes(None)
         self.rc.execute(perform_assignment=True)
-        table = self.rc.get_results().to_pandas()
+        table = self.rc.get_results()
 
         self.rc.set_save_routes(path)
         self.rc.execute(perform_assignment=True)
-        table2 = self.rc.get_results().to_table().to_pandas()
+        table2 = self.rc.get_results()
 
         table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
         table2 = table2[table.columns].sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)

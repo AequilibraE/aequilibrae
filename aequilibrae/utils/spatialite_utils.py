@@ -36,37 +36,47 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
     if inside_qgis:
         import qgis
 
-        return qgis.utils.spatialite_connect(path_to_file)
+        return qgis.utils.spatialite_connect(str(path_to_file))
 
     ensure_spatialite_binaries()
+
     return _connect_spatialite(path_to_file, missing_ok)
 
 
 def _connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False):
     conn = safe_connect(path_to_file, missing_ok)
+    load_spatialite_extension(conn)
+    return conn
+
+
+def load_spatialite_extension(conn: Connection):
     conn.enable_load_extension(True)
     conn.load_extension("mod_spatialite")
-    return conn
 
 
 def is_spatialite(conn):
     return has_table(conn, "geometry_columns")
 
 
-def ensure_spatialite_binaries(directory: Optional[os.PathLike] = None) -> None:
-    if is_not_windows():
-        return
-
-    directory = directory or gettempdir()
-
-    if not _dll_already_exists(directory):
-        _download_and_extract_spatialite(directory)
-
-    # Update path and proj_lib env vars
+def set_known_spatialite_folder(spatialite_folder: os.PathLike):
+    directory = str(spatialite_folder)
     if directory not in os.environ["PATH"]:
         os.environ["PATH"] = directory + os.pathsep + os.environ["PATH"]
     if "PROJ_LIB" not in os.environ:
         os.environ["PROJ_LIB"] = directory
+
+
+def ensure_spatialite_binaries() -> None:
+    if is_not_windows():
+        return
+
+    directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
+
+    if not _dll_already_exists(directory):
+        global_logger.info(f"mod_spatialite.dll not found in {directory} attempting to download")
+        _download_and_extract_spatialite(directory)
+
+    set_known_spatialite_folder(directory)
 
     try:
         # We need to have the proj.db file in place.

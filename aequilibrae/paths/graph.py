@@ -1,16 +1,17 @@
+import dataclasses
 import pickle
 import uuid
+import warnings
 from abc import ABC
 from datetime import datetime
 from os.path import join
-from typing import List, Tuple, Optional
-import dataclasses
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 from aequilibrae.context import get_logger
+from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 
 @dataclasses.dataclass
@@ -115,10 +116,11 @@ class GraphBase(ABC):  # noqa: B024
 
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
-        self.dead_end_links = np.array([])
+        self.dead_end_links = np.array([], dtype=np.int64)
 
         self.compressed_link_network_mapping_idx = None
         self.compressed_link_network_mapping_data = None
+        self.network_compressed_node_mapping = None
 
         # Randomly generate a unique Graph ID randomly
         self._id = uuid.uuid4().hex
@@ -137,7 +139,7 @@ class GraphBase(ABC):  # noqa: B024
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: Optional[np.ndarray]) -> None:
+    def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -150,6 +152,7 @@ class GraphBase(ABC):  # noqa: B024
 
         :Arguments:
             **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
+            **remove_dead_ends** (:obj:`bool`): Whether or not to remove dead ends from the graph. (*Optional*, default is "True").
         """
         self.__network_error_checking__()
 
@@ -189,7 +192,7 @@ class GraphBase(ABC):  # noqa: B024
         self.__build_derived_properties()
 
         if self.centroids.shape[0]:
-            self.__build_compressed_graph()
+            self.__build_compressed_graph(remove_dead_ends)
             self.compact_num_links = self.compact_graph.shape[0]
 
         # The cache property should be recalculated when the graph has been re-prepared
@@ -197,8 +200,8 @@ class GraphBase(ABC):  # noqa: B024
         self.compressed_link_network_mapping_data = None
         self.network_compressed_node_mapping = None
 
-    def __build_compressed_graph(self):
-        build_compressed_graph(self)
+    def __build_compressed_graph(self, remove_dead_ends):
+        build_compressed_graph(self, remove_dead_ends)
 
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
@@ -240,6 +243,8 @@ class GraphBase(ABC):  # noqa: B024
 
         # Now we take care of centroids
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
+        if not np.isin(centroids, nodes, assume_unique=True).all():
+            warnings.warn("Found centroids not present in the graph!")
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
         all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
@@ -273,6 +278,54 @@ class GraphBase(ABC):  # noqa: B024
         df["direction"] = df.direction.values.astype(np.int8)
 
         return all_nodes, num_nodes, nodes_to_indices, fs, df
+
+    def compute_path(
+        self,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
+    ):
+        """
+        Returns the results from path computation result holder.
+
+        :Arguments:
+            **origin** (:obj:`int`): origin for the path
+
+            **destination** (:obj:`int`): destination for the path
+
+            **early_exit** (:obj:`bool`): stop constructing the shortest path tree once the destination is found.
+            Doing so may cause subsequent calls to ``update_trace`` to recompute the tree. Default is ``False``.
+
+            **a_star** (:obj:`bool`): whether or not to use A* over Dijkstra's algorithm.
+            When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
+
+            **heuristic** (:obj:`str`): heuristic to use if ``a_star`` is enabled. Default is ``None``.
+        """
+        from aequilibrae.paths import PathResults
+
+        res = PathResults()
+        res.prepare(self)
+        res.compute_path(origin, destination, early_exit, a_star, heuristic)
+
+        return res
+
+    def compute_skims(self, cores: Union[int, None] = None):
+        """
+        Returns the results from network skimming result holder.
+
+        :Arguments:
+            **cores** (:obj:`Union[int, None]`): number of cores (threads) to be used in computation
+        """
+        from aequilibrae.paths import NetworkSkimming
+
+        skimmer = NetworkSkimming(self)
+        if cores:
+            skimmer.set_cores(cores)
+        skimmer.execute()
+
+        return skimmer
 
     def exclude_links(self, links: list) -> None:
         """
@@ -341,18 +394,22 @@ class GraphBase(ABC):  # noqa: B024
         :Arguments:
             **cost_field** (:obj:`str`): Field name. Must be numeric
         """
-        if cost_field in self.graph.columns:
-            self.cost_field = cost_field
+        if cost_field not in self.graph.columns:
+            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
+
+        self.cost_field = cost_field
+
+        # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
+        if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
             df = self.__graph_groupby.sum(numeric_only=True)[[cost_field]].reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
-            if self.graph[cost_field].dtype == self.__float_type:
-                self.cost = np.array(self.graph[cost_field].values, copy=True)
-            else:
-                self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
-                self.logger.warning("Cost field with wrong type. Converting to float64")
+
+        if self.graph[cost_field].dtype == self.__float_type:
+            self.cost = np.array(self.graph[cost_field].values, copy=True)
         else:
-            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
+            self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
+            self.logger.warning("Cost field with wrong type. Converting to float64")
 
         self.__build_derived_properties()
 
@@ -379,10 +436,17 @@ class GraphBase(ABC):  # noqa: B024
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
-        self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
-        df = self.__graph_groupby.sum(numeric_only=True)[skim_fields].reset_index()
-        for i, skm in enumerate(skim_fields):
-            self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
+        if self.centroids.shape[0]:
+            self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
+
+            gpb = self.__graph_groupby
+            if any(x not in self.__graph_groupby for x in skim_fields):
+                gpb = self.graph.groupby(["__compressed_id__"])
+
+            df = gpb.sum(numeric_only=True)[skim_fields].reset_index()
+
+            for i, skm in enumerate(skim_fields):
+                self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
@@ -514,13 +578,13 @@ class GraphBase(ABC):  # noqa: B024
                 self.logger.warning("Could not convert {} - {}".format(new_type, verr.__str__()))
         if isinstance(new_type, int):
             def_type = int
-            if current_type == float:
+            if current_type is float:
                 def_type = float
-            elif current_type == str:
+            elif current_type is str:
                 def_type = str
         elif isinstance(new_type, float):
             def_type = float
-            if current_type == str:
+            if current_type is str:
                 def_type = str
         elif isinstance(new_type, str):
             def_type = str
@@ -543,6 +607,10 @@ class GraphBase(ABC):  # noqa: B024
         network IDs are then in the range ``idx[id]:idx[id + 1]``.
 
         Links not in the compressed graph are not contained within the 'data' array.
+
+        'node_mapping' provides an easy way to check if a node index is present within the compressed graph. If the
+        value is -1 then the node has been removed, either by compression of dead end link removal. If the value is
+        greater than or equal to 0, then that value is the compressed node index.
 
         .. code-block:: python
 
@@ -577,3 +645,7 @@ class TransitGraph(GraphBase):
         self._config = config
         self.od_node_mapping = od_node_mapping
         self.mode = "t"
+
+    @property
+    def config(self):
+        return self._config

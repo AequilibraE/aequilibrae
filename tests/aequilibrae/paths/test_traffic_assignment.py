@@ -47,6 +47,30 @@ def assignment(project):
     return TrafficAssignment(project)
 
 
+def test_skim_after(project, assigclass):
+    assig = TrafficAssignment(project)
+
+    assig.add_class(assigclass)
+    assig.set_vdf("BPR")
+    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+    assig.set_capacity_field("capacity")
+    assig.set_time_field("free_flow_time")
+
+    assig.max_iter = 10
+    assig.set_algorithm("msa")
+    assig.execute()
+
+    b = assig.skim_congested(["distance"], return_matrices=True)
+
+    assert b["car"].names == ["distance", "__assignment_cost__", "__congested_time__"]
+
+    b = assig.skim_congested(return_matrices=True)
+
+    assert b["car"].names == ["__assignment_cost__", "__congested_time__"]
+
+
 class TestTrafficAssignmentSetup:
     algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 

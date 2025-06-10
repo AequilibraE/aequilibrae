@@ -1,16 +1,15 @@
 import os
 import uuid
 from copy import copy, deepcopy
-from random import randint, random
+from random import randint
 from shutil import copytree, rmtree
 from tempfile import gettempdir
 from unittest import TestCase, TestLoader as _TestLoader
+
 import pandas as pd
 
-import shapely.wkb
-from shapely.geometry import Point
-
 from aequilibrae.project import Project
+from aequilibrae.utils.db_utils import read_and_close
 from ...data import siouxfalls_project
 
 _TestLoader.sortTestMethodsUsing = None
@@ -26,11 +25,9 @@ class TestPeriods(TestCase):
         self.project = Project()
         self.project.open(self.proj_dir)
         self.network = self.project.network
-        self.curr = self.project.conn.cursor()
 
     def tearDown(self) -> None:
         self.project.close()
-        del self.curr
         try:
             rmtree(self.proj_dir)
         except Exception as e:
@@ -56,8 +53,9 @@ class TestPeriods(TestCase):
         f_editor = periods.fields
 
         fields = sorted(f_editor.all_fields())
-        self.curr.execute("pragma table_info(periods)")
-        dt = self.curr.fetchall()
+
+        with read_and_close(self.project.path_to_file) as conn:
+            dt = conn.execute("pragma table_info(periods)").fetchall()
 
         actual_fields = sorted({x[1] for x in dt})
         self.assertEqual(fields, actual_fields, "Table editor is weird for table periods")

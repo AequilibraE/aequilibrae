@@ -23,4 +23,4 @@ THE SOFTWARE.
 Additional clause:
 
 Reference to the software has to be made in all documentation for
-work developed with the software, where appropriate.
+work developed with the software.
