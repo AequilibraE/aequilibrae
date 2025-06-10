@@ -20,6 +20,8 @@ def import_file_as_module(file: pathlib.Path, module_name):
         raise ImportError(f"Could not find module spec for {file}")
 
     module = importlib.util.module_from_spec(spec)
+    if module_name in sys.modules:
+        raise ImportError(f"Module name '{module_name}' already exists in sys.modules")
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
 
