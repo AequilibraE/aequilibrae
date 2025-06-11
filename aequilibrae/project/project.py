@@ -202,7 +202,7 @@ class Project:
         Refer to ``run/__init__.py`` file within the project folder for documentation.
         """
         entry_points = self.parameters["run"]
-        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run")
+        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run", force=True)
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)

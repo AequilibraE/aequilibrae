@@ -128,7 +128,7 @@ class Migration:
         conn.executescript(contents)
 
     def _apply_python(self, conn: sqlite3.Connection):
-        module = import_file_as_module(self.file, self.name)
+        module = import_file_as_module(self.file, self.name, force=True)
         try:
             migrate = module.migrate
         except AttributeError as e:
@@ -160,6 +160,7 @@ class MigrationManager:
         migrations = import_file_as_module(
             migration_file,
             "aequilibrae.project.database_specification.migrations",
+            force=True,
         ).migrations
 
         res = []
