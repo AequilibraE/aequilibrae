@@ -1,15 +1,17 @@
-from math import floor
+import os
 import string
-from unittest import TestCase
+import uuid
+from math import floor
+from os.path import join
 from random import choice, randint
 from shutil import copyfile
-import os
-from os.path import join
 from shutil import copytree
-import uuid
 from tempfile import gettempdir
-from ...data import siouxfalls_project
+from unittest import TestCase
+
 from aequilibrae.project import Project
+from aequilibrae.utils.db_utils import read_and_close
+from ...data import siouxfalls_project
 
 
 class TestMatrices(TestCase):
@@ -21,7 +23,6 @@ class TestMatrices(TestCase):
         self.project.open(proj_dir)
         self.matrices = self.project.matrices
         self.matrices.reload()
-        self.curr = self.project.conn.cursor()
 
     def tearDown(self) -> None:
         self.project.close()
@@ -95,25 +96,34 @@ class TestMatrices(TestCase):
         rec.description = text
         rec.save()
 
-        self.curr.execute('select description from matrices where name="omx";')
-        self.assertEqual(text, self.curr.fetchone()[0], "Saving matrix record description failed")
+        with read_and_close(self.project.path_to_file) as conn:
+            cnt = conn.execute('select description from matrices where name="omx";').fetchone()[0]
+
+        self.assertEqual(text, cnt, "Saving matrix record description failed")
 
     def test_delete(self):
         self.matrices.delete_record("omx")
-        self.curr.execute('select count(*) from matrices where name="omx";')
 
-        self.assertEqual(0, self.curr.fetchone()[0], " Deleting matrix record failed")
+        with read_and_close(self.project.path_to_file) as conn:
+            cnt = conn.execute('select count(*) from matrices where name="omx";').fetchone()[0]
+
+        self.assertEqual(0, cnt, " Deleting matrix record failed")
 
         with self.assertRaises(Exception):
             self.matrices.get_record("omx")
 
     def test_list(self):
         df = self.matrices.list()
-        self.curr.execute("select count(*) from Matrices")
-        self.assertEqual(df.shape[0], self.curr.fetchone()[0], "Returned the wrong number of matrices in the database")
+
+        with read_and_close(self.project.path_to_file) as conn:
+            cnt = conn.execute("select count(*) from Matrices").fetchone()[0]
+
+        self.assertEqual(df.shape[0], cnt, "Returned the wrong number of matrices in the database")
 
         self.assertEqual(df[df.status == "file missing"].shape[0], 1, "Wrong # of records for missing matrix files")
 
     def __mat_count(self, should_have: int, error_message: str) -> None:
-        self.curr.execute("Select count(*) from Matrices;")
-        self.assertEqual(self.curr.fetchone()[0], should_have, error_message)
+        with read_and_close(self.project.path_to_file) as conn:
+            cnt = conn.execute("Select count(*) from Matrices;").fetchone()[0]
+
+        self.assertEqual(cnt, should_have, error_message)

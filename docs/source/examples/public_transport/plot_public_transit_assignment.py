@@ -36,7 +36,6 @@ from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = '../source/_images/transit/hyperpath_bell_n_10_alpha_100d0.png'
 
 # %%
-
 # Let's create an empty project on an arbitrary folder.
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -78,7 +77,7 @@ periods.data
 project.network.build_graphs()
 
 # %%
-# Now we'll create the line strings for the access connectors, this step is optinal but provides more accurate distance 
+# Now we'll create the line strings for the access connectors, this step is optional but provides more accurate distance 
 # estimations and better looking geometry.
 # 
 # Because Coquimbo doesn't have many walking edges we'll match onto the ``"c"`` graph.
@@ -154,7 +153,6 @@ mat.computational_view()
 from aequilibrae.paths import TransitAssignment, TransitClass
 
 # %%
-
 # Create the assignment class
 assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
 
@@ -169,9 +167,12 @@ assig.set_frequency_field("freq")
 
 assig.set_algorithm("os")
 
-# When there's multiple matrix cores we'll also need to set the core to use for the demand.
+# %%
+# When there's multiple matrix cores we'll also need to set the core to use for the demand as we can only assign one
+# at a time.
 assigclass.set_demand_matrix_core("pt")
 
+# %%
 # Let's perform the assignment for the transit classes added
 assig.execute()
 

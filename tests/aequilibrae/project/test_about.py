@@ -3,7 +3,9 @@ import sqlite3
 import string
 
 import pytest
+
 from aequilibrae import Project
+from aequilibrae.utils.db_utils import read_and_close
 
 
 class TestAbout:
@@ -51,10 +53,9 @@ class TestAbout:
                 all_added.add(k)
                 project.about.add_info_field(k)
 
-        curr = project.conn.cursor()
-        curr.execute("select infoname from 'about'")
+        with read_and_close(project.path_to_file) as conn:
+            charac = [x[0] for x in conn.execute("select infoname from 'about'").fetchall()]
 
-        charac = [x[0] for x in curr.fetchall()]
         for k in all_added:
             if k not in charac:
                 self.fail(f"Failed to add {k}")

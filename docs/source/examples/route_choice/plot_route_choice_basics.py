@@ -95,11 +95,6 @@ graph.prepare_graph(np.array(nodes_of_interest))
 # And set the cost of the graph the as the utility field just created
 graph.set_graph("utility")
 
-# We allow flows through "centroid connectors" because our centroids are not really centroids
-# If we have actual centroid connectors in the network (and more than one per centroid), then we
-# should remove them from the graph
-graph.set_blocked_centroid_flows(False)
-
 # %%
 # Mock demand matrix
 # ------------------
@@ -124,8 +119,8 @@ import folium
 # %%
 def plot_results(link_loads):
 
-    link_loads = link_loads[link_loads.tot > 0]
-    max_load = link_loads["tot"].max()
+    link_loads = link_loads[link_loads["demand_tot"] > 0]
+    max_load = link_loads["demand_tot"].max()
     links = project.network.links.data
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
@@ -138,7 +133,7 @@ def plot_results(link_loads):
         color="red",
         style_kwds={
             "style_function": lambda x: {
-                "weight": x["properties"]["tot"] * factor,
+                "weight": x["properties"]["demand_tot"] * factor,
             }
         },
     )
@@ -173,12 +168,11 @@ print(results[0])
 
 # %%
 # Because we asked it to also perform an assignment we can access the various results from that.
-# The default return is a Pyarrow Table but Pandas is nicer for viewing.
-res = rc.get_results().to_pandas()
+res = rc.get_results()
 res.head()
 
 # %%
-plot_results(rc.get_load_results()["demand"])
+plot_results(rc.get_load_results())
 
 # %%
 # Batch operations
@@ -190,7 +184,7 @@ rc.prepare()
 # %%
 # Now we can perform a batch computation with an assignment
 rc.execute(perform_assignment=True)
-res = rc.get_results().to_pandas()
+res = rc.get_results()
 res.head()
 
 # %%
@@ -199,7 +193,7 @@ rc.get_load_results()
 
 # %% 
 # We can plot these as well
-plot_results(rc.get_load_results()["demand"])
+plot_results(rc.get_load_results())
 
 # %%
 # Select link analysis

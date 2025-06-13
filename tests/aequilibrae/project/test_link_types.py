@@ -2,6 +2,7 @@ import random
 import string
 from unittest import TestCase
 
+from aequilibrae.utils.db_utils import read_and_close
 from tests.models_for_test import ModelsTest
 
 
@@ -9,7 +10,6 @@ class TestLinkTypes(TestCase):
     def setUp(self) -> None:
         tm = ModelsTest()
         self.proj = tm.no_triggers()
-        self.curr = self.proj.conn.cursor()
 
         letters = [random.choice(string.ascii_letters + "_") for x in range(20)]
         self.random_string = "".join(letters)
@@ -57,9 +57,8 @@ class TestLinkTypes(TestCase):
         lt = self.proj.network.link_types
         all_lts = set(lt.all_types().keys())
 
-        c = self.proj.conn.cursor()
-        c.execute("select link_type_id from link_types")
-        reallts = {x[0] for x in c.fetchall()}
+        with read_and_close(self.proj.path_to_file) as conn:
+            reallts = {x[0] for x in conn.execute("select link_type_id from link_types").fetchall()}
 
         diff = all_lts.symmetric_difference(reallts)
         self.assertEqual(diff, set(), "Getting all link_types failed")

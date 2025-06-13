@@ -14,7 +14,6 @@ In this example, we show how to perform path computation for Coquimbo, a city in
 #     * :func:`aequilibrae.paths.PathResults`
 
 # %%
-
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -22,7 +21,6 @@ from os.path import join
 from aequilibrae.utils.create_example import create_example
 
 # %%
-
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -51,21 +49,20 @@ project.network.build_graphs()
 # This is true, but we won't use those fields.
 
 # %%
-# We grab the graph for cars
+# We grab the graph for cars,
 graph = project.network.graphs["c"]
 
-# we also see what graphs are available
+# %%
+# we'll also see what graphs are available.
 project.network.graphs.keys()
 
-# let's say we want to minimize the distance
+# %%
+# Let's say we want to minimise the distance,
 graph.set_graph("distance")
 
-# And will skim time and distance while we are at it
+# %%
+# and will skim time and distance while we are at it.
 graph.set_skimming(["travel_time", "distance"])
-
-# And we will allow paths to be computed going through other centroids/centroid connectors.
-# We recommend you to `be extremely careful` with this setting.
-graph.set_blocked_centroid_flows(False)
 
 # %%
 # Let's create a path results object from the graph and compute a path from 

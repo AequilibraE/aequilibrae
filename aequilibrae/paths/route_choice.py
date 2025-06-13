@@ -7,14 +7,13 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict
 from collections.abc import Hashable
+from os import path
 from uuid import uuid4
 from functools import cached_property
 
 import numpy as np
 import pandas as pd
-import pyarrow as pa
 import openmatrix as omx
-import pyarrow.dataset
 import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
@@ -22,6 +21,7 @@ from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class RouteChoice:
@@ -45,7 +45,7 @@ class RouteChoice:
     demand_index_names = ["origin id", "destination id"]
 
     def __init__(self, graph: Graph, project=None):
-        self.parameters = self.default_parameters.copy()
+        self.parameters = {}
         self.procedure_id = None
         self.procedure_date = None
 
@@ -62,7 +62,6 @@ class RouteChoice:
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
 
         self.where: Optional[pathlib.Path] = None
-        self.save_path_files: bool = False
         self.index_name = "route_choice_sl_index"
 
         self._config = {}
@@ -79,13 +78,14 @@ class RouteChoice:
         )
         return d
 
-    def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
+    def set_choice_set_generation(self, /, algorithm: str = None, **kwargs) -> None:
         """
         Chooses the assignment algorithm and set its parameters.
 
         Options for algorithm are 'bfsle' for breadth first search with link removal, or
-        'link-penalisation'/'link-penalization'. 'lp' is also accepted as an alternative
-        to 'link-penalisation'
+        'link-penalisation'/'link-penalization'. 'lp' is also accepted as an alternative to
+        'link-penalisation'. If ``algorithm`` is ``None``, none will be set, but the parameters
+        will be updated. This is useful when assigning from path-files.
 
         BFSLE implementation based on "Route choice sets for very high-resolution data" by
         Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
@@ -140,21 +140,31 @@ class RouteChoice:
 
             **kwargs** (:obj:`dict`): Dictionary with all parameters for the algorithm
         """
-        algo_dict = {i: i for i in self.all_algorithms}
-        algo_dict["lp"] = "link-penalisation"
-        algo_dict["link-penalization"] = "link-penalisation"
-        algo = algo_dict.get(algorithm.lower())
+        if algorithm is not None:
+            algo_dict = {i: i for i in self.all_algorithms}
+            algo_dict["lp"] = "link-penalisation"
+            algo_dict["link-penalization"] = "link-penalisation"
 
-        if algo is None:
-            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
+            sentinel = object()
+            algorithm = algo_dict.get(algorithm.lower(), sentinel)
 
-        defaults = self.default_parameters["generic"] | self.default_parameters[algo]
-        for key in kwargs.keys():
-            if key not in defaults:
-                raise ValueError(f"Invalid parameter `{key}` provided for algorithm `{algo}`")
+            if algorithm is sentinel:
+                raise AttributeError(
+                    f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}"
+                )
 
-        self.algorithm = algo
-        self._config["Algorithm"] = algo
+            defaults = self.default_parameters["generic"] | self.default_parameters[algorithm]
+            for key in kwargs.keys():
+                if key not in defaults:
+                    raise ValueError(f"Invalid parameter '{key}' provided for algorithm `{algorithm}`")
+        else:
+            defaults = self.default_parameters["generic"]
+            for key in kwargs.keys():
+                if key not in defaults:
+                    raise ValueError(f"Invalid or non-generic parameter '{key}' provided")
+
+        self.algorithm = algorithm
+        self._config["Algorithm"] = algorithm
 
         self.parameters = defaults | kwargs
 
@@ -167,15 +177,6 @@ class RouteChoice:
             **cores** (:obj:`int`): Number of CPU cores to use
         """
         self.cores = cores
-
-    def set_save_path_files(self, save_it: bool) -> None:
-        """turn path saving on or off.
-
-        :Arguments:
-            **save_it** (:obj:`bool`): Boolean to indicate whether paths should be saved
-        """
-        self.save_path_files = save_it
-        raise NotImplementedError()
 
     def set_save_routes(self, where: Optional[str] = None) -> None:
         """
@@ -316,6 +317,82 @@ class RouteChoice:
             **self.parameters,
         )
 
+    def execute_from_path_files(self, path_files: Union[pathlib.Path, str], recompute_psl: bool = False) -> None:
+        """
+        Perform an assignment from an existing set of path-files.
+
+        This method expects the path-files to be written by the ``self.save_path_files()`` method,
+        however any parquet hive dataset with the correct structure is accepted. This allows the
+        use of AequilibraE's path-sized logit, link loading, select link analysis, and assignment
+        while using externally generated routes.
+        """
+
+        # Read the dataset schema and make sure it conforms to what we want
+        df = RouteChoiceSetResults.read_dataset(path_files)
+        required_fields = ["origin id", "destination id", "route set"] + [] if recompute_psl else ["probability"]
+        schema = {
+            "destination id": "uint32",
+            "route set": "object",
+            "cost": "float64",
+            "mask": "bool",
+            "path overlap": "float64",
+            "probability": "float64",
+            "origin id": "uint32",
+        }
+        dtypes = df.dtypes
+
+        try:
+            for field in required_fields:
+                if schema[field] != dtypes.loc[field]:
+                    raise TypeError(
+                        f"schema of required field '{field}' does not match. "
+                        f"Expected {schema[field]}, "
+                        f"found {dtypes.loc[field]}"
+                    )
+        except KeyError as e:
+            raise KeyError(f"Column '{field}' does not exist in the path-files") from e
+
+        self.execute_from_pandas(df=df, recompute_psl=recompute_psl)
+
+    def execute_from_pandas(self, df: pd.DataFrame, recompute_psl: bool = False) -> None:
+        """
+        Perform an assignment using route sets from a Pandas DataFrame.
+
+        Requires the DataFrame contains the ``origin id``, ``destination id`` and ``route set``
+        columns. The route sets must be a list of links IDs stored as integers with the direction
+        encoded as the sign.  Additionally, when ``recompute_psl`` is ``False``, the
+        ``probability`` column must also be present.
+
+        When ``recompute_psl`` is ``True``, the path-sized logit is recomputed for each route with
+        respect to the graphs current cost field and the ``beta`` and ``cutoff_prob`` parameters.
+
+        All origin and destination IDs within the DataFrame must exist within the demand matrix.
+
+        All link IDs and directions must exist within the graph. Links must also be present within
+        the compressed graph.
+
+        If ``recompute_psl`` is ``False`` the table returned from ``self.get_results()`` will have
+        all zeros for the cost and path overlap fields, and all True for the mask field. If
+        ``recompute_psl`` is ``True`` these fields will be recalculated as required.
+        """
+
+        required_columns = ["origin id", "destination id", "route set"] + [] if recompute_psl else ["probability"]
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"provided DataFrame is missing required column '{col}'")
+
+        self.__rc.assign_from_df(
+            self.graph.graph,
+            df,
+            self.demand,
+            select_links=self._selected_links,
+            recompute_psl=recompute_psl,
+            sl_link_loading=self.sl_link_loading,
+            store_results=self.parameters["store_results"],
+            beta=self.parameters["beta"],
+            cutoff_prob=self.parameters["cutoff_prob"],
+        )
+
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
 
@@ -351,7 +428,7 @@ class RouteChoice:
         self.logger.info("Route Choice specification")
         self.logger.info(self._config)
 
-    def get_results(self) -> Union[pa.Table, pa.dataset.Dataset]:
+    def get_results(self) -> pd.DataFrame:
         """
         Returns the results of the route choice procedure
 
@@ -359,11 +436,8 @@ class RouteChoice:
         ``origin`` to ``destination``. When the link id in the route set is positive it represents the ab direction,
         while negative represents the ba direction.
 
-        If ``save_routes`` was specified then a Pyarrow dataset is returned. The caller is
-        responsible for reading this dataset.
-
         :Returns:
-            **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
+            **results** (:obj:`pd.DataFrame`): Table with the results of the route choice procedure
         """
         if self.where is None:
             results = self.__rc.get_results()
@@ -371,6 +445,22 @@ class RouteChoice:
             results = RouteChoiceSetResults.read_dataset(self.where)
 
         return results
+
+    def save_path_files(self, where: Optional[pathlib.Path] = None):
+        """
+        Save path-files to the directory specific.
+
+        Files will be saved as a parquet hive dataset partitioned by the origin ID. Existing path-files will not be
+        removed to allow incremental route choice set generation.
+
+        :Arguments:
+            **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+        """
+        where = where if where is not None else self.where
+        if where is None:
+            raise ValueError("either the 'where' argument or 'self.where' property must not None")
+
+        self.__rc.write_path_files(where)
 
     def get_load_results(self) -> pd.DataFrame:
         """
@@ -410,7 +500,8 @@ class RouteChoice:
             added_dfs.append(pd.DataFrame({(*k, "tot"): df[(*k, "ab")] + df[(*k, "ba")]}))
 
         df = pd.concat([df] + added_dfs, axis=1).set_index("link_id")
-        df.columns = pd.MultiIndex.from_tuples(df.columns)
+        df.columns = ["_".join(x) for x in df.columns]
+
         return df.sort_index()
 
     def set_select_links(
@@ -552,19 +643,16 @@ class RouteChoice:
         ]
 
         # sqlite3 context managers only commit, they don't close, oh well
-        conn = sqlite3.connect(pathlib.Path(project.project_base_path) / "results_database.sqlite")
-        with conn:
+        res_path = path.join(project.project_base_path, "results_database.sqlite")
+        with commit_and_close(res_path, missing_ok=True) as conn:
             df.to_sql(table_name, conn, index=True)
-        conn.close()
 
-        conn = project.connect()
-        with conn:
+        with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                 description) Values(?,?,?,?,?,?)""",
                 data,
             )
-        conn.close()
 
     def save_link_flows(self, table_name: str, project=None) -> None:
         """

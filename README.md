@@ -1,18 +1,10 @@
 # AequilibraE
 
 [![Downloads](https://img.shields.io/pypi/dm/aequilibrae.svg?maxAge=2592000)](https://pypi.python.org/pypi/aequilibrae)
-
 [![Documentation](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml)
-
 [![unit tests](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml)
-
 [![Code coverage](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml)
-
-[![Linux builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml)
-
-[![MacOS buils](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_mac.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_mac.yml)
-
-[![Windows builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml)
+[![Packaging](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_wheels.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_wheels.yml)
 
 AequilibraE is a fully-featured Open-Source transportation modeling package and
 the first comprehensive package of its kind for the Python ecosystem, and is 

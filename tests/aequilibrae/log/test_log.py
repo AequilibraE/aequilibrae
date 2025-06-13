@@ -58,7 +58,7 @@ class TestStartsLogging:
 
     def test_project_logger(self, create_project):
         project = create_project()
-        assert self.get_logger_file(project.logger).startswith(project.project_base_path)
+        assert self.get_logger_file(project.logger).startswith(str(project.project_base_path))
 
     def test_multiple_projects_have_separate_logger(self, create_project):
         a = create_project()

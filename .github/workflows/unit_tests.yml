@@ -17,8 +17,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install uv
-          python -m uv pip install -r requirements.txt
-          python -m uv pip install -r tests/requirements_tests.txt
+          python -m uv pip install ruff==0.9.10 black==25.1.0
 
       - name: Lint with ruff
         run: ruff check .
@@ -43,9 +42,8 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip setuptools uv
-        python -m uv pip install -r requirements.txt
-        python -m uv pip install -r tests/requirements_tests.txt
+        python -m pip install --upgrade pip uv
+        python -m uv pip install -e .[dev]
 
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'
@@ -59,10 +57,6 @@ jobs:
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
       run:  python tests/setup_windows_spatialite.py
-
-    - name: Compile library
-      run: |
-        python setup.py build_ext -j 4 --inplace
 
     - name: Runs test
       run: python -m pytest --durations=50

@@ -1,16 +1,6 @@
 # distutils: language = c++
 
 from libcpp.vector cimport vector
-from libcpp.string cimport string
-import importlib.util as iutil
-spec = iutil.find_spec("pyarrow")
-
-if spec is not None:
-    import pyarrow as pa
-    cimport pyarrow as pa
-    # need to decide or make optional which format we want
-    import pyarrow.parquet as pq
-    import pyarrow.feather as feather
 
 import numpy as np
 cimport numpy as np
@@ -25,8 +15,8 @@ cpdef void save_path_file(long origin_index,
                           long zones,
                           long long [:] pred,
                           long long [:] conn,
-                          string path_file,
-                          string index_file,
+                          str path_file,
+                          str index_file,
                           bint write_feather) noexcept:
 
     cdef long long node, predecessor, connector
@@ -62,9 +52,12 @@ cpdef void save_path_file(long origin_index,
     numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, &path_data[0])
     numpy_array_ind = np.PyArray_SimpleNewFromData(1, dims_ind, np.NPY_LONGLONG, &size_of_path_arrays[0])
 
+    table1 = pd.DataFrame({"data": numpy_array})
+    table2 = pd.DataFrame({"data": numpy_array_ind})
+
     if write_feather:
-        feather.write_feather(pa.table({"data": numpy_array}), path_file.decode('utf-8'))
-        feather.write_feather(pa.table({"data": numpy_array_ind}), index_file.decode('utf-8'))
+        table1.to_feather(path_file)
+        table2.to_feather(index_file)
     else:
-        pq.write_table(pa.table({"data": numpy_array}), path_file.decode('utf-8'))
-        pq.write_table(pa.table({"data": numpy_array_ind}), index_file.decode('utf-8'))
+        table1.to_parquet(path_file)
+        table2.to_parquet(index_file)

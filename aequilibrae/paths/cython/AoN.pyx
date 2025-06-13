@@ -89,8 +89,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
 
     # path saving file paths
-    cdef string path_file_base
-    cdef string path_index_file_base
     cdef bint write_feather = True
     if result.save_path_file:
         write_feather = result.write_feather
@@ -100,8 +98,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         else:
             base_string = os.path.join(result.path_file_dir, f"o{origin_index}.parquet")
             index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.parquet")
-        path_file_base = base_string.encode('utf-8')
-        path_index_file_base = index_string.encode('utf-8')
 
     cdef:
         double [:, :, :] sl_od_matrix_view
@@ -187,8 +183,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             zones,
             predecessors_view,
             conn_view,
-            path_file_base,
-            path_index_file_base,
+            base_string,
+            index_string,
             write_feather
         )
     return origin

@@ -32,26 +32,24 @@ class TestNetwork(TestCase):
         self.project = Project()
         self.project.new(self.proj_path2)
         self.project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
-        curr = self.project.conn.cursor()
 
-        curr.execute("""select count(*) from links""")
-        lks = curr.fetchone()[0]
+        with self.project.db_connection as conn:
+            lks = conn.execute("""select count(*) from links""").fetchone()[0]
 
-        curr.execute("""select count(distinct osm_id) from links""")
-        osmids = curr.fetchone()[0]
+            osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]
 
-        if osmids == 0:
-            warn("COULD NOT RETRIEVE DATA FROM OSM")
-            return
+            if osmids == 0:
+                warn("COULD NOT RETRIEVE DATA FROM OSM")
+                return
 
-        if osmids >= lks:
-            self.fail("OSM links not broken down properly")
+            if osmids >= lks:
+                self.fail("OSM links not broken down properly")
 
-        curr.execute("""select count(*) from nodes""")
-        nds = curr.fetchone()[0]
+            nds = conn.execute("""select count(*) from nodes""").fetchone()[0]
 
-        if lks > nds:
-            self.fail("We imported more links than nodes. Something wrong here")
+            if lks > nds:
+                self.fail("We imported more links than nodes. Something wrong here")
+
         self.project.close()
         self.siouxfalls.open(self.proj_path)
 

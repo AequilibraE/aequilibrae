@@ -1,12 +1,15 @@
+from os.path import join
+
+import pytest
+
 from aequilibrae.project import Project
 from aequilibrae.transit import Transit
-from aequilibrae.project.database_connection import database_connection
-import pytest
+from aequilibrae.utils.db_utils import read_and_close
 
 
 @pytest.fixture
 def create_project(project: Project):
-    Transit(project)
+    yield Transit(project)
 
 
 @pytest.mark.parametrize(
@@ -61,9 +64,7 @@ def create_project(project: Project):
     ],
 )
 def test_create_table(table: str, exp_column: list, create_project):
-    curr = database_connection(db_type="transit").cursor()
-    curr.execute(f"PRAGMA table_info({table});")
-    fields = curr.fetchall()
-    fields = [x[1] for x in fields]
+    with read_and_close(join(create_project.project_base_path, "public_transport.sqlite")) as conn:
+        fields = [x[1] for x in conn.execute(f"PRAGMA table_info({table});").fetchall()]
 
     assert exp_column == fields, f"Table {table.upper()} was not created correctly"

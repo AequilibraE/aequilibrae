@@ -4,7 +4,6 @@ from os.path import join, dirname, realpath
 
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class About:
@@ -31,14 +30,14 @@ class About:
         self.__path_to_file = project.path_to_file
         self.logger = project.logger
 
-        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+        with project.db_connection as conn:
             if self.__has_about(conn):
                 self.__load(conn)
 
     def create(self):
         """Creates the 'about' table for project files that did not previously contain it"""
 
-        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+        with commit_and_close(self.__path_to_file, spatial=True) as conn:
             if not self.__has_about(conn):
                 qry_file = join(dirname(realpath(__file__)), "database_specification", "tables", "about.sql")
                 run_queries_from_sql_file(conn, self.logger, qry_file)
@@ -77,7 +76,7 @@ class About:
         if has_forbidden:
             raise ValueError(f"{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _")
 
-        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+        with commit_and_close(self.__path_to_file) as conn:
             conn.execute("INSERT INTO 'about' (infoname) VALUES(?)", [info_field])
         self.__characteristics.append(info_field)
         self.__original[info_field] = None
@@ -92,7 +91,7 @@ class About:
             >>> project.about.description = 'This is the example project. Do not use for forecast'
             >>> project.about.write_back()
         """
-        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+        with commit_and_close(self.__path_to_file) as conn:
             for k in self.__characteristics:
                 v = self.__dict__[k]
                 if v != self.__original[k]:

@@ -244,6 +244,9 @@ cdef void _min_heapify(PriorityQueue* pqueue, size_t node_idx) noexcept nogil:
         size_t c1, c2, c3, c4, i = node_idx, s
         DTYPE_t val_tmp, val_min
 
+    if pqueue.size == 0:
+        return
+
     while True:
 
         c1 = 4 * i + 1

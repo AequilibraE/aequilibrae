@@ -23,7 +23,7 @@ jobs:
         python-version: '3.10'
         architecture: x64
   
-    - name: Install dependencies
+    - name: Install
       run: |
         sudo apt-get update
         sudo apt install libsqlite3-mod-spatialite
@@ -31,13 +31,7 @@ jobs:
         sudo apt install -y latexmk texlive-xetex fonts-freefont-otf xindy
         pip install uv
         python -m uv pip install wheel openmatrix pytest
-        python -m uv pip install -r requirements.txt
-        python -m uv pip install -r docs/requirements-docs.txt
-
-    - name: Compile library
-      run: |
-        python setup.py build_ext -j 4 --inplace
-        python -m uv pip install .
+        python -m uv pip install -e .[dev]
 
     - name: Check history of versions
       run: |
@@ -50,10 +44,10 @@ jobs:
         python -m pytest --doctest-modules aequilibrae/distribution --ignore=aequilibrae/distribution/setup_ipf.py
         python -m pytest --doctest-modules aequilibrae/matrix
         python -m pytest --doctest-modules aequilibrae/paths --ignore=aequilibrae/paths/setup_assignment.py
-        python -m pytest --doctest-modules aequilibrae/project
-        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py 
+        python -m pytest --doctest-modules aequilibrae/project --ignore=aequilibrae/project/database_specification
+        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py
         python -m pytest --doctest-modules aequilibrae/transit
-        python -m pytest --doctest-glob=*.rst docs/source/project_components
+        python -m pytest --doctest-glob=*.rst docs/source/aequilibrae_project/project_components
         python -m pytest --doctest-glob=*.rst docs/source/traffic_assignment
         python -m pytest --doctest-glob=*.rst docs/source/public_transport
 

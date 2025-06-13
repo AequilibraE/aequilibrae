@@ -82,19 +82,15 @@ plt.show()
 
 # Or we plot the entire network
 plt.clf()
-curr = project.conn.cursor()
-curr.execute("Select link_id from links;")
 
-for lid in curr.fetchall():
-    geo = links.get(lid[0]).geometry
+link_ids = links.data["link_id"].values.tolist()
+for lid in link_ids:
+    geo = links.get(lid).geometry
     plt.plot(*geo.xy, color="blue")
 
-all_nodes = project.network.nodes
-curr = project.conn.cursor()
-curr.execute("Select node_id from nodes;")
-
-for nid in curr.fetchall():
-    geo = all_nodes.get(nid[0]).geometry
+node_ids = all_nodes.data["node_id"].values.tolist()
+for nid in node_ids:
+    geo = all_nodes.get(nid).geometry
     plt.plot(*geo.xy, "o", color="black")
 
 plt.show()

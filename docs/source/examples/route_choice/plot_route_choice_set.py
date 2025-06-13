@@ -63,11 +63,6 @@ graph.set_graph("distance")
 # We set the nodes of interest as centroids to make sure they are not simplified away when we create the network
 graph.prepare_graph(np.array(nodes_of_interest))
 
-# We allow flows through "centroid connectors" because our centroids are not really centroids.
-# If we have actual centroid connectors in the network (and more than one per centroid), then we
-# should remove them from the graph.
-graph.set_blocked_centroid_flows(False)
-
 # %%
 # Route Choice class
 # ------------------
@@ -88,7 +83,22 @@ rc.set_choice_set_generation("bfsle", max_routes=5, penalty=1.05)
 rc.prepare(od_pairs_of_interest)
 rc.execute(perform_assignment=True)
 
-choice_set = rc.get_results().to_pandas()
+choice_set = rc.get_results()
+
+# %%
+# If we were interested in storing the route choice result, we could also write them to disk using the ``save_path_files`` method.
+
+# rc.save_path_files(path)
+
+# %%
+# From those path files we could also preform a full assignment or select link analysis by using the ``execute_from_path_files`` method.
+
+# rc.execute_from_path_files(path)
+
+# %%
+# Or if we had externally computed route choice sets, we can use AequilibraEs assignment procedures by loading them with the ``execute_from_pandas` method.
+
+# rc.execute_from_pandas(path_files_df)
 
 # %%
 # Plotting choice sets

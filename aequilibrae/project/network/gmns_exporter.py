@@ -3,7 +3,6 @@ from os.path import join
 import pandas as pd
 
 from aequilibrae.parameters import Parameters
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class GMNSExporter:
@@ -18,7 +17,7 @@ class GMNSExporter:
         self.gmns_links = self.gmns_parameters["link"]
         self.gmns_nodes = self.gmns_parameters["node"]
 
-        with commit_and_close(net.project.connect()) as conn:
+        with net.project.db_connection as conn:
             cur = conn.execute("select mode_name, mode_id, description, pce, vot, ppv from modes").fetchall()
         self.modes_df = pd.DataFrame(cur, columns=["mode_name", "mode_id", "description", "pce", "vot", "ppv"])
 

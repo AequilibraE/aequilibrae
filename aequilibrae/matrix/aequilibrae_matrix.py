@@ -337,66 +337,70 @@ class AequilibraeMatrix(object):
             raise Warning("Matrix compression not yet supported")
 
         src = omx.open_file(omx_path, "a")
+        try:
+            avail_cores = src.list_matrices()
 
-        avail_cores = src.list_matrices()
+            if cores is None:
+                do_cores = avail_cores
+            else:
+                do_cores = [x for x in cores if x in avail_cores]
+                if cores != do_cores:
+                    do_cores = [x for x in cores if x not in avail_cores]
+                    raise ValueError("Cores listed not available in the OMX file: {}".format(do_cores))
 
-        if cores is None:
-            do_cores = avail_cores
-        else:
-            do_cores = [x for x in cores if x in avail_cores]
-            if cores != do_cores:
-                do_cores = [x for x in cores if x not in avail_cores]
-                raise ValueError("Cores listed not available in the OMX file: {}".format(do_cores))
+            avail_idx = src.list_mappings()
+            if mappings is None:
+                do_idx = avail_idx
+                if not avail_idx:
+                    do_idx = ["zero_base_index"]
+            else:
+                do_idx = [x for x in mappings if x in avail_idx]
+                if mappings != do_idx:
+                    do_idx = [x for x in mappings if x not in avail_idx]
+                    raise ValueError("Mappings/indices listed not available in the OMX file: {}".format(do_idx))
 
-        avail_idx = src.list_mappings()
-        if mappings is None:
-            do_idx = avail_idx
-            if not avail_idx:
-                do_idx = ["zero_base_index"]
-        else:
-            do_idx = [x for x in mappings if x in avail_idx]
-            if mappings != do_idx:
-                do_idx = [x for x in mappings if x not in avail_idx]
-                raise ValueError("Mappings/indices listed not available in the OMX file: {}".format(do_idx))
+            shp = src.shape()
+            if shp[0] != shp[1]:
+                raise ValueError("AequilibraE only supports square matrices")
+            zones = shp[0]
 
-        shp = src.shape()
-        if shp[0] != shp[1]:
-            raise ValueError("AequilibraE only supports square matrices")
-        zones = shp[0]
+            if robust:
+                # Use reduce as we have to keep track of which generated names have been used (to avoid collisions)
+                core_names = functools.reduce(
+                    lambda acc, n: acc + [robust_name(n, CORE_NAME_MAX_LENGTH, acc)], do_cores, []
+                )
+                idx_names = functools.reduce(
+                    lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)], do_idx, []
+                )
+            else:
+                core_names = list(do_cores)
+                idx_names = list(do_idx)
 
-        if robust:
-            # Use reduce as we have to keep track of which generated names have been used (to avoid collisions)
-            core_names = functools.reduce(
-                lambda acc, n: acc + [robust_name(n, CORE_NAME_MAX_LENGTH, acc)], do_cores, []
+            self.create_empty(
+                file_name=file_path,
+                zones=zones,
+                matrix_names=core_names,
+                index_names=idx_names,
+                compressed=compressed,
+                memory_only=memory_only,
             )
-            idx_names = functools.reduce(lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)], do_idx, [])
-        else:
-            core_names = list(do_cores)
-            idx_names = list(do_idx)
 
-        self.create_empty(
-            file_name=file_path,
-            zones=zones,
-            matrix_names=core_names,
-            index_names=idx_names,
-            compressed=compressed,
-            memory_only=memory_only,
-        )
+            # Copy all cores
+            for ncore, core in zip(core_names, do_cores):
+                self.matrix[ncore][:, :] = np.array(src[core])[:, :]
+            self.__flush(self.matrices)
 
-        # Copy all cores
-        for ncore, core in zip(core_names, do_cores):
-            self.matrix[ncore][:, :] = np.array(src[core])[:, :]
-        self.__flush(self.matrices)
+            # copy all indices
+            if avail_idx:
+                for nidx, idx in enumerate(do_idx):
+                    ix = np.array(list(src.mapping(idx).keys()))
+                    self.indices[:, nidx] = ix[:]
+            else:
+                self.index[:, 0] = np.arange(zones)
 
-        # copy all indices
-        if avail_idx:
-            for nidx, idx in enumerate(do_idx):
-                ix = np.array(list(src.mapping(idx).keys()))
-                self.indices[:, nidx] = ix[:]
-        else:
-            self.index[:, 0] = np.arange(zones)
-
-        self.__flush(self.indices)
+            self.__flush(self.indices)
+        finally:
+            src.close()
 
     def create_from_trip_list(self, path_to_file: str, from_column: str, to_column: str, list_cores: List[str]) -> str:
         """

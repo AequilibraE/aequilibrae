@@ -1,8 +1,5 @@
 import string
 
-from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
-
 
 class Mode:
     """A mode object represents a single record in the *modes* table"""
@@ -17,7 +14,7 @@ class Mode:
         if len(mode_id) != 1 or mode_id not in string.ascii_letters:
             raise ValueError("Mode IDs must be a single ascii character")
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             table_struct = conn.execute("pragma table_info(modes)").fetchall()
             self.__fields = [x[1] for x in table_struct]
             self.__original__ = {}
@@ -53,7 +50,7 @@ class Mode:
             if letter not in self.__alowed_characters:
                 raise ValueError('mode_name can only contain letters and "_"')
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             if conn.execute(f'select count(*) from modes where mode_id="{self.mode_id}"').fetchone()[0] == 0:
                 raise ValueError("Mode does not exist in the model. You need to explicitly add it")
 

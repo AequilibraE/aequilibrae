@@ -625,6 +625,7 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
+            c.congested_time = self.congested_time
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")

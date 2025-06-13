@@ -8,3 +8,4 @@ from aequilibrae.project.data import Matrices
 from aequilibrae.log import Log
 from aequilibrae.project.network.period import Period
 from aequilibrae.project.network.periods import Periods
+from aequilibrae.project.tools.network_simplifier import NetworkSimplifier

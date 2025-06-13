@@ -1,5 +1,6 @@
 from aequilibrae.project import Project
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.utils.db_utils import read_and_close
 import pytest
 
 
@@ -18,10 +19,8 @@ class TestProject:
         ],
     )
     def test_table_creation(self, table: str, exp_column: str, project: Project):
-        curr = project.conn.cursor()
-        curr.execute(f"PRAGMA table_info({table});")
-        fields = curr.fetchall()
-        fields = {x[1] for x in fields}
+        with read_and_close(project.path_to_file) as conn:
+            fields = {x[1] for x in conn.execute(f"PRAGMA table_info({table});").fetchall()}
 
         assert exp_column in fields, f"Table {table.upper()} was not created correctly"
 

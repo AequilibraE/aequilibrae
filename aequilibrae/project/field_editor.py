@@ -2,8 +2,6 @@ import re
 import string
 from typing import List
 
-from aequilibrae.utils.db_utils import commit_and_close
-
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
 
@@ -90,7 +88,11 @@ class FieldEditor:
         raise NotImplementedError
 
     def save(self) -> None:
-        """Saves any field descriptions which my have been changed to the database"""
+        """
+        Saves any field descriptions which my have been changed to the database and update layer statistics.
+
+        This is required for new fields to appear in applications like QGIS.
+        """
 
         qry = 'update attributes_documentation set description="{}" where attribute="{}" and name_table="{}"'
         for key, val in self._original_values.items():
@@ -98,6 +100,12 @@ class FieldEditor:
             if new_val != val:
                 self.__run_query_commit(qry.format(new_val, key, self._table))
                 self.logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
+
+        self.logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
+        with self.project.db_connection as conn:
+            conn.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
+            conn.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
+        self.logger.info(f"Updated layer statistics for {self._table}")
 
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
@@ -131,12 +139,12 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             dt = conn.execute(qry).fetchall()
         return dt
 
     def __run_query_commit(self, qry: str, values=None) -> None:
-        with commit_and_close(self.project.connect()) as conn:
+        with self.project.db_connection as conn:
             if values is None:
                 conn.execute(qry)
             else:

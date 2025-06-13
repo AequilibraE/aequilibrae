@@ -30,8 +30,8 @@ class TestPathResultsDisconnected(TestCase):
     def test_path_disconnected_delete_link(self):
         for early_exit, a_star in product([True, False], repeat=2):
             with self.subTest(early_exit=early_exit, a_star=a_star):
-                self.project.conn.executemany("delete from Links where link_id=?", [[2], [4], [5], [14]])
-                self.project.conn.commit()
+                with self.project.db_connection as conn:
+                    conn.executemany("delete from Links where link_id=?", [[2], [4], [5], [14]])
 
                 self.project.network.build_graphs()
                 self.g = self.project.network.graphs["c"]  # type: Graph

@@ -37,6 +37,7 @@ CREATE TABLE  if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                    capacity_ab     NUMERIC,
                                    capacity_ba     NUMERIC
                                    CHECK(TYPEOF(link_id) == 'integer')
+                                   CHECK(link_id > 0)
                                    CHECK(TYPEOF(a_node) == 'integer')
                                    CHECK(TYPEOF(b_node) == 'integer')
                                    CHECK(TYPEOF(direction) == 'integer')

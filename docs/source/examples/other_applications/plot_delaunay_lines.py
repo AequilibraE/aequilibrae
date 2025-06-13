@@ -24,8 +24,7 @@ from uuid import uuid4
 from os.path import join
 import sqlite3
 from tempfile import gettempdir
-import matplotlib.pyplot as plt
-import shapely.wkb
+from geopandas import read_postgis
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.create_delaunay_network import DelaunayAnalysis
@@ -60,18 +59,20 @@ results = pd.read_sql("Select * from delaunay_test", conn).set_index("link_id")
 
 # %%
 # Now we get the matrix we want and create the Delaunay Lines
-links = pd.read_sql("Select link_id, st_asBinary(geometry) geometry from delaunay_network", project.conn)
-links.geometry = links.geometry.apply(shapely.wkb.loads)
-links.set_index("link_id", inplace=True)
+with project.db_connection as conn:
+    links = read_postgis(
+        "Select link_id, st_asBinary(geometry) geometry from delaunay_network", 
+        conn, 
+        geom_col="geometry", 
+        crs=4326
+    )
+    links.set_index("link_id", inplace=True)
 
 df = links.join(results)
 
 max_vol = df.matrix_tot.max()
 
-for idx, lnk in df.iterrows():
-    geo = lnk.geometry
-    plt.plot(*geo.xy, color="blue", linewidth=4 * lnk.matrix_tot / max_vol)
-plt.show()
+df.plot(linewidth=4 * df["matrix_tot"] / max_vol, color="blue")
 
 # %%
 # Close the project

@@ -1,6 +1,5 @@
 import gc
 import string
-from math import floor
 from pathlib import Path
 from typing import List, Tuple
 
@@ -13,10 +12,9 @@ from shapely.geometry import Polygon
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
-from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
+from aequilibrae.utils.db_utils import commit_and_close, list_columns
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
 
 
@@ -47,7 +45,7 @@ class OSMBuilder(WorkerThread):
         self.links_df = data["links"]
 
     def doWork(self):
-        with commit_and_close(connect_spatialite(self.path)) as conn:
+        with commit_and_close(self.path, spatial=True) as conn:
             self.__update_table_structure(conn)
             self.importing_network(conn)
 
@@ -181,7 +179,7 @@ class OSMBuilder(WorkerThread):
         list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = []
         # Initialize link types
-        with read_and_close(self.project.path_to_file) as conn:
+        with self.project.db_connection as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
             for df in simple_progress(list_dfs, self.signal, "Processing chunks"):
                 if "tags" in df.columns:
@@ -315,7 +313,8 @@ class OSMBuilder(WorkerThread):
                 if f"{field}_backward" in df:
                     fld = pd.to_numeric(df[f"{field}_backward"], errors="coerce")
                     df.loc[fld > 0, f"{field}_ba"] = fld[fld > 0]
-        cols = list_columns(self.project.conn, "links") + ["nodes"]
+        with self.project.db_connection as conn:
+            cols = list_columns(conn, "links") + ["nodes"]
         return df[[x for x in cols if x in df.columns]]
 
     ######## TABLE STRUCTURE UPDATING ########
