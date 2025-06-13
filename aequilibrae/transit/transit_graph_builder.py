@@ -19,6 +19,7 @@ import shapely
 import shapely.ops
 import json
 import sqlite3
+from pandas.api.types import is_integer_dtype
 
 from aequilibrae.utils.geo_utils import haversine
 from aequilibrae.project.database_connection import database_connection
@@ -200,7 +201,7 @@ class TransitGraphBuilder:
         """
         if "zone_id" not in zones.columns or "geometry" not in zones.columns:
             raise KeyError("zone_id and geometry must be columns in zones")
-        elif not (zones.zone_id.dtype == int and zones.zone_id.min() > 0):
+        elif not (is_integer_dtype(zones.zone_id.dtype) and zones.zone_id.min() > 0):
             raise ValueError("'zone_id' must consist of integers greater than 0")
 
         if zones.geometry.dtype is str or zones.geometry.dtype is bytes:

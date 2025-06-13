@@ -4,6 +4,7 @@ import multiprocessing
 import socket
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_active_project
@@ -44,8 +45,8 @@ class HyperpathGenerating:
             check_edges=False,
             skim_cols = None,
             *,
-            o_vert_ids,
-            d_vert_ids,
+            o_vert_ids=np.array([], dtype=np.int64),
+            d_vert_ids=np.array([], dtype=np.int64),
             nodes_to_indices,
     ):
         skim_cols = self.check_skim_cols(skim_cols)
@@ -87,8 +88,8 @@ class HyperpathGenerating:
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
 
-        self._o_vert_ids = o_vert_ids  # taz_id
-        self._d_vert_ids = d_vert_ids  # node_id for destination in the above taz_id
+        self._o_vert_ids = o_vert_ids.astype(np.int64) # node_id for origin in the above taz_id
+        self._d_vert_ids = d_vert_ids.astype(np.int64) # node_id for destination in the above taz_id
 
         self._nodes_to_indices = nodes_to_indices
 

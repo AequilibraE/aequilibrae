@@ -56,10 +56,8 @@ class TestMigrationManager(TestCase):
         self.assertEqual(status[3], MigrationStatus.MISSING)
 
         # Check migrations table was created
-        result = self.connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
-        ).fetchone()
-        self.assertIsNotNone(result)
+        sql = "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
+        self.assertIsNotNone(self.connection.execute(sql).fetchone())
 
     def test_mark_all_as_seen(self):
         manager = MigrationManager(self.migrations_file)
