@@ -1,5 +1,6 @@
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools import MigrationManager, MigrationStatus
+from aequilibrae.utils.db_utils import AequilibraEConnection
 
 from unittest import TestCase
 import tempfile
@@ -10,7 +11,7 @@ import pathlib
 class TestMigrationManager(TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
-        self.connection = sqlite3.connect(":memory:")
+        self.connection = sqlite3.connect(":memory:", factory=AequilibraEConnection)
 
         self.migrations_file = pathlib.Path(__file__).parent.parent.parent / "data" / "mock_migrations" / "init.py"
         self.migrations_duplicate = (

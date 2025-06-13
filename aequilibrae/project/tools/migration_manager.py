@@ -6,6 +6,7 @@ from typing import Optional
 
 from aequilibrae import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
+from aequilibrae.utils.db_utils import AequilibraEConnection
 
 
 class MigrationStatus(IntEnum):
@@ -244,7 +245,7 @@ class MigrationManager:
 
         return res
 
-    def upgrade(self, conn: sqlite3.Connection, skip: set[int] = None):
+    def upgrade(self, conn: AequilibraEConnection, skip: set[int] = None):
         """
         Find and apply all applicable migrations.
 
@@ -258,15 +259,9 @@ class MigrationManager:
             skip = set()
         migrations = self.find_applicable(conn)
 
-        iso_lvl = conn.isolation_level
-        conn.isolation_level = None
-        try:
-            for migration in migrations:
-                conn.execute("BEGIN")
-                with conn:
-                    if migration.id in skip:
-                        migration.mark_as(conn, MigrationStatus.SKIPPED)
-                    else:
-                        migration.apply(conn)
-        finally:
-            conn.isolation_level = iso_lvl
+        for migration in migrations:
+            with conn.manual_transaction():
+                if migration.id in skip:
+                    migration.mark_as(conn, MigrationStatus.SKIPPED)
+                else:
+                    migration.apply(conn)

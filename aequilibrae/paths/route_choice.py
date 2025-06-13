@@ -635,7 +635,7 @@ class RouteChoice:
         self.procedure_id = uuid4().hex
         data = [
             table_name,
-            "select link",
+            method_name,
             self.procedure_id,
             str(report),
             self.procedure_date,
