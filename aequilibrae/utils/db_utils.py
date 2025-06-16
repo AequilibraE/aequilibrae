@@ -27,8 +27,10 @@ class AequilibraEConnection(sqlite3.Connection):
         self.__isolation_level = self.isolation_level
 
     def manual_transaction(self):
-        if self.__manual_transaction or self.in_transaction:
-            raise RuntimeError("cannot start a manual transaction while another is already in progress!")
+        if self.__manual_transaction:
+            raise RuntimeError("cannot start a manual transaction while another manual transaction is already in progress")
+        elif self.in_transaction:
+            raise RuntimeError("cannot start a manual transaction while in another transaction")
 
         logger.debug("Manual transaction control enabled")
         self.__depth = 0

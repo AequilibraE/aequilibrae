@@ -184,7 +184,8 @@ class MigrationManager:
     def __ensure_inital_is_applied(self, conn):
         # Handle the initial migration separately, the 'migrations' table might not have been created. We implicitly
         # apply this migration all the time to ensure the table exists.
-        self.migrations[0].apply(conn)
+        with conn:
+            self.migrations[0].apply(conn)
 
     def status(self, conn: sqlite3.Connection) -> dict[int, MigrationStatus]:
         """
@@ -212,8 +213,9 @@ class MigrationManager:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
         self.__ensure_inital_is_applied(conn)
-        for migration in self.migrations.values():
-            migration.mark_as_seen(conn)
+        with conn:
+            for migration in self.migrations.values():
+                migration.mark_as_seen(conn)
 
     def find_applicable(self, conn: sqlite3.Connection):
         """
