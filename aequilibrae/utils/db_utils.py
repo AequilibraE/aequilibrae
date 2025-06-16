@@ -28,7 +28,9 @@ class AequilibraEConnection(sqlite3.Connection):
 
     def manual_transaction(self):
         if self.__manual_transaction:
-            raise RuntimeError("cannot start a manual transaction while another manual transaction is already in progress")
+            raise RuntimeError(
+                "cannot start a manual transaction while another manual transaction is already in progress"
+            )
         elif self.in_transaction:
             raise RuntimeError("cannot start a manual transaction while in another transaction")
 
