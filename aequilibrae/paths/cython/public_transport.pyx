@@ -4,6 +4,7 @@ import multiprocessing
 import socket
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_active_project
@@ -43,7 +44,10 @@ class HyperpathGenerating:
             freq="freq",
             check_edges=False,
             skim_cols = None,
-            centroids = None
+            *,
+            o_vert_ids=np.array([], dtype=np.int64),
+            d_vert_ids=np.array([], dtype=np.int64),
+            nodes_to_indices,
     ):
         skim_cols = self.check_skim_cols(skim_cols)
 
@@ -84,8 +88,35 @@ class HyperpathGenerating:
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
 
-        if self._skimming:
+        self._o_vert_ids = o_vert_ids.astype(np.int64) # node_id for origin in the above taz_id
+        self._d_vert_ids = d_vert_ids.astype(np.int64) # node_id for destination in the above taz_id
 
+        self._nodes_to_indices = nodes_to_indices
+
+        # map taz_id -> node index, removing origins and destinations where either is disconnected completely
+        self._o_indices = nodes_to_indices[self._o_vert_ids]
+        origin_mask = self._o_indices != -1
+
+        # create a similar mapping for a destination to its origin index
+        d_indices = nodes_to_indices[self._d_vert_ids]
+        destination_mask = d_indices != -1
+
+        d_indices = d_indices[origin_mask & destination_mask]
+        o_indices = self._o_indices[origin_mask & destination_mask].astype("uint32")
+
+        # We need to map each origin and destination index to the index of their respective taz_id. When centroid flow
+        # is not blocked there is only "od" nodes, thus their indices are equal. When centroid flow is blocked, the
+        # origin and destinations are unique nodes and thus have unique indices within the graph, thus there is no
+        # overlap. We mask out the ODs that are completely disconnected.
+        self._od_index_to_taz_index = np.full(max(o_indices.max(), d_indices.max()) + 1, -1, dtype="int64")
+        tmp = np.arange(len(self._o_indices))[origin_mask & destination_mask]
+        assert len(o_indices) == len(d_indices)
+        self._od_index_to_taz_index[o_indices] = tmp
+        self._od_index_to_taz_index[d_indices] = tmp
+
+        self._o_indices = o_indices
+
+        if self._skimming:
             self._is_travel_time = trav_time in skim_cols
             if self._is_travel_time:
                 skim_cols.remove(trav_time)
@@ -98,22 +129,9 @@ class HyperpathGenerating:
             self._skim_cols_names = skim_cols
             self._trav_time_name = trav_time
 
-            # This index already exists, graph.nodes_to_indices. What's the difference between idx and idx_pos?
-            self._centroids = centroids.astype(np.uint32)
-            self._centroids_idx = np.array(range(len(self._centroids)))
-            self._centroids_idx_pos = np.zeros_like(np.array(list(range(self._centroids[-1]+1))))
-            for i in self._centroids_idx:
-                self._centroids_idx_pos[self._centroids[i]] = i
-            self._centroids_idx_pos = self._centroids_idx_pos.astype(np.uint32)
-
         else:
             self._skim_cols = np.zeros((self._trav_time.shape[0], 1), dtype=DATATYPE_PY)
-
             self._skim_cols_names = []
-
-            self._centroids = np.array([0], dtype=np.uint32)
-            self._centroids_idx_pos = np.array([0], dtype=np.uint32)
-
             self._is_travel_time = False
 
     def compute_skim_cols(self, skim_cols, edges: pd.DataFrame, trav_time: str):
@@ -175,29 +193,6 @@ class HyperpathGenerating:
             self._skimming = False
 
         return skim_cols
-
-    def _update_od_values(self, origin_column: np.array, destination_column: np.array, demand_column: np.array):
-
-        # get all O-D combinations between centroids
-        n = len(self._centroids)
-        origin_values = np.repeat(self._centroids, n)
-
-        destination_values = np.tile(self._centroids, n)
-
-        check_bool = origin_values != destination_values
-        centroids_origin_column = origin_values[check_bool]
-        centroids_destination_column = destination_values[check_bool]
-
-        not_included = ~np.logical_and(
-            np.isin(centroids_origin_column, origin_column),
-            np.isin(centroids_destination_column, destination_column)
-        )  # the combinations of centroids that are not in
-
-        centroids_demand = np.concatenate((demand_column, np.zeros_like(centroids_origin_column[not_included])))
-        centroids_origin_column = np.concatenate((origin_column, centroids_origin_column[not_included]))
-        centroids_destination_column = np.concatenate((destination_column, centroids_destination_column[not_included]))
-
-        return centroids_origin_column, centroids_destination_column, centroids_demand
 
     def run(self, origin, destination, volume):
         self.assign(
@@ -276,13 +271,6 @@ class HyperpathGenerating:
         available threads).
         """
 
-        if self._skimming:
-            origin_column, destination_column, demand_column = self._update_od_values(
-                origin_column,
-                destination_column,
-                demand_column
-            )
-
         self.origin_column = origin_column.astype(np.uint32)
         self.destination_column = destination_column.astype(np.uint32)
         self.demand_column = demand_column.astype(DATATYPE_PY)
@@ -299,10 +287,16 @@ class HyperpathGenerating:
         # travel time is computed but not saved into an array in the following
         self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
 
-        # get the list of all destinations
-        destination_vertex_indices = np.unique(self.destination_column)
+        # get the list of all destinations, we use "rest of" for skimming
+        destinations = np.unique(self.destination_column)
+        if self._skimming:
+            rest_of_destinations = self._d_vert_ids[
+                np.isin(self._d_vert_ids, destinations, invert=True, assume_unique=True)
+            ].astype("uint32")
+        else:
+            rest_of_destinations = np.array([], dtype="uint32")
 
-        n_centroids = self._centroids.shape[0]
+        n_centroids = self._o_vert_ids.shape[0]
         n_skim_cols = len(self._skim_cols_names)
         skim_cols = self._skim_cols_names
         if self._is_travel_time:
@@ -319,7 +313,8 @@ class HyperpathGenerating:
             self._tail[:],
             self._head[:],
             self.destination_column[:],
-            destination_vertex_indices[:],
+            destinations[:],
+            rest_of_destinations[:],
             self.origin_column[:],
             self.demand_column[:],
             self._edges["volume"].values,
@@ -329,22 +324,22 @@ class HyperpathGenerating:
             self._skim_cols[:],
             self.u_i_vec,
             self.skim_matrix,
-            self._centroids[:],
-            self._centroids_idx_pos[:],
+            self._o_vert_ids[:],
+            self._o_indices[:],
+            self._od_index_to_taz_index[:],
+            self._nodes_to_indices[:],
             self._skimming,
             self._is_travel_time,
             len(self._skim_cols_names)
         )
 
         if self._skimming:
-
-            self.skim_matrix = self.skim_matrix.transpose(2, 1, 0)
-            arr = self.skim_matrix.copy()
+            fmax = np.finfo(dtype="float64").max
+            self.skim_matrix[self.skim_matrix == fmax] = 0.0
             if self._get_waiting_time:
                 skim_matrix_dict = {}
                 for i in range(n_skim_cols):
-
-                    skim_matrix_dict[skim_cols[i]] = arr[i]
+                    skim_matrix_dict[skim_cols[i]] = self.skim_matrix[:, :, i]
 
                 skim_matrix_dict['waiting_time'] = (
                     skim_matrix_dict['trav_time']
@@ -353,13 +348,16 @@ class HyperpathGenerating:
                     - skim_matrix_dict['access_trav_time']
                 )
                 skim_cols = skim_cols + ['waiting_time']
-                arr = np.concatenate((arr, np.expand_dims(skim_matrix_dict['waiting_time'], axis=0)), axis=0)
+                arr = np.dstack([skim_matrix_dict[k] for k in skim_cols])
+            else:
+                arr = self.skim_matrix
 
             self.skim_matrix = AequilibraeMatrix()
-            self.skim_matrix.create_empty(zones=len(self._centroids), matrix_names=skim_cols)
-            self.skim_matrix.index = self._centroids
+            self.skim_matrix.create_empty(zones=len(self._o_vert_ids), matrix_names=skim_cols)
+            self.skim_matrix.index[:] = self._o_vert_ids
+            self.skim_matrix.indices[:] = self.skim_matrix.indices.reshape(-1, 1)
             self.skim_matrix.computational_view()
-            self.skim_matrix.matrices[:, :, :] = arr.transpose(1, 2, 0)[:, :, :]
+            self.skim_matrix.matrices[:, :, :] = arr
 
         else:
             self.skim_matrix = None

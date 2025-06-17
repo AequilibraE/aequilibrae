@@ -3,7 +3,7 @@ import pathlib
 
 from aequilibrae import Project, logger
 from aequilibrae.context import get_active_project
-from aequilibrae.project.project_creation import add_triggers, remove_triggers
+from aequilibrae.project.project_creation import add_triggers, remove_triggers, recreate_columns
 from aequilibrae.project.database_connection import database_connection
 
 
@@ -23,8 +23,12 @@ def migrate(conn: sqlite3.Connection):
     if not nodes_schema.exists():
         raise FileNotFoundError(str(nodes_schema))
 
-    with project.db_connection as project_conn:
-        period_ids = project_conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+    try:
+        with project.db_connection as project_conn:
+            period_ids = project_conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+    except sqlite3.OperationalError:
+        logger.info("Migration finished, no 'transit_graph_configs' table found.")
+        return
 
     existing_links = conn.execute("SELECT link_id FROM links LIMIT 1").fetchone()
 
@@ -62,18 +66,7 @@ def migrate(conn: sqlite3.Connection):
             conn.execute(sql)
 
         for table in ["links", "nodes"]:
-            columns = conn.execute(
-                f"SELECT name, type FROM PRAGMA_TABLE_INFO('__old_{table}') AS table_info"
-            ).fetchall()
-            columns = {f"{x[0]}": x[1] for x in columns if x[0]}
-
-            orig_columns = conn.execute(f"SELECT name, type FROM PRAGMA_TABLE_INFO('{table}') AS table_info").fetchall()
-            orig_columns = {f"{x[0]}" for x in orig_columns}
-
-            new_columns = {k: v for k, v in columns.items() if k not in orig_columns}
-            sql = "ALTER TABLE {} ADD COLUMN {} {};"
-            for k, v in new_columns.items():
-                conn.execute(sql.format(table, k, v))
+            columns = recreate_columns(conn, logger, table, f"__old_{table}")
 
             conn.execute(
                 f"""INSERT INTO {table}({",".join(columns)},'period_id') SELECT {",".join(columns)},{period_id} FROM __old_{table}"""

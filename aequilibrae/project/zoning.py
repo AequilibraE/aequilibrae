@@ -1,5 +1,6 @@
 from copy import deepcopy
-from os.path import join, realpath
+from os.path import join
+from pathlib import Path
 from typing import Union, Dict
 import warnings
 
@@ -70,7 +71,7 @@ class Zoning(BasicTable):
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.__has_zoning():
-            qry_file = join(realpath(__file__), "database_specification", "tables", "zones.sql")
+            qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
             with self.network.project.db_connection as conn:
                 run_queries_from_sql_file(conn, self.project.logger, qry_file)
             self.__load()

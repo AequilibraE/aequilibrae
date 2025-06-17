@@ -19,6 +19,7 @@ import shapely
 import shapely.ops
 import json
 import sqlite3
+from pandas.api.types import is_integer_dtype
 
 from aequilibrae.utils.geo_utils import haversine
 from aequilibrae.project.database_connection import database_connection
@@ -200,6 +201,8 @@ class TransitGraphBuilder:
         """
         if "zone_id" not in zones.columns or "geometry" not in zones.columns:
             raise KeyError("zone_id and geometry must be columns in zones")
+        elif not (is_integer_dtype(zones.zone_id.dtype) and zones.zone_id.min() > 0):
+            raise ValueError("'zone_id' must consist of integers greater than 0")
 
         if zones.geometry.dtype is str or zones.geometry.dtype is bytes:
             geometry = shapely.from_wkt(zones.geometry.values)
@@ -223,7 +226,7 @@ class TransitGraphBuilder:
 
         self.zones = pd.DataFrame(
             {
-                "zone_id": zones.zone_id.copy(deep=True).astype(str),
+                "zone_id": zones.zone_id.copy(deep=True).astype(int),
                 "geometry": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in geometry]),
                 "centroids": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in centroids]),
             }
@@ -433,6 +436,7 @@ class TransitGraphBuilder:
 
         # uniform attributes
         stop_vertices["line_seg_idx"] = -1
+        stop_vertices["taz_id"] = -1
         stop_vertices["node_type"] = "stop"
 
         self.__stop_vertices = stop_vertices
@@ -446,6 +450,7 @@ class TransitGraphBuilder:
         )
 
         # uniform attributes
+        boarding_vertices["taz_id"] = -1
         boarding_vertices["node_type"] = "boarding"
 
         self.__boarding_vertices = boarding_vertices
@@ -459,6 +464,7 @@ class TransitGraphBuilder:
         )
 
         # uniform attributes
+        alighting_vertices["taz_id"] = -1
         alighting_vertices["node_type"] = "alighting"
 
         self.__alighting_vertices = alighting_vertices
@@ -486,7 +492,6 @@ class TransitGraphBuilder:
 
             # uniform attributes
             origin_vertices["node_type"] = "origin"
-            origin_vertices["line_seg_idx"] = -1
 
             destination_vertices = origin_vertices.copy(deep=True)
             destination_vertices["node_type"] = "destination"
@@ -500,7 +505,10 @@ class TransitGraphBuilder:
 
             # uniform attributes
             od_vertices["node_type"] = "od"
-            od_vertices["line_seg_idx"] = -1
+
+        od_vertices["line_seg_idx"] = -1
+        od_vertices["stop_id"] = ""
+        od_vertices["line_id"] = ""
 
         self.__od_vertices = od_vertices
 
@@ -531,12 +539,12 @@ class TransitGraphBuilder:
         """Graph vertices creation as a dataframe.
 
         Vertices have the following attributes:
-            - node_id (:obj:`int`),
+            - node_id (:obj:`int`): Equal to the ``taz_id`` for centroids/origins. Contiguous after,
             - node_type (:obj:`str`): Either 'stop', 'boarding', 'alighting', 'od', 'origin', or 'destination',
             - stop_id (:obj:`str`): Only applies to 'stop', 'boarding' and 'alighting' vertices,
             - line_id (:obj:`str`): Only applies to 'boarding' and 'alighting' vertices,
             - line_seg_idx (:obj:`int`): Only applies to 'boarding' and 'alighting' vertices,
-            - taz_id (:obj:`str`): Only applies to 'origin', 'destination', and 'od' nodes,
+            - taz_id (:obj:`int`): Only applies to 'origin', 'destination', and 'od' nodes, ``-1`` elsewhere,
             - geometry (:obj:`str`): Geometry object in WKB (well known binary).
         """
         self._create_line_segments()
@@ -558,7 +566,16 @@ class TransitGraphBuilder:
 
         # reset index and copy it to column
         self.vertices.reset_index(drop=True, inplace=True)
-        self.vertices["node_id"] = self.vertices.index + 1
+
+        o_vertices = self.__od_vertices[self.__od_vertices.node_type.isin(["origin", "od"])]
+        node_id_min = o_vertices.taz_id.max() + 1
+        self.vertices["node_id"] = np.hstack(
+            (
+                o_vertices.taz_id.to_numpy(),
+                np.arange(node_id_min, node_id_min + len(self.vertices) - len(o_vertices)),
+            )
+        )
+
         self.vertices = self.vertices[SF_VERTEX_COLS]
         self.create_od_node_mapping()
 
@@ -567,7 +584,7 @@ class TransitGraphBuilder:
         self.vertices.stop_id = self.vertices.stop_id.fillna("").astype(str)
         self.vertices.line_id = self.vertices.line_id.fillna("").astype(str)
         self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int64")
-        self.vertices.taz_id = self.vertices.taz_id.fillna("").astype(str)
+        self.vertices.taz_id = self.vertices.taz_id.astype("int64")
 
     def _create_on_board_edges(self):
         """Create on board edges."""
@@ -1008,7 +1025,6 @@ class TransitGraphBuilder:
             """
             stops = pd.read_sql(sql=sql, con=self.pt_conn)
 
-            print(stops)
             stops.drop_duplicates(inplace=True)
             stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
@@ -1275,12 +1291,17 @@ class TransitGraphBuilder:
             lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
         return lines
 
-    def create_additional_db_fields(self):
-        """Create the additional required entries in the tables."""
+    def create_additional_db_fields(self, conn: sqlite3.Connection = None):
+        """
+        Create the additional required entries in the tables.
+
+        :Arguments:
+            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+        """
         # This graph requires some additional tables and fields in order to store all our information.
         # Currently it mimics what we are storing in the df
 
-        with self.pt_conn as conn:
+        with conn or self.pt_conn as conn:
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
@@ -1298,14 +1319,15 @@ class TransitGraphBuilder:
                 ],
             )
 
-    def save_vertices(self, robust=None):
+    def save_vertices(self, robust=None, conn: sqlite3.Connection = None):
         """
         Write the vertices DataFrame to the public transport database.
 
         Within the database nodes may not exist at the exact same point in space, provide ``robust=True`` to move the nodes slightly.
 
         :Arguments:
-           **robust** (:obj:`bool`): Deprecated. No longer in use.
+            **robust** (:obj:`bool`): Deprecated. No longer in use.
+            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         if robust is not None:
             warnings.warn(
@@ -1313,18 +1335,17 @@ class TransitGraphBuilder:
                 DeprecationWarning,
             )
 
-        with self.pt_conn as conn:
+        with conn or self.pt_conn as conn:
             if conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError(
                     f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})"
                 )
 
             df = self.vertices[SF_VERTEX_COLS]
-            df.loc[:, "period_id"] = self.period_id
             conn.executemany(
                 f"""\
                 INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes,period_id)
-                VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",?);
+                VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),'t',{self.period_id});
                 """,
                 df.itertuples(index=False, name=None),
             )
@@ -1342,7 +1363,7 @@ class TransitGraphBuilder:
         with pt_conn as conn:
             conn.execute("DELETE FROM nodes where period_id=?", (period_id,))
 
-    def save_edges(self, recreate_line_geometry=False):
+    def save_edges(self, recreate_line_geometry=False, conn: sqlite3.Connection = None):
         """
         Save the contents of self.edges to the public transport database.
 
@@ -1350,21 +1371,21 @@ class TransitGraphBuilder:
 
         :Arguments:
            **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
+            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         # We need to generate the geometry for each edge, this may take a bit
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
-        with self.pt_conn as conn:
+        with conn or self.pt_conn as conn:
             if conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError("cannot save links into a database with existing links in the same period")
 
             df = self.edges[SF_EDGE_COLS + ["geometry"]]
-            df.loc[:, "period_id"] = self.period_id
             conn.executemany(
                 f"""\
                 INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_id)
-                VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",?);
+                VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),'t',{self.period_id});
                 """,
                 df.itertuples(index=False, name=None),
             )
@@ -1382,8 +1403,8 @@ class TransitGraphBuilder:
         with pt_conn as conn:
             conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
 
-    def save_config(self):
-        with self.project_conn as conn:
+    def save_config(self, conn: sqlite3.Connection = None):
+        with conn or self.project_conn as conn:
             sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
             conn.execute(sql, [self.period_id, json.dumps(self.config)])
 
@@ -1401,16 +1422,18 @@ class TransitGraphBuilder:
             sql = "DELETE FROM transit_graph_configs WHERE period_id = ?"
             conn.execute(sql, [period_id])
 
-    def save(self, robust=True):
+    def save(self, robust=True, pt_conn: sqlite3.Connection = None, project_conn: sqlite3.Connection = None):
         """Save the current graph to the public transport database.
 
         :Arguments:
             **robust** (:obj:`bool`): Deprecated. No longer in use.
+            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+            **project_conn** (:obj:`sqlite.Connection`): Optional project connection to use
         """
-        self.create_additional_db_fields()
-        self.save_vertices(robust=robust)
-        self.save_edges()
-        self.save_config()
+        self.create_additional_db_fields(conn=pt_conn)
+        self.save_vertices(robust=robust, conn=pt_conn)
+        self.save_edges(conn=pt_conn)
+        self.save_config(conn=project_conn)
 
     @classmethod
     def remove(cls, pt_conn: sqlite3.Connection, period_id: int):
@@ -1443,7 +1466,8 @@ class TransitGraphBuilder:
                     if self.blocking_centroid_flows
                     else (self.vertices.node_type == "od")
                 )
-            ].node_id.values
+            ].node_id.values,
+            remove_dead_ends=False,
         )
         g.set_graph("trav_time")
         g.set_blocked_centroid_flows(True)

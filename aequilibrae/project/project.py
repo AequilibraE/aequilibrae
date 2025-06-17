@@ -4,6 +4,7 @@ import os
 import shutil
 import sqlite3
 from contextlib import contextmanager
+from collections import namedtuple
 from pathlib import Path
 
 from aequilibrae import global_logger
@@ -171,7 +172,6 @@ class Project:
             for mm, conn in targets:
                 with conn:
                     mm.upgrade(conn)
-                    conn.execute("VACUUM")
             global_logger.info("Completed database upgrades")
         finally:
             for _, conn in targets:
@@ -202,7 +202,9 @@ class Project:
         Refer to ``run/__init__.py`` file within the project folder for documentation.
         """
         entry_points = self.parameters["run"]
-        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run")
+        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run", force=True)
+
+        res = []
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
@@ -211,10 +213,11 @@ class Project:
             elif not callable(attr):
                 raise RuntimeError(f"found symbol '{name}' in the run module but it is not callable")
 
-            func = functools.partial(attr, **kwargs)
-            setattr(module, name, func)
+            func = functools.partial(attr, **(kwargs if kwargs is not None else {}))
+            res.append((name, func))
 
-        return module
+        Run = namedtuple("Run", [k for k, _ in res])
+        return Run._make([v for _, v in res])
 
     def check_file_indices(self) -> None:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""

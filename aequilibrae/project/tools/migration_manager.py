@@ -6,6 +6,7 @@ from typing import Optional
 
 from aequilibrae import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
+from aequilibrae.utils.db_utils import AequilibraEConnection
 
 
 class MigrationStatus(IntEnum):
@@ -128,7 +129,7 @@ class Migration:
         conn.executescript(contents)
 
     def _apply_python(self, conn: sqlite3.Connection):
-        module = import_file_as_module(self.file, self.name)
+        module = import_file_as_module(self.file, self.name, force=True)
         try:
             migrate = module.migrate
         except AttributeError as e:
@@ -160,6 +161,7 @@ class MigrationManager:
         migrations = import_file_as_module(
             migration_file,
             "aequilibrae.project.database_specification.migrations",
+            force=True,
         ).migrations
 
         res = []
@@ -182,7 +184,8 @@ class MigrationManager:
     def __ensure_inital_is_applied(self, conn):
         # Handle the initial migration separately, the 'migrations' table might not have been created. We implicitly
         # apply this migration all the time to ensure the table exists.
-        self.migrations[0].apply(conn)
+        with conn:
+            self.migrations[0].apply(conn)
 
     def status(self, conn: sqlite3.Connection) -> dict[int, MigrationStatus]:
         """
@@ -210,8 +213,9 @@ class MigrationManager:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
         self.__ensure_inital_is_applied(conn)
-        for migration in self.migrations.values():
-            migration.mark_as_seen(conn)
+        with conn:
+            for migration in self.migrations.values():
+                migration.mark_as_seen(conn)
 
     def find_applicable(self, conn: sqlite3.Connection):
         """
@@ -243,7 +247,7 @@ class MigrationManager:
 
         return res
 
-    def upgrade(self, conn: sqlite3.Connection, skip: set[int] = None):
+    def upgrade(self, conn: AequilibraEConnection, skip: set[int] = None):
         """
         Find and apply all applicable migrations.
 
@@ -257,15 +261,9 @@ class MigrationManager:
             skip = set()
         migrations = self.find_applicable(conn)
 
-        iso_lvl = conn.isolation_level
-        conn.isolation_level = None
-        try:
-            for migration in migrations:
-                conn.execute("BEGIN")
-                with conn:
-                    if migration.id in skip:
-                        migration.mark_as(conn, MigrationStatus.SKIPPED)
-                    else:
-                        migration.apply(conn)
-        finally:
-            conn.isolation_level = iso_lvl
+        for migration in migrations:
+            with conn.manual_transaction():
+                if migration.id in skip:
+                    migration.mark_as(conn, MigrationStatus.SKIPPED)
+                else:
+                    migration.apply(conn)
