@@ -30,6 +30,7 @@ def setup_project(tmp_path):
 def setup_graph(setup_project):
     return setup_project.network.graphs["c"]
 
+
 def test_upper_case_variables(setup_graph):
     network = setup_graph.network
     network.columns = network.columns.str.upper()
