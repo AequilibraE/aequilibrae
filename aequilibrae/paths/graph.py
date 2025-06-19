@@ -634,6 +634,11 @@ class GraphBase(ABC):  # noqa: B024
 
         return create_compressed_link_network_mapping(self)
 
+    def __setattr__(self, key, value):
+        if key == "network" and isinstance(value, pd.DataFrame):
+            value.columns = [col.lower() for col in value.columns]
+        self.__dict__[key] = value
+
 
 class Graph(GraphBase):
     def __init__(self, *args, **kwargs):

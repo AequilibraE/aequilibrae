@@ -25,6 +25,13 @@ from tests.data import siouxfalls_project
 DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
 
+aeq_test_path = Path(gettempdir()) / "aequilibrae_testing"
+aeq_test_cache = aeq_test_path / "cache"
+aeq_test_scratch = aeq_test_path / "tests"
+
+aeq_test_cache.mkdir(exist_ok=True, parents=True)
+aeq_test_scratch.mkdir(exist_ok=True, parents=True)
+
 
 def project_factory_fixture(scope):
     @pytest.fixture(scope=scope)
@@ -85,12 +92,12 @@ def project(create_empty_project):
 
 @pytest.fixture
 def create_path(tmp_path):
-    return tmp_path / uuid.uuid4().hex
+    yield tmp_path / uuid.uuid4().hex
 
 
 @pytest.fixture(scope="session")
-def coquimbo_project():
-    return create_example(Path(gettempdir()) / uuid.uuid4().hex, "coquimbo")
+def coquimbo_project(create_path):
+    return create_example(create_path / uuid.uuid4().hex, "coquimbo")
 
 
 @pytest.fixture
