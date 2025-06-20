@@ -637,7 +637,7 @@ class GraphBase(ABC):  # noqa: B024
     def __setattr__(self, key, value):
         if key == "network" and isinstance(value, pd.DataFrame):
             value.columns = [col.lower() for col in value.columns]
-        self.__dict__[key] = value
+        super().__setattr__(key, value)
 
 
 class Graph(GraphBase):
