@@ -384,6 +384,7 @@ cdef class RouteChoiceSet:
                             progress[0] += 1
 
                 del route_set
+            free(progress)
 
             if store_results:
                 self.get_results()
