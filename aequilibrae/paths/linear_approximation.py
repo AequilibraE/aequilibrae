@@ -24,8 +24,6 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
 class LinearApproximation(WorkerThread):
-    equilibration = SIGNAL(object)
-    assignment = SIGNAL(object)
     signal = SIGNAL(object)
 
     def __init__(self, assig_spec, algorithm, project=None) -> None:
@@ -468,6 +466,7 @@ class LinearApproximation(WorkerThread):
             c.graph.set_graph(self.time_field)
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
+            self.aons[c._id].signal = self.signal
 
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
@@ -488,8 +487,6 @@ class LinearApproximation(WorkerThread):
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
-                self.signal.emit(["refresh"])
-                self.signal.emit(["reset"])
                 aon.signal = self.signal
 
                 aon.execute()
@@ -620,7 +617,7 @@ class LinearApproximation(WorkerThread):
                     c.graph.skims[:, idx] = self.congested_time[:]
 
             msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
-            self.signal.emit(["set_text", msg])
+            self.signal.emit(["update", self.iter, msg])
 
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce

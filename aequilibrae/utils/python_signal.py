@@ -14,7 +14,7 @@ if not missing_tqdm:
     else:
         from tqdm import tqdm  # type: ignore
 
-show_status = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE"
+show_status = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE" or missing_tqdm
 
 
 class PythonSignal:  # type: ignore
@@ -63,7 +63,7 @@ class PythonSignal:  # type: ignore
 
         elif action == "set_text":
             desc = str(val[1]).ljust(50)
-            if self.pbar is not None and self.pbar.desc != desc:
+            if self.pbar is not None:
                 self.pbar.set_description(desc, refresh=True)
 
         elif action == "start":
@@ -86,5 +86,4 @@ class PythonSignal:  # type: ignore
             self.pbar.update(val[1] - self.pbar.n)
             if len(val) > 2:
                 desc = str(val[2]).ljust(50)
-                if self.pbar.desc != desc:
-                    self.pbar.set_description(desc, refresh=True)
+                self.pbar.set_description(desc, refresh=True)
