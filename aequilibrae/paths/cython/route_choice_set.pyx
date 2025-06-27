@@ -3,8 +3,9 @@ from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 
+import cython
 from cython.operator cimport dereference as d
-from cython.parallel cimport parallel, prange, threadid, atomic
+from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
 from libc.string cimport memcpy
 from libcpp cimport nullptr
@@ -378,7 +379,7 @@ cdef class RouteChoiceSet:
                             b_nodes_matrix[thread_id],
                             self.b_nodes_view,
                         )
-                    with atomic():
+                    with cython.parallel.atomic():
                         progress[0] += 1
 
                 del route_set
