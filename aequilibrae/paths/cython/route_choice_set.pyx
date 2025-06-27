@@ -4,7 +4,7 @@ from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand,
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 
 from cython.operator cimport dereference as d
-from cython.parallel cimport parallel, prange, threadid
+from cython.parallel cimport parallel, prange, threadid, atomic
 from libc.limits cimport UINT_MAX
 from libc.string cimport memcpy
 from libcpp cimport nullptr
@@ -249,6 +249,9 @@ cdef class RouteChoiceSet:
 
             unsigned char [:, :] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
 
+            int * progress = <int *> malloc(sizeof(int))
+        progress[0] = 0
+
             # self.a_star = a_star
 
         if self.a_star:
@@ -375,6 +378,8 @@ cdef class RouteChoiceSet:
                             b_nodes_matrix[thread_id],
                             self.b_nodes_view,
                         )
+                    with atomic():
+                        progress[0] += 1
 
                 del route_set
 
