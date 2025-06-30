@@ -3,7 +3,6 @@ from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 
-cimport cython
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
@@ -250,9 +249,6 @@ cdef class RouteChoiceSet:
 
             unsigned char [:, :] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
 
-        cdef int* progress = <int *> malloc(sizeof(int))
-        progress[0] = 0
-
             # self.a_star = a_star
 
         if self.a_star:
@@ -379,12 +375,8 @@ cdef class RouteChoiceSet:
                             b_nodes_matrix[thread_id],
                             self.b_nodes_view,
                         )
-                    with gil:
-                        with cython.parallel.atomic():
-                            progress[0] += 1
 
                 del route_set
-            free(progress)
 
             if store_results:
                 self.get_results()
