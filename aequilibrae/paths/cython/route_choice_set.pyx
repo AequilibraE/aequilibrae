@@ -2,6 +2,7 @@
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.utils.cython.atomic_signal cimport AtomicSignal
 
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
@@ -152,6 +153,7 @@ cdef class RouteChoiceSet:
         return [tuple(x) for x in results["route set"]]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
+    @AtomicSignal.progress_bar(1.0, msg="{}/{} OD pairs processed")
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -174,6 +176,8 @@ cdef class RouteChoiceSet:
         path_size_logit: bool = False,
         beta: float = 1.0,
         cutoff_prob: float = 0.0,
+        *,
+        signal: AtomicSignal
     ):
         """Compute the a route set for a list of OD pairs.
 
@@ -221,6 +225,8 @@ cdef class RouteChoiceSet:
                 raise ValueError(f"Origin {origin} is not present within the compact graph")
             if self.nodes_to_indices_view[dest] == -1:
                 raise ValueError(f"Destination {dest} is not present within the compact graph")
+
+        signal.total = len(demand.df)
 
         cdef:
             long long origin_index, dest_index
@@ -293,6 +299,7 @@ cdef class RouteChoiceSet:
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
 
                     if origin_index == dest_index:
+                        signal.inc()
                         continue
 
                     if self.block_flows_through_centroids:
@@ -375,6 +382,8 @@ cdef class RouteChoiceSet:
                             b_nodes_matrix[thread_id],
                             self.b_nodes_view,
                         )
+
+                    signal.inc()
 
                 del route_set
 
