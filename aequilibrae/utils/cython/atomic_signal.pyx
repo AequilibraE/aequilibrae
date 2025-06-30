@@ -1,6 +1,5 @@
 from libcpp.atomic cimport atomic, memory_order
 from libc.stdint cimport uint64_t
-from posix.time cimport timespec, nanosleep
 from cython.operator cimport preincrement
 cimport cython
 
@@ -13,7 +12,7 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 @cython.final
 cdef class AtomicSignal:
     def __init__(self, interval: float, msg: str = None, total: int = 0):
-        self.interval = interval
+        self.interval = <int>(interval * 1_000)
         self.msg = msg or "{}/{}"
         self.__total = total
 
@@ -45,14 +44,10 @@ cdef class AtomicSignal:
     def __loop(self):
         self.__signal.emit(["start", self.total, self.msg.format(0, self.total)])
 
-        cdef timespec req, rem
-
-        req.tv_sec = math.floor(self.interval)
-        req.tv_nsec = <long>((self.interval - req.tv_sec) * 1_000_000_000)
         try:
             while not self.__stop.is_set():
                 with nogil:
-                    nanosleep(&req, &rem)
+                    msleep(self.interval)
 
                 val = self.__counter.load(memory_order.memory_order_relaxed)
                 self.__signal.emit(["update", val, self.msg.format(val, self.total)])
