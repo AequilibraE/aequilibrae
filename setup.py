@@ -95,6 +95,12 @@ ext_mod_coo_demand = Extension(
     **extension_args,
 )
 
+ext_mod_atomic_signal = Extension(
+    "aequilibrae.utils.cython.atomic_signal",
+    [join("aequilibrae", "utils", "cython", "atomic_signal.pyx")],
+    **extension_args,
+)
+
 
 if __name__ == "__main__":
     setup(
@@ -113,6 +119,7 @@ if __name__ == "__main__":
                 ext_mod_rc_set_results,
                 ext_mod_graph_building,
                 ext_mod_sparse_matrix,
+                ext_mod_atomic_signal,
             ],
             compiler_directives={"language_level": "3str"},
             nthreads=min(60, cpu_count()),  # Windows does not do well with more than 60 threads
