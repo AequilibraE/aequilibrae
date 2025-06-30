@@ -14,7 +14,7 @@ if not missing_tqdm:
     else:
         from tqdm import tqdm  # type: ignore
 
-show_status = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE" or missing_tqdm
+show_status = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE" and not missing_tqdm
 
 
 class PythonSignal:  # type: ignore
