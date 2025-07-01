@@ -240,7 +240,7 @@ cdef void compute_SF_in_parallel(
         int i  # openmp on windows requires iterator variable have signed type
         size_t k, j
         cnp.int64_t destination_vertex
-        cnp.uint64_t total = (
+        cnp.int64_t total = (
             destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
             if skimming else
             destination_vertex_indices_view.shape[0]

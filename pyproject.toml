@@ -25,9 +25,7 @@ maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
-
-
-
+license-files = ["LICENSE.TXT"]
 dependencies = [
     "numpy<1.99",
     "scipy>=1.4",
@@ -41,11 +39,7 @@ dependencies = [
     "geopandas",
     "tqdm"]
 
-[project.license]
-file = "LICENSE.TXT"
-
 [project.optional-dependencies]
-
 docs = [
     "enum34",
     "Sphinx",
@@ -86,12 +80,13 @@ version = { attr = "aequilibrae.version" }
 aequilibrae = "aequilibrae"
 
 [tool.setuptools.package-data]
-    "aequilibrae.reference_files"= ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"]
-    "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
-    "aequilibrae.distribution"= ["cython/*.pyx"]
-    "aequilibrae.matrix"= ["*.pyx", "*.pxd"]
-    "aequilibrae"= ["./parameters.yml"]
-    "aequilibrae.project"= [
+    "aequilibrae.reference_files" = ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"]
+    "aequilibrae.paths" = ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
+    "aequilibrae.distribution" = ["cython/*.pyx"]
+    "aequilibrae.matrix" = ["*.pyx", "*.pxd"]
+    "aequilibrae.utils" = ["cython/*.pyx", "cython/*.pxd"]
+    "aequilibrae" = ["./parameters.yml"]
+    "aequilibrae.project" = [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
         "database_specification/transit/tables/*.*",
