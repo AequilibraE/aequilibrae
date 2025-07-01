@@ -21,7 +21,6 @@ cdef extern from *:
 cdef class AtomicSignal:
     cdef:
         public object msg
-        public object total
         readonly int interval
 
         object __signal
@@ -30,5 +29,7 @@ cdef class AtomicSignal:
         object __resend
 
         atomic[uint64_t] __counter
+        atomic[uint64_t] __total
 
+    cpdef inline void set_total(self, uint64_t total) noexcept nogil
     cpdef inline void inc(AtomicSignal self) noexcept nogil

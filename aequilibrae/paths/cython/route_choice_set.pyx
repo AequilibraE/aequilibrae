@@ -226,7 +226,7 @@ cdef class RouteChoiceSet:
             if self.nodes_to_indices_view[dest] == -1:
                 raise ValueError(f"Destination {dest} is not present within the compact graph")
 
-        signal.total = len(demand.df)
+        signal.set_total(len(demand.df))
 
         cdef:
             long long origin_index, dest_index
