@@ -13,6 +13,8 @@ cimport numpy as cnp
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
+from aequilibrae.utils.cython.atomic_signal cimport AtomicSignal
+
 ctypedef cnp.float64_t DATATYPE_t
 DATATYPE_PY = np.float64
 
@@ -207,6 +209,7 @@ cdef void compute_SF_in_parallel(
     bint skimming,
     bint is_travel_time,
     size_t n_skim_cols,
+    AtomicSignal signal,
 ) noexcept nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     cdef:
@@ -237,6 +240,13 @@ cdef void compute_SF_in_parallel(
         int i  # openmp on windows requires iterator variable have signed type
         size_t k, j
         cnp.int64_t destination_vertex
+        cnp.uint64_t total = (
+            destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
+            if skimming else
+            destination_vertex_indices_view.shape[0]
+        )
+
+    signal.set_total(total)
 
     with parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
@@ -256,11 +266,7 @@ cdef void compute_SF_in_parallel(
 
         thread_skim_j_vec = <cnp.float64_t *> calloc(edge_count, sizeof(cnp.float64_t) * n_skim_cols)
 
-        for i in prange(
-                destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
-                if skimming else
-                destination_vertex_indices_view.shape[0]
-        ):
+        for i in prange(total):
             if i < destination_vertex_indices_view.shape[0]:
                 destination_vertex = destination_vertex_indices_view[i]
             else:
@@ -269,6 +275,7 @@ cdef void compute_SF_in_parallel(
                 destination_vertex = rest_of_destinations_view[i - destination_vertex_indices_view.shape[0]]
 
             if nodes_to_indices[destination_vertex] == -1:
+                signal.inc()
                 continue  # Completely disconnected nodes have an index of -1
 
             if i < destination_vertex_indices_view.shape[0]:
@@ -322,6 +329,7 @@ cdef void compute_SF_in_parallel(
                 skimming,
                 is_travel_time
             )
+            signal.inc()
 
         free(thread_demand_origins)
         free(thread_demand_values)
