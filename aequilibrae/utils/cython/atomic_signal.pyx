@@ -14,8 +14,8 @@ cdef class AtomicSignal:
     def __init__(self, interval: float, msg: str = None, total: int = 0):
         self.interval = <int>(interval * 1_000)
         self.msg = msg or "{}/{}"
-        self.total = total
 
+        self.__total.store(total, memory_order.memory_order_relaxed)
         self.__signal = SIGNAL(object)
         self.__task = None
         self.__stop = threading.Event()
@@ -31,8 +31,15 @@ cdef class AtomicSignal:
         self.__stop.set()
         self.__task.join()
 
+    cpdef inline void set_total(self, uint64_t total) noexcept nogil:
+        self.__total.store(total, memory_order.memory_order_relaxed)
+
     def __loop(self):
-        cdef uint64_t val = 0, total = self.total
+        cdef:
+            uint64_t val = 0
+            uint64_t total = self.__total.load(memory_order.memory_order_relaxed)
+            uint64_t _total = total
+
         self.__signal.emit(["start", total, self.msg.format(val, total)])
 
         try:
@@ -40,9 +47,10 @@ cdef class AtomicSignal:
                 with nogil:
                     msleep(self.interval)
                     val = self.__counter.load(memory_order.memory_order_relaxed)
+                    total = self.__total.load(memory_order.memory_order_relaxed)
 
-                if total != self.total:
-                    total = self.total
+                if _total != total:
+                    _total = total
                     self.__signal.emit(["start", total, self.msg.format(val, total)])
                     self.__signal.emit(["set_position", val])
                 else:
@@ -66,3 +74,11 @@ cdef class AtomicSignal:
                     signal.stop()
             return wrapper
         return decorator
+
+    def __enter__(self):
+        self.start()
+
+        return self
+
+    def __exit__(self, *_):
+        self.stop()
