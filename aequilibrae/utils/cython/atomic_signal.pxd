@@ -21,12 +21,13 @@ cdef extern from *:
 cdef class AtomicSignal:
     cdef:
         public object msg
+        public object total
         readonly int interval
 
-        int __total
         object __signal
         object __task
         object __stop
+        object __resend
 
         atomic[uint64_t] __counter
 

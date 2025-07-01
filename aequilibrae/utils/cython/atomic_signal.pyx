@@ -14,21 +14,11 @@ cdef class AtomicSignal:
     def __init__(self, interval: float, msg: str = None, total: int = 0):
         self.interval = <int>(interval * 1_000)
         self.msg = msg or "{}/{}"
-        self.__total = total
+        self.total = total
 
         self.__signal = SIGNAL(object)
         self.__task = None
         self.__stop = threading.Event()
-
-    @property
-    def total(self):
-        return self.__total
-
-    @total.setter
-    def total(self, val: int):
-        self.__total = val
-        if self.__signal.pbar is not None:
-            self.__signal.pbar.total = val
 
     def start(self):
         self.__stop.clear()
@@ -42,15 +32,21 @@ cdef class AtomicSignal:
         self.__task.join()
 
     def __loop(self):
-        self.__signal.emit(["start", self.total, self.msg.format(0, self.total)])
+        cdef uint64_t val = 0, total = self.total
+        self.__signal.emit(["start", total, self.msg.format(val, total)])
 
         try:
             while not self.__stop.is_set():
                 with nogil:
                     msleep(self.interval)
+                    val = self.__counter.load(memory_order.memory_order_relaxed)
 
-                val = self.__counter.load(memory_order.memory_order_relaxed)
-                self.__signal.emit(["update", val, self.msg.format(val, self.total)])
+                if total != self.total:
+                    total = self.total
+                    self.__signal.emit(["start", total, self.msg.format(val, total)])
+                    self.__signal.emit(["set_position", val])
+                else:
+                    self.__signal.emit(["update", val, self.msg.format(val, total)])
         finally:
             self.__signal.emit(["finished"])
 
