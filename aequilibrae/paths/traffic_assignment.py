@@ -603,7 +603,14 @@ class TrafficAssignment(AssignmentBase):
             df.to_sql(table_name, conn)
 
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
-        data = [table_name, "traffic assignment", self.procedure_id, json.dumps(report), self.procedure_date, self.description]
+        data = [
+            table_name,
+            "traffic assignment",
+            self.procedure_id,
+            json.dumps(report),
+            self.procedure_date,
+            self.description,
+        ]
         with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
@@ -1048,7 +1055,14 @@ class TransitAssignment(AssignmentBase):
             df.to_sql(table_name, conn)
 
         report = {"setup": self.info()}
-        data = [table_name, "transit assignment", self.procedure_id, json.dumps(report), self.procedure_date, self.description]
+        data = [
+            table_name,
+            "transit assignment",
+            self.procedure_id,
+            json.dumps(report),
+            self.procedure_date,
+            self.description,
+        ]
         with commit_and_close(path.join(project.project_base_path, "public_transport.sqlite")) as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,

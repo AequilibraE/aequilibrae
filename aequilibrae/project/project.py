@@ -88,13 +88,17 @@ class Project:
     @property
     @contextmanager
     def results_connection(self):
-        with commit_and_close(self.project_base_path / "results_database.sqlite", spatial=False, missing_ok=True) as conn:
+        with commit_and_close(
+            self.project_base_path / "results_database.sqlite", spatial=False, missing_ok=True
+        ) as conn:
             yield conn
 
     @property
     @contextmanager
     def transit_connection(self):
-        with commit_and_close(self.project_base_path / "public_transport.sqlite", spatial=True, missing_ok=True) as conn:
+        with commit_and_close(
+            self.project_base_path / "public_transport.sqlite", spatial=True, missing_ok=True
+        ) as conn:
             yield conn
 
     def new(self, project_path: str) -> None:

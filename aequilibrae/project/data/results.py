@@ -51,9 +51,7 @@ class Results:
             remove = set(mats) - {
                 name
                 for name in mats
-                if results_conn.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-                ).fetchone()
+                if results_conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
                 is not None
             }
             if remove:
@@ -64,13 +62,17 @@ class Results:
     def update_database(self) -> None:
         """Adds records to the results table for results found in the results database"""
         with self.project.db_connection as project_conn, self.project.results_connection as results_conn:
-            existing_results = {x[0] for x in results_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            existing_results = {
+                x[0] for x in results_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            }
             existing_records = {x[0] for x in project_conn.execute("SELECT table_name FROM results").fetchall()}
 
         new_results = existing_results - existing_records
 
         if new_results:
-            self.logger.warning(f"New results found in the results database. Added to the database: {','.join(new_results)}")
+            self.logger.warning(
+                f"New results found in the results database. Added to the database: {','.join(new_results)}"
+            )
 
         for table in new_results:
             rec = self.new_record(table)
@@ -125,14 +127,14 @@ class Results:
         rr.delete()
 
     def new_record(
-            self,
-            table_name: str,
-            procedure: str = None,
-            procedure_id: str = None,
-            procedure_report: dict = None,
-            timestamp: str = None,
-            description: str = None,
-        ) -> ResultRecord:
+        self,
+        table_name: str,
+        procedure: str = None,
+        procedure_id: str = None,
+        procedure_report: dict = None,
+        timestamp: str = None,
+        description: str = None,
+    ) -> ResultRecord:
         """Creates a new record for a result.
 
         :Arguments:
