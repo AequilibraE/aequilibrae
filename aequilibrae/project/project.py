@@ -13,7 +13,7 @@ from aequilibrae.log import Log
 from aequilibrae.log import get_log_handler
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
-from aequilibrae.project.data import Matrices
+from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
@@ -83,6 +83,18 @@ class Project:
     @contextmanager
     def db_connection(self):
         with commit_and_close(self.path_to_file, spatial=True) as conn:
+            yield conn
+
+    @property
+    @contextmanager
+    def results_connection(self):
+        with commit_and_close(self.project_base_path / "results_database.sqlite", spatial=False, missing_ok=True) as conn:
+            yield conn
+
+    @property
+    @contextmanager
+    def transit_connection(self):
+        with commit_and_close(self.project_base_path / "public_transport.sqlite", spatial=True, missing_ok=True) as conn:
             yield conn
 
     def new(self, project_path: str) -> None:
@@ -184,6 +196,7 @@ class Project:
         self.network = Network(self)
         self.about = About(self)
         self.matrices = Matrices(self)
+        self.results = Results(self)
 
     @property
     def project_parameters(self) -> Parameters:

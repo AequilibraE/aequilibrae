@@ -1,26 +1,28 @@
 import itertools
-import warnings
+import json
 import logging
 import pathlib
 import socket
 import sqlite3
-from datetime import datetime
-from typing import List, Optional, Tuple, Union, Dict
+import warnings
 from collections.abc import Hashable
-from os import path
-from uuid import uuid4
+from datetime import datetime
 from functools import cached_property
+from os import path
+from typing import Dict, List, Optional, Tuple, Union
+from uuid import uuid4
 
 import numpy as np
-import pandas as pd
 import openmatrix as omx
+import pandas as pd
 import scipy
+
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
+from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
-from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
+from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.utils.db_utils import commit_and_close
 
 
@@ -637,7 +639,7 @@ class RouteChoice:
             table_name,
             method_name,
             self.procedure_id,
-            str(report),
+            json.dumps(report),
             self.procedure_date,
             description,
         ]

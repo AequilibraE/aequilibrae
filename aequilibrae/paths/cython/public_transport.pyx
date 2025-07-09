@@ -3,6 +3,7 @@
 import multiprocessing
 import socket
 from pathlib import Path
+import json
 
 import numpy as np
 import pandas as pd
@@ -417,7 +418,7 @@ class HyperpathGenerating:
             df.to_sql(table_name, conn)
 
         rep = {"setup": self.info()}
-        data = [table_name, "hyperpath assignment", self.procedure_id, str(rep), self.procedure_date, self.description]
+        data = [table_name, "hyperpath assignment", self.procedure_id, json.dumps(rep), self.procedure_date, self.description]
         sql = """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                                     description) Values(?,?,?,?,?,?)""",
         with commit_and_close(database_path("transit", project.project_base_path)) as conn:

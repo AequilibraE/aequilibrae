@@ -1,9 +1,10 @@
+import json
 import logging
 import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import List, Dict, Union, Optional
+from typing import Dict, List, Optional, Union
 from uuid import uuid4
 
 import numpy as np
@@ -602,7 +603,7 @@ class TrafficAssignment(AssignmentBase):
             df.to_sql(table_name, conn)
 
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
-        data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
+        data = [table_name, "traffic assignment", self.procedure_id, json.dumps(report), self.procedure_date, self.description]
         with self.project.db_connection as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
@@ -858,7 +859,7 @@ class TrafficAssignment(AssignmentBase):
             table_name,
             "select link",
             f"{self.procedure_id}_sl",
-            str(report),
+            json.dumps(report),
             self.procedure_date,
             self.description,
         ]
@@ -1047,7 +1048,7 @@ class TransitAssignment(AssignmentBase):
             df.to_sql(table_name, conn)
 
         report = {"setup": self.info()}
-        data = [table_name, "transit assignment", self.procedure_id, str(report), self.procedure_date, self.description]
+        data = [table_name, "transit assignment", self.procedure_id, json.dumps(report), self.procedure_date, self.description]
         with commit_and_close(path.join(project.project_base_path, "public_transport.sqlite")) as conn:
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
