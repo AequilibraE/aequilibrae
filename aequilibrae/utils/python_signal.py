@@ -63,9 +63,8 @@ class PythonSignal:  # type: ignore
 
         elif action == "set_text":
             desc = str(val[1]).ljust(50)
-            if self.pbar is not None:
-                if self.pbar.desc != desc:
-                    self.pbar.set_description(desc, refresh=True)
+            if self.pbar is not None and self.pbar.desc != desc:
+                self.pbar.set_description(desc, refresh=True)
 
         elif action == "start":
             if missing_tqdm and not inside_qgis:
