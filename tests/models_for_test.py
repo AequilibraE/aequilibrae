@@ -13,6 +13,9 @@ from aequilibrae.utils.db_utils import read_and_close
 from .data import no_triggers_project
 
 
+# FIXME: This resource shouldn't persist between test runs. This creates a weird, stateful, test environment. If this
+# fails to setup the "no triggers" project correctly the first time each day, then tests will fail in incredibly odd
+# ways.
 class ModelsTest:
     today = datetime.today().strftime("%Y-%m-%d")
     path_no_trigger = Path(gettempdir()) / f"aeq_test_no_trigger_base_{today}"
