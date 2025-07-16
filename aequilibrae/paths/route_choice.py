@@ -8,7 +8,6 @@ import warnings
 from collections.abc import Hashable
 from datetime import datetime
 from functools import cached_property
-from os import path
 from typing import Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 
