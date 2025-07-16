@@ -18,7 +18,13 @@ class ResultRecord(SafeClass):
         **results_conn** (:obj:`Optional[sqlite3.Connection]`): Connection to the results database. If None, the project's results connection will be used.
     """
 
-    def __init__(self, data_set: dict, project, project_conn: Optional[sqlite3.Connection] = None, results_conn: Optional[sqlite3.Connection] = None):
+    def __init__(
+        self,
+        data_set: dict,
+        project,
+        project_conn: Optional[sqlite3.Connection] = None,
+        results_conn: Optional[sqlite3.Connection] = None,
+    ):
         super().__init__(data_set, project)
         self._exists: bool
         self.__dict__["_exists"] = True

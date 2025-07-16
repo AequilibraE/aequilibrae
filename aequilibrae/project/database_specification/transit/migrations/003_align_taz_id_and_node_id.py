@@ -10,7 +10,12 @@ from aequilibrae.project.project_creation import add_triggers, remove_triggers, 
 import numpy as np
 
 
-def migrate(*, project_conn: sqlite3.Connection, transit_conn: Optional[sqlite3.Connection], results_conn: Optional[sqlite3.Connection]):
+def migrate(
+    *,
+    project_conn: sqlite3.Connection,
+    transit_conn: Optional[sqlite3.Connection],
+    results_conn: Optional[sqlite3.Connection],
+):
     logger.info("Beginning migration to align taz_ids and node_ids for origins/destinations/centroids")
 
     if not transit_conn:

@@ -143,7 +143,11 @@ class TestMigrationManager(TestCase):
             self.assertEqual(stat, MigrationStatus.APPLIED)
 
         # Check tables were created
-        tables = self.connections[self.main_connection].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        tables = (
+            self.connections[self.main_connection]
+            .execute("SELECT name FROM sqlite_master WHERE type='table'")
+            .fetchall()
+        )
         table_names = [t[0] for t in tables]
         self.assertIn("migrations", table_names)
         self.assertIn("users", table_names)

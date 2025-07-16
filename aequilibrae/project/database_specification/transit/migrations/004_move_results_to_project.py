@@ -9,7 +9,12 @@ from aequilibrae.project.data import Results
 import pandas as pd
 
 
-def migrate(*, project_conn: sqlite3.Connection, transit_conn: Optional[sqlite3.Connection], results_conn: Optional[sqlite3.Connection]):
+def migrate(
+    *,
+    project_conn: sqlite3.Connection,
+    transit_conn: Optional[sqlite3.Connection],
+    results_conn: Optional[sqlite3.Connection],
+):
     logger.info("Beginning migration to move transit results to the main project_database.sqlite")
 
     if not transit_conn:

@@ -8,7 +8,12 @@ from aequilibrae.project.project_creation import add_triggers, remove_triggers, 
 from aequilibrae.project.database_connection import database_connection
 
 
-def migrate(*, project_conn: sqlite3.Connection, transit_conn: Optional[sqlite3.Connection], results_conn: Optional[sqlite3.Connection]):
+def migrate(
+    *,
+    project_conn: sqlite3.Connection,
+    transit_conn: Optional[sqlite3.Connection],
+    results_conn: Optional[sqlite3.Connection],
+):
     logger.info("Beginning migration to support saving and loading multiple Transit graphs")
     project: Project = get_active_project(must_exist=True)
 
