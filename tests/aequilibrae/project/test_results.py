@@ -107,14 +107,6 @@ class TestResultRecord(TestCase):
 
         self.assertFalse(record._exists)
 
-    def test_report_property(self):
-        record = ResultRecord(self.sample_data, self.project, self.project_conn, self.results_conn)
-        report = record.report
-
-        self.assertIsInstance(report, dict)
-        self.assertEqual(report["status"], "success")
-        self.assertEqual(report["items"], 100)
-
     def test_get_data(self):
         record = ResultRecord(self.sample_data, self.project, self.project_conn, self.results_conn)
 

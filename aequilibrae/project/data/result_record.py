@@ -45,7 +45,7 @@ class ResultRecord(SafeClass):
                     str(self.table_name),
                     str(self.procedure),
                     str(self.procedure_id),
-                    json.dumps(self.procedure_report),
+                    self.procedure_report,
                     str(self.timestamp),
                     str(self.description),
                 ]
@@ -75,15 +75,6 @@ class ResultRecord(SafeClass):
             results_conn.execute(f"DROP TABLE IF EXISTS {self.table_name}")
 
         self.__dict__["_exists"] = False
-
-    @property
-    def report(self) -> dict:
-        """Retrieves the underlying report and decodes from JSON.
-
-        Returns:
-            **procedure_report** (:obj:`dict`): The report data decoded from JSON.
-        """
-        return json.loads(self.__dict__["procedure_report"])
 
     def get_data(self) -> pd.DataFrame:
         """Returns the results data for further computation.
@@ -123,7 +114,5 @@ class ResultRecord(SafeClass):
                 qry_value = sum(conn.execute(sql, [str(value).lower()]).fetchone())
                 if qry_value > 0:
                     raise ValueError("Another results with this table_name already exists")
-        elif instance == "report":
-            self.__dict__[instance] = json.dumps(value)
         else:
             self.__dict__[instance] = value

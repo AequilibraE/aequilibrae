@@ -189,7 +189,6 @@ class Project:
         if (self.project_base_path / "results_database.sqlite").exists():
             connections["results_conn"] = database_connection("results")
 
-        print(connections)
         try:
             for mm, main_conn in targets:
                 with connections[main_conn] as conn:
