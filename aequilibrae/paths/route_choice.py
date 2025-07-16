@@ -422,7 +422,7 @@ class RouteChoice:
             "Computer name": socket.gethostname(),
             "Procedure ID": self.procedure_id,
             "Parameters": self.parameters,
-            "Select links": self._selected_links,
+            "Select links": [list(x) for x in self._selected_links],
         }
         return info
 

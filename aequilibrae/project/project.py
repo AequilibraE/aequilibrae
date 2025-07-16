@@ -53,7 +53,7 @@ class Project:
 
     @classmethod
     def from_path(cls, project_folder):
-        project = Project()
+        project = cls()
         project.open(project_folder)
         return project
 
