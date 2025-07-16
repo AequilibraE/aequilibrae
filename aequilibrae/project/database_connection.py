@@ -18,7 +18,6 @@ def database_path(db_type: str, project_path=None) -> Path:
     elif db_type == "results":
         db = "results_database"
     else:
-        print("LKJSLDFKJSLKFJ:", db_type)
         raise ValueError(f"unknown database type {db_type}")
 
     return Path(project_path) / f"{db}.sqlite"

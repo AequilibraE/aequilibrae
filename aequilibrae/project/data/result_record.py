@@ -1,18 +1,37 @@
 import pandas as pd
 import json
+import sqlite3
+from typing import Optional
 
 from aequilibrae.project.network.safe_class import SafeClass
 
 
 class ResultRecord(SafeClass):
-    def __init__(self, data_set: dict, project):
+    """Class for handling records of results in the AequilibraE project database.
+
+    This class provides methods to save, delete, and retrieve result records and their data.
+
+    Arguments:
+        **data_set** (:obj:`dict`): Dictionary containing the result record data.
+        **project**: (:obj:`Project`): Project object this result record belongs to.
+        **project_conn** (:obj:`Optional[sqlite3.Connection])`: Connection to the project database. If None, the project's connection will be used.
+        **results_conn** (:obj:`Optional[sqlite3.Connection]`): Connection to the results database. If None, the project's results connection will be used.
+    """
+
+    def __init__(self, data_set: dict, project, project_conn: Optional[sqlite3.Connection] = None, results_conn: Optional[sqlite3.Connection] = None):
         super().__init__(data_set, project)
         self._exists: bool
         self.__dict__["_exists"] = True
 
-    def save(self):
-        """Saves results record to the project database"""
-        with self.project.db_connection as conn:
+        self.__dict__["_project_conn"] = project_conn
+        self.__dict__["_results_conn"] = results_conn
+
+    def save(self) -> None:
+        """Saves results record to the project database.
+
+        Creates a new record if it doesn't exist or updates an existing one.
+        """
+        with self._project_conn or self.project.db_connection as conn:
             sql = "SELECT COUNT(*) FROM results WHERE table_name=?"
 
             if conn.execute(sql, [self.table_name]).fetchone()[0] == 0:
@@ -37,37 +56,68 @@ class ResultRecord(SafeClass):
                         self.__original__[key] = value
                         conn.execute(f"UPDATE results SET '{key}'=? WHERE table_name=?", [value, self.table_name])
 
-    def delete(self):
-        """Deletes this results record and the underlying data from disk"""
-        with self.project.db_connection as project_conn, self.project.results_connection as results_conn:
+    def delete(self) -> None:
+        """Deletes this results record and the underlying data from disk.
+
+        Removes both the record from the project database and the data table from the results database.
+        """
+        with (
+            self._project_conn or self.project.db_connection as project_conn,
+            self._result_conn or self.project.results_connection as results_conn,
+        ):
             project_conn.execute("DELETE FROM results WHERE table_name=?", [self.table_name])
             results_conn.execute(f"DROP TABLE IF EXISTS {self.table_name}")
 
         self.__dict__["_exists"] = False
 
     @property
-    def report(self):
-        """Retrieves the underlying report and decodes from JSON"""
+    def report(self) -> dict:
+        """Retrieves the underlying report and decodes from JSON.
+
+        Returns:
+            **procedure_report** (:obj:`dict`): The report data decoded from JSON.
+        """
         return json.loads(self.__dict__["procedure_report"])
 
     def get_data(self) -> pd.DataFrame:
-        """Returns the results for further computation
+        """Returns the results data for further computation.
 
         Returns:
-            **results** (:obj:`pd.DataFrame`): DataFrame object
+            **df** (:obj:`pd.DataFrame`): DataFrame containing the results data.
         """
-        with self.project.results_connection as conn:
+        with self._result_conn or self.project.results_connection as conn:
             return pd.read_sql(f"SELECT * FROM {self.table_name}", conn)
 
-    def __setattr__(self, instance, value) -> None:
-        with self.project.db_connection as conn:
-            sql = f"Select count(*) from results where LOWER({instance})=?"
-            qry_value = sum(conn.execute(sql, [str(value).lower()]).fetchone())
-            if qry_value > 0:
-                if instance == "table_name":
-                    raise ValueError("Another results with this table_name already exists")
+    def set_data(self, df: pd.DataFrame, **kwargs) -> None:
+        """Set the results data corresponding to this record.
 
-        if instance == "report":
+        Additional keyword arguments forwarded to the ``pd.DataFrame.to_sql`` method.
+
+        Arguments:
+            **df** (:obj:`pd.DataFrame`): DataFrame object to save. Uses ``pd.DataFrame.to_sql``.
+        """
+        with self._result_conn or self.project.results_connection as conn:
+            df.to_sql(self.table_name, conn, **kwargs)
+
+    def __setattr__(self, instance, value) -> None:
+        """Override attribute setting with validation.
+
+        Validates table_name uniqueness and handles report serialisation.
+
+        Arguments:
+            **instance** (:obj:`str`): Attribute name.
+            **value** (:obj:`object`): Value to set.
+
+        Raises:
+            ValueError: If trying to set a table_name that already exists.
+        """
+        if instance == "table_name":
+            with self._project_conn or self.project.db_connection as conn:
+                sql = f"Select count(*) from results where LOWER({instance})=?"
+                qry_value = sum(conn.execute(sql, [str(value).lower()]).fetchone())
+                if qry_value > 0:
+                    raise ValueError("Another results with this table_name already exists")
+        elif instance == "report":
             self.__dict__[instance] = json.dumps(value)
         else:
             self.__dict__[instance] = value
