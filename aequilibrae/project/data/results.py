@@ -104,7 +104,7 @@ class Results:
         else:
             self.logger.info("No new result records to add")
 
-    def list(self, conn: Optional[sqlite3.Connection] = None) -> pd.DataFrame:
+    def list(self) -> pd.DataFrame:
         """List of all results available.
 
         Arguments:

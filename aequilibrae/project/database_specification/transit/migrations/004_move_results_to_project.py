@@ -24,6 +24,10 @@ def migrate(
         logger.info("Migration finished, no 'results.sqlite' connection provided.")
         return
 
+    if transit_conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='results'").fetchone() is None:
+        logger.info("Migration finished, no table 'results' in 'public_transport.sqlite'.")
+        return
+
     project: Project = get_active_project(must_exist=True)
 
     results = Results(project, project_conn=project_conn, results_conn=results_conn)
@@ -45,4 +49,8 @@ def migrate(
         record.save()
 
     logger.info("Dropping the transit results table")
-    transit_conn.execute("DROP TABLE results")
+    transit_conn.execute("DROP TABLE IF EXISTS results")
+
+    logger.info("Adding additional columns to the results table")
+    project_conn.execute("ALTER TABLE results ADD COLUMN year TEXT")
+    project_conn.execute("ALTER TABLE results ADD COLUMN scenario TEXT")

@@ -114,5 +114,5 @@ class ResultRecord(SafeClass):
                 qry_value = sum(conn.execute(sql, [str(value).lower()]).fetchone())
                 if qry_value > 0:
                     raise ValueError("Another results with this table_name already exists")
-        else:
-            self.__dict__[instance] = value
+
+        self.__dict__[instance.lower()] = value

@@ -22,4 +22,6 @@ create TABLE if not exists results (table_name       TEXT     NOT NULL PRIMARY K
                                     procedure_id     TEXT     NOT NULL,
                                     procedure_report TEXT     NOT NULL,
                                     timestamp        DATETIME DEFAULT current_timestamp,
-                                    description      TEXT);
+                                    description      TEXT,
+                                    year             TEXT,
+                                    scenario         TEXT);
