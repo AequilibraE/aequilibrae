@@ -57,7 +57,7 @@ class Results:
     def reload(self) -> None:
         """Reloads the results from the database."""
         self.__items.clear()
-        self.__init__(self.project)
+        self.__init__(self.project, self.__project_conn, self.__results_conn)
 
     def clear_database(self) -> None:
         """Removes records from the results table that do not exist in the results database."""
