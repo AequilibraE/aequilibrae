@@ -130,10 +130,7 @@ import geopandas as gpd
 
 # %%
 # Let's retrieve the results
-res_path = join(project.project_base_path, "results_database.sqlite")
-conn = sqlite3.connect(res_path)
-
-results = pd.read_sql("SELECT * FROM my_run_module_example", conn).set_index("link_id")
+results = project.results.get_results("my_run_module_example").set_index("link_id")
 
 # %%
 with project.db_connection as conn:

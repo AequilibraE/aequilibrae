@@ -598,25 +598,16 @@ class TrafficAssignment(AssignmentBase):
         if not project:
             project = self.project or get_active_project()
 
-        res_path = path.join(project.project_base_path, "results_database.sqlite")
-        with commit_and_close(res_path, missing_ok=True) as conn:
-            df.to_sql(table_name, conn)
-
-        report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
-        data = [
-            table_name,
-            "traffic assignment",
-            self.procedure_id,
-            json.dumps(report),
-            self.procedure_date,
-            self.description,
-        ]
-        with self.project.db_connection as conn:
-            conn.execute(
-                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                                description) Values(?,?,?,?,?,?)""",
-                data,
-            )
+        report = {"convergence": self.assignment.convergence_report, "setup": self.info()}
+        record = project.results.new_record(
+            table_name=table_name,
+            procedure="traffic assignment",
+            procedure_id=self.procedure_id,
+            procedure_report=json.dumps(report),
+            timestamp=self.procedure_date,
+            description=self.description,
+        )
+        record.set_data(df)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -855,27 +846,17 @@ class TrafficAssignment(AssignmentBase):
             project = self.project or get_active_project()
         df = self.select_link_flows()
 
-        res_path = path.join(project.project_base_path, "results_database.sqlite")
-        with commit_and_close(res_path, missing_ok=True) as conn:
-            df.to_sql(table_name, conn)
-
-        # Create description table
-        self.description = f"Select link analysis from {self.procedure_id}"
         report = {}
-        data = [
-            table_name,
-            "select link",
-            f"{self.procedure_id}_sl",
-            json.dumps(report),
-            self.procedure_date,
-            self.description,
-        ]
-        with self.project.db_connection as conn:
-            conn.execute(
-                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                            description) Values(?,?,?,?,?,?)""",
-                data,
-            )
+        description = f"Select link analysis from {self.procedure_id}"
+        record = project.results.new_record(
+            table_name=table_name,
+            procedure="traffic select link",
+            procedure_id=f"{self.procedure_id}_sl",
+            procedure_report=json.dumps(report),
+            timestamp=self.procedure_date,
+            description=description,
+        )
+        record.set_data(df)
 
     def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
@@ -1050,25 +1031,16 @@ class TransitAssignment(AssignmentBase):
         if not project:
             project = project or get_active_project()
 
-        res_path = path.join(project.project_base_path, "results_database.sqlite")
-        with commit_and_close(res_path, missing_ok=True) as conn:
-            df.to_sql(table_name, conn)
-
         report = {"setup": self.info()}
-        data = [
-            table_name,
-            "transit assignment",
-            self.procedure_id,
-            json.dumps(report),
-            self.procedure_date,
-            self.description,
-        ]
-        with commit_and_close(path.join(project.project_base_path, "public_transport.sqlite")) as conn:
-            conn.execute(
-                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                            description) Values(?,?,?,?,?,?)""",
-                data,
-            )
+        record = project.results.new_record(
+            table_name=table_name,
+            procedure="transit assignment",
+            procedure_id=self.procedure_id,
+            procedure_report=json.dumps(report),
+            timestamp=self.procedure_date,
+            description=self.description,
+        )
+        record.set_data(df)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame

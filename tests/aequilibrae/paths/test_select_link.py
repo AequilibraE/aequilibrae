@@ -82,9 +82,7 @@ class TestSelectLink(TestCase):
             m = sla.get_matrix(mat)
             assert m.sum() > 0 and m.shape == (num_zones, num_zones)
 
-        pth = Path(self.project.project_base_path)
-        conn = sqlite3.connect(pth / "results_database.sqlite")
-        results = [x[0] for x in conn.execute("SELECT name FROM sqlite_master WHERE type ='table'").fetchall()]
+        results = self.project.results.list()["table_name"].to_list()
         assert "select_link_analysis" in results
 
     def test_equals_demand_one_origin(self):

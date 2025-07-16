@@ -414,12 +414,15 @@ class HyperpathGenerating:
 
         if not project:
             project = project or get_active_project()
-        with commit_and_close(Path(project.project_base_path) / "results_database.sqlite", missing_ok=True) as conn:
-            df.to_sql(table_name, conn)
 
         rep = {"setup": self.info()}
-        data = [table_name, "hyperpath assignment", self.procedure_id, json.dumps(rep), self.procedure_date, self.description]
-        sql = """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                                                    description) Values(?,?,?,?,?,?)""",
-        with commit_and_close(database_path("transit", project.project_base_path)) as conn:
-            conn.execute(sql, data)
+        record = project.results.new_record(
+            table_name=table_name,
+            procedure="Hyperpath assignment",
+            procedure_id=self.procedure_id,
+            procedure_report=json.dumps(rep),
+            timestamp=self.procedure_date,
+            description=self.description,
+        )
+
+        record.set_data(df)

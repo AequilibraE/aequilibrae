@@ -11,7 +11,8 @@ import pathlib
 class TestMigrationManager(TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
-        self.connection = sqlite3.connect(":memory:", factory=AequilibraEConnection)
+        self.connections = {"conn": sqlite3.connect(":memory:", factory=AequilibraEConnection)}
+        self.main_connection = "conn"
 
         self.migrations_file = pathlib.Path(__file__).parent.parent.parent / "data" / "mock_migrations" / "init.py"
         self.migrations_duplicate = (
@@ -22,7 +23,7 @@ class TestMigrationManager(TestCase):
         )
 
     def tearDown(self):
-        self.connection.close()
+        self.connections[self.main_connection].close()
         self.tmpdir.cleanup()
 
     def test_migration_manager_init(self):
@@ -47,9 +48,10 @@ class TestMigrationManager(TestCase):
 
     def test_status(self):
         manager = MigrationManager(self.migrations_file)
+        conn = self.connections[self.main_connection]
 
         # Initially all should be missing except initial which gets auto-applied
-        status = manager.status(self.connection)
+        status = manager.status(conn)
         self.assertEqual(status[0], MigrationStatus.APPLIED)
         self.assertEqual(status[1], MigrationStatus.MISSING)
         self.assertEqual(status[2], MigrationStatus.MISSING)
@@ -57,14 +59,15 @@ class TestMigrationManager(TestCase):
 
         # Check migrations table was created
         sql = "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
-        self.assertIsNotNone(self.connection.execute(sql).fetchone())
+        self.assertIsNotNone(conn.execute(sql).fetchone())
 
     def test_mark_all_as_seen(self):
         manager = MigrationManager(self.migrations_file)
-        manager.mark_all_as_seen(self.connection)
+        conn = self.connections[self.main_connection]
+        manager.mark_all_as_seen(conn)
 
         # All should be marked as MISSING
-        status = manager.status(self.connection)
+        status = manager.status(conn)
         for id, stat in status.items():
             if id == 0:
                 self.assertEqual(stat, MigrationStatus.APPLIED)
@@ -72,7 +75,7 @@ class TestMigrationManager(TestCase):
                 self.assertEqual(stat, MigrationStatus.MISSING)
 
         # Check entries exist in migrations table
-        rows = self.connection.execute("SELECT id, status FROM migrations ORDER BY id").fetchall()
+        rows = conn.execute("SELECT id, status FROM migrations ORDER BY id").fetchall()
         self.assertEqual(len(rows), 6)
         self.assertEqual(rows[0][1], "APPLIED")
         self.assertEqual(rows[1][1], "MISSING")
@@ -83,9 +86,10 @@ class TestMigrationManager(TestCase):
 
     def test_find_applicable(self):
         manager = MigrationManager(self.migrations_file)
+        conn = self.connections[self.main_connection]
 
         # Should find all non-initial migrations
-        applicable = manager.find_applicable(self.connection)
+        applicable = manager.find_applicable(conn)
         self.assertEqual(len(applicable), 5)
         self.assertEqual(applicable[0].id, 1)
         self.assertEqual(applicable[1].id, 2)
@@ -94,14 +98,14 @@ class TestMigrationManager(TestCase):
         self.assertEqual(applicable[4].id, 5)
 
         # Apply first and second migration
-        applicable[0].apply(self.connection)
-        applicable[0].mark_as(self.connection, MigrationStatus.APPLIED)
+        applicable[0].apply(conn, self.connections)
+        applicable[0].mark_as(conn, MigrationStatus.APPLIED)
 
-        applicable[1].apply(self.connection)
-        applicable[1].mark_as(self.connection, MigrationStatus.APPLIED)
+        applicable[1].apply(conn, self.connections)
+        applicable[1].mark_as(conn, MigrationStatus.APPLIED)
 
         # Should now find only remaining migrations
-        applicable = manager.find_applicable(self.connection)
+        applicable = manager.find_applicable(conn)
         self.assertEqual(len(applicable), 3)
         self.assertEqual(applicable[0].id, 3)
         self.assertEqual(applicable[1].id, 4)
@@ -109,20 +113,21 @@ class TestMigrationManager(TestCase):
 
     def test_out_of_order_migrations(self):
         manager = MigrationManager(self.migrations_file)
+        conn = self.connections[self.main_connection]
 
         # Apply migrations 0, 1, and 3 but not 2
-        manager.migrations[0].apply(self.connection)
-        manager.migrations[0].mark_as(self.connection, MigrationStatus.APPLIED)
+        manager.migrations[0].apply(conn, self.connections)
+        manager.migrations[0].mark_as(conn, MigrationStatus.APPLIED)
 
-        manager.migrations[1].apply(self.connection)
-        manager.migrations[1].mark_as(self.connection, MigrationStatus.APPLIED)
+        manager.migrations[1].apply(conn, self.connections)
+        manager.migrations[1].mark_as(conn, MigrationStatus.APPLIED)
 
-        manager.migrations[3].apply(self.connection)
-        manager.migrations[3].mark_as(self.connection, MigrationStatus.APPLIED)
+        manager.migrations[3].apply(conn, self.connections)
+        manager.migrations[3].mark_as(conn, MigrationStatus.APPLIED)
 
         # Should raise error because migration 2 was skipped
         with self.assertRaises(RuntimeError):
-            manager.find_applicable(self.connection)
+            manager.find_applicable(conn)
 
     def test_upgrade(self):
         manager = MigrationManager(self.migrations_file)
@@ -130,15 +135,15 @@ class TestMigrationManager(TestCase):
         del manager.migrations[5]
 
         # Upgrade should apply all migrations
-        manager.upgrade(self.connection)
+        manager.upgrade(self.main_connection, self.connections)
 
         # Check all migrations were applied
-        status = manager.status(self.connection)
+        status = manager.status(self.connections[self.main_connection])
         for id, stat in status.items():
             self.assertEqual(stat, MigrationStatus.APPLIED)
 
         # Check tables were created
-        tables = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        tables = self.connections[self.main_connection].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         table_names = [t[0] for t in tables]
         self.assertIn("migrations", table_names)
         self.assertIn("users", table_names)
@@ -147,36 +152,37 @@ class TestMigrationManager(TestCase):
 
     def test_upgrade_with_skip(self):
         manager = MigrationManager(self.migrations_file)
+        conn = self.connections[self.main_connection]
         del manager.migrations[4]
         del manager.migrations[5]
 
-        manager.mark_all_as_seen(self.connection)
+        manager.mark_all_as_seen(conn)
 
         # Skip migration 2
-        manager.upgrade(self.connection, skip={2})
+        manager.upgrade(self.main_connection, self.connections, skip={2})
 
         # Check migrations 1 and 3 were applied, 2 was skipped
-        status = manager.status(self.connection)
+        status = manager.status(conn)
         self.assertEqual(status[0], MigrationStatus.APPLIED)
         self.assertEqual(status[1], MigrationStatus.APPLIED)
         self.assertEqual(status[2], MigrationStatus.SKIPPED)
         self.assertEqual(status[3], MigrationStatus.APPLIED)
 
         # There are no applicable upgrades now
-        applicable = manager.find_applicable(self.connection)
+        applicable = manager.find_applicable(conn)
         self.assertListEqual(applicable, [])
 
         # Check tables were created (should have users and comments but not posts)
-        tables = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         table_names = [t[0] for t in tables]
         self.assertIn("migrations", table_names)
         self.assertIn("users", table_names)
         self.assertNotIn("posts", table_names)  # Was skipped
         self.assertIn("comments", table_names)
 
-        manager.migrations[2].apply(self.connection)
-        tables = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        manager.migrations[2].apply(conn, self.connections)
+        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         self.assertIn("posts", [t[0] for t in tables])  # Was just applied
 
-        status = manager.status(self.connection)
+        status = manager.status(conn)
         self.assertEqual(status[2], MigrationStatus.APPLIED)

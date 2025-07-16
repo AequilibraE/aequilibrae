@@ -54,8 +54,7 @@ da.assign_matrix(demand, "delaunay_test")
 
 # %%
 # we retrieve the results
-conn = sqlite3.connect(join(fldr, "results_database.sqlite"))
-results = pd.read_sql("Select * from delaunay_test", conn).set_index("link_id")
+results = project.results.get_results("delaunay_test").set_index("link_id")
 
 # %%
 # Now we get the matrix we want and create the Delaunay Lines

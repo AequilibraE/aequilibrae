@@ -635,26 +635,16 @@ class RouteChoice:
 
     def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
         self.procedure_id = uuid4().hex
-        data = [
-            table_name,
-            method_name,
-            self.procedure_id,
-            json.dumps(report),
-            self.procedure_date,
-            description,
-        ]
 
-        # sqlite3 context managers only commit, they don't close, oh well
-        res_path = path.join(project.project_base_path, "results_database.sqlite")
-        with commit_and_close(res_path, missing_ok=True) as conn:
-            df.to_sql(table_name, conn, index=True)
-
-        with self.project.db_connection as conn:
-            conn.execute(
-                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                                description) Values(?,?,?,?,?,?)""",
-                data,
-            )
+        record = project.results.new_record(
+            table_name=table_name,
+            procedure=method_name,
+            procedure_id=self.procedure_id,
+            procedure_report=json.dumps(report),
+            timestamp=self.procedure_date,
+            description=description,
+        )
+        record.set_data(df, index=True)
 
     def save_link_flows(self, table_name: str, project=None) -> None:
         """

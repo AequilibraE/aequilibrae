@@ -2,6 +2,7 @@ import sqlite3
 import uuid
 from itertools import combinations
 from os.path import join
+import json
 
 import numpy as np
 import pandas as pd
@@ -93,37 +94,36 @@ class DelaunayAnalysis:
             sql = f"select link_id, direction, a_node, b_node, distance, 1 capacity from {DELAUNAY_TABLE}"
 
             df = pd.read_sql(sql, conn)
-            centroids = np.array(np.unique(np.hstack((df.a_node.values, df.b_node.values))), int)
+        centroids = np.array(np.unique(np.hstack((df.a_node.values, df.b_node.values))), int)
 
-            g = Graph()
-            g.mode = "delaunay"
-            g.network = df
-            g.prepare_graph(centroids)
-            g.set_blocked_centroid_flows(True)
+        g = Graph()
+        g.mode = "delaunay"
+        g.network = df
+        g.prepare_graph(centroids)
+        g.set_blocked_centroid_flows(True)
 
-            tc = TrafficClass("delaunay", g, matrix)
-            ta = TrafficAssignment(self.project)
-            ta.set_classes([tc])
-            ta.set_time_field("distance")
-            ta.set_capacity_field("capacity")
-            ta.set_vdf("BPR")
-            ta.set_vdf_parameters({"alpha": 0, "beta": 1.0})
-            ta.set_algorithm("all-or-nothing")
-            ta.execute()
-
-            report = {"setup": str(ta.info())}
-            data = [result_name, "Delaunay assignment", self.procedure_id, str(report), ta.procedure_date, ""]
-            conn.execute(
-                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                                description) Values(?,?,?,?,?,?)""",
-                data,
-            )
+        tc = TrafficClass("delaunay", g, matrix)
+        ta = TrafficAssignment(self.project)
+        ta.set_classes([tc])
+        ta.set_time_field("distance")
+        ta.set_capacity_field("capacity")
+        ta.set_vdf("BPR")
+        ta.set_vdf_parameters({"alpha": 0, "beta": 1.0})
+        ta.set_algorithm("all-or-nothing")
+        ta.execute()
 
         cols = []
         for x in matrix.view_names:
             cols.extend([f"{x}_ab", f"{x}_ba", f"{x}_tot"])
         df = ta.results()[cols]
 
-        res_path = join(self.project.project_base_path, "results_database.sqlite")
-        with commit_and_close(res_path, missing_ok=True) as conn:
-            df.to_sql(result_name, conn)
+        report = {"setup": str(ta.info())}
+        record = self.project.results.new_record(
+            table_name=result_name,
+            procedure="Delaunay assignment",
+            procedure_id=self.procedure_id,
+            procedure_report=json.dumps(report),
+            timestamp=ta.procedure_date,
+            description="",
+        )
+        record.set_data(df)

@@ -658,15 +658,18 @@ class TestRouteChoice(TestCase):
         self.rc.save_link_flows("ll")
         self.rc.save_select_link_flows("sl")
 
-        conn = sqlite3.connect(pathlib.Path(self.project.project_base_path) / "results_database.sqlite")
-        with conn:
+        with self.project.results_connection as conn:
             for table, df in [
                 ("ll_uncompressed", lloads),
                 ("sl_uncompressed", u_sl),
             ]:
                 with self.subTest(table=table):
                     df2 = pd.read_sql(f"select * from {table}", conn).set_index("link_id")
+                    df3 = self.project.results.get_results(table).set_index("link_id")
+
                     pd.testing.assert_frame_equal(df2, df)
+                    pd.testing.assert_frame_equal(df3, df)
+
         conn.close()
 
         matrices = AequilibraeMatrix()

@@ -63,7 +63,7 @@ class ResultRecord(SafeClass):
         """
         with (
             self._project_conn or self.project.db_connection as project_conn,
-            self._result_conn or self.project.results_connection as results_conn,
+            self._results_conn or self.project.results_connection as results_conn,
         ):
             project_conn.execute("DELETE FROM results WHERE table_name=?", [self.table_name])
             results_conn.execute(f"DROP TABLE IF EXISTS {self.table_name}")
@@ -85,7 +85,7 @@ class ResultRecord(SafeClass):
         Returns:
             **df** (:obj:`pd.DataFrame`): DataFrame containing the results data.
         """
-        with self._result_conn or self.project.results_connection as conn:
+        with self._results_conn or self.project.results_connection as conn:
             return pd.read_sql(f"SELECT * FROM {self.table_name}", conn)
 
     def set_data(self, df: pd.DataFrame, **kwargs) -> None:
@@ -96,7 +96,7 @@ class ResultRecord(SafeClass):
         Arguments:
             **df** (:obj:`pd.DataFrame`): DataFrame object to save. Uses ``pd.DataFrame.to_sql``.
         """
-        with self._result_conn or self.project.results_connection as conn:
+        with self._results_conn or self.project.results_connection as conn:
             df.to_sql(self.table_name, conn, **kwargs)
 
     def __setattr__(self, instance, value) -> None:
