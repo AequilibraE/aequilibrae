@@ -261,7 +261,8 @@ class MigrationManager:
             **main_conn** (:obj:`str`): Main SQLite database connection. This is connection is used for the migrations
               table. Must be a key in ``connections``.
             **skip** (:obj:`set[int]`): Set of migration IDs to skip.
-            **connections** (:obj:`dict[str, AequilibraEConnection]`): Set of migration IDs to skip.g
+            **connections** (:obj:`dict[str, Optional[AequilibraEConnection]]`): Dictionary mapping connection names to
+              `AequilibraEConnection` objects. These connections are used during the migration process.
         """
         if skip is None:
             skip = set()
