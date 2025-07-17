@@ -305,7 +305,7 @@ class TestResults(TestCase):
             timestamp="2000-01-01 15:00:00",
             description="New test result",
             scenario="testing",
-            year="2020"
+            year="2020",
         )
 
         self.assertIsInstance(record, ResultRecord)
