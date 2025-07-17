@@ -333,7 +333,7 @@ class Project:
         else:
             self.scenario = Scenario(
                 base_path=self.root_scenario.base_path / scenario_name,
-                path_to_file=self.root_scenario.base_path / scenario_name / "project_database.sqlite"
+                path_to_file=self.root_scenario.base_path / scenario_name / "project_database.sqlite",
             )
             self.scenario.logger = self.__setup_logger()
             self.__load_objects()
@@ -395,12 +395,16 @@ class Project:
         shutil.copyfile(self.path_to_file, db)
 
         try:
-            shutil.copyfile(self.project_base_path / "public_transport.sqlite", scenario_path / "public_transport.sqlite")
+            shutil.copyfile(
+                self.project_base_path / "public_transport.sqlite", scenario_path / "public_transport.sqlite"
+            )
         except FileNotFoundError:
             pass
 
         try:
-            shutil.copyfile(self.project_base_path / "results_database.sqlite", scenario_path / "results_database.sqlite")
+            shutil.copyfile(
+                self.project_base_path / "results_database.sqlite", scenario_path / "results_database.sqlite"
+            )
         except FileNotFoundError:
             pass
 
