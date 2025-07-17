@@ -186,6 +186,8 @@ class Results:
         procedure_report: dict = None,
         timestamp: str = None,
         description: str = None,
+        scenario: str = None,
+        year: str = None,
     ) -> ResultRecord:
         """Creates a new record for a result.
 
@@ -207,6 +209,8 @@ class Results:
             raise ValueError(f"There is already a result of name ({table_name}). It must be unique.")
 
         tp = {
+            "scenario": scenario,
+            "year": year,
             "table_name": table_name,
             "procedure": procedure,
             "procedure_id": procedure_id,

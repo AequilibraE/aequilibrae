@@ -47,6 +47,8 @@ class TestResultRecord(TestCase):
             "procedure_report": '{"status": "success", "items": 100}',
             "timestamp": "2000-01-01 12:00:00",
             "description": "Test result description",
+            "year": "2020",
+            "scenario": "testing",
         }
 
     def tearDown(self):
@@ -71,9 +73,11 @@ class TestResultRecord(TestCase):
         result = cursor.fetchone()
 
         self.assertIsNotNone(result)
-        self.assertEqual(result[0], "test_result")
-        self.assertEqual(result[1], "test_procedure")
-        self.assertEqual(result[2], "test_id_123")
+        self.assertEqual(result[0], "testing")
+        self.assertEqual(result[1], "2020")
+        self.assertEqual(result[2], "test_result")
+        self.assertEqual(result[3], "test_procedure")
+        self.assertEqual(result[4], "test_id_123")
 
     def test_save_update_existing_record(self):
         record = ResultRecord(self.sample_data, self.project, self.project_conn, self.results_conn)
@@ -285,6 +289,28 @@ class TestResults(TestCase):
         self.assertIsInstance(record, ResultRecord)
         self.assertEqual(record.table_name, "new_test_result")
         self.assertEqual(record.procedure, "new_procedure")
+
+        cursor = self.project_conn.execute("SELECT * FROM results WHERE table_name='new_test_result'")
+        result = cursor.fetchone()
+        self.assertIsNotNone(result)
+
+    def test_new_record_with_scenario(self):
+        results = Results(self.project, self.project_conn, self.results_conn)
+
+        record = results.new_record(
+            "new_test_result",
+            procedure="new_procedure",
+            procedure_id="new_id",
+            procedure_report={"status": "pending"},
+            timestamp="2000-01-01 15:00:00",
+            description="New test result",
+            scenario="testing",
+            year="2020"
+        )
+
+        self.assertIsInstance(record, ResultRecord)
+        self.assertEqual(record.scenario, "testing")
+        self.assertEqual(record.year, "2020")
 
         cursor = self.project_conn.execute("SELECT * FROM results WHERE table_name='new_test_result'")
         result = cursor.fetchone()
