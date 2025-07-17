@@ -43,7 +43,6 @@ class AequilibraEConnection(sqlite3.Connection):
         return self
 
     def __enter__(self):
-        logger.debug(f"Called __enter__ with {self.__manual_transaction=}, {self.__depth=}")
         if self.__manual_transaction:
             self.__depth += 1
 
@@ -52,7 +51,6 @@ class AequilibraEConnection(sqlite3.Connection):
             return super().__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        logger.debug(f"Called __exit__ with {self.__manual_transaction=}, {self.__depth=}")
         if self.__manual_transaction:
             self.__depth -= 1
 

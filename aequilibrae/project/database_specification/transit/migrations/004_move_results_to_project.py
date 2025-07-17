@@ -50,7 +50,3 @@ def migrate(
 
     logger.info("Dropping the transit results table")
     transit_conn.execute("DROP TABLE IF EXISTS results")
-
-    logger.info("Adding additional columns to the results table")
-    project_conn.execute("ALTER TABLE results ADD COLUMN year TEXT")
-    project_conn.execute("ALTER TABLE results ADD COLUMN scenario TEXT")

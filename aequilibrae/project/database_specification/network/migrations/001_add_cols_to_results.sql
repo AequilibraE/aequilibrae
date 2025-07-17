@@ -1,0 +1,2 @@
+ALTER TABLE results ADD COLUMN year TEXT;
+ALTER TABLE results ADD COLUMN scenario TEXT;
