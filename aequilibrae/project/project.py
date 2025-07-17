@@ -392,15 +392,15 @@ class Project:
         shutil.copytree(self.project_base_path / "run", pth)
 
         db = scenario_path / "project_database.sqlite"
-        shutil.copyfile(spatialite_database, db)
+        shutil.copyfile(self.path_to_file, db)
 
         try:
-            shutil.copyfile(spatialite_database, scenario_path / "public_transport.sqlite")
+            shutil.copyfile(self.project_base_path / "public_transport.sqlite", scenario_path / "public_transport.sqlite")
         except FileNotFoundError:
             pass
 
         try:
-            shutil.copyfile(spatialite_database, scenario_path / "results_database.sqlite")
+            shutil.copyfile(self.project_base_path / "results_database.sqlite", scenario_path / "results_database.sqlite")
         except FileNotFoundError:
             pass
 
