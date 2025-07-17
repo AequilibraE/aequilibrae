@@ -164,7 +164,7 @@ class Results:
         Returns:
             **exists** (:obj:`bool`): Does the result exist?
         """
-        return table_name.lower() in self.__items
+        return table_name.lower() in self.__items and self.__items[table_name.lower()]._exists
 
     def delete_record(self, table_name: str) -> None:
         """Deletes a ResultRecord from the model and attempts to remove it from the results database.
@@ -175,6 +175,7 @@ class Results:
         Raises:
             **ValueError**: If the result doesn't exist
         """
+        table_name = table_name.lower()
         rr = self.get_record(table_name)
         rr.delete()
 

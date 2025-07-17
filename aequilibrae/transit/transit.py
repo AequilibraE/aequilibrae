@@ -42,7 +42,7 @@ class Transit(WorkerThread):
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
         """
-        WorkerThread.__init__(self, None)
+        super().__init__(self, None)
 
         self.project = project
         self.project_base_path = project.project_base_path
