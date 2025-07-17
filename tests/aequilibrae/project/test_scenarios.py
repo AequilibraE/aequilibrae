@@ -83,19 +83,21 @@ class TestScenarios(unittest.TestCase):
                 #     continue
 
                 data = Transit(self.project)
-                graph = data.create_graph(with_outer_stop_transfers=False, with_walking_edges=False,
-                                        blocking_centroid_flows=False, connector_method="overlapping_regions")
+                graph = data.create_graph(
+                    with_outer_stop_transfers=False,
+                    with_walking_edges=False,
+                    blocking_centroid_flows=False,
+                    connector_method="overlapping_regions",
+                )
 
                 self.project.network.build_graphs(modes=["c"])
                 graph.create_line_geometry(method="connector project match", graph="c")
                 transit_graph = graph.to_transit_graph()
                 zones_in_the_model = len(transit_graph.centroids)
-                names_list = ['pt']
+                names_list = ["pt"]
 
                 mat = AequilibraeMatrix()
-                mat.create_empty(zones=zones_in_the_model,
-                               matrix_names=names_list,
-                               memory_only=True)
+                mat.create_empty(zones=zones_in_the_model, matrix_names=names_list, memory_only=True)
                 mat.index = transit_graph.centroids[:]
                 mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
                 mat.computational_view()
@@ -113,12 +115,12 @@ class TestScenarios(unittest.TestCase):
                 results = assig.results()
                 self.assertIsNotNone(results)
 
-                assig.save_results(table_name=f'transit_test_{scenario}')
+                assig.save_results(table_name=f"transit_test_{scenario}")
 
                 # Verify the result was saved
                 saved_results = self.project.results.list()
-                table_names = saved_results['table_name'].tolist() if len(saved_results) > 0 else []
-                self.assertIn(f'transit_test_{scenario}', table_names)
+                table_names = saved_results["table_name"].tolist() if len(saved_results) > 0 else []
+                self.assertIn(f"transit_test_{scenario}", table_names)
 
     def test_matrices_scenarios(self):
         for scenario in self.scenarios:
