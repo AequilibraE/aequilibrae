@@ -10,10 +10,10 @@ req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ["ogc_fid", "geometry"]
 
 
-def initialize_tables(project, db_type: str) -> None:
-    with commit_and_close(database_connection(db_type)) as conn:
-        create_base_tables(conn, project.logger, db_type)
-        add_triggers(conn, project.logger, db_type)
+def initialize_tables(logger, db_type: str, project_path=None) -> None:
+    with commit_and_close(database_connection(db_type, project_path)) as conn:
+        create_base_tables(conn, logger, db_type)
+        add_triggers(conn, logger, db_type)
 
 
 def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:

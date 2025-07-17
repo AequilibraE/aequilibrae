@@ -90,7 +90,7 @@ class Transit(WorkerThread):
         """Creates the public transport database"""
         if not os.path.exists(self.__transit_file):
             shutil.copyfile(spatialite_database, self.__transit_file)
-            initialize_tables(self, "transit")
+            initialize_tables(self.logger, "transit")
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

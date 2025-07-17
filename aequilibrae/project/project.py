@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from collections import namedtuple
 from pathlib import Path
 
+import pandas as pd
+
 from aequilibrae import global_logger
 from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.log import Log
@@ -20,6 +22,7 @@ from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.scenario import Scenario
 from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close
@@ -43,13 +46,8 @@ class Project:
     """
 
     def __init__(self):
-        self.path_to_file: str = None
-        self.project_base_path = Path()
-        self.source: str = None
-        self.network: Network = None
-        self.about: About = None
-        self.logger: logging.Logger = None
-        self.transit: Transit = None
+        self.root_scenario: Scenario = None
+        self.scenario: Scenario = None
 
     @classmethod
     def from_path(cls, project_folder):
@@ -66,18 +64,58 @@ class Project:
             not exist, it will fail.
         """
 
-        self.project_base_path = Path(project_path)
-        file_name = self.project_base_path / "project_database.sqlite"
+        base_path = Path(project_path)
+        file_name = base_path / "project_database.sqlite"
+
         if not file_name.is_file() or not file_name.exists():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-        self.path_to_file = file_name
-        self.source = self.path_to_file
-        self.__setup_logger()
+
+        path_to_file = file_name
+
+        self.root_scenario = Scenario(
+            base_path=base_path,
+            path_to_file=path_to_file,
+        )
+        self.scenario = self.root_scenario
+        self.scenario.logger = self.__setup_logger()
+
         self.activate()
 
         self.__load_objects()
         global_logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
+
+    @property
+    def project_base_path(self):
+        return self.scenario.base_path  # do we want to use the root scenario here?
+
+    @property
+    def path_to_file(self):
+        return self.scenario.path_to_file  # do we want to use the root scenario here?
+
+    @property
+    def about(self):
+        return self.scenario.about
+
+    @property
+    def logger(self):
+        return self.scenario.logger
+
+    @property
+    def network(self):
+        return self.scenario.network
+
+    @property
+    def transit(self):
+        return self.scenario.transit
+
+    @property
+    def matrices(self):
+        return self.scenario.matrices
+
+    @property
+    def results(self):
+        return self.scenario.results
 
     @property
     @contextmanager
@@ -108,23 +146,27 @@ class Project:
             **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
-        self.project_base_path = Path(project_path)
-        self.path_to_file = self.project_base_path / "project_database.sqlite"
-        self.source = self.path_to_file
+        base_path = Path(project_path)
+        path_to_file = base_path / "project_database.sqlite"
 
         if os.path.isdir(project_path):
             raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
 
         # We create the project folder and create the base file
-        self.project_base_path.mkdir(parents=True, exist_ok=True)
+        base_path.mkdir(parents=True, exist_ok=True)
 
-        self.__setup_logger()
+        self.root_scenario = Scenario(
+            base_path=base_path,
+            path_to_file=path_to_file,
+        )
+        self.scenario = self.root_scenario
+        self.scenario.logger = self.__setup_logger()
         self.activate()
 
         self.__create_empty_network()
         self.__load_objects()
         self.about.create()
-        global_logger.info(f"Created project on {self.project_base_path}")
+        global_logger.info(f"Created project on {base_path}")
 
     def close(self) -> None:
         """Safely closes the project"""
@@ -205,14 +247,14 @@ class Project:
         matrix_folder = self.project_base_path / "matrices"
         matrix_folder.mkdir(parents=True, exist_ok=True)
 
-        self.network = Network(self)
-        self.about = About(self)
-        self.matrices = Matrices(self)
-        self.results = Results(self)
+        self.scenario.network = Network(self)
+        self.scenario.about = About(self)
+        self.scenario.matrices = Matrices(self)
+        self.scenario.results = Results(self)
 
     @property
     def project_parameters(self) -> Parameters:
-        return Parameters(self)
+        return Parameters(path=self.project_base_path)
 
     @property
     def parameters(self) -> dict:
@@ -266,15 +308,106 @@ class Project:
         # Create actual tables
         with self.db_connection as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
-        initialize_tables(self, "network")
+        initialize_tables(self.logger, "network")
 
     def __setup_logger(self):
-        self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
-        self.logger.propagate = False
-        self.logger.setLevel(logging.DEBUG)
+        logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
+        logger.propagate = False
+        logger.setLevel(logging.DEBUG)
 
         par = self.parameters or self.project_parameters._default
         do_log = par["system"]["logging"]
 
         if do_log:
-            self.logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
+            logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
+
+        return logger
+
+    def list_scenarios(self):
+        with self.db_connection as conn:
+            return pd.read_sql("SELECT * FROM scenarios", conn)
+
+    def switch_scenario(self, scenario_name: str):
+        if scenario_name == "root":
+            self.scenario = self.root_scenario
+        else:
+            self.scenario = Scenario(
+                base_path=self.root_scenario.base_path / scenario_name,
+                path_to_file=self.root_scenario.base_path / scenario_name / "project_database.sqlite"
+            )
+            self.scenario.logger = self.__setup_logger()
+            self.__load_objects()
+
+    def create_empty_scenario(self, scenario_name: str, description: str = ""):
+        scenario_path = self.root_scenario.base_path / scenario_name
+        pth = scenario_path / "run"
+
+        if scenario_path.exists():
+            raise FileExistsError(f"a file or directory of the name ({scenario_name}) already exists")
+        else:
+            with self.db_connection as conn:
+                if (
+                    conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
+                    is not None
+                ):
+                    raise ValueError("a scenario of that name already exists")
+
+        pth.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(demo_init_py, pth / "__init__.py")
+
+        db = scenario_path / "project_database.sqlite"
+        shutil.copyfile(spatialite_database, db)
+
+        # Write parameters to the project folder
+        p = Parameters(path=scenario_path)
+        p.parameters["system"]["logging_directory"] = str(scenario_path)
+        p.write_back()
+
+        # Create actual tables
+        with self.db_connection as conn:
+            conn.execute("PRAGMA foreign_keys = ON;")
+        initialize_tables(self.logger, "network", project_path=scenario_path)
+
+        with commit_and_close(db, spatial=True) as conn:
+            conn.execute("DROP TABLE IF EXISTS scenarios")
+
+        with self.db_connection as conn:
+            conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
+
+    def clone_scenario(self, scenario_name: str, description: str = ""):
+        scenario_path = self.root_scenario.base_path / scenario_name
+        pth = scenario_path / "run"
+
+        if scenario_path.exists():
+            raise FileExistsError(f"a file or directory of the name ({scenario_name}) already exists")
+        else:
+            with self.db_connection as conn:
+                if (
+                    conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
+                    is not None
+                ):
+                    raise ValueError("a scenario of that name already exists")
+
+        pth.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(self.project_base_path / "run", pth)
+
+        db = scenario_path / "project_database.sqlite"
+        shutil.copyfile(spatialite_database, db)
+
+        try:
+            shutil.copyfile(spatialite_database, scenario_path / "public_transport.sqlite")
+        except FileNotFoundError:
+            pass
+
+        try:
+            shutil.copyfile(spatialite_database, scenario_path / "results_database.sqlite")
+        except FileNotFoundError:
+            pass
+
+        shutil.copy(self.parameters.file, scenario_path)
+
+        with commit_and_close(db, spatial=True) as conn:
+            conn.execute("DROP TABLE IF EXISTS scenarios")
+
+        with self.db_connection as conn:
+            conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))

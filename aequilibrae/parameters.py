@@ -2,6 +2,8 @@ import os
 import yaml
 from copy import deepcopy
 import logging
+import pathlib
+from typing import Optional
 from aequilibrae.context import get_active_project
 
 
@@ -47,20 +49,22 @@ class Parameters:
     _default: dict
     file_default: str
 
-    def __init__(self, project=None):
-        """Loads parameters from file. The place is always the same. The root of the package"""
-        project = project or get_active_project(must_exist=False)
-        proj_path = project.project_base_path if project is not None else ""
+    def __init__(self, path: Optional[pathlib.Path] = None):
+        """Loads parameters from file."""
+        self.file = None
+        if path is not None:
+            self.file = path / "parameters.yml"
+        else:
+            proj = get_active_project(must_exist=False)
+            if proj is not None:
+                self.file = proj.project_base_path / "parameters.yml"
 
-        self.file = os.path.join(proj_path, "parameters.yml")
-
-        if os.path.isfile(self.file):
+        if self.file is not None and self.file.is_file():
             with open(self.file, "r") as yml:
                 self.parameters = yaml.load(yml, Loader=yaml.SafeLoader)
         else:
-            if project is not None:
-                logger = logging.getLogger("aequilibrae")
-                logger.warning("No pre-existing parameter file exists for this project. Will use default")
+            logger = logging.getLogger("aequilibrae")
+            logger.warning("No pre-existing parameter file exists for this project. Will use default")
 
             self.parameters = deepcopy(self._default)
 
