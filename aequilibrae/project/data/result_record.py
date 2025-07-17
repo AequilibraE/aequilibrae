@@ -86,13 +86,14 @@ class ResultRecord(SafeClass):
             return pd.read_sql(f"SELECT * FROM {self.table_name}", conn)
 
     def set_data(self, df: pd.DataFrame, **kwargs) -> None:
-        """Set the results data corresponding to this record.
+        """Set the results data corresponding to this record. Additionally saves this record.
 
         Additional keyword arguments forwarded to the ``pd.DataFrame.to_sql`` method.
 
         Arguments:
             **df** (:obj:`pd.DataFrame`): DataFrame object to save. Uses ``pd.DataFrame.to_sql``.
         """
+        self.save()
         with self._results_conn or self.project.results_connection as conn:
             df.to_sql(self.table_name, conn, **kwargs)
 

@@ -1,6 +1,10 @@
 --@ The *results* table holds the metadata for results stored in
 --@ *results_database.sqlite*.
 --@
+--@ The **scenario** field describes which scenario this record belongs to.
+--@
+--@ The **year** field describes which year of the scenario was used.
+--@
 --@ The **table_name** field presents the actual name of the result
 --@ table in *results_database.sqlite*.
 --@
@@ -17,11 +21,11 @@
 --@ The **description** field holds the user-provided description of the result.
 
 
-create TABLE if not exists results (table_name       TEXT     NOT NULL PRIMARY KEY,
+create TABLE if not exists results (scenario         TEXT,
+                                    year             TEXT,
+                                    table_name       TEXT     NOT NULL PRIMARY KEY,
                                     procedure        TEXT     NOT NULL,
                                     procedure_id     TEXT     NOT NULL,
                                     procedure_report TEXT     NOT NULL,
                                     timestamp        DATETIME DEFAULT current_timestamp,
-                                    description      TEXT,
-                                    year             TEXT,
-                                    scenario         TEXT);
+                                    description      TEXT);
