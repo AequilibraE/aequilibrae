@@ -189,6 +189,7 @@ class Results:
         description: str = None,
         scenario: str = None,
         year: str = None,
+        reference_table: str = "links",
     ) -> ResultRecord:
         """Creates a new record for a result.
 
@@ -218,6 +219,7 @@ class Results:
             "procedure_report": json.dumps(procedure_report),
             "timestamp": timestamp,
             "description": description,
+            "reference_table": reference_table,
         }
         rr = ResultRecord(tp, self.project, project_conn=self.__project_conn, results_conn=self.__results_conn)
         rr.save()
