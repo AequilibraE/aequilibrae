@@ -162,11 +162,12 @@ class TestTransitGraphBuilder(TestCase):
             self.data.save_graphs(force=True)
             self.data.remove_graphs([1])
 
-            links = self.data.pt_con.execute("SELECT link_id FROM links LIMIT 1;")
-            nodes = self.data.pt_con.execute("SELECT node_id FROM nodes LIMIT 1;")
+            with self.data.project.transit_connection as conn:
+                links = conn.execute("SELECT link_id FROM links LIMIT 1;").fetchall()
+                nodes = conn.execute("SELECT node_id FROM nodes LIMIT 1;").fetchall()
 
-            self.assertListEqual(links.fetchall(), [])
-            self.assertListEqual(nodes.fetchall(), [])
+            self.assertListEqual(links, [])
+            self.assertListEqual(nodes, [])
 
             with self.assertRaises(ValueError):
                 self.data.load([1])
@@ -178,15 +179,16 @@ class TestTransitGraphBuilder(TestCase):
                 graph.period_id = i
                 graph.save()
 
-            for i in range(10, 13):
-                links = self.data.pt_con.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (i,))
-                nodes = self.data.pt_con.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (i,))
+            with self.data.project.transit_connection as conn:
+                for i in range(10, 13):
+                    links = conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (i,)).fetchall()
+                    nodes = conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (i,)).fetchall()
 
-                self.assertEqual(len(links.fetchall()), 1)
-                self.assertEqual(len(nodes.fetchall()), 1)
+                    self.assertEqual(len(links), 1)
+                    self.assertEqual(len(nodes), 1)
 
-                self.data.load([10, 11, 12])
-                self.assertListEqual(list(self.data.graphs.keys()), [1, 10, 11, 12])
+                    self.data.load([10, 11, 12])
+                    self.assertListEqual(list(self.data.graphs.keys()), [1, 10, 11, 12])
 
         with self.subTest("remove multiple transit graph"):
             self.data.remove_graphs([10, 11, 12], unload=True)

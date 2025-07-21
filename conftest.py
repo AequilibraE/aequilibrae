@@ -15,7 +15,6 @@ from shapely.geometry import Polygon
 
 from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
@@ -108,7 +107,8 @@ def create_gtfs_project(create_path):
 
 @pytest.fixture
 def transit_conn(create_gtfs_project):
-    return database_connection("transit")
+    with create_gtfs_project.project.transit_connection as conn:
+        yield conn
 
 
 @pytest.fixture(autouse=True)

@@ -50,10 +50,11 @@ class ResultRecord(SafeClass):
                     str(self.description),
                     self.year,
                     self.scenario,
+                    self.reference_table,
                 ]
                 conn.execute(
-                    "INSERT INTO results (table_name, procedure, procedure_id, procedure_report, timestamp, description, year, scenario)"
-                    " VALUES(?,?,?,?,?,?,?,?)",
+                    "INSERT INTO results (table_name, procedure, procedure_id, procedure_report, timestamp, description, year, scenario, reference_table)"
+                    " VALUES(?,?,?,?,?,?,?,?,?)",
                     data,
                 )
 

@@ -113,7 +113,7 @@ from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 # %%
 pt_con = database_connection("transit")
 
-graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period.period_id)
+graph_db = TransitGraphBuilder.from_db(project, periods.default_period.period_id)
 graph_db.vertices.drop(columns="geometry")
 
 # %%

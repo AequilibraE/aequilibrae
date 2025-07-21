@@ -15,8 +15,8 @@ from aequilibrae.utils.db_utils import commit_and_close
 
 
 class RouteSystem:
-    def __init__(self, database_path):
-        self.__database_path = database_path
+    def __init__(self, project):
+        self.project = project
 
         self.agencies = []
         self.stops = []
@@ -32,7 +32,7 @@ class RouteSystem:
         self.transformer = Transformer.from_crs(f"epsg:{get_srid()}", "epsg:4326", always_xy=True)
 
     def load_route_system(self):
-        with commit_and_close(database_connection(join(self.__database_path, "public_transport.sqlite"))) as conn:
+        with self.project.transit_connection as conn:
             self._read_agencies(conn)
             self._read_stops(conn)
             self._read_routes(conn)
@@ -61,7 +61,7 @@ class RouteSystem:
     def write_GTFS(self, path_to_folder: str):
         """ """
 
-        with commit_and_close(database_connection(join(self.__database_path, "public_transport.sqlite"))) as conn:
+        with self.project.transit_connection as conn:
             write_agencies(self.agencies, path_to_folder)
             write_stops(self.stops, path_to_folder)
             write_routes(self.routes, path_to_folder)
@@ -73,7 +73,7 @@ class RouteSystem:
             self._zip_feed(path_to_folder)
 
     def _zip_feed(self, path_to_folder: str):
-        filename = join(path_to_folder, "polaris_gtfs.zip")
+        filename = join(path_to_folder, "aequilibrae_gtfs.zip")
         files = [
             "agency",
             "stops",

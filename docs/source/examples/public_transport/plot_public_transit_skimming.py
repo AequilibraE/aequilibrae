@@ -80,7 +80,7 @@ data.load()
 
 # Reading back into AequilibraE
 pt_con = database_connection("transit")
-graph_db = TransitGraphBuilder.from_db(pt_con, project.network.periods.default_period.period_id)
+graph_db = TransitGraphBuilder.from_db(project, project.network.periods.default_period.period_id)
 graph_db.vertices.drop(columns="geometry")
 
 # To perform an assignment we need to convert the graph builder into a graph.

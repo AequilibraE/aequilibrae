@@ -12,7 +12,8 @@ from aequilibrae.utils.create_example import create_example
 
 @pytest.fixture
 def gtfs_loader(create_gtfs_project):
-    return GTFSReader()
+    with create_gtfs_project.project.transit_connection as conn:
+        yield GTFSReader(conn)
 
 
 @pytest.fixture

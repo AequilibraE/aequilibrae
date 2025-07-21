@@ -5,7 +5,7 @@ import shutil
 import sqlite3
 from contextlib import contextmanager
 from collections import namedtuple
-from pathlib import Path
+import pathlib
 
 import pandas as pd
 
@@ -21,12 +21,12 @@ from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.project.tools import MigrationManager
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.scenario import Scenario
 from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.transit.transit import Transit
-from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.db_utils import commit_and_close, safe_connect
 from aequilibrae.utils.model_run_utils import import_file_as_module
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Project:
@@ -64,7 +64,7 @@ class Project:
             not exist, it will fail.
         """
 
-        base_path = Path(project_path)
+        base_path = pathlib.Path(project_path)
         file_name = base_path / "project_database.sqlite"
 
         if not file_name.is_file() or not file_name.exists():
@@ -94,49 +94,57 @@ class Project:
         return self.scenario.path_to_file  # do we want to use the root scenario here?
 
     @property
-    def about(self):
+    def about(self) -> About:
         return self.scenario.about
 
     @property
-    def logger(self):
+    def logger(self) -> logging.Logger:
         return self.scenario.logger
 
     @property
-    def network(self):
+    def network(self) -> Network:
         return self.scenario.network
 
     @property
-    def transit(self):
+    def transit(self) -> Transit:
         return self.scenario.transit
 
     @property
-    def matrices(self):
+    def matrices(self) -> Matrices:
         return self.scenario.matrices
 
     @property
-    def results(self):
+    def results(self) -> Results:
         return self.scenario.results
+
+    @property
+    def _project_database_path(self) -> pathlib.Path:
+        return self.project_base_path / "project_database.sqlite"
+
+    @property
+    def _results_database_path(self) -> pathlib.Path:
+        return self.project_base_path / "results_database.sqlite"
+
+    @property
+    def _tranit_database_path(self) -> pathlib.Path:
+        return self.project_base_path / "public_transport.sqlite"
 
     @property
     @contextmanager
     def db_connection(self):
-        with commit_and_close(self.path_to_file, spatial=True) as conn:
+        with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
     @property
     @contextmanager
     def results_connection(self):
-        with commit_and_close(
-            self.project_base_path / "results_database.sqlite", spatial=False, missing_ok=True
-        ) as conn:
+        with commit_and_close(self._results_database_path, spatial=False, missing_ok=True) as conn:
             yield conn
 
     @property
     @contextmanager
     def transit_connection(self):
-        with commit_and_close(
-            self.project_base_path / "public_transport.sqlite", spatial=True, missing_ok=True
-        ) as conn:
+        with commit_and_close(self._tranit_database_path, spatial=True, missing_ok=True) as conn:
             yield conn
 
     def new(self, project_path: str) -> None:
@@ -146,7 +154,7 @@ class Project:
             **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
-        base_path = Path(project_path)
+        base_path = pathlib.Path(project_path)
         path_to_file = base_path / "project_database.sqlite"
 
         if os.path.isdir(project_path):
@@ -216,7 +224,7 @@ class Project:
         """
         global_logger.info("Starting database upgrades")
         connections = {
-            "project_conn": database_connection("project"),
+            "project_conn": spatialite_database(self._project_database_path),
             "transit_conn": None,
             "results_conn": None,
         }
@@ -226,10 +234,10 @@ class Project:
 
         if (self.project_base_path / "public_transport.sqlite").exists():
             targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
-            connections["transit_conn"] = database_connection("transit")
+            connections["transit_conn"] = spatialite_database(self._tranit_database_path)
 
         if (self.project_base_path / "results_database.sqlite").exists():
-            connections["results_conn"] = database_connection("results")
+            connections["results_conn"] = safe_connect(self._results_database_path)
 
         try:
             for mm, main_conn in targets:
@@ -308,7 +316,7 @@ class Project:
         # Create actual tables
         with self.db_connection as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
-        initialize_tables(self.logger, "network")
+            initialize_tables(self.logger, "network", conn=conn)
 
     def __setup_logger(self):
         logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
@@ -332,14 +340,14 @@ class Project:
             self.scenario = self.root_scenario
         else:
             self.scenario = Scenario(
-                base_path=self.root_scenario.base_path / scenario_name,
-                path_to_file=self.root_scenario.base_path / scenario_name / "project_database.sqlite",
+                base_path=self.root_scenario.base_path / "scenarios" / scenario_name,
+                path_to_file=self.root_scenario.base_path / "scenarios" / scenario_name / "project_database.sqlite",
             )
             self.scenario.logger = self.__setup_logger()
             self.__load_objects()
 
     def create_empty_scenario(self, scenario_name: str, description: str = ""):
-        scenario_path = self.root_scenario.base_path / scenario_name
+        scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
         pth = scenario_path / "run"
 
         if scenario_path.exists():
@@ -366,7 +374,7 @@ class Project:
         # Create actual tables
         with self.db_connection as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
-        initialize_tables(self.logger, "network", project_path=scenario_path)
+            initialize_tables(self.logger, "network", conn=conn)
 
         with commit_and_close(db, spatial=True) as conn:
             conn.execute("DROP TABLE IF EXISTS scenarios")
@@ -375,7 +383,7 @@ class Project:
             conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
 
     def clone_scenario(self, scenario_name: str, description: str = ""):
-        scenario_path = self.root_scenario.base_path / scenario_name
+        scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
         pth = scenario_path / "run"
 
         if scenario_path.exists():

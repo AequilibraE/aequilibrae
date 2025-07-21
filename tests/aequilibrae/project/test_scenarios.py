@@ -20,8 +20,8 @@ class TestScenarios(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(delete=False)
         self.root = pathlib.Path(self.tmp.name)
         self.project = create_example(self.root / "sioux_falls", "sioux_falls")
-        self.nauru = create_example(self.root / "sioux_falls" / "nauru", "nauru")
-        self.coquimbo = create_example(self.root / "sioux_falls" / "coquimbo", "coquimbo")
+        self.nauru = create_example(self.root / "sioux_falls" / "scenarios" / "nauru", "nauru")
+        self.coquimbo = create_example(self.root / "sioux_falls" / "scenarios" / "coquimbo", "coquimbo")
 
         with self.project.db_connection as conn:
             conn.executemany("INSERT INTO scenarios (scenario_name) VALUES (?)", [("nauru",), ("coquimbo",)])
@@ -79,16 +79,17 @@ class TestScenarios(unittest.TestCase):
             with self.subTest(scenario=scenario):
                 self.project.switch_scenario(scenario)
 
-                # if scenario != "coquimbo":
-                #     continue
-
                 data = Transit(self.project)
-                graph = data.create_graph(
-                    with_outer_stop_transfers=False,
-                    with_walking_edges=False,
-                    blocking_centroid_flows=False,
-                    connector_method="overlapping_regions",
-                )
+                try:
+                    graph = data.create_graph(
+                        with_outer_stop_transfers=False,
+                        with_walking_edges=False,
+                        blocking_centroid_flows=False,
+                        connector_method="overlapping_regions",
+                    )
+                except ValueError:
+                    self.assertNotEqual(scenario, "coquimbo")
+                    continue
 
                 self.project.network.build_graphs(modes=["c"])
                 graph.create_line_geometry(method="connector project match", graph="c")

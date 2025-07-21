@@ -10,7 +10,6 @@ import pandas as pd
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project.database_connection import database_path
 from aequilibrae.utils.db_utils import commit_and_close
 
 include 'hyperpath.pyx'
