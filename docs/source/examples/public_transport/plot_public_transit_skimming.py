@@ -35,7 +35,6 @@ import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.create_example import create_example
@@ -79,7 +78,6 @@ data.save_graphs()
 data.load()
 
 # Reading back into AequilibraE
-pt_con = database_connection("transit")
 graph_db = TransitGraphBuilder.from_db(project, project.network.periods.default_period.period_id)
 graph_db.vertices.drop(columns="geometry")
 

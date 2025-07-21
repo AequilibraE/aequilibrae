@@ -5,7 +5,6 @@ from os.path import join
 import pandas as pd
 from pyproj import Transformer
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.gtfs_writer import write_routes, write_agencies, write_fares
 from aequilibrae.transit.gtfs_writer import write_stops, write_trips, write_stop_times, write_shapes

@@ -1,7 +1,6 @@
 from contextlib import closing
 from sqlite3 import Connection
 
-# from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 

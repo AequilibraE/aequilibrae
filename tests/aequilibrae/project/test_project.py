@@ -24,6 +24,7 @@ class TestProject:
 
         assert exp_column in fields, f"Table {table.upper()} was not created correctly"
 
+    # FIXME: this doesn't really test close()
     def test_close(self, project):
         database_connection(db_type="network")
 
