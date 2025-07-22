@@ -2,7 +2,7 @@ import pytest
 import os
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def pat(create_path, create_gtfs_project):
     gtfs_fldr = os.path.join(create_path, "gtfs_coquimbo.zip")
 

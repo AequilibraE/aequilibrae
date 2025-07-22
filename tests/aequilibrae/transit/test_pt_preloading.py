@@ -5,7 +5,7 @@ from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def project(tmp_path):
     proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
     proj.network.build_graphs()
@@ -14,12 +14,12 @@ def project(tmp_path):
     proj.close()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def transit(project: Project):
     return Transit(project)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def graph(project: Project):
     g = project.network.graphs["c"]
     g.set_skimming(["travel_time"])
@@ -30,7 +30,7 @@ def graph(project: Project):
     return g
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def demand(graph):
     n_zones = graph.centroids.shape[0]
     matrix = AequilibraeMatrix()

@@ -7,7 +7,7 @@ from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import read_and_close
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def create_project(project: Project):
     yield Transit(project)
 

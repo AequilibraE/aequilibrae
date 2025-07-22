@@ -26,5 +26,3 @@ siouxfalls_skims = siouxfalls_project / "matrices" / "sfalls_skims.omx"
 
 #
 no_triggers_project = data_folder / "no_triggers_project"
-
-st_varent_network = Path(__file__).resolve().parent / "St_Varent_issue307.zip"

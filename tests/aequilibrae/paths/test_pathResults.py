@@ -1,28 +1,22 @@
-import os
-import sys
-import uuid
 import zipfile
-from os.path import join
-from shutil import copytree
-from tempfile import gettempdir
 from itertools import product
+from os.path import join
+from tempfile import gettempdir
 
 import numpy as np
 import pytest
 
 from aequilibrae import Project
-from aequilibrae.paths import path_computation, Graph
+from aequilibrae.paths import path_computation
 from aequilibrae.paths.results import PathResults
-from aequilibrae.utils.create_example import create_example
-from ...data import triangle_graph_blocking, st_varent_network
 
 origin = 5
 dest = 13
 
 
-@pytest.fixture
-def pathresults_setup():
-    project = create_example(join(gettempdir(), "test_set_pce_" + uuid.uuid4().hex))
+@pytest.fixture(scope="function")
+def p_results(sioux_falls_example):
+    project = sioux_falls_example
     project.network.build_graphs()
     g = project.network.graphs["c"]
     g.set_graph("free_flow_time")
@@ -37,8 +31,8 @@ def pathresults_setup():
     del r
 
 
-def test_reset(pathresults_setup):
-    r = pathresults_setup["r"]
+def test_reset(p_results):
+    r = p_results["r"]
     r.compute_path(dest, origin, early_exit=True, a_star=True, heuristic="haversine")
     r.reset()
     assert r.path is None
@@ -62,8 +56,8 @@ def test_reset(pathresults_setup):
         new_r.reset()
 
 
-def test_heuristics(pathresults_setup):
-    r = pathresults_setup["r"]
+def test_heuristics(p_results):
+    r = p_results["r"]
     assert r.get_heuristics() == ["haversine", "equirectangular"]
     r.set_heuristic("haversine")
     assert r._heuristic == "haversine"
@@ -72,11 +66,11 @@ def test_heuristics(pathresults_setup):
 
 
 @pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_compute_paths(pathresults_setup, early_exit, a_star):
-    r = pathresults_setup["r"]
+def test_compute_paths(p_results, early_exit, a_star):
+    r = p_results["r"]
     r.early_exit = early_exit
     r.a_star = a_star
-    path_computation(5, 2, pathresults_setup["g"], r)
+    path_computation(5, 2, p_results["g"], r)
     assert list(r.path) == [12, 14]
     assert list(r.path_link_directions) == [1, 1]
     assert list(r.path_nodes) == [5, 6, 2]
@@ -84,8 +78,8 @@ def test_compute_paths(pathresults_setup, early_exit, a_star):
 
 
 @pytest.mark.parametrize("early_exit", [True, False])
-def test_compute_with_skimming(pathresults_setup, early_exit):
-    g = pathresults_setup["g"]
+def test_compute_with_skimming(p_results, early_exit):
+    g = p_results["g"]
     r = PathResults()
     g.set_skimming("free_flow_time")
     r.prepare(g)
@@ -94,8 +88,8 @@ def test_compute_with_skimming(pathresults_setup, early_exit):
 
 
 @pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_update_trace(pathresults_setup, early_exit, a_star):
-    r = pathresults_setup["r"]
+def test_update_trace(p_results, early_exit, a_star):
+    r = p_results["r"]
     r.compute_path(origin, 2, early_exit=early_exit, a_star=a_star)
     r.update_trace(10)
     assert list(r.path) == [13, 25]
@@ -107,21 +101,16 @@ def test_update_trace(pathresults_setup, early_exit, a_star):
 # --- Blocking triangle network tests ---
 
 
-@pytest.fixture
-def triangle_blocking_setup():
-    os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
-    proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
-    copytree(triangle_graph_blocking, proj_dir)
-    project = Project()
-    project.open(proj_dir)
-    project.network.build_graphs(modes=["c"])
-    g = project.network.graphs["c"]
+@pytest.fixture(scope="function")
+def triangle_blocking_setup(triangle_graph_blocking):
+    triangle_graph_blocking.network.build_graphs(modes=["c"])
+    g = triangle_graph_blocking.network.graphs["c"]
     g.set_graph("free_flow_time")
     g.set_blocked_centroid_flows(True)
     r = PathResults()
     r.prepare(g)
-    yield {"project": project, "g": g, "r": r}
-    project.close()
+    yield {"project": triangle_graph_blocking, "g": g, "r": r}
+    triangle_graph_blocking.close()
     del r
 
 
@@ -216,7 +205,7 @@ def test_triangle_update_trace_full(triangle_blocking_setup):
     assert [r.graph.all_nodes[x] if x != -1 else -1 for x in r.predecessors] == [1, 2, 3, -1, 3, 1, -1]
 
 
-def test_compute_paths_centroid_last_node_id():
+def test_compute_paths_centroid_last_node_id(st_varent_network):
     zipfile.ZipFile(st_varent_network).extractall(gettempdir())
     st_varent = join(gettempdir(), "St_Varent")
     project = Project()

@@ -1,44 +1,27 @@
-import os
-import pathlib
-import random
-import sqlite3
-import string
-import uuid
-from random import choice
-from tempfile import gettempdir
-
-import numpy as np
-import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
-from aequilibrae.utils.create_example import create_example
-from ...data import siouxfalls_project
 
 
-@pytest.fixture
-def assignment_setup():
-    os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
-
-    proj_path = os.path.join(gettempdir(), "test_mc_traffic_assignment_" + uuid.uuid4().hex)
-    project = create_example(proj_path)
-    project.network.build_graphs()
-    car_graph = project.network.graphs["c"]  # type: Graph
-    truck_graph = project.network.graphs["T"]  # type: Graph
-    moto_graph = project.network.graphs["M"]  # type: Graph
+@pytest.fixture(scope="function")
+def assignment_setup(sioux_falls_example):
+    sioux_falls_example.network.build_graphs()
+    car_graph = sioux_falls_example.network.graphs["c"]  # type: Graph
+    truck_graph = sioux_falls_example.network.graphs["T"]  # type: Graph
+    moto_graph = sioux_falls_example.network.graphs["M"]  # type: Graph
 
     for graph in [car_graph, truck_graph, moto_graph]:
         graph.set_skimming(["free_flow_time"])
         graph.set_graph("free_flow_time")
         graph.set_blocked_centroid_flows(False)
 
-    car_matrix = project.matrices.get_matrix("demand_mc")
+    car_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
     car_matrix.computational_view(["car"])
 
-    truck_matrix = project.matrices.get_matrix("demand_mc")
+    truck_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
     truck_matrix.computational_view(["trucks"])
 
-    moto_matrix = project.matrices.get_matrix("demand_mc")
+    moto_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
     moto_matrix.computational_view(["motorcycle"])
 
     assignment = TrafficAssignment()
@@ -52,7 +35,7 @@ def assignment_setup():
     algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
     yield {
-        "project": project,
+        "project": sioux_falls_example,
         "car_matrix": car_matrix,
         "truck_matrix": truck_matrix,
         "moto_matrix": moto_matrix,
@@ -66,7 +49,7 @@ def assignment_setup():
     # Teardown
     for mat in [car_matrix, truck_matrix, moto_matrix]:
         mat.close()
-    project.close()
+    sioux_falls_example.close()
 
 
 def test_set_classes(assignment_setup):

@@ -116,12 +116,12 @@ def test_exclude_links(sioux_falls_example):
     assert list(r1.path) == [63, 69]
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def transit_data(coquimbo_example):
     return Transit(coquimbo_example)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def transit_graph(transit_data):
     graph = transit_data.create_graph(
         with_outer_stop_transfers=False,

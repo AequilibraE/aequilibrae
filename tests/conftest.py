@@ -2,6 +2,7 @@ import logging
 import shutil
 import tempfile
 import uuid
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -59,7 +60,7 @@ def no_index_omx(test_data_path, test_folder):
 @pytest.fixture(scope="function")
 def sioux_falls_example(cache_path, test_folder):
     source = cache_path / "sioux_falls"
-    shutil.copytree(source, test_folder)
+    shutil.copytree(source, test_folder, dirs_exist_ok=True)
     project = Project.from_path(test_folder)
     yield project
     project.close()
@@ -68,16 +69,39 @@ def sioux_falls_example(cache_path, test_folder):
 @pytest.fixture(scope="function")
 def sioux_falls_test(test_data_path, test_folder) -> Project:
     source = test_data_path / "SiouxFalls_project"
-    shutil.copytree(source, test_folder)
+    shutil.copytree(source, test_folder, dirs_exist_ok=True)
     project = Project.from_path(test_folder)
     yield project
     project.close()
 
 
 @pytest.fixture(scope="function")
+def sioux_falls_single_class(cache_path, test_folder) -> Project:
+    source = cache_path / "sioux_falls_single_class"
+    shutil.copytree(source, test_folder, dirs_exist_ok=True)
+    project = Project.from_path(test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture(scope="function")
+def triangle_graph_blocking(test_data_path, test_folder) -> Project:
+    source = test_data_path / "blocking_triangle_graph_project"
+    shutil.copytree(source, test_folder, dirs_exist_ok=True)
+    project = Project.from_path(test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture(scope="function")
+def st_varent_network(test_data_path, test_folder) -> Project:
+    return test_data_path / "St_Varent_issue307.zip"
+
+
+@pytest.fixture(scope="function")
 def coquimbo_example(cache_path, test_folder):
     source = cache_path / "coquimbo"
-    shutil.copytree(source, test_folder)
+    shutil.copytree(source, test_folder, dirs_exist_ok=True)
     project = Project.from_path(test_folder)
     yield project
     project.close()
@@ -92,6 +116,13 @@ def pytest_sessionstart(session):
     tgt = test_base / "cache" / "coquimbo"
     if not tgt.exists():
         create_example(tgt, "coquimbo").close()
+    tgt = test_base / "cache" / "coquimbo"
+    if not tgt.exists():
+        create_example(tgt, "coquimbo").close()
+
+    tgt = test_base / "cache" / "sioux_falls_single_class"
+    if not tgt.exists():
+        zipfile.ZipFile(Path(__file__).parent / "data" / "sioux_falls_single_class.zip").extractall(tgt)
 
     right_now = datetime.now().strftime("%Y-%m-%d_%H")
     for item in test_base.glob("*"):

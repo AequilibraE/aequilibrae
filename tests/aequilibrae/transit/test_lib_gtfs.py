@@ -4,12 +4,12 @@ import pytest
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def gtfs_file(create_path):
     return os.path.join(create_path, "gtfs_coquimbo.zip")
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def system_builder(transit_conn, gtfs_file):
     yield GTFSRouteSystemBuilder(
         network=transit_conn, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file

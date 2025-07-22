@@ -5,7 +5,7 @@ from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def project(sioux_falls_example):
     sioux_falls_example.network.build_graphs()
     yield sioux_falls_example

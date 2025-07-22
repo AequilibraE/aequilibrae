@@ -9,7 +9,7 @@ from aequilibrae.transit.transit_elements import Stop
 from tests.aequilibrae.transit.random_word import randomword
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def data():
     return {
         "stop_id": randint(0, 400000000),

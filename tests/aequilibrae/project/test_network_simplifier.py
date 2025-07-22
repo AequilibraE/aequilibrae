@@ -4,7 +4,7 @@ from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def project_with_graph(create_path):
     project = create_example(create_path, "nauru")
     remaining_links = [899, 900, 901, 902, 903, 1042, 1043, 1159, 1160]

@@ -15,7 +15,7 @@ class TestFieldEditor:
     def database_backup(self, project_session):
         return Path(project_session.project_base_path).joinpath("project_database.sqlite").read_bytes()
 
-    @pytest.fixture
+    @pytest.fixture(scope="function")
     def cleanup_database(self, project_session, database_backup):
         """An optional fixture that can be used to revert the project's database in case the test
         modifies it. This adds some extra overhead to the test (teardown)
@@ -27,15 +27,15 @@ class TestFieldEditor:
     def table_name(self, request):
         return request.param
 
-    @pytest.fixture
+    @pytest.fixture(scope="function")
     def table(self, project_session, table_name):
         return FieldEditor(project_session, table_name)
 
-    @pytest.fixture
+    @pytest.fixture(scope="function")
     def field_name(self, table):
         return next(iter(table._original_values.keys()))
 
-    @pytest.fixture
+    @pytest.fixture(scope="function")
     def attribute_count(self, table, table_name):
         qry = f'select count(*) from "attributes_documentation" where name_table="{table_name}"'
         with table.project.db_connection as conn:

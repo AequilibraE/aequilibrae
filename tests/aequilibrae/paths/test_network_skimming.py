@@ -1,9 +1,4 @@
-import os
-import uuid
 from os.path import join, isfile
-from shutil import rmtree
-from tempfile import gettempdir
-import pytest
 
 import numpy as np
 
@@ -11,30 +6,12 @@ from aequilibrae.paths import skimming_single_origin
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import SkimResults
-from aequilibrae.utils.create_example import create_example
 
 
-@pytest.fixture
-def network_setup():
-    os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
-
-    proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
-    project = create_example(proj_dir)
-    network = project.network
-
-    yield {"proj_dir": proj_dir, "project": project, "network": network}
-
-    # Teardown
-    try:
-        rmtree(proj_dir)
-    except Exception as e:
-        print(f"Failed to remove at {e.args}")
-
-
-def test_network_skimming(network_setup):
-    network = network_setup["network"]
-    project = network_setup["project"]
-    proj_dir = network_setup["proj_dir"]
+def test_network_skimming(sioux_falls_example):
+    network = sioux_falls_example.network
+    project = sioux_falls_example
+    proj_dir = sioux_falls_example.project_base_path
 
     network.build_graphs()
     graph = network.graphs["c"]
@@ -73,9 +50,9 @@ def test_network_skimming(network_setup):
     project.close()
 
 
-def test_network_skimming_no_project(network_setup):
-    network = network_setup["network"]
-    project = network_setup["project"]
+def test_network_skimming_no_project(sioux_falls_example):
+    network = sioux_falls_example.network
+    project = sioux_falls_example
 
     network.build_graphs()
     graph = network.graphs["c"]

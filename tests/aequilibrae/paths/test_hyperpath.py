@@ -355,7 +355,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     return edges, demand
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def network_setup(request):
     """
     Fixture for creating network data based on parameters.

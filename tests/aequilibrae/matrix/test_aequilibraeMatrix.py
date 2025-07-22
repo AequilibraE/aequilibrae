@@ -34,7 +34,7 @@ def file_paths(sioux_falls_test):
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def matrix(file_paths):
     args = {
         "file_name": file_paths["name_test"],

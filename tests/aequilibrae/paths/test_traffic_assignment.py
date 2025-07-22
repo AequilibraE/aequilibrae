@@ -14,7 +14,7 @@ from aequilibrae.utils.create_example import create_example
 from ...data import siouxfalls_project
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def project(tmp_path):
     proj = create_example(str(tmp_path / "test_traffic_assignment"))
     proj.network.build_graphs()
@@ -22,7 +22,7 @@ def project(tmp_path):
     return proj
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def car_graph(project):
     graph: Graph = project.network.graphs["c"]
     graph.set_graph("free_flow_time")
@@ -30,19 +30,19 @@ def car_graph(project):
     return graph
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def matrix(project):
     mat = project.matrices.get_matrix("demand_omx")
     mat.computational_view()
     return mat
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def assigclass(car_graph, matrix):
     return TrafficClass("car", car_graph, matrix)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def assignment(project):
     return TrafficAssignment(project)
 
