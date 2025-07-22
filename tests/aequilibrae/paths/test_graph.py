@@ -164,17 +164,16 @@ def test_compressed_graph(compressed_graph):
     compressed_links = compressed_graph.graph[
         compressed_graph.graph.__compressed_id__.duplicated(keep=False)
         & (compressed_graph.graph.__compressed_id__ != compressed_graph.compact_graph.id.max() + 1)
-        ]
+    ]
 
     assert compressed_links.link_id.unique().tolist() == [4, 5]
 
     # Confirm these compacted links map back up to a contraction between the correct nodes
     assert compressed_graph.compact_all_nodes[
-               compressed_graph.compact_graph[
-                   compressed_graph.compact_graph.id.isin(compressed_links.__compressed_id__.unique())][
-                   ["a_node", "b_node"]
-               ].values
-           ].tolist() == [[3, 10], [10, 3]]
+        compressed_graph.compact_graph[
+            compressed_graph.compact_graph.id.isin(compressed_links.__compressed_id__.unique())
+        ][["a_node", "b_node"]].values
+    ].tolist() == [[3, 10], [10, 3]]
 
 
 def test_dead_end_removal(compressed_graph):

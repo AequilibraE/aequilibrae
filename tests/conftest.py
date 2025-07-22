@@ -3,7 +3,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-
+import logging
 import numpy as np
 import pytest
 
@@ -29,15 +29,16 @@ def test_base():
 @pytest.fixture(scope="function")
 def test_folder(test_base):
     right_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    dir = test_base / f"aequilibrae_test_{uuid.uuid4().hex}"
+    dir = test_base / f"{right_now}--{uuid.uuid4().hex[:4]}"
     while dir.exists():
-        dir = test_base / f"aequilibrae_test_{uuid.uuid4().hex}"
+        dir = test_base / f"{right_now}--{uuid.uuid4().hex[:4]}"
     return dir
 
 
 @pytest.fixture(scope="session")
 def test_data_path():
     return Path(__file__).parent / "data"
+
 
 @pytest.fixture(scope="function")
 def sioux_falls_example(cache_path, test_folder):
