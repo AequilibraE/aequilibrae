@@ -50,6 +50,15 @@ def sioux_falls_example(cache_path, test_folder):
 
 
 @pytest.fixture(scope="function")
+def sioux_falls_test(test_data_path, test_folder):
+    source = test_data_path / "SiouxFalls_project"
+    shutil.copytree(source, test_folder)
+    project = Project.from_path(test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture(scope="function")
 def coquimbo_example(cache_path, test_folder):
     source = cache_path / "coquimbo"
     shutil.copytree(source, test_folder)
