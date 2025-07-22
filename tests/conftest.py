@@ -33,6 +33,7 @@ def test_folder(test_base):
     dir = test_base / f"{right_now}--{uuid.uuid4().hex[:4]}"
     while dir.exists():
         dir = test_base / f"{right_now}--{uuid.uuid4().hex[:4]}"
+    dir.mkdir(parents=True, exist_ok=True)
     return dir
 
 
