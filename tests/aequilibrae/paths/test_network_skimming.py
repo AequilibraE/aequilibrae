@@ -3,7 +3,7 @@ import uuid
 from os.path import join, isfile
 from shutil import rmtree
 from tempfile import gettempdir
-from unittest import TestCase
+import pytest
 
 import numpy as np
 
@@ -14,83 +14,86 @@ from aequilibrae.paths.results import SkimResults
 from aequilibrae.utils.create_example import create_example
 
 
-class TestNetwork_skimming(TestCase):
-    def setUp(self) -> None:
-        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+@pytest.fixture
+def network_setup():
+    os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
-        self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
+    proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
+    project = create_example(proj_dir)
+    network = project.network
 
-        self.project = create_example(self.proj_dir)
-        self.network = self.project.network
+    yield {"proj_dir": proj_dir, "project": project, "network": network}
 
-    def tearDown(self) -> None:
-        try:
-            rmtree(self.proj_dir)
-        except Exception as e:
-            print(f"Failed to remove at {e.args}")
+    # Teardown
+    try:
+        rmtree(proj_dir)
+    except Exception as e:
+        print(f"Failed to remove at {e.args}")
 
-    def test_network_skimming(self):
-        self.network.build_graphs()
-        graph = self.network.graphs["c"]
-        graph.set_graph(cost_field="distance")
-        graph.set_skimming("distance")
-        graph.set_blocked_centroid_flows(False)
 
-        # skimming results
-        res = SkimResults()
-        res.prepare(graph)
-        aux_res = MultiThreadedNetworkSkimming()
-        aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
-        _ = skimming_single_origin(12, graph, res, aux_res, 0)
+def test_network_skimming(network_setup):
+    network = network_setup["network"]
+    project = network_setup["project"]
+    proj_dir = network_setup["proj_dir"]
 
-        skm = NetworkSkimming(graph)
-        skm.execute()
+    network.build_graphs()
+    graph = network.graphs["c"]
+    graph.set_graph(cost_field="distance")
+    graph.set_skimming("distance")
+    graph.set_blocked_centroid_flows(False)
 
-        tot = np.nanmax(skm.results.skims.distance[:, :])
-        if tot > np.sum(graph.cost):
-            self.fail("Skimming was not successful. At least one np.inf returned.")
+    # skimming results
+    res = SkimResults()
+    res.prepare(graph)
+    aux_res = MultiThreadedNetworkSkimming()
+    aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
+    _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
-        if skm.report:
-            self.fail("Skimming returned an error:" + str(skm.report))
+    skm = NetworkSkimming(graph)
+    skm.execute()
 
-        fn = "test_Skimming"
-        skm.save_to_project(fn, format="omx")
-        matrix_dir = join(self.proj_dir, "matrices")
+    tot = np.nanmax(skm.results.skims.distance[:, :])
+    assert tot <= np.sum(graph.cost), "Skimming was not successful. At least one np.inf returned."
+    assert not skm.report, f"Skimming returned an error: {skm.report}"
 
-        if not isfile(join(matrix_dir, f"{fn}.omx")):
-            self.fail("Did not save project to project")
+    fn = "test_Skimming"
+    skm.save_to_project(fn, format="omx")
+    matrix_dir = join(proj_dir, "matrices")
 
-        matrices = self.project.matrices
-        mat = matrices.get_record(fn)
-        self.assertEqual(mat.name, fn, "Matrix record name saved wrong")
-        self.assertEqual(mat.file_name, f"{fn}.omx", "matrix file_name saved  wrong")
-        self.assertEqual(mat.cores, 1, "matrix saved number of matrix cores wrong")
-        self.assertEqual(mat.procedure, "Network skimming", "Matrix saved wrong procedure name")
-        self.assertEqual(mat.procedure_id, skm.procedure_id, "Procedure ID saved  wrong")
-        self.assertEqual(mat.timestamp, skm.procedure_date, "Procedure ID saved  wrong")
-        self.project.close()
+    assert isfile(join(matrix_dir, f"{fn}.omx")), "Did not save project to project"
 
-    def test_network_skimming_no_project(self):
-        self.network.build_graphs()
-        graph = self.network.graphs["c"]
-        graph.set_graph(cost_field="distance")
-        graph.set_skimming("distance")
-        graph.set_blocked_centroid_flows(False)
+    matrices = project.matrices
+    mat = matrices.get_record(fn)
+    assert mat.name == fn, "Matrix record name saved wrong"
+    assert mat.file_name == f"{fn}.omx", "matrix file_name saved wrong"
+    assert mat.cores == 1, "matrix saved number of matrix cores wrong"
+    assert mat.procedure == "Network skimming", "Matrix saved wrong procedure name"
+    assert mat.procedure_id == skm.procedure_id, "Procedure ID saved wrong"
+    assert mat.timestamp == skm.procedure_date, "Procedure ID saved wrong"
+    project.close()
 
-        self.project.close()
-        # skimming results
-        res = SkimResults()
-        res.prepare(graph)
-        aux_res = MultiThreadedNetworkSkimming()
-        aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
-        _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
-        skm = NetworkSkimming(graph)
-        skm.execute()
+def test_network_skimming_no_project(network_setup):
+    network = network_setup["network"]
+    project = network_setup["project"]
 
-        tot = np.nanmax(skm.results.skims.distance[:, :])
-        if tot > np.sum(graph.cost):
-            self.fail("Skimming was not successful. At least one np.inf returned.")
+    network.build_graphs()
+    graph = network.graphs["c"]
+    graph.set_graph(cost_field="distance")
+    graph.set_skimming("distance")
+    graph.set_blocked_centroid_flows(False)
 
-        if skm.report:
-            self.fail("Skimming returned an error:" + str(skm.report))
+    project.close()
+    # skimming results
+    res = SkimResults()
+    res.prepare(graph)
+    aux_res = MultiThreadedNetworkSkimming()
+    aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
+    _ = skimming_single_origin(12, graph, res, aux_res, 0)
+
+    skm = NetworkSkimming(graph)
+    skm.execute()
+
+    tot = np.nanmax(skm.results.skims.distance[:, :])
+    assert tot <= np.sum(graph.cost), "Skimming was not successful. At least one np.inf returned."
+    assert not skm.report, f"Skimming returned an error: {skm.report}"
