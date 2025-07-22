@@ -205,8 +205,8 @@ def test_triangle_update_trace_full(triangle_blocking_setup):
     assert [r.graph.all_nodes[x] if x != -1 else -1 for x in r.predecessors] == [1, 2, 3, -1, 3, 1, -1]
 
 
-def test_compute_paths_centroid_last_node_id(st_varent_network):
-    zipfile.ZipFile(st_varent_network).extractall(gettempdir())
+def test_compute_paths_centroid_last_node_id(test_data_path):
+    zipfile.ZipFile(test_data_path / "St_Varent_issue307.zip").extractall(gettempdir())
     st_varent = join(gettempdir(), "St_Varent")
     project = Project()
     project.open(st_varent)

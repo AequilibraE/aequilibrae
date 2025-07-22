@@ -94,11 +94,6 @@ def triangle_graph_blocking(test_data_path, test_folder) -> Project:
 
 
 @pytest.fixture(scope="function")
-def st_varent_network(test_data_path, test_folder) -> Project:
-    return test_data_path / "St_Varent_issue307.zip"
-
-
-@pytest.fixture(scope="function")
 def coquimbo_example(cache_path, test_folder):
     source = cache_path / "coquimbo"
     shutil.copytree(source, test_folder, dirs_exist_ok=True)
