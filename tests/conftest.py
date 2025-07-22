@@ -1,0 +1,78 @@
+import shutil
+import tempfile
+import uuid
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from aequilibrae import Project
+from aequilibrae.utils.create_example import create_example
+
+
+@pytest.fixture(scope="session")
+def centroids():
+    return np.arange(27) + 1
+
+
+@pytest.fixture(scope="session")
+def cache_path(test_base):
+    return test_base / "cache"
+
+
+@pytest.fixture(scope="session")
+def test_base():
+    return Path(tempfile.gettempdir()) / "aequilibrae_testing"
+
+
+@pytest.fixture(scope="function")
+def test_folder(test_base):
+    right_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    dir = test_base / f"aequilibrae_test_{uuid.uuid4().hex}"
+    while dir.exists():
+        dir = test_base / f"aequilibrae_test_{uuid.uuid4().hex}"
+    return dir
+
+
+@pytest.fixture(scope="session")
+def test_data_path():
+    return Path(__file__).parent / "data"
+
+@pytest.fixture(scope="function")
+def sioux_falls_example(cache_path, test_folder):
+    source = cache_path / "sioux_falls"
+    shutil.copytree(source, test_folder)
+    project = Project.from_path(test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture(scope="function")
+def coquimbo_example(cache_path, test_folder):
+    source = cache_path / "coquimbo"
+    shutil.copytree(source, test_folder)
+    project = Project.from_path(test_folder)
+    yield project
+    project.close()
+
+
+def pytest_sessionstart(session):
+    test_base = Path(tempfile.gettempdir()) / "aequilibrae_testing"
+    tgt = test_base / "cache" / "sioux_falls"
+    if not tgt.exists():
+        create_example(tgt, "sioux_falls").close()
+
+    tgt = test_base / "cache" / "coquimbo"
+    if not tgt.exists():
+        create_example(tgt, "coquimbo").close()
+
+    right_now = datetime.now().strftime("%Y-%m-%d_%H")
+    for item in test_base.glob("*"):
+        if item.is_dir():
+            try:
+                if right_now not in item.name and "cache" not in item.name:
+                    shutil.rmtree(item)
+            except Exception as e:
+                # Skip folders with non-matching name pattern
+                logging.error(f"Couldn't delete dir {item}, reason: {e}")

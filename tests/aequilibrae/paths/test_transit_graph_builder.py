@@ -17,7 +17,7 @@ from aequilibrae.utils.create_example import create_example
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
 # sys.path.append(lib_path)
-from ...data import path_test, siouxfalls_project, test_graph, test_network
+from ...data import path_test, siouxfalls_project, test_network
 
 
 class TestTransitGraphBuilder(TestCase):

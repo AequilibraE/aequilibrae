@@ -6,7 +6,6 @@ data_folder = base_dir / "data"
 
 # For the graph tests
 test_network = data_folder / "Final_Network.shp"
-test_graph = data_folder / "test_graph.aeg"
 path_test = Path(tempfile.gettempdir())
 triangle_graph_blocking = data_folder / "blocking_triangle_graph_project"
 
