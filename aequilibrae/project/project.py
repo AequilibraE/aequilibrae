@@ -224,7 +224,7 @@ class Project:
         """
         global_logger.info("Starting database upgrades")
         connections = {
-            "project_conn": spatialite_database(self._project_database_path),
+            "project_conn": connect_spatialite(self._project_database_path),
             "transit_conn": None,
             "results_conn": None,
         }
@@ -234,7 +234,7 @@ class Project:
 
         if (self.project_base_path / "public_transport.sqlite").exists():
             targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
-            connections["transit_conn"] = spatialite_database(self._tranit_database_path)
+            connections["transit_conn"] = connect_spatialite(self._tranit_database_path)
 
         if (self.project_base_path / "results_database.sqlite").exists():
             connections["results_conn"] = safe_connect(self._results_database_path)
