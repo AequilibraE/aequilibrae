@@ -16,10 +16,6 @@ gtfs_db_output = path_test / "test.db"
 # For the skimming test
 
 
-# For the matrix test
-omx_example = data_folder / "test_omx.omx"
-no_index_omx = data_folder / "no_index.omx"
-
 # For project tests
 project_file = data_folder / "AequilibraE_Project.sqlite"
 

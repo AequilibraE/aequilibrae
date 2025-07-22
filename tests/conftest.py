@@ -1,9 +1,10 @@
+import logging
 import shutil
 import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-import logging
+
 import numpy as np
 import pytest
 
@@ -41,6 +42,20 @@ def test_data_path():
 
 
 @pytest.fixture(scope="function")
+def omx_example(test_data_path, test_folder):
+    test_folder.mkdir(parents=True, exist_ok=True)
+    shutil.copy(test_data_path / "test_omx.omx", test_folder / "test_omx.omx")
+    return test_folder / "test_omx.omx"
+
+
+@pytest.fixture(scope="function")
+def no_index_omx(test_data_path, test_folder):
+    test_folder.mkdir(parents=True, exist_ok=True)
+    shutil.copy(test_data_path / "no_index.omx", test_folder / "no_index.omx")
+    return test_folder / "test_omx.omx"
+
+
+@pytest.fixture(scope="function")
 def sioux_falls_example(cache_path, test_folder):
     source = cache_path / "sioux_falls"
     shutil.copytree(source, test_folder)
@@ -50,7 +65,7 @@ def sioux_falls_example(cache_path, test_folder):
 
 
 @pytest.fixture(scope="function")
-def sioux_falls_test(test_data_path, test_folder):
+def sioux_falls_test(test_data_path, test_folder) -> Project:
     source = test_data_path / "SiouxFalls_project"
     shutil.copytree(source, test_folder)
     project = Project.from_path(test_folder)

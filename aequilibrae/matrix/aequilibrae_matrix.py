@@ -782,7 +782,7 @@ class AequilibraeMatrix(object):
             >>> mat2.cores
             2
         """
-        fname, file_extension = os.path.splitext(output_name.upper())
+        file_extension = Path(output_name).suffix.upper()
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
             raise NotImplementedError(f"File extension {file_extension} not implemented yet")
