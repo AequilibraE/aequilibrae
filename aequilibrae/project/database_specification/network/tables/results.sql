@@ -24,6 +24,7 @@
 create TABLE if not exists results (scenario         TEXT,
                                     year             TEXT,
                                     table_name       TEXT     NOT NULL PRIMARY KEY,
+                                    reference_table  TEXT,
                                     procedure        TEXT     NOT NULL,
                                     procedure_id     TEXT     NOT NULL,
                                     procedure_report TEXT     NOT NULL,

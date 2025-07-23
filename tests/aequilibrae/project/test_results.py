@@ -49,6 +49,7 @@ class TestResultRecord(TestCase):
             "description": "Test result description",
             "year": "2020",
             "scenario": "testing",
+            "reference_table": "links",
         }
 
     def tearDown(self):
@@ -69,15 +70,28 @@ class TestResultRecord(TestCase):
         record = ResultRecord(self.sample_data, self.project, self.project_conn, self.results_conn)
         record.save()
 
-        cursor = self.project_conn.execute("SELECT * FROM results WHERE table_name=?", ["test_result"])
+        cursor = self.project_conn.execute(
+            "SELECT scenario, year, table_name, reference_table, procedure, procedure_id, "
+            "procedure_report, timestamp, description FROM results WHERE table_name=?",
+            ["test_result"],
+        )
         result = cursor.fetchone()
 
         self.assertIsNotNone(result)
-        self.assertEqual(result[0], "testing")
-        self.assertEqual(result[1], "2020")
-        self.assertEqual(result[2], "test_result")
-        self.assertEqual(result[3], "test_procedure")
-        self.assertEqual(result[4], "test_id_123")
+        self.assertEqual(
+            result,
+            (
+                "testing",
+                "2020",
+                "test_result",
+                "links",
+                "test_procedure",
+                "test_id_123",
+                '{"status": "success", "items": 100}',
+                "2000-01-01 12:00:00",
+                "Test result description",
+            ),
+        )
 
     def test_save_update_existing_record(self):
         record = ResultRecord(self.sample_data, self.project, self.project_conn, self.results_conn)
