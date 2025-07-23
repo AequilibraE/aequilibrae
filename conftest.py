@@ -19,7 +19,7 @@ from shapely.geometry import Polygon
 
 from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.project_creation import remove_triggers
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
@@ -53,7 +53,7 @@ def test_folder():
 
 @pytest.fixture(scope="session")
 def test_data_path():
-    return Path(__file__).parent / "tests/data"
+    return Path(__file__).parent / "tests" / "data"
 
 
 @pytest.fixture(scope="function")
@@ -93,6 +93,13 @@ def coquimbo_example(cache_path, test_folder) -> Project:
 @pytest.fixture
 def empty_project(cache_path, test_folder) -> Project:
     project = cached_model("empty_project", cache_path, test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture
+def empty_no_triggers_project(cache_path, test_folder) -> Project:
+    project = cached_model("empty_no_triggers", cache_path, test_folder)
     yield project
     project.close()
 
@@ -200,7 +207,18 @@ def pytest_sessionstart(session):
 
     tgt = test_base / "cache" / "sioux_falls_single_class"
     if not tgt.exists():
-        zipfile.ZipFile(Path(__file__).parent / "data" / "sioux_falls_single_class.zip").extractall(tgt)
+        zipfile.ZipFile(Path(__file__).parent / "tests" / "data" / "sioux_falls_single_class.zip").extractall(tgt)
+
+    tgt = test_base / "cache" / "empty_no_triggers"
+    if not tgt.exists():
+        shutil.copytree(test_base / "cache" / "empty_project", tgt, dirs_exist_ok=True)
+        proj = Project.from_path(tgt)
+        with proj.db_connection as proj_conn:
+            remove_triggers(proj_conn, proj.logger, db_type="network")
+            tables = ["link_types", "nodes", "links"]
+            with proj.db_connection as conn:
+                for tbl in tables:
+                    conn.execute(f"DELETE FROM {tbl}")
 
     right_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     for item in test_base.glob("*"):
