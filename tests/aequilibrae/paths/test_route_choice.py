@@ -21,9 +21,7 @@ def route_choice_setup(sioux_falls_single_class):
     mat = sioux_falls_single_class.matrices.get_matrix("demand_omx")
     mat.computational_view()
 
-    rc = RouteChoice(graph)
-
-    yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": rc}
+    yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": RouteChoice(graph)}
 
     mat.close()
     sioux_falls_single_class.close()
