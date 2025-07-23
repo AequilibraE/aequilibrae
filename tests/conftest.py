@@ -58,7 +58,7 @@ def no_index_omx(test_data_path, test_folder):
 
 
 @pytest.fixture(scope="function")
-def sioux_falls_example(cache_path, test_folder):
+def sioux_falls_example(cache_path, test_folder) -> Project:
     source = cache_path / "sioux_falls"
     shutil.copytree(source, test_folder, dirs_exist_ok=True)
     project = Project.from_path(test_folder)
