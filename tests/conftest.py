@@ -111,9 +111,6 @@ def pytest_sessionstart(session):
     tgt = test_base / "cache" / "coquimbo"
     if not tgt.exists():
         create_example(tgt, "coquimbo").close()
-    tgt = test_base / "cache" / "coquimbo"
-    if not tgt.exists():
-        create_example(tgt, "coquimbo").close()
 
     tgt = test_base / "cache" / "sioux_falls_single_class"
     if not tgt.exists():
