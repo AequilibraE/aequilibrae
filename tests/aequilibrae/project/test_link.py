@@ -1,130 +1,127 @@
-import os
-import uuid
 from random import randint, random
-from shutil import copytree, rmtree
-from tempfile import gettempdir
-from unittest import TestCase
 
+import pytest
 from shapely.ops import substring
 
-from aequilibrae.project import Project
 from aequilibrae.utils.db_utils import read_and_close
-from ...data import siouxfalls_project
 
 
-class TestLink(TestCase):
-    def setUp(self) -> None:
-        os.environ["PATH"] = os.path.join(gettempdir(), "../../temp_data") + ";" + os.environ["PATH"]
+@pytest.fixture
+def links(sioux_falls_test):
+    return sioux_falls_test.network.links
 
-        self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
-        copytree(siouxfalls_project, self.proj_dir)
 
-        self.project = Project()
-        self.project.open(self.proj_dir)
-        self.network = self.project.network
+@pytest.fixture
+def modes(sioux_falls_test):
+    return sioux_falls_test.network.modes
 
-        self.links = self.network.links
-        self.modes = self.network.modes
-        self.lid = randint(1, 24)
-        self.link = self.links.get(self.lid)
 
-    def tearDown(self) -> None:
-        self.project.close()
-        try:
-            rmtree(self.proj_dir)
-        except Exception as e:
-            print(f"Failed to remove at {e.args}")
+@pytest.fixture
+def link_id():
+    return randint(1, 24)
 
-    def test_delete(self):
-        self.link.delete()
 
-        with self.assertRaises(Exception):
-            _ = self.links.get(self.lid)
+@pytest.fixture
+def link(links, link_id):
+    return links.get(link_id)
 
-        with read_and_close(self.project.path_to_file) as conn:
-            lid = conn.execute(f"Select count(*) from links where link_id={self.lid}").fetchone()[0]
 
-        self.assertEqual(0, lid, f"Failed to delete link {self.lid}")
+def check_mode(sioux_falls_test, link_id):
+    with read_and_close(sioux_falls_test.path_to_file) as conn:
+        return conn.execute(f"Select modes from links where link_id={link_id}").fetchone()[0]
 
-    def test_save(self):
-        self.link.save()
-        extension = random()
-        name = "just a non-important value"
 
-        geo = substring(self.link.geometry, 0, extension, normalized=True)
+def test_delete(sioux_falls_test, links, link_id, link):
+    link.delete()
 
-        self.link.name = name
-        self.link.geometry = geo
+    with pytest.raises(Exception):
+        _ = links.get(link_id)
 
-        self.link.save()
-        self.links.refresh()
-        link2 = self.links.get(self.lid)
+    with read_and_close(sioux_falls_test.path_to_file) as conn:
+        lid = conn.execute(f"Select count(*) from links where link_id={link_id}").fetchone()[0]
 
-        self.assertEqual(link2.name, name, "Failed to save the link name")
-        self.assertAlmostEqual(link2.geometry, geo, 3, "Failed to save the link geometry")
+    assert lid == 0, f"Failed to delete link {link_id}"
 
-        tot_prev = self.network.count_links()
-        lnk = self.links.new()
-        lnk.geometry = substring(self.link.geometry, 0, 0.88, normalized=True)
-        lnk.modes = "c"
-        lnk.save()
 
-        self.assertEqual(tot_prev + 1, self.network.count_links(), "Failed to save new link")
+def test_save(sioux_falls_test, links, link_id, link):
+    link.save()
+    extension = random()
+    name = "just a non-important value"
 
-    def test_set_modes(self):
-        self.link.set_modes("cbt")
+    geo = substring(link.geometry, 0, extension, normalized=True)
 
-        self.assertEqual(self.link.modes, "cbt", "Did not set modes correctly")
-        self.link.save()
+    link.name = name
+    link.geometry = geo
 
-        self.assertEqual(self.__check_mode(), "cbt")
+    link.save()
+    links.refresh()
+    link2 = links.get(link_id)
 
-    def test_add_mode(self):
-        for mode in [1, ["cbt"]]:
-            with self.assertRaises(TypeError):
-                self.link.add_mode(mode)
-        with self.assertRaises(ValueError):
-            self.link.add_mode("bt")
+    assert link2.name == name, "Failed to save the link name"
+    assert link2.geometry.equals_exact(geo, 0.001), "Failed to save the link geometry"
 
-        self.link.add_mode("b")
-        self.link.save()
-        self.assertEqual(self.__check_mode(), "cb")
+    tot_prev = sioux_falls_test.network.count_links()
+    lnk = links.new()
+    lnk.geometry = substring(link.geometry, 0, 0.88, normalized=True)
+    lnk.modes = "c"
+    lnk.save()
 
-        mode = self.modes.get("t")
-        self.link.add_mode(mode)
-        self.link.save()
-        self.assertEqual(self.__check_mode(), "cbt")
+    assert sioux_falls_test.network.count_links() == tot_prev + 1, "Failed to save new link"
 
-    def test_drop_mode(self):
-        self.link.set_modes("cbt")
-        self.link.save()
-        self.assertEqual(self.__check_mode(), "cbt")
 
-        self.link.drop_mode("t")
-        self.link.save()
-        self.assertEqual(self.__check_mode(), "cb")
+def test_set_modes(sioux_falls_test, link, link_id):
+    link.set_modes("cbt")
 
-        mode = self.modes.get("b")
-        self.link.drop_mode(mode)
-        self.link.save()
-        self.assertEqual(self.__check_mode(), "c")
+    assert link.modes == "cbt", "Did not set modes correctly"
+    link.save()
 
-    def test_data_fields(self):
-        link2 = self.links.get(randint(1, 24))
-        while link2.link_id == self.link.link_id:
-            link2 = self.links.get(randint(1, 24))
+    assert check_mode(sioux_falls_test, link_id) == "cbt"
 
-        self.assertEqual(link2.data_fields(), self.link.data_fields(), "Different links have different data fields")
 
-        fields = sorted(link2.data_fields())
+def test_add_mode(sioux_falls_test, link, link_id, modes):
+    for mode in [1, ["cbt"]]:
+        with pytest.raises(TypeError):
+            link.add_mode(mode)
+    with pytest.raises(ValueError):
+        link.add_mode("bt")
 
-        with read_and_close(self.project.path_to_file) as conn:
-            dt = conn.execute("pragma table_info(links)").fetchall()
+    link.add_mode("b")
+    link.save()
+    assert check_mode(sioux_falls_test, link_id) == "cb"
 
-        data_fields = sorted([x[1] for x in dt if x[1] != "ogc_fid"])
+    mode = modes.get("t")
+    link.add_mode(mode)
+    link.save()
+    assert check_mode(sioux_falls_test, link_id) == "cbt"
 
-        self.assertEqual(sorted(fields), sorted(data_fields), "Link has unexpected set of fields")
 
-    def __check_mode(self):
-        with read_and_close(self.project.path_to_file) as conn:
-            return conn.execute(f"Select modes from links where link_id={self.lid}").fetchone()[0]
+def test_drop_mode(sioux_falls_test, link, link_id, modes):
+    link.set_modes("cbt")
+    link.save()
+    assert check_mode(sioux_falls_test, link_id) == "cbt"
+
+    link.drop_mode("t")
+    link.save()
+    assert check_mode(sioux_falls_test, link_id) == "cb"
+
+    mode = modes.get("b")
+    link.drop_mode(mode)
+    link.save()
+    assert check_mode(sioux_falls_test, link_id) == "c"
+
+
+def test_data_fields(sioux_falls_test, links, link):
+    link2 = links.get(randint(1, 24))
+    while link2.link_id == link.link_id:
+        link2 = links.get(randint(1, 24))
+
+    assert link2.data_fields() == link.data_fields(), "Different links have different data fields"
+
+    fields = sorted(link2.data_fields())
+
+    with read_and_close(sioux_falls_test.path_to_file) as conn:
+        dt = conn.execute("pragma table_info(links)").fetchall()
+
+    data_fields = sorted([x[1] for x in dt if x[1] != "ogc_fid"])
+
+    assert sorted(fields) == sorted(data_fields), "Link has unexpected set of fields"
