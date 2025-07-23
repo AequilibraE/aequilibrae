@@ -27,6 +27,7 @@ def assignment_setup(sioux_falls_single_class):
     matrix.close()
     project.close()
 
+
 def test_set_save_path_files(assignment_setup):
     assignment = assignment_setup["assignment"]
     assigclass = assignment_setup["assigclass"]
@@ -42,6 +43,7 @@ def test_set_save_path_files(assignment_setup):
     for c in assignment.classes:
         assert c._aon_results.save_path_file is False
 
+
 def test_set_path_file_format(assignment_setup):
     assignment = assignment_setup["assignment"]
     assigclass = assignment_setup["assigclass"]
@@ -54,6 +56,7 @@ def test_set_path_file_format(assignment_setup):
     assignment.set_path_file_format("feather")
     for c in assignment.classes:
         assert c._aon_results.write_feather is True
+
 
 def test_save_path_files(assignment_setup, sioux_falls_test):
     assignment = assignment_setup["assignment"]
