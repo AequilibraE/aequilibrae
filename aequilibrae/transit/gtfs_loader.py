@@ -18,14 +18,14 @@ from aequilibrae.transit.date_tools import to_seconds, create_days_between, form
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
-from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
-class GTFSReader(WorkerThread):
-    signal = SIGNAL(object)
-
+class GTFSReader:
     """Loader for GTFS data. Not meant to be used directly by the user"""
+
+    signal = SIGNAL(object)
 
     def __init__(self):
         WorkerThread.__init__(self, None)
@@ -34,7 +34,7 @@ class GTFSReader(WorkerThread):
         self.__pces__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
-        self.agency = Agency()
+        self.agency: Dict[int, Agency] = {}
         self.services = {}
         self.routes: Dict[int, Route] = {}
         self.trips: Dict[int, Dict[Route]] = {}
@@ -49,6 +49,7 @@ class GTFSReader(WorkerThread):
         self.wgs84 = pyproj.Proj("epsg:4326")
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
+        self.agency_correspondence = {}
         self.logger = get_logger()
 
     def set_feed_path(self, file_path):
@@ -78,14 +79,15 @@ class GTFSReader(WorkerThread):
     def _set_maximum_speeds(self, max_speeds: dict):
         self.__max_speeds__ = max_speeds
 
-    def load_data(self, service_date: str):
+    def load_data(self, service_date: str, description: str):
         """Loads the data for a respective service date.
 
         :Arguments:
             **service_date** (:obj:`str`): service date. e.g. "2020-04-01".
         """
-        ag_id = self.agency.agency
-        self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
+        self.service_date = service_date
+        self.description = description
+        self.logger.info(f"Loading data for {self.service_date} from the GTFS feed. This may take some time")
 
         self.__load_date()
 
@@ -93,29 +95,38 @@ class GTFSReader(WorkerThread):
         self.logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
 
+        self.__load_agencies()
+
+        self.signal.emit(["start", 7, "Loading routes"])
         self.__load_routes_table()
 
+        self.signal.emit(["update", 1, "Loading stops"])
         self.__load_stops_table()
 
+        self.signal.emit(["update", 2, "Loading stop times"])
         self.__load_stop_times()
 
+        self.signal.emit(["update", 3, "Loading shapes"])
         self.__load_shapes_table()
 
+        self.signal.emit(["update", 4, "Loading trips"])
         self.__load_trips_table()
 
+        self.signal.emit(["update", 5, "De-conflicting stop times"])
         self.__deconflict_stop_times()
 
+        self.signal.emit(["update", 6, "Loading fares"])
         self.__load_fare_data()
 
         self.zip_archive.close()
+        self.signal.emit(["finished"])
         self.signal = SIGNAL(object)
 
     def __deconflict_stop_times(self) -> None:
         self.logger.info("Starting deconflict_stop_times")
 
-        msg = "De-conflicting stop times (Step: 6/12)"
         total_fast = 0
-        for route in simple_progress(self.trips, self.signal, msg):
+        for prog_counter, route in enumerate(self.trips):
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
                 for trip in self.trips[route][pattern]:
@@ -196,7 +207,6 @@ class GTFSReader(WorkerThread):
         self.logger.debug("Starting __load_fare_data")
         fareatttxt = "fare_attributes.txt"
         self.fare_attributes = {}
-        self.signal.emit(["set_text", "Loading fare data (Step: 7/12)"])
         if fareatttxt in self.zip_archive.namelist():
             self.logger.debug('  Loading "fare_attributes" table')
 
@@ -204,13 +214,19 @@ class GTFSReader(WorkerThread):
                 fareatt = parse_csv(file, column_order[fareatttxt])
             self.data_arrays[fareatttxt] = fareatt
 
+            existing_agencies = np.unique(fareatt["agency_id"])
+            if existing_agencies.shape[0] != len(self.agency):
+                self.logger.debug("agency_id exists on fare_attributes.txt but not in agency.txt")
+            elif existing_agencies.shape[0] == 1 and existing_agencies[0] == "":
+                fareatt["agency_id"] = list(self.agency.keys())[0]
+
             for line in range(fareatt.shape[0]):
                 data = tuple(fareatt[line][list(column_order[fareatttxt].keys())])
                 headers = ["fare_id", "price", "currency", "payment_method", "transfer", "transfer_duration"]
-                f = Fare(self.agency.agency_id)
+                f = Fare(fareatt[line]["agency_id"])
                 f.populate(data, headers)
                 if f.fare in self.fare_attributes:
-                    self.__fail(f"Fare ID {f.fare} for {self.agency.agency} is duplicated")
+                    self.__fail(f"Fare ID {f.fare} for {fareatt[line]['agency_id']} is duplicated")
                 self.fare_attributes[f.fare] = f
 
         farerltxt = "fare_rules.txt"
@@ -231,7 +247,8 @@ class GTFSReader(WorkerThread):
             fr.fare_id = self.fare_attributes[fr.fare].fare_id
             if fr.route in self.routes:
                 fr.route_id = self.routes[fr.route].route_id
-            fr.agency_id = self.agency.agency_id
+            fr.origin_id = None if fr.origin == "" else int(fr.origin)
+            fr.destination_id = None if fr.destination == "" else int(fr.destination)
             self.fare_rules.append(fr)
 
     def __load_shapes_table(self):
@@ -252,8 +269,7 @@ class GTFSReader(WorkerThread):
         lats, lons = self.transformer.transform(shapes[:]["shape_pt_lat"], shapes[:]["shape_pt_lon"])
         shapes[:]["shape_pt_lat"][:] = lats[:]
         shapes[:]["shape_pt_lon"][:] = lons[:]
-
-        for shape_id in simple_progress(all_shape_ids, self.signal, "Loading shapes (Step: 4/12)"):
+        for i, shape_id in enumerate(all_shape_ids):
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
             shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
@@ -289,7 +305,7 @@ class GTFSReader(WorkerThread):
 
         self.trips = {str(x): {} for x in np.unique(trips_array["route_id"])}
 
-        for line in simple_progress(trips_array, self.signal, "Loading trips (Step: 5/12)"):
+        for i, line in enumerate(trips_array):
             trip = Trip()
             trip._populate(line, trips_array.dtype.names)
             trip.route_id = self.routes[trip.route].route_id
@@ -321,6 +337,7 @@ class GTFSReader(WorkerThread):
                 trip.source_time = list(stop_times.source_time.values)
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
+
                 # trip.shape = self.shapes.get(trip.shape)
                 trip.pce = self.routes[trip.route].pce
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
@@ -411,11 +428,10 @@ class GTFSReader(WorkerThread):
         df = df.merge(stop_list, on="stop")
         df.sort_values(["trip_id", "stop_sequence"], inplace=True)
         df = df.assign(source_time=0)
-
-        msg = "Loading stop times (Step: 3/12)"
-        for trip_id, data in simple_progress(df.groupby(df["trip_id"]), self.signal, msg):
+        for trip_id, data in [[trip_id, x] for trip_id, x in df.groupby(df["trip_id"])]:
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
+            counter += data.shape[0]
 
     def __load_stops_table(self):
         self.logger.debug("Starting __load_stops_table")
@@ -434,9 +450,8 @@ class GTFSReader(WorkerThread):
         stops[:]["stop_lat"][:] = lats[:]
         stops[:]["stop_lon"][:] = lons[:]
 
-        for line in simple_progress(stops, self.signal, "Loading stops (Step: 2/12)"):
-            s = Stop(self.agency.agency_id, line, stops.dtype.names)
-            s.agency = self.agency.agency
+        for i, line in enumerate(stops):
+            s = Stop(line, stops.dtype.names)
             s.srid = self.srid
             s.get_node_id()
             self.stops[s.stop_id] = s
@@ -465,8 +480,11 @@ class GTFSReader(WorkerThread):
         for route_type, pce in self.__pces__.items():
             routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
-        for i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
-            r = Route(self.agency.agency_id)
+        agency_finder = routes["agency_id"].values.tolist()
+        routes.drop(columns="agency_id", inplace=True)
+
+        for i, line in routes.iterrows():
+            r = Route(self.agency_correspondence[agency_finder[i]])
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
 
@@ -476,7 +494,6 @@ class GTFSReader(WorkerThread):
 
         has_cal, has_caldate = True, True
 
-        self.signal.emit(["set_text", "Loading feed calendar"])
         caltxt = "calendar.txt"
         if caltxt in self.zip_archive.namelist():
             self.logger.debug('    Loading "calendar" table')
@@ -563,6 +580,25 @@ class GTFSReader(WorkerThread):
 
         if exception_inconsistencies:
             self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
+
+    def __load_agencies(self):
+        self.logger.debug("Starting __load_agencies")
+        agencytxt = "agency.txt"
+
+        self.logger.debug('    Loading "agency" table')
+        self.agency = {}
+        with self.zip_archive.open(agencytxt, "r") as file:
+            agencies = parse_csv(file, column_order[agencytxt])
+        self.data_arrays[agencytxt] = agencies
+
+        for i, line in enumerate(agencies):
+            a = Agency()
+            a.agency = line["agency_name"]
+            a.feed_date = self.feed_date
+            a.service_date = self.service_date
+            a.description = self.description
+            self.agency[a.agency_id] = a
+            self.agency_correspondence[line["agency_id"]] = a.agency_id
 
     def __fail(self, msg: str) -> None:
         self.logger.error(msg)

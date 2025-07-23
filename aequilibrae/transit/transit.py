@@ -57,15 +57,11 @@ class Transit(WorkerThread):
         with read_and_close(self.__transit_file, spatial=True) as conn:
             return get_geo_table(table_name, conn)
 
-    def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
+    def new_gtfs_builder(self, file_path, description="") -> GTFSRouteSystemBuilder:
         """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
 
         :Arguments:
-            **agency** (:obj:`str`): Name for the agency this feed refers to (e.g. 'CTA')
-
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
-
-            **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
 
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
 
@@ -74,9 +70,7 @@ class Transit(WorkerThread):
         """
         gtfs = GTFSRouteSystemBuilder(
             network=self.project_base_path,
-            agency_identifier=agency,
             file_path=file_path,
-            day=day,
             description=description,
             capacities=self.default_capacities,
             pces=self.default_pces,
