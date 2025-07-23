@@ -3,7 +3,6 @@ import string
 import pytest
 
 from aequilibrae.project.network.mode import Mode
-from aequilibrae.utils.db_utils import read_and_close
 
 
 def get_random_string():
@@ -29,7 +28,7 @@ def test_changing_mode_id(empty_no_triggers_project):
 
 def test_save(empty_no_triggers_project):
     random_string = get_random_string()
-    with read_and_close(empty_no_triggers_project.path_to_file) as conn:
+    with empty_no_triggers_project.db_connection as conn:
         letter = random.choice([x[0] for x in conn.execute("select mode_id from 'modes'").fetchall()])
         m = Mode(letter, empty_no_triggers_project)
         m.mode_name = random_string
