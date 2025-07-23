@@ -84,6 +84,13 @@ def sioux_falls_example(cache_path, test_folder) -> Project:
 
 
 @pytest.fixture(scope="function")
+def nauru_example(cache_path, test_folder) -> Project:
+    project = cached_model("nauru", cache_path, test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture(scope="function")
 def coquimbo_example(cache_path, test_folder) -> Project:
     project = cached_model("coquimbo", cache_path, test_folder)
     yield project
@@ -196,6 +203,10 @@ def pytest_sessionstart(session):
     tgt = test_base / "cache" / "sioux_falls"
     if not tgt.exists():
         create_example(tgt, "sioux_falls").close()
+
+    tgt = test_base / "cache" / "nauru"
+    if not tgt.exists():
+        create_example(tgt, "nauru").close()
 
     tgt = test_base / "cache" / "coquimbo"
     if not tgt.exists():

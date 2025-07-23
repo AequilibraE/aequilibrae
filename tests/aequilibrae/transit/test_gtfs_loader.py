@@ -1,13 +1,8 @@
-from os.path import join, dirname, abspath
-from pathlib import Path
-
 import pytest
 
 import pandas as pd
-from aequilibrae.transit import Transit
 
 from aequilibrae.transit.gtfs_loader import GTFSReader
-from aequilibrae.utils.create_example import create_example
 
 
 def test_set_feed_path(coquimbo_example):
