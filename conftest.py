@@ -144,11 +144,6 @@ def build_gtfs_project(coquimbo_example):
     prj.close()
 
 
-@pytest.fixture
-def transit_conn(build_gtfs_project):
-    return database_connection("transit")
-
-
 @pytest.fixture(autouse=True)
 def doctest_fixtures(doctest_namespace, test_folder, tmp_path_factory):
     doctest_namespace["project_path"] = str(test_folder)
