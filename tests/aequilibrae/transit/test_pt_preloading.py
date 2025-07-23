@@ -2,26 +2,17 @@ import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
 from aequilibrae.transit import Transit
-from aequilibrae.utils.create_example import create_example
 
 
 @pytest.fixture(scope="function")
-def project(tmp_path):
-    proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
-    proj.network.build_graphs()
-    proj.activate()
-    yield proj
-    proj.close()
+def transit(coquimbo_example: Project):
+    return Transit(coquimbo_example)
 
 
 @pytest.fixture(scope="function")
-def transit(project: Project):
-    return Transit(project)
-
-
-@pytest.fixture(scope="function")
-def graph(project: Project):
-    g = project.network.graphs["c"]
+def graph(coquimbo_example: Project):
+    coquimbo_example.network.build_graphs()
+    g = coquimbo_example.network.graphs["c"]
     g.set_skimming(["travel_time"])
     g.set_graph("travel_time")
     g.set_blocked_centroid_flows(False)

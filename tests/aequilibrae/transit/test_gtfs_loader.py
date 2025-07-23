@@ -10,32 +10,21 @@ from aequilibrae.transit.gtfs_loader import GTFSReader
 from aequilibrae.utils.create_example import create_example
 
 
-@pytest.fixture
-def gtfs_loader(create_gtfs_project):
-    return GTFSReader()
-
-
-@pytest.fixture
-def gtfs_fldr(create_path):
-    return join(create_path, "gtfs_coquimbo.zip")
-
-
-def test_set_feed_path(gtfs_loader, gtfs_fldr):
-    gtfs = gtfs_loader
+def test_set_feed_path(coquimbo_example):
+    gtfs = GTFSReader()
 
     with pytest.raises(Exception):
-        gtfs.set_feed_path(gtfs_fldr + "_")
+        gtfs.set_feed_path(coquimbo_example.project_base_path / "wrong_name")
 
 
-def test_load_data(gtfs_loader, gtfs_fldr):
-    pth = Path(__file__).parent.parent.parent
-    cap = pd.read_csv(pth / "data/gtfs/transit_max_speeds.txt")
+def test_load_data(build_gtfs_project, test_data_path):
+    cap = pd.read_csv(test_data_path / "gtfs/transit_max_speeds.txt")
 
     df = cap[cap.city == "Coquimbo"]
     df.loc[df.min_distance < 100, "speed"] = 10
     dict_speeds = {x: df for x, df in df.groupby(["mode"])}  # noqa: C416
-    gtfs = gtfs_loader
+    gtfs = GTFSReader()
 
     gtfs._set_maximum_speeds(dict_speeds)
-    gtfs.set_feed_path(gtfs_fldr)
+    gtfs.set_feed_path(build_gtfs_project.project_base_path / "gtfs_coquimbo.zip")
     gtfs.load_data("2016-04-13")

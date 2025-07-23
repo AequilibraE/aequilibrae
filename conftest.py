@@ -11,7 +11,6 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 from shutil import copytree
-from tempfile import gettempdir
 
 import numpy as np
 import pandas as pd
@@ -29,6 +28,8 @@ from tests.data import siouxfalls_project
 DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
 
+test_base = Path(tempfile.gettempdir()) / "aequilibrae_testing"
+
 
 @pytest.fixture(scope="session")
 def centroids():
@@ -36,17 +37,12 @@ def centroids():
 
 
 @pytest.fixture(scope="session")
-def cache_path(test_base):
+def cache_path():
     return test_base / "cache"
 
 
-@pytest.fixture(scope="session")
-def test_base():
-    return Path(tempfile.gettempdir()) / "aequilibrae_testing"
-
-
 @pytest.fixture(scope="function")
-def test_folder(test_base):
+def test_folder():
     right_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     dir = test_base / f"{right_now}--{uuid.uuid4().hex[:4]}"
     while dir.exists():
@@ -74,49 +70,98 @@ def no_index_omx(test_data_path, test_folder):
     return test_folder / "test_omx.omx"
 
 
+def cached_model(model_name, cache_pth, test_folder) -> Project:
+    source = cache_pth / model_name
+    shutil.copytree(source, test_folder, dirs_exist_ok=True)
+    return Project.from_path(test_folder)
+
+
 @pytest.fixture(scope="function")
 def sioux_falls_example(cache_path, test_folder) -> Project:
-    source = cache_path / "sioux_falls"
-    shutil.copytree(source, test_folder, dirs_exist_ok=True)
-    project = Project.from_path(test_folder)
+    project = cached_model("sioux_falls", cache_path, test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture(scope="function")
+def coquimbo_example(cache_path, test_folder) -> Project:
+    project = cached_model("coquimbo", cache_path, test_folder)
+    yield project
+    project.close()
+
+
+@pytest.fixture
+def empty_project(cache_path, test_folder) -> Project:
+    project = cached_model("empty_project", cache_path, test_folder)
     yield project
     project.close()
 
 
 @pytest.fixture(scope="function")
 def sioux_falls_test(test_data_path, test_folder) -> Project:
-    source = test_data_path / "SiouxFalls_project"
-    shutil.copytree(source, test_folder, dirs_exist_ok=True)
-    project = Project.from_path(test_folder)
+    project = cached_model("SiouxFalls_project", test_data_path, test_folder)
     yield project
     project.close()
 
 
 @pytest.fixture(scope="function")
 def sioux_falls_single_class(cache_path, test_folder) -> Project:
-    source = cache_path / "sioux_falls_single_class"
-    shutil.copytree(source, test_folder, dirs_exist_ok=True)
-    project = Project.from_path(test_folder)
+    project = cached_model("sioux_falls_single_class", cache_path, test_folder)
     yield project
     project.close()
 
 
 @pytest.fixture(scope="function")
 def triangle_graph_blocking(test_data_path, test_folder) -> Project:
-    source = test_data_path / "blocking_triangle_graph_project"
-    shutil.copytree(source, test_folder, dirs_exist_ok=True)
-    project = Project.from_path(test_folder)
+    project = cached_model("blocking_triangle_graph_project", test_data_path, test_folder)
     yield project
     project.close()
 
 
-@pytest.fixture(scope="function")
-def coquimbo_example(cache_path, test_folder):
-    source = cache_path / "coquimbo"
-    shutil.copytree(source, test_folder, dirs_exist_ok=True)
-    project = Project.from_path(test_folder)
-    yield project
-    project.close()
+@pytest.fixture
+def create_empty_project(_empty_project, create_project):
+    def _create_empty_project(name=None):
+        return create_project(name=name, source_dir=_empty_project)
+
+    return _create_empty_project
+
+
+@pytest.fixture(scope="session")
+def create_empty_project_session(_empty_project, create_project_session):
+    def _create_empty_project(name=None):
+        return create_project_session(name=name, source_dir=_empty_project)
+
+    return _create_empty_project
+
+
+@pytest.fixture
+def build_gtfs_project(coquimbo_example):
+    prj = coquimbo_example
+
+    (coquimbo_example.project_base_path / "public_transport.sqlite").unlink(True)
+    data = Transit(prj)
+    yield data
+    prj.close()
+
+
+@pytest.fixture
+def transit_conn(build_gtfs_project):
+    return database_connection("transit")
+
+
+@pytest.fixture(autouse=True)
+def doctest_fixtures(doctest_namespace, test_folder, tmp_path_factory):
+    doctest_namespace["project_path"] = str(test_folder)
+    doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
+    doctest_namespace["create_example"] = create_example
+    doctest_namespace["Project"] = Project
+    doctest_namespace["Transit"] = Transit
+    doctest_namespace["AequilibraeMatrix"] = AequilibraeMatrix
+
+    doctest_namespace["os"] = os
+    doctest_namespace["pd"] = pd
+    doctest_namespace["np"] = np
+    doctest_namespace["Polygon"] = Polygon
 
 
 def project_factory_fixture(scope):
@@ -145,77 +190,7 @@ create_project = project_factory_fixture(scope="function")
 create_project_session = project_factory_fixture(scope="session")
 
 
-@pytest.fixture
-def create_empty_project(_empty_project, create_project):
-    def _create_empty_project(name=None):
-        return create_project(name=name, source_dir=_empty_project)
-
-    return _create_empty_project
-
-
-@pytest.fixture(scope="session")
-def create_empty_project_session(_empty_project, create_project_session):
-    def _create_empty_project(name=None):
-        return create_project_session(name=name, source_dir=_empty_project)
-
-    return _create_empty_project
-
-
-# This fixture creates a default empty structure on disk that can be used as the
-# source folder for creating temporary empty projects
-@pytest.fixture(scope="session")
-def _empty_project(tmp_path_factory):
-    proj_dir = tmp_path_factory.mktemp("_empty_project") / uuid.uuid4().hex
-    project = Project()
-    project.new(str(proj_dir))
-    return proj_dir
-
-
-@pytest.fixture
-def empty_project(create_empty_project):
-    return create_empty_project()
-
-
-@pytest.fixture
-def create_path(tmp_path):
-    return tmp_path / uuid.uuid4().hex
-
-
-@pytest.fixture
-def create_gtfs_project(create_path):
-    prj = create_example(create_path, "coquimbo")
-
-    if os.path.isfile(os.path.join(create_path, "public_transport.sqlite")):
-        os.remove(os.path.join(create_path, "public_transport.sqlite"))
-
-    data = Transit(prj)
-
-    yield data
-    prj.close()
-
-
-@pytest.fixture
-def transit_conn(create_gtfs_project):
-    return database_connection("transit")
-
-
-@pytest.fixture(autouse=True)
-def doctest_fixtures(doctest_namespace, test_folder, tmp_path_factory):
-    doctest_namespace["project_path"] = str(test_folder)
-    doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
-    doctest_namespace["create_example"] = create_example
-    doctest_namespace["Project"] = Project
-    doctest_namespace["Transit"] = Transit
-    doctest_namespace["AequilibraeMatrix"] = AequilibraeMatrix
-
-    doctest_namespace["os"] = os
-    doctest_namespace["pd"] = pd
-    doctest_namespace["np"] = np
-    doctest_namespace["Polygon"] = Polygon
-
-
 def pytest_sessionstart(session):
-    test_base = Path(tempfile.gettempdir()) / "aequilibrae_testing"
     tgt = test_base / "cache" / "sioux_falls"
     if not tgt.exists():
         create_example(tgt, "sioux_falls").close()
@@ -224,11 +199,15 @@ def pytest_sessionstart(session):
     if not tgt.exists():
         create_example(tgt, "coquimbo").close()
 
+    tgt = test_base / "cache" / "empty_project"
+    if not tgt.exists():
+        Project().new(tgt)
+
     tgt = test_base / "cache" / "sioux_falls_single_class"
     if not tgt.exists():
         zipfile.ZipFile(Path(__file__).parent / "data" / "sioux_falls_single_class.zip").extractall(tgt)
 
-    right_now = datetime.now().strftime("%Y-%m-%d_%H")
+    right_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     for item in test_base.glob("*"):
         if item.is_dir():
             try:
