@@ -1,64 +1,98 @@
-import random
-import string
-from unittest import TestCase
+from copy import copy, deepcopy
+from random import randint
 
-from aequilibrae.utils.db_utils import read_and_close
-from tests.models_for_test import ModelsTest
+import pytest
 
 
-class TestLinkTypes(TestCase):
-    def setUp(self) -> None:
-        tm = ModelsTest()
-        self.proj = tm.no_triggers()
+def test_get(sioux_falls_test):
+    links = sioux_falls_test.network.links
+    with pytest.raises(ValueError):
+        _ = links.get(123456)
 
-        letters = [random.choice(string.ascii_letters + "_") for x in range(20)]
-        self.random_string = "".join(letters)
+    link = links.get(1)
+    assert link.capacity_ab == 25900.20064, "Did not populate link correctly"
 
-    def tearDown(self) -> None:
-        self.proj.close()
 
-    def test_add(self):
-        lt = self.proj.network.link_types
-        existing = list(lt.all_types().keys())
+def test_new(sioux_falls_test):
+    links = sioux_falls_test.network.links
+    new_link = links.new()
 
-        newlt = lt.new("G")
-        newlt.link_type = "unique_link_type"
-        newlt.save()
+    with sioux_falls_test.db_connection as conn:
+        id = conn.execute("Select max(link_id) + 1 from Links").fetchone()[0]
+    assert new_link.link_id == id, "Did not populate new link ID properly"
+    assert new_link.geometry is None, "Did not populate new geometry properly"
 
-        nowexisting = list(lt.all_types().keys())
 
-        n = [x for x in nowexisting if x not in existing][0]
-        self.assertEqual("G", n, "Failed to add link type")
+def test_copy_link(sioux_falls_test):
+    links = sioux_falls_test.network.links
 
-    def test_delete(self):
-        lt = self.proj.network.link_types
-        existing = list(lt.all_types().keys())
-        deleted = random.choice(existing)
-        lt.delete(deleted)
-        remaining = list(lt.all_types().keys())
+    with pytest.raises(ValueError):
+        _ = links.copy_link(11111)
 
-        difference = [x for x in existing if x not in remaining]
+    new_link = links.copy_link(11)
+    old_link = links.get(11)
 
-        self.assertEqual(deleted, difference[0], "Failed to delete link type")
+    assert new_link.geometry == old_link.geometry
+    assert new_link.a_node == old_link.a_node
+    assert new_link.b_node == old_link.b_node
+    assert new_link.direction == old_link.direction
+    assert new_link.distance == old_link.distance
+    assert new_link.modes == old_link.modes
+    assert new_link.link_type == old_link.link_type
+    new_link.save()
 
-    def test_get_and_get_by_name(self):
-        lt = self.proj.network.link_types
-        ltget = lt.get("y")
-        ltgetbn = lt.get_by_name("default")
 
-        self.assertEqual(ltget.link_type_id, ltgetbn.link_type_id, "Get methods returned different things")
-        self.assertEqual(ltget.link_type, ltgetbn.link_type, "Get methods returned different things")
-        self.assertEqual(ltget.description, ltgetbn.description, "Get methods returned different things")
-        self.assertEqual(ltget.lanes, ltgetbn.lanes, "Get methods returned different things")
-        self.assertEqual(ltget.lane_capacity, ltgetbn.lane_capacity, "Get methods returned different things")
-        self.assertEqual(ltget.link_type, "default", "Get methods returned different things")
+def test_delete(sioux_falls_test):
+    links = sioux_falls_test.network.links
 
-    def test_all_types(self):
-        lt = self.proj.network.link_types
-        all_lts = set(lt.all_types().keys())
+    _ = links.get(10)
 
-        with read_and_close(self.proj.path_to_file) as conn:
-            reallts = {x[0] for x in conn.execute("select link_type_id from link_types").fetchall()}
+    with sioux_falls_test.db_connection as conn:
+        tot = conn.execute("Select count(*) from Links").fetchone()[0]
+        links.delete(10)
+        links.delete(11)
+        tot2 = conn.execute("Select count(*) from Links").fetchone()[0]
 
-        diff = all_lts.symmetric_difference(reallts)
-        self.assertEqual(diff, set(), "Getting all link_types failed")
+    assert tot == tot2 + 2, "Did not delete the link properly"
+
+    with pytest.raises(ValueError):
+        links.delete(123456)
+
+    with pytest.raises(ValueError):
+        _ = links.get(10)
+
+
+def test_fields(sioux_falls_test):
+    links = sioux_falls_test.network.links
+    f_editor = links.fields
+
+    fields = sorted(f_editor.all_fields())
+    with sioux_falls_test.db_connection as conn:
+        dt = conn.execute("pragma table_info(links)").fetchall()
+
+    actual_fields = sorted({x[1].replace("_ab", "").replace("_ba", "") for x in dt if x[1] != "ogc_fid"})
+    assert fields == actual_fields, "Table editor is weird for table links"
+
+
+def test_refresh(sioux_falls_test):
+    links = sioux_falls_test.network.links
+
+    link1 = links.get(1)
+    val = randint(1, 99999999)
+    original_value = link1.capacity_ba
+
+    link1.capacity_ba = val
+    link1_again = links.get(1)
+    assert link1_again.capacity_ba == val, "Did not preserve correctly"
+
+    links.refresh()
+    link1 = links.get(1)
+    assert link1.capacity_ba == original_value, "Did not reset correctly"
+
+
+def test_copy(sioux_falls_test):
+    nodes = sioux_falls_test.network.nodes
+    with pytest.raises(Exception):
+        _ = copy(nodes)
+    with pytest.raises(Exception):
+        _ = deepcopy(nodes)
