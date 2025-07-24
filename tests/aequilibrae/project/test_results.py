@@ -45,15 +45,15 @@ def project(db_connections):
 def sample_data():
     return {
         "table_name": "test_result",
-            "procedure": "test_procedure",
-            "procedure_id": "test_id_123",
-            "procedure_report": '{"status": "success", "items": 100}',
-            "timestamp": "2000-01-01 12:00:00",
-            "description": "Test result description",
-            "year": "2020",
-            "scenario": "testing",
-            "reference_table": "links",
-        }
+        "procedure": "test_procedure",
+        "procedure_id": "test_id_123",
+        "procedure_report": '{"status": "success", "items": 100}',
+        "timestamp": "2000-01-01 12:00:00",
+        "description": "Test result description",
+        "year": "2020",
+        "scenario": "testing",
+        "reference_table": "links",
+    }
 
 
 # Fixtures for Results tests
