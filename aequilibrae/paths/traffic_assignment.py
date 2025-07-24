@@ -159,7 +159,7 @@ class TrafficAssignment(AssignmentBase):
 
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
 
-        >>> project = create_example(project_path)
+        >>> project = create_siouxfalls_example
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars

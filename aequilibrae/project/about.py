@@ -11,7 +11,7 @@ class About:
 
     .. code-block:: python
 
-        >>> project = create_example(project_path)
+        >>> project = create_siouxfalls_example
 
         # Adding a new field and saving it
         >>> project.about.add_info_field('my_super_relevant_field')
@@ -64,7 +64,7 @@ class About:
 
         .. code-block:: python
 
-            >>> project = create_example(project_path)
+            >>> project = create_siouxfalls_example
 
             >>> project.about.add_info_field('a_cool_field')
             >>> project.about.a_cool_field = 'super relevant information'
@@ -86,7 +86,7 @@ class About:
 
         .. code-block:: python
 
-            >>> project = create_example(project_path)
+            >>> project = create_siouxfalls_example
 
             >>> project.about.description = 'This is the example project. Do not use for forecast'
             >>> project.about.write_back()

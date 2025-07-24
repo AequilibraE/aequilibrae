@@ -15,7 +15,7 @@ Each item in the 'links' table is a ``Link`` object.
 
     >>> from shapely.geometry import LineString
 
-    >>> project = create_example(project_path, "coquimbo")
+    >>> project = create_coquimbo_example
 
     >>> project_links = project.network.links
 
@@ -227,8 +227,7 @@ this information, otherwise it will be lost.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_sfalls_data")
+    >>> project = create_coquimbo_example
 
     >>> project.about.add_info_field("my_new_field")
     >>> project.about.my_new_field = "add some useful information about the field"
@@ -270,8 +269,7 @@ This class is directly accessed from within the corresponding module one wants t
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_nauru_data")
+    >>> project = create_nauru_example
 
     # We'll edit the fields in the 'nodes' table
     >>> node_fields = project.network.nodes.fields
@@ -310,8 +308,7 @@ It is possible to access the log file contents, as presented in the next code bl
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_nauru_data")
+    >>> project = create_nauru_example
 
     >>> project_log = project.log()
 
@@ -340,8 +337,7 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_sfalls_data")
+    >>> project = create_siouxfalls_example
 
     >>> matrices = project.matrices
 
@@ -393,8 +389,7 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_coquimbo_data")
+    >>> project = create_coquimbo_example
 
     >>> link_types = project.network.link_types
 
@@ -446,8 +441,7 @@ Each item in 'modes' table is a ``Mode`` object.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_coquimbo_data")
+    >>> project = create_coquimbo_example
 
     >>> modes = project.network.modes
 
@@ -494,8 +488,7 @@ Each item in the 'periods' table is a ``Period`` object.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_coquimbo_data")
+    >>> project = create_coquimbo_example
 
     >>> periods = project.network.periods
 

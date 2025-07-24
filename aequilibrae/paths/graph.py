@@ -615,7 +615,7 @@ class GraphBase(ABC):  # noqa: B024
 
         .. code-block:: python
 
-            >>> project = create_example(project_path)
+            >>> project = create_siouxfalls_example
 
             >>> project.network.build_graphs()
 

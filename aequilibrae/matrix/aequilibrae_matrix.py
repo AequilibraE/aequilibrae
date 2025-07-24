@@ -829,7 +829,7 @@ class AequilibraeMatrix(object):
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            >>> project = create_example(project_path)
+            >>> project = create_siouxfalls_example
 
             >>> mat = AequilibraeMatrix()
             >>> mat.load(os.path.join(project_path, 'matrices/skims.omx'))
@@ -1013,7 +1013,7 @@ class AequilibraeMatrix(object):
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            >>> project = create_example(project_path)
+            >>> project = create_siouxfalls_example
 
             >>> mat = AequilibraeMatrix()
             >>> mat.load(os.path.join(project_path, 'matrices/skims.omx'))
@@ -1042,7 +1042,7 @@ class AequilibraeMatrix(object):
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            >>> project = create_example(project_path)
+            >>> project = create_siouxfalls_example
 
             >>> mat = AequilibraeMatrix()
             >>> mat.load(os.path.join(project_path, 'matrices/skims.omx'))

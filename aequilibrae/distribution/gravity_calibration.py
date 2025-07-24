@@ -24,7 +24,7 @@ class GravityCalibration:
 
         >>> from aequilibrae.distribution import GravityCalibration
 
-        >>> project = create_example(project_path)
+        >>> project = create_siouxfalls_example
 
         # We load the demand matrix
         >>> demand = project.matrices.get_matrix("demand_omx")

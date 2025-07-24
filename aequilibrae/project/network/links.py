@@ -15,7 +15,7 @@ class Links(BasicTable):
 
     .. code-block:: python
 
-        >>> project = create_example(project_path)
+        >>> project = create_siouxfalls_example
 
         >>> all_links = project.network.links
 

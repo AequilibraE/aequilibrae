@@ -27,7 +27,7 @@ class Zoning(BasicTable):
 
     .. code-block:: python
 
-        >>> project = create_example(project_path, "coquimbo")
+        >>> project = create_coquimbo_example
 
         >>> zoning = project.zoning
 

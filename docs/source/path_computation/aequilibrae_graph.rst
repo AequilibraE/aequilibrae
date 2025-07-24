@@ -40,7 +40,7 @@ or when using AequilibraE in anger, as much of the setup is done by default.
 
 .. code-block:: python
 
-    >>> project = create_example(project_path, "coquimbo")
+    >>> project = create_coquimbo_example
 
     >>> project.network.build_graphs() # We build the graph for all modes
     >>> graph = project.network.graphs['c'] # we grab the graph for cars

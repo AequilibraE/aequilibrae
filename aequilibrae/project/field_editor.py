@@ -21,7 +21,7 @@ class FieldEditor:
 
     .. code-block:: python
 
-        >>> project = create_example(project_path)
+        >>> project = create_siouxfalls_example
 
         # To edit the fields of the link_types table
         >>> lt_fields = project.network.link_types.fields

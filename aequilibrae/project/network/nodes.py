@@ -15,7 +15,7 @@ class Nodes(BasicTable):
 
     .. code-block:: python
 
-        >>> project = create_example(project_path)
+        >>> project = create_siouxfalls_example
 
         >>> all_nodes = project.network.nodes
 

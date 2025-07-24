@@ -6,7 +6,7 @@ class Period(SafeClass):
 
     .. code-block:: python
 
-        >>> project = create_example(project_path, "coquimbo")
+        >>> project = create_coquimbo_example
 
         >>> all_periods = project.network.periods
 

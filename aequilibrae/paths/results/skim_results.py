@@ -12,7 +12,7 @@ class SkimResults:
 
           >>> from aequilibrae.paths.results import SkimResults
 
-          >>> project = create_example(project_path)
+          >>> project = create_siouxfalls_example
           >>> project.network.build_graphs()
 
           # Mode c is car in this project

@@ -11,7 +11,7 @@ class LinkTypes:
 
     .. code-block:: python
 
-        >>> project = create_example(project_path)
+        >>> project = create_siouxfalls_example
 
         >>> link_types = project.network.link_types
 

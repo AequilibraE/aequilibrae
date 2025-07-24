@@ -7,8 +7,7 @@ class Log:
 
     .. code-block:: python
 
-        >>> project = Project()
-        >>> project.new(project_path)
+        >>> project = create_empty_project
 
         >>> log = project.log()
 
