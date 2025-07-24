@@ -3,8 +3,8 @@ import logging
 import os
 import shutil
 import sqlite3
-from contextlib import contextmanager
 from collections import namedtuple
+from contextlib import contextmanager
 from pathlib import Path
 
 from aequilibrae import global_logger
@@ -14,12 +14,12 @@ from aequilibrae.log import get_log_handler
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network import Network
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
-from aequilibrae.project.zoning import Zoning
 from aequilibrae.project.tools import MigrationManager
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close
@@ -148,6 +148,11 @@ class Project:
             global_logger.warning(f"This project at {self.project_base_path} is already closed")
 
         finally:
+            handlers = global_logger.handlers[:]  # Make a copy of the handlers list
+            for handler in handlers:
+                handler.close()  # Explicitly close each handler to release file handles
+                global_logger.removeHandler(handler)  # Remove the handler from the logger
+
             self.deactivate()
 
     def activate(self):

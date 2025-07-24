@@ -81,7 +81,7 @@ def sioux_falls_example(cache_path, test_folder) -> Project:
     project = cached_model("sioux_falls", cache_path, test_folder)
     yield project
     project.close()
-    # shutil.rmtree(test_folder, ignore_errors=True)
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
@@ -123,6 +123,7 @@ def sioux_falls_test(test_data_path, test_folder) -> Project:
     project.close()
     shutil.rmtree(test_folder, ignore_errors=True)
 
+
 @pytest.fixture(scope="function")
 def no_triggers_test(test_data_path, test_folder) -> Project:
     project = cached_model("no_triggers_project", test_data_path, test_folder)
@@ -145,22 +146,6 @@ def triangle_graph_blocking(test_data_path, test_folder) -> Project:
     yield project
     project.close()
     shutil.rmtree(test_folder, ignore_errors=True)
-
-
-@pytest.fixture
-def create_empty_project(_empty_project, create_project):
-    def _create_empty_project(name=None):
-        return create_project(name=name, source_dir=_empty_project)
-
-    return _create_empty_project
-
-
-@pytest.fixture(scope="session")
-def create_empty_project_session(_empty_project, create_project_session):
-    def _create_empty_project(name=None):
-        return create_project_session(name=name, source_dir=_empty_project)
-
-    return _create_empty_project
 
 
 @pytest.fixture
@@ -215,44 +200,49 @@ create_project_session = project_factory_fixture(scope="session")
 
 
 def pytest_sessionstart(session):
-    tgt = test_base / "cache" / "sioux_falls"
-    if not tgt.exists():
-        create_example(tgt, "sioux_falls").upgrade()
-
-    tgt = test_base / "cache" / "nauru"
-    if not tgt.exists():
-        create_example(tgt, "nauru").upgrade()
-
-    tgt = test_base / "cache" / "coquimbo"
-    if not tgt.exists():
-        create_example(tgt, "coquimbo").upgrade()
-
-    tgt = test_base / "cache" / "empty_project"
-    if not tgt.exists():
-        Project().new(tgt)
-
-    tgt = test_base / "cache" / "sioux_falls_single_class"
-    if not tgt.exists():
-        zipfile.ZipFile(Path(__file__).parent / "tests" / "data" / "sioux_falls_single_class.zip").extractall(tgt)
-        Project.from_path(tgt).upgrade()
-
-    tgt = test_base / "cache" / "empty_no_triggers"
-    if not tgt.exists():
-        shutil.copytree(test_base / "cache" / "empty_project", tgt, dirs_exist_ok=True)
-        proj = Project.from_path(tgt)
-        with proj.db_connection as proj_conn:
-            remove_triggers(proj_conn, proj.logger, db_type="network")
-            tables = ["link_types", "nodes", "links"]
-            with proj.db_connection as conn:
-                for tbl in tables:
-                    conn.execute(f"DELETE FROM {tbl}")
-
     right_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     for item in test_base.glob("*"):
         if item.is_dir():
             try:
-                if right_now not in item.name and "cache" not in item.name:
+                if right_now not in item.name and "cache" not in item.parts:
                     shutil.rmtree(item)
             except Exception as e:
                 # Skip folders with non-matching name pattern
                 logging.error(f"Couldn't delete dir {item}, reason: {e}")
+
+    cache_dir = test_base / "cache"
+
+    # shutil.rmtree(cache_dir, ignore_errors=True)
+    # cache_dir.mkdir(parents=True, exist_ok=True)
+
+    tgt = cache_dir / "sioux_falls"
+    if not tgt.exists():
+        create_example(tgt, "sioux_falls").upgrade()
+
+    tgt = cache_dir / "nauru"
+    if not tgt.exists():
+        create_example(tgt, "nauru").upgrade()
+
+    tgt = cache_dir / "coquimbo"
+    if not tgt.exists():
+        create_example(tgt, "coquimbo").upgrade()
+
+    tgt = cache_dir / "empty_project"
+    if not tgt.exists():
+        Project().new(tgt)
+
+    tgt = cache_dir / "sioux_falls_single_class"
+    if not tgt.exists():
+        zipfile.ZipFile(Path(__file__).parent / "tests" / "data" / "sioux_falls_single_class.zip").extractall(tgt)
+        Project.from_path(tgt).upgrade()
+
+    tgt = cache_dir / "empty_no_triggers"
+    if not tgt.exists():
+        shutil.copytree(cache_dir / "empty_project", tgt, dirs_exist_ok=True)
+        proj = Project.from_path(tgt)
+        with proj.db_connection as proj_conn:
+            remove_triggers(proj_conn, proj.logger, db_type="network")
+            tables = ["nodes", "links"]
+            with proj.db_connection as conn:
+                for tbl in tables:
+                    conn.execute(f"DELETE FROM {tbl}")

@@ -26,11 +26,11 @@ def test_changing_mode_id(empty_no_triggers_project):
         m.mode_id = "test my description"
 
 
-def test_save(empty_no_triggers_project):
+def test_save(sioux_falls_example):
     random_string = get_random_string()
-    with empty_no_triggers_project.db_connection as conn:
+    with sioux_falls_example.db_connection as conn:
         letter = random.choice([x[0] for x in conn.execute("select mode_id from 'modes'").fetchall()])
-        m = Mode(letter, empty_no_triggers_project)
+        m = Mode(letter, sioux_falls_example)
         m.mode_name = random_string
         m.description = random_string[::-1]
         m.save()

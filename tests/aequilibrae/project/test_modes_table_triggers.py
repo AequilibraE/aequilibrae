@@ -56,9 +56,9 @@ def test_all_tests_considered(queries):
                 pytest.fail(f"Trigger not tested. {trigger}")
 
 
-def test_mode_single_letter_update(project):
-    with project.db_connection as conn:
-        sql = "UPDATE 'modes' SET mode_id= 'ttt' where mode_id='b'"
+def test_mode_single_letter_update(sioux_falls_example):
+    with sioux_falls_example.db_connection as conn:
+        sql = "UPDATE 'modes' SET mode_id= 'ttt' where mode_id='c'"
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(sql)
 

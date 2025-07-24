@@ -1,19 +1,7 @@
 import os
 import sqlite3
+
 import pytest
-from warnings import warn
-
-from tests.models_for_test import ModelsTest
-
-
-@pytest.fixture
-def project(empty_no_triggers_project):
-    # Modes to add
-    sql = "INSERT INTO modes (mode_name, mode_id) VALUES (?, ?);"
-    with empty_no_triggers_project.db_connection as conn:
-        for mid in ["p", "l", "g", "x", "y", "d", "k", "a", "r", "n", "m"]:
-            conn.execute(sql, [f"mode_{mid}", mid])
-    return empty_no_triggers_project
 
 
 @pytest.fixture
@@ -32,16 +20,6 @@ def get_query(queries, qry: str) -> str:
     raise FileNotFoundError("QUERY DOES NOT EXIST")
 
 
-def check_rtree(project) -> bool:
-    with project.db_connection as conn:
-        try:
-            conn.execute("SELECT rtreecheck('idx_nodes_geometry');")
-        except Exception as e:
-            warn(f"RTREE not available --> {e.args}")
-            return False
-        return True
-
-
 def test_all_tests_considered(queries):
     import sys
 
@@ -56,22 +34,22 @@ def test_all_tests_considered(queries):
                 pytest.fail(f"Trigger not tested. {trigger}")
 
 
-def test_link_type_single_letter_update(project):
-    sql = "UPDATE 'link_types' SET link_type_id= 'ttt' where link_type_id='t'"
+def test_link_type_single_letter_update(sioux_falls_example):
+    sql = "UPDATE 'link_types' SET link_type_id= 'ttt' where link_type_id='z'"
     with pytest.raises(sqlite3.IntegrityError):
-        with project.db_connection as conn:
+        with sioux_falls_example.db_connection as conn:
             conn.execute(sql)
 
 
-def test_link_type_single_letter_insert(project):
+def test_link_type_single_letter_insert(empty_no_triggers_project):
     sql = "INSERT INTO 'link_types' (link_type, link_type_id) VALUES(?, ?)"
     with pytest.raises(sqlite3.IntegrityError):
-        with project.db_connection as conn:
+        with empty_no_triggers_project.db_connection as conn:
             conn.execute(sql, ["test1b", "mm"])
 
 
-def test_link_type_keep_if_in_use_updating(project, queries):
-    with project.db_connection as conn:
+def test_link_type_keep_if_in_use_updating(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         sql = "UPDATE 'link_types' SET link_type= 'ttt' where link_type='test'"
         conn.execute(sql)
 
@@ -84,8 +62,8 @@ def test_link_type_keep_if_in_use_updating(project, queries):
             conn.execute(sql)
 
 
-def test_link_type_keep_if_in_use_deleting(project, queries):
-    with project.db_connection as conn:
+def test_link_type_keep_if_in_use_deleting(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "link_type_keep_if_in_use_deleting")
 
         sql = "DELETE FROM 'link_types' where link_type='test3'"
@@ -98,8 +76,8 @@ def test_link_type_keep_if_in_use_deleting(project, queries):
             conn.execute(sql)
 
 
-def test_link_type_on_links_update(project, queries):
-    with project.db_connection as conn:
+def test_link_type_on_links_update(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "link_type_on_links_update")
 
         sql = "UPDATE 'links' SET link_type= 'rrr' where link_type='test3'"
@@ -112,39 +90,38 @@ def test_link_type_on_links_update(project, queries):
             conn.execute(sql)
 
 
-def test_link_type_on_links_insert(project, queries):
-    with project.db_connection as conn:
+def test_link_type_on_links_insert(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "link_type_on_links_insert")
 
-        if check_rtree(project):
-            f = conn.execute("pragma table_info(links)").fetchall()
-            fields = {x[1]: x[0] for x in f}
+        f = conn.execute("pragma table_info(links)").fetchall()
+        fields = {x[1]: x[0] for x in f}
 
-            sql = "select * from links where link_id=70"
-            a = list(conn.execute(sql).fetchone())
-            a[fields["link_type"]] = "something indeed silly123"
-            a[fields["link_id"]] = 456789
-            a[fields["a_node"]] = 777
-            a[fields["b_node"]] = 999
-            a[0] = 456789
+        sql = "select * from links where link_id=70"
+        a = list(conn.execute(sql).fetchone())
+        a[fields["link_type"]] = "something indeed silly123"
+        a[fields["link_id"]] = 456789
+        a[fields["a_node"]] = 777
+        a[fields["b_node"]] = 999
+        a[0] = 456789
 
-            idx = ",".join(["?"] * len(a))
-            conn.execute(f"insert into links values ({idx})", a)
-            conn.execute("delete from links where link_id=456789")
+        idx = ",".join(["?"] * len(a))
+        conn.execute(f"insert into links values ({idx})", a)
+        conn.execute("delete from links where link_id=456789")
 
-            conn.execute(cmd)
+        conn.execute(cmd)
 
-            with pytest.raises(sqlite3.IntegrityError):
-                conn.execute(f"insert into links values ({idx})", a)
-
-            sql = "select link_type from link_types;"
-
-            a[fields["link_type"]] = conn.execute(sql).fetchone()[0]
+        with pytest.raises(sqlite3.IntegrityError):
             conn.execute(f"insert into links values ({idx})", a)
 
+        sql = "select link_type from link_types;"
 
-def test_link_type_on_links_delete_protected_link_type(project, queries):
-    with project.db_connection as conn:
+        a[fields["link_type"]] = conn.execute(sql).fetchone()[0]
+        conn.execute(f"insert into links values ({idx})", a)
+
+
+def test_link_type_on_links_delete_protected_link_type(empty_no_triggers_project, queries):
+    with empty_no_triggers_project.db_connection as conn:
         cmd = get_query(queries, "link_type_on_links_delete_protected_link_type")
 
         conn.execute(cmd)
@@ -155,8 +132,8 @@ def test_link_type_on_links_delete_protected_link_type(project, queries):
             conn.execute('delete from link_types where link_type_id="y"')
 
 
-def test_link_type_id_keep_if_protected_type(project, queries):
-    with project.db_connection as conn:
+def test_link_type_id_keep_if_protected_type(empty_no_triggers_project, queries):
+    with empty_no_triggers_project.db_connection as conn:
         cmd = get_query(queries, "link_type_id_keep_if_protected_type")
 
         conn.execute(cmd)
@@ -168,8 +145,8 @@ def test_link_type_id_keep_if_protected_type(project, queries):
             conn.execute('update link_types set link_type_id="x" where link_type_id="z"')
 
 
-def test_link_type_keep_if_protected_type(project, queries):
-    with project.db_connection as conn:
+def test_link_type_keep_if_protected_type(empty_no_triggers_project, queries):
+    with empty_no_triggers_project.db_connection as conn:
         cmd = get_query(queries, "link_type_keep_if_protected_type")
         conn.execute(cmd)
 
@@ -180,8 +157,8 @@ def test_link_type_keep_if_protected_type(project, queries):
             conn.execute('update link_types set link_type="xsdfg" where link_type_id="y"')
 
 
-def test_link_type_on_nodes_table_update_nodes_link_type(project, queries):
-    with project.db_connection as conn:
+def test_link_type_on_nodes_table_update_nodes_link_type(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "link_type_on_nodes_table_update_nodes_link_type")
         conn.execute(cmd)
 
@@ -192,8 +169,8 @@ def test_link_type_on_nodes_table_update_nodes_link_type(project, queries):
         assert lts == "etuw", "link_types was allowed to be corrupted in the nodes table"
 
 
-def test_link_type_on_nodes_table_update_links_link_type(project, queries):
-    with project.db_connection as conn:
+def test_link_type_on_nodes_table_update_links_link_type(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "link_type_on_nodes_table_update_links_link_type")
         conn.execute(cmd)
 
@@ -208,8 +185,8 @@ def test_link_type_on_nodes_table_update_links_link_type(project, queries):
         assert lts == "egrtw", "link_types was allowed to be corrupted in the nodes table"
 
 
-def test_link_type_on_nodes_table_update_links_a_node(project, queries):
-    with project.db_connection as conn:
+def test_link_type_on_nodes_table_update_links_a_node(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "link_type_on_nodes_table_update_links_a_node")
         conn.execute(cmd)
 
@@ -224,8 +201,8 @@ def test_link_type_on_nodes_table_update_links_a_node(project, queries):
         assert lts == "grw", "link_types was allowed to be corrupted in the nodes table"
 
 
-def test_link_type_on_nodes_table_update_links_b_node(project, queries):
-    with project.db_connection as conn:
+def test_link_type_on_nodes_table_update_links_b_node(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "link_type_on_nodes_table_update_links_b_node")
         conn.execute(cmd)
 
