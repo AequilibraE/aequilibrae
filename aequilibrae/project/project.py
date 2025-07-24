@@ -35,11 +35,16 @@ class Project:
         >>> new_project = Project()
         >>> new_project.new(project_path)
 
+        # Safely closes the project
+        >>> new_project.close()
+
     .. code-block:: python
         :caption: Open Project
 
         >>> existing_project = Project()
         >>> existing_project.open(project_path)
+
+        >>> existing_project.close()
     """
 
     def __init__(self):

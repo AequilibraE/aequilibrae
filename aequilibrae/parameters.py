@@ -29,7 +29,8 @@ class Parameters:
 
         >>> from aequilibrae import Parameters
 
-        >>> project = create_empty_project
+        >>> project = Project()
+        >>> project.new(project_path)
 
         >>> p = Parameters(project)
 
@@ -41,6 +42,8 @@ class Parameters:
 
         >>> # You can also restore the software default values
         >>> p.restore_default()
+
+        >>> project.close()
     """
 
     _default: dict

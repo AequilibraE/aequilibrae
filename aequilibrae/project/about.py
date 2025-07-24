@@ -11,7 +11,7 @@ class About:
 
     .. code-block:: python
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         # Adding a new field and saving it
         >>> project.about.add_info_field('my_super_relevant_field')
@@ -21,6 +21,8 @@ class About:
         # changing the value for an existing value/field
         >>> project.about.scenario_name = 'Just a better scenario name'
         >>> project.about.write_back()
+
+        >>> project.close()
 
     """
 
@@ -64,11 +66,13 @@ class About:
 
         .. code-block:: python
 
-            >>> project = create_siouxfalls_example
+            >>> project = create_example(project_path)
 
             >>> project.about.add_info_field('a_cool_field')
             >>> project.about.a_cool_field = 'super relevant information'
             >>> project.about.write_back()
+
+            >>> project.close()
         """
         allowed = string.ascii_lowercase + "_"
         has_forbidden = [x for x in info_field if x not in allowed]
@@ -86,10 +90,12 @@ class About:
 
         .. code-block:: python
 
-            >>> project = create_siouxfalls_example
+            >>> project = create_example(project_path)
 
             >>> project.about.description = 'This is the example project. Do not use for forecast'
             >>> project.about.write_back()
+
+            >>> project.close()
         """
         with commit_and_close(self.__path_to_file) as conn:
             for k in self.__characteristics:

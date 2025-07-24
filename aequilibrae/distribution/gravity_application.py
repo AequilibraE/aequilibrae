@@ -74,6 +74,8 @@ class GravityApplication:
         # Solve and save the outputs
         >>> gravity.apply()
         >>> gravity.output.export(os.path.join(project_path, 'matrices/gravity_omx.omx'))
+
+        >>> project.close()
     """
 
     def __init__(self, project=None, **kwargs):

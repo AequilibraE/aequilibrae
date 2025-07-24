@@ -159,7 +159,7 @@ class TrafficAssignment(AssignmentBase):
 
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
@@ -215,6 +215,8 @@ class TrafficAssignment(AssignmentBase):
         # skims are here
         >>> avg_skims = assigclass.results.skims # blended ones
         >>> last_skims = assigclass._aon_results.skims # those for the last iteration
+
+        >>> project.close()
     """
 
     bpr_parameters = ["alpha", "beta"]

@@ -11,7 +11,7 @@ class LinkTypes:
 
     .. code-block:: python
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> link_types = project.network.link_types
 
@@ -52,6 +52,7 @@ class LinkTypes:
         >>> new_type.lane_capacity = 1100
         >>> new_type.save()
 
+        >>> project.close()
     """
 
     def __init__(self, net):

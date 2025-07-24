@@ -7,7 +7,8 @@ class Log:
 
     .. code-block:: python
 
-        >>> project = create_empty_project
+        >>> project = Project()
+        >>> project.new(project_path)
 
         >>> log = project.log()
 
@@ -16,6 +17,8 @@ class Log:
 
         # Or clear everything (NO UN-DOs)
         >>> log.clear()
+
+        >>> project.close()
     """
 
     def __init__(self, project_base_path: Path):

@@ -615,7 +615,7 @@ class GraphBase(ABC):  # noqa: B024
 
         .. code-block:: python
 
-            >>> project = create_siouxfalls_example
+            >>> project = create_example(project_path)
 
             >>> project.network.build_graphs()
 
@@ -623,6 +623,8 @@ class GraphBase(ABC):  # noqa: B024
             >>> graph.prepare_graph(np.arange(1,25))
 
             >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()
+
+            >>> project.close()
 
         :Returns:
             **idx** (:obj:`np.array`): index array for ``data``

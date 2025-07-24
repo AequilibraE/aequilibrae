@@ -26,7 +26,7 @@ class NetworkSkimming(WorkerThread):
 
         >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> network = project.network
         >>> network.build_graphs()

@@ -137,7 +137,8 @@ class Network(WorkerThread):
 
         .. code-block:: python
 
-            >>> project = create_empty_project
+            >>> project = Project()
+            >>> project.new(project_path)
 
             # Now we can import the network for any place we want
             >>> project.network.create_from_osm(place_name="my_beautiful_hometown") # doctest: +SKIP
@@ -284,10 +285,12 @@ class Network(WorkerThread):
 
         .. code-block:: python
 
-            >>> project = create_siouxfalls_example
+            >>> project = create_example(project_path)
 
             >>> fields = ['distance']
             >>> project.network.build_graphs(fields, modes = ['c', 'w'])
+
+            >>> project.close()
 
         """
         from aequilibrae.paths import Graph

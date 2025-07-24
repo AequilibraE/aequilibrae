@@ -15,7 +15,7 @@ class Links(BasicTable):
 
     .. code-block:: python
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> all_links = project.network.links
 
@@ -24,6 +24,8 @@ class Links(BasicTable):
 
         # We can save changes for all links we have edited so far
         >>> all_links.save()
+
+        >>> project.close()
     """
 
     __max_id = -1

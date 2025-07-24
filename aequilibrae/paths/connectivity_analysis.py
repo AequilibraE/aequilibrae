@@ -16,7 +16,7 @@ class ConnectivityAnalysis:
 
         >>> from aequilibrae.paths.connectivity_analysis import ConnectivityAnalysis
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> network = project.network
         >>> network.build_graphs()

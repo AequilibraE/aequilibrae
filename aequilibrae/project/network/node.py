@@ -13,7 +13,7 @@ class Node(SafeClass):
 
         >>> from shapely.geometry import Point
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> all_nodes = project.network.nodes
 
@@ -30,6 +30,8 @@ class Node(SafeClass):
 
         # We can just save the node
         >>> node1.save()
+
+        >>> project.close()
     """
 
     def __init__(self, dataset, project):

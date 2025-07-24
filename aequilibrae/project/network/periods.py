@@ -13,7 +13,7 @@ class Periods(BasicTable):
 
     .. code-block:: python
 
-        >>> project = create_coquimbo_example
+        >>> project = create_example(project_path, "coquimbo")
 
         >>> all_periods = project.network.periods
 
@@ -22,6 +22,8 @@ class Periods(BasicTable):
 
         # We can save changes for all periods we have edited so far
         >>> all_periods.save()
+
+        >>> project.close()
     """
 
     #: Query sql for retrieving periods

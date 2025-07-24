@@ -15,7 +15,7 @@ class Nodes(BasicTable):
 
     .. code-block:: python
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> all_nodes = project.network.nodes
 
@@ -24,6 +24,8 @@ class Nodes(BasicTable):
 
         # We can save changes for all nodes we have edited so far
         >>> all_nodes.save()
+
+        >>> project.close()
     """
 
     #: Query sql for retrieving nodes

@@ -20,7 +20,7 @@ class Ipf:
 
         >>> from aequilibrae.distribution import Ipf
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
@@ -41,6 +41,8 @@ class Ipf:
 
         # We can get back to our OMX matrix in the end
         >>> fratar.output.export(os.path.join(my_folder_path, "to_omx_output.omx"))
+
+        >>> project.close()
     """
 
     def __init__(self, project=None, **kwargs):

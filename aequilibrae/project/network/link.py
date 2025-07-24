@@ -9,7 +9,7 @@ class Link(SafeClass):
 
     .. code-block:: python
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         >>> all_links = project.network.links
 
@@ -40,6 +40,8 @@ class Link(SafeClass):
         # We can just save the link
         >>> link1.save()
         >>> link2.save()
+
+        >>> project.close()
     """
 
     def __init__(self, dataset, project):

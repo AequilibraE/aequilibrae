@@ -121,7 +121,7 @@ def sioux_falls_test(test_data_path, test_folder) -> Project:
     project = cached_model("SiouxFalls_project", test_data_path, test_folder)
     yield project
     project.close()
-    # shutil.rmtree(test_folder, ignore_errors=True)
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
@@ -158,14 +158,16 @@ def build_gtfs_project(coquimbo_example):
     prj.close()
 
 
+@pytest.fixture
+def project_path(test_folder):
+    return test_folder / "0"
+
+
 @pytest.fixture(autouse=True)
-def doctest_fixtures(doctest_namespace, test_folder, tmp_path_factory, sioux_falls_example, coquimbo_example, empty_project, nauru_example):
-    doctest_namespace["project_path"] = str(test_folder)
+def doctest_fixtures(doctest_namespace, tmp_path_factory, project_path):
+    doctest_namespace["project_path"] = str(project_path)
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
-    doctest_namespace["create_siouxfalls_example"] = sioux_falls_example
-    doctest_namespace["create_nauru_example"] = nauru_example
-    doctest_namespace["create_coquimbo_example"] = coquimbo_example
-    doctest_namespace["create_empty_project"] = empty_project
+    doctest_namespace["create_example"] = create_example
     doctest_namespace["Project"] = Project
     doctest_namespace["Transit"] = Transit
     doctest_namespace["AequilibraeMatrix"] = AequilibraeMatrix

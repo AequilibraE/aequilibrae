@@ -21,13 +21,15 @@ class FieldEditor:
 
     .. code-block:: python
 
-        >>> project = create_siouxfalls_example
+        >>> project = create_example(project_path)
 
         # To edit the fields of the link_types table
         >>> lt_fields = project.network.link_types.fields
 
         # To edit the fields of the modes table
         >>> m_fields = project.network.modes.fields
+
+        >>> project.close()
 
     Field descriptions are kept in the table *attributes_documentation*
     """
