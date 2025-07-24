@@ -45,14 +45,15 @@ def project(db_connections):
 def sample_data():
     return {
         "table_name": "test_result",
-        "procedure": "test_procedure",
-        "procedure_id": "test_id_123",
-        "procedure_report": '{"status": "success", "items": 100}',
-        "timestamp": "2000-01-01 12:00:00",
-        "description": "Test result description",
-        "year": "2020",
-        "scenario": "testing",
-    }
+            "procedure": "test_procedure",
+            "procedure_id": "test_id_123",
+            "procedure_report": '{"status": "success", "items": 100}',
+            "timestamp": "2000-01-01 12:00:00",
+            "description": "Test result description",
+            "year": "2020",
+            "scenario": "testing",
+            "reference_table": "links",
+        }
 
 
 # Fixtures for Results tests
@@ -106,15 +107,20 @@ def test_save_new_record(db_connections, project, sample_data):
     record = ResultRecord(sample_data, project, project_conn, results_conn)
     record.save()
 
-    cursor = project_conn.execute("SELECT * FROM results WHERE table_name=?", ["test_result"])
+    cursor = project_conn.execute(
+        "SELECT scenario, year, table_name, reference_table, procedure, procedure_id, "
+        "procedure_report, timestamp, description FROM results WHERE table_name=?",
+        ["test_result"],
+    )
     result = cursor.fetchone()
 
     assert result is not None
     assert result[0] == "testing"
     assert result[1] == "2020"
     assert result[2] == "test_result"
-    assert result[3] == "test_procedure"
-    assert result[4] == "test_id_123"
+    assert result[3] == "links"
+    assert result[4] == "test_procedure"
+    assert result[5] == "test_id_123"
 
 
 def test_save_update_existing_record(db_connections, project, sample_data):
