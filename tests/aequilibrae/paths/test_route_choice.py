@@ -141,7 +141,10 @@ def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost)
     if recompute_psl and change_cost:
         # Recomputing PSL and changing the cost field means the link loads will be different (cost change), and path
         # overlap, cost, and mask will be different (recompute PSL)
-        pd.testing.assert_frame_equal(results[["origin id", "destination id", "route set"]], results_new[["origin id", "destination id", "route set"]])
+        pd.testing.assert_frame_equal(
+            results[["origin id", "destination id", "route set"]],
+            results_new[["origin id", "destination id", "route set"]],
+        )
     elif recompute_psl and not change_cost:
         # Everything must match here
         pd.testing.assert_frame_equal(results, results_new)
