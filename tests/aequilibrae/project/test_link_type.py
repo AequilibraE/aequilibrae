@@ -18,8 +18,8 @@ def link_types(empty_no_triggers_project):
     return empty_no_triggers_project.network.link_types
 
 
-def test_changing_link_type_id(link_types):
-    lt = random.choice(list(link_types.all_types().values()))
+def test_changing_link_type_id(no_triggers_test):
+    lt = random.choice(list(no_triggers_test.network.link_types.all_types().values()))
 
     with pytest.raises(ValueError):
         lt.link_type_id = "test my description"
