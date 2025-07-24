@@ -9,6 +9,7 @@ import pytest
 from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix, GeneralisedCOODemand
 from aequilibrae.paths.route_choice import RouteChoice
+from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 
 
 @pytest.fixture(scope="function")
@@ -28,7 +29,7 @@ def route_choice_setup(sioux_falls_single_class):
 
 
 def test_prepare(route_choice_setup):
-    rc = RouteChoice(route_choice_setup["rc"])
+    rc = route_choice_setup["rc"]
 
     with pytest.raises(ValueError):
         rc.prepare([])
@@ -50,7 +51,7 @@ def test_prepare(route_choice_setup):
 
 
 def test_set_save_routes(route_choice_setup):
-    rc = RouteChoice(route_choice_setup["graph"])
+    rc = route_choice_setup["rc"]
 
     with pytest.raises(ValueError):
         rc.set_save_routes("/non-existent-path")
@@ -137,21 +138,26 @@ def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost)
     results_new = rc2.get_results()
     ll_res_new = rc2.get_load_results()
 
-    pd.testing.assert_frame_equal(ll_res, ll_res_new)
-
-    if recompute_psl and not change_cost:
+    if recompute_psl and change_cost:
+        # Recomputing PSL and changing the cost field means the link loads will be different (cost change), and path
+        # overlap, cost, and mask will be different (recompute PSL)
+        pd.testing.assert_frame_equal(results[["origin id", "destination id", "route set"]], results_new[["origin id", "destination id", "route set"]])
+    elif recompute_psl and not change_cost:
+        # Everything must match here
         pd.testing.assert_frame_equal(results, results_new)
-    elif not recompute_psl:
+        pd.testing.assert_frame_equal(ll_res, ll_res_new)
+    elif not recompute_psl and change_cost:
+        raise RuntimeError("branch should be unreachable, cannot change cost field without recomputing PSL")
+    elif not recompute_psl and not change_cost:
+        # Cost, mask, and path overlap are not compared because the they are note used when assigning from DF
         pd.testing.assert_frame_equal(
             results[["origin id", "destination id", "route set", "probability"]],
             results_new[["origin id", "destination id", "route set", "probability"]],
         )
-    else:  # change_cost
-        pd.testing.assert_series_equal(results["origin id"], results_new["origin id"])
-        pd.testing.assert_series_equal(results["destination id"], results_new["destination id"])
-        pd.testing.assert_series_equal(results["route set"], results_new["route set"])
-        pd.testing.assert_series_equal(results["path overlap"], results_new["path overlap"])
-        # All other fields may be different
+        # Not recomputing PSL means the assignment results are the same
+        pd.testing.assert_frame_equal(ll_res, ll_res_new)
+    else:
+        raise  # Unreachable
 
 
 def test_saving(route_choice_setup):
@@ -221,6 +227,7 @@ def test_round_trip(route_choice_setup):
 
 def test_assign_from_df(route_choice_setup):
     graph = route_choice_setup["graph"]
+    rc = RouteChoiceSet(graph)
 
     mat2 = AequilibraeMatrix()
     mat2.create_empty(
@@ -238,8 +245,6 @@ def test_assign_from_df(route_choice_setup):
         shape=(graph.num_zones, graph.num_zones),
     )
     demand.add_matrix(mat2)
-
-    rc = RouteChoice(graph)
 
     args = {
         "graph": graph.graph,
@@ -363,10 +368,11 @@ def test_assign_from_df(route_choice_setup):
 @pytest.mark.parametrize("cost", ["distance", "free_flow_time"])
 def test_known_results(route_choice_setup, cost):
     graph = route_choice_setup["graph"]
+    rc = RouteChoiceSet(graph)
+
     graph.set_graph(cost)
 
     np.random.seed(0)
-    rc = RouteChoice(graph)
     nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
 
     mat = AequilibraeMatrix()
@@ -414,10 +420,11 @@ def test_known_results(route_choice_setup, cost):
 @pytest.mark.parametrize("cost", ["distance", "free_flow_time"])
 def test_select_link(route_choice_setup, cost):
     graph = route_choice_setup["graph"]
+    rc = RouteChoiceSet(graph)
+
     graph.set_graph(cost)
 
     np.random.seed(0)
-    rc = RouteChoice(graph)
     nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
     demand = demand_from_nodes(nodes, graph)
 
