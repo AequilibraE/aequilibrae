@@ -81,6 +81,7 @@ def sioux_falls_example(cache_path, test_folder) -> Project:
     project = cached_model("sioux_falls", cache_path, test_folder)
     yield project
     project.close()
+    # shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
@@ -88,6 +89,7 @@ def nauru_example(cache_path, test_folder) -> Project:
     project = cached_model("nauru", cache_path, test_folder)
     yield project
     project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
@@ -95,6 +97,7 @@ def coquimbo_example(cache_path, test_folder) -> Project:
     project = cached_model("coquimbo", cache_path, test_folder)
     yield project
     project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture
@@ -102,6 +105,7 @@ def empty_project(cache_path, test_folder) -> Project:
     project = cached_model("empty_project", cache_path, test_folder)
     yield project
     project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture
@@ -109,6 +113,7 @@ def empty_no_triggers_project(cache_path, test_folder) -> Project:
     project = cached_model("empty_no_triggers", cache_path, test_folder)
     yield project
     project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
@@ -116,6 +121,14 @@ def sioux_falls_test(test_data_path, test_folder) -> Project:
     project = cached_model("SiouxFalls_project", test_data_path, test_folder)
     yield project
     project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
+
+@pytest.fixture(scope="function")
+def no_triggers_test(test_data_path, test_folder) -> Project:
+    project = cached_model("no_triggers_project", test_data_path, test_folder)
+    yield project
+    project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
@@ -123,6 +136,7 @@ def sioux_falls_single_class(cache_path, test_folder) -> Project:
     project = cached_model("sioux_falls_single_class", cache_path, test_folder)
     yield project
     project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
@@ -130,6 +144,7 @@ def triangle_graph_blocking(test_data_path, test_folder) -> Project:
     project = cached_model("blocking_triangle_graph_project", test_data_path, test_folder)
     yield project
     project.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture
@@ -202,15 +217,15 @@ create_project_session = project_factory_fixture(scope="session")
 def pytest_sessionstart(session):
     tgt = test_base / "cache" / "sioux_falls"
     if not tgt.exists():
-        create_example(tgt, "sioux_falls").close()
+        create_example(tgt, "sioux_falls").upgrade()
 
     tgt = test_base / "cache" / "nauru"
     if not tgt.exists():
-        create_example(tgt, "nauru").close()
+        create_example(tgt, "nauru").upgrade()
 
     tgt = test_base / "cache" / "coquimbo"
     if not tgt.exists():
-        create_example(tgt, "coquimbo").close()
+        create_example(tgt, "coquimbo").upgrade()
 
     tgt = test_base / "cache" / "empty_project"
     if not tgt.exists():
@@ -219,6 +234,7 @@ def pytest_sessionstart(session):
     tgt = test_base / "cache" / "sioux_falls_single_class"
     if not tgt.exists():
         zipfile.ZipFile(Path(__file__).parent / "tests" / "data" / "sioux_falls_single_class.zip").extractall(tgt)
+        Project.from_path(tgt).upgrade()
 
     tgt = test_base / "cache" / "empty_no_triggers"
     if not tgt.exists():

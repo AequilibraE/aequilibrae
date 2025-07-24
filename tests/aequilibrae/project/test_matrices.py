@@ -25,25 +25,25 @@ def test_set_record(sioux_falls_example):
     matrices = sioux_falls_example.matrices
     rec = matrices.get_record("demand_omx")
     with pytest.raises(ValueError):
-        rec.name = "omx"
+        rec.name = "skims"
     with pytest.raises(ValueError):
-        rec.file_name = "sfalls_skims.omx"
+        rec.file_name = "demand_mc.omx"
     assert rec.file_name == "demand.omx"
     assert rec.cores == 1, "Setting a file that exists did not correct the number of cores"
 
 
-def test_clear_database(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
-    mat_count(sioux_falls_example, 3, "The test data started wrong")
+def test_clear_database(sioux_falls_test):
+    matrices = sioux_falls_test.matrices
+    mat_count(sioux_falls_test, 3, "The test data started wrong")
     matrices.clear_database()
-    mat_count(sioux_falls_example, 2, "Did not clear the database appropriately")
+    mat_count(sioux_falls_test, 2, "Did not clear the database appropriately")
 
 
-def test_update_database(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
-    mat_count(sioux_falls_example, 3, "The test data started wrong")
+def test_update_database(sioux_falls_test):
+    matrices = sioux_falls_test.matrices
+    mat_count(sioux_falls_test, 3, "The test data started wrong")
     matrices.update_database()
-    mat_count(sioux_falls_example, 4, "Did not add to the database appropriately")
+    mat_count(sioux_falls_test, 4, "Did not add to the database appropriately")
     rec = matrices.get_record("omx")
     existing = join(rec.fldr, rec.file_name)
     new_name = "test_name.omx"
@@ -71,8 +71,8 @@ def test_get_record(sioux_falls_example):
     assert rec.description is None, "record populated wrong. Description"
 
 
-def test_record_update_cores(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
+def test_record_update_cores(sioux_falls_test):
+    matrices = sioux_falls_test.matrices
     rec = matrices.get_record("omx")
     rec.update_cores()
     assert rec.cores == 2, "Cores update did not work"

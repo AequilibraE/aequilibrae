@@ -70,20 +70,18 @@ def test_mode_single_letter_insert(project):
             conn.execute(sql, ["testasdasd", "pp"])
 
 
-def test_mode_keep_if_in_use_updating(project, queries):
-    with project.db_connection as conn:
-        sql = "UPDATE 'modes' SET mode_id= 'h' where mode_id='g'"
-        conn.execute(sql)
-        cmd = get_query(queries, "mode_keep_if_in_use_updating")
-        conn.execute(cmd)
+def test_mode_keep_if_in_use_updating(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
+        conn.execute("UPDATE 'modes' SET mode_id= 'h' where mode_id='g'")
+        conn.execute(get_query(queries, "mode_keep_if_in_use_updating"))
         conn.commit()
-        sql = "UPDATE 'modes' SET mode_id= 'j' where mode_id='l'"
+        sql = "UPDATE 'modes' SET mode_id= 'j' where mode_id='c'"
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(sql)
 
 
-def test_mode_keep_if_in_use_deleting(project, queries):
-    with read_and_close(project.path_to_file) as conn:
+def test_mode_keep_if_in_use_deleting(no_triggers_test, queries):
+    with read_and_close(no_triggers_test.path_to_file) as conn:
         cmd = get_query(queries, "mode_keep_if_in_use_deleting")
         sql = "DELETE FROM 'modes' where mode_id='p'"
         conn.execute(sql)
@@ -93,8 +91,8 @@ def test_mode_keep_if_in_use_deleting(project, queries):
             conn.execute(sql)
 
 
-def test_modes_on_links_update(project, queries):
-    with read_and_close(project.path_to_file) as conn:
+def test_modes_on_links_update(no_triggers_test, queries):
+    with read_and_close(no_triggers_test.path_to_file) as conn:
         cmd = get_query(queries, "modes_on_links_update")
         sql = "UPDATE 'links' SET modes= 'qwerty' where link_id=55"
         conn.execute(sql)
@@ -104,15 +102,15 @@ def test_modes_on_links_update(project, queries):
             conn.execute(sql)
 
 
-def test_modes_length_on_links_update(project):
-    with read_and_close(project.path_to_file) as conn:
-        sql = "UPDATE 'links' SET modes= '' where modes='wb'"
+def test_modes_length_on_links_update(sioux_falls_test):
+    with read_and_close(sioux_falls_test.path_to_file) as conn:
+        sql = "UPDATE 'links' SET modes= '' where modes='c'"
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(sql)
 
 
-def test_modes_on_nodes_table_update_a_node(project, queries):
-    with read_and_close(project.path_to_file) as conn:
+def test_modes_on_nodes_table_update_a_node(no_triggers_test, queries):
+    with read_and_close(no_triggers_test.path_to_file) as conn:
         cmd = get_query(queries, "modes_on_nodes_table_update_a_node")
         sql = "UPDATE 'links' SET a_node= 1 where a_node=3"
         conn.execute(sql)
@@ -131,8 +129,8 @@ def test_modes_on_nodes_table_update_a_node(project, queries):
         assert i == existing
 
 
-def test_modes_on_nodes_table_update_b_node(project, queries):
-    with read_and_close(project.path_to_file) as conn:
+def test_modes_on_nodes_table_update_b_node(no_triggers_test, queries):
+    with read_and_close(no_triggers_test.path_to_file) as conn:
         cmd = get_query(queries, "modes_on_nodes_table_update_b_node")
         sql = "UPDATE 'links' SET b_node= 1 where b_node=3"
         conn.execute(sql)
@@ -147,31 +145,33 @@ def test_modes_on_nodes_table_update_b_node(project, queries):
         assert i == "ctw"
 
 
-def test_modes_on_nodes_table_update_links_modes(project, queries):
-    with read_and_close(project.path_to_file) as conn:
+def test_modes_on_nodes_table_update_links_modes(no_triggers_test, queries):
+    with read_and_close(no_triggers_test.path_to_file) as conn:
         cmd = get_query(queries, "modes_on_nodes_table_update_links_modes")
         sql = "UPDATE 'links' SET modes= 'x' where a_node=24"
         conn.execute(sql)
+        conn.commit()
         sql = "SELECT modes from nodes where node_id=24"
         i = conn.execute(sql).fetchone()[0]
         assert i == "c"
         conn.execute(cmd)
-        sql = "UPDATE 'links' SET 'modes'= 'y' where a_node=24"
+        sql = "UPDATE 'links' SET 'modes'= 'w' where a_node=24"
+        conn.execute(sql)
+        conn.commit()
+        sql = "SELECT modes from nodes where node_id=24"
+        i = conn.execute(sql).fetchone()[0]
+        assert "c" in i and "w" in i
+        sql = "UPDATE 'links' SET 'modes'= 'w' where b_node=24"
         conn.execute(sql)
         sql = "SELECT modes from nodes where node_id=24"
         i = conn.execute(sql).fetchone()[0]
-        assert "c" in i and "y" in i
-        sql = "UPDATE 'links' SET 'modes'= 'r' where b_node=24"
-        conn.execute(sql)
-        sql = "SELECT modes from nodes where node_id=24"
-        i = conn.execute(sql).fetchone()[0]
-        assert "r" in i and "y" in i
+        assert "w" == i
 
 
-def test_modes_on_links_insert(project, queries):
-    with read_and_close(project.path_to_file, spatial=True) as conn:
+def test_modes_on_links_insert(no_triggers_test, queries):
+    with read_and_close(no_triggers_test.path_to_file, spatial=True) as conn:
         cmd = get_query(queries, "modes_on_links_insert")
-        if check_rtree(project):
+        if check_rtree(no_triggers_test):
             fds = conn.execute("pragma table_info(links)").fetchall()
             fields = {x[1]: x[0] for x in fds}
             sql = "select * from links where link_id=10"
@@ -189,10 +189,10 @@ def test_modes_on_links_insert(project, queries):
                 conn.execute(f"insert into links values ({idx})", a)
 
 
-def test_modes_length_on_links_insert(project):
-    if not check_rtree(project):
+def test_modes_length_on_links_insert(sioux_falls_test):
+    if not check_rtree(sioux_falls_test):
         return
-    with project.db_connection as conn:
+    with sioux_falls_test.db_connection as conn:
         f = conn.execute("pragma table_info(links)").fetchall()
         fields = {x[1]: x[0] for x in f}
         sql = "select * from links where link_id=70"
@@ -207,8 +207,8 @@ def test_modes_length_on_links_insert(project):
             conn.execute(f"insert into links values ({idx})", a)
 
 
-def test_keep_at_least_one(project, queries):
-    with project.db_connection as conn:
+def test_keep_at_least_one(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "mode_keep_at_least_one")
         conn.execute("Delete from modes;")
         cnt = conn.execute("select count(*) from modes;").fetchone()[0]
@@ -219,8 +219,8 @@ def test_keep_at_least_one(project, queries):
             conn.execute("Delete from modes;")
 
 
-def test_modes_on_nodes_table_update_nodes_modes(project, queries):
-    with project.db_connection as conn:
+def test_modes_on_nodes_table_update_nodes_modes(no_triggers_test, queries):
+    with no_triggers_test.db_connection as conn:
         cmd = get_query(queries, "modes_on_nodes_table_update_nodes_modes")
         sql = "select node_id, modes from nodes where length(modes)>0"
         dt = conn.execute(sql).fetchall()
