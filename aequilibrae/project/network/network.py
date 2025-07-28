@@ -290,6 +290,8 @@ class Network(WorkerThread):
             >>> fields = ['distance']
             >>> project.network.build_graphs(fields, modes = ['c', 'w'])
 
+            >>> project.close()
+
         """
         from aequilibrae.paths import Graph
 

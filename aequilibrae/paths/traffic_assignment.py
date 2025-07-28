@@ -215,6 +215,8 @@ class TrafficAssignment(AssignmentBase):
         # skims are here
         >>> avg_skims = assigclass.results.skims # blended ones
         >>> last_skims = assigclass._aon_results.skims # those for the last iteration
+
+        >>> project.close()
     """
 
     bpr_parameters = ["alpha", "beta"]

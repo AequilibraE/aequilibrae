@@ -15,6 +15,8 @@ class Period(SafeClass):
 
         # We can find out which fields exist for the period
         >>> which_fields_do_we_have = period1.data_fields()
+
+        >>> project.close()
     """
 
     def __init__(self, dataset, project):

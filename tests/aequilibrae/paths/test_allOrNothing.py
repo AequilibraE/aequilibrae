@@ -1,67 +1,75 @@
-import os
-from tempfile import gettempdir
-from unittest import TestCase
-import uuid
-from aequilibrae.utils.create_example import create_example
+import pytest
+
 from aequilibrae.paths import Graph
-from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from ...data import test_graph
+from aequilibrae.paths.results import AssignmentResults
 
 
-# TODO: Add checks for results for this test (Assignment AoN)
-class TestAllOrNothing(TestCase):
-    def setUp(self) -> None:
-        proj_path = os.path.join(gettempdir(), "test_traffic_assignment_" + uuid.uuid4().hex)
-        self.project = create_example(proj_path)
-        self.project.network.build_graphs()
-        self.g = self.project.network.graphs["c"]  # type: Graph
-        self.g.set_graph("distance")
-        self.g.set_skimming("distance")
-        self.g.set_blocked_centroid_flows(False)
+@pytest.fixture(scope="function")
+def project(sioux_falls_example):
+    sioux_falls_example.network.build_graphs()
+    yield sioux_falls_example
 
-        self.matrix = self.project.matrices.get_matrix("demand_aem")
-        self.matrix.computational_view()
-        self.matrix2 = self.project.matrices.get_matrix("demand_omx")
-        self.matrix2.computational_view()
-        self.matrix2.matrix_view *= 2
 
-    def tearDown(self) -> None:
-        self.matrix.close()
-        self.matrix2.close()
-        self.project.close()
+def build_graph(project):
+    project.network.build_graphs()
+    g = project.network.graphs["c"]  # type: Graph
+    g.set_graph("distance")
+    g.set_skimming("distance")
+    g.set_blocked_centroid_flows(False)
+    return g
 
-    def test_skimming_on_assignment(self):
-        res = AssignmentResults()
 
-        res.prepare(self.g, self.matrix)
+def matrix_aem(project):
+    mat = project.matrices.get_matrix("demand_aem")
+    mat.computational_view()
+    return mat
 
-        self.g.set_skimming([])
-        self.g.set_blocked_centroid_flows(True)
-        assig = allOrNothing("name", self.matrix, self.g, res)
-        assig.execute()
 
-        if res.skims.distance.sum() > 0:
-            self.fail("skimming for nothing during assignment returned something different than zero")
+def matrix_omx(project):
+    matrix = project.matrices.get_matrix("demand_omx")
+    matrix.computational_view()
+    matrix.matrix_view *= 2
+    return matrix
 
-        res.prepare(self.g, self.matrix)
 
-        assig = allOrNothing("name", self.matrix, self.g, res)
-        assig.execute()
+def test_skimming_on_assignment(sioux_falls_example):
+    matrix = matrix_aem(sioux_falls_example)
+    graph = build_graph(sioux_falls_example)
+    res = AssignmentResults()
+    res.prepare(graph, matrix)
 
-    def test_execute(self):
-        # Loads and prepares the graph
-        res1 = AssignmentResults()
-        res1.prepare(self.g, self.matrix)
-        assig1 = allOrNothing("name", self.matrix, self.g, res1)
-        assig1.execute()
+    graph.set_skimming([])
+    graph.set_blocked_centroid_flows(True)
+    assig = allOrNothing("name", matrix, graph, res)
+    assig.execute()
 
-        res2 = AssignmentResults()
-        res2.prepare(self.g, self.matrix2)
-        assig2 = allOrNothing("name", self.matrix2, self.g, res2)
-        assig2.execute()
+    assert (
+        res.skims.distance.sum() == 0
+    ), "skimming for nothing during assignment returned something different than zero"
 
-        load1 = res1.get_load_results()
-        load2 = res2.get_load_results()
+    res.prepare(graph, matrix)
+    assig = allOrNothing("name", matrix, graph, res)
+    assig.execute()
 
-        self.assertEqual(list(load1.matrix_tot * 2), list(load2.matrix_tot), "Something wrong with the AoN")
+
+def test_execute(sioux_falls_example):
+    matrix = matrix_aem(sioux_falls_example)
+    matrix2 = matrix_omx(sioux_falls_example)
+    graph = build_graph(sioux_falls_example)
+    # Loads and prepares the graph
+    res1 = AssignmentResults()
+    res1.prepare(graph, matrix)
+    assig1 = allOrNothing("name", matrix, graph, res1)
+    assig1.execute()
+
+    res2 = AssignmentResults()
+    res2.prepare(graph, matrix2)
+    assig2 = allOrNothing("name", matrix2, graph, res2)
+    assig2.execute()
+
+    load1 = res1.get_load_results()
+    load2 = res2.get_load_results()
+
+    assert list(load1.matrix_tot * 2) == list(load2.matrix_tot), "Something wrong with the AoN"
+    matrix2.close()

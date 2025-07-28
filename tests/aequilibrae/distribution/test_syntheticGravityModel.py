@@ -1,35 +1,41 @@
-from unittest import TestCase
+import pytest
+
 from aequilibrae.distribution import SyntheticGravityModel
-import tempfile
-import os
-
-filename = os.path.join(tempfile.gettempdir(), "aequilibrae_model_test.mod")
 
 
-class TestSyntheticGravityModel(TestCase):
-    def test_load(self):
-        self.test_save()
-        model = SyntheticGravityModel()
-        model.load(filename)
+@pytest.fixture
+def model_filename(test_folder):
+    return test_folder / "aequilibrae_model_test.mod"
 
-        if model.alpha != 0.1:
-            self.fail("Gravity model: Alpha not saved properly")
 
-        if model.function != "POWER":
-            self.fail("Gravity model: Function not saved properly")
+@pytest.fixture
+def saved_model(model_filename):
+    model = SyntheticGravityModel()
+    model.function = "POWER"
+    model.alpha = 0.1
+    model.save(model_filename)
+    return model_filename
 
-        if model.beta is not None:
-            self.fail("Gravity model: Beta not saved properly")
 
-    def test_save(self):
-        model = SyntheticGravityModel()
-        model.function = "EXPO"
-        model.beta = 0.1
-        self.assertEqual(model.function, "EXPO")  # Did we save the value?
+def test_save(model_filename):
+    model = SyntheticGravityModel()
+    model.function = "EXPO"
+    model.beta = 0.1
+    assert model.function == "EXPO"  # Did we save the value?
 
-        model.function = "POWER"
-        # Check if we zeroed the parameters when changing the function
-        self.assertEqual(model.beta, None)
-        model.alpha = 0.1
+    model.function = "POWER"
+    # Check if we zeroed the parameters when changing the function
+    assert model.beta is None
+    model.alpha = 0.1
 
-        model.save(filename)
+    model.save(model_filename)
+    return model_filename
+
+
+def test_load(saved_model):
+    model = SyntheticGravityModel()
+    model.load(saved_model)
+
+    assert model.alpha == 0.1, "Gravity model: Alpha not saved properly"
+    assert model.function == "POWER", "Gravity model: Function not saved properly"
+    assert model.beta is None, "Gravity model: Beta not saved properly"

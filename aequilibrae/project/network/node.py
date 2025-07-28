@@ -30,6 +30,8 @@ class Node(SafeClass):
 
         # We can just save the node
         >>> node1.save()
+
+        >>> project.close()
     """
 
     def __init__(self, dataset, project):

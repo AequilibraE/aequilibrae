@@ -624,6 +624,8 @@ class GraphBase(ABC):  # noqa: B024
 
             >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()
 
+            >>> project.close()
+
         :Returns:
             **idx** (:obj:`np.array`): index array for ``data``
 

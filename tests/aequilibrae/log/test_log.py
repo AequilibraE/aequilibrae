@@ -1,39 +1,23 @@
-from logging import FileHandler
 import os
-import uuid
-from shutil import copytree
-from tempfile import gettempdir
-from unittest import TestCase
+from logging import FileHandler
 
 import pytest
 
-from ...data import siouxfalls_project
-from aequilibrae.project import Project
+
+def test_contents(sioux_falls_test):
+    log = sioux_falls_test.log()
+    cont = log.contents()
+    assert len(cont) == 4, "Returned the wrong amount of data from the log"
 
 
-class TestLog(TestCase):
-    def setUp(self) -> None:
-        self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
-        copytree(siouxfalls_project, self.proj_dir)
+def test_clear(sioux_falls_test):
+    log = sioux_falls_test.log()
+    log.clear()
 
-        self.project = Project()
-        self.project.open(self.proj_dir)
-
-    def tearDown(self) -> None:
-        self.project.close()
-
-    def test_contents(self):
-        log = self.project.log()
-        cont = log.contents()
-        self.assertEqual(len(cont), 4, "Returned the wrong amount of data from the log")
-
-    def test_clear(self):
-        log = self.project.log()
-        log.clear()
-
-        with open(os.path.join(self.proj_dir, "aequilibrae.log"), "r") as file:
-            q = file.readlines()
-        self.assertEqual(len(q), 0, "Failed to clear the log file")
+    proj_dir = sioux_falls_test.project_base_path
+    with open(os.path.join(proj_dir, "aequilibrae.log"), "r") as file:
+        q = file.readlines()
+    assert len(q) == 0, "Failed to clear the log file"
 
 
 class TestStartsLogging:

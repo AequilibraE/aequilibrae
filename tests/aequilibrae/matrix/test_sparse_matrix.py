@@ -1,38 +1,25 @@
-from tempfile import gettempdir
-from aequilibrae.matrix import COO
-from unittest import TestCase
-from uuid import uuid4
-import scipy.sparse
 import numpy as np
-import pathlib
+import scipy.sparse
+
+from aequilibrae.matrix import COO
 
 
-class TestSparseMatrix(TestCase):
-    def setUp(self) -> None:
-        self.data = np.full((100, 100), 5.0)
-        self.dir = pathlib.Path(gettempdir()) / uuid4().hex
-        self.dir.mkdir()
+def test_round_trip(test_folder):
+    test_data = np.full((100, 100), 5.0)
+    p = test_folder / "test.omx"
 
-    def tearDown(self) -> None:
-        pass
+    coo = COO.from_matrix(test_data)
+    coo.to_disk(p, "m1")
+    coo.to_disk(p, "m2")
 
-    def test_round_trip(self):
-        p = self.dir / "test.omx"
+    sp = coo.to_scipy()
 
-        coo = COO.from_matrix(
-            self.data,
-        )
-        coo.to_disk(p, "m1")
-        coo.to_disk(p, "m2")
+    coo1 = COO.from_disk(p)
+    coo2 = COO.from_disk(p, aeq=True)
 
-        sp = coo.to_scipy()
+    for m in ["m1", "m2"]:
+        assert isinstance(coo1[m], scipy.sparse.csr_matrix)
+        assert isinstance(coo2[m], COO)
 
-        coo1 = COO.from_disk(p)
-        coo2 = COO.from_disk(p, aeq=True)
-
-        for m in ["m1", "m2"]:
-            self.assertIsInstance(coo1[m], scipy.sparse.csr_matrix)
-            self.assertIsInstance(coo2[m], COO)
-
-            np.testing.assert_allclose(sp.toarray(), coo1[m].toarray())
-            np.testing.assert_allclose(sp.toarray(), coo2[m].to_scipy().toarray())
+        np.testing.assert_allclose(sp.toarray(), coo1[m].toarray())
+        np.testing.assert_allclose(sp.toarray(), coo2[m].to_scipy().toarray())

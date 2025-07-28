@@ -9,7 +9,7 @@ https://aetperf.github.io/2023/05/10/Hyperpath-routing-in-the-context-of-transit
 
 import numpy as np
 import pandas as pd
-from unittest import TestCase
+import pytest
 from aequilibrae.paths.public_transport import HyperpathGenerating
 
 
@@ -355,225 +355,243 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     return edges, demand
 
 
-class TestHyperPath(TestCase):
-    def _setUp(self, network="bell", n=10, alpha=10.0, dwell_time=0.0, seed=124) -> None:
-        """
-        Use our own setup method to allow specifying args for network creation
-        """
-        if network == "bell":
-            self.vertices = create_vertices(n)
-            self.edges = create_edges(n, seed=seed)
+@pytest.fixture(scope="function")
+def network_setup(request):
+    """
+    Fixture for creating network data based on parameters.
 
-            delay_base = self.edges.delay_base.values
-            indices = np.where(delay_base == 0.0)
-            delay_base[indices] = 1.0
-            freq_base = 1.0 / delay_base
-            freq_base[indices] = np.inf
-            self.edges["freq_base"] = freq_base
+    Parameters are passed using indirect parametrization:
+    @pytest.mark.parametrize("network_setup", [
+        {"network": "bell", "n": 10, "alpha": 10.0, "dwell_time": 0.0, "seed": 124}
+    ], indirect=True)
+    """
+    network_type = request.param.get("network", "bell")
+    n = request.param.get("n", 10)
+    alpha = request.param.get("alpha", 10.0)
+    dwell_time = request.param.get("dwell_time", 0.0)
+    seed = request.param.get("seed", 124)
 
-            if alpha == 0.0:
-                self.edges["freq"] = np.inf
-            else:
-                self.edges["freq"] = self.edges.freq_base / alpha
+    result = {}
 
-            self.demand = pd.DataFrame(
-                {
-                    "orig_vert_idx": self.vertices.index[:10],
-                    "dest_vert_idx": np.flip(self.vertices.index[-10:]),
-                    "demand": np.full(10, 1),
-                }
-            )
-            self.centroids = self.vertices.index.to_numpy()
-            self.all_nodes = self.vertices.index.to_numpy()
+    if network_type == "bell":
+        result["vertices"] = create_vertices(n)
+        result["edges"] = create_edges(n, seed=seed)
 
-        elif network == "SF":
-            self.edges, self.demand = create_SF_network(dwell_time=dwell_time)
-            self.centroids = np.array([0, 12])
-            self.all_nodes = np.unique(np.hstack((self.edges["head"].values, self.edges["tail"].values)))
+        delay_base = result["edges"].delay_base.values
+        indices = np.where(delay_base == 0.0)
+        delay_base[indices] = 1.0
+        freq_base = 1.0 / delay_base
+        freq_base[indices] = np.inf
+        result["edges"]["freq_base"] = freq_base
 
+        if alpha == 0.0:
+            result["edges"]["freq"] = np.inf
         else:
-            raise KeyError(f'Unknown network type "{network}"')
+            result["edges"]["freq"] = result["edges"].freq_base / alpha
 
-        self.nodes_to_indices = np.full(self.all_nodes.max() + 1, -1, dtype="int64")
-        self.nodes_to_indices[self.all_nodes] = np.arange(len(self.all_nodes))
-
-    def tearDown(self) -> None:
-        try:
-            del self.vertices, self.edges, self.demand
-        except NameError:
-            pass
-        except AttributeError:
-            pass
-
-    def test_bell_assign_parallel_agreement(self) -> None:
-        self._setUp(network="bell")
-
-        hp = HyperpathGenerating(
-            self.edges,
-            o_vert_ids=self.centroids,
-            d_vert_ids=self.centroids,
-            nodes_to_indices=self.nodes_to_indices,
+        result["demand"] = pd.DataFrame(
+            {
+                "orig_vert_idx": result["vertices"].index[:10],
+                "dest_vert_idx": np.flip(result["vertices"].index[-10:]),
+                "demand": np.full(10, 1),
+            }
         )
+        result["centroids"] = result["vertices"].index.to_numpy()
+        result["all_nodes"] = result["vertices"].index.to_numpy()
 
-        results = []
-        for threads in [1, 2, 4]:
-            hp.assign(
-                self.demand["orig_vert_idx"].values.astype(np.uint32),
-                self.demand["dest_vert_idx"].values.astype(np.uint32),
-                self.demand["demand"].values.astype(np.float64),
-                check_demand=True,
-                threads=threads,
-            )
-            results.append(hp._edges.copy(deep=True))
+    elif network_type == "SF":
+        result["edges"], result["demand"] = create_SF_network(dwell_time=dwell_time)
+        result["centroids"] = np.array([0, 12])
+        result["all_nodes"] = np.unique(np.hstack((result["edges"]["head"].values, result["edges"]["tail"].values)))
+    else:
+        raise KeyError(f'Unknown network type "{network_type}"')
 
-        for result in results[1:]:
-            pd.testing.assert_frame_equal(results[0], result)
+    result["nodes_to_indices"] = np.full(result["all_nodes"].max() + 1, -1, dtype="int64")
+    result["nodes_to_indices"][result["all_nodes"]] = np.arange(len(result["all_nodes"]))
 
-    def test_SF_run_01(self):
-        self._setUp(network="SF")
+    return result
 
-        hp = HyperpathGenerating(
-            self.edges,
-            o_vert_ids=self.centroids,
-            d_vert_ids=self.centroids,
-            nodes_to_indices=self.nodes_to_indices,
-        )
-        hp.run(origin=0, destination=12, volume=1.0)
 
-        np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
+@pytest.mark.parametrize("network_setup", [{"network": "bell", "n": 10, "alpha": 10.0}], indirect=True)
+def test_bell_assign_parallel_agreement(network_setup):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
 
-        u_i_vec_ref = np.array(
-            [
-                1.66500000e03,
-                1.47000000e03,
-                1.50000000e03,
-                1.14428572e03,
-                4.80000000e02,
-                1.05000000e03,
-                1.05000000e03,
-                6.90000000e02,
-                6.00000000e02,
-                2.40000000e02,
-                2.40000000e02,
-                6.90000000e02,
-                0.00000000e00,
-                0.00000000e00,
-                0.00000000e00,
-                0.00000000e00,
-            ]
-        )
-
-        np.testing.assert_allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
-
-    def test_SF_assign_01(self):
-        self._setUp(network="SF")
-
-        hp = HyperpathGenerating(
-            self.edges,
-            o_vert_ids=self.centroids,
-            d_vert_ids=self.centroids,
-            nodes_to_indices=self.nodes_to_indices,
-        )
-
+    results = []
+    for threads in [1, 2, 4]:
         hp.assign(
-            self.demand["origin_vertex_id"].values.astype(np.uint32),
-            self.demand["destination_vertex_id"].values.astype(np.uint32),
-            self.demand["demand"].values.astype(np.float64),
+            network_setup["demand"]["orig_vert_idx"].values.astype(np.uint32),
+            network_setup["demand"]["dest_vert_idx"].values.astype(np.uint32),
+            network_setup["demand"]["demand"].values.astype(np.float64),
             check_demand=True,
+            threads=threads,
         )
+        results.append(hp._edges.copy(deep=True))
 
-        np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
+    for result in results[1:]:
+        pd.testing.assert_frame_equal(results[0], result)
 
-    def test_skimming_cols(self):
-        self._setUp(network="SF", dwell_time=10.0)
 
-        columns = ["boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
-        for col in columns:
-            with self.subTest(col=col):
-                hp = HyperpathGenerating(
-                    self.edges,
-                    skim_cols=[col],
-                    o_vert_ids=self.centroids,
-                    d_vert_ids=self.centroids,
-                    nodes_to_indices=self.nodes_to_indices,
-                )
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_SF_run_01(network_setup):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
+    hp.run(origin=0, destination=12, volume=1.0)
 
-                self.assertIn(col, hp._edges.columns, "requested column missing from edges")
+    np.testing.assert_allclose(
+        network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
+    )
 
-        with self.subTest(col=col):
-            hp = HyperpathGenerating(
-                self.edges,
-                skim_cols=["waiting_time"],
-                o_vert_ids=self.centroids,
-                d_vert_ids=self.centroids,
-                nodes_to_indices=self.nodes_to_indices,
-            )
+    u_i_vec_ref = np.array(
+        [
+            1.66500000e03,
+            1.47000000e03,
+            1.50000000e03,
+            1.14428572e03,
+            4.80000000e02,
+            1.05000000e03,
+            1.05000000e03,
+            6.90000000e02,
+            6.00000000e02,
+            2.40000000e02,
+            2.40000000e02,
+            6.90000000e02,
+            0.00000000e00,
+            0.00000000e00,
+            0.00000000e00,
+            0.00000000e00,
+        ]
+    )
 
-            self.assertNotIn("waiting_time", hp._edges.columns, "waiting time isn't a real column")
-            self.assertNotIn("boardings", hp._edges.columns, "boardings isn't required for waiting time skims")
+    np.testing.assert_allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
 
-            for col in ["in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]:
-                self.assertIn(col, hp._edges.columns, "waiting time requires all other skimming columns")
 
-        for col in columns:
-            self.assertNotIn(col, self.edges.columns, "don't modify the users dataframe")
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_SF_assign_01(network_setup):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
 
-    def test_SF_skimming_01(self):
-        self._setUp(network="SF")
+    hp.assign(
+        network_setup["demand"]["origin_vertex_id"].values.astype(np.uint32),
+        network_setup["demand"]["destination_vertex_id"].values.astype(np.uint32),
+        network_setup["demand"]["demand"].values.astype(np.float64),
+        check_demand=True,
+    )
 
-        hp = HyperpathGenerating(
-            self.edges,
-            skim_cols=["boardings", "transfers", "waiting_time"],
-            o_vert_ids=self.centroids,
-            d_vert_ids=self.centroids,
-            nodes_to_indices=self.nodes_to_indices,
-        )
+    np.testing.assert_allclose(
+        network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
+    )
 
-        hp.assign(
-            self.demand["origin_vertex_id"].values.astype(np.uint32),
-            self.demand["destination_vertex_id"].values.astype(np.uint32),
-            self.demand["demand"].values.astype(np.float64),
-            check_demand=True,
-        )
-        mats = hp.skim_matrix.matrix
 
-        np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [0, 0]]))  # travel time from paper
+@pytest.mark.parametrize(
+    "network_setup,skim_col",
+    [
+        ({"network": "SF", "dwell_time": 10.0}, "boardings"),
+        ({"network": "SF", "dwell_time": 10.0}, "in_vehicle_trav_time"),
+        ({"network": "SF", "dwell_time": 10.0}, "egress_trav_time"),
+        ({"network": "SF", "dwell_time": 10.0}, "access_trav_time"),
+    ],
+    indirect=["network_setup"],
+)
+def test_skimming_cols(network_setup, skim_col):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        skim_cols=[skim_col],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
 
-        # No access or egress links in the network
-        np.testing.assert_allclose(mats["access_trav_time"], np.array([[0, 0], [0, 0]]))
-        np.testing.assert_allclose(mats["egress_trav_time"], np.array([[0, 0], [0, 0]]))
+    assert skim_col in hp._edges.columns, "requested column missing from edges"
 
-        # Only board once
-        np.testing.assert_allclose(mats["boardings"], np.array([[0, 1], [0, 0]]))
 
-        # Some routes transfer
-        np.testing.assert_allclose(mats["transfers"], np.array([[0, 0.5], [0, 0]]))  # Why is this 0.5 not 0.66?
+@pytest.mark.parametrize("network_setup", [{"network": "SF", "dwell_time": 10.0}], indirect=True)
+def test_waiting_time_skimming(network_setup):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        skim_cols=["waiting_time"],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
 
-        np.testing.assert_allclose(
-            mats["in_vehicle_trav_time"], np.array([[0, 27.75 * 60.0 - mats["waiting_time"][0, 1]], [0, 0]])
-        )
-        np.testing.assert_allclose(
-            mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [0, 0]])
-        )
+    assert "waiting_time" not in hp._edges.columns, "waiting time isn't a real column"
+    assert "boardings" not in hp._edges.columns, "boardings isn't required for waiting time skims"
 
-    def test_SF_skimming_02(self):
-        self._setUp(network="SF")
+    for col in ["in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]:
+        assert col in hp._edges.columns, "waiting time requires all other skimming columns"
 
-        hp = HyperpathGenerating(
-            self.edges,
-            skim_cols=["boardings", "alightings"],
-            o_vert_ids=self.centroids,
-            d_vert_ids=self.centroids,
-            nodes_to_indices=self.nodes_to_indices,
-        )
+    for col in ["in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]:
+        assert col not in network_setup["edges"].columns, "don't modify the users dataframe"
 
-        hp.assign(
-            self.demand["origin_vertex_id"].values.astype(np.uint32),
-            self.demand["destination_vertex_id"].values.astype(np.uint32),
-            self.demand["demand"].values.astype(np.float64),
-            check_demand=True,
-        )
-        mats = hp.skim_matrix.matrix
 
-        # Only board once
-        np.testing.assert_allclose(mats["boardings"], mats["alightings"])
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_SF_skimming_01(network_setup):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        skim_cols=["boardings", "transfers", "waiting_time"],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
+
+    hp.assign(
+        network_setup["demand"]["origin_vertex_id"].values.astype(np.uint32),
+        network_setup["demand"]["destination_vertex_id"].values.astype(np.uint32),
+        network_setup["demand"]["demand"].values.astype(np.float64),
+        check_demand=True,
+    )
+    mats = hp.skim_matrix.matrix
+
+    np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [0, 0]]))  # travel time from paper
+
+    # No access or egress links in the network
+    np.testing.assert_allclose(mats["access_trav_time"], np.array([[0, 0], [0, 0]]))
+    np.testing.assert_allclose(mats["egress_trav_time"], np.array([[0, 0], [0, 0]]))
+
+    # Only board once
+    np.testing.assert_allclose(mats["boardings"], np.array([[0, 1], [0, 0]]))
+
+    # Some routes transfer
+    np.testing.assert_allclose(mats["transfers"], np.array([[0, 0.5], [0, 0]]))  # Why is this 0.5 not 0.66?
+
+    np.testing.assert_allclose(
+        mats["in_vehicle_trav_time"], np.array([[0, 27.75 * 60.0 - mats["waiting_time"][0, 1]], [0, 0]])
+    )
+    np.testing.assert_allclose(
+        mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [0, 0]])
+    )
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_SF_skimming_02(network_setup):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        skim_cols=["boardings", "alightings"],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
+
+    hp.assign(
+        network_setup["demand"]["origin_vertex_id"].values.astype(np.uint32),
+        network_setup["demand"]["destination_vertex_id"].values.astype(np.uint32),
+        network_setup["demand"]["demand"].values.astype(np.float64),
+        check_demand=True,
+    )
+    mats = hp.skim_matrix.matrix
+
+    # Only board once
+    np.testing.assert_allclose(mats["boardings"], mats["alightings"])

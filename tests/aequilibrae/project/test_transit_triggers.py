@@ -1,44 +1,46 @@
 from shapely.geometry import LineString
-from aequilibrae.project import Project
+
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
-import pytest
 
 
-class TestTransitTriggers:
-    def test_link_insert(self, project: Project):
-        Transit(project)
+def test_link_insert(empty_project):
+    Transit(empty_project)
 
-        with project.transit_connection as conn:
-            data = [10001001000, 3, 20000001, 5, 6, 0, LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb]
-            conn.execute(
-                """INSERT INTO route_links (pattern_id, seq, transit_link, from_stop, to_stop, distance, geometry)
-                            VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));""",
-                data,
-            )
-            conn.commit()
+    conn = database_connection(db_type="transit")
 
-            distance = conn.execute("SELECT distance FROM route_links WHERE seq=3;").fetchone()[0]
+    data = [10001001000, 3, 20000001, 5, 6, 0, LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb]
+    conn.execute(
+        """INSERT INTO route_links (pattern_id, seq, transit_link, from_stop, to_stop, distance, geometry)
+                    VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));""",
+        data,
+    )
+    conn.commit()
 
-        assert distance != 0
+    distance = conn.execute("SELECT distance FROM route_links WHERE seq=3;").fetchone()[0]
 
-    def test_geometry_update(self, project: Project):
-        Transit(project)
+    assert distance != 0
 
-        with project.transit_connection as conn:
-            data = [10001001000, 3, 20000001, 5, 6, 0, LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb]
-            conn.execute(
-                """INSERT INTO route_links (pattern_id, seq, transit_link, from_stop, to_stop, distance, geometry)
-                            VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));""",
-                data,
-            )
-            conn.commit()
 
-            conn.execute(
-                "UPDATE route_links SET geometry=GeomFromWKB(?, 4326) WHERE seq=3;",
-                [LineString([[-23.59, -46.64], [-23.01, -47.14]]).wkb],
-            )
-            conn.commit()
+def test_geometry_update(empty_project):
+    Transit(empty_project)
 
-            distance = conn.execute("SELECT distance FROM route_links WHERE seq=3;").fetchone()[0]
+    conn = database_connection(db_type="transit")
 
-        assert round(distance, 2) != 19815.63
+    data = [10001001000, 3, 20000001, 5, 6, 0, LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb]
+    conn.execute(
+        """INSERT INTO route_links (pattern_id, seq, transit_link, from_stop, to_stop, distance, geometry)
+                    VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));""",
+        data,
+    )
+    conn.commit()
+
+    conn.execute(
+        "UPDATE route_links SET geometry=GeomFromWKB(?, 4326) WHERE seq=3;",
+        [LineString([[-23.59, -46.64], [-23.01, -47.14]]).wkb],
+    )
+    conn.commit()
+
+    distance = conn.execute("SELECT distance FROM route_links WHERE seq=3;").fetchone()[0]
+
+    assert round(distance, 2) != 19815.63

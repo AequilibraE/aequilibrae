@@ -47,6 +47,8 @@ class Modes:
         # we can even keep editing and save it directly once we have added it to the project
         >>> new_mode.description = 'this is my new description'
         >>> new_mode.save()
+
+        >>> project.close()
     """
 
     def __init__(self, net):

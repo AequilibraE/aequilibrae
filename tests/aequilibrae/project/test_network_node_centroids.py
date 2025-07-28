@@ -1,16 +1,6 @@
-import os
-import uuid
-from tempfile import gettempdir
-
-from aequilibrae.utils.create_example import create_example
-
-
-def test_no_centroids():
-    proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)
-    model = create_example(proj_path, "sioux_falls")
-
-    with model.db_connection as conn:
+def test_no_centroids(sioux_falls_example):
+    with sioux_falls_example.db_connection as conn:
         conn.execute("Update Nodes set is_centroid=0")
 
-    model.network.build_graphs(modes=["c"])
-    model.network.build_graphs()
+    sioux_falls_example.network.build_graphs(modes=["c"])
+    sioux_falls_example.network.build_graphs()

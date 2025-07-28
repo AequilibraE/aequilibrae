@@ -1,20 +1,22 @@
 import pytest
-import os
+
+from aequilibrae.project.database_connection import database_connection
 
 
-@pytest.fixture
-def pat(create_path, create_gtfs_project):
-    gtfs_fldr = os.path.join(create_path, "gtfs_coquimbo.zip")
+@pytest.fixture(scope="function")
+def pat(build_gtfs_project):
+    gtfs_fldr = build_gtfs_project.project_base_path / "gtfs_coquimbo.zip"
 
-    transit = create_gtfs_project.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
+    transit = build_gtfs_project.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
     transit.load_date("2016-04-13")
 
     patterns = transit.select_patterns
     yield list(patterns.values())[0]
 
 
-def test_save_to_database(pat, transit_conn):
-    pat.save_to_database(transit_conn)
+def test_save_to_database(pat):
+    with database_connection("transit") as transit_conn:
+        pat.save_to_database(transit_conn)
 
     routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
     assert routes == 1
@@ -31,9 +33,10 @@ def test_get_error(pat):
     assert pat.get_error() is None, "Resulted a map-matching error when should have returned none"
 
 
-def test_map_match(pat, transit_conn):
-    pat.map_match()
-    pat.save_to_database(transit_conn)
+def test_map_match(pat):
+    with database_connection("transit") as transit_conn:
+        pat.map_match()
+        pat.save_to_database(transit_conn)
 
-    pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
+        pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
     assert pattern_map > 0

@@ -183,6 +183,8 @@ class Transit(WorkerThread):
 
             >>> transit = Transit(project)
             >>> preload = transit.build_pt_preload(start, end)
+
+            >>> project.close()
         """
         with self.project.transit_connection as conn:
             return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), conn)

@@ -35,6 +35,8 @@ class PathResults:
 
         # clears all computation results
         >>> res.reset()
+
+        >>> project.close()
     """
 
     def __init__(self) -> None:

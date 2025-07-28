@@ -24,6 +24,8 @@ class Nodes(BasicTable):
 
         # We can save changes for all nodes we have edited so far
         >>> all_nodes.save()
+
+        >>> project.close()
     """
 
     #: Query sql for retrieving nodes

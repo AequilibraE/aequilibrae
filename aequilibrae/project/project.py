@@ -3,9 +3,9 @@ import logging
 import os
 import shutil
 import sqlite3
-from contextlib import contextmanager
 from collections import namedtuple
-import pathlib
+from contextlib import contextmanager
+from pathlib import Path
 
 import pandas as pd
 
@@ -19,11 +19,11 @@ from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
-from aequilibrae.project.zoning import Zoning
-from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.scenario import Scenario
+from aequilibrae.project.tools import MigrationManager
+from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database, demo_init_py
-from aequilibrae.transit.transit import Transit
+from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close, safe_connect
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -38,11 +38,16 @@ class Project:
         >>> new_project = Project()
         >>> new_project.new(project_path)
 
+        # Safely closes the project
+        >>> new_project.close()
+
     .. code-block:: python
         :caption: Open Project
 
         >>> existing_project = Project()
         >>> existing_project.open(project_path)
+
+        >>> existing_project.close()
     """
 
     def __init__(self):
@@ -64,7 +69,7 @@ class Project:
             not exist, it will fail.
         """
 
-        base_path = pathlib.Path(project_path)
+        base_path = Path(project_path)
         file_name = base_path / "project_database.sqlite"
 
         if not file_name.is_file() or not file_name.exists():
@@ -118,15 +123,15 @@ class Project:
         return self.scenario.results
 
     @property
-    def _project_database_path(self) -> pathlib.Path:
+    def _project_database_path(self) -> Path:
         return self.project_base_path / "project_database.sqlite"
 
     @property
-    def _results_database_path(self) -> pathlib.Path:
+    def _results_database_path(self) -> Path:
         return self.project_base_path / "results_database.sqlite"
 
     @property
-    def _tranit_database_path(self) -> pathlib.Path:
+    def _tranit_database_path(self) -> Path:
         return self.project_base_path / "public_transport.sqlite"
 
     @property
@@ -154,7 +159,7 @@ class Project:
             **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
-        base_path = pathlib.Path(project_path)
+        base_path = Path(project_path)
         path_to_file = base_path / "project_database.sqlite"
 
         if os.path.isdir(project_path):
@@ -198,6 +203,11 @@ class Project:
             global_logger.warning(f"This project at {self.project_base_path} is already closed")
 
         finally:
+            handlers = global_logger.handlers[:]  # Make a copy of the handlers list
+            for handler in handlers:
+                handler.close()  # Explicitly close each handler to release file handles
+                global_logger.removeHandler(handler)  # Remove the handler from the logger
+
             self.deactivate()
 
     def activate(self):

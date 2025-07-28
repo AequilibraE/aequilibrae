@@ -1,4 +1,7 @@
 run:
+  matrix_summary:
+  graph_summary:
+  results_summary:
   example_function_with_kwargs:
     arg1: "parameters.yml argument"
 assignment:

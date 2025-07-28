@@ -1,39 +1,23 @@
-from unittest import TestCase
-from aequilibrae.paths.results import AssignmentResults
 import multiprocessing as mp
 
+import pytest
 
-class TestAssignmentResults(TestCase):
-    # def test_prepare(self):
-    #     self.fail()
-    #
-    # def test_reset(self):
-    #     self.fail()
-    #
-    # def test_total_flows(self):
-    #     self.fail()
+from aequilibrae.paths.results import AssignmentResults
 
-    def test_set_cores(self):
-        a = AssignmentResults()
-        a.set_cores(10)
 
-        with self.assertRaises(ValueError):
-            a.set_cores(1.3)
+def test_set_cores():
+    a = AssignmentResults()
+    a.set_cores(10)
 
-        a.set_cores(-2)
-        self.assertEqual(a.cores, max(1, mp.cpu_count() - 2))
+    with pytest.raises(ValueError):
+        a.set_cores(1.3)
 
-    def test_set_save_path_file(self):
-        a = AssignmentResults()
+    a.set_cores(-2)
+    assert a.cores == max(1, mp.cpu_count() - 2)
 
-        # Never save by default
-        self.assertEqual(a.save_path_file, False)
 
-    # def test_set_critical_links(self):
-    #     self.fail()
-    #
-    # def test_get_load_results(self):
-    #     self.fail()
-    #
-    # def test_save_to_disk(self):
-    #     self.fail()
+def test_set_save_path_file():
+    a = AssignmentResults()
+
+    # Never save by default
+    assert a.save_path_file is False

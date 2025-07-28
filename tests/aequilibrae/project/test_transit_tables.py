@@ -7,9 +7,9 @@ from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import read_and_close
 
 
-@pytest.fixture
-def create_project(project: Project):
-    yield Transit(project)
+@pytest.fixture(scope="function")
+def create_project(empty_project: Project):
+    yield Transit(empty_project)
 
 
 @pytest.mark.parametrize(

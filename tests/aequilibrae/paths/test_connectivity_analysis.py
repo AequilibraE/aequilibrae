@@ -1,15 +1,10 @@
-import os
-import tempfile
-import uuid
 import pandas as pd
 
 from aequilibrae.paths.connectivity_analysis import ConnectivityAnalysis
-from aequilibrae.utils.create_example import create_example
 
 
-def test_connectivity_analysis():
-    project = create_example(os.path.join(tempfile.gettempdir(), uuid.uuid4().hex))
-    network = project.network
+def test_connectivity_analysis(sioux_falls_example):
+    network = sioux_falls_example.network
     network.build_graphs()
     graph = network.graphs["c"]
     graph.set_graph(cost_field="distance")
@@ -46,4 +41,4 @@ def test_connectivity_analysis():
     results = conn_test.disconnected_pairs.reset_index(drop=True)
     pd.testing.assert_frame_equal(results, df, check_dtype=False, check_index_type=False)
 
-    project.close()
+    sioux_falls_example.close()

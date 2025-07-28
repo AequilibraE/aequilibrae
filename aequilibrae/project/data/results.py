@@ -178,6 +178,7 @@ class Results:
         table_name = table_name.lower()
         rr = self.get_record(table_name)
         rr.delete()
+        del self.__items[table_name]
 
     def new_record(
         self,

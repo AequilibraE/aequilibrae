@@ -24,6 +24,8 @@ class Links(BasicTable):
 
         # We can save changes for all links we have edited so far
         >>> all_links.save()
+
+        >>> project.close()
     """
 
     __max_id = -1

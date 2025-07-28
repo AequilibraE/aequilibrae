@@ -44,6 +44,8 @@ class Parameters:
 
         >>> # You can also restore the software default values
         >>> p.restore_default()
+
+        >>> project.close()
     """
 
     _default: dict

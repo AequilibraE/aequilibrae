@@ -114,9 +114,9 @@ class ResultRecord(SafeClass):
         """
         if instance == "table_name":
             with self._project_conn or self.project.db_connection as conn:
-                sql = f"Select count(*) from results where LOWER({instance})=?"
-                qry_value = sum(conn.execute(sql, [str(value).lower()]).fetchone())
+                sql = f"Select count(*) from results where {instance}=?"
+                qry_value = sum(conn.execute(sql, [str(value)]).fetchone())
                 if qry_value > 0:
                     raise ValueError("Another results with this table_name already exists")
 
-        self.__dict__[instance.lower()] = value
+        self.__dict__[instance] = value

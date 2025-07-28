@@ -27,7 +27,7 @@ class Zoning(BasicTable):
 
     .. code-block:: python
 
-        >>> project = create_example(project_path, "coquimbo")
+        >>> project = create_example(project_path)
 
         >>> zoning = project.zoning
 
@@ -39,6 +39,8 @@ class Zoning(BasicTable):
         # We can also add one more field to the table
         >>> fields = zoning.fields
         >>> fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
+
+        >>> project.close()
     """
 
     def __init__(self, network):

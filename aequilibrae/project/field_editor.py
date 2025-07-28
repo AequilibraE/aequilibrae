@@ -2,6 +2,8 @@ import re
 import string
 from typing import List
 
+from aequilibrae.context import get_logger
+
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
 
@@ -27,6 +29,8 @@ class FieldEditor:
         # To edit the fields of the modes table
         >>> m_fields = project.network.modes.fields
 
+        >>> project.close()
+
     Field descriptions are kept in the table *attributes_documentation*
     """
 
@@ -34,7 +38,7 @@ class FieldEditor:
 
     def __init__(self, project, table_name: str) -> None:
         self.project = project
-        self.logger = project.logger
+        self.logger = get_logger()
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}

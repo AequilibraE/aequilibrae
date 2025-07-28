@@ -1,257 +1,292 @@
 import os
-import uuid
 import zipfile
-from os.path import join, dirname
-from pathlib import Path
-from tempfile import gettempdir
-from unittest import TestCase
-import pandas as pd
+
 import numpy as np
-import sqlite3
+import pandas as pd
+import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathResults
+from aequilibrae import TrafficAssignment, TrafficClass, Graph, PathResults
 from aequilibrae.matrix import AequilibraeMatrix
-from ...data import siouxfalls_project
 
 
-class TestSelectLink(TestCase):
-    def setUp(self) -> None:
-        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+@pytest.fixture
+def select_link_setup(sioux_falls_single_class):
+    sioux_falls_single_class.network.build_graphs()
+    car_graph = sioux_falls_single_class.network.graphs["c"]  # type: Graph
+    car_graph.set_graph("free_flow_time")
+    car_graph.set_blocked_centroid_flows(False)
+    matrix = sioux_falls_single_class.matrices.get_matrix("demand_omx")
+    matrix.computational_view()
 
-        proj_path = os.path.join(gettempdir(), "test_traffic_assignment_path_files" + uuid.uuid4().hex)
-        os.mkdir(proj_path)
-        zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
-        self.project = Project()
-        self.project.open(proj_path)
-        self.project.network.build_graphs()
-        self.car_graph = self.project.network.graphs["c"]  # type: Graph
-        self.car_graph.set_graph("free_flow_time")
-        self.car_graph.set_blocked_centroid_flows(False)
-        self.matrix = self.project.matrices.get_matrix("demand_omx")
-        self.matrix.computational_view()
+    assignment = TrafficAssignment()
+    assignclass = TrafficClass("car", car_graph, matrix)
+    assignment.set_classes([assignclass])
+    assignment.set_vdf("BPR")
+    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_capacity_field("capacity")
+    assignment.set_time_field("free_flow_time")
+    assignment.max_iter = 1
+    assignment.set_algorithm("msa")
 
-        self.assignment = TrafficAssignment()
-        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-        self.assignment.set_classes([self.assignclass])
-        self.assignment.set_vdf("BPR")
-        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-        self.assignment.set_capacity_field("capacity")
-        self.assignment.set_time_field("free_flow_time")
-        self.assignment.max_iter = 1
-        self.assignment.set_algorithm("msa")
+    yield {
+        "project": sioux_falls_single_class,
+        "car_graph": car_graph,
+        "matrix": matrix,
+        "assignment": assignment,
+        "assignclass": assignclass,
+    }
 
-    def tearDown(self) -> None:
-        self.matrix.close()
-        self.project.close()
+    matrix.close()
 
-    def test_multiple_link_sets(self):
-        """
-        Tests whether the Select Link feature works as wanted.
-        Uses two examples: 2 links in one select link, and a single Selected Link
-        Checks both the OD Matrix and Link Loading
-        """
-        self.assignclass.set_select_links({"sl_9_or_6": [(9, 1), (6, 1)], "just_3": [(3, 1)], "sl_5_for_fun": [(5, 1)]})
-        self.assignment.execute()
-        for key in self.assignclass._selected_links.keys():
-            od_mask, link_loading = create_od_mask(
-                self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_od.matrix[key][:, :, 0],
-                od_mask,
-                err_msg="OD SL matrix for: " + str(key) + " does not match",
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_loading[key],
-                link_loading,
-                err_msg="Link loading SL matrix for: " + str(key) + " does not match",
-            )
 
-        # Test if files are saved in the right place
-        self.assignment.save_select_link_results("select_link_analysis")
+def test_multiple_link_sets(select_link_setup):
+    """
+    Tests whether the Select Link feature works as wanted.
+    Uses two examples: 2 links in one select link, and a single Selected Link
+    Checks both the OD Matrix and Link Loading
+    """
+    assignclass = select_link_setup["assignclass"]
+    assignment = select_link_setup["assignment"]
+    project = select_link_setup["project"]
 
-        matrices = self.project.matrices
-        matrices.update_database()
-        assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
+    assignclass.set_select_links({"sl_9_or_6": [(9, 1), (6, 1)], "just_3": [(3, 1)], "sl_5_for_fun": [(5, 1)]})
+    assignment.execute()
 
-        # Test if matrices are with the correct shape and are not empty
-        sla = matrices.get_matrix("select_link_analysis_omx")
-        num_zones = self.assignment.classes[0].graph.num_zones
-        for mat in sla.names:
-            m = sla.get_matrix(mat)
-            assert m.sum() > 0 and m.shape == (num_zones, num_zones)
-
-        results = self.project.results.list()["table_name"].to_list()
-        assert "select_link_analysis" in results
-
-    def test_equals_demand_one_origin(self):
-        """
-        Test to ensure the Select Link functionality behaves as required.
-        Tests to make sure the OD matrix works when all links surrounding one origin are selected
-        Confirms the Link Loading is done correctly in this case
-        """
-        self.assignclass.set_select_links({"sl_1_4_3_and_2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
-
-        self.assignment.execute()
-
-        for key in self.assignclass._selected_links.keys():
-            od_mask, link_loading = create_od_mask(
-                self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_od.matrix[key][:, :, 0],
-                od_mask,
-                err_msg="OD SL matrix for: " + str(key) + " does not match",
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_loading[key],
-                link_loading,
-                err_msg="Link loading SL matrix for: " + str(key) + " does not match",
-            )
-
-    def test_single_demand(self):
-        """
-        Tests the functionality of Select Link when given a custom demand matrix, where only 1 OD pair has demand on it
-        Confirms the OD matrix behaves, and the Link Loading is just on the path of this OD pair
-        """
-        custom_demand = np.zeros((24, 24, 1)).astype(float)
-        custom_demand[0, 23, 0] = 1000
-        self.matrix.matrix_view = custom_demand
-        self.assignclass.matrix = self.matrix
-
-        self.assignclass.set_select_links({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
-
-        self.assignment.execute()
-        for key in self.assignclass._selected_links.keys():
-            od_mask, link_loading = create_od_mask(
-                self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_od.matrix[key][:, :, 0],
-                od_mask,
-                err_msg="OD SL matrix for: " + str(key) + " does not match",
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_loading[key],
-                link_loading,
-                err_msg="Link loading SL matrix for: " + str(key) + " does not match",
-            )
-
-    def test_select_link_network_loading(self):
-        """
-        Test to ensure the SL_network_loading method correctly does the network loading
-        """
-        self.assignment.execute()
-        non_sl_loads = self.assignclass.results.get_load_results()
-        self.setUp()
-        self.assignclass.set_select_links({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
-        self.assignment.execute()
-        sl_loads = self.assignclass.results.get_load_results()
-        np.testing.assert_allclose(non_sl_loads.matrix_tot, sl_loads.matrix_tot)
-
-    def test_duplicate_links(self):
-        """
-        Tests to make sure the user api correctly filters out duplicate links in the compressed graph
-        """
-        self.assignment = TrafficAssignment()
-        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-        with self.assertWarns(Warning):
-            self.assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
-        self.assertEqual(len(self.assignclass._selected_links["test"]), 1, "Did not correctly remove duplicate link")
-
-    def test_link_out_of_bounds(self):
-        """
-        Test to confirm the user api correctly identifies when an input node is invalid for the current graph
-        """
-        self.assignment = TrafficAssignment()
-        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-        self.assertRaises(ValueError, self.assignclass.set_select_links, {"test": [(78, 1), (1, 1)]})
-
-    def test_kaitang(self):
-        proj_path = os.path.join(gettempdir(), "test_traffic_assignment_path_files" + uuid.uuid4().hex)
-        os.mkdir(proj_path)
-        zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
-
-        link_df = pd.read_csv(os.path.join(proj_path, "link.csv"))
-        centroids_array = np.array([7, 8, 11])
-
-        net = link_df.copy()
-
-        g = Graph()
-        g.network = net
-        g.network_ok = True
-        g.status = "OK"
-        g.mode = "a"
-        g.prepare_graph(centroids_array)
-        g.set_blocked_centroid_flows(False)
-        g.set_graph("fft")
-
-        aem_mat = AequilibraeMatrix()
-        aem_mat.load(os.path.join(proj_path, "demand_a.aem"))
-        aem_mat.computational_view(["a"])
-
-        assign_class = TrafficClass("class_a", g, aem_mat)
-        assign_class.set_fixed_cost("a_toll")
-        assign_class.set_vot(1.1)
-        assign_class.set_select_links(links={"trace": [(7, 0), (13, 0)]})
-
-        assign = TrafficAssignment()
-        assign.set_classes([assign_class])
-        assign.set_vdf("BPR")
-        assign.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
-        assign.set_capacity_field("capacity")
-        assign.set_time_field("fft")
-        assign.set_algorithm("bfw")
-        assign.max_iter = 100
-        assign.rgap_target = 0.0001
-
-        # 4.execute
-        assign.execute()
-
-        # 5.receive results
-        assign_flow_res_df = assign.results().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
-        select_link_flow_df = assign.select_link_flows().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
-
-        pd.testing.assert_frame_equal(
-            assign_flow_res_df[["link_id", "a_ab", "a_ba", "a_tot"]],
-            select_link_flow_df.rename(
-                columns={"class_a_trace_a_ab": "a_ab", "class_a_trace_a_ba": "a_ba", "class_a_trace_a_tot": "a_tot"}
-            ),
+    for key in assignclass._selected_links.keys():
+        od_mask, link_loading = create_od_mask(
+            assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
+        )
+        np.testing.assert_allclose(
+            assignclass.results.select_link_od.matrix[key][:, :, 0],
+            od_mask,
+            err_msg=f"OD SL matrix for: {key} does not match",
+        )
+        np.testing.assert_allclose(
+            assignclass.results.select_link_loading[key],
+            link_loading,
+            err_msg=f"Link loading SL matrix for: {key} does not match",
         )
 
-    def test_multi_iteration(self):
-        for algorithm in ["all-or-nothing", "msa", "fw", "cfw", "bfw"]:
-            with self.subTest(algorithm=algorithm):
-                assignment = TrafficAssignment()
-                assignclass = TrafficClass("car", self.car_graph, self.matrix)
-                assignment.set_classes([assignclass])
-                assignment.set_vdf("BPR")
-                assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-                assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-                assignment.set_capacity_field("capacity")
-                assignment.set_time_field("free_flow_time")
-                assignment.max_iter = 10
-                assignment.set_algorithm(algorithm)
+    # Test if files are saved in the right place
+    assignment.save_select_link_results("select_link_analysis")
 
-                assignclass.set_select_links({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]})
-                assignment.execute()
+    matrices = project.matrices
+    matrices.update_database()
+    assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
 
-                assignment_results = assignclass.results.get_load_results()
-                sl_results = assignclass.results.get_sl_results()
+    # Test if matrices are with the correct shape and are not empty
+    sla = matrices.get_matrix("select_link_analysis_omx")
+    num_zones = assignment.classes[0].graph.num_zones
+    for mat in sla.names:
+        m = sla.get_matrix(mat)
+        assert m.sum() > 0 and m.shape == (num_zones, num_zones)
 
-                self.assertAlmostEqual(
-                    assignment_results["matrix_ab"].loc[1],
-                    sl_results["sl_1_1_matrix_ab"].loc[1],
-                    msg=f"Select link results differ to that of the assignment ({algorithm})",
-                    delta=1e-6,
-                )
-                self.assertAlmostEqual(
-                    assignment_results["matrix_ab"].loc[5],
-                    sl_results["sl_5_1_matrix_ab"].loc[5],
-                    msg=f"Select link results differ to that of the assignment ({algorithm})",
-                    delta=1e-6,
-                )
+    results = project.results.list()["table_name"].to_list()
+    assert "select_link_analysis" in results
+
+
+def test_equals_demand_one_origin(select_link_setup):
+    """
+    Test to ensure the Select Link functionality behaves as required.
+    Tests to make sure the OD matrix works when all links surrounding one origin are selected
+    Confirms the Link Loading is done correctly in this case
+    """
+    assignclass = select_link_setup["assignclass"]
+    assignment = select_link_setup["assignment"]
+
+    assignclass.set_select_links({"sl_1_4_3_and_2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
+    assignment.execute()
+
+    for key in assignclass._selected_links.keys():
+        od_mask, link_loading = create_od_mask(
+            assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
+        )
+        np.testing.assert_allclose(
+            assignclass.results.select_link_od.matrix[key][:, :, 0],
+            od_mask,
+            err_msg=f"OD SL matrix for: {key} does not match",
+        )
+        np.testing.assert_allclose(
+            assignclass.results.select_link_loading[key],
+            link_loading,
+            err_msg=f"Link loading SL matrix for: {key} does not match",
+        )
+
+
+def test_single_demand(select_link_setup):
+    """
+    Tests the functionality of Select Link when given a custom demand matrix, where only 1 OD pair has demand on it
+    Confirms the OD matrix behaves, and the Link Loading is just on the path of this OD pair
+    """
+    assignclass = select_link_setup["assignclass"]
+    assignment = select_link_setup["assignment"]
+    matrix = select_link_setup["matrix"]
+
+    custom_demand = np.zeros((24, 24, 1)).astype(float)
+    custom_demand[0, 23, 0] = 1000
+    matrix.matrix_view = custom_demand
+    assignclass.matrix = matrix
+
+    assignclass.set_select_links({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
+    assignment.execute()
+
+    for key in assignclass._selected_links.keys():
+        od_mask, link_loading = create_od_mask(
+            assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
+        )
+        np.testing.assert_allclose(
+            assignclass.results.select_link_od.matrix[key][:, :, 0],
+            od_mask,
+            err_msg=f"OD SL matrix for: {key} does not match",
+        )
+        np.testing.assert_allclose(
+            assignclass.results.select_link_loading[key],
+            link_loading,
+            err_msg=f"Link loading SL matrix for: {key} does not match",
+        )
+
+
+def test_select_link_network_loading(select_link_setup):
+    """
+    Test to ensure the SL_network_loading method correctly does the network loading
+    """
+    assignclass = select_link_setup["assignclass"]
+    assignment = select_link_setup["assignment"]
+    car_graph = select_link_setup["car_graph"]
+    matrix = select_link_setup["matrix"]
+
+    # First run without select links
+    assignment.execute()
+    non_sl_loads = assignclass.results.get_load_results()
+
+    # Create new setup for select links
+    new_assignment = TrafficAssignment()
+    new_assignclass = TrafficClass("car", car_graph, matrix)
+    new_assignment.set_classes([new_assignclass])
+    new_assignment.set_vdf("BPR")
+    new_assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    new_assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    new_assignment.set_capacity_field("capacity")
+    new_assignment.set_time_field("free_flow_time")
+    new_assignment.max_iter = 1
+    new_assignment.set_algorithm("msa")
+
+    new_assignclass.set_select_links({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
+    new_assignment.execute()
+    sl_loads = new_assignclass.results.get_load_results()
+
+    np.testing.assert_allclose(non_sl_loads.matrix_tot, sl_loads.matrix_tot)
+
+
+def test_duplicate_links(select_link_setup):
+    """
+    Tests to make sure the user api correctly filters out duplicate links in the compressed graph
+    """
+    car_graph = select_link_setup["car_graph"]
+    matrix = select_link_setup["matrix"]
+
+    assignclass = TrafficClass("car", car_graph, matrix)
+
+    with pytest.warns(Warning):
+        assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
+
+    assert len(assignclass._selected_links["test"]) == 1, "Did not correctly remove duplicate link"
+
+
+def test_link_out_of_bounds(select_link_setup):
+    """
+    Test to confirm the user api correctly identifies when an input node is invalid for the current graph
+    """
+    car_graph = select_link_setup["car_graph"]
+    matrix = select_link_setup["matrix"]
+
+    assignclass = TrafficClass("car", car_graph, matrix)
+
+    with pytest.raises(ValueError):
+        assignclass.set_select_links({"test": [(78, 1), (1, 1)]})
+
+
+def test_kaitang(test_data_path, test_folder):
+    zipfile.ZipFile(test_data_path / "KaiTang.zip").extractall(test_folder)
+
+    link_df = pd.read_csv(os.path.join(test_folder, "link.csv"))
+    centroids_array = np.array([7, 8, 11])
+
+    net = link_df.copy()
+
+    g = Graph()
+    g.network = net
+    g.network_ok = True
+    g.status = "OK"
+    g.mode = "a"
+    g.prepare_graph(centroids_array)
+    g.set_blocked_centroid_flows(False)
+    g.set_graph("fft")
+
+    aem_mat = AequilibraeMatrix()
+    aem_mat.load(os.path.join(test_folder, "demand_a.aem"))
+    aem_mat.computational_view(["a"])
+
+    assign_class = TrafficClass("class_a", g, aem_mat)
+    assign_class.set_fixed_cost("a_toll")
+    assign_class.set_vot(1.1)
+    assign_class.set_select_links(links={"trace": [(7, 0), (13, 0)]})
+
+    assign = TrafficAssignment()
+    assign.set_classes([assign_class])
+    assign.set_vdf("BPR")
+    assign.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+    assign.set_capacity_field("capacity")
+    assign.set_time_field("fft")
+    assign.set_algorithm("bfw")
+    assign.max_iter = 100
+    assign.rgap_target = 0.0001
+
+    # 4.execute
+    assign.execute()
+
+    # 5.receive results
+    assign_flow_res_df = assign.results().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
+    select_link_flow_df = assign.select_link_flows().sort_index().reset_index(drop=False).astype(float).fillna(0.0)
+
+    pd.testing.assert_frame_equal(
+        assign_flow_res_df[["link_id", "a_ab", "a_ba", "a_tot"]],
+        select_link_flow_df.rename(
+            columns={"class_a_trace_a_ab": "a_ab", "class_a_trace_a_ba": "a_ba", "class_a_trace_a_tot": "a_tot"}
+        )[["link_id", "a_ab", "a_ba", "a_tot"]],
+    )
+
+
+@pytest.mark.parametrize("algorithm", ["all-or-nothing", "msa", "fw", "cfw", "bfw"])
+def test_multi_iteration(select_link_setup, algorithm):
+    car_graph = select_link_setup["car_graph"]
+    matrix = select_link_setup["matrix"]
+
+    assignment = TrafficAssignment()
+    assignclass = TrafficClass("car", car_graph, matrix)
+    assignment.set_classes([assignclass])
+    assignment.set_vdf("BPR")
+    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_capacity_field("capacity")
+    assignment.set_time_field("free_flow_time")
+    assignment.max_iter = 10
+    assignment.set_algorithm(algorithm)
+
+    assignclass.set_select_links({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]})
+    assignment.execute()
+
+    assignment_results = assignclass.results.get_load_results()
+    sl_results = assignclass.results.get_sl_results()
+
+    assert (
+        abs(assignment_results["matrix_ab"].loc[1] - sl_results["sl_1_1_matrix_ab"].loc[1]) < 1e-6
+    ), f"Select link results differ to that of the assignment ({algorithm})"
+
+    assert (
+        abs(assignment_results["matrix_ab"].loc[5] - sl_results["sl_5_1_matrix_ab"].loc[5]) < 1e-6
+    ), f"Select link results differ to that of the assignment ({algorithm})"
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):

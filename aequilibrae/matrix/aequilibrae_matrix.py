@@ -782,7 +782,7 @@ class AequilibraeMatrix(object):
             >>> mat2.cores
             2
         """
-        fname, file_extension = os.path.splitext(output_name.upper())
+        file_extension = Path(output_name).suffix.upper()
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
             raise NotImplementedError(f"File extension {file_extension} not implemented yet")
@@ -836,6 +836,8 @@ class AequilibraeMatrix(object):
             >>> mat.computational_view()
             >>> mat.names
             ['distance_blended', 'time_final']
+
+            >>> project.close()
         """
 
         self.file_path = file_path
@@ -1025,6 +1027,8 @@ class AequilibraeMatrix(object):
                    303.58100777, 270.48841269, 263.20417379, 253.92665702,
                    277.1655432 , 258.84368258, 280.65697316, 272.7651157 ,
                    264.06806038, 252.87533845, 273.45639965, 281.61102767])
+
+            >>> project.close()
         """
         return self.__vector(axis=0)
 
@@ -1054,6 +1058,8 @@ class AequilibraeMatrix(object):
                    302.97058146, 270.61855294, 264.59944248, 257.83842251,
                    276.63310578, 257.74513863, 281.15724257, 271.63886077,
                    264.62215032, 252.79791125, 273.18139747, 282.7636574 ])
+
+            >>> project.close()
         """
         return self.__vector(axis=1)
 

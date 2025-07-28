@@ -1,100 +1,87 @@
 import os
-import uuid
-from shutil import copytree
-from tempfile import gettempdir
-from unittest import TestCase
+import shutil
 from warnings import warn
 
+import pytest
 from shapely.geometry import box, Polygon
 
 from aequilibrae.project import Project
-from ...data import siouxfalls_project
 
 
-class TestNetwork(TestCase):
-    def setUp(self) -> None:
-        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
-        self.proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)
-        copytree(siouxfalls_project, self.proj_path)
-        self.siouxfalls = Project()
-        self.siouxfalls.open(self.proj_path)
-        self.proj_path2 = os.path.join(gettempdir(), uuid.uuid4().hex)
+def test_create_from_osm(test_folder):
+    if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
+        pytest.skip("Skipped check to not load OSM servers")
 
-    def tearDown(self) -> None:
-        self.siouxfalls.close()
+    shutil.rmtree(test_folder, ignore_errors=True)
+    project = Project()
+    project.new(test_folder)
+    project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
 
-    def test_create_from_osm(self):
-        if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
-            print("Skipped check to not load OSM servers")
+    with project.db_connection as conn:
+        lks = conn.execute("""select count(*) from links""").fetchone()[0]
+        osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]
+
+        if osmids == 0:
+            warn("COULD NOT RETRIEVE DATA FROM OSM")
             return
 
-        self.siouxfalls.close()
-        self.project = Project()
-        self.project.new(self.proj_path2)
-        self.project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
+        if osmids >= lks:
+            pytest.fail("OSM links not broken down properly")
 
-        with self.project.db_connection as conn:
-            lks = conn.execute("""select count(*) from links""").fetchone()[0]
+        nds = conn.execute("""select count(*) from nodes""").fetchone()[0]
 
-            osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]
+        if lks > nds:
+            pytest.fail("We imported more links than nodes. Something wrong here")
 
-            if osmids == 0:
-                warn("COULD NOT RETRIEVE DATA FROM OSM")
-                return
+    project.close()
 
-            if osmids >= lks:
-                self.fail("OSM links not broken down properly")
 
-            nds = conn.execute("""select count(*) from nodes""").fetchone()[0]
+def test_count_centroids(sioux_falls_test):
+    items = sioux_falls_test.network.count_centroids()
+    assert items == 24, "Wrong number of centroids found"
 
-            if lks > nds:
-                self.fail("We imported more links than nodes. Something wrong here")
+    nodes = sioux_falls_test.network.nodes
+    node = nodes.get(1)
+    node.is_centroid = 0
+    node.save()
 
-        self.project.close()
-        self.siouxfalls.open(self.proj_path)
+    items = sioux_falls_test.network.count_centroids()
+    assert items == 23, "Wrong number of centroids found"
 
-    def test_count_centroids(self):
-        items = self.siouxfalls.network.count_centroids()
-        self.assertEqual(24, items, "Wrong number of centroids found")
 
-        nodes = self.siouxfalls.network.nodes
-        node = nodes.get(1)
-        node.is_centroid = 0
-        node.save()
+def test_count_links(sioux_falls_test):
+    items = sioux_falls_test.network.count_links()
+    assert items == 76, "Wrong number of links found"
 
-        items = self.siouxfalls.network.count_centroids()
-        self.assertEqual(23, items, "Wrong number of centroids found")
 
-    def test_count_links(self):
-        items = self.siouxfalls.network.count_links()
-        self.assertEqual(76, items, "Wrong number of links found")
+def test_count_nodes(sioux_falls_test):
+    items = sioux_falls_test.network.count_nodes()
+    assert items == 24, "Wrong number of nodes found"
 
-    def test_count_nodes(self):
-        items = self.siouxfalls.network.count_nodes()
-        self.assertEqual(24, items, "Wrong number of nodes found")
 
-    def test_build_graphs_with_polygons(self):
-        coords = ((-96.75, 43.50), (-96.75, 43.55), (-96.70, 43.55), (-96.70, 43.50), (-96.75, 43.50))
-        polygon = Polygon(coords)
+def test_build_graphs_with_polygons(sioux_falls_test):
+    coords = ((-96.75, 43.50), (-96.75, 43.55), (-96.70, 43.55), (-96.70, 43.50), (-96.75, 43.50))
+    polygon = Polygon(coords)
 
-        fields = ["distance"]
-        modes = ["c"]
+    fields = ["distance"]
+    modes = ["c"]
 
-        self.siouxfalls.network.build_graphs(fields, modes, polygon)
-        assert len(self.siouxfalls.network.graphs) == 1
+    sioux_falls_test.network.build_graphs(fields, modes, polygon)
+    assert len(sioux_falls_test.network.graphs) == 1
 
-        g = self.siouxfalls.network.graphs["c"]
-        assert g.num_nodes == 19
-        assert g.num_links == 52
+    g = sioux_falls_test.network.graphs["c"]
+    assert g.num_nodes == 19
+    assert g.num_links == 52
 
-        existing_nodes = [i for i in range(1, 25) if i not in [1, 2, 3, 6, 7]]
-        assert list(g.centroids) == existing_nodes
+    existing_nodes = [i for i in range(1, 25) if i not in [1, 2, 3, 6, 7]]
+    assert list(g.centroids) == existing_nodes
 
-    def test_build_graphs_without_polygons(self):
-        self.siouxfalls.network.build_graphs()
-        assert len(self.siouxfalls.network.graphs) == 3
 
-        g = self.siouxfalls.network.graphs["c"]
-        assert g.num_nodes == 24
-        assert g.num_links == 76
-        assert list(g.centroids) == list(range(1, 25))
+def test_build_graphs_without_polygons(sioux_falls_test):
+    sioux_falls_test.network.build_graphs()
+    assert len(sioux_falls_test.network.graphs) == 3
+
+    g = sioux_falls_test.network.graphs["c"]
+    assert g.num_nodes == 24
+    assert g.num_links == 76
+    assert list(g.centroids) == list(range(1, 25))

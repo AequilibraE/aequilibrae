@@ -1,50 +1,53 @@
-from math import pi
 import sqlite3
+from math import pi
 from random import randint
+
 import pytest
-
 from shapely.geometry import LineString
-from aequilibrae.transit.functions.get_srid import get_srid
 
+from aequilibrae.project.database_connection import database_connection
+from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link
 from tests.aequilibrae.transit.random_word import randomword
 
 
-class TestLink:
-    @pytest.fixture
-    def srid(self):
-        return get_srid()
+@pytest.fixture(scope="module")
+def srid():
+    return get_srid()
 
-    def test_build_object(self, srid):
-        new_link = Link(srid)
 
-        assert new_link.key == "####-1", "Pair not initiated properly"
-        assert new_link.length == -1, "Length not initiated properly"
+def test_build_object(srid):
+    new_link = Link(srid)
 
-        assert new_link.srid == srid, "SRID was not assigned properly"
+    assert new_link.key == "####-1", "Pair not initiated properly"
+    assert new_link.length == -1, "Length not initiated properly"
 
-        fstop = randomword(randint(3, 15))
-        tstop = randomword(randint(3, 15))
+    assert new_link.srid == srid, "SRID was not assigned properly"
 
-        new_link.from_stop = fstop
-        assert new_link.key == fstop + "####-1", "Pair not computed properly"
+    fstop = randomword(randint(3, 15))
+    tstop = randomword(randint(3, 15))
 
-        new_link.to_stop = tstop
-        assert new_link.key == fstop + "##" + tstop + "##-1", "Pair not computed properly"
+    new_link.from_stop = fstop
+    assert new_link.key == fstop + "####-1", "Pair not computed properly"
 
-        geo = LineString([(0, 0), (3, 4)])
+    new_link.to_stop = tstop
+    assert new_link.key == fstop + "##" + tstop + "##-1", "Pair not computed properly"
 
-        new_link.geo = geo
-        assert new_link.length == pytest.approx(5 * pi * 6371000 / 180), "Length not computed properly"
+    geo = LineString([(0, 0), (3, 4)])
 
-    def test_save_to_database(self, srid, transit_conn):
-        route_type = randint(0, 13)
-        fstop = randomword(randint(3, 15))
-        tstop = randomword(randint(3, 15))
-        geo = LineString([(0, 0), (3, 4)])
+    new_link.geo = geo
+    assert new_link.length == pytest.approx(5 * pi * 6371000 / 180), "Length not computed properly"
 
-        new_link = Link(srid)
 
+def test_save_to_database(srid, build_gtfs_project):
+    route_type = randint(0, 13)
+    fstop = randomword(randint(3, 15))
+    tstop = randomword(randint(3, 15))
+    geo = LineString([(0, 0), (3, 4)])
+
+    new_link = Link(srid)
+
+    with database_connection("transit") as transit_conn:
         with pytest.raises(AttributeError):
             new_link.save_to_database(transit_conn)
 

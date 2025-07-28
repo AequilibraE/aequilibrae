@@ -248,6 +248,8 @@ Finally, run traffic assignment!
 
   >>> assig.execute()
 
+  >>> project.close()
+
 References
 ----------
 
