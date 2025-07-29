@@ -128,11 +128,14 @@ def test_saving_loading_removing(coquimbo_example):
         data.periods.new_period(i, 0, 0).save()
         graph.period_id = i
         graph.save()
-    for i in range(10, 13):
-        links = data.pt_con.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (i,))
-        nodes = data.pt_con.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (i,))
-        assert len(links.fetchall()) == 1
-        assert len(nodes.fetchall()) == 1
+
+    with data.project.transit_connection as pt_con:
+        for i in range(10, 13):
+            links = pt_con.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (i,))
+            nodes = pt_con.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (i,))
+            assert len(links.fetchall()) == 1
+            assert len(nodes.fetchall()) == 1
+
     data.load([10, 11, 12])
     assert list(data.graphs.keys()) == [1, 10, 11, 12]
     # remove multiple transit graph
