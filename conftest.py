@@ -2,6 +2,7 @@
 # Fixtures defined in a conftest.py can be used by any test in that package without
 # needing to import them (pytest will automatically discover them).
 
+import faulthandler
 import logging
 import os
 import shutil
@@ -24,6 +25,8 @@ from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
 from tests.data import siouxfalls_project
+
+faulthandler.enable()
 
 DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
@@ -204,7 +207,7 @@ create_project = project_factory_fixture(scope="function")
 create_project_session = project_factory_fixture(scope="session")
 
 
-def pytest_sessionstart(session):
+def cleanup_test_folders():
     right_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     for item in test_base.glob("*"):
         if item.is_dir():
@@ -215,6 +218,9 @@ def pytest_sessionstart(session):
                 # Skip folders with non-matching name pattern
                 logging.error(f"Couldn't delete dir {item}, reason: {e}")
 
+
+def pytest_sessionstart(session):
+    cleanup_test_folders()
     cache_dir = test_base / "cache"
 
     # shutil.rmtree(cache_dir, ignore_errors=True)
@@ -251,3 +257,17 @@ def pytest_sessionstart(session):
             with proj.db_connection as conn:
                 for tbl in tables:
                     conn.execute(f"DELETE FROM {tbl}")
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """
+    Called after the test session has finished, before returning the exit status.
+
+    Args:
+        session: The pytest session object
+        exitstatus: The status code that will be returned to the system
+    """
+    # Add your cleanup code or any procedure you want to run after all tests
+    logging.info(f"Test session finished with exit status: {exitstatus}")
+
+    cleanup_test_folders()
