@@ -147,13 +147,13 @@ class Results:
             **ValueError**: If the result doesn't exist or was deleted
         """
 
-        if table_name.lower() not in self.__items:
+        if table_name not in self.__items:
             raise ValueError("There is no results record with that name")
 
-        if not self.__items[table_name.lower()]._exists:
+        if not self.__items[table_name]._exists:
             raise ValueError("This result was deleted during this session")
 
-        return self.__items[table_name.lower()]
+        return self.__items[table_name]
 
     def check_exists(self, table_name: str) -> bool:
         """Checks whether a result with a given name exists.
@@ -164,7 +164,7 @@ class Results:
         Returns:
             **exists** (:obj:`bool`): Does the result exist?
         """
-        return table_name.lower() in self.__items and self.__items[table_name.lower()]._exists
+        return table_name in self.__items and self.__items[table_name]._exists
 
     def delete_record(self, table_name: str) -> None:
         """Deletes a ResultRecord from the model and attempts to remove it from the results database.
@@ -175,7 +175,6 @@ class Results:
         Raises:
             **ValueError**: If the result doesn't exist
         """
-        table_name = table_name.lower()
         rr = self.get_record(table_name)
         rr.delete()
         del self.__items[table_name]
@@ -224,7 +223,7 @@ class Results:
         }
         rr = ResultRecord(tp, self.project, project_conn=self.__project_conn, results_conn=self.__results_conn)
         rr.save()
-        self.__items[table_name.lower()] = rr
+        self.__items[table_name] = rr
         self.logger.warning("ResultRecord has been saved to the database")
         return rr
 
