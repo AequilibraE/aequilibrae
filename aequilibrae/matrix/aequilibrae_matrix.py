@@ -1206,7 +1206,7 @@ class AequilibraeMatrix(object):
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.random_name() # doctest: +ELLIPSIS
+            >>> str(mat.random_name()) # doctest: +ELLIPSIS
             '/tmp/aequilibrae/Aequilibrae_matrix_...'
         """
         (Path(tempfile.gettempdir()) / "aequilibrae").mkdir(exist_ok=True, parents=True)
