@@ -36,7 +36,7 @@ class TestScenarios(unittest.TestCase):
 
     def tearDown(self):
         self.project.close()
-        self.tmp.cleanup()
+        # self.tmp.cleanup()
 
     def test_traffic_assignment_scenarios(self):
         for scenario in self.scenarios:

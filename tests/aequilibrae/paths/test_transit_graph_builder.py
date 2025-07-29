@@ -111,12 +111,17 @@ def test_saving_loading_removing(coquimbo_example):
     # removing transit graph
     data.save_graphs(force=True)
     data.remove_graphs([1])
-    links = data.pt_con.execute("SELECT link_id FROM links LIMIT 1;")
-    nodes = data.pt_con.execute("SELECT node_id FROM nodes LIMIT 1;")
-    assert links.fetchall() == []
-    assert nodes.fetchall() == []
+
+    with data.project.transit_connection as pt_con:
+        links = pt_con.execute("SELECT link_id FROM links LIMIT 1;").fetchall()
+        nodes = pt_con.execute("SELECT node_id FROM nodes LIMIT 1;").fetchall()
+
+    assert links == []
+    assert nodes == []
+
     with pytest.raises(ValueError):
         data.load([1])
+
     # save multiple transit graph
     graph = data.graphs[1]
     for i in range(10, 13):

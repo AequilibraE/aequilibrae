@@ -14,7 +14,7 @@ def test_new_gtfs_builder(build_gtfs_project):
     transit = build_gtfs_project.new_gtfs_builder(
         agency="Agency_1",
         day="2016-04-13",
-        file_path=join(build_gtfs_project.project_base_path, "gtfs_coquimbo.zip"),
+        file_path=join(build_gtfs_project.project.project_base_path, "gtfs_coquimbo.zip"),
     )
 
     assert str(type(transit)) == "<class 'aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder'>"
@@ -22,7 +22,7 @@ def test_new_gtfs_builder(build_gtfs_project):
     transit2 = build_gtfs_project.new_gtfs_builder(
         agency="Agency_2",
         day="2016-07-19",
-        file_path=join(build_gtfs_project.project_base_path, "gtfs_coquimbo.zip"),
+        file_path=join(build_gtfs_project.project.project_base_path, "gtfs_coquimbo.zip"),
     )
 
     transit.save_to_disk()
@@ -33,7 +33,7 @@ def test_new_gtfs_builder(build_gtfs_project):
     transit3 = build_gtfs_project.new_gtfs_builder(
         agency="Agency_3",
         day="2016-07-19",
-        file_path=join(build_gtfs_project.project_base_path, "gtfs_coquimbo.zip"),
+        file_path=join(build_gtfs_project.project.project_base_path, "gtfs_coquimbo.zip"),
     )
 
     transit3.save_to_disk()
@@ -41,4 +41,4 @@ def test_new_gtfs_builder(build_gtfs_project):
 
 
 def test___create_transit_database(build_gtfs_project):
-    assert isfile(join(build_gtfs_project.project_base_path, "public_transport.sqlite")) is True
+    assert isfile(join(build_gtfs_project.project.project_base_path, "public_transport.sqlite")) is True
