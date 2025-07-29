@@ -8,7 +8,6 @@ import pandas as pd
 
 from aequilibrae.log import logger
 from aequilibrae.paths.graph import TransitGraph
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
@@ -42,19 +41,16 @@ class Transit(WorkerThread):
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
         """
-        WorkerThread.__init__(self, None)
+        super().__init__(self, None)
 
         self.project = project
-        self.project_base_path = project.project_base_path
         self.logger = logger
-        self.__transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
         self.periods = project.network.periods
 
         self.create_transit_database()
-        self.pt_con = database_connection("transit")
 
     def get_table(self, table_name) -> pd.DataFrame:
-        with read_and_close(self.__transit_file, spatial=True) as conn:
+        with self.project.transit_connection as conn:
             return get_geo_table(table_name, conn)
 
     def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
@@ -73,7 +69,7 @@ class Transit(WorkerThread):
             **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
         """
         gtfs = GTFSRouteSystemBuilder(
-            network=self.project_base_path,
+            network=self.project.project_base_path,
             agency_identifier=agency,
             file_path=file_path,
             day=day,
@@ -88,9 +84,10 @@ class Transit(WorkerThread):
 
     def create_transit_database(self):
         """Creates the public transport database"""
-        if not os.path.exists(self.__transit_file):
-            shutil.copyfile(spatialite_database, self.__transit_file)
-            initialize_tables(self, "transit")
+        if not os.path.exists(self.project._tranit_database_path):
+            shutil.copyfile(spatialite_database, self.project._tranit_database_path)
+            with self.project.transit_connection as conn:
+                initialize_tables(self.logger, "transit", conn=conn)
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """
@@ -103,7 +100,7 @@ class Transit(WorkerThread):
         """
         period_id = kwargs.pop("period_id", self.periods.default_period.period_id)
 
-        graph = TransitGraphBuilder(self.pt_con, period_id, **kwargs)
+        graph = TransitGraphBuilder(self.project, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
         return graph
@@ -138,7 +135,8 @@ class Transit(WorkerThread):
 
         """
         for period_id in period_ids:
-            TransitGraphBuilder.remove(self.pt_con, period_id)
+            with self.project.transit_connection as pt_conn, self.project.db_connection as project_conn:
+                TransitGraphBuilder.remove(pt_conn, project_conn, period_id)
             if unload:
                 del self.graphs[period_id]
 
@@ -157,7 +155,7 @@ class Transit(WorkerThread):
             period_ids = [x[0] for x in res]
 
         for period_id in period_ids:
-            self.graphs[period_id] = TransitGraphBuilder.from_db(self.pt_con, period_id)
+            self.graphs[period_id] = TransitGraphBuilder.from_db(self.project, period_id)
 
     def build_pt_preload(self, start: int, end: int, inclusion_cond: str = "start") -> pd.DataFrame:
         """Builds a preload vector for the transit network over the specified time period
@@ -188,7 +186,8 @@ class Transit(WorkerThread):
 
             >>> project.close()
         """
-        return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self.pt_con)
+        with self.project.transit_connection as conn:
+            return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), conn)
 
     def __build_pt_preload_sql(self, start, end, inclusion_cond):
         probe_point_lookup = {

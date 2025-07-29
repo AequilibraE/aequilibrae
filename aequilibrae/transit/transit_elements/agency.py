@@ -1,7 +1,6 @@
 from contextlib import closing
 from sqlite3 import Connection
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
@@ -15,12 +14,12 @@ class Agency(BasicPTElement):
     * service_date (:obj:`str`): Date for the route services being imported
     * description (:obj:`str`): Description of the feed"""
 
-    def __init__(self):
+    def __init__(self, conn: Connection):
         self.agency = ""
         self.feed_date = ""
         self.service_date = ""
         self.description = 0
-        self.agency_id = self.__get_agency_id()
+        self.agency_id = self.__get_agency_id(conn)
 
     def save_to_database(self, conn: Connection) -> None:
         """Saves route to the database"""
@@ -31,8 +30,8 @@ class Agency(BasicPTElement):
         conn.execute(sql, data)
         conn.commit()
 
-    def __get_agency_id(self):
-        with closing(database_connection("transit")) as conn:
+    def __get_agency_id(self, conn):
+        with conn as conn:
             sql = "Select coalesce(max(distinct(agency_id)), 0) from agencies;"
             max_db = int(conn.execute(sql).fetchone()[0])
 

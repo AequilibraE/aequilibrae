@@ -14,16 +14,16 @@ from aequilibrae.log import get_log_handler
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network import Network
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database, demo_init_py
-from aequilibrae.transit.transit import Transit
-from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.transit import Transit
+from aequilibrae.utils.db_utils import commit_and_close, safe_connect
 from aequilibrae.utils.model_run_utils import import_file_as_module
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Project:
@@ -48,13 +48,7 @@ class Project:
     """
 
     def __init__(self):
-        self.path_to_file: str = None
-        self.project_base_path = Path()
-        self.source: str = None
-        self.network: Network = None
-        self.about: About = None
-        self.logger: logging.Logger = None
-        self.transit: Transit = None
+        pass
 
     @classmethod
     def from_path(cls, project_folder):
@@ -71,13 +65,15 @@ class Project:
             not exist, it will fail.
         """
 
-        self.project_base_path = Path(project_path)
-        file_name = self.project_base_path / "project_database.sqlite"
+        base_path = Path(project_path)
+        file_name = base_path / "project_database.sqlite"
+
         if not file_name.is_file() or not file_name.exists():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-        self.path_to_file = file_name
-        self.source = self.path_to_file
-        self.__setup_logger()
+
+        self.__base_path = base_path
+        self.__logger = self.__setup_logger()
+
         self.activate()
 
         self.__load_objects()
@@ -85,25 +81,65 @@ class Project:
         clean(self)
 
     @property
+    def project_base_path(self):
+        return self.__base_path
+
+    @property
+    def path_to_file(self):
+        return self._project_database_path
+
+    @property
+    def about(self) -> About:
+        return self.__about
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self.__logger
+
+    @property
+    def network(self) -> Network:
+        return self.__network
+
+    @property
+    def transit(self) -> Transit:
+        return self.__transit
+
+    @property
+    def matrices(self) -> Matrices:
+        return self.__matrices
+
+    @property
+    def results(self) -> Results:
+        return self.__results
+
+    @property
+    def _project_database_path(self) -> Path:
+        return self.project_base_path / "project_database.sqlite"
+
+    @property
+    def _results_database_path(self) -> Path:
+        return self.project_base_path / "results_database.sqlite"
+
+    @property
+    def _tranit_database_path(self) -> Path:
+        return self.project_base_path / "public_transport.sqlite"
+
+    @property
     @contextmanager
     def db_connection(self):
-        with commit_and_close(self.path_to_file, spatial=True) as conn:
+        with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
     @property
     @contextmanager
     def results_connection(self):
-        with commit_and_close(
-            self.project_base_path / "results_database.sqlite", spatial=False, missing_ok=True
-        ) as conn:
+        with commit_and_close(self._results_database_path, spatial=False, missing_ok=True) as conn:
             yield conn
 
     @property
     @contextmanager
     def transit_connection(self):
-        with commit_and_close(
-            self.project_base_path / "public_transport.sqlite", spatial=True, missing_ok=True
-        ) as conn:
+        with commit_and_close(self._tranit_database_path, spatial=True, missing_ok=True) as conn:
             yield conn
 
     def new(self, project_path: str) -> None:
@@ -113,23 +149,22 @@ class Project:
             **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
-        self.project_base_path = Path(project_path)
-        self.path_to_file = self.project_base_path / "project_database.sqlite"
-        self.source = self.path_to_file
+        base_path = Path(project_path)
 
         if os.path.isdir(project_path):
             raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
 
         # We create the project folder and create the base file
-        self.project_base_path.mkdir(parents=True, exist_ok=True)
+        base_path.mkdir(parents=True, exist_ok=True)
 
-        self.__setup_logger()
+        self.__base_path = base_path
+        self.__logger = self.__setup_logger()
         self.activate()
 
         self.__create_empty_network()
         self.__load_objects()
         self.about.create()
-        global_logger.info(f"Created project on {self.project_base_path}")
+        global_logger.info(f"Created project on {base_path}")
 
     def close(self) -> None:
         """Safely closes the project"""
@@ -184,7 +219,7 @@ class Project:
         """
         global_logger.info("Starting database upgrades")
         connections = {
-            "project_conn": database_connection("project"),
+            "project_conn": connect_spatialite(self._project_database_path),
             "transit_conn": None,
             "results_conn": None,
         }
@@ -194,10 +229,10 @@ class Project:
 
         if (self.project_base_path / "public_transport.sqlite").exists():
             targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
-            connections["transit_conn"] = database_connection("transit")
+            connections["transit_conn"] = connect_spatialite(self._tranit_database_path)
 
         if (self.project_base_path / "results_database.sqlite").exists():
-            connections["results_conn"] = database_connection("results")
+            connections["results_conn"] = safe_connect(self._results_database_path)
 
         try:
             for mm, main_conn in targets:
@@ -215,14 +250,14 @@ class Project:
         matrix_folder = self.project_base_path / "matrices"
         matrix_folder.mkdir(parents=True, exist_ok=True)
 
-        self.network = Network(self)
-        self.about = About(self)
-        self.matrices = Matrices(self)
-        self.results = Results(self)
+        self.__network = Network(self)
+        self.__about = About(self)
+        self.__matrices = Matrices(self)
+        self.__results = Results(self)
 
     @property
     def project_parameters(self) -> Parameters:
-        return Parameters(self)
+        return Parameters(path=self.project_base_path)
 
     @property
     def parameters(self) -> dict:
@@ -276,15 +311,17 @@ class Project:
         # Create actual tables
         with self.db_connection as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
-        initialize_tables(self, "network")
+            initialize_tables(self.logger, "network", conn=conn)
 
     def __setup_logger(self):
-        self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
-        self.logger.propagate = False
-        self.logger.setLevel(logging.DEBUG)
+        logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
+        logger.propagate = False
+        logger.setLevel(logging.DEBUG)
 
         par = self.parameters or self.project_parameters._default
         do_log = par["system"]["logging"]
 
         if do_log:
-            self.logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
+            logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
+
+        return logger

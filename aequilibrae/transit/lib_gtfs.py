@@ -8,7 +8,6 @@ from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
 
 from aequilibrae.context import get_active_project, get_logger
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
@@ -47,8 +46,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.archive_dir = None  # type: str
         self.day = day
         self.logger = get_logger()
-        self.gtfs_data = GTFSReader()
-
+        with self.project.transit_connection as conn:
+            self.gtfs_data = GTFSReader(conn)
         self.srid = get_srid()
         self.transformer = None
         self.wgs84 = pyproj.Proj("epsg:4326")
@@ -224,7 +223,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def save_to_disk(self):
         """Saves all transit elements built in memory to disk"""
 
-        with closing(database_connection("transit")) as conn:
+        with self.project.transit_connection as conn:
             for pattern in simple_progress(self.select_patterns.values(), self.signal, "Saving patterns (Step: 10/12)"):
                 pattern.save_to_database(conn, commit=False)
             conn.commit()

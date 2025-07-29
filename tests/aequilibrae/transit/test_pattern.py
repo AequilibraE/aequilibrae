@@ -5,7 +5,7 @@ from aequilibrae.project.database_connection import database_connection
 
 @pytest.fixture(scope="function")
 def pat(build_gtfs_project):
-    gtfs_fldr = build_gtfs_project.project_base_path / "gtfs_coquimbo.zip"
+    gtfs_fldr = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
 
     transit = build_gtfs_project.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
     transit.load_date("2016-04-13")

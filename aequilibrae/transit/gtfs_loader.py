@@ -27,14 +27,14 @@ class GTFSReader(WorkerThread):
 
     """Loader for GTFS data. Not meant to be used directly by the user"""
 
-    def __init__(self):
-        WorkerThread.__init__(self, None)
+    def __init__(self, conn):
+        super().__init__(None)
 
         self.__capacities__ = {}
         self.__pces__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
-        self.agency = Agency()
+        self.agency = Agency(conn)
         self.services = {}
         self.routes: Dict[int, Route] = {}
         self.trips: Dict[int, Dict[Route]] = {}

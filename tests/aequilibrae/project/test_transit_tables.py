@@ -64,7 +64,7 @@ def create_project(empty_project: Project):
     ],
 )
 def test_create_table(table: str, exp_column: list, create_project):
-    with read_and_close(join(create_project.project_base_path, "public_transport.sqlite")) as conn:
+    with create_project.project.transit_connection as conn:
         fields = [x[1] for x in conn.execute(f"PRAGMA table_info({table});").fetchall()]
 
     assert exp_column == fields, f"Table {table.upper()} was not created correctly"
