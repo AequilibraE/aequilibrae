@@ -1,5 +1,4 @@
 import functools
-import os
 import tempfile
 import uuid
 import warnings
@@ -9,8 +8,8 @@ from pathlib import Path
 from typing import List
 
 import numpy as np
-import pandas as pd
 import openmatrix as omx
+import pandas as pd
 from scipy.sparse import coo_matrix
 
 # Checks if we can display OMX
@@ -83,7 +82,6 @@ class AequilibraeMatrix(object):
         self.current_index = None
         self.__omx = False
         self.__memory_only = True
-        self.omx_file = None  # type: omx.File
         self.__version__ = VERSION  # Writes file version
 
     def save(self, names=(), file_name=None) -> None:
@@ -98,7 +96,7 @@ class AequilibraeMatrix(object):
         """
         if file_name is not None:
             cores = names if len(names) else self.names
-            self.__save_as(file_name, cores)
+            self.__save_as(Path(file_name), cores)
             return
 
         if not self.__omx:
@@ -115,16 +113,17 @@ class AequilibraeMatrix(object):
         if exists:
             raise ValueError(f'Matrix(ces) "{".".join(exists)}" already exist. Choose (a) new name(s)')
 
-        if len(self.view_names) == 1:
-            self.omx_file[names[0]] = self.matrix_view[:, :]
-        else:
-            for i, name in enumerate(names):
-                self.omx_file[name] = self.matrix_view[:, :, i]
+        with omx.open_file(self.file_path, "a") as omx_file:
+            if len(self.view_names) == 1:
+                omx_file[names[0]] = self.matrix_view[:, :]
+            else:
+                for i, name in enumerate(names):
+                    omx_file[name] = self.matrix_view[:, :, i]
 
-        self.names = self.omx_file.list_matrices()
-        self.computational_view(names)
+            self.names = omx_file.list_matrices()
+            self.computational_view(names)
 
-    def __save_as(self, file_name: str, cores: List[str]):
+    def __save_as(self, file_name: Path, cores: List[str]):
         if Path(file_name).suffix.lower() == ".aem":
             mat = AequilibraeMatrix()
             args = {
@@ -144,20 +143,19 @@ class AequilibraeMatrix(object):
             del mat
 
         elif Path(file_name).suffix.lower() == ".omx":
-            omx_mat = omx.open_file(file_name, "w")
-            for core in cores:
-                omx_mat[core] = self.matrix[core]
+            with omx.open_file(file_name, "w") as omx_mat:
+                for core in cores:
+                    omx_mat[core] = self.matrix[core]
 
-            for index in self.index_names:
-                omx_mat.create_mapping(index, self.indices[index])
+                for index in self.index_names:
+                    omx_mat.create_mapping(index, self.indices[index])
 
-            omx_mat.attrs.name = self.name
-            omx_mat.attrs.description = self.description
-            omx_mat.close()
+                omx_mat.attrs.name = self.name
+                omx_mat.attrs.description = self.description
 
     def create_empty(
         self,
-        file_name: str = None,
+        file_name: Path = None,
         zones: int = None,
         matrix_names: List[str] = None,
         data_type: np.dtype = np.float64,
@@ -169,7 +167,7 @@ class AequilibraeMatrix(object):
         Creates an empty matrix in the AequilibraE format
 
         :Arguments:
-            **file_name** (:obj:`str`): Local path to the matrix file
+            **file_name** (:obj:`Path`): Local path to the matrix file
 
             **zones** (:obj:`int`): Number of zones in the model (Integer). Maximum number of zones in a matrix is
             4,294,967,296
@@ -197,7 +195,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list,
             ...                  memory_only=False)
@@ -208,7 +206,7 @@ class AequilibraeMatrix(object):
         """
 
         self.__memory_only = memory_only
-        self.file_path = file_name
+        self.file_path = Path(file_name) if file_name is not None else file_name
         self.zones = zones
         self.index_names = index_names
         self.dtype = data_type
@@ -274,7 +272,8 @@ class AequilibraeMatrix(object):
         if core not in self.names:
             raise AttributeError("Matrix core does not exist in this matrix")
         if self.__omx:
-            return np.array(self.omx_file[core])
+            with omx.open_file(self.file_path, "r") as omx_file:
+                return np.array(omx_file[core])
         else:
             mat = self.matrix[core]
             if copy:
@@ -295,9 +294,9 @@ class AequilibraeMatrix(object):
         Creates an AequilibraeMatrix from an original OpenMatrix
 
         :Arguments:
-            **omx_path** (:obj:`str`): Path to the OMX file one wants to import
+            **omx_path** (:obj:`Path`): Path to the OMX file one wants to import
 
-            **file_path** (:obj:`str`, *Optional*): Path for the output AequilibraeMatrix
+            **file_path** (:obj:`Path`, *Optional*): Path for the output AequilibraeMatrix
 
             **cores** (:obj:`list`, *Optional*): List of matrix cores to be imported
 
@@ -336,71 +335,72 @@ class AequilibraeMatrix(object):
         if compressed:
             raise Warning("Matrix compression not yet supported")
 
-        src = omx.open_file(omx_path, "a")
-        try:
-            avail_cores = src.list_matrices()
+        with omx.open_file(omx_path, "a") as src:
+            try:
+                avail_cores = src.list_matrices()
 
-            if cores is None:
-                do_cores = avail_cores
-            else:
-                do_cores = [x for x in cores if x in avail_cores]
-                if cores != do_cores:
-                    do_cores = [x for x in cores if x not in avail_cores]
-                    raise ValueError("Cores listed not available in the OMX file: {}".format(do_cores))
+                if cores is None:
+                    do_cores = avail_cores
+                else:
+                    do_cores = [x for x in cores if x in avail_cores]
+                    if cores != do_cores:
+                        do_cores = [x for x in cores if x not in avail_cores]
+                        raise ValueError("Cores listed not available in the OMX file: {}".format(do_cores))
 
-            avail_idx = src.list_mappings()
-            if mappings is None:
-                do_idx = avail_idx
-                if not avail_idx:
-                    do_idx = ["zero_base_index"]
-            else:
-                do_idx = [x for x in mappings if x in avail_idx]
-                if mappings != do_idx:
-                    do_idx = [x for x in mappings if x not in avail_idx]
-                    raise ValueError("Mappings/indices listed not available in the OMX file: {}".format(do_idx))
+                avail_idx = src.list_mappings()
+                if mappings is None:
+                    do_idx = avail_idx
+                    if not avail_idx:
+                        do_idx = ["zero_base_index"]
+                else:
+                    do_idx = [x for x in mappings if x in avail_idx]
+                    if mappings != do_idx:
+                        do_idx = [x for x in mappings if x not in avail_idx]
+                        raise ValueError("Mappings/indices listed not available in the OMX file: {}".format(do_idx))
 
-            shp = src.shape()
-            if shp[0] != shp[1]:
-                raise ValueError("AequilibraE only supports square matrices")
-            zones = shp[0]
+                shp = src.shape()
+                if shp[0] != shp[1]:
+                    raise ValueError("AequilibraE only supports square matrices")
+                zones = shp[0]
 
-            if robust:
-                # Use reduce as we have to keep track of which generated names have been used (to avoid collisions)
-                core_names = functools.reduce(
-                    lambda acc, n: acc + [robust_name(n, CORE_NAME_MAX_LENGTH, acc)], do_cores, []
+                if robust:
+                    # Use reduce as we have to keep track of which generated names have been used (to avoid collisions)
+                    core_names = functools.reduce(
+                        lambda acc, n: acc + [robust_name(n, CORE_NAME_MAX_LENGTH, acc)], do_cores, []
+                    )
+                    idx_names = functools.reduce(
+                        lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)], do_idx, []
+                    )
+                else:
+                    core_names = list(do_cores)
+                    idx_names = list(do_idx)
+
+                self.create_empty(
+                    file_name=file_path,
+                    zones=zones,
+                    matrix_names=core_names,
+                    index_names=idx_names,
+                    compressed=compressed,
+                    memory_only=memory_only,
                 )
-                idx_names = functools.reduce(
-                    lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)], do_idx, []
-                )
-            else:
-                core_names = list(do_cores)
-                idx_names = list(do_idx)
 
-            self.create_empty(
-                file_name=file_path,
-                zones=zones,
-                matrix_names=core_names,
-                index_names=idx_names,
-                compressed=compressed,
-                memory_only=memory_only,
-            )
+                # Copy all cores
+                for ncore, core in zip(core_names, do_cores):
+                    self.matrix[ncore][:, :] = np.array(src[core])[:, :]
+                self.__flush(self.matrices)
 
-            # Copy all cores
-            for ncore, core in zip(core_names, do_cores):
-                self.matrix[ncore][:, :] = np.array(src[core])[:, :]
-            self.__flush(self.matrices)
+                # copy all indices
+                if avail_idx:
+                    for nidx, idx in enumerate(do_idx):
+                        ix = np.array(list(src.mapping(idx).keys()))
+                        self.indices[:, nidx] = ix[:]
+                else:
+                    self.index[:, 0] = np.arange(zones)
 
-            # copy all indices
-            if avail_idx:
-                for nidx, idx in enumerate(do_idx):
-                    ix = np.array(list(src.mapping(idx).keys()))
-                    self.indices[:, nidx] = ix[:]
-            else:
-                self.index[:, 0] = np.arange(zones)
-
-            self.__flush(self.indices)
-        finally:
-            src.close()
+                self.__flush(self.indices)
+                self.name = src.attrs.name if "attrs" in src.__dict__ and "name" in src.attrs else "OMX Matrix"
+            finally:
+                pass
 
     def create_from_trip_list(self, path_to_file: str, from_column: str, to_column: str, list_cores: List[str]) -> str:
         """
@@ -552,25 +552,26 @@ class AequilibraeMatrix(object):
 
         self.name = self.file_path
         self.description = "OMX MATRIX"
-        self.names = self.omx_file.list_matrices()
+        with omx.open_file(self.file_path, "r") as omx_file:
+            self.names = omx_file.list_matrices()
 
-        if len(self.omx_file) == 0:
-            raise LookupError("Matrix file has no cores")
+            if len(omx_file) == 0:
+                raise LookupError("Matrix file has no cores")
 
-        self.index_names = self.omx_file.list_mappings()
+            self.index_names = omx_file.list_mappings()
 
-        if len(self.index_names) == 0:
-            raise LookupError("Matrix file has no indices (mappings). If you can't index it, you can't use it")
+            if len(self.index_names) == 0:
+                raise LookupError("Matrix file has no indices (mappings). If you can't index it, you can't use it")
 
-        self.num_indices = len(self.index_names)
-        self.zones = len(list(self.omx_file.mapping(self.index_names[0]).keys()))
+            self.num_indices = len(self.index_names)
+            self.zones = len(list(omx_file.mapping(self.index_names[0]).keys()))
 
-        self.cores = len(self.names)
-        self.set_index(self.index_names[0])
+            self.cores = len(self.names)
+            self.set_index(self.index_names[0])
 
-        self.matrices = np.zeros(1)
-        self.matrix = {}
-        self.matrix_hash = self.__builds_hash__()
+            self.matrices = np.zeros(1)
+            self.matrix = {}
+            self.matrix_hash = self.__builds_hash__()
 
     def __write__(self):
         if not self.__memory_only:
@@ -679,7 +680,7 @@ class AequilibraeMatrix(object):
             >>> index_list = ['tazs', 'census']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list,
             ...                  index_names=index_list )
@@ -692,7 +693,8 @@ class AequilibraeMatrix(object):
             'census'
         """
         if self.__omx:
-            self.index = np.array(list(self.omx_file.mapping(index_to_set).keys()))
+            with omx.open_file(self.file_path, "r") as omx_file:
+                self.index = np.array(list(omx_file.mapping(index_to_set).keys()))
             self.current_index = index_to_set
         else:
             if index_to_set in self.index_names:
@@ -740,16 +742,14 @@ class AequilibraeMatrix(object):
         Removes matrix from memory and flushes all data to disk, or closes the OMX file if that is the case
         """
 
-        if self.__omx:
-            self.omx_file.close()
-        else:
+        if not self.__omx:
             self.__flush(self.matrices)
             self.__flush(self.index)
 
         for attr in ("index", "indices", "matrix", "matrices"):
             delattr(self, attr)
 
-    def export(self, output_name: str, cores: List[str] = None):
+    def export(self, output_name: Path, cores: List[str] = None):
         """
         Exports the matrix to other formats, rather than AEM. Formats currently supported: CSV, OMX
 
@@ -759,7 +759,7 @@ class AequilibraeMatrix(object):
         the output file
 
         :Arguments:
-            **output_name** (:obj:`str`): Path to the output file
+            **output_name** (:obj:`Path`): Path to the output file
 
             **cores** (:obj:`list`): Names of the cores to be exported.
 
@@ -771,14 +771,14 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
 
-            >>> mat.export(os.path.join(my_folder_path, 'my_new_path.aem'), ['Car trips', 'bike trips'])
+            >>> mat.export(Path(my_folder_path) / 'my_new_path.aem', ['Car trips', 'bike trips'])
 
             >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load(os.path.join(my_folder_path, 'my_new_path.aem'))
+            >>> mat2.load(Path(my_folder_path) / 'my_new_path.aem')
             >>> mat2.cores
             2
         """
@@ -794,23 +794,16 @@ class AequilibraeMatrix(object):
             self.copy(output_name=output_name, cores=cores, memory_only=False)
 
         elif file_extension == ".OMX":
-            omx_export = omx.open_file(output_name, "w")
-            for c in cores:
-                if self.__omx:
-                    omx_export[c] = np.array(self.omx_file[c])
-                else:
-                    omx_export[c] = self.matrix[c]
-            for i, idx in enumerate(self.index_names):
-                omx_export.create_mapping(idx, self.indices[:, i])
-            omx_export.close()
+            with omx.open_file(output_name, "w") as omx_export:
+                for c in cores:
+                    omx_export[c] = self.get_matrix(c, copy=True)
+                for i, idx in enumerate(self.index_names):
+                    omx_export.create_mapping(idx, self.indices[:, i])
 
         elif file_extension == ".CSV":
 
             def f(name):
-                if self.__omx:
-                    coo = coo_matrix(np.array(self.omx_file[name]))
-                else:
-                    coo = coo_matrix(self.matrix[name])
+                coo = coo_matrix(self.get_matrix(name, copy=True))
                 data = {"row": self.index[coo.row], "column": self.index[coo.col], name: coo.data}
                 return pd.DataFrame(data).set_index(["row", "column"])
 
@@ -818,7 +811,7 @@ class AequilibraeMatrix(object):
             df = reduce(lambda a, b: a.join(b, how="outer"), dfs)
             df.to_csv(output_name, index=True)
 
-    def load(self, file_path: str):
+    def load(self, file_path: Path):
         """
         Loads matrix from disk. All cores and indices are load. First index is default.
 
@@ -832,7 +825,7 @@ class AequilibraeMatrix(object):
             >>> project = create_example(project_path)
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load(os.path.join(project_path, 'matrices/skims.omx'))
+            >>> mat.load(Path(project_path) / 'matrices/skims.omx')
             >>> mat.computational_view()
             >>> mat.names
             ['distance_blended', 'time_final']
@@ -840,11 +833,10 @@ class AequilibraeMatrix(object):
             >>> project.close()
         """
 
-        self.file_path = file_path
+        self.file_path = Path(file_path)
 
-        if os.path.splitext(file_path)[-1].upper() == ".OMX":
+        if self.file_path.suffix.upper() == ".OMX":
             self.__omx = True
-            self.omx_file = omx.open_file(file_path, "a")
             self.__load_omx__()
         else:
             self.__load_aem__()
@@ -872,7 +864,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
             >>> mat.computational_view(['bike trips', 'walk trips'])
@@ -891,13 +883,14 @@ class AequilibraeMatrix(object):
             raise ValueError(f"Matrix core(s) {','.join(missing)} not available on this matrix")
 
         if self.__omx:
-            self.view_names = core_list
-            if len(core_list) == 1:
-                self.matrix_view = np.array(self.omx_file[core_list[0]])
-            else:
-                self.matrix_view = np.empty((self.zones, self.zones, len(core_list)))
-                for i, core in enumerate(core_list):
-                    self.matrix_view[:, :, i] = np.array(self.omx_file[core])
+            with omx.open_file(self.file_path, "r") as omx_file:
+                self.view_names = core_list
+                if len(core_list) == 1:
+                    self.matrix_view = np.array(omx_file[core_list[0]])
+                else:
+                    self.matrix_view = np.empty((self.zones, self.zones, len(core_list)))
+                    for i, core in enumerate(core_list):
+                        self.matrix_view[:, :, i] = np.array(omx_file[core])
         else:
             # Check if matrices are adjacent
             if len(core_list) > 1:
@@ -948,18 +941,18 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
 
-            >>> mat.copy(os.path.join(my_folder_path, 'copy_of_my_matrix.aem'),
+            >>> mat.copy(Path(my_folder_path) / 'copy_of_my_matrix.aem',
             ...          cores=['bike trips', 'walk trips'],
             ...          names=['bicycle', 'walking'],
             ...          memory_only=False)  # doctest: +ELLIPSIS
             <aequilibrae.matrix.aequilibrae_matrix.AequilibraeMatrix object at 0x...>
 
             >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load(os.path.join(my_folder_path, 'copy_of_my_matrix.aem'))
+            >>> mat2.load(Path(my_folder_path) / 'copy_of_my_matrix.aem')
             >>> mat2.cores
             2
         """
@@ -1018,7 +1011,7 @@ class AequilibraeMatrix(object):
             >>> project = create_example(project_path)
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load(os.path.join(project_path, 'matrices/skims.omx'))
+            >>> mat.load(Path(project_path) / 'matrices/skims.omx')
             >>> mat.computational_view(["distance_blended"])
             >>> mat.rows()
             array([357.68202084, 358.68778868, 310.68285491, 275.87964738,
@@ -1049,7 +1042,7 @@ class AequilibraeMatrix(object):
             >>> project = create_example(project_path)
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load(os.path.join(project_path, 'matrices/skims.omx'))
+            >>> mat.load(Path(project_path) / 'matrices/skims.omx')
             >>> mat.computational_view(["distance_blended"])
             >>> mat.columns()
             array([357.54256811, 357.45109051, 310.88655449, 276.6783439 ,
@@ -1077,7 +1070,7 @@ class AequilibraeMatrix(object):
             >>> index = np.arange(1, 4, dtype=np.int32)
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, "matrices/nan_matrix.aem"),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / "matrices/nan_matrix.aem",
             ...                  zones=3,
             ...                  matrix_names=["only_nan"])
             >>> mat.index[:] = index[:]
@@ -1135,7 +1128,7 @@ class AequilibraeMatrix(object):
             >>> zones_in_the_model = 3317
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  memory_only=False)
             >>> mat.setName('This is my example')
@@ -1143,7 +1136,7 @@ class AequilibraeMatrix(object):
             >>> mat.close()
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load(os.path.join(my_folder_path, 'my_matrix.aem'))
+            >>> mat.load(Path(my_folder_path) / 'my_matrix.aem')
             >>> mat.name.decode('utf-8')
             'This is my example'
         """
@@ -1173,7 +1166,7 @@ class AequilibraeMatrix(object):
             >>> zones_in_the_model = 3317
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  memory_only=False)
             >>> mat.setDescription('This is a text')
@@ -1181,7 +1174,7 @@ class AequilibraeMatrix(object):
             >>> mat.close()
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load(os.path.join(my_folder_path, 'my_matrix.aem'))
+            >>> mat.load(Path(my_folder_path) / 'my_matrix.aem')
             >>> mat.description.decode('utf-8')
             'This is a text'
         """
@@ -1204,7 +1197,7 @@ class AequilibraeMatrix(object):
             )[0] = matrix_description
 
     @staticmethod
-    def random_name() -> str:
+    def random_name() -> Path:
         """
         Returns a random name for a matrix with root in the temp directory of the user
 
@@ -1213,7 +1206,8 @@ class AequilibraeMatrix(object):
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.random_name() # doctest: +ELLIPSIS
-            '/tmp/Aequilibrae_matrix_...'
+            >>> str(mat.random_name()) # doctest: +ELLIPSIS
+            '/tmp/aequilibrae/Aequilibrae_matrix_...'
         """
-        return os.path.join(tempfile.gettempdir(), f"Aequilibrae_matrix_{uuid.uuid4()}.aem")
+        (Path(tempfile.gettempdir()) / "aequilibrae").mkdir(exist_ok=True, parents=True)
+        return Path(tempfile.gettempdir()) / "aequilibrae" / f"Aequilibrae_matrix_{uuid.uuid4()}.aem"
