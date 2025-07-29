@@ -229,7 +229,7 @@ class Project:
 
         if (self.project_base_path / "public_transport.sqlite").exists():
             targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
-            connections["transit_conn"] = connect_spatialite(self._tranit_database_path)
+            connections["transit_conn"] = connect_spatialite(self._transit_database_path)
 
         if (self.project_base_path / "results_database.sqlite").exists():
             connections["results_conn"] = safe_connect(self._results_database_path)
