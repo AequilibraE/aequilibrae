@@ -67,7 +67,7 @@ def omx_example(test_data_path, test_folder):
 def no_index_omx(test_data_path, test_folder):
     test_folder.mkdir(parents=True, exist_ok=True)
     shutil.copy(test_data_path / "no_index.omx", test_folder / "no_index.omx")
-    return test_folder / "test_omx.omx"
+    return test_folder / "no_index.omx"
 
 
 def cached_model(model_name, cache_pth, test_folder) -> Project:
@@ -175,6 +175,7 @@ def doctest_fixtures(doctest_namespace, tmp_path_factory, project_path):
     doctest_namespace["os"] = os
     doctest_namespace["pd"] = pd
     doctest_namespace["np"] = np
+    doctest_namespace["Path"] = Path
     doctest_namespace["Polygon"] = Polygon
 
 
