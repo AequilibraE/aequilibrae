@@ -41,7 +41,7 @@ class Transit(WorkerThread):
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
         """
-        super().__init__(self, None)
+        super().__init__(None)
 
         self.project = project
         self.logger = logger
