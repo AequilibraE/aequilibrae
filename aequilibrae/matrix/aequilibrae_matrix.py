@@ -749,7 +749,7 @@ class AequilibraeMatrix(object):
         for attr in ("index", "indices", "matrix", "matrices"):
             delattr(self, attr)
 
-    def export(self, output_name: str, cores: List[str] = None):
+    def export(self, output_name: Path, cores: List[str] = None):
         """
         Exports the matrix to other formats, rather than AEM. Formats currently supported: CSV, OMX
 
@@ -759,7 +759,7 @@ class AequilibraeMatrix(object):
         the output file
 
         :Arguments:
-            **output_name** (:obj:`str`): Path to the output file
+            **output_name** (:obj:`Path`): Path to the output file
 
             **cores** (:obj:`list`): Names of the cores to be exported.
 
@@ -796,20 +796,14 @@ class AequilibraeMatrix(object):
         elif file_extension == ".OMX":
             with omx.open_file(output_name, "w") as omx_export:
                 for c in cores:
-                    if self.__omx:
-                        omx_export[c] = np.array(omx_export[c])
-                    else:
-                        omx_export[c] = self.matrix[c]
+                    omx_export[c] = self.get_matrix(c, copy=True)
                 for i, idx in enumerate(self.index_names):
                     omx_export.create_mapping(idx, self.indices[:, i])
 
         elif file_extension == ".CSV":
 
             def f(name):
-                if self.__omx:
-                    coo = coo_matrix(np.array(omx_export[name]))
-                else:
-                    coo = coo_matrix(self.matrix[name])
+                coo = coo_matrix(self.get_matrix(name, copy=True))
                 data = {"row": self.index[coo.row], "column": self.index[coo.col], name: coo.data}
                 return pd.DataFrame(data).set_index(["row", "column"])
 
