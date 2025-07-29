@@ -17,7 +17,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 
 class TestScenarios(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(delete=False)
+        self.tmp = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.tmp.name)
         self.project = create_example(self.root / "sioux_falls", "sioux_falls")
         self.nauru = create_example(self.root / "sioux_falls" / "scenarios" / "nauru", "nauru")
