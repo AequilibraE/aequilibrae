@@ -131,7 +131,7 @@ class Project:
         return self.project_base_path / "results_database.sqlite"
 
     @property
-    def _tranit_database_path(self) -> Path:
+    def _transit_database_path(self) -> Path:
         return self.project_base_path / "public_transport.sqlite"
 
     @property
@@ -149,7 +149,7 @@ class Project:
     @property
     @contextmanager
     def transit_connection(self):
-        with commit_and_close(self._tranit_database_path, spatial=True, missing_ok=True) as conn:
+        with commit_and_close(self._transit_database_path, spatial=True, missing_ok=True) as conn:
             yield conn
 
     def new(self, project_path: str) -> None:
@@ -244,7 +244,7 @@ class Project:
 
         if (self.project_base_path / "public_transport.sqlite").exists():
             targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
-            connections["transit_conn"] = connect_spatialite(self._tranit_database_path)
+            connections["transit_conn"] = connect_spatialite(self._transit_database_path)
 
         if (self.project_base_path / "results_database.sqlite").exists():
             connections["results_conn"] = safe_connect(self._results_database_path)

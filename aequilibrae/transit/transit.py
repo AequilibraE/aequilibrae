@@ -84,8 +84,8 @@ class Transit(WorkerThread):
 
     def create_transit_database(self):
         """Creates the public transport database"""
-        if not os.path.exists(self.project._tranit_database_path):
-            shutil.copyfile(spatialite_database, self.project._tranit_database_path)
+        if not os.path.exists(self.project._transit_database_path):
+            shutil.copyfile(spatialite_database, self.project._transit_database_path)
             with self.project.transit_connection as conn:
                 initialize_tables(self.logger, "transit", conn=conn)
 

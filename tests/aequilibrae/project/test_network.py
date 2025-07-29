@@ -1,5 +1,4 @@
 import os
-import shutil
 from warnings import warn
 
 import pytest
@@ -12,9 +11,8 @@ def test_create_from_osm(test_folder):
     if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
         pytest.skip("Skipped check to not load OSM servers")
 
-    shutil.rmtree(test_folder, ignore_errors=True)
     project = Project()
-    project.new(test_folder)
+    project.new(test_folder / "test")
     project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
 
     with project.db_connection as conn:
