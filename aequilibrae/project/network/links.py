@@ -117,7 +117,7 @@ class Links(BasicTable):
             link = self.__items.pop(link_id)  # type: Link
             link.delete()
         else:
-            with self.project.db_connection as conn:
+            with self.project.db_connection_spatial as conn:
                 d = conn.execute("Delete from Links where link_id=?", [link_id]).rowcount
         if d:
             self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
@@ -127,7 +127,7 @@ class Links(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             self.__max_id = conn.execute("select coalesce(max(link_id),0) from Links").fetchone()[0]
             tl.load_structure(conn, "links")
         self.sql = tl.sql
@@ -160,7 +160,7 @@ class Links(BasicTable):
         raise ValueError(f"Link {link_id} does not exist in the model")
 
     def __link_data(self, link_id: int) -> dict:
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
             return dict(zip(self.__fields, data))

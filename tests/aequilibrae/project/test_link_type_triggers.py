@@ -91,7 +91,7 @@ def test_link_type_on_links_update(no_triggers_test, queries):
 
 
 def test_link_type_on_links_insert(no_triggers_test, queries):
-    with no_triggers_test.db_connection as conn:
+    with no_triggers_test.db_connection_spatial as conn:
         cmd = get_query(queries, "link_type_on_links_insert")
 
         f = conn.execute("pragma table_info(links)").fetchall()

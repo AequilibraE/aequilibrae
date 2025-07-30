@@ -192,7 +192,7 @@ def test_modes_on_links_insert(no_triggers_test, queries):
 def test_modes_length_on_links_insert(sioux_falls_test):
     if not check_rtree(sioux_falls_test):
         return
-    with sioux_falls_test.db_connection as conn:
+    with sioux_falls_test.db_connection_spatial as conn:
         f = conn.execute("pragma table_info(links)").fetchall()
         fields = {x[1]: x[0] for x in f}
         sql = "select * from links where link_id=70"

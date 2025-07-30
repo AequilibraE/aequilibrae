@@ -23,7 +23,7 @@ from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close, safe_connect
 from aequilibrae.utils.model_run_utils import import_file_as_module
-from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.utils.spatialite_utils import connect_spatialite, load_spatialite_extension
 
 
 class Project:
@@ -127,6 +127,12 @@ class Project:
     @property
     @contextmanager
     def db_connection(self):
+        with commit_and_close(self._project_database_path, spatial=False) as conn:
+            yield conn
+
+    @property
+    @contextmanager
+    def db_connection_spatial(self):
         with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
@@ -309,7 +315,7 @@ class Project:
         p.write_back()
 
         # Create actual tables
-        with self.db_connection as conn:
+        with self.db_connection_spatial as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables(self.logger, "network", conn=conn)
 

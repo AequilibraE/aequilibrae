@@ -1,6 +1,5 @@
 import hashlib
 import math
-from contextlib import closing
 from copy import deepcopy
 from os.path import isfile, join
 from tempfile import gettempdir
@@ -68,7 +67,7 @@ class MMGraph(WorkerThread):
         self.__mm_graph_file = join(gettempdir(), f"map_matching_graph_{self.__agency}_{self.__mode}.csv")
         modename = self.project.network.modes.get(self.__mode).mode_name
 
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             get_qry = f"""Select link_id, a_node, b_node, max(speed_ab, speed_ba) speed,
                           distance, ST_AsText(geometry) wkt from links
                           WHERE INSTR(links.modes, "{self.__mode}")>0 AND direction>=0
