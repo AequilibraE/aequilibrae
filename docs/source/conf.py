@@ -78,6 +78,7 @@ sphinx_gallery_conf = {
     "capture_repr": ("_repr_html_", "__repr__"),
     "remove_config_comments": True,
     "plot_gallery": True,
+    "parallel": 5,
 }
 
 # Add any paths that contain templates here, relative to this directory.

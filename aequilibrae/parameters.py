@@ -34,7 +34,7 @@ class Parameters:
         >>> project = Project()
         >>> project.new(project_path)
 
-        >>> p = Parameters(project)
+        >>> p = Parameters()
 
         >>> p.parameters['system']['logging_directory'] =  "/path_to/other_logging_directory"
         >>> p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
