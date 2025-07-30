@@ -99,7 +99,7 @@ def _dll_already_exists(d: os.PathLike) -> bool:
 
 
 def _download_and_extract_spatialite(directory: os.PathLike) -> None:
-    url = "https://github.com/AequilibraE/aequilibrae/releases/download/V.0.7.5/mod_spatialite-5.0.1-win-amd64.zip"
+    url = "https://github.com/AequilibraE/aequilibrae/releases/download/v1.4.3/mod_spatialite-5.1.0-win-amd64.zip"
     zip_file = join(directory, basename(url))
 
     Path(directory).mkdir(exist_ok=True, parents=True)
