@@ -113,7 +113,7 @@ def test_connect_mode(nauru_example):
     zone1 = zones.get(1)
     zone1.add_centroid(None)
 
-    with project.db_connection as conn:
+    with project.db_connection_spatial as conn:
         zone1.connect_mode(mode_id="c", conn=conn)
         cnt = conn.execute("Select count(*) from links where a_node=?", [1]).fetchone()[0]
         assert cnt != 0, "failed to add connectors"
@@ -133,7 +133,7 @@ def test_disconnect_mode(nauru_example):
     zone1 = zones.get(1)
     zone1.add_centroid(None)
 
-    with project.db_connection as conn:
+    with project.db_connection_spatial as conn:
         zone1.connect_mode(mode_id="c", conn=conn)
         zone1.connect_mode(mode_id="w", conn=conn)
         tot = conn.execute("""select COUNT(*) from links where a_node=1""").fetchone()[0]
@@ -141,7 +141,7 @@ def test_disconnect_mode(nauru_example):
 
     zone1.disconnect_mode("w")
 
-    with project.db_connection as conn:
+    with project.db_connection_spatial as conn:
         cnt = conn.execute("""select COUNT(*) from links where a_node=1""").fetchone()[0]
         assert tot != cnt, "failed to delete links"
         cnt = conn.execute("""Select count(*) from links where a_node=1 and instr(modes,'w')>0""").fetchone()[0]

@@ -36,7 +36,7 @@ class DelaunayAnalysis:
         if source not in ["zones", "network"]:
             raise ValueError("Source must be 'zones' or 'network'")
 
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type ='table'", conn)
             if DELAUNAY_TABLE in tables.name.values:
                 if not overwrite:
