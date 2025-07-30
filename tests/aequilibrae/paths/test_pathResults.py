@@ -65,37 +65,39 @@ def test_heuristics(p_results):
     assert r._heuristic == "equirectangular"
 
 
-@pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_compute_paths(p_results, early_exit, a_star):
+def test_compute_paths(p_results):
     r = p_results["r"]
-    r.early_exit = early_exit
-    r.a_star = a_star
-    path_computation(5, 2, p_results["g"], r)
-    assert list(r.path) == [12, 14]
-    assert list(r.path_link_directions) == [1, 1]
-    assert list(r.path_nodes) == [5, 6, 2]
-    assert list(r.milepost) == [0, 4, 9]
+
+    for early_exit, a_star in product([True, False], repeat=2):
+        r.early_exit = early_exit
+        r.a_star = a_star
+        path_computation(5, 2, p_results["g"], r)
+        assert list(r.path) == [12, 14]
+        assert list(r.path_link_directions) == [1, 1]
+        assert list(r.path_nodes) == [5, 6, 2]
+        assert list(r.milepost) == [0, 4, 9]
 
 
-@pytest.mark.parametrize("early_exit", [True, False])
-def test_compute_with_skimming(p_results, early_exit):
+def test_compute_with_skimming(p_results):
     g = p_results["g"]
-    r = PathResults()
-    g.set_skimming("free_flow_time")
-    r.prepare(g)
-    r.compute_path(origin, dest, early_exit=early_exit)
-    assert r.milepost[-1] == r.skims[dest]
+    for early_exit in [True, False]:
+        r = PathResults()
+        g.set_skimming("free_flow_time")
+        r.prepare(g)
+        r.compute_path(origin, dest, early_exit=early_exit)
+        assert r.milepost[-1] == r.skims[dest]
 
 
-@pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_update_trace(p_results, early_exit, a_star):
+def test_update_trace(p_results):
     r = p_results["r"]
-    r.compute_path(origin, 2, early_exit=early_exit, a_star=a_star)
-    r.update_trace(10)
-    assert list(r.path) == [13, 25]
-    assert list(r.path_link_directions) == [1, 1]
-    assert list(r.path_nodes) == [5, 9, 10]
-    assert list(r.milepost) == [0, 5, 8]
+
+    for early_exit, a_star in product([True, False], repeat=2):
+        r.compute_path(origin, 2, early_exit=early_exit, a_star=a_star)
+        r.update_trace(10)
+        assert list(r.path) == [13, 25]
+        assert list(r.path_link_directions) == [1, 1]
+        assert list(r.path_nodes) == [5, 9, 10]
+        assert list(r.milepost) == [0, 5, 8]
 
 
 # --- Blocking triangle network tests ---
@@ -109,77 +111,75 @@ def triangle_blocking_setup(triangle_graph_blocking):
     g.set_blocked_centroid_flows(True)
     r = PathResults()
     r.prepare(g)
-    yield {"project": triangle_graph_blocking, "g": g, "r": r}
-    triangle_graph_blocking.close()
-    del r
+    return {"project": triangle_graph_blocking, "g": g, "r": r}
 
 
-@pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_triangle_compute_paths(triangle_blocking_setup, early_exit, a_star):
+def test_triangle_compute_paths(triangle_blocking_setup):
     r = triangle_blocking_setup["r"]
-    r.compute_path(1, 2, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [1, 3, 2]
-    assert list(r.path) == [1, 2]
-    r.compute_path(2, 1, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [2, 1]
-    assert list(r.path) == [3]
-    r.compute_path(3, 1, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [3, 2, 1]
-    assert list(r.path) == [2, 3]
-    r.compute_path(3, 2, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [3, 2]
-    assert list(r.path) == [2]
-    r.compute_path(1, 3, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [1, 3]
-    assert list(r.path) == [1]
-    r.compute_path(2, 3, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [2, 1, 3]
-    assert list(r.path) == [3, 1]
+    for early_exit, a_star in product([True, False], repeat=2):
+        r.compute_path(1, 2, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [1, 3, 2]
+        assert list(r.path) == [1, 2]
+        r.compute_path(2, 1, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [2, 1]
+        assert list(r.path) == [3]
+        r.compute_path(3, 1, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [3, 2, 1]
+        assert list(r.path) == [2, 3]
+        r.compute_path(3, 2, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [3, 2]
+        assert list(r.path) == [2]
+        r.compute_path(1, 3, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [1, 3]
+        assert list(r.path) == [1]
+        r.compute_path(2, 3, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [2, 1, 3]
+        assert list(r.path) == [3, 1]
 
 
-@pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_triangle_compute_blocking_paths(triangle_blocking_setup, early_exit, a_star):
+def test_triangle_compute_blocking_paths(triangle_blocking_setup):
     r = triangle_blocking_setup["r"]
-    r.compute_path(4, 5, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [4, 1, 3, 2, 5]
-    assert list(r.path) == [4, 1, 2, 5]
-    r.compute_path(5, 4, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [5, 2, 1, 4]
-    assert list(r.path) == [5, 3, 4]
-    r.compute_path(6, 4, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [6, 3, 2, 1, 4]
-    assert list(r.path) == [6, 2, 3, 4]
-    r.compute_path(6, 5, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [6, 3, 2, 5]
-    assert list(r.path) == [6, 2, 5]
-    r.compute_path(4, 6, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [4, 1, 3, 6]
-    assert list(r.path) == [4, 1, 6]
-    r.compute_path(5, 6, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [5, 2, 1, 3, 6]
-    assert list(r.path) == [5, 3, 1, 6]
+    for early_exit, a_star in product([True, False], repeat=2):
+        r.compute_path(4, 5, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [4, 1, 3, 2, 5]
+        assert list(r.path) == [4, 1, 2, 5]
+        r.compute_path(5, 4, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [5, 2, 1, 4]
+        assert list(r.path) == [5, 3, 4]
+        r.compute_path(6, 4, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [6, 3, 2, 1, 4]
+        assert list(r.path) == [6, 2, 3, 4]
+        r.compute_path(6, 5, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [6, 3, 2, 5]
+        assert list(r.path) == [6, 2, 5]
+        r.compute_path(4, 6, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [4, 1, 3, 6]
+        assert list(r.path) == [4, 1, 6]
+        r.compute_path(5, 6, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [5, 2, 1, 3, 6]
+        assert list(r.path) == [5, 3, 1, 6]
 
 
-@pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_triangle_update_trace(triangle_blocking_setup, early_exit, a_star):
+def test_triangle_update_trace(triangle_blocking_setup):
     r = triangle_blocking_setup["r"]
-    r.compute_path(1, 2, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [1, 3, 2]
-    assert list(r.path) == [1, 2]
-    r.update_trace(3)
-    assert list(r.path_nodes) == [1, 3]
-    assert list(r.path) == [1]
+    for early_exit, a_star in product([True, False], repeat=2):
+        r.compute_path(1, 2, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [1, 3, 2]
+        assert list(r.path) == [1, 2]
+        r.update_trace(3)
+        assert list(r.path_nodes) == [1, 3]
+        assert list(r.path) == [1]
 
 
-@pytest.mark.parametrize("early_exit,a_star", product([True, False], repeat=2))
-def test_triangle_update_blocking_trace(triangle_blocking_setup, early_exit, a_star):
+def test_triangle_update_blocking_trace(triangle_blocking_setup):
     r = triangle_blocking_setup["r"]
-    r.compute_path(4, 5, early_exit=early_exit, a_star=a_star)
-    assert list(r.path_nodes) == [4, 1, 3, 2, 5]
-    assert list(r.path) == [4, 1, 2, 5]
-    r.update_trace(6)
-    assert list(r.path_nodes) == [4, 1, 3, 6]
-    assert list(r.path) == [4, 1, 6]
+    for early_exit, a_star in product([True, False], repeat=2):
+        r.compute_path(4, 5, early_exit=early_exit, a_star=a_star)
+        assert list(r.path_nodes) == [4, 1, 3, 2, 5]
+        assert list(r.path) == [4, 1, 2, 5]
+        r.update_trace(6)
+        assert list(r.path_nodes) == [4, 1, 3, 6]
+        assert list(r.path) == [4, 1, 6]
 
 
 def test_triangle_update_trace_early_exit(triangle_blocking_setup):
