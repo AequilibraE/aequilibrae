@@ -1,5 +1,3 @@
-import os
-from os.path import join, dirname, realpath
 from pathlib import Path
 
 from aequilibrae.project import about
@@ -44,7 +42,7 @@ def test_trigger_names():
 
         for f in pth.glob("*.sql"):
 
-            with open(join(pth, f), "r") as file:
+            with open(pth /f, "r") as file:
                 lines = file.readlines()
             for line in lines:
                 line = line.rstrip()
