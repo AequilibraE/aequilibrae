@@ -14,8 +14,8 @@ def pat(build_gtfs_project):
     yield list(patterns.values())[0]
 
 
-def test_save_to_database(pat):
-    with database_connection("transit") as transit_conn:
+def test_save_to_database(build_gtfs_project, pat):
+    with build_gtfs_project.project.transit_connection as transit_conn:
         pat.save_to_database(transit_conn)
 
     routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
@@ -33,8 +33,8 @@ def test_get_error(pat):
     assert pat.get_error() is None, "Resulted a map-matching error when should have returned none"
 
 
-def test_map_match(pat):
-    with database_connection("transit") as transit_conn:
+def test_map_match(build_gtfs_project, pat):
+    with build_gtfs_project.project.transit_connection as transit_conn:
         pat.map_match()
         pat.save_to_database(transit_conn)
 
