@@ -17,8 +17,7 @@ def pat(build_gtfs_project):
 def test_save_to_database(build_gtfs_project, pat):
     with build_gtfs_project.project.transit_connection as transit_conn:
         pat.save_to_database(transit_conn)
-
-    routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
+        routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
     assert routes == 1
 
 
