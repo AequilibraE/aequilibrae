@@ -170,7 +170,7 @@ def build_gtfs_project(coquimbo_example):
 
 @pytest.fixture(autouse=True)
 def doctest_fixtures(doctest_namespace, tmp_path_factory, tmp_path):
-    doctest_namespace["project_path"] = str(tmp_path)
+    doctest_namespace["project_path"] = str(tmp_path / "p")
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
     doctest_namespace["create_example"] = create_example
     doctest_namespace["Project"] = Project
