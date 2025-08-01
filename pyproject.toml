@@ -47,32 +47,34 @@ file = "LICENSE.TXT"
 [project.optional-dependencies]
 
 docs = [
-    "enum34",
-    "Sphinx",
-    "pydata-sphinx-theme",
-    "sphinx_autodoc_annotation",
-    "matplotlib",
-    "folium",
-    "mapclassify",
-    "sphinx-gallery",
-    "sphinx-copybutton",
-    "sphinx-design",
-    "sphinx-git",
-    "nbconvert",
-    "sphinx-tabs",
-    "sphinx-subfigure"]
+  "enum34",
+  "Sphinx",
+  "pydata-sphinx-theme",
+  "sphinx_autodoc_annotation",
+  "matplotlib",
+  "folium",
+  "mapclassify",
+  "sphinx-gallery",
+  "sphinx-copybutton",
+  "sphinx-design",
+  "sphinx-git",
+  "nbconvert",
+  "sphinx-tabs",
+  "sphinx-subfigure"
+]
 
 tests = [
-"setuptools",
-"codecov",
-"pytest",
-"pytest-xdist",
-"pytest-cov",
-"pytest-subtests",
-"coveralls",
-"ruff==0.9.10",
-"black==25.1.0",
-"wheel",
+  "setuptools",
+  "codecov",
+  "pytest",
+  "pytest-xdist",
+  "pytest-cov",
+  "pytest-subtests",
+  "pytest-random-order",
+  "coveralls",
+  "ruff==0.9.10",
+  "black==25.1.0",
+  "wheel",
 ]
 
 build=["setuptools", "numpy<1.99", "cython", "wheel"]
