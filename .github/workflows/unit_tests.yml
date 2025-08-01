@@ -43,7 +43,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip uv
-        python -m uv pip install -e .[dev]
+        python -m uv pip install .[dev]
 
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'
@@ -59,4 +59,4 @@ jobs:
       run:  python tests/setup_windows_spatialite.py
 
     - name: Runs test
-      run: python -m pytest --durations=50 --dist=loadscope -n 4 --random-order --verbose
+      run: python -m pytest ./tests --durations=50 --dist=loadscope -n 4 --random-order --verbose
