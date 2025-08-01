@@ -151,8 +151,11 @@ class GraphBase(ABC):  # noqa: B024
         connectors.
 
         :Arguments:
-            **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
-            **remove_dead_ends** (:obj:`bool`): Whether or not to remove dead ends from the graph. (*Optional*, default is "True").
+            **centroids** (`np.ndarray` or `None`, optional): Array with centroid IDs. Mandatory type
+            ``Int64``, unique and positive.
+
+            **remove_dead_ends** (`bool`, optional): Whether or not to remove dead ends from the graph.
+            Defaults to ``True``.
         """
         self.__network_error_checking__()
 
