@@ -62,8 +62,8 @@ def test_trigger_names():
 
         repeated = set()
         for trigger in all_triggers:
-            if trigger not in repeated:
-                repeated.add(trigger)
-            else:
+            if trigger in repeated:
                 print(f"TRIGGER REPEATED: {trigger}")
+            else:
+                repeated.add(trigger)
         assert len(all_triggers) == len(set(all_triggers)), "We have triggers with repeated names"
