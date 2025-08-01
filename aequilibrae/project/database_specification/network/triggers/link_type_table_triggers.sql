@@ -1,6 +1,6 @@
 -- Prevents a link_type record to be changed when it is in use for any link
 
-CREATE TRIGGER link_type_keep_if_in_use_updating BEFORE UPDATE OF link_type ON "link_types"
+CREATE TRIGGER aequilibrae_link_type_keep_if_in_use_updating BEFORE UPDATE OF link_type ON "link_types"
 WHEN
     (SELECT count(*) FROM links WHERE old.link_type = link_type)>0
 BEGIN
@@ -9,7 +9,7 @@ END;
 
 --#
 -- Prevents a link_type record to be removed when it is in use for any link
-CREATE TRIGGER link_type_keep_if_in_use_deleting BEFORE DELETE ON "link_types"
+CREATE TRIGGER aequilibrae_link_type_keep_if_in_use_deleting BEFORE DELETE ON "link_types"
 WHEN
     (SELECT count(*) FROM links WHERE old.link_type = link_type)>0
 BEGIN
@@ -18,7 +18,7 @@ END;
 
 --#
 -- Ensures an ALTERED link does not reference a non existing link_type
-CREATE TRIGGER link_type_on_links_update BEFORE UPDATE OF 'link_type' ON links
+CREATE TRIGGER aequilibrae_link_type_on_links_update BEFORE UPDATE OF 'link_type' ON links
 WHEN
     (SELECT count(*) FROM link_types WHERE new.link_type = link_type)<1
 BEGIN
@@ -27,7 +27,7 @@ END;
 
 --#
 -- Ensures an added link does not reference a non existing mode
-CREATE TRIGGER link_type_on_links_insert BEFORE INSERT ON links
+CREATE TRIGGER aequilibrae_link_type_on_links_insert BEFORE INSERT ON links
 WHEN
     (SELECT count(*) FROM link_types WHERE new.link_type = link_type)<1
 BEGIN
@@ -36,7 +36,7 @@ END;
 
 --#
 -- Ensures that we do not delete a protected link type
-CREATE TRIGGER link_type_on_links_delete_protected_link_type BEFORE DELETE ON link_types
+CREATE TRIGGER aequilibrae_link_type_on_links_delete_protected_link_type BEFORE DELETE ON link_types
 WHEN
     old.link_type = "default" OR old.link_type = "centroid_connector"
 BEGIN
@@ -45,7 +45,7 @@ END;
 
 --#
 -- Ensures that we do not alter a protected link type
-CREATE TRIGGER link_type_keep_if_protected_type BEFORE UPDATE OF link_type ON "link_types"
+CREATE TRIGGER aequilibrae_link_type_keep_if_protected_type BEFORE UPDATE OF link_type ON "link_types"
 WHEN
     old.link_type = "default" OR old.link_type = "centroid_connector"
 BEGIN
@@ -54,7 +54,7 @@ END;
 
 --#
 -- Keeps the two protected items unchanged in the database
-CREATE TRIGGER link_type_id_keep_if_protected_type BEFORE UPDATE OF link_type_id ON "link_types"
+CREATE TRIGGER aequilibrae_link_type_id_keep_if_protected_type BEFORE UPDATE OF link_type_id ON "link_types"
 WHEN
     old.link_type = "default" OR old.link_type = "centroid_connector"
 BEGIN
@@ -63,7 +63,7 @@ END;
 
 --#
 -- Keeps the list of link_types at a node up-to-date when we try to manually change it in the modes table
-CREATE TRIGGER link_type_on_nodes_table_update_nodes_link_type AFTER UPDATE of link_types ON nodes
+CREATE TRIGGER aequilibrae_link_type_on_nodes_table_update_nodes_link_type AFTER UPDATE of link_types ON nodes
 BEGIN
     UPDATE nodes
           SET link_types = (SELECT GROUP_CONCAT(link_type_id, '') 
@@ -77,7 +77,7 @@ END;
 
 --#
 -- Keeps the list of link_types at a node up-to-date when we change link type for a link
-CREATE TRIGGER link_type_on_nodes_table_update_links_link_type AFTER UPDATE of link_type ON links
+CREATE TRIGGER aequilibrae_link_type_on_nodes_table_update_links_link_type AFTER UPDATE of link_type ON links
 BEGIN
     UPDATE nodes
         SET link_types = (SELECT GROUP_CONCAT(link_type_id, '') 
@@ -103,7 +103,7 @@ END;
 
 --#
 -- Keeps the list of link_types at a node up-to-date when we change the a_node for a link
-CREATE TRIGGER link_type_on_nodes_table_update_links_a_node AFTER UPDATE of a_node ON links
+CREATE TRIGGER aequilibrae_link_type_on_nodes_table_update_links_a_node AFTER UPDATE of a_node ON links
 BEGIN
     UPDATE nodes
         SET link_types = (SELECT GROUP_CONCAT(link_type_id, '') 
@@ -128,7 +128,7 @@ END;
 
 --#
 -- Keeps the list of link_types at a node up-to-date when we change the b_node for a link
-CREATE TRIGGER link_type_on_nodes_table_update_links_b_node AFTER UPDATE of b_node ON links
+CREATE TRIGGER aequilibrae_link_type_on_nodes_table_update_links_b_node AFTER UPDATE of b_node ON links
 BEGIN
 UPDATE nodes
     SET link_types = (SELECT GROUP_CONCAT(link_type_id, '')
