@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from aequilibrae import project
+from aequilibrae.project import about
 
 
 @pytest.fixture
 def queries():
-    qry = Path(inspect.getfile(project)).parent / "database_specification/network/triggers/link_type_table_triggers.sql"
+    qry = Path(inspect.getfile(about)).parent / "database_specification/network/triggers/link_type_table_triggers.sql"
     with open(qry, "r") as sql_file:
         queries = sql_file.read()
     return list(queries.split("#"))

@@ -6,6 +6,7 @@ from warnings import warn
 
 import pytest
 
+from aequilibrae.project import about
 from aequilibrae.utils.db_utils import read_and_close
 
 
@@ -21,7 +22,7 @@ def project(empty_no_triggers_project):
 
 @pytest.fixture
 def queries():
-    qry = Path(inspect.getfile(project)).parent / "database_specification/network/triggers/modes_table_triggers.sql"
+    qry = Path(inspect.getfile(about)).parent / "database_specification/network/triggers/modes_table_triggers.sql"
     with open(qry, "r") as sql_file:
         queries = sql_file.read()
 
