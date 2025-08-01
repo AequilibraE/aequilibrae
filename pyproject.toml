@@ -96,8 +96,10 @@ aequilibrae = "aequilibrae"
     "aequilibrae.project"= [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
+        "database_specification/network/migrations/*.*",
         "database_specification/transit/tables/*.*",
         "database_specification/transit/triggers/*.*",
+        "database_specification/transit/migrations/*.*",
     ]
 
 
