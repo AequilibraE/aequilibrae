@@ -4,9 +4,9 @@ import scipy.sparse
 from aequilibrae.matrix import COO
 
 
-def test_round_trip(test_folder):
+def test_round_trip(tmp_path):
     test_data = np.full((100, 100), 5.0)
-    p = test_folder / "test.omx"
+    p = tmp_path / "test.omx"
 
     coo = COO.from_matrix(test_data)
     coo.to_disk(p, "m1")

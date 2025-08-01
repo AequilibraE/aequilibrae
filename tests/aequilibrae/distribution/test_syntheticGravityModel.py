@@ -4,8 +4,8 @@ from aequilibrae.distribution import SyntheticGravityModel
 
 
 @pytest.fixture
-def model_filename(test_folder):
-    return test_folder / "aequilibrae_model_test.mod"
+def model_filename(tmp_path):
+    return tmp_path / "aequilibrae_model_test.mod"
 
 
 @pytest.fixture

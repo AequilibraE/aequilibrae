@@ -2,6 +2,7 @@ import os
 from logging import FileHandler
 
 import pytest
+from aequilibrae import Project
 
 
 def test_contents(sioux_falls_test):
@@ -20,31 +21,29 @@ def test_clear(sioux_falls_test):
     assert len(q) == 0, "Failed to clear the log file"
 
 
-class TestStartsLogging:
-    @pytest.fixture
-    def project(self, create_project):
-        return create_project()
+def get_handlers(logger, name="aequilibrae"):
+    return [h for h in logger.handlers if h.name == name]
 
-    @staticmethod
-    def get_handlers(logger, name="aequilibrae"):
-        return [h for h in logger.handlers if h.name == name]
 
-    @classmethod
-    def get_logger_file(cls, logger, name="aequilibrae") -> str:
-        handlers = cls.get_handlers(logger, name)
-        if not handlers:
-            raise ValueError(f"Logger has no handlers named {name}")
-        handler = handlers[0]
-        if not isinstance(handler, FileHandler):
-            raise TypeError(f"Handler must be FileHandler, not {type(handler).__name__}")
+def get_logger_file(logger, name="aequilibrae") -> str:
+    handlers = get_handlers(logger, name)
+    if not handlers:
+        raise ValueError(f"Logger has no handlers named {name}")
+    handler = handlers[0]
+    if not isinstance(handler, FileHandler):
+        raise TypeError(f"Handler must be FileHandler, not {type(handler).__name__}")
 
-        return handlers[0].baseFilename
+    return handlers[0].baseFilename
 
-    def test_project_logger(self, create_project):
-        project = create_project()
-        assert self.get_logger_file(project.logger).startswith(str(project.project_base_path))
 
-    def test_multiple_projects_have_separate_logger(self, create_project):
-        a = create_project()
-        b = create_project()
-        assert self.get_logger_file(a.logger) != self.get_logger_file(b.logger)
+def test_project_logger(empty_project):
+    assert get_logger_file(empty_project.logger).startswith(str(empty_project.project_base_path))
+
+
+def test_multiple_projects_have_separate_logger(tmp_path):
+    a = Project()
+    a.new(tmp_path / "a")
+
+    b = Project()
+    b.new(tmp_path / "b")
+    assert get_logger_file(a.logger) != get_logger_file(b.logger)

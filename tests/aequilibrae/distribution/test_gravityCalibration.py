@@ -1,9 +1,8 @@
 from aequilibrae.distribution import SyntheticGravityModel
 
 
-def test_save_and_load(test_folder):
-    test_folder.mkdir(parents=True, exist_ok=True)
-    model_filename = test_folder / "aequilibrae_model_test.mod"
+def test_save_and_load(tmp_path):
+    model_filename = tmp_path / "aequilibrae_model_test.mod"
 
     model = SyntheticGravityModel()
     model.function = "EXPO"

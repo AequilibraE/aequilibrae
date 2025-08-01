@@ -143,11 +143,10 @@ def test_transit_graph_od_node_mapping(transit_graph):
 
 
 @pytest.fixture(scope="function")
-def compressed_graph(test_data_path, test_folder):
-    test_folder.mkdir(parents=True, exist_ok=True)
-    zipfile.ZipFile(test_data_path / "KaiTang.zip").extractall(test_folder)
+def compressed_graph(test_data_path, tmp_path):
+    zipfile.ZipFile(test_data_path / "KaiTang.zip").extractall(tmp_path)
 
-    link_df = pd.read_csv(test_folder / "links_modified.csv")
+    link_df = pd.read_csv(tmp_path / "links_modified.csv")
     centroids_array = np.array([7, 8, 11])
 
     graph = Graph()

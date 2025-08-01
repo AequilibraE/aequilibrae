@@ -31,27 +31,10 @@ faulthandler.enable()
 DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
 
-test_base = Path(tempfile.gettempdir()) / "aequilibrae_testing"
-
 
 @pytest.fixture(scope="session")
-def centroids():
-    return np.arange(27) + 1
-
-
-@pytest.fixture(scope="session")
-def cache_path():
-    return test_base / "cache"
-
-
-@pytest.fixture(scope="function")
-def test_folder():
-    right_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    dir = test_base / f"{right_now}--{uuid.uuid4().hex[:4]}"
-    while dir.exists():
-        dir = test_base / f"{right_now}--{uuid.uuid4().hex[:4]}"
-    dir.mkdir(parents=True, exist_ok=True)
-    return dir
+def cache_path(tmp_path_factory):
+    return tmp_path_factory.mktemp("cache", numbered=True)
 
 
 @pytest.fixture(scope="session")
@@ -60,17 +43,17 @@ def test_data_path():
 
 
 @pytest.fixture(scope="function")
-def omx_example(test_data_path, test_folder):
-    test_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(test_data_path / "test_omx.omx", test_folder / "test_omx.omx")
-    return test_folder / "test_omx.omx"
+def omx_example(test_data_path, tmp_path):
+    file = tmp_path / "test_omx.omx"
+    shutil.copy(test_data_path / "test_omx.omx", file)
+    return file
 
 
 @pytest.fixture(scope="function")
-def no_index_omx(test_data_path, test_folder):
-    test_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(test_data_path / "no_index.omx", test_folder / "no_index.omx")
-    return test_folder / "no_index.omx"
+def no_index_omx(test_data_path, tmp_path):
+    file = tmp_path / "no_index.omx"
+    shutil.copy(test_data_path / "no_index.omx", file)
+    return file
 
 
 def cached_model(model_name, cache_pth, test_folder) -> Project:
@@ -79,76 +62,100 @@ def cached_model(model_name, cache_pth, test_folder) -> Project:
     return Project.from_path(test_folder)
 
 
-@pytest.fixture(scope="function")
-def sioux_falls_example(cache_path, test_folder) -> Project:
-    project = cached_model("sioux_falls", cache_path, test_folder)
-    yield project
-    project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
+@pytest.fixture(scope="session")
+def cached_sioux_falls_example(cache_path):
+    create_example(cache_path / "sioux_falls", "sioux_falls")
 
 
 @pytest.fixture(scope="function")
-def nauru_example(cache_path, test_folder) -> Project:
-    project = cached_model("nauru", cache_path, test_folder)
+def sioux_falls_example(cached_sioux_falls_example, cache_path, tmp_path) -> Project:
+    project = cached_model("sioux_falls", cache_path, tmp_path)
     yield project
     project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
+
+
+@pytest.fixture(scope="session")
+def cached_nauru_example(cache_path):
+    create_example(cache_path / "nauru", "nauru")
 
 
 @pytest.fixture(scope="function")
-def coquimbo_example(cache_path, test_folder) -> Project:
-    project = cached_model("coquimbo", cache_path, test_folder)
+def nauru_example(cached_nauru_example, cache_path, tmp_path) -> Project:
+    project = cached_model("nauru", cache_path, tmp_path)
     yield project
     project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
+
+
+@pytest.fixture(scope="session")
+def cached_coquimbo_example(cache_path):
+    create_example(cache_path / "coquimbo", "coquimbo")
+
+
+@pytest.fixture(scope="function")
+def coquimbo_example(cached_coquimbo_example, cache_path, tmp_path) -> Project:
+    project = cached_model("coquimbo", cache_path, tmp_path)
+    yield project
+    project.close()
 
 
 @pytest.fixture
-def empty_project(cache_path, test_folder) -> Project:
-    project = cached_model("empty_project", cache_path, test_folder)
+def empty_project(tmp_path) -> Project:
+    project = Project()
+    project.new(tmp_path / "p")
     yield project
     project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
+
+
+@pytest.fixture(scope="session")
+def cached_empty_no_triggers_project(cache_path):
+    create_example(cache_path / "empty_no_triggers", "empty_no_triggers")
 
 
 @pytest.fixture
-def empty_no_triggers_project(cache_path, test_folder) -> Project:
-    project = cached_model("empty_no_triggers", cache_path, test_folder)
-    yield project
-    project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
+def empty_no_triggers_project(empty_project, tmp_path) -> Project:
+    with empty_project.db_connection as conn:
+        remove_triggers(conn, empty_project.logger, db_type="network")
+        tables = ["nodes", "links"]
+        for tbl in tables:
+            conn.execute(f"DELETE FROM {tbl}")
+
+    yield empty_project
+    empty_project.close()
 
 
 @pytest.fixture(scope="function")
-def sioux_falls_test(test_data_path, test_folder) -> Project:
-    project = cached_model("SiouxFalls_project", test_data_path, test_folder)
+def sioux_falls_test(test_data_path, tmp_path) -> Project:
+    project = cached_model("SiouxFalls_project", test_data_path, tmp_path)
     yield project
     project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
-def no_triggers_test(test_data_path, test_folder) -> Project:
-    project = cached_model("no_triggers_project", test_data_path, test_folder)
+def no_triggers_test(test_data_path, tmp_path) -> Project:
+    project = cached_model("no_triggers_project", test_data_path, tmp_path)
     yield project
     project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
+
+
+@pytest.fixture(scope="session")
+def cached_sioux_falls_single_class(cache_path):
+    zipfile.ZipFile(Path(__file__).parent / "tests" / "data" / "sioux_falls_single_class.zip").extractall(
+        cache_path / "sioux_falls_single_class"
+    )
 
 
 @pytest.fixture(scope="function")
-def sioux_falls_single_class(cache_path, test_folder) -> Project:
-    project = cached_model("sioux_falls_single_class", cache_path, test_folder)
+def sioux_falls_single_class(cached_sioux_falls_single_class, cache_path, tmp_path) -> Project:
+    project = cached_model("sioux_falls_single_class", cache_path, tmp_path)
     yield project
     project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="function")
-def triangle_graph_blocking(test_data_path, test_folder) -> Project:
-    project = cached_model("blocking_triangle_graph_project", test_data_path, test_folder)
+def triangle_graph_blocking(test_data_path, tmp_path) -> Project:
+    project = cached_model("blocking_triangle_graph_project", test_data_path, tmp_path)
     yield project
     project.close()
-    shutil.rmtree(test_folder, ignore_errors=True)
 
 
 @pytest.fixture
@@ -161,14 +168,9 @@ def build_gtfs_project(coquimbo_example):
     prj.close()
 
 
-@pytest.fixture
-def project_path(test_folder):
-    return test_folder / "0"
-
-
 @pytest.fixture(autouse=True)
-def doctest_fixtures(doctest_namespace, tmp_path_factory, project_path):
-    doctest_namespace["project_path"] = str(project_path)
+def doctest_fixtures(doctest_namespace, tmp_path_factory, tmp_path):
+    doctest_namespace["project_path"] = str(tmp_path)
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
     doctest_namespace["create_example"] = create_example
     doctest_namespace["Project"] = Project
@@ -180,86 +182,3 @@ def doctest_fixtures(doctest_namespace, tmp_path_factory, project_path):
     doctest_namespace["np"] = np
     doctest_namespace["Path"] = Path
     doctest_namespace["Polygon"] = Polygon
-
-
-def project_factory_fixture(scope):
-    @pytest.fixture(scope=scope)
-    def create_project_fixture(tmp_path_factory):
-        base_dir = tmp_path_factory.mktemp(f"projects_{scope}")
-        projects = []
-
-        def _create_project(name=None, source_dir=DEFAULT_PROJECT):
-            proj_dir = base_dir / (name or uuid.uuid4().hex)
-            copytree(source_dir, proj_dir)
-            project = Project()
-            project.open(str(proj_dir))
-            projects.append(project)
-            return project
-
-        yield _create_project
-
-        for project in projects:
-            project.close()
-
-    return create_project_fixture
-
-
-create_project = project_factory_fixture(scope="function")
-create_project_session = project_factory_fixture(scope="session")
-
-
-def cleanup_test_folders():
-    right_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    for item in test_base.glob("*"):
-        if item.is_dir():
-            try:
-                if right_now not in item.name and "cache" not in item.parts:
-                    shutil.rmtree(item)
-            except Exception as e:
-                # Skip folders with non-matching name pattern
-                logging.error(f"Couldn't delete dir {item}, reason: {e}")
-
-
-def pytest_sessionstart(session):
-    cleanup_test_folders()
-    cache_dir = test_base / "cache"
-
-    # shutil.rmtree(cache_dir, ignore_errors=True)
-    # cache_dir.mkdir(parents=True, exist_ok=True)
-
-    tgt = cache_dir / "sioux_falls"
-    if not tgt.exists():
-        create_example(tgt, "sioux_falls").upgrade()
-
-    tgt = cache_dir / "nauru"
-    if not tgt.exists():
-        create_example(tgt, "nauru").upgrade()
-
-    tgt = cache_dir / "coquimbo"
-    if not tgt.exists():
-        create_example(tgt, "coquimbo").upgrade()
-
-    tgt = cache_dir / "empty_project"
-    if not tgt.exists():
-        Project().new(tgt)
-
-    tgt = cache_dir / "sioux_falls_single_class"
-    if not tgt.exists():
-        zipfile.ZipFile(Path(__file__).parent / "tests" / "data" / "sioux_falls_single_class.zip").extractall(tgt)
-        Project.from_path(tgt).upgrade()
-
-    tgt = cache_dir / "empty_no_triggers"
-    if not tgt.exists():
-        shutil.copytree(cache_dir / "empty_project", tgt, dirs_exist_ok=True)
-        proj = Project.from_path(tgt)
-        with proj.db_connection as proj_conn:
-            remove_triggers(proj_conn, proj.logger, db_type="network")
-            tables = ["nodes", "links"]
-            with proj.db_connection as conn:
-                for tbl in tables:
-                    conn.execute(f"DELETE FROM {tbl}")
-
-
-def pytest_sessionfinish(session, exitstatus):
-    if not hasattr(session.config, "workerinput"):
-        cleanup_test_folders()
