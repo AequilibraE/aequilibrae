@@ -260,14 +260,5 @@ def pytest_sessionstart(session):
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """
-    Called after the test session has finished, before returning the exit status.
-
-    Args:
-        session: The pytest session object
-        exitstatus: The status code that will be returned to the system
-    """
-    # Add your cleanup code or any procedure you want to run after all tests
-    logging.info(f"Test session finished with exit status: {exitstatus}")
-
-    cleanup_test_folders()
+    if not hasattr(session.config, "workerinput"):
+        cleanup_test_folders()
