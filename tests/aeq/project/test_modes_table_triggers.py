@@ -1,5 +1,6 @@
-import os
+import inspect
 import sqlite3
+from pathlib import Path
 from random import choice
 from warnings import warn
 
@@ -20,9 +21,8 @@ def project(empty_no_triggers_project):
 
 @pytest.fixture
 def queries():
-    root = os.path.dirname(os.path.realpath(__file__)).replace("tests", "")
-    qry_file = os.path.join(root, "database_specification/network/triggers/modes_table_triggers.sql")
-    with open(qry_file, "r") as sql_file:
+    qry = Path(inspect.getfile(project)).parent / "database_specification/network/triggers/modes_table_triggers.sql"
+    with open(qry, "r") as sql_file:
         queries = sql_file.read()
 
     return list(queries.split("#"))
