@@ -59,4 +59,4 @@ jobs:
       run:  python tests/setup_windows_spatialite.py
 
     - name: Runs test
-      run: rm -r aequilibrae && python -m pytest ./tests --durations=50 --dist=loadscope -n 4 --random-order --verbose
+      run: cd tests && python -m pytest . --durations=50 --dist=loadscope -n 4 --random-order --verbose
