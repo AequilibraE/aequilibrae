@@ -453,31 +453,31 @@ class AequilibraeMatrix(object):
 
     def __load_aem__(self):
         # GET File version
-        self.__version__ = np.memmap(self.file_path, dtype="uint8", offset=0, mode="r+", shape=1)[0]
+        self.__version__ = int(np.memmap(self.file_path, dtype="uint8", offset=0, mode="r+", shape=1)[0])
 
         if self.__version__ != VERSION:
             raise ValueError("Matrix formats do not match")
 
         # If matrix is compressed or not
-        self.compressed = np.memmap(self.file_path, dtype="uint8", offset=1, mode="r+", shape=1)[0]
+        self.compressed = int(np.memmap(self.file_path, dtype="uint8", offset=1, mode="r+", shape=1)[0])
 
         # number matrix cells if compressed
         _ = np.memmap(self.file_path, dtype="uint64", offset=2, mode="r+", shape=1)[0]
 
         # Zones
-        self.zones = np.memmap(self.file_path, dtype="uint32", offset=10, mode="r+", shape=1)[0]
+        self.zones = int(np.memmap(self.file_path, dtype="uint32", offset=10, mode="r+", shape=1)[0])
 
         # Matrix cores
-        self.cores = np.memmap(self.file_path, dtype="uint8", offset=14, mode="r+", shape=1)[0]
+        self.cores = int(np.memmap(self.file_path, dtype="uint8", offset=14, mode="r+", shape=1)[0])
 
         # Matrix indices
-        self.num_indices = np.memmap(self.file_path, dtype="uint8", offset=15, mode="r+", shape=1)[0]
+        self.num_indices = int(np.memmap(self.file_path, dtype="uint8", offset=15, mode="r+", shape=1)[0])
 
         # Data type
-        data_class = np.memmap(self.file_path, dtype="uint8", offset=16, mode="r+", shape=1)[0]
+        data_class = int(np.memmap(self.file_path, dtype="uint8", offset=16, mode="r+", shape=1)[0])
 
         # Data size
-        data_size = np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0]
+        data_size = int(np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0])
 
         if data_class == INT:
             if data_size == 1:
