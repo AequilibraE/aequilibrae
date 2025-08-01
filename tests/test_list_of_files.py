@@ -58,7 +58,7 @@ def test_trigger_names():
                     for text in eliminate:
                         t = t.replace(text, "")
                     all_triggers.append(t.split(" ")[0])
-                    assert t[:12] == "AEQUILIBRAE_"
+                    assert t[:len("AEQUILIBRAE_")] == "AEQUILIBRAE_"
 
         repeated = set()
         for trigger in all_triggers:
