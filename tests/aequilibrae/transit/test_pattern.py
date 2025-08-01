@@ -33,10 +33,17 @@ def test_get_error(pat):
     assert pat.get_error() is None, "Resulted a map-matching error when should have returned none"
 
 
-def test_map_match(pat):
-    with database_connection("transit") as transit_conn:
+def test_map_match(build_gtfs_project):
+    gtfs_fldr = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
+
+    transit = build_gtfs_project.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
+    transit.load_date("2016-04-13")
+
+    patterns = transit.select_patterns
+    pat = list(patterns.values())[0]
+
+    with build_gtfs_project.project.transit_connection as transit_conn:
         pat.map_match()
         pat.save_to_database(transit_conn)
-
         pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
     assert pattern_map > 0
