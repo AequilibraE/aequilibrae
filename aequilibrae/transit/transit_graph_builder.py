@@ -53,11 +53,15 @@ class TransitGraphBuilder:
 
         **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
 
-        **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
+        **time_margin** (:obj:`int`): Time margin, extends the start and end times by `time_margin`
+        ([start, end] becomes [start - time_margin, end + time_margin]), in order to include more trips
+        when computing mean values. Defaults to ``0``.
 
-        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
+        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations.
+        Defaults to ``EPSG:3857``, Spherical Mercator.
 
-        **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
+        **num_threads** (:obj:`int`): Number of threads to be used where possible.
+        Defaults to ``-1`` (using all available threads).
 
         **seed** (:obj:`int`): Deprecated. No longer in use.
 
@@ -65,9 +69,11 @@ class TransitGraphBuilder:
 
         **noise_coef** (:obj:`float`): Deprecated. No longer in use.
 
-        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``False``.
+        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations.
+        Defaults to ``False``.
 
-        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``False``.
+        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations.
+        Defaults to ``False``.
 
         **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
 
@@ -193,9 +199,12 @@ class TransitGraphBuilder:
         """Add zones as ODs.
 
         :Arguments:
-            **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
+            **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information.
+            Columns must include `zone_id` and `geometry`.
 
-            **from_crs** (:obj:`str`): The CRS of the ``geometry`` column of ``zones``. If not provided it's assumed that the geometry is already in ``self.projected_crs``. If provided, the geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
+            **from_crs** (:obj:`str`): The CRS of the `geometry` column of `zones`. If not provided
+            it's assumed that the geometry is already in ``self.projected_crs``. If provided, the
+            geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
         """
         if "zone_id" not in zones.columns or "geometry" not in zones.columns:
             raise KeyError("zone_id and geometry must be columns in zones")
@@ -737,11 +746,12 @@ class TransitGraphBuilder:
 
         Nearest neighbour: Creates edges between every stop and its nearest OD.
 
-        Overlapping regions: Creates edges between all stops that lying within the circle centred on each OD whose radius is the distance to the next nearest OD.
+        Overlapping regions: Creates edges between all stops that lying within the circle
+        centred on each OD whose radius is the distance to the next nearest OD.
 
         :Arguments:
-           **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour".
-           Defaults to ``overlapping_regions``.
+           **method** (:obj:`str`): Must either be `overlapping_regions`, or `nearest_neighbour`.
+           Defaults to `overlapping_regions`.
 
            **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not.
            Defaults to ``True``.
@@ -1097,8 +1107,8 @@ class TransitGraphBuilder:
         """Graph edges creation as a Dataframe.
 
         Edges have the following attributes:
-            - type (:obj:`str`): Either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer', 'outer_transfer',
-              'access_connector', "egress_connector" or 'walking',
+            - type (:obj:`str`): Either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer',
+              'outer_transfer', 'access_connector', "egress_connector" or 'walking',
             - line_id (:obj:`str`): Only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges,
             - stop_id (:obj:`str`),
             - line_seg_idx (:obj:`int`): Only applies to 'on-board', 'boarding' and 'alighting' edges,
@@ -1187,8 +1197,8 @@ class TransitGraphBuilder:
         Project graphs must be built for the "connector project match" method.
 
         :Arguments:
-           **method** (:obj:`str`): Must be either ``"direct"`` or ``"connector project match"``.
-           If method is ``"direct"``, ``graph`` argument is ignored.
+           **method** (:obj:`str`): Must be either `direct` or `connector project match`.
+           If method is `direct`, `graph` argument is ignored.
 
            **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
@@ -1241,17 +1251,20 @@ class TransitGraphBuilder:
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
-        """Create line string geometry for ``connector_rows`` that matches the line strings in
+        """Create line string geometry for `connector_rows` that matches the line strings in
         ``project.network.graphs[graph_key]``.
 
         :Arguments:
-           **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges`` to create line strings for.
+           **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges``
+           to create line strings for.
 
            **project** (:obj:`Aequilibrae.project.Project`): Reference to the project to pull the graph from.
 
-           **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes. Must have columns ``geometry``, and an index of ``node_id``s.
+           **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes.
+           Must have columns `geometry`, and an index of `node_id`\'s.
 
-           **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links. Must have columns ``geometry``, and an index of ``link_id``s.
+           **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links.
+           Must have columns `geometry`, and an index of `link_id`\'s.
 
            **graph_key** (:obj:`str`): The key of the ``project.network.graphs`` graph to use for path finding.
         """
@@ -1344,10 +1357,12 @@ class TransitGraphBuilder:
         """
         Write the vertices DataFrame to the public transport database.
 
-        Within the database nodes may not exist at the exact same point in space, provide ``robust=True`` to move the nodes slightly.
+        Within the database nodes may not exist at the exact same point in space, provide
+        ``robust=True`` to move the nodes slightly.
 
         :Arguments:
             **robust** (:obj:`bool`): Deprecated. No longer in use.
+
             **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         if robust is not None:
@@ -1374,10 +1389,11 @@ class TransitGraphBuilder:
     @staticmethod
     def remove_vertices(pt_conn: sqlite3.Connection, period_id: int):
         """
-        Remove a transit graph's vertices from the public transport database specified by it's 'period_id'.
+        Remove a transit graph's vertices from the public transport database specified by it's `period_id`.
 
         :Arguments:
             **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+
             **period_id** (:obj:`int`): ``period_id`` to remove.
 
         """
@@ -1388,11 +1404,13 @@ class TransitGraphBuilder:
         """
         Save the contents of self.edges to the public transport database.
 
-        If no geometry for the edges is present or ``recreate_line_geometry`` is ``True``, direct lines will be created.
+        If no geometry for the edges is present or `recreate_line_geometry` is ``True``, direct lines will be created.
 
         :Arguments:
-           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
-            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges
+           as direct lines. Defaults to ``False``.
+
+           **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         # We need to generate the geometry for each edge, this may take a bit
         if "geometry" not in self.edges.columns or recreate_line_geometry:
@@ -1414,11 +1432,12 @@ class TransitGraphBuilder:
     @staticmethod
     def remove_edges(pt_conn: sqlite3.Connection, period_id: int):
         """
-        Remove a transit graph's edges from the public transport database specified by it's 'period_id'.
+        Remove a transit graph's edges from the public transport database specified by it's `period_id`.
 
         :Arguments:
             **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
-            **period_id** (:obj:`int`): ``period_id`` to remove.
+
+            **period_id** (:obj:`int`): `period_id` to remove.
 
         """
         with pt_conn as conn:
@@ -1432,11 +1451,12 @@ class TransitGraphBuilder:
     @staticmethod
     def remove_config(conn: sqlite3.Connection, period_id: int):
         """
-        Remove a transit graph configuration from the project database specified by it's 'period_id'.
+        Remove a transit graph configuration from the project database specified by it's `period_id`.
 
         :Arguments:
             **conn** (:obj:`sqlite3.Connection`): Connection to the ``project.sqlite`` database.
-            **period_id** (:obj:`int`): 'period_id' key for the 'transit_graph_configs' table.
+
+            **period_id** (:obj:`int`): `period_id` key for the `transit_graph_configs` table.
 
         """
         with conn as conn:
@@ -1448,7 +1468,9 @@ class TransitGraphBuilder:
 
         :Arguments:
             **robust** (:obj:`bool`): Deprecated. No longer in use.
+
             **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+
             **project_conn** (:obj:`sqlite.Connection`): Optional project connection to use
         """
         self.create_additional_db_fields(conn=pt_conn)
@@ -1504,6 +1526,7 @@ class TransitGraphBuilder:
 
         :Arguments:
            **project** (:obj:`Project`): AequilbraE project to use.
+
            **period_id** (:obj:`int`): Period ID to use.
         """
         with project.db_connection as project_conn:

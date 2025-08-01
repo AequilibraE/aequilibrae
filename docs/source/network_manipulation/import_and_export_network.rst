@@ -65,7 +65,7 @@ is different than 4326, it must be passed as an input using the argument ``srid`
 .. image:: ../_images/plot_import_from_gmns.png
     :align: center
     :alt: example
-    :target: ../_auto_examples/network_manipulation/plot_import_from_gmns.html
+    :target: ../_auto_examples/network_manipulation/plot_create_from_gmns.html
 
 It is possible to import the following files from a GMNS source:
 

@@ -70,15 +70,14 @@ class SubAreaAnalysis:
         Apply the necessary post processing to the route choice assignment select link results.
 
         :Arguments:
-            **demand_cols** (*Optional*: :obj:`[list[str]]`): If provided, only construct the
-              sub-area matrix for these demand matrices.
+            **demand_cols** (:obj:`[list[str]]`, optional): If provided, only construct the
+            sub-area matrix for these demand matrices.
 
-            **keep_original_ods** (*Optional*: :obj:`bool`): If provided, the original origin and destination IDs for
-              the demand will be kept. This will create a significantly larger demand matrix but is more flexible.
+            **keep_original_ods** (:obj:`bool`, optional): If provided, the original origin and destination IDs for
+            the demand will be kept. This will create a significantly larger demand matrix but is more flexible.
 
         :Returns:
-            **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area
-            demand matrix.
+            **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area demand matrix.
         """
 
         if demand_cols is None:

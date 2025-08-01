@@ -40,7 +40,7 @@ class NetworkSkimming(WorkerThread):
 
         # The skim report (if any error generated) is available here
         >>> skm.report
-        []
+        ... []
 
         # To access the skim matrix directly from its temporary file
         >>> matrix = skm.results.skims

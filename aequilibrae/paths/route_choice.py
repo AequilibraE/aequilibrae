@@ -207,9 +207,9 @@ class RouteChoice:
             assignment. If the supplied demand is a DataFrame, it should have a 2-level
             MultiIndex of Origin and Destination node IDs. If an AequilibraE Matrix is
             supplied node IDs will be inferred from the index. Demand values should be either
-            ``float32``s or ``float64``s.
+            ``float32`` or ``float64``.
 
-            **fill** (:obj:`float`): Value to fill any ``NaN``s with.
+            **fill** (:obj:`float`): Value to fill any ``NaN`` with.
         """
         if isinstance(demand, pd.DataFrame):
             self.demand.add_df(demand, fill=fill)
