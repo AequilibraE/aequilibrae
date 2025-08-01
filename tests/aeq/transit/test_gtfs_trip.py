@@ -5,7 +5,7 @@ import pytest
 
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.transit_elements import Trip
-from tests.aequilibrae.transit.random_word import randomword
+from tests.aeq.transit.random_word import randomword
 
 
 @pytest.fixture

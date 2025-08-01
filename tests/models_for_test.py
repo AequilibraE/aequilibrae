@@ -7,9 +7,9 @@ from tempfile import gettempdir
 
 import pandas as pd
 
-from aequilibrae.project import Project
-from aequilibrae.project.project_creation import remove_triggers
-from aequilibrae.utils.db_utils import read_and_close
+from aeq.project import Project
+from aeq.project.project_creation import remove_triggers
+from aeq.utils.db_utils import read_and_close
 from .data import no_triggers_project
 
 

@@ -4,7 +4,7 @@ from random import randint
 import pytest
 
 from aequilibrae.transit.transit_elements import Service
-from tests.aequilibrae.transit.random_word import randomword
+from tests.aeq.transit.random_word import randomword
 
 
 @pytest.fixture
