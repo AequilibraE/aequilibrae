@@ -1,7 +1,5 @@
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
-
 
 @pytest.fixture(scope="function")
 def pat(build_gtfs_project):
@@ -14,28 +12,24 @@ def pat(build_gtfs_project):
     yield list(patterns.values())[0]
 
 
-def test_save_to_database(build_gtfs_project, pat):
+# We put multiple tests in the same test to avoid long setup times
+def test_pattern_complete(build_gtfs_project, pat):
+    shp = pat.best_shape()
+
+    # Tests that we get the stop-based shape when we build it and not map-match it
+    assert shp != pat._stop_based_shape, "Returned the wrong shape"
+
+    # Asserts that we dont have any errors
+    assert pat.get_error() is None, "Resulted a map-matching error when should have returned none"
+
+    # We map-match
+    pat.map_match()
+
+    # We save the pattern to the database
     with build_gtfs_project.project.transit_connection as transit_conn:
         pat.save_to_database(transit_conn)
         routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
-    assert routes == 1
-
-
-def test_best_shape(pat):
-    shp = pat.best_shape()
-
-    # shp and pat._stop_based_shape must be different because there is a shape.txt file in the gtfs.
-    assert shp != pat._stop_based_shape, "Returned the wrong shape"
-
-
-def test_get_error(pat):
-    assert pat.get_error() is None, "Resulted a map-matching error when should have returned none"
-
-
-def test_map_match(build_gtfs_project, pat):
-    with build_gtfs_project.project.transit_connection as transit_conn:
-        pat.map_match()
-        pat.save_to_database(transit_conn)
-
         pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
+
+    assert routes == 1
     assert pattern_map > 0
