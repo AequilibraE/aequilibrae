@@ -45,8 +45,9 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 logger = project.logger
 
-# %% markdown
+# %%
 # Traffic assignment
+# ------------------
 
 # %%
 # We build all graphs

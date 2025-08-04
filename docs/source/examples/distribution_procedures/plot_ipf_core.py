@@ -11,7 +11,8 @@ to trip distribution.
 
 We demonstrate the usage of ``ipf_core`` with a 4x4 matrix with 64-bit data, which is indeed very
 small. Additionally, a more comprehensive discussion of the algorithm's performance
-with a 32-bit or 64-bit seed matrices is provided in :doc:`../IPF_benchmark`.
+with a 32-bit or 64-bit seed matrices is provided in 
+:doc:`../../distribution_procedures/IPF_benchmark`.
 
 The data used in this example comes from Table 5.6 in 
 `Ortúzar & Willumsen (2011) <https://www.wiley.com/en-us/Modelling+Transport%2C+4th+Edition-p-9780470760390>`_.
