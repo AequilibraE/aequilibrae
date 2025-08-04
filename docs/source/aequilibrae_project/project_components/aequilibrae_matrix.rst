@@ -23,7 +23,7 @@ There are three ways of creating an ``AequilibraeMatrix``:
 
     >>> from aequilibrae.matrix import AequilibraeMatrix
     
-    >>> file = os.path.join(my_folder_path, "path_to_my_matrix.aem")
+    >>> file = Path(my_folder_path) / "path_to_my_matrix.aem"
     >>> num_zones = 5
     >>> index = np.arange(1, 6, dtype=np.int32)
     >>> mtx = np.ones((5, 5), dtype=np.float32)
@@ -32,7 +32,7 @@ There are three ways of creating an ``AequilibraeMatrix``:
     >>> mat = AequilibraeMatrix()
     >>> mat.create_empty(file_name=file, zones=num_zones, matrix_names=names)
 
-    # `memory_only` parameter can be changed to `True` case you want to save the matrix in disk.
+    # 'memory_only' parameter can be changed to `True` case you want to save the matrix in disk.
 
     # Adds the matrix indexes, which are going to be used for computation
     >>> mat.index[:] = index[:]
@@ -79,16 +79,16 @@ for CSV file, in which all cores will be exported as separate columns in the out
 
 .. code-block:: python
 
-    >>> mat.export(os.path.join(my_folder_path, 'my_new_omx_file.omx'))
+    >>> mat.export(Path(my_folder_path) / 'my_new_omx_file.omx')
 
-    >>> mat.export(os.path.join(my_folder_path, 'my_new_csv_file.csv'))
+    >>> mat.export(Path(my_folder_path) / 'my_new_csv_file.csv')
 
 The ``export`` method also allows you to change your mind and save your AequilibraE matrix into an AEM
 file, if it's only in memory.
 
 .. code-block:: python
 
-    >>> mat.export(os.path.join(my_folder_path, 'my_new_aem_file.aem'))
+    >>> mat.export(Path(my_folder_path) / 'my_new_aem_file.aem')
 
 .. is there a better name rather than error?
 
@@ -105,7 +105,7 @@ AequilibraE matrices in disk can be reused and loaded once again.
 .. code-block:: python
 
     >>> mat = AequilibraeMatrix()
-    >>> mat.load(os.path.join(my_folder_path, 'my_new_aem_file.aem'))
+    >>> mat.load(Path(my_folder_path) / 'my_new_aem_file.aem')
 
     >>> mat.get_matrix("only_ones") # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     memmap([[1., 1., 1., 1., 1.],
@@ -147,8 +147,8 @@ Creating an AequilibraE matrix from an OMX file is pretty straightforward.
 
 .. code-block:: python
 
-    >>> file_path = os.path.join(my_folder_path, "path_to_new_matrix.aem")
-    >>> omx_path = os.path.join(my_folder_path, "my_new_omx_file.omx")
+    >>> file_path = Path(my_folder_path) / "path_to_new_matrix.aem"
+    >>> omx_path = Path(my_folder_path) / "my_new_omx_file.omx"
 
     >>> omx_mat = AequilibraeMatrix()
     >>> omx_mat.create_from_omx(omx_path, file_path)

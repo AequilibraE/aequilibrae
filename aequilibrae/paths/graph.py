@@ -141,7 +141,7 @@ class GraphBase(ABC):  # noqa: B024
 
     def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
-        Prepares the graph for a computation for a certain set of centroids
+        Prepares the graph for a computation for a certain set of centroids.
 
         Under the hood, if sets all centroids to have IDs from 1 through **n**,
         which should correspond to the index of the matrix being assigned.
@@ -151,10 +151,10 @@ class GraphBase(ABC):  # noqa: B024
         connectors.
 
         :Arguments:
-            **centroids** (`np.ndarray` or `None`, optional): Array with centroid IDs. Mandatory type
+            **centroids** (``np.ndarray`` or ``None``, optional): Array with centroid IDs. Mandatory type
             ``Int64``, unique and positive.
 
-            **remove_dead_ends** (`bool`, optional): Whether or not to remove dead ends from the graph.
+            **remove_dead_ends** (``bool``, optional): Whether or not to remove dead ends from the graph.
             Defaults to ``True``.
         """
         self.__network_error_checking__()
@@ -300,10 +300,10 @@ class GraphBase(ABC):  # noqa: B024
             **destination** (:obj:`int`): destination for the path
 
             **early_exit** (:obj:`bool`): stop constructing the shortest path tree once the destination is found.
-            Doing so may cause subsequent calls to ``update_trace`` to recompute the tree. Default is ``False``.
+            Doing so may cause subsequent calls to 'update_trace' to recompute the tree. Default is ``False``.
 
             **a_star** (:obj:`bool`): whether or not to use A* over Dijkstra's algorithm.
-            When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
+            When ``True``, 'early_exit' is always ``True``. Default is ``False``.
 
             **heuristic** (:obj:`str`): heuristic to use if ``a_star`` is enabled. Default is ``None``.
         """
@@ -466,11 +466,10 @@ class GraphBase(ABC):  # noqa: B024
     def set_blocked_centroid_flows(self, block_centroid_flows) -> None:
         """
         Chooses whether we want to block paths to go through centroids or not.
-
-        Default value is ``True``
+        Default value is ``True``.
 
         :Arguments:
-            **block_centroid_flows** (:obj:`bool`): Blocking or not
+            **block_centroid_flows** (:obj:`bool`): Blocking or not paths to go through centroids.
         """
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("Blocking flows through centroids needs to be boolean")
@@ -485,7 +484,7 @@ class GraphBase(ABC):  # noqa: B024
         Saves graph to disk
 
         :Arguments:
-            **filename** (:obj:`str`): Path to file. Usual file extension is 'aeg'
+            **filename** (:obj:`str`): Path to file. Usual file extension is ``aeg``.
         """
         mygraph = {}
         mygraph["description"] = self.description
@@ -544,10 +543,10 @@ class GraphBase(ABC):  # noqa: B024
 
     def available_skims(self) -> List[str]:
         """
-        Returns graph fields that are available to be set as skims
+        Returns graph fields that are available to be set as skims.
 
         :Returns:
-            **list** (:obj:`str`): Field names
+            **list** (:obj:`str`): Skimmeable field names
         """
         return [x for x in self.graph.columns if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
 

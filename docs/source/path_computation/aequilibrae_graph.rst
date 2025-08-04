@@ -3,9 +3,10 @@
 AequilibraE Graphs
 ==================
 
+The AequilibraE Graph is a computational representation of the network.
 The Graph object is rather complex, but the difference between the graph and the physical 
-links are the availability of two class member variables consisting of Pandas DataFrames: the
-**network** and the **graph**.
+links are the availability of two class member variables consisting of Pandas DataFrames:
+the *network* and the *graph*.
 
 .. code-block:: python
 
@@ -15,6 +16,29 @@ links are the availability of two class member variables consisting of Pandas Da
 
     >>> g.network # doctest: +SKIP
     >>> g.graph # doctest: +SKIP
+
+When implementing the AequilibraE Graph, two forms of compression are applied:
+
+1. Dead end removal
+2. Link contraction
+
+Dead end removal consists in removing dead ends and fish spines from the network. For those
+not familiar with the term, a fish spine is a road network with multiple smaller streets
+branching off from it, often leading to dead ends or cul-de-sacs, creating a pattern that
+resembles a fish spine.
+
+Whilst it's easy for humans to ignore dead ends when planning a route, the same cannot be
+said for computers. Dead end removal is done based on the observation that in a graph with
+non-negative weights a dead end will only ever appear in the results of a short(est) path if
+the origin or destination is present within that dead end.
+
+Dead end removal is applied before link contraction and does not create a strictly topological
+equivalent graph, however, all centroids are preserved. More about dead end remova can be
+found `at this blog post <https://www.outerloop.io/blog/20240205_dead_end_removal/>`_.
+
+On its turn, link contraction consists in creating a topological equivalent of the graph
+by contracting sequences of links between nodes with degrees of two. This is oftenly common
+in long streams of links, such as highways or curved roads.
 
 Directionality
 --------------
@@ -27,10 +51,13 @@ bi-directionality.
 Direction-specific fields must be coded in fields **_AB** and **_BA**, where the name of
 the field in the graph will be equal to the prefix of the directional fields. For example:
 
-The fields **free_flow_travel_time_AB** and **free_flow_travel_time_BA** provide the same
+The fields *free_flow_travel_time_AB* and *free_flow_travel_time_BA* provide the same
 metric (*free_flow_travel_time*) for each of the directions of a link, and the field of
 the graph used to set computations (e.g. field to minimize during path-finding, skimming,
-etc.) will be **free_flow_travel_time**.
+etc.) will be *free_flow_travel_time*.
+
+Observe that a bi-directional link in the network is decomposed in to two different links
+in the graph, each one representing a direction.
 
 Graphs from a model
 -------------------
@@ -48,10 +75,9 @@ or when using AequilibraE in anger, as much of the setup is done by default.
 Manipulating graphs in memory
 -----------------------------
 
-As mentioned before, the AequilibraE Graph can be manipulated in memory, with all its
-components available for editing. One of the simple tools available directly in the
-API is a method call for excluding one or more links from the Graph, **which is done**
-**in place**.
+The AequilibraE Graph can be manipulated in memory, with all its components available 
+for editing. One of the simple tools available directly in the API is a method call for
+excluding one or more links from the Graph, **which is done in place**.
 
 .. code-block:: python
 
@@ -60,7 +86,7 @@ API is a method call for excluding one or more links from the Graph, **which is 
 When working with very large networks, it is possible to filter the database to a small
 area for computation by providing a polygon that delimits the desired area, instead of
 selecting the links for deletion. The selection of links and nodes is limited to a spatial
-inidex search, which is very fast but not accurate.
+index search, which is very fast but not accurate.
 
 .. code-block:: python
 
@@ -117,11 +143,28 @@ not blocking flows through "centroids".**
     * :func:`aequilibrae.paths.TransitGraph`
         Class documentation
 
+Blocking flows through centroids
+--------------------------------
+
+When using AequilibraE Graph, it is possible to configure if one wants to allow paths
+through centroids or not. As centroid connectors are a bi-directional link type, in
+practice what blocking flows through centroids does is 'removing' graph links leaving
+from the centroid.
+
+Suppose one wants to compute the shortest path between node N1 and centroid C3 in the 
+figure below. An initial path guess would be N1 -> N3 -> C2 -> N6 -> C3 because all
+links are bi-directional. However, when we block paths through centroids, it is not
+possible to compute the path between C2 and N6 because we 'removed' the link leaving
+from the centroid.
+
+.. image:: ../_images/aequilibrae_graph-1.png
+    :align: center
+    :alt: example of aequilibrae graph
 
 Topological simplification
 ---------------------------
 
-When using the AequilibraE graph to perform topological simplification of the graph,
+When using the AequilibraE Graph to perform topological simplification of the graph,
 the user should be explicit in not removing dead ends from the graph, as that will
 result in simplification beyond pure topological simplification.
 
