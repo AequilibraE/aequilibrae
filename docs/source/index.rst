@@ -142,7 +142,7 @@ Python
    :maxdepth: 1
 
    aequilibrae_project
-   project_components
+   run_module
    network_manipulation
    distribution_procedures
    path_computation

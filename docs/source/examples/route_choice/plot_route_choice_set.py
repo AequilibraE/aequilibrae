@@ -96,7 +96,8 @@ choice_set = rc.get_results()
 # rc.execute_from_path_files(path)
 
 # %%
-# Or if we had externally computed route choice sets, we can use AequilibraEs assignment procedures by loading them with the ``execute_from_pandas` method.
+# Or if we had externally computed route choice sets, we can use AequilibraEs assignment procedures by 
+# loading them with the ``execute_from_pandas`` method.
 
 # rc.execute_from_pandas(path_files_df)
 

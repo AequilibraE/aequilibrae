@@ -1,3 +1,5 @@
+:orphan:
+
 .. _database_migration:
 
 Database Upgrades
@@ -7,7 +9,7 @@ Occasionally AequilibraE needs to make changes to the database schemas or provid
 delivered through a set of migration files shipped with AequilibraE.
 
 ``aequilibrae.Project.upgrade()``
---------------------------------
+---------------------------------
 
 Database upgrades can be applied via the ``aequilibrae.Project.upgrade()`` function. All applicable upgrades will be
 applied and marked as such in the ``migrations`` table of ``project_database.sqlite``. On first upgrade this table will

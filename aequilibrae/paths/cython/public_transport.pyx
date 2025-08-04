@@ -254,7 +254,7 @@ class HyperpathGenerating:
         """
         Assigns demand to the edges of the graph.
 
-        Assumes the ``*_column`` arguments are provided as numpy arrays that form a COO sprase matrix.
+        Assumes the `*_column` arguments are provided as numpy arrays that form a COO sprase matrix.
 
         :Arguments:
             **origin_column** (:obj:`np.ndarray`, optional): The column for the origin vertices. 
@@ -271,6 +271,7 @@ class HyperpathGenerating:
 
             **threads** (:obj:`int`, optional): The number of threads to use for computation. 
             Default is ``0`` (using all available threads).
+
         """
 
         self.origin_column = origin_column.astype(np.uint32)

@@ -40,7 +40,7 @@ class Ipf:
         >>> fratar.fit()
 
         # We can get back to our OMX matrix in the end
-        >>> fratar.output.export(os.path.join(my_folder_path, "to_omx_output.omx"))
+        >>> fratar.output.export(Path(my_folder_path) / "to_omx_output.omx")
 
         >>> project.close()
     """
