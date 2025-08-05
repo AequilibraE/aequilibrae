@@ -33,11 +33,11 @@ non-negative weights a dead end will only ever appear in the results of a short(
 the origin or destination is present within that dead end.
 
 Dead end removal is applied before link contraction and does not create a strictly topological
-equivalent graph, however, all centroids are preserved. More about dead end remova can be
+equivalent graph, however, all centroids are preserved. More about dead end removal can be
 found `at this blog post <https://www.outerloop.io/blog/20240205_dead_end_removal/>`_.
 
 On its turn, link contraction consists in creating a topological equivalent of the graph
-by contracting sequences of links between nodes with degrees of two. This is oftenly common
+by contracting sequences of links between nodes with degrees of two. This is often common
 in long streams of links, such as highways or curved roads.
 
 Directionality
@@ -56,7 +56,7 @@ metric (*free_flow_travel_time*) for each of the directions of a link, and the f
 the graph used to set computations (e.g. field to minimize during path-finding, skimming,
 etc.) will be *free_flow_travel_time*.
 
-Observe that a bi-directional link in the network is decomposed in to two different links
+Observe that a bi-directional link in the network is decomposed into two different links
 in the graph, each one representing a direction.
 
 Graphs from a model
