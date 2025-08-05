@@ -42,7 +42,7 @@ def test_trigger_names():
 
         for f in pth.glob("*.sql"):
 
-            with open(pth /f, "r") as file:
+            with open(pth / f, "r") as file:
                 lines = file.readlines()
             for line in lines:
                 line = line.rstrip()
@@ -58,7 +58,7 @@ def test_trigger_names():
                     for text in eliminate:
                         t = t.replace(text, "")
                     all_triggers.append(t.split(" ")[0])
-                    assert t[:len("AEQUILIBRAE_")] == "AEQUILIBRAE_"
+                    assert t[: len("AEQUILIBRAE_")] == "AEQUILIBRAE_"
 
         repeated = set()
         for trigger in all_triggers:
