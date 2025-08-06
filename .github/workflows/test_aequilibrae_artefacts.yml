@@ -1,0 +1,40 @@
+name: QAequilibraE artefact testing
+
+on: [pull_request]
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
+    strategy:
+      matrix:
+        python-version: [3.11]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set Python environment
+    uses: actions/setup-python@v5
+    with:
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+
+    - name: update versions to conform with QGIS
+      run: python ./.github/qgis_requirements.py
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install libsqlite3-mod-spatialite
+        sudo apt install -y libspatialite-dev
+        pip3 install uv
+        uv venv ./venv_test
+        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+    - name: Compile library
+      run: |
+        source ./venv_test/bin/activate
+        uv pip install .[dev]
+        python setup.py build_ext --inplace
+
+    - name: Generate coverage report
+      run: |
+        source ./venv_test/bin/activate
+        python -m pytest --cov=aequilibrae tests/

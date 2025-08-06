@@ -77,7 +77,7 @@ tests = [
   "wheel",
 ]
 
-build=["setuptools", "numpy<1.99", "cython", "wheel"]
+build=["setuptools", "numpy<1.99<1.99<1.99<1.99<1.99", "cython", "wheel"]
 
 dev = ['aequilibrae[build, tests, docs]']
 
