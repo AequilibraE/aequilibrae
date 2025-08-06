@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "numpy<1.99", "cython", "wheel"]
+requires = ["setuptools", "numpy>=2.0", "cython", "wheel"]
 
 [project]
 authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
@@ -29,7 +29,7 @@ requires-python = ">=3.9" # match classifiers above and black version below
 
 
 dependencies = [
-    "numpy<1.99",
+    "numpy>=1.26",
     "scipy>=1.4",
     "pyaml",
     "requests",
