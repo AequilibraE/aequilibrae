@@ -29,4 +29,4 @@ jobs:
     - name: Generate coverage report
       run: |
         source ./venv_test/bin/activate
-        python -m pytest --cov=aequilibrae tests/
+        python -m pytest --cov=aequilibrae -n 4 tests/ 

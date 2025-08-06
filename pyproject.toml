@@ -29,7 +29,7 @@ requires-python = ">=3.9" # match classifiers above and black version below
 
 
 dependencies = [
-    "numpy>=2.0",
+    "numpy>=1.26",
     "scipy>=1.4",
     "pyaml",
     "requests",
@@ -96,8 +96,10 @@ aequilibrae = "aequilibrae"
     "aequilibrae.project"= [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
+        "database_specification/network/migrations/*.*",
         "database_specification/transit/tables/*.*",
         "database_specification/transit/triggers/*.*",
+        "database_specification/transit/migrations/*.*",
     ]
 
 
