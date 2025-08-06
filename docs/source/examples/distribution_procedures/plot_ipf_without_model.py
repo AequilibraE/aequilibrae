@@ -26,7 +26,6 @@ The data used in this example comes from Table 5.6 in
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
 #     * :func:`aequilibrae.distribution.Ipf`
 
 # %%

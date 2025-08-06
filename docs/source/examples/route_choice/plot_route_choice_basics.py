@@ -18,7 +18,6 @@ Serena Metropolitan Area in Chile.
 #
 #     * :func:`aequilibrae.paths.Graph`
 #     * :func:`aequilibrae.paths.RouteChoice`
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
 
 # %%
 
