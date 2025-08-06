@@ -34,7 +34,6 @@ def test_trigger_files_are_listed():
 
 def test_trigger_names():
     base_pth = Path(about.__file__).parent / "database_specification"
-    eliminate = ["CREATE TRIGGER IF NOT EXISTS ", "CREATE TRIGGER "]
 
     all_triggers = []
     for fldr in ["network", "transit"]:
