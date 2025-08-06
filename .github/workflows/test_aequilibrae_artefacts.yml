@@ -2,6 +2,10 @@ name: QAequilibraE artefact testing
 
 on: [pull_request]
 
+env:
+  QGIS_RELEASE: true
+
+
 jobs:
   testing:
     runs-on: ubuntu-latest
@@ -9,15 +13,13 @@ jobs:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
-        python-version: [3.11]
+        python-version: [3.12]
     steps:
     - uses: actions/checkout@v4
     - name: Set Python environment
-    uses: actions/setup-python@v5
-    with:
-      python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
-
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
     - name: update versions to conform with QGIS
       run: python ./.github/qgis_requirements.py
     - name: Install dependencies
