@@ -66,7 +66,6 @@ class GravityApplication:
         ...         "row_field": "productions",
         ...         "model": model,
         ...         "column_field": "attractions",
-        ...         "output": project_path / 'matrices' / 'gravity_matrix.aem',
         ...         "nan_as_zero":True
         ...         }
         >>> gravity = GravityApplication(**args)

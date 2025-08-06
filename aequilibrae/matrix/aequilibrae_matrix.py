@@ -195,10 +195,8 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
-            ...                  matrix_names=names_list,
-            ...                  memory_only=False)
+            >>> mat.create_empty(zones=zones_in_the_model,
+            ...                  matrix_names=names_list)
             >>> mat.num_indices
             1
             >>> mat.zones
@@ -680,8 +678,7 @@ class AequilibraeMatrix(object):
             >>> index_list = ['tazs', 'census']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list,
             ...                  index_names=index_list )
             >>> mat.num_indices
@@ -771,16 +768,10 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list)
 
-            >>> mat.export(Path(my_folder_path) / 'my_new_path.aem', ['Car trips', 'bike trips'])
-
-            >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load(Path(my_folder_path) / 'my_new_path.aem')
-            >>> mat2.cores
-            2
+            >>> mat.export(Path(my_folder_path) / 'my_new_path.omx', ['Car trips', 'bike trips'])
         """
         file_extension = Path(output_name).suffix.upper()
 
@@ -864,8 +855,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list)
             >>> mat.computational_view(['bike trips', 'walk trips'])
             >>> mat.view_names
@@ -941,8 +931,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list)
 
             >>> mat.copy(Path(my_folder_path) / 'copy_of_my_matrix.aem',
@@ -1128,17 +1117,12 @@ class AequilibraeMatrix(object):
             >>> zones_in_the_model = 3317
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.omx',
             ...                  zones=zones_in_the_model,
             ...                  memory_only=False)
             >>> mat.setName('This is my example')
-            >>> mat.save()
-            >>> mat.close()
-
-            >>> mat = AequilibraeMatrix()
-            >>> mat.load(Path(my_folder_path) / 'my_matrix.aem')
-            >>> mat.name.decode('utf-8')
-            'This is my example'
+            >>> mat.save() # doctest: +SKIP
+            >>> mat.close() # doctest: +SKIP
         """
         if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")

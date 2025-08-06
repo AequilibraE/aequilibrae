@@ -27,7 +27,7 @@ class SkimResults:
           >>> res = SkimResults()
           >>> res.prepare(car_graph)
 
-          >>> res.skims.export(project_path / "skim_matrices.aem")
+          >>> res.skims.export(project_path / "skim_matrices.omx")
 
           >>> project.close()
     """

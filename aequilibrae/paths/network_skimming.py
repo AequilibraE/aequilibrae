@@ -44,9 +44,6 @@ class NetworkSkimming(WorkerThread):
         # Or you can save the results to disk
         >>> skm.save_to_project('skimming_result_omx', 'omx')
 
-        # Or specify the AequilibraE's matrix file format
-        >>> skm.save_to_project('skimming_result_aem', 'aem')
-
         >>> project.close()
     """
 
