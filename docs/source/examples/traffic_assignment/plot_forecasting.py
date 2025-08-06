@@ -316,7 +316,7 @@ logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR WITH SELECT LINK ANALYSIS
 # %%
 # Let's get our future demand matrix, which corresponds to the IPF result we just saved,
 # and see what is the core we ended up getting. It should be ``matrix``.
-demand = proj_matrices.get_matrix("demand_ipfd")
+demand = proj_matrices.get_matrix("demand_ipfd_omx")
 demand.names
 
 # %%
