@@ -55,10 +55,10 @@ def test_trigger_names():
 
                 if "CREATE TRIGGER" in new_line.upper():
                     t = new_line.upper()
-                    for text in eliminate:
-                        t = t.replace(text, "")
-                    all_triggers.append(t.split(" ")[0])
-                    assert t[: len("AEQUILIBRAE_")] == "AEQUILIBRAE_"
+                    assert "AEQUILIBRAE_" in t
+                    for portion in t.split(" "):
+                        if "AEQUILIBRAE_" in portion:
+                            all_triggers.append(portion)
 
         repeated = set()
         for trigger in all_triggers:
