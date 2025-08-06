@@ -20,8 +20,6 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - name: update versions to conform with QGIS
-      run: python ./.github/qgis_requirements.py
 
     - name: Install dependencies
       run: |
