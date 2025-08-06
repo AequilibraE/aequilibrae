@@ -10,10 +10,9 @@ couple model parameters and methods to run models to the model itself.
 ``run/__init__.py``
 -------------------
 
-The run module is a standard Python module that is dynamically imported when the
-``project.run`` property is accessed. Objects named within ``parameters.yml`` under the ``run``
-heading will have their arguments partially applied via ``functools.partial`` and will replace
-the objects within the module.
+The run module is a standard Python module that is dynamically imported when the ``project.run``
+property is accessed. Objects named within ``parameters.yml`` under the ``run`` heading will have
+their arguments partially applied via ``functools.partial`` and return a ``namedtuple``.
 
 Not all objects within the module must be named ``parameters.yml``. If an object is named within
 ``parameters.yml``, then it must exist within the module otherwise a ``RuntimeError`` will be

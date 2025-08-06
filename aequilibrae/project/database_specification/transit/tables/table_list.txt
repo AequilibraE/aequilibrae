@@ -13,7 +13,6 @@ route_links
 routes
 stop_connectors
 stops
-results
 trigger_settings
 trips_schedule
 trips

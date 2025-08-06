@@ -119,8 +119,8 @@ import folium
 # %%
 def plot_results(link_loads):
 
-    link_loads = link_loads[link_loads.tot > 0]
-    max_load = link_loads["tot"].max()
+    link_loads = link_loads[link_loads["demand_tot"] > 0]
+    max_load = link_loads["demand_tot"].max()
     links = project.network.links.data
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
@@ -133,7 +133,7 @@ def plot_results(link_loads):
         color="red",
         style_kwds={
             "style_function": lambda x: {
-                "weight": x["properties"]["tot"] * factor,
+                "weight": x["properties"]["demand_tot"] * factor,
             }
         },
     )
@@ -172,7 +172,7 @@ res = rc.get_results()
 res.head()
 
 # %%
-plot_results(rc.get_load_results()["demand"])
+plot_results(rc.get_load_results())
 
 # %%
 # Batch operations
@@ -193,7 +193,7 @@ rc.get_load_results()
 
 # %% 
 # We can plot these as well
-plot_results(rc.get_load_results()["demand"])
+plot_results(rc.get_load_results())
 
 # %%
 # Select link analysis

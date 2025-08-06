@@ -489,6 +489,9 @@ cdef class RouteChoiceSetResults:
         }
         route_set_col = []  # We treat this one differently when constructing it
 
+        types = {"cost":"float64", "mask":"bool", "path overlap":"float64", "probability":"float64",
+                 "origin id":"uint32", "destination id":"uint32"}
+
         if have_assignment_results:
             columns["cost"] = []
             columns["mask"] = []
@@ -540,7 +543,7 @@ cdef class RouteChoiceSetResults:
 
                 route_set_col.append(np.hstack(links))
 
-        columns = {k: np.hstack(v, casting="no") if len(v) else np.array([], dtype=v.dtype) for k, v in columns.items()}
+        columns = {k: np.hstack(v, casting="no") if len(v) else np.array([], dtype=types[k]) for k, v in columns.items()}
         columns["route set"] = route_set_col
 
         self.table = pd.DataFrame(columns)

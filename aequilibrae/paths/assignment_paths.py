@@ -2,6 +2,7 @@ import os
 from typing import Dict, List
 import numpy as np
 import pandas as pd
+import json
 from aequilibrae.context import get_active_project
 
 
@@ -46,9 +47,7 @@ class AssignmentResultsTable(object):
         rep_with_replacement = (
             self.assignment_results["procedure_report"].values[0].replace("inf", "np.inf").replace("nan", "np.nan")
         )
-        report = eval(rep_with_replacement)
-        report["convergence"] = eval(report["convergence"])
-        report["setup"] = eval(report["setup"])
+        report = json.loads(rep_with_replacement)
         return report
 
     def get_traffic_class_names_and_id(self) -> List[TrafficClassIdentifier]:

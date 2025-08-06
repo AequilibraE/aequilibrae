@@ -189,8 +189,8 @@ cdef void compute_SF_in_parallel(
     cnp.uint32_t[::1] tail_view,
     cnp.uint32_t[::1] head_view,
     cnp.uint32_t[:] d_vert_ids_view,  # destination vertices
-    # in public_transport.run case, same as d_vert_ids_view in .assign are the unique destination values
     cnp.uint32_t[:] destination_vertex_indices_view,
+    cnp.uint32_t[:] rest_of_destinations_view,  # Used when skimming to lookup the rest of the destinations to skim from
     cnp.uint32_t[::1] o_vert_ids_view,  # origin vertices
     cnp.float64_t[::1] demand_vls_view,  # volume
     cnp.float64_t[::1] edge_volume_view,
@@ -200,8 +200,10 @@ cdef void compute_SF_in_parallel(
     cnp.float64_t[:, ::1] skim_col_view,
     cnp.float64_t[::1] u_i_vec_view,
     cnp.float64_t[:, :, ::1] skim_matrix,
-    cnp.uint32_t[::1] centroids,
-    cnp.uint32_t[::1] centroids_idx_pos,
+    cnp.int64_t[::1] origin_ids,
+    cnp.uint32_t[::1] o_indices,
+    cnp.int64_t[::1] od_index_to_taz_index,
+    cnp.int64_t[::1] nodes_to_indices,
     bint skimming,
     bint is_travel_time,
     size_t n_skim_cols,
@@ -233,9 +235,10 @@ cdef void compute_SF_in_parallel(
             num_threads, sizeof(cnp.float64_t) * vertex_count * n_skim_cols)
 
         int i  # openmp on windows requires iterator variable have signed type
-        size_t k, j, destination_vertex_index
+        size_t k, j
+        cnp.int64_t destination_vertex
 
-    with parallel(num_threads=min(num_threads, centroids.shape[0] if skimming else d_vert_ids_view.shape[0])):
+    with parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
         thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
@@ -253,16 +256,40 @@ cdef void compute_SF_in_parallel(
 
         thread_skim_j_vec = <cnp.float64_t *> calloc(edge_count, sizeof(cnp.float64_t) * n_skim_cols)
 
-        for i in prange(destination_vertex_indices_view.shape[0]):
-            destination_vertex_index = destination_vertex_indices_view[i]
+        for i in prange(
+                destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
+                if skimming else
+                destination_vertex_indices_view.shape[0]
+        ):
+            if i < destination_vertex_indices_view.shape[0]:
+                destination_vertex = destination_vertex_indices_view[i]
+            else:
+                # Setup for when we are skimming, and demand hasn't been provided
+                # We have to go to every origin, and we just say there is 0.0 demand
+                destination_vertex = rest_of_destinations_view[i - destination_vertex_indices_view.shape[0]]
 
-            demand_size = 0
-            for j in range(d_vert_ids_view.shape[0]):
-                if d_vert_ids_view[j] == destination_vertex_index:
-                    thread_demand_origins[demand_size] = o_vert_ids_view[j]
-                    thread_demand_values[demand_size] = demand_vls_view[j]
-                    # demand_size += 1 is not allowed as cython believes this is a reduction
-                    demand_size = demand_size + 1
+            if nodes_to_indices[destination_vertex] == -1:
+                continue  # Completely disconnected nodes have an index of -1
+
+            if i < destination_vertex_indices_view.shape[0]:
+                demand_size = 0
+                for j in range(d_vert_ids_view.shape[0]):
+                    if d_vert_ids_view[j] == destination_vertex:
+                        if nodes_to_indices[o_vert_ids_view[j]] == -1:
+                            continue
+
+                        thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
+                        thread_demand_values[demand_size] = demand_vls_view[j]
+                        # demand_size += 1 is not allowed as cython believes this is a reduction
+                        demand_size = demand_size + 1
+            else:
+                demand_size = o_vert_ids_view.shape[0]
+                for j in range(demand_size):
+                    if nodes_to_indices[o_vert_ids_view[j]] == -1:
+                        continue
+
+                    thread_demand_origins[j] = nodes_to_indices[o_vert_ids_view[j]]
+                    thread_demand_values[j] = 0.0
 
             # S&F
             compute_SF_in(
@@ -283,14 +310,15 @@ cdef void compute_SF_in_parallel(
                 thread_h_a_vec,
                 thread_edge_indices,
                 vertex_count,
-                destination_vertex_index,
+                nodes_to_indices[destination_vertex],
                 skim_col_view,
                 thread_skim_i_vec,
                 thread_skim_j_vec,
                 n_skim_cols,
                 skim_matrix,
-                centroids,
-                centroids_idx_pos,
+                origin_ids,
+                o_indices,
+                od_index_to_taz_index,
                 skimming,
                 is_travel_time
             )
@@ -347,8 +375,9 @@ cdef void compute_SF_in(
     cnp.float64_t *skim_j_vec,
     size_t n_skim_cols,
     cnp.float64_t[:, :, ::1] skim_matrix,
-    cnp.uint32_t[::1] centroids,
-    cnp.uint32_t[::1] centroids_idx_pos,
+    cnp.int64_t[::1] origin_ids,
+    cnp.uint32_t[::1] o_indices,
+    cnp.int64_t[::1] od_index_to_taz_index,
     bint skimming,
     bint is_travel_time,
 ) noexcept nogil:
@@ -359,6 +388,7 @@ cdef void compute_SF_in(
         size_t i, j, h_a_count
         cnp.uint32_t vert_idx
         int cent_dest
+        double tmp
 
     # initialization
     for i in range(vertex_count):
@@ -395,23 +425,22 @@ cdef void compute_SF_in(
         vertex_count
     )
 
-    # store skimming results
-    cent_dest = centroids_idx_pos[dest_vert_index]
-
     if skimming:
+        zone_idx = od_index_to_taz_index[dest_vert_index]
+        # store skimming results
         if is_travel_time:
-            for i in range(centroids.shape[0]):
-                skim_matrix[cent_dest][i][0] = u_i_vec[centroids[i]]
+            for i in o_indices:
+                skim_matrix[od_index_to_taz_index[i], zone_idx, 0] = u_i_vec[i]
 
             if n_skim_cols > 0:
                 for j in range(<size_t>n_skim_cols):
-                    for i in range(centroids.shape[0]):
-                        skim_matrix[cent_dest][i][j+1] = skim_i_vec[centroids[i] + j * vertex_count]
+                    for i in o_indices:
+                        skim_matrix[od_index_to_taz_index[i], zone_idx, j+1] = skim_i_vec[i + j * vertex_count]
 
         else:
             for j in range(<size_t>n_skim_cols):
-                for i in range(centroids.shape[0]):
-                    skim_matrix[cent_dest][i][j] = skim_i_vec[centroids[i] + j * vertex_count]
+                for i in o_indices:
+                    skim_matrix[od_index_to_taz_index[i], zone_idx, j] = skim_i_vec[i + j * vertex_count]
 
     # second pass #
     # ----------- #

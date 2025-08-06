@@ -4,6 +4,7 @@ from typing import Optional
 from shapely.geometry import Polygon
 from .safe_class import SafeClass
 from .connector_creation import connector_creation
+from ...utils.spatialite_utils import load_spatialite_extension
 
 
 class Node(SafeClass):
@@ -30,6 +31,8 @@ class Node(SafeClass):
 
         # We can just save the node
         >>> node1.save()
+
+        >>> project.close()
     """
 
     def __init__(self, dataset, project):
@@ -40,8 +43,7 @@ class Node(SafeClass):
 
     def save(self):
         """Saves node to database"""
-        with self.project.db_connection as conn:
-
+        with self.project.db_connection_spatial as conn:
             if self.node_id != self.__original__["node_id"]:
                 raise ValueError("One cannot change the node_id")
 

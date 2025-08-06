@@ -17,6 +17,8 @@ class Log:
 
         # Or clear everything (NO UN-DOs)
         >>> log.clear()
+
+        >>> project.close()
     """
 
     def __init__(self, project_base_path: Path):

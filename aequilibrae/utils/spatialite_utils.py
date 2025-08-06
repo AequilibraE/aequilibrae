@@ -3,7 +3,7 @@ import os
 import shutil
 import urllib
 import warnings
-from os.path import join, basename
+from os.path import basename, join
 from pathlib import Path
 from sqlite3 import Connection, register_adapter
 from tempfile import gettempdir
@@ -13,7 +13,7 @@ from zipfile import ZipFile
 import numpy as np
 
 from aequilibrae.log import global_logger
-from aequilibrae.utils.db_utils import has_table, safe_connect
+from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
 # Setup adapaters so that we can read/write numpy types directly to DB
@@ -21,7 +21,7 @@ register_adapter(np.int64, int)
 register_adapter(np.int32, int)
 register_adapter(np.float32, float)
 register_adapter(np.float64, float)
-register_adapter(np.object_, str)
+register_adapter(object, str)
 
 
 def is_windows():
@@ -36,7 +36,7 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
     if inside_qgis:
         import qgis
 
-        return qgis.utils.spatialite_connect(str(path_to_file))
+        return qgis.utils.spatialite_connect(str(path_to_file), factory=AequilibraEConnection)
 
     ensure_spatialite_binaries()
 
@@ -99,7 +99,7 @@ def _dll_already_exists(d: os.PathLike) -> bool:
 
 
 def _download_and_extract_spatialite(directory: os.PathLike) -> None:
-    url = "https://github.com/AequilibraE/aequilibrae/releases/download/V.0.7.5/mod_spatialite-5.0.1-win-amd64.zip"
+    url = "https://github.com/AequilibraE/aequilibrae/releases/download/v1.4.3/mod_spatialite-5.1.0-win-amd64.zip"
     zip_file = join(directory, basename(url))
 
     Path(directory).mkdir(exist_ok=True, parents=True)

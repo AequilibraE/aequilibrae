@@ -33,9 +33,9 @@ CREATE TABLE if not exists nodes (ogc_fid      INTEGER PRIMARY KEY,
                                   modes        TEXT,
                                   link_types   TEXT,
                                   node_type    TEXT,
-                                  taz_id       TEXT,
+                                  taz_id       INTEGER,
+                                  CHECK(TYPEOF(taz_id) == 'integer')
                                   CHECK(TYPEOF(node_id) == 'integer')
-                                  UNIQUE(node_id, period_id) ON CONFLICT ABORT
                                   CHECK(TYPEOF(is_centroid) == 'integer')
                                   CHECK(is_centroid>=0)
                                   CHECK(is_centroid<=1));

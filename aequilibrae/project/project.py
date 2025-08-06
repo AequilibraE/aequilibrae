@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import sqlite3
+from collections import namedtuple
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -12,17 +13,17 @@ from aequilibrae.log import Log
 from aequilibrae.log import get_log_handler
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
-from aequilibrae.project.data import Matrices
+from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
-from aequilibrae.project.zoning import Zoning
 from aequilibrae.project.tools import MigrationManager
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database, demo_init_py
-from aequilibrae.transit.transit import Transit
-from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.transit import Transit
+from aequilibrae.utils.db_utils import commit_and_close, safe_connect
 from aequilibrae.utils.model_run_utils import import_file_as_module
+from aequilibrae.utils.spatialite_utils import connect_spatialite, load_spatialite_extension
 
 
 class Project:
@@ -34,25 +35,24 @@ class Project:
         >>> new_project = Project()
         >>> new_project.new(project_path)
 
+        # Safely closes the project
+        >>> new_project.close()
+
     .. code-block:: python
         :caption: Open Project
 
         >>> existing_project = Project()
         >>> existing_project.open(project_path)
+
+        >>> existing_project.close()
     """
 
     def __init__(self):
-        self.path_to_file: str = None
-        self.project_base_path = Path()
-        self.source: str = None
-        self.network: Network = None
-        self.about: About = None
-        self.logger: logging.Logger = None
-        self.transit: Transit = None
+        pass
 
     @classmethod
     def from_path(cls, project_folder):
-        project = Project()
+        project = cls()
         project.open(project_folder)
         return project
 
@@ -65,13 +65,15 @@ class Project:
             not exist, it will fail.
         """
 
-        self.project_base_path = Path(project_path)
-        file_name = self.project_base_path / "project_database.sqlite"
+        base_path = Path(project_path)
+        file_name = base_path / "project_database.sqlite"
+
         if not file_name.is_file() or not file_name.exists():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-        self.path_to_file = file_name
-        self.source = self.path_to_file
-        self.__setup_logger()
+
+        self.__base_path = base_path
+        self.__logger = self.__setup_logger()
+
         self.activate()
 
         self.__load_objects()
@@ -79,9 +81,71 @@ class Project:
         clean(self)
 
     @property
+    def project_base_path(self):
+        return self.__base_path
+
+    @property
+    def path_to_file(self):
+        return self._project_database_path
+
+    @property
+    def about(self) -> About:
+        return self.__about
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self.__logger
+
+    @property
+    def network(self) -> Network:
+        return self.__network
+
+    @property
+    def transit(self) -> Transit:
+        return self.__transit
+
+    @property
+    def matrices(self) -> Matrices:
+        return self.__matrices
+
+    @property
+    def results(self) -> Results:
+        return self.__results
+
+    @property
+    def _project_database_path(self) -> Path:
+        return self.project_base_path / "project_database.sqlite"
+
+    @property
+    def _results_database_path(self) -> Path:
+        return self.project_base_path / "results_database.sqlite"
+
+    @property
+    def _transit_database_path(self) -> Path:
+        return self.project_base_path / "public_transport.sqlite"
+
+    @property
     @contextmanager
     def db_connection(self):
-        with commit_and_close(self.path_to_file, spatial=True) as conn:
+        with commit_and_close(self._project_database_path, spatial=False) as conn:
+            yield conn
+
+    @property
+    @contextmanager
+    def db_connection_spatial(self):
+        with commit_and_close(self._project_database_path, spatial=True) as conn:
+            yield conn
+
+    @property
+    @contextmanager
+    def results_connection(self):
+        with commit_and_close(self._results_database_path, spatial=False, missing_ok=True) as conn:
+            yield conn
+
+    @property
+    @contextmanager
+    def transit_connection(self):
+        with commit_and_close(self._transit_database_path, spatial=True, missing_ok=True) as conn:
             yield conn
 
     def new(self, project_path: str) -> None:
@@ -91,23 +155,22 @@ class Project:
             **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
-        self.project_base_path = Path(project_path)
-        self.path_to_file = self.project_base_path / "project_database.sqlite"
-        self.source = self.path_to_file
+        base_path = Path(project_path)
 
         if os.path.isdir(project_path):
             raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
 
         # We create the project folder and create the base file
-        self.project_base_path.mkdir(parents=True, exist_ok=True)
+        base_path.mkdir(parents=True, exist_ok=True)
 
-        self.__setup_logger()
+        self.__base_path = base_path
+        self.__logger = self.__setup_logger()
         self.activate()
 
         self.__create_empty_network()
         self.__load_objects()
         self.about.create()
-        global_logger.info(f"Created project on {self.project_base_path}")
+        global_logger.info(f"Created project on {base_path}")
 
     def close(self) -> None:
         """Safely closes the project"""
@@ -131,6 +194,11 @@ class Project:
             global_logger.warning(f"This project at {self.project_base_path} is already closed")
 
         finally:
+            handlers = global_logger.handlers[:]  # Make a copy of the handlers list
+            for handler in handlers:
+                handler.close()  # Explicitly close each handler to release file handles
+                global_logger.removeHandler(handler)  # Remove the handler from the logger
+
             self.deactivate()
 
     def activate(self):
@@ -156,38 +224,46 @@ class Project:
         directly. Consult it's documentation page for details. Take care when skipping migrations.
         """
         global_logger.info("Starting database upgrades")
+        connections = {
+            "project_conn": connect_spatialite(self._project_database_path),
+            "transit_conn": None,
+            "results_conn": None,
+        }
         targets = [
-            (MigrationManager(MigrationManager.network_migration_file), database_connection("project")),
+            (MigrationManager(MigrationManager.network_migration_file), "project_conn"),
         ]
 
         if (self.project_base_path / "public_transport.sqlite").exists():
-            targets.append((MigrationManager(MigrationManager.transit_migration_file), database_connection("transit")))
+            targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
+            connections["transit_conn"] = connect_spatialite(self._transit_database_path)
+
+        if (self.project_base_path / "results_database.sqlite").exists():
+            connections["results_conn"] = safe_connect(self._results_database_path)
 
         try:
-            for mm, conn in targets:
-                with conn:
+            for mm, main_conn in targets:
+                with connections[main_conn] as conn:
                     mm.mark_all_as_seen(conn)
 
-            for mm, conn in targets:
-                with conn:
-                    mm.upgrade(conn)
-                    conn.execute("VACUUM")
+            for mm, main_conn in targets:
+                mm.upgrade(main_conn, connections=connections)
             global_logger.info("Completed database upgrades")
         finally:
-            for _, conn in targets:
-                conn.close()
+            for _, main_conn in targets:
+                connections[main_conn].close()
 
     def __load_objects(self):
         matrix_folder = self.project_base_path / "matrices"
         matrix_folder.mkdir(parents=True, exist_ok=True)
 
-        self.network = Network(self)
-        self.about = About(self)
-        self.matrices = Matrices(self)
+        self.__network = Network(self)
+        self.__about = About(self)
+        self.__matrices = Matrices(self)
+        self.__results = Results(self)
 
     @property
     def project_parameters(self) -> Parameters:
-        return Parameters(self)
+        return Parameters(path=self.project_base_path)
 
     @property
     def parameters(self) -> dict:
@@ -202,7 +278,9 @@ class Project:
         Refer to ``run/__init__.py`` file within the project folder for documentation.
         """
         entry_points = self.parameters["run"]
-        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run")
+        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run", force=True)
+
+        res = []
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
@@ -211,10 +289,11 @@ class Project:
             elif not callable(attr):
                 raise RuntimeError(f"found symbol '{name}' in the run module but it is not callable")
 
-            func = functools.partial(attr, **kwargs)
-            setattr(module, name, func)
+            func = functools.partial(attr, **(kwargs if kwargs is not None else {}))
+            res.append((name, func))
 
-        return module
+        Run = namedtuple("Run", [k for k, _ in res])
+        return Run._make([v for _, v in res])
 
     def check_file_indices(self) -> None:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""
@@ -236,17 +315,19 @@ class Project:
         p.write_back()
 
         # Create actual tables
-        with self.db_connection as conn:
+        with self.db_connection_spatial as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
-        initialize_tables(self, "network")
+            initialize_tables(self.logger, "network", conn=conn)
 
     def __setup_logger(self):
-        self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
-        self.logger.propagate = False
-        self.logger.setLevel(logging.DEBUG)
+        logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
+        logger.propagate = False
+        logger.setLevel(logging.DEBUG)
 
         par = self.parameters or self.project_parameters._default
         do_log = par["system"]["logging"]
 
         if do_log:
-            self.logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
+            logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
+
+        return logger

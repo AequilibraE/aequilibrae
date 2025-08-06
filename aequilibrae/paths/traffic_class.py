@@ -50,11 +50,11 @@ class TransportClassBase(ABC):  # noqa: B024
         }
         if len(matrix.view_names) == 1:
             mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :]) for nm in matrix.view_names
+                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :])) for nm in matrix.view_names
             }
         else:
             mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i]) for i, nm in enumerate(matrix.view_names)
+                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i])) for i, nm in enumerate(matrix.view_names)
             }
         self._config["Matrix"] = str(mat_config)
 
@@ -77,15 +77,17 @@ class TrafficClass(TransportClassBase):
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
         >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
         >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
-        >>> graph.set_blocked_centroid_flows(True)
+        >>> graph.set_blocked_centroid_flows(False)
 
         >>> proj_matrices = project.matrices
 
         >>> demand = proj_matrices.get_matrix("demand_omx")
-        >>> demand.computational_view(['matrix'])
+        >>> demand.computational_view()
 
         >>> tc = TrafficClass("car", graph, demand)
         >>> tc.set_pce(1.3)
+
+        >>> project.close()
     """
 
     def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:

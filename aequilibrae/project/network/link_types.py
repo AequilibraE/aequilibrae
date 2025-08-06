@@ -52,6 +52,7 @@ class LinkTypes:
         >>> new_type.lane_capacity = 1100
         >>> new_type.save()
 
+        >>> project.close()
     """
 
     def __init__(self, net):

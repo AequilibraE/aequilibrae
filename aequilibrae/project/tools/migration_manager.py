@@ -3,9 +3,11 @@ import sqlite3
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional
+import contextlib
 
 from aequilibrae import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
+from aequilibrae.utils.db_utils import AequilibraEConnection
 
 
 class MigrationStatus(IntEnum):
@@ -100,7 +102,7 @@ class Migration:
         """
         self.mark_as(conn, MigrationStatus.MISSING, force=False)
 
-    def apply(self, conn: sqlite3.Connection):
+    def apply(self, conn: sqlite3.Connection, connections: dict[str, sqlite3.Connection]):
         """
         Apply this migration.
 
@@ -110,10 +112,13 @@ class Migration:
         in autocommit mode. If the migration then fails the database will be bad state.
 
         :Arguments:
-            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+            **conn** (:obj:`sqlite3.Connection`): Main SQLite database connection. This is connection is used for the migrations
+              table and '.sql' migrations.
+            **connections** (:obj:`dict[str, sqlite3.Connection]`): All open SQLite connections. Passed as keyword
+              arguments for Python migrations.
         """
         if self.type == "py":
-            self._apply_python(conn)
+            self._apply_python(connections)
         elif self.type == "sql":
             self._apply_sql(conn)
         else:
@@ -127,8 +132,8 @@ class Migration:
             contents = f.read()
         conn.executescript(contents)
 
-    def _apply_python(self, conn: sqlite3.Connection):
-        module = import_file_as_module(self.file, self.name)
+    def _apply_python(self, connections: dict[str, sqlite3.Connection]):
+        module = import_file_as_module(self.file, self.name, force=True)
         try:
             migrate = module.migrate
         except AttributeError as e:
@@ -137,7 +142,7 @@ class Migration:
         if not callable(migrate):
             raise RuntimeError("found 'migrate' symbol in the migration file but it is not callable")
 
-        migrate(conn)
+        migrate(**connections)
 
 
 class MigrationManager:
@@ -160,6 +165,7 @@ class MigrationManager:
         migrations = import_file_as_module(
             migration_file,
             "aequilibrae.project.database_specification.migrations",
+            force=True,
         ).migrations
 
         res = []
@@ -182,7 +188,8 @@ class MigrationManager:
     def __ensure_inital_is_applied(self, conn):
         # Handle the initial migration separately, the 'migrations' table might not have been created. We implicitly
         # apply this migration all the time to ensure the table exists.
-        self.migrations[0].apply(conn)
+        with conn:
+            self.migrations[0].apply(conn, {})
 
     def status(self, conn: sqlite3.Connection) -> dict[int, MigrationStatus]:
         """
@@ -210,8 +217,9 @@ class MigrationManager:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
         """
         self.__ensure_inital_is_applied(conn)
-        for migration in self.migrations.values():
-            migration.mark_as_seen(conn)
+        with conn:
+            for migration in self.migrations.values():
+                migration.mark_as_seen(conn)
 
     def find_applicable(self, conn: sqlite3.Connection):
         """
@@ -243,29 +251,33 @@ class MigrationManager:
 
         return res
 
-    def upgrade(self, conn: sqlite3.Connection, skip: set[int] = None):
+    def upgrade(self, main_conn: str, connections: dict[str, Optional[AequilibraEConnection]], skip: set[int] = None):
         """
         Find and apply all applicable migrations.
 
         Optionally skip some migrations. Take care when skipping migrations.
 
         :Arguments:
-            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+            **main_conn** (:obj:`str`): Main SQLite database connection. This is connection is used for the migrations
+              table. Must be a key in ``connections``.
             **skip** (:obj:`set[int]`): Set of migration IDs to skip.
+            **connections** (:obj:`dict[str, Optional[AequilibraEConnection]]`): Dictionary mapping connection names to
+              `AequilibraEConnection` objects. These connections are used during the migration process.
         """
         if skip is None:
             skip = set()
-        migrations = self.find_applicable(conn)
+        migrations = self.find_applicable(connections[main_conn])
 
-        iso_lvl = conn.isolation_level
-        conn.isolation_level = None
-        try:
-            for migration in migrations:
-                conn.execute("BEGIN")
-                with conn:
-                    if migration.id in skip:
-                        migration.mark_as(conn, MigrationStatus.SKIPPED)
-                    else:
-                        migration.apply(conn)
-        finally:
-            conn.isolation_level = iso_lvl
+        for migration in migrations:
+            # We use a contextlib.ExitStack to enter and exit an arbitrary number of manual transactions at once. We
+            # want to start manual transactions for all the provided databases.
+            with contextlib.ExitStack() as stack:
+                conns = {
+                    k: stack.enter_context(v.manual_transaction()) if v is not None else None
+                    for k, v in connections.items()
+                }
+
+                if migration.id in skip:
+                    migration.mark_as(conns[main_conn], MigrationStatus.SKIPPED)
+                else:
+                    migration.apply(conns[main_conn], connections=conns)

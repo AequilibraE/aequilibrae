@@ -22,6 +22,8 @@ class About:
         >>> project.about.scenario_name = 'Just a better scenario name'
         >>> project.about.write_back()
 
+        >>> project.close()
+
     """
 
     def __init__(self, project):
@@ -69,6 +71,8 @@ class About:
             >>> project.about.add_info_field('a_cool_field')
             >>> project.about.a_cool_field = 'super relevant information'
             >>> project.about.write_back()
+
+            >>> project.close()
         """
         allowed = string.ascii_lowercase + "_"
         has_forbidden = [x for x in info_field if x not in allowed]
@@ -90,6 +94,8 @@ class About:
 
             >>> project.about.description = 'This is the example project. Do not use for forecast'
             >>> project.about.write_back()
+
+            >>> project.close()
         """
         with commit_and_close(self.__path_to_file) as conn:
             for k in self.__characteristics:

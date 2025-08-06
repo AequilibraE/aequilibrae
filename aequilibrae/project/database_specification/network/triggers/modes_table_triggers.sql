@@ -86,17 +86,15 @@ begin
 
 -- We update the modes for the node ID that just received a new link ending in it
 update nodes
-set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
-select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
-, mode_id) > 0)
-where nodes.node_id=new.b_node;
+set modes = (SELECT GROUP_CONCAT(mode_id, '')  from modes WHERE
+            INSTR((SELECT GROUP_CONCAT(modes, '') from links where (links.a_node = new.a_node) or (links.b_node = new.a_node)), mode_id)>0)
+where nodes.node_id=new.a_node;
 
 -- We update the modes for the node ID that just received a new link ending in it
 update nodes
-set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
-select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
-, mode_id) > 0)
-where nodes.node_id=new.a_node;
+set modes =(SELECT GROUP_CONCAT(mode_id, '')  from modes WHERE
+            INSTR((SELECT GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node)), mode_id)>0)
+where nodes.node_id=new.b_node;
 
 end;
 
