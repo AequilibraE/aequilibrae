@@ -26,20 +26,20 @@ name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
 
-
-
 dependencies = [
-    "numpy>=1.26",
-    "scipy>=1.4",
-    "pyaml",
-    "requests",
-    "pandas",
-    "pyproj",
-    "rtree",
-    "pyarrow",
-    "openmatrix",
-    "geopandas",
-    "tqdm"]
+  "numpy<1.99; python_version <= '3.10'",
+  "numpy>=2.0; python_version >= '3.11'",
+  "scipy>=1.4",
+  "pyaml",
+  "requests",
+  "pandas",
+  "pyproj",
+  "rtree",
+  "pyarrow",
+  "openmatrix",
+  "geopandas",
+  "tqdm"
+]
 
 [project.license]
 file = "LICENSE.TXT"
@@ -77,7 +77,13 @@ tests = [
   "wheel",
 ]
 
-build=["setuptools", "numpy<1.99", "cython", "wheel"]
+build = [
+  "setuptools", 
+  "numpy<1.99; python_version <= '3.10'",
+  "numpy>=2.0; python_version >= '3.11'",
+  "cython",
+  "wheel"
+]
 
 dev = ['aequilibrae[build, tests, docs]']
 

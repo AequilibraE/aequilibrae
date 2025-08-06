@@ -29,7 +29,6 @@ def test_save(model_filename):
     model.alpha = 0.1
 
     model.save(model_filename)
-    return model_filename
 
 
 def test_load(saved_model):
