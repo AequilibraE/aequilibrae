@@ -32,7 +32,7 @@ jobs:
     needs: linting
     runs-on: ${{ matrix.os}}
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.python-os }}-${{ matrix.python-version }}
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}
       cancel-in-progress: true
     strategy:
       matrix:
