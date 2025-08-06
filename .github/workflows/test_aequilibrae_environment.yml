@@ -1,4 +1,4 @@
-name: QAequilibraE artefact testing
+name: Testing on QAequilibraE environment
 
 on: [pull_request]
 
