@@ -22,7 +22,7 @@ requirements:
     - python >= 3.8
     - cython
   run:
-    - numpy>=1.18.0,<1.22
+    - numpy>=2.0
     - pandas
     - pyaml
     - pyarrow

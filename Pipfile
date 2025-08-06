@@ -26,7 +26,7 @@ matplotlib = "*"
 pytest-xdist="*"
 
 [packages]
-numpy = ">=1.14.0"
+numpy = ">=2.0"
 pyaml = "*"
 pyshp = "*"
 cython = "*"
