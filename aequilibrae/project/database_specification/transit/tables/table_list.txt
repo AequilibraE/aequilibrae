@@ -16,3 +16,5 @@ stops
 trigger_settings
 trips_schedule
 trips
+migrations
+zones

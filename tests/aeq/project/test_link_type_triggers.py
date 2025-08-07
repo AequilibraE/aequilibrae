@@ -55,7 +55,7 @@ def test_link_type_keep_if_in_use_updating(no_triggers_test, queries):
         sql = "UPDATE 'link_types' SET link_type= 'ttt' where link_type='test'"
         conn.execute(sql)
 
-        cmd = get_query(queries, "link_type_keep_if_in_use_updating")
+        cmd = get_query(queries, "aequilibrae_link_type_keep_if_in_use_updating")
         conn.execute(cmd)
 
         conn.commit()
@@ -66,7 +66,7 @@ def test_link_type_keep_if_in_use_updating(no_triggers_test, queries):
 
 def test_link_type_keep_if_in_use_deleting(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "link_type_keep_if_in_use_deleting")
+        cmd = get_query(queries, "aequilibrae_link_type_keep_if_in_use_deleting")
 
         sql = "DELETE FROM 'link_types' where link_type='test3'"
         conn.execute(sql)
@@ -80,7 +80,7 @@ def test_link_type_keep_if_in_use_deleting(no_triggers_test, queries):
 
 def test_link_type_on_links_update(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "link_type_on_links_update")
+        cmd = get_query(queries, "aequilibrae_link_type_on_links_update")
 
         sql = "UPDATE 'links' SET link_type= 'rrr' where link_type='test3'"
         conn.execute(sql)
@@ -94,7 +94,7 @@ def test_link_type_on_links_update(no_triggers_test, queries):
 
 def test_link_type_on_links_insert(no_triggers_test, queries):
     with no_triggers_test.db_connection_spatial as conn:
-        cmd = get_query(queries, "link_type_on_links_insert")
+        cmd = get_query(queries, "aequilibrae_link_type_on_links_insert")
 
         f = conn.execute("pragma table_info(links)").fetchall()
         fields = {x[1]: x[0] for x in f}
@@ -124,7 +124,7 @@ def test_link_type_on_links_insert(no_triggers_test, queries):
 
 def test_link_type_on_links_delete_protected_link_type(empty_no_triggers_project, queries):
     with empty_no_triggers_project.db_connection as conn:
-        cmd = get_query(queries, "link_type_on_links_delete_protected_link_type")
+        cmd = get_query(queries, "aequilibrae_link_type_on_links_delete_protected_link_type")
 
         conn.execute(cmd)
         with pytest.raises(sqlite3.IntegrityError):
@@ -136,7 +136,7 @@ def test_link_type_on_links_delete_protected_link_type(empty_no_triggers_project
 
 def test_link_type_id_keep_if_protected_type(empty_no_triggers_project, queries):
     with empty_no_triggers_project.db_connection as conn:
-        cmd = get_query(queries, "link_type_id_keep_if_protected_type")
+        cmd = get_query(queries, "aequilibrae_link_type_id_keep_if_protected_type")
 
         conn.execute(cmd)
 
@@ -149,7 +149,7 @@ def test_link_type_id_keep_if_protected_type(empty_no_triggers_project, queries)
 
 def test_link_type_keep_if_protected_type(empty_no_triggers_project, queries):
     with empty_no_triggers_project.db_connection as conn:
-        cmd = get_query(queries, "link_type_keep_if_protected_type")
+        cmd = get_query(queries, "aequilibrae_link_type_keep_if_protected_type")
         conn.execute(cmd)
 
         with pytest.raises(sqlite3.IntegrityError):
@@ -161,7 +161,7 @@ def test_link_type_keep_if_protected_type(empty_no_triggers_project, queries):
 
 def test_link_type_on_nodes_table_update_nodes_link_type(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "link_type_on_nodes_table_update_nodes_link_type")
+        cmd = get_query(queries, "aequilibrae_link_type_on_nodes_table_update_nodes_link_type")
         conn.execute(cmd)
 
         conn.execute('update nodes set link_types="qwerrreyrtuyiuio" where node_id=1')
@@ -173,7 +173,7 @@ def test_link_type_on_nodes_table_update_nodes_link_type(no_triggers_test, queri
 
 def test_link_type_on_nodes_table_update_links_link_type(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "link_type_on_nodes_table_update_links_link_type")
+        cmd = get_query(queries, "aequilibrae_link_type_on_nodes_table_update_links_link_type")
         conn.execute(cmd)
 
         conn.execute('update links set link_type="test" where link_id=15')
@@ -189,7 +189,7 @@ def test_link_type_on_nodes_table_update_links_link_type(no_triggers_test, queri
 
 def test_link_type_on_nodes_table_update_links_a_node(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "link_type_on_nodes_table_update_links_a_node")
+        cmd = get_query(queries, "aequilibrae_link_type_on_nodes_table_update_links_a_node")
         conn.execute(cmd)
 
         conn.execute("update links set a_node=1 where link_id=15")
@@ -205,7 +205,7 @@ def test_link_type_on_nodes_table_update_links_a_node(no_triggers_test, queries)
 
 def test_link_type_on_nodes_table_update_links_b_node(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "link_type_on_nodes_table_update_links_b_node")
+        cmd = get_query(queries, "aequilibrae_link_type_on_nodes_table_update_links_b_node")
         conn.execute(cmd)
 
         conn.execute("update links set b_node=1 where link_id=15")

@@ -74,7 +74,7 @@ def test_mode_single_letter_insert(project):
 def test_mode_keep_if_in_use_updating(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
         conn.execute("UPDATE 'modes' SET mode_id= 'h' where mode_id='g'")
-        conn.execute(get_query(queries, "mode_keep_if_in_use_updating"))
+        conn.execute(get_query(queries, "aequilibrae_mode_keep_if_in_use_updating"))
         conn.commit()
         sql = "UPDATE 'modes' SET mode_id= 'j' where mode_id='c'"
         with pytest.raises(sqlite3.IntegrityError):
@@ -83,7 +83,7 @@ def test_mode_keep_if_in_use_updating(no_triggers_test, queries):
 
 def test_mode_keep_if_in_use_deleting(no_triggers_test, queries):
     with read_and_close(no_triggers_test.path_to_file) as conn:
-        cmd = get_query(queries, "mode_keep_if_in_use_deleting")
+        cmd = get_query(queries, "aequilibrae_mode_keep_if_in_use_deleting")
         sql = "DELETE FROM 'modes' where mode_id='p'"
         conn.execute(sql)
         conn.execute(cmd)
@@ -94,7 +94,7 @@ def test_mode_keep_if_in_use_deleting(no_triggers_test, queries):
 
 def test_modes_on_links_update(no_triggers_test, queries):
     with read_and_close(no_triggers_test.path_to_file) as conn:
-        cmd = get_query(queries, "modes_on_links_update")
+        cmd = get_query(queries, "aequilibrae_modes_on_links_update")
         sql = "UPDATE 'links' SET modes= 'qwerty' where link_id=55"
         conn.execute(sql)
         conn.execute(cmd)
@@ -112,7 +112,7 @@ def test_modes_length_on_links_update(sioux_falls_test):
 
 def test_modes_on_nodes_table_update_a_node(no_triggers_test, queries):
     with read_and_close(no_triggers_test.path_to_file) as conn:
-        cmd = get_query(queries, "modes_on_nodes_table_update_a_node")
+        cmd = get_query(queries, "aequilibrae_modes_on_nodes_table_update_a_node")
         sql = "UPDATE 'links' SET a_node= 1 where a_node=3"
         conn.execute(sql)
         i = conn.execute("SELECT modes from nodes where node_id=1").fetchone()[0]
@@ -132,7 +132,7 @@ def test_modes_on_nodes_table_update_a_node(no_triggers_test, queries):
 
 def test_modes_on_nodes_table_update_b_node(no_triggers_test, queries):
     with read_and_close(no_triggers_test.path_to_file) as conn:
-        cmd = get_query(queries, "modes_on_nodes_table_update_b_node")
+        cmd = get_query(queries, "aequilibrae_modes_on_nodes_table_update_b_node")
         sql = "UPDATE 'links' SET b_node= 1 where b_node=3"
         conn.execute(sql)
         sql = "SELECT modes from nodes where node_id=1"
@@ -148,7 +148,7 @@ def test_modes_on_nodes_table_update_b_node(no_triggers_test, queries):
 
 def test_modes_on_nodes_table_update_links_modes(no_triggers_test, queries):
     with read_and_close(no_triggers_test.path_to_file) as conn:
-        cmd = get_query(queries, "modes_on_nodes_table_update_links_modes")
+        cmd = get_query(queries, "aequilibrae_modes_on_nodes_table_update_links_modes")
         sql = "UPDATE 'links' SET modes= 'x' where a_node=24"
         conn.execute(sql)
         conn.commit()
@@ -171,7 +171,7 @@ def test_modes_on_nodes_table_update_links_modes(no_triggers_test, queries):
 
 def test_modes_on_links_insert(no_triggers_test, queries):
     with read_and_close(no_triggers_test.path_to_file, spatial=True) as conn:
-        cmd = get_query(queries, "modes_on_links_insert")
+        cmd = get_query(queries, "aequilibrae_modes_on_links_insert")
         if check_rtree(no_triggers_test):
             fds = conn.execute("pragma table_info(links)").fetchall()
             fields = {x[1]: x[0] for x in fds}
@@ -210,7 +210,7 @@ def test_modes_length_on_links_insert(sioux_falls_test):
 
 def test_keep_at_least_one(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "mode_keep_at_least_one")
+        cmd = get_query(queries, "aequilibrae_mode_keep_at_least_one")
         conn.execute("Delete from modes;")
         cnt = conn.execute("select count(*) from modes;").fetchone()[0]
         assert cnt == 0
@@ -222,7 +222,7 @@ def test_keep_at_least_one(no_triggers_test, queries):
 
 def test_modes_on_nodes_table_update_nodes_modes(no_triggers_test, queries):
     with no_triggers_test.db_connection as conn:
-        cmd = get_query(queries, "modes_on_nodes_table_update_nodes_modes")
+        cmd = get_query(queries, "aequilibrae_modes_on_nodes_table_update_nodes_modes")
         sql = "select node_id, modes from nodes where length(modes)>0"
         dt = conn.execute(sql).fetchall()
         x = choice(dt)
