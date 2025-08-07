@@ -22,6 +22,7 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 #     * :func:`aequilibrae.transit.TransitGraphBuilder`
 #     * :func:`aequilibrae.paths.TransitClass`
 #     * :func:`aequilibrae.paths.TransitAssignment`
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
 
 # %%
 

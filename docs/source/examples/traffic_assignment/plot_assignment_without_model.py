@@ -20,6 +20,7 @@ We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetwor
 #     * :func:`aequilibrae.paths.Graph`
 #     * :func:`aequilibrae.paths.TrafficClass`
 #     * :func:`aequilibrae.paths.TrafficAssignment` 
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
 
 # %%
 

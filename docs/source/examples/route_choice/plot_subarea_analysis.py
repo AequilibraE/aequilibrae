@@ -17,6 +17,7 @@ for a city in La Serena Metropolitan Area in Chile.
     * :func:`aequilibrae.paths.Graph`
     * :func:`aequilibrae.paths.RouteChoice`
     * :func:`aequilibrae.paths.SubAreaAnalysis`
+    * :func:`aequilibrae.matrix.AequilibraeMatrix`
 """
 
 # %%
