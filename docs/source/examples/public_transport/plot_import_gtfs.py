@@ -27,7 +27,6 @@ import folium
 import geopandas as gpd
 import pandas as pd
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
@@ -75,10 +74,9 @@ transit.save_to_disk()
 
 # %%
 # Now we will plot one of the route's patterns we just imported
-conn = database_connection("transit")
-
-patterns = pd.read_sql("SELECT pattern_id, ST_AsText(geometry) geom FROM routes;", con=conn)
-stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=conn)
+with project.transit_connection as conn:
+    patterns = pd.read_sql("SELECT pattern_id, ST_AsText(geometry) geom FROM routes;", con=conn)
+    stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=conn)
 
 # %%
 # We turn the patterns and stops DataFrames into GeoDataFrames so we can plot them more easily.

@@ -241,10 +241,21 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
         :link-type: url
         :text-align: center
 
+    .. grid-item-card:: 1.5.0
+        :link:  https://www.aequilibrae.com/docs/python/V.1.5.0/
+        :link-type: url
+        :text-align: center
+
+.. grid::
+
     .. grid-item-card:: Upcoming version
         :link:  https://www.aequilibrae.com/develop/python/index.html
         :link-type: url
         :text-align: center
+
+    .. grid-item::
+
+    .. grid-item::
 
 This documentation correspond to software version:
 

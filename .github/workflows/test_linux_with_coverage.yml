@@ -5,6 +5,9 @@ on: [pull_request]
 jobs:
   testing:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     env:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
@@ -29,4 +32,4 @@ jobs:
     - name: Generate coverage report
       run: |
         source ./venv_test/bin/activate
-        python -m pytest --cov=aequilibrae tests/
+        python -m pytest --cov=aequilibrae -n 4 tests/ 

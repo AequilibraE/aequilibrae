@@ -1,5 +1,6 @@
 import sqlite3
 import pathlib
+from typing import Optional
 
 from aequilibrae import Project, logger
 from aequilibrae.transit import Transit
@@ -9,13 +10,19 @@ from aequilibrae.project.project_creation import add_triggers, remove_triggers, 
 import numpy as np
 
 
-def migrate(conn: sqlite3.Connection):
+def migrate(
+    *,
+    project_conn: sqlite3.Connection,
+    transit_conn: Optional[sqlite3.Connection],
+    results_conn: Optional[sqlite3.Connection],
+):
     logger.info("Beginning migration to align taz_ids and node_ids for origins/destinations/centroids")
-    project: Project = get_active_project(must_exist=True)
 
-    if not (project.project_base_path / "public_transport.sqlite").exists():
-        logger.info("Migration finished, no 'public_transport.sqlite' found.")
+    if not transit_conn:
+        logger.info("Migration finished, no 'public_transport.sqlite' connection provided.")
         return
+
+    project: Project = get_active_project(must_exist=True)
 
     nodes_schema = pathlib.Path(__file__).parent.parent / "tables" / "nodes.sql"
     if not nodes_schema.exists():
@@ -40,11 +47,11 @@ def migrate(conn: sqlite3.Connection):
         ]
 
     logger.info("Removing triggers...")
-    remove_triggers(conn, logger, "transit")
+    remove_triggers(transit_conn, logger, "transit")
     try:
         logger.info("Removing/renaming tables...")
         for sql in sqls:
-            conn.execute(sql)
+            transit_conn.execute(sql)
 
         for graph_builder in data.graphs.values():
             logger.info(f"Aligning graph for period {graph_builder.period_id}...")
@@ -78,12 +85,12 @@ def migrate(conn: sqlite3.Connection):
             )
 
             logger.info(f"Saving graph for period {graph_builder.period_id}...")
-            graph_builder.save(pt_conn=conn)
+            graph_builder.save(pt_conn=transit_conn)
 
-        conn.execute("SELECT DropTable(NULL, '__old_nodes')")
+        transit_conn.execute("SELECT DropTable(NULL, '__old_nodes')")
 
     finally:
         logger.info("Re-adding triggers...")
-        add_triggers(conn, logger, "transit")
+        add_triggers(transit_conn, logger, "transit")
 
     logger.info("Migration successful")

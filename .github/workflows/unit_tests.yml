@@ -5,6 +5,9 @@ on: [pull_request]
 jobs:
   linting:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - name: Set Python environment
@@ -28,9 +31,12 @@ jobs:
   testing:
     needs: linting
     runs-on: ${{ matrix.os}}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}
+      cancel-in-progress: true
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
         os: [windows-latest, ubuntu-latest]
 
       max-parallel: 20
@@ -59,4 +65,4 @@ jobs:
       run:  python tests/setup_windows_spatialite.py
 
     - name: Runs test
-      run: python -m pytest --durations=50
+      run: pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose

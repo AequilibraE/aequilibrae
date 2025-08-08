@@ -22,7 +22,7 @@ ext_modules = [
         ["ipf_core.pyx"],
         extra_compile_args=[f"{prefix}openmp", cpp_std],
         extra_link_args=[f"{prefix}openmp"],
-        define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+        define_macros=[("NPY_TARGET_VERSION", "NPY_1_26_API_VERSION")],
         include_dirs=[np.get_include()],
     )
 ]

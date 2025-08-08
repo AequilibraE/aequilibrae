@@ -43,7 +43,6 @@ class AequilibraEConnection(sqlite3.Connection):
         return self
 
     def __enter__(self):
-        logger.debug(f"Called __enter__ with {self.__manual_transaction=}, {self.__depth=}")
         if self.__manual_transaction:
             self.__depth += 1
 
@@ -52,7 +51,6 @@ class AequilibraEConnection(sqlite3.Connection):
             return super().__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        logger.debug(f"Called __exit__ with {self.__manual_transaction=}, {self.__depth=}")
         if self.__manual_transaction:
             self.__depth -= 1
 
@@ -74,7 +72,7 @@ def list_tables_in_db(conn: Connection):
 def safe_connect(filepath: PathLike, missing_ok=False):
     if Path(filepath).exists() or missing_ok or str(filepath) == ":memory:":
         return connect(filepath, factory=AequilibraEConnection)
-    raise FileNotFoundError(f"Attempting to open non-existant SQLite database: {filepath}")
+    raise FileNotFoundError(f"Attempting to open non-existent SQLite database: {filepath}")
 
 
 class commit_and_close:

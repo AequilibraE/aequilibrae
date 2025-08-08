@@ -22,6 +22,8 @@ class Periods(BasicTable):
 
         # We can save changes for all periods we have edited so far
         >>> all_periods.save()
+
+        >>> project.close()
     """
 
     #: Query sql for retrieving periods

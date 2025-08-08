@@ -1,26 +1,27 @@
 import itertools
-import warnings
+import json
 import logging
 import pathlib
 import socket
 import sqlite3
-from datetime import datetime
-from typing import List, Optional, Tuple, Union, Dict
+import warnings
 from collections.abc import Hashable
-from os import path
-from uuid import uuid4
+from datetime import datetime
 from functools import cached_property
+from typing import Dict, List, Optional, Tuple, Union
+from uuid import uuid4
 
 import numpy as np
-import pandas as pd
 import openmatrix as omx
+import pandas as pd
 import scipy
+
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
+from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
-from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
+from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.utils.db_utils import commit_and_close
 
 
@@ -420,7 +421,7 @@ class RouteChoice:
             "Computer name": socket.gethostname(),
             "Procedure ID": self.procedure_id,
             "Parameters": self.parameters,
-            "Select links": self._selected_links,
+            "Select links": [list(x) for x in self._selected_links],
         }
         return info
 
@@ -633,26 +634,16 @@ class RouteChoice:
 
     def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
         self.procedure_id = uuid4().hex
-        data = [
-            table_name,
-            method_name,
-            self.procedure_id,
-            str(report),
-            self.procedure_date,
-            description,
-        ]
 
-        # sqlite3 context managers only commit, they don't close, oh well
-        res_path = path.join(project.project_base_path, "results_database.sqlite")
-        with commit_and_close(res_path, missing_ok=True) as conn:
-            df.to_sql(table_name, conn, index=True)
-
-        with self.project.db_connection as conn:
-            conn.execute(
-                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                                description) Values(?,?,?,?,?,?)""",
-                data,
-            )
+        record = project.results.new_record(
+            table_name=table_name,
+            procedure=method_name,
+            procedure_id=self.procedure_id,
+            procedure_report=json.dumps(report),
+            timestamp=self.procedure_date,
+            description=description,
+        )
+        record.set_data(df, index=True)
 
     def save_link_flows(self, table_name: str, project=None) -> None:
         """

@@ -7,5 +7,6 @@ zones
 links
 results
 matrices
+migrations
 periods
 transit_graph_configs

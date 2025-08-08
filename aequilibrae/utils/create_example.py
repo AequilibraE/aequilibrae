@@ -26,7 +26,7 @@ def create_example(path: os.PathLike, from_model="sioux_falls") -> Project:
 
     source = Path(__file__).parent.parent / "reference_files" / f"{from_model}.zip"
     if not source.exists():
-        raise FileExistsError("Example not found")
+        raise FileExistsError(f"Example not found '{path}'")
 
     pth.mkdir(parents=True, exist_ok=True)
     zipfile.ZipFile(source).extractall(pth)

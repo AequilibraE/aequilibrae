@@ -2,6 +2,8 @@ import re
 import string
 from typing import List
 
+from aequilibrae.context import get_logger
+
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
 
@@ -27,6 +29,8 @@ class FieldEditor:
         # To edit the fields of the modes table
         >>> m_fields = project.network.modes.fields
 
+        >>> project.close()
+
     Field descriptions are kept in the table *attributes_documentation*
     """
 
@@ -34,7 +38,7 @@ class FieldEditor:
 
     def __init__(self, project, table_name: str) -> None:
         self.project = project
-        self.logger = project.logger
+        self.logger = get_logger()
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -102,7 +106,7 @@ class FieldEditor:
                 self.logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
         self.logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             conn.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
             conn.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
         self.logger.info(f"Updated layer statistics for {self._table}")
@@ -139,12 +143,12 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             dt = conn.execute(qry).fetchall()
         return dt
 
     def __run_query_commit(self, qry: str, values=None) -> None:
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             if values is None:
                 conn.execute(qry)
             else:
