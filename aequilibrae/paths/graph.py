@@ -401,7 +401,7 @@ class GraphBase(ABC):  # noqa: B024
 
         field = cost_field.lower()
         if field not in self.graph.columns:
-            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
+            raise ValueError(f"Field '{cost_field}' not found in graph columns. Available fields: {list(self.graph.columns)}")
 
         self.cost_field = field
 
