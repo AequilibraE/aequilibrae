@@ -249,6 +249,13 @@ class GraphBase(ABC):  # noqa: B024
         present_centroids = np.isin(centroids, nodes, assume_unique=True)
         if not present_centroids.all():
             warnings.warn("Found centroids not present in the graph!\n" + str(centroids[~present_centroids]))
+                        missing_centroids = centroids[~np.isin(centroids, nodes)]
+            warnings.warn(f"Found {len(missing_centroids)} centroids not present in the graph!")
+            # Save to disk for network debugging and fixing
+            output_path = os.path.join(os.getcwd(), "missing_centroids_from_graph.csv")
+            pd.Series(missing_centroids).to_csv(output_path, index=False, header=False)
+            print(f"Missing centroids written to: {output_path}")
+            
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
         all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
