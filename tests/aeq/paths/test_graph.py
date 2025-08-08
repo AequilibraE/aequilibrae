@@ -27,6 +27,13 @@ def test_upper_case_variables(sioux_falls_example):
     g.network = network
     assert g.network.columns.tolist() == graph.network.columns.tolist(), "Graph columns are not lower case"
 
+    g.prepare_graph()
+    g.set_graph("DiStAnce")
+    assert g.cost_field == "distance", "Graph cost field is not set to distance lower case"
+
+    g.set_skimming("DiStAnce")
+    assert g.skim_fields == ["distance"], "Graph skim fields are not set to distance lower case"
+
 
 def test_prepare_graph(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
