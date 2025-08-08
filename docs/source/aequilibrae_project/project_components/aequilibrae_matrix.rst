@@ -3,8 +3,8 @@
 AequilibraE Matrix
 ==================
 
-AequilibraE matrices are very useful objects that allow you to make the most with AequilibraE.
-In the following sections, we'll cover the main points regarding them.
+The AequilibraEMatrix class is the AequilibraE vehicle to all things matrices, and in the 
+following sections we'll cover the main points regarding them.
 
 ``AequilibraeMatrix``
 ---------------------
@@ -29,9 +29,10 @@ There are three ways of creating an ``AequilibraeMatrix``:
     >>> names = ["only_ones"]
 
     >>> mat = AequilibraeMatrix()
-    >>> mat.create_empty(zones=num_zones, matrix_names=names)
+    >>> mat.create_empty(zones=num_zones, matrix_names=names) #memory_only parameter defaults to True
 
-    # `memory_only` parameter can be changed to `True` case you want to save the matrix in disk.
+    # `memory_only` parameter can be changed to `False` case you want to save the matrix in disk.
+	# This would, however, result in a file format that is being deprecated and will not be available on AequilibraE 2.0
 
     # Adds the matrix indexes, which are going to be used for computation
     >>> mat.index[:] = index[:]
@@ -60,21 +61,19 @@ The following methods allow you to check the data in you AequilibraE matrix.
            [1., 1., 1., 1., 1.],
            [1., 1., 1., 1., 1.]])
 
-More than storing project data, AequilibraE matrices are objects necessary to run procedures,
-such as traffic assignment. To do so, one must create a computational view of the matrix, which
-allows AequilibraE matrices to be used in parallelized algorithms. It is possible to create a 
-computational view for more than one matrix at a time.
+More than dealing with stored project data, AequilibraE matrices are objects necessary to run procedures,
+such as traffic assignment. Since a matrix object can hold multiple matrices (i.,e. _matrix cores_),
+it is necessary to specify which matrices will be used in computation, dubbed a computational view in 
+AequilibraE, which sets matrix data in memory in a way it can be used in parallelized algorithms.
 
-Case you're using matricial data from an OMX file, this step is mandatory to load the data to memory,
-otherwise the matrix is useless in other procedures.
+Case you're using matricial data from an OMX file, this step also loads the data to memory.
 
 .. code-block:: python
 
     >>> mat.computational_view(["only_ones"])
 
-You can also export AequilibraE matrices to another file formats, such as CSV and OMX. When exporting
-to a OMX file, you can choose the cores os the matrix you want to save, although this is not the case
-for CSV file, in which all cores will be exported as separate columns in the output file.
+You can also export AequilibraE matrices, with your chosen set of _matrix cores_, to different file 
+formats, such as CSV and OMX.
 
 .. code-block:: python
 
@@ -82,11 +81,9 @@ for CSV file, in which all cores will be exported as separate columns in the out
 
     >>> mat.export(Path(my_folder_path) / 'my_new_csv_file.csv')
 
-.. is there a better name rather than error?
 
-To avoid errors, once open, the same AequilibraE matrix can only be used once at a time in different
-procedures. To do so, you have to close the matrix, to remove it from memory and flush the data to disk,
-or to close the OMX file, if that's the case.
+To avoid inconsistencies, once open, the same AequilibraE matrix can only be used once at a time in different
+procedures. To do so, you have to close the matrix.
 
 .. code-block:: python
 
@@ -116,7 +113,8 @@ AequilibraE matrices in disk can be reused and loaded once again.
 OpenMatrix (OMX)
 ----------------
 
-AequilibraE can handle OMX files and if you're wondering what is OMX and what does
+AequilibraE uses OMX files as a standard format for storing its matrices. 
+If you're wondering what is OMX and what does
 it stand for, this section is for you. The text in this section is borrowed from 
 `OpenMatrix Wiki page <https://github.com/osPlanning/omx/wiki>`_.
 
