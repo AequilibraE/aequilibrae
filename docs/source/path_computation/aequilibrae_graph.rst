@@ -5,8 +5,8 @@ AequilibraE Graphs
 
 The AequilibraE Graph is a computational representation of the network.
 The Graph object is rather complex, but the difference between the graph and the physical 
-links are the availability of two class member variables consisting of Pandas DataFrames:
-the *network* and the *graph*.
+links are the availability of three class member variables consisting of Pandas DataFrames:
+the *network*, the *graph*, and the *compressed_graph*.
 
 .. code-block:: python
 
@@ -16,34 +16,13 @@ the *network* and the *graph*.
 
     >>> g.network # doctest: +SKIP
     >>> g.graph # doctest: +SKIP
+    >>> g.compressed_graph # doctest: +SKIP
 
-When implementing the AequilibraE Graph, two forms of compression are applied:
 
-1. Dead end removal
-2. Link contraction
+The network dataframe
+---------------------
 
-Dead end removal consists in removing dead ends and fish spines from the network. For those
-not familiar with the term, a fish spine is a road network with multiple smaller streets
-branching off from it, often leading to dead ends or cul-de-sacs, creating a pattern that
-resembles a fish spine.
-
-Whilst it's easy for humans to ignore dead ends when planning a route, the same cannot be
-said for computers. Dead end removal is done based on the observation that in a graph with
-non-negative weights a dead end will only ever appear in the results of a short(est) path if
-the origin or destination is present within that dead end.
-
-Dead end removal is applied before link contraction and does not create a strictly topological
-equivalent graph, however, all centroids are preserved. More about dead end removal can be
-found `at this blog post <https://www.outerloop.io/blog/20240205_dead_end_removal/>`_.
-
-On its turn, link contraction consists in creating a topological equivalent of the graph
-by contracting sequences of links between nodes with degrees of two. This is often common
-in long streams of links, such as highways or curved roads.
-
-Directionality
---------------
-
-Links in the Network table (the Pandas representation of the project's *Links* table) are
+Links in the *network* table (the Pandas representation of the project's *Links* table) are
 potentially bi-directional, and the directions allowed for traversal are dictated by the
 field *direction*, where -1 and 1 denote only BA and AB traversal respectively and 0 denotes
 bi-directionality.
@@ -56,8 +35,67 @@ metric (*free_flow_travel_time*) for each of the directions of a link, and the f
 the graph used to set computations (e.g. field to minimize during path-finding, skimming,
 etc.) will be *free_flow_travel_time*.
 
-Observe that a bi-directional link in the network is decomposed into two different links
-in the graph, each one representing a direction.
+The graph dataframe
+-------------------
+
+The graph dataframe is a very simple transformation of the network where all links are **directed**.
+This is achieved by decomposing bi-direction links two different links in the graph, each one 
+representing a direction.
+
+As described above, fields are made uni-directional, with bi-directional fields being 
+transformed into a single field and all other fields remaining the same.
+
+The compressed graph dataframe
+------------------------------
+
+The purpose of the compressed graph is to optimize its performance for the more recurrent
+and time consuming computations in modelling, which are traffic assignment and skimming.
+
+The key characterist we can leverage to optimize performance for these operations is that paths
+are computed only between centroids, therefore two forms of compression are possible:
+
+1. Topological simplification
+2. Dead end removal
+
+Topological simplification consists in creating a topological equivalent of the graph
+by contracting sequences of links between intersections (extra nodes). These links are often common
+in long links.
+
+It is important to note that computations that cannot be handled at the compressed level without 
+loss of fidelity, for example the computation of congestion during traffic assignment, is done 
+at the uncompressed (graph) level, but we still extract the full benefits of the compression 
+at the path-computation stage, which is the most time-consuming portion of assignment.
+
+Dead end removal is an additional procedure, that consists in removing dead ends and fish 
+spines from the network. For those
+not familiar with the term, a fish spine is a road network with multiple smaller streets
+branching off from it, often leading to dead ends or cul-de-sacs, creating a pattern that
+resembles a fish spine.
+
+Whilst it's easy for humans to ignore dead ends when planning a route, the same cannot be
+said for computers. Dead end removal is done based on the observation that in a graph with
+non-negative weights a dead end will only ever appear in the results of a short(est) path if
+the origin or destination is present within that dead end.
+
+Dead end removal is applied before topological simplification and results in a distinctive
+network, topologically speaking. However, all centroids are preserved. More about dead end removal can be
+found `at this blog post <https://www.outerloop.io/blog/20240205_dead_end_removal/>`_.
+
+
+Leveraging topological simplification
+-------------------------------------
+
+Topological simplification is a powerful tool that may want to be leveraged for other purposes.
+As such, we make it available for users to access it.
+
+For this purpose, the user should be explicit in not removing dead ends from the graph, as that will
+result in simplification beyond pure topological simplification.
+
+.. code-block:: python
+
+    >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32), remove_dead_ends=False)
+
+
 
 Graphs from a model
 -------------------
@@ -160,14 +198,3 @@ from the centroid.
 .. image:: ../_images/aequilibrae_graph-1.png
     :align: center
     :alt: example of aequilibrae graph
-
-Topological simplification
----------------------------
-
-When using the AequilibraE Graph to perform topological simplification of the graph,
-the user should be explicit in not removing dead ends from the graph, as that will
-result in simplification beyond pure topological simplification.
-
-.. code-block:: python
-
-    >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32), remove_dead_ends=False)
