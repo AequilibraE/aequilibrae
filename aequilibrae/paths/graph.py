@@ -398,21 +398,23 @@ class GraphBase(ABC):  # noqa: B024
         :Arguments:
             **cost_field** (:obj:`str`): Field name. Must be numeric
         """
-        if cost_field not in self.graph.columns:
+
+        field = cost_field.lower()
+        if field not in self.graph.columns:
             raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
 
-        self.cost_field = cost_field
+        self.cost_field = field
 
         # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
         if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
-            df = self.__graph_groupby.sum(numeric_only=True)[[cost_field]].reset_index()
-            self.compact_cost[df.index.values] = df[cost_field].values
+            df = self.__graph_groupby.sum(numeric_only=True)[[field]].reset_index()
+            self.compact_cost[df.index.values] = df[field].values
 
-        if self.graph[cost_field].dtype == self.__float_type:
-            self.cost = np.array(self.graph[cost_field].values, copy=True)
+        if self.graph[field].dtype == self.__float_type:
+            self.cost = np.array(self.graph[field].values, copy=True)
         else:
-            self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
+            self.cost = np.array(self.graph[field].values, dtype=self.__float_type)
             self.logger.warning("Cost field with wrong type. Converting to float64")
 
         self.__build_derived_properties()
@@ -434,6 +436,7 @@ class GraphBase(ABC):  # noqa: B024
             skim_fields = [skim_fields]
         elif not isinstance(skim_fields, list):
             raise ValueError("You need to provide a list of skims or the same of a single field")
+        skim_fields = [skim.lower() for skim in skim_fields]
 
         # Check if list of fields make sense
         k = [x for x in skim_fields if x not in self.graph.columns]
