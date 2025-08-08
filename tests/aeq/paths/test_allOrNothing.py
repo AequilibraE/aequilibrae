@@ -1,6 +1,6 @@
 import pytest
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 

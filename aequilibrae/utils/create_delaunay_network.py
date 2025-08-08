@@ -7,7 +7,8 @@ import pandas as pd
 from scipy.spatial import Delaunay
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
+from aequilibrae.paths.graph import Graph
+from aequilibrae.traffic_assignment import TrafficClass, TrafficAssignment
 
 DELAUNAY_TABLE = "delaunay_network"
 

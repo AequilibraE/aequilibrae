@@ -157,7 +157,7 @@ class TrafficAssignment(AssignmentBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
+        >>> from aequilibrae.paths.traffic_assignment import TrafficAssignment, TrafficClass
 
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()

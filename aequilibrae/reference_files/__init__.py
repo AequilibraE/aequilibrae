@@ -1,4 +1,4 @@
-from os.path import dirname, abspath, join
+from pathlib import Path
 
-spatialite_database = join(dirname(dirname(abspath(__file__))), "reference_files", "spatialite.sqlite")
-demo_init_py = join(dirname(dirname(abspath(__file__))), "reference_files", "demo.__init__.py")
+spatialite_database = Path(__file__).parent / "spatialite.sqlite"
+demo_init_py = Path(__file__).parent / "demo.__init__.py"

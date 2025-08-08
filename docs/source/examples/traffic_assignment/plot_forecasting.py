@@ -47,7 +47,7 @@ logger = project.logger
 # In this step, we'll set the skims for the variable ``free_flow_time``, and execute the
 # traffic assignment for the base-year.
 
-from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.traffic_assignment import TrafficClass, TrafficAssignment
 
 # %%
 

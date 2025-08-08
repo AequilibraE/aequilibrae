@@ -14,10 +14,10 @@ from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.traffic_assignment import TrafficClass
 
 if False:
-    from aequilibrae.paths.traffic_assignment import TrafficAssignment
+    from aequilibrae.traffic_assignment import TrafficAssignment
 
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread

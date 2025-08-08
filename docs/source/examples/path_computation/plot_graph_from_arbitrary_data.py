@@ -23,7 +23,7 @@ from TNTP.
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths.graph import Graph
 # sphinx_gallery_thumbnail_path = '../source/_images/graph_network.png'
 
 # %%

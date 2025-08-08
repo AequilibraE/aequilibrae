@@ -76,7 +76,7 @@ method call:
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TrafficAssignment
+    >>> from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
     >>> assig = TrafficAssignment()
 

@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from aequilibrae import Project, TrafficAssignment, TrafficClass  # noqa: E402
-from aequilibrae.utils.db_utils import read_and_close
+from aequilibrae import Project  # noqa: E402
+from aequilibrae.traffic_assignment import TrafficClass, TrafficAssignment
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -44,7 +44,7 @@ def aequilibrae_init(proj_path: str, cost: str):
 
 def arkansas(path: str):
     from aequilibrae import Project
-    from aequilibrae.paths import TrafficAssignment, TrafficClass
+    from aequilibrae.traffic_assignment import TrafficClass, TrafficAssignment
     from aequilibrae import logger
 
     proj = Project()

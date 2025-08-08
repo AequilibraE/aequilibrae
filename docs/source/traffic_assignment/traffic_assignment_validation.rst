@@ -315,7 +315,7 @@ understand, and then we'll perform the assignment.
     from sklearn.metrics import r2_score
 
     from aequilibrae.matrix import AequilibraeMatrix
-    from aequilibrae.paths import Graph
+    from aequilibrae.paths.graph import Graph
     from aequilibrae.paths import TrafficAssignment
     from aequilibrae.paths.traffic_class import TrafficClass
 

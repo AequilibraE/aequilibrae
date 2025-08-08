@@ -33,7 +33,7 @@ from tempfile import gettempdir
 from uuid import uuid4
 
 from aequilibrae.utils.create_example import create_example
-from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.traffic_assignment import TrafficClass, TrafficAssignment
 
 # sphinx_gallery_thumbnail_path = '../source/_images/sparse_matrix.png'
 
