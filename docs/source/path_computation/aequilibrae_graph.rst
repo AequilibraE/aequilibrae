@@ -81,6 +81,7 @@ Dead end removal is applied before topological simplification and results in a d
 network, topologically speaking. However, all centroids are preserved. More about dead end removal can be
 found `at this blog post <https://www.outerloop.io/blog/20240205_dead_end_removal/>`_.
 
+It should be noted that not all fields are compressed in this process, but only the cost field.
 
 Leveraging topological simplification
 -------------------------------------
