@@ -13,7 +13,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -25,7 +24,7 @@ description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
-requires-python = ">=3.9" # match classifiers above and black version below
+requires-python = ">=3.10" # match classifiers above and black version below
 
 dependencies = [
   "numpy<1.99; python_version <= '3.10'",
@@ -73,8 +72,7 @@ tests = [
   "pytest-subtests",
   "pytest-random-order",
   "coveralls",
-  "ruff==0.9.10",
-  "black==25.1.0",
+  "ruff==0.12.8",
   "wheel",
 ]
 
@@ -109,17 +107,9 @@ aequilibrae = "aequilibrae"
         "database_specification/transit/migrations/*.*",
     ]
 
-
-[tool.black]
-line-length = 120
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
-include = '\.pyi?$'
-extend-exclude = '''docs/*'''
-
-
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
-lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
+lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017", "B905"]
 exclude = [
     ".idea",
     "__pycache__",
@@ -156,12 +146,44 @@ exclude = [
     ".venv311",
     ".venv312",
 ]
-line-length = 120
 lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-target-version = "py39"
+target-version = "py312"
+indent-width = 4
 
 [tool.ruff.lint.mccabe]
 max-complexity = 20
+
+
+[tool.ruff.format]
+
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+#
+# This is currently disabled by default, but it is planned for this
+# to be opt-out in the future.
+docstring-code-format = false
+
+# Set the line length limit used when formatting code snippets in
+# docstrings.
+#
+# This only has an effect when the `docstring-code-format` setting is
+# enabled.
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"  # Accepts: "google", "numpy", or "pep257".
 
 [tool.cibuildwheel]
 build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*", "cp313-*"]

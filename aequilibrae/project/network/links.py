@@ -72,7 +72,7 @@ class Links(BasicTable):
             **link** (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
         """
 
-        data = {key: None for key in self.__fields}
+        data = dict.fromkeys(self.__fields)
         data["a_node"] = 0
         data["b_node"] = 0
         data["direction"] = 0

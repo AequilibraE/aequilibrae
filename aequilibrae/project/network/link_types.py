@@ -78,7 +78,7 @@ class LinkTypes:
         if link_type_id in self.__items:
             raise ValueError(f"Link Type ID ({link_type_id}) already exists in the model. It must be unique.")
 
-        tp = {key: None for key in self.__fields}
+        tp = dict.fromkeys(self.__fields)
         tp["link_type_id"] = link_type_id
         lt = LinkType(tp, self.project)
         self.__items[link_type_id] = lt
