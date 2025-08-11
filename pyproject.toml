@@ -27,9 +27,6 @@ name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
 
-[project.license]
-file = "LICENSE.TXT"
-
 dependencies = [
   "numpy<1.99; python_version <= '3.10'",
   "numpy>=2.0; python_version >= '3.11'",
@@ -87,6 +84,9 @@ build = [
 ]
 
 dev = ['aequilibrae[build, tests, docs]']
+
+[project.license]
+file = "LICENSE.TXT"
 
 [tool.setuptools.dynamic]
 version = { attr = "aequilibrae.version" }

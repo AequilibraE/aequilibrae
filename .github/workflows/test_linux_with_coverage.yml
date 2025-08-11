@@ -26,7 +26,7 @@ jobs:
     - name: Compile library
       run: |
         source ./venv_test/bin/activate
-        uv pip install . .[dev]
+        uv pip install .[dev]
         python setup.py build_ext --inplace
 
     - name: Generate coverage report
