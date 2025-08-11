@@ -1,10 +1,7 @@
-from typing import Union, List, TYPE_CHECKING
-
 import numpy as np
 from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
 
-if TYPE_CHECKING:
-    from aequilibrae.traffic_assignment import Graph
+from aequilibrae.traffic_assignment.graph import Graph
 
 
 class PathResults:
@@ -68,12 +65,12 @@ class PathResults:
         self._heuristic = "equirectangular"
 
     def compute_path(
-        self,
-        origin: int,
-        destination: int,
-        early_exit: bool = False,
-        a_star: bool = False,
-        heuristic: Union[str, None] = None,
+            self,
+            origin: int,
+            destination: int,
+            early_exit: bool = False,
+            a_star: bool = False,
+            heuristic: Union[str, None] = None,
     ) -> None:
         """Computes the path between two nodes in the network.
 
