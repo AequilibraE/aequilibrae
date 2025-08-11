@@ -2,10 +2,10 @@ from os.path import join, isfile
 
 import numpy as np
 
-from aequilibrae.paths import skimming_single_origin
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
-from aequilibrae.paths.network_skimming import NetworkSkimming
-from aequilibrae.paths.results import SkimResults
+from aequilibrae.paths.AoN import skimming_single_origin
+from aequilibrae.traffic_assignment.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.traffic_assignment.network_skimming import NetworkSkimming
+from aequilibrae.traffic_assignment.skim_results import SkimResults
 
 
 def test_network_skimming(sioux_falls_example):

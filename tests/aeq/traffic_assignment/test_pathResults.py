@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from aequilibrae import Project
-from aequilibrae.paths import path_computation
+from aequilibrae.paths.AoN import path_computation
 from aequilibrae.paths import PathResults
 
 origin = 5

@@ -2,9 +2,9 @@ import random
 
 import numpy as np
 
-from aequilibrae.paths import skimming_single_origin
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
-from aequilibrae.paths.results import SkimResults
+from aequilibrae.paths.AoN import skimming_single_origin
+from aequilibrae.traffic_assignment.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.traffic_assignment.skim_results import SkimResults
 
 
 # Adds the folder with the data to the path and collects the paths to the files

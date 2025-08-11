@@ -2,7 +2,7 @@ import multiprocessing as mp
 
 import pytest
 
-from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.traffic_assignment.assignment_results import AssignmentResults
 
 
 def test_set_cores():

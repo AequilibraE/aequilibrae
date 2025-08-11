@@ -1,6 +1,6 @@
 import pytest
 
-from aequilibrae.paths.vdf import VDF
+from aequilibrae.traffic_assignment.vdf import VDF
 
 
 def test_functions_available():

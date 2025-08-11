@@ -1,7 +1,7 @@
 import pytest
 
-from aequilibrae.paths import TrafficClass, Graph
-from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.traffic_assignment import TrafficClass, Graph
+from aequilibrae.traffic_assignment.assignment_results import AssignmentResults
 
 
 @pytest.fixture
