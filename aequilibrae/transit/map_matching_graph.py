@@ -80,7 +80,7 @@ class MMGraph(WorkerThread):
             self.df = pd.read_sql(get_qry, conn)
 
         if not self.df.shape[0]:
-            from aequilibrae.paths.graph import Graph
+            from aequilibrae.traffic_assignment.graph import Graph
 
             return Graph()
 
@@ -274,7 +274,7 @@ class MMGraph(WorkerThread):
             self.__all_links[connector.link_id] = connector
 
     def __graph_from_broken_net(self, centroids, net):
-        from aequilibrae.paths.graph import Graph
+        from aequilibrae.traffic_assignment.graph import Graph
 
         net_data = pd.DataFrame(
             {

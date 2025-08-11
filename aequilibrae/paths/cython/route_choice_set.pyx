@@ -1,5 +1,5 @@
 # cython: language_level=3str
-from aequilibrae.paths.graph import Graph
+from aequilibrae.traffic_assignment.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 

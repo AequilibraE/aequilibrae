@@ -1,8 +1,8 @@
 import pytest
 
-from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.traffic_assignment.graph import Graph
+from aequilibrae.traffic_assignment.all_or_nothing import allOrNothing
+from aequilibrae.traffic_assignment.assignment_results import AssignmentResults
 
 
 @pytest.fixture(scope="function")

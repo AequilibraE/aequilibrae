@@ -322,7 +322,7 @@ class GraphBase(ABC):  # noqa: B024
         :Arguments:
             **cores** (:obj:`Union[int, None]`): number of cores (threads) to be used in computation
         """
-        from aequilibrae.paths import NetworkSkimming
+        from aequilibrae.traffic_assignment import NetworkSkimming
 
         skimmer = NetworkSkimming(self)
         if cores:
