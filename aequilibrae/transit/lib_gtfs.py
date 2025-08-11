@@ -1,4 +1,3 @@
-from contextlib import closing
 from copy import deepcopy
 
 import geopandas as gpd

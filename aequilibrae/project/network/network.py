@@ -40,7 +40,7 @@ class Network(WorkerThread):
 
     def __init__(self, project) -> None:
         WorkerThread.__init__(self, None)
-        from aequilibrae.paths.graph import Graph
+        from aequilibrae.traffic_assignment import Graph
 
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
@@ -294,7 +294,7 @@ class Network(WorkerThread):
             >>> project.close()
 
         """
-        from aequilibrae.paths.graph import Graph
+        from aequilibrae.traffic_assignment import Graph
 
         with self.project.db_connection as conn:
             if fields is None:

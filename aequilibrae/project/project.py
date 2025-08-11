@@ -7,23 +7,24 @@ from collections import namedtuple
 from contextlib import contextmanager
 from pathlib import Path
 
-from aequilibrae import global_logger
 from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.log import Log
 from aequilibrae.log import get_log_handler
+from aequilibrae.log import global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
-from aequilibrae.project.data import Matrices, Results
-from aequilibrae.project.network import Network
+from aequilibrae.project.data.matrices import Matrices
+from aequilibrae.project.data.results import Results
+from aequilibrae.project.network.network import Network
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
-from aequilibrae.project.tools import MigrationManager
+from aequilibrae.project.tools.migration_manager import MigrationManager
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database, demo_init_py
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close, safe_connect
 from aequilibrae.utils.model_run_utils import import_file_as_module
-from aequilibrae.utils.spatialite_utils import connect_spatialite, load_spatialite_extension
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Project:

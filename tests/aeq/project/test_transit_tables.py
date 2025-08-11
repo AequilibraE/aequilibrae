@@ -1,10 +1,7 @@
-from os.path import join
-
 import pytest
 
-from aequilibrae.project import Project
+from aequilibrae import Project
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import read_and_close
 
 
 @pytest.fixture(scope="function")

@@ -8,8 +8,8 @@ from uuid import uuid4
 from aequilibrae.paths.AoN import skimming_single_origin
 
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
-from aequilibrae.paths.results.skim_results import SkimResults
+from aequilibrae.traffic_assignment.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.traffic_assignment.skim_results import SkimResults
 from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -22,7 +22,7 @@ class NetworkSkimming(WorkerThread):
 
     .. code-block:: python
 
-        >>> from aequilibrae.paths.network_skimming import NetworkSkimming
+        >>> from aequilibrae.traffic_assignment import NetworkSkimming
 
         >>> project = create_example(project_path)
         >>> project.network.build_graphs(modes=["c"])

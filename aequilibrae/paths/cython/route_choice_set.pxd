@@ -1,5 +1,5 @@
 # cython: language_level=3str
-from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import PathResults
 from aequilibrae.paths.cython.route_choice_set_results cimport RouteChoiceSetResults
 from aequilibrae.paths.cython.route_choice_link_loading_results cimport LinkLoadingResults
 

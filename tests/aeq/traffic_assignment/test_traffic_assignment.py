@@ -1,16 +1,11 @@
 import random
-import sqlite3
 import string
-from os.path import join, isfile
-from pathlib import Path
 from random import choice
 
 import numpy as np
-import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
-from ...data import siouxfalls_project
+from aequilibrae.traffic_assignment import TrafficAssignment, TrafficClass, Graph
 
 
 @pytest.fixture(scope="function")

@@ -27,6 +27,9 @@ name = "aequilibrae"
 readme = "README.md"
 requires-python = ">=3.9" # match classifiers above and black version below
 
+[project.license]
+file = "LICENSE.TXT"
+
 dependencies = [
   "numpy<1.99; python_version <= '3.10'",
   "numpy>=2.0; python_version >= '3.11'",
@@ -41,9 +44,6 @@ dependencies = [
   "geopandas",
   "tqdm"
 ]
-
-[project.license]
-file = "LICENSE.TXT"
 
 [project.optional-dependencies]
 
@@ -164,10 +164,10 @@ target-version = "py39"
 max-complexity = 20
 
 [tool.cibuildwheel]
-build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*", "cp313-*"]
+build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*"]
 
 # We do not build wheels for Python 3.6 or 3.7, or for 32-bit in either Linux or Windows
-skip = ["cp36-*", "cp37-*", "cp38-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*"]
+skip = ["cp36-*", "cp37-*", "cp38-*", "cp39-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*"]
 
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"

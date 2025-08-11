@@ -1,9 +1,10 @@
-from typing import Union, List
+from typing import Union, List, TYPE_CHECKING
 
 import numpy as np
 from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
 
-from aequilibrae.paths.graph import Graph
+if TYPE_CHECKING:
+    from aequilibrae.traffic_assignment import Graph
 
 
 class PathResults:
@@ -11,7 +12,7 @@ class PathResults:
 
     .. code-block:: python
 
-        >>> from aequilibrae.paths.results import PathResults
+        >>> from aequilibrae.paths import PathResults
 
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()

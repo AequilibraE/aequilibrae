@@ -1,3 +1,4 @@
+from .basic_log import logger
 from aequilibrae.project.project import Project
 
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file

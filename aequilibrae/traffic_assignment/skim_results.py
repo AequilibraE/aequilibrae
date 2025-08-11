@@ -1,7 +1,7 @@
 import multiprocessing as mp
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph
+from aequilibrae.traffic_assignment.graph import Graph
 
 
 class SkimResults:
@@ -10,7 +10,7 @@ class SkimResults:
 
     .. code-block:: python
 
-          >>> from aequilibrae.paths.results import SkimResults
+          >>> from aequilibrae.traffic_assignment.skim_results import SkimResults
 
           >>> project = create_example(project_path)
           >>> project.network.build_graphs()

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import os
 from functools import partial
@@ -12,15 +13,11 @@ from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
 from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
 from scipy.optimize import root_scalar
 
-from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.traffic_assignment import TrafficClass
-
-if False:
-    from aequilibrae.traffic_assignment import TrafficAssignment
-
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from .all_or_nothing import allOrNothing
+from .assignment_results import AssignmentResults
+from .traffic_class import TrafficClass
 
 
 class LinearApproximation(WorkerThread):

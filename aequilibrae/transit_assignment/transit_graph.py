@@ -1,3 +1,6 @@
+import pandas as pd
+from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+
 from aequilibrae.paths.graph import GraphBase
 
 

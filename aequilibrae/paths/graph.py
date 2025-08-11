@@ -4,14 +4,14 @@ import uuid
 import warnings
 from abc import ABC
 from datetime import datetime
-from os.path import join
+from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 from aequilibrae.context import get_logger
-from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 
 @dataclasses.dataclass
@@ -602,9 +602,9 @@ class GraphBase(ABC):  # noqa: B024
 
     def save_compressed_correspondence(self, path, mode_name, mode_id):
         """Save graph and nodes_to_indices to disk"""
-        graph_path = join(path, f"correspondence_c{mode_name}_{mode_id}.feather")
+        graph_path = Path(path) / f"correspondence_c{mode_name}_{mode_id}.feather"
         self.graph.to_feather(graph_path)
-        node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
+        node_path = Path(path) / f"nodes_to_indices_c{mode_name}_{mode_id}.feather"
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
 
     def create_compressed_link_network_mapping(self):
@@ -647,4 +647,3 @@ class GraphBase(ABC):  # noqa: B024
         if key == "network" and isinstance(value, pd.DataFrame):
             value.columns = [col.lower() for col in value.columns]
         super().__setattr__(key, value)
-

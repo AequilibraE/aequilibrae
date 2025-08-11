@@ -3,7 +3,6 @@ import pytest
 from aequilibrae.traffic_assignment import Graph, TrafficClass, TrafficAssignment
 
 
-
 @pytest.fixture(scope="function")
 def assignment_setup(sioux_falls_example):
     sioux_falls_example.network.build_graphs()

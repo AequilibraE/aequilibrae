@@ -32,8 +32,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph
-from aequilibrae.traffic_assignment import TrafficClass, TrafficAssignment
+from aequilibrae.traffic_assignment import TrafficClass, TrafficAssignment, Graph
 # sphinx_gallery_thumbnail_path = '../source/_images/assignment_plot.png'
 
 # %%

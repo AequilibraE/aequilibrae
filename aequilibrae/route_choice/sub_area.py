@@ -1,14 +1,15 @@
 import itertools
 import logging
-from typing import Union
 from collections import defaultdict
+from typing import Union
 
 import geopandas as gpd
 import pandas as pd
+
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import RouteChoice
-from aequilibrae.paths.graph import Graph
+from aequilibrae.route_choice.route_choice import RouteChoice
+from aequilibrae.traffic_assignment import Graph
 
 
 class SubAreaAnalysis:

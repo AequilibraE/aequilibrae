@@ -10,6 +10,8 @@ TransitGraphBuilder Assumptions:
 
 """
 
+import json
+import sqlite3
 import warnings
 
 import numpy as np
@@ -17,16 +19,12 @@ import pandas as pd
 import pyproj
 import shapely
 import shapely.ops
-import json
-import sqlite3
 from pandas.api.types import is_integer_dtype
-
-from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import KDTree, minkowski_distance
-from shapely.geometry import Point
 
-from aequilibrae.paths import PathResults
-from aequilibrae.paths import TransitGraph
+from aequilibrae.paths.path_results import PathResults
+from aequilibrae.transit_assignment import TransitGraph
+from aequilibrae.utils.geo_utils import haversine
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [

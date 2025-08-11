@@ -3,7 +3,6 @@ import json
 import logging
 import pathlib
 import socket
-import sqlite3
 import warnings
 from collections.abc import Hashable
 from datetime import datetime
@@ -15,14 +14,14 @@ import numpy as np
 import openmatrix as omx
 import pandas as pd
 import scipy
+from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
-from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
-from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.paths.graph import _get_graph_to_network_mapping
+from aequilibrae.traffic_assignment import Graph
 
 
 class RouteChoice:

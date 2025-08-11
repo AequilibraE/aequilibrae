@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, PathResults
+from aequilibrae.paths import PathResults
+from aequilibrae.traffic_assignment import TrafficAssignment, TrafficClass, Graph
 from aequilibrae.matrix import AequilibraeMatrix
 
 

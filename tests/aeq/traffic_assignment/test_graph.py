@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.results import PathResults
+from aequilibrae.traffic_assignment import Graph
+from aequilibrae.paths import PathResults
 from aequilibrae.transit import Transit
 
 

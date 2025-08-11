@@ -10,7 +10,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .multi_threaded_aon import MultiThreadedAoN
 
 if False:
-    from .results import AssignmentResults
+    from .assignment_results import AssignmentResults
     from .graph import Graph
 
 

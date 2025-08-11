@@ -41,7 +41,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 from aequilibrae.utils.create_example import create_example
-from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import PathResults
 # sphinx_gallery_thumbnail_path = '../source/_images/disconnected_network.png'
 
 # %%

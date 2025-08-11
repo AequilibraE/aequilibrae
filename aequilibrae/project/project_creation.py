@@ -1,8 +1,7 @@
 import logging
 import re
-from os.path import join, dirname, realpath
+from pathlib import Path
 from sqlite3 import Connection
-from aequilibrae.utils.db_utils import commit_and_close
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
@@ -16,34 +15,34 @@ def initialize_tables(logger, db_type: str, conn: Connection) -> None:
 
 
 def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "tables")
-    with open(join(spec_folder, "table_list.txt"), "r") as file_list:
+    spec_folder = Path(__file__).parent / "database_specification" / db_type / "tables"
+    with open(spec_folder / "table_list.txt", "r") as file_list:
         all_tables = file_list.readlines()
     all_tables = [x.rstrip() for x in all_tables]
     for f in all_tables:
-        qry_file = join(spec_folder, f"{f}.sql")
+        qry_file = spec_folder / f"{f}.sql"
         run_queries_from_sql_file(conn, logger, qry_file)
 
 
 def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
     """Adds consistency triggers to the project"""
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
-    with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
+    spec_folder = Path(__file__).parent / "database_specification" / db_type / "triggers"
+    with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
     for f in all_trigger_sets:
-        qry_file = join(spec_folder, f"{f}.sql")
+        qry_file = spec_folder / f"{f}.sql"
         run_queries_from_sql_file(conn, logger, qry_file)
 
 
 def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
-    with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
+    spec_folder = Path(__file__).parent / "database_specification" / db_type / "triggers"
+    with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
 
     create_drop_regex = re.compile(r"create\s+trigger\s+(\w+)", flags=re.I)
     for table in all_trigger_sets:
-        qry_file = join(spec_folder, f"{table.rstrip()}.sql")
+        qry_file = spec_folder / f"{table.rstrip()}.sql"
 
         with open(qry_file, "r") as sql_file:
             query_list = sql_file.read()

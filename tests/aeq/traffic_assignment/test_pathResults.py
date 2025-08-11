@@ -8,7 +8,7 @@ import pytest
 
 from aequilibrae import Project
 from aequilibrae.paths import path_computation
-from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import PathResults
 
 origin = 5
 dest = 13

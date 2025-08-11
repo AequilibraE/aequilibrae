@@ -1,6 +1,8 @@
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
+from aequilibrae import Project
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.traffic_assignment import TrafficAssignment, TrafficClass, Graph
 from aequilibrae.transit import Transit
 
 

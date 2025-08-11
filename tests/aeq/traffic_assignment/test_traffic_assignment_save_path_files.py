@@ -1,7 +1,8 @@
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
+from aequilibrae import Project
+from aequilibrae.traffic_assignment import TrafficAssignment, TrafficClass
 
 
 @pytest.fixture

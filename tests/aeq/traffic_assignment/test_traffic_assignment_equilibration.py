@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
+from aequilibrae.traffic_assignment import TrafficAssignment, TrafficClass, Graph
 
 
 @pytest.fixture(scope="function")

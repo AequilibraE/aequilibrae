@@ -1,6 +1,6 @@
 from itertools import product
 
-from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import PathResults
 
 
 def test_path_disconnected_delete_link(sioux_falls_example):

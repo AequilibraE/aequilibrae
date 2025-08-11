@@ -1,14 +1,15 @@
 import warnings
+from abc import ABC
 from copy import deepcopy
 from typing import Union, List, Tuple, Dict
-from abc import ABC, abstractmethod
 
 import numpy as np
-import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
-from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
+from aequilibrae.paths.graph import GraphBase
+from aequilibrae.traffic_assignment.assignment_results import AssignmentResults
+from aequilibrae.traffic_assignment.graph import Graph
+from aequilibrae.transit_assignment import TransitGraph, TransitAssignmentResults
 
 
 class TransportClassBase(ABC):  # noqa: B024
