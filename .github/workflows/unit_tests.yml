@@ -86,6 +86,7 @@ jobs:
     - name: Install spatialite
       shell: bash
       run: |
+        brew update
         brew install sqlite
         brew install pyenv
         brew install libspatialite
