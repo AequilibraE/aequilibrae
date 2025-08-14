@@ -13,7 +13,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -24,11 +23,10 @@ description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
-requires-python = ">=3.10" # match classifiers above and black version below
+requires-python = ">=3.11" # match classifiers above and black version below
 
 dependencies = [
-  "numpy<1.99; python_version <= '3.10'",
-  "numpy>=2.0; python_version >= '3.11'",
+  "numpy>=2.0",
   "scipy>=1.4",
   "pyaml",
   "requests",
@@ -78,8 +76,7 @@ tests = [
 
 build = [
   "setuptools",
-  "numpy<1.99; python_version <= '3.10'",
-  "numpy>=2.0; python_version >= '3.11'",
+  "numpy>=2.0",
   "cython",
   "wheel"
 ]
@@ -167,10 +164,10 @@ docstring-code-line-length = "dynamic"
 convention = "google"  # Accepts: "google", "numpy", or "pep257".
 
 [tool.cibuildwheel]
-build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*", "cp313-*"]
+build = ["cp311-*", "cp312-*", "cp313-*"]
 
 # We do not build wheels for Python 3.6 or 3.7, or for 32-bit in either Linux or Windows
-skip = ["cp36-*", "cp37-*", "cp38-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*"]
+skip = ["cp36-*", "cp37-*", "cp38-*", "cp39-*", "cp310-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*"]
 
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
@@ -179,7 +176,7 @@ manylinux-pypy_aarch64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.linux]
 archs = ["auto"]
-build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*"]
+build = ["cp311-*", "cp312-*", "cp313-*"]
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} "
 
 [tool.cibuildwheel.macos]

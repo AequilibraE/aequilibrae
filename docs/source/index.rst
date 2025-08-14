@@ -18,7 +18,7 @@ Python
 **Previous versions**: documentation for all AequilibraE's versions are available 
 :doc:`here <useful_links/version_history>`.
 
-**Useful links**: :doc:`useful_links/installation` | :doc:`useful_links/api` | 
+**Useful links**: :doc:`useful_links/aequilibrae_2_0` | :doc:`useful_links/installation` | :doc:`useful_links/api` | 
 :doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history` | :doc:`_auto_examples/index`
 
 |
