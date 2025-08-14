@@ -107,7 +107,7 @@ class Periods(BasicTable):
         if dt > 0:
             raise Exception("period_id already exists. Failed to create it")
 
-        data = {key: None for key in self.__fields}
+        data = dict.fromkeys(self.__fields)
         data["period_id"] = period_id
         data["period_start"] = start
         data["period_end"] = end

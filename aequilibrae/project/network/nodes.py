@@ -97,7 +97,7 @@ class Nodes(BasicTable):
         if ct > 0:
             raise Exception("Node_id already exists. Failed to create it")
 
-        data = {key: None for key in self.__fields}
+        data = dict.fromkeys(self.__fields)
         data["node_id"] = node_id
         data["is_centroid"] = 1
         node = Node(data, self.project)
