@@ -107,7 +107,7 @@ data.load()
 # Reading back into AequilibraE
 # -----------------------------
 # You can create back in a particular graph via it's 'period_id'.
-from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
+from aequilibrae.transit_assignment.transit_graph_builder import TransitGraphBuilder
 
 # %%
 

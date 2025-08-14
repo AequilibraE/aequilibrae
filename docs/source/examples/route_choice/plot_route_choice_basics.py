@@ -142,7 +142,7 @@ def plot_results(link_loads):
 # Route Choice class
 # ------------------
 # Here we'll construct and use the Route Choice class to generate our route sets
-from aequilibrae.paths import RouteChoice
+from aequilibrae.route_choice import RouteChoice
 
 # %%
 # This object construct might take a minute depending on the size of the graph due to the construction of the compressed

@@ -141,7 +141,7 @@ zones.head()
 # origin and destination IDs for each entry we could use `subarea.post_process(keep_original_ods=True)` instead. This
 # will attach the true ODs from the select link OD matrix as part of the index. However, this will create a
 # significantly larger, but more flexible matrix.
-from aequilibrae.paths import SubAreaAnalysis
+from aequilibrae.route_choice import SubAreaAnalysis
 
 subarea = SubAreaAnalysis(graph, zones, mat)
 subarea.rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False)
@@ -158,7 +158,7 @@ new_centroids
 
 # %%
 # We can then perform an assignment using our new demand matrix on the limited graph
-from aequilibrae.paths import RouteChoice
+from aequilibrae.route_choice import RouteChoice
 
 rc = RouteChoice(graph)
 rc.add_demand(demand)

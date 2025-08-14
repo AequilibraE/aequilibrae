@@ -67,7 +67,7 @@ graph.prepare_graph(np.array(nodes_of_interest))
 # Route Choice class
 # ------------------
 # Here we'll construct and use the Route Choice class to generate our route sets
-from aequilibrae.paths import RouteChoice
+from aequilibrae.route_choice import RouteChoice
 
 # %% 
 # This object construct might take a minute depending on the size of the graph due to the construction of the

@@ -36,7 +36,7 @@ import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.transit_assignment import TransitAssignment, TransitClass
 from aequilibrae.transit import Transit
-from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
+from aequilibrae.transit_assignment.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.create_example import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/transit/skimming.png'
