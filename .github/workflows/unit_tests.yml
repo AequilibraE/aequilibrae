@@ -89,7 +89,9 @@ jobs:
         brew install sqlite
         brew install pyenv
         brew install libspatialite
-        pyenv install ${{ matrix.python-version }} --with-sqlite3="$(brew --prefix sqlite)"
+        export CPPFLAGS="-I$(brew --prefix sqlite)/include"
+        export LDFLAGS="-L$(brew --prefix sqlite)/lib"
+        pyenv install ${{ matrix.python-version }}
         pyenv global ${{ matrix.python-version }}
         python --version
 
