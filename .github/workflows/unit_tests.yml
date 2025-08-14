@@ -81,20 +81,17 @@ jobs:
     - name: Set Python environment
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: { matrix.python-version }
 
     - name: Install spatialite
       shell: bash
       run: |
         brew update
         brew install sqlite
-        brew install pyenv
-        brew install libspatialite
+        brew install sqlite libspatialite
         export CPPFLAGS="-I$(brew --prefix sqlite)/include"
         export LDFLAGS="-L$(brew --prefix sqlite)/lib"
-        pyenv install ${{ matrix.python-version }}
-        pyenv global ${{ matrix.python-version }}
-        python --version
+        python -m pip install --force-reinstall --no-binary=:all: pysqlite3
 
     - name: Install dependencies
       run: |
