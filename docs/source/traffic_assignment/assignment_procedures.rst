@@ -25,7 +25,7 @@ assigned. There are three pieces of information that are required in the instant
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TrafficClass
+    >>> from aequilibrae.traffic_assignment	import TrafficClass
 
     >>> project = create_example(project_path)
     >>> project.network.build_graphs()
@@ -76,7 +76,7 @@ method call:
 
 .. doctest::
 
-    >>> from aequilibrae.paths.traffic_assignment import TrafficAssignment
+    >>> from aequilibrae.traffic_assignment import TrafficAssignment
 
     >>> assig = TrafficAssignment()
 
