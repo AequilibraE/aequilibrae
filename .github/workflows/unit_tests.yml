@@ -89,6 +89,7 @@ jobs:
         brew install sqlite libspatialite
         export CPPFLAGS="-I$(brew --prefix sqlite)/include"
         export LDFLAGS="-L$(brew --prefix sqlite)/lib"
+        export SQLITE_ENABLE_LOAD_EXTENSION=1
         python -m pip install --force-reinstall --no-binary=:all: pysqlite3
 
     - name: Install dependencies
