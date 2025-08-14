@@ -34,8 +34,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11', '3.12', '3.13']
-        os: [windows-latest, ubuntu-latest, macos-latest]
-
+        os: [windows-latest, ubuntu-latest]
       max-parallel: 20
     steps:
     - uses: actions/checkout@v4
@@ -44,10 +43,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      env:
-        CC: gcc-12
-        CXX: g++-12
-        MACOSX_DEPLOYMENT_TARGET: 14.0
       run: |
         python -m pip install --upgrade pip uv
         python -m uv pip install -e .[dev]
@@ -59,17 +54,50 @@ jobs:
           sudo apt update
           sudo apt install libsqlite3-mod-spatialite libspatialite-dev -y
           sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-        elif [[ "$RUNNER_OS" == "macOS" ]]; then
-          brew install libspatialite
         elif [[ "$RUNNER_OS" == "Windows" ]]; then
           python tests/setup_windows_spatialite.py
         fi
 
     - name: Runs test
       shell: bash
+      run: pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+
+  testingMacOS:
+    needs: linting
+    runs-on: macos-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.python-version }}
+      cancel-in-progress: true
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+      max-parallel: 20
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set Python environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.10
+
+    - name: Install spatialite
+      shell: bash
       run: |
-        if [[ "$RUNNER_OS" == "macOS" ]]; then
-          pytest tests/ --durations=50 --dist=loadscope -n 3 --random-order --verbose
-        else
-          pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
-        fi
+        brew install sqlite
+        brew install pyenv
+        brew install libspatialite
+        pyenv install ${{ matrix.python-version }} --with-sqlite3="$(brew --prefix sqlite)"
+        pyenv global ${{ matrix.python-version }}
+        python --version
+
+    - name: Install dependencies
+      env:
+        CC: gcc-12
+        CXX: g++-12
+        MACOSX_DEPLOYMENT_TARGET: 14.0
+      run: |
+        python -m pip install --upgrade pip uv
+        python -m uv pip install -e .[dev]
+
+    - name: Runs test
+      shell: bash
+      run: pytest tests/ --durations=50 --dist=loadscope -n 3 --random-order --verbose
