@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_active_project
-from aequilibrae.traffic_assignment.traffic_assignment import AssignmentBase
+from aequilibrae.paths.assignment_base import AssignmentBase
 from aequilibrae.transit_assignment.optimal_strategies import OptimalStrategies
 from aequilibrae.utils.core_setter import set_cores
 

@@ -9,7 +9,8 @@ from aequilibrae.log import logger
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
-from aequilibrae.transit_assignment import TransitGraph, TransitGraphBuilder
+from aequilibrae.transit_assignment import TransitGraph
+from aequilibrae.transit_assignment.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread

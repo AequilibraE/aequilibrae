@@ -148,7 +148,7 @@ mat.computational_view()
 # Hyperpath generation/assignment
 # -------------------------------
 # We'll create a ``TransitAssignment`` object as well as a ``TransitClass``
-from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.transit_assignment import TransitAssignment, TransitClass
 
 # %%
 # Create the assignment class

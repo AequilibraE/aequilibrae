@@ -34,7 +34,7 @@ from uuid import uuid4
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.transit_assignment import TransitAssignment, TransitClass
 from aequilibrae.transit import Transit
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.create_example import create_example

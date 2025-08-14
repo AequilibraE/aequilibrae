@@ -1,4 +1,3 @@
-from .assignment_results import TransitAssignmentResults
-from .optimal_strategies import OptimalStrategies
+from .transit_assignment import TransitAssignment
+from .transit_class import TransitClass
 from .transit_graph import TransitGraph
-from .transit_graph_builder import TransitGraphBuilder

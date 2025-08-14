@@ -1,68 +1,12 @@
 import warnings
-from abc import ABC
-from copy import deepcopy
 from typing import Union, List, Tuple, Dict
 
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import GraphBase
-from aequilibrae.traffic_assignment.assignment_results import AssignmentResults
-from aequilibrae.traffic_assignment.graph import Graph
-from aequilibrae.transit_assignment import TransitGraph, TransitAssignmentResults
-
-
-class TransportClassBase(ABC):  # noqa: B024
-    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
-        """
-        Instantiates the class
-
-        :Arguments:
-            **name** (:obj:`str`): UNIQUE class name.
-
-            **graph** (:obj:`Graph`): Class/mode-specific graph
-
-            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
-        """
-        if not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
-
-        if matrix.matrix_view.dtype != graph.default_types("float"):
-            raise TypeError("Matrix's computational view need to be of type np.float64")
-        self._config = {}
-        self.graph = graph
-        self.logger = graph.logger
-        self.matrix = matrix
-        self._id = name
-
-        graph_config = {
-            "Mode": graph.mode,
-            "Block through centroids": graph.block_centroid_flows,
-            "Number of centroids": graph.num_zones,
-            "Links": graph.num_links,
-            "Nodes": graph.num_nodes,
-        }
-        self._config["Graph"] = str(graph_config)
-
-        mat_config = {
-            "Source": matrix.file_path or "",
-            "Number of centroids": matrix.zones,
-            "Matrix cores": matrix.view_names,
-        }
-        if len(matrix.view_names) == 1:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :])) for nm in matrix.view_names
-            }
-        else:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i])) for i, nm in enumerate(matrix.view_names)
-            }
-        self._config["Matrix"] = str(mat_config)
-
-    @property
-    def info(self) -> dict:
-        config = deepcopy(self._config)
-        return {self._id: config}
+from aequilibrae.paths.assignment_class_base import TransportClassBase
+from .assignment_results import AssignmentResults
+from .graph import Graph
 
 
 class TrafficClass(TransportClassBase):
@@ -70,7 +14,7 @@ class TrafficClass(TransportClassBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae.paths import TrafficClass
+        >>> from aequilibrae.traffic_assignment import TrafficClass
 
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()
@@ -173,7 +117,7 @@ class TrafficClass(TransportClassBase):
             for link, dir in link_set:
                 if dir == 0:
                     query = (self.graph.graph["link_id"] == link) & (
-                        (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
+                            (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
                     )
                 else:
                     query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
@@ -231,25 +175,3 @@ class TrafficClass(TransportClassBase):
         ]:
             raise KeyError(f"Traffic Class does not have '{key}'")
         self.__dict__[key] = value
-
-
-class TransitClass(TransportClassBase):
-    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
-        super().__init__(name, graph, matrix)
-        self._config["Graph"] = str(graph._config)
-        self.results = TransitAssignmentResults()
-
-        if len(matrix.view_names) == 1:
-            self.matrix_core = matrix.view_names[0]
-        else:
-            self.matrix_core = None
-
-    def set_demand_matrix_core(self, core: str):
-        """
-        Set the matrix core to use for demand.
-
-        :Arguments:
-            **core** (:obj:`str`):"""
-        if core not in self.matrix.view_names:
-            raise KeyError(f"'{core}' is not present in `matrix.view_names`")
-        self.matrix_core = core

@@ -7,7 +7,7 @@ from aequilibrae import Project
 import numpy as np
 import pandas as pd
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.transit_assignment import TransitAssignment, TransitClass
 
 import time
 
