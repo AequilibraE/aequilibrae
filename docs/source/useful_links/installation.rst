@@ -18,7 +18,7 @@ as of September 2024.
 Installation
 ------------
 
-1. Install `Python 3.9, 3.10, 3.11 or 3.12 <https://www.python.org/downloads/>`_. We recommend Python 3.10 or 3.11
+1. Install `Python 3.10, 3.11, 3.12 or 3.13 <https://www.python.org/downloads/>`_. We recommend Python 3.12
 2. Install AequilibraE
 
 ::
@@ -63,8 +63,8 @@ to the Python SQLite driver every time you connect to the database.
 
 One can download the appropriate version of the latest SpatiaLite release
 directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ , or the
-cached versions on AequilibraE's website for
-`64-Bit Python <https://github.com/AequilibraE/aequilibrae/releases/tag/V.0.7.5>`_
+cached versions on AequilibraE's github repository for
+`64-Bit Python <https://github.com/AequilibraE/aequilibrae/releases/tag/v1.4.3>`_
 
 After unpacking the zip file into its own folder (say ``D:/spatialite``), one can
 *temporarily* add the SpatiaLite folder to system path environment variable,
