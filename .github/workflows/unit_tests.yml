@@ -69,6 +69,7 @@ jobs:
       CC: gcc-12
       CXX: g++-12
       MACOSX_DEPLOYMENT_TARGET: 14.0
+      SDKROOT: /Library/Developer/CommandLineTools/SDKs/MacOSX14.sdk
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.python-version }}
       cancel-in-progress: true
