@@ -107,9 +107,8 @@ jobs:
       shell: bash
       run: |
         source .venv/bin/activate
-
         export DYLD_LIBRARY_PATH="/opt/homebrew/opt/libspatialite/lib:$DYLD_LIBRARY_PATH"
         export PATH="/opt/homebrew/opt/libspatialite/lib:$PATH"
+        pytest tests/ --durations=50 --dist=loadscope --random-order --verbose
 #        WE are getting segfaults on MacOS with parallel tests, so we run them sequentially to see if we find the issue
 #        pytest tests/ --durations=50 --dist=loadscope -n 3 --random-order --verbose
-        pytest tests/ --durations=50 --dist=loadscope --random-order --verbose
