@@ -87,16 +87,18 @@ jobs:
       run: |
         brew update
         brew install libspatialite
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        uv python install 3.12
-        uv python pin 3.12
-        uv venv --python 3.12
+        brew --prefix libspatialite
+        export DYLD_LIBRARY_PATH="/opt/homebrew/opt/libspatialite/lib:$DYLD_LIBRARY_PATH"
 
-    - name: Install dependencies
+    - name: Install Python and environment
       env:
         CC: gcc-12
         CXX: g++-12
       run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        uv python install 3.12
+        uv python pin 3.12
+        uv venv --python 3.12
         source .venv/bin/activate
         python -m ensurepip --upgrade
         python -m pip install --upgrade pip uv
