@@ -86,22 +86,18 @@ jobs:
       shell: bash
       run: |
         brew update
-        brew install sqlite
-        brew install sqlite libspatialite
+        brew install libspatialite
         curl -LsSf https://astral.sh/uv/install.sh | sh
         uv python install 3.12
         uv python pin 3.12
         uv venv --python 3.12
-#        export CPPFLAGS="-I$(brew --prefix sqlite)/include"
-#        export LDFLAGS="-L$(brew --prefix sqlite)/lib"
-#        export SQLITE_ENABLE_LOAD_EXTENSION=1
-#        python -m pip install --force-reinstall --no-binary=:all: pysqlite3
 
     - name: Install dependencies
       env:
         CC: gcc-12
         CXX: g++-12
       run: |
+        source .venv/bin/activate
         python -m pip install --upgrade pip uv
         python -m uv pip install -e .[dev]
 
