@@ -104,4 +104,6 @@ jobs:
 
     - name: Runs test
       shell: bash
-      run: pytest tests/ --durations=50 --dist=loadscope -n 3 --random-order --verbose
+      run: |
+        source .venv/bin/activate
+        pytest tests/ --durations=50 --dist=loadscope -n 3 --random-order --verbose
