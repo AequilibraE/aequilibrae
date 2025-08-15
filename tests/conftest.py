@@ -3,6 +3,7 @@
 # needing to import them (pytest will automatically discover them).
 
 import faulthandler
+import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -154,3 +155,7 @@ def build_gtfs_project(coquimbo_example):
     data = Transit(prj)
     yield data
     prj.close()
+
+
+def pytest_sessionstart(session):
+    os.environ["AEQ_SHOW_PROGRESS"] = "FALSE"
