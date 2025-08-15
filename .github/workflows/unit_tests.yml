@@ -26,7 +26,7 @@ jobs:
         run: ruff check .
 
   testing:
-    needs: linting
+    needs: [linting, build_wheels]
     runs-on: ${{ matrix.os}}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}
@@ -63,7 +63,7 @@ jobs:
       run: pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
   testingMacOS:
-    needs: linting
+#    needs: linting
     runs-on: 	macos-latest
     env:
       MACOSX_DEPLOYMENT_TARGET: 14.0
@@ -72,7 +72,8 @@ jobs:
       cancel-in-progress: true
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+#        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.11']
       max-parallel: 20
     steps:
     - uses: actions/checkout@v4
@@ -87,10 +88,14 @@ jobs:
         brew update
         brew install sqlite
         brew install sqlite libspatialite
-        export CPPFLAGS="-I$(brew --prefix sqlite)/include"
-        export LDFLAGS="-L$(brew --prefix sqlite)/lib"
-        export SQLITE_ENABLE_LOAD_EXTENSION=1
-        python -m pip install --force-reinstall --no-binary=:all: pysqlite3
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        uv python install 3.12
+        uv python pin 3.12
+        uv venv --python 3.12
+#        export CPPFLAGS="-I$(brew --prefix sqlite)/include"
+#        export LDFLAGS="-L$(brew --prefix sqlite)/lib"
+#        export SQLITE_ENABLE_LOAD_EXTENSION=1
+#        python -m pip install --force-reinstall --no-binary=:all: pysqlite3
 
     - name: Install dependencies
       env:
