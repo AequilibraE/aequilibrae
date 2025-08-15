@@ -88,7 +88,7 @@ jobs:
         brew update
         brew install libspatialite
         brew --prefix libspatialite
-        export DYLD_LIBRARY_PATH="/opt/homebrew/opt/libspatialite/lib:$DYLD_LIBRARY_PATH"
+        export DYLD_LIBRARY_PATH="/opt/homebrew/opt/libspatialite:$DYLD_LIBRARY_PATH"
 
     - name: Install Python and environment
       env:
