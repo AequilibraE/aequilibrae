@@ -104,6 +104,8 @@ jobs:
         python -m uv pip install -e .[dev]
 
     - name: Runs test
+      env:
+        AEQ_SHOW_PROGRESS: "FALSE"
       shell: bash
       run: |
         source .venv/bin/activate
