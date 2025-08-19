@@ -154,3 +154,26 @@ def build_gtfs_project(coquimbo_example):
     data = Transit(prj)
     yield data
     prj.close()
+
+
+@pytest.fixture(scope="session")
+def cached_scenario_example(cache_path):
+    sioux_falls = create_example(cache_path / "scenario_project", "sioux_falls")
+    nauru = create_example(cache_path / "scenario_project" / "scenarios" / "nauru", "nauru")
+    coquimbo = create_example(cache_path / "scenario_project" / "scenarios" / "coquimbo", "coquimbo")
+
+    with sioux_falls.db_connection as conn:
+        conn.executemany("INSERT INTO scenarios (scenario_name) VALUES (?)", [("nauru",), ("coquimbo",)])
+
+    with nauru.db_connection as conn:
+        conn.execute("DROP TABLE scenarios")
+
+    with coquimbo.db_connection as conn:
+        conn.execute("DROP TABLE scenarios")
+
+
+@pytest.fixture(scope="function")
+def scenario_example(cached_scenario_example, cache_path, tmp_path) -> Project:
+    project = cached_model("scenario_project", cache_path, tmp_path)
+    yield project
+    project.close()
