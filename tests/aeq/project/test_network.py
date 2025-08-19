@@ -7,15 +7,13 @@ from shapely.geometry import box, Polygon
 from aequilibrae.project import Project
 
 
-def test_create_from_osm(test_folder):
+def test_create_from_osm(empty_project):
     if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
         pytest.skip("Skipped check to not load OSM servers")
 
-    project = Project()
-    project.new(test_folder / "test")
-    project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
+    empty_project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
 
-    with project.db_connection as conn:
+    with empty_project.db_connection as conn:
         lks = conn.execute("""select count(*) from links""").fetchone()[0]
         osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]
 
@@ -30,8 +28,6 @@ def test_create_from_osm(test_folder):
 
         if lks > nds:
             pytest.fail("We imported more links than nodes. Something wrong here")
-
-    project.close()
 
 
 def test_count_centroids(sioux_falls_test):

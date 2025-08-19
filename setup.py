@@ -38,7 +38,7 @@ if os.getenv("AEQ_ASAN"):
 extension_args = {
     "extra_compile_args": compile_args,
     "extra_link_args": link_args,
-    "define_macros": [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    "define_macros": [("NPY_TARGET_VERSION", "NPY_1_26_API_VERSION")],
     "include_dirs": include_dirs,
     "libraries": libraries,
     "library_dirs": library_dirs,

@@ -43,7 +43,7 @@ class GravityCalibration:
 
         # Solve and save outputs
         >>> gravity.calibrate()
-        >>> gravity.model.save(os.path.join(project_path, 'dist_expo_model.mod'))
+        >>> gravity.model.save(project_path / 'dist_expo_model.mod')
 
         >>> project.close()
     """

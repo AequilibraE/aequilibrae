@@ -50,11 +50,11 @@ class TransportClassBase(ABC):  # noqa: B024
         }
         if len(matrix.view_names) == 1:
             mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :]) for nm in matrix.view_names
+                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :])) for nm in matrix.view_names
             }
         else:
             mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i]) for i, nm in enumerate(matrix.view_names)
+                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i])) for i, nm in enumerate(matrix.view_names)
             }
         self._config["Matrix"] = str(mat_config)
 

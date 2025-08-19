@@ -207,10 +207,10 @@ def test_link_out_of_bounds(select_link_setup):
         assignclass.set_select_links({"test": [(78, 1), (1, 1)]})
 
 
-def test_kaitang(test_data_path, test_folder):
-    zipfile.ZipFile(test_data_path / "KaiTang.zip").extractall(test_folder)
+def test_kaitang(test_data_path, tmp_path):
+    zipfile.ZipFile(test_data_path / "KaiTang.zip").extractall(tmp_path)
 
-    link_df = pd.read_csv(os.path.join(test_folder, "link.csv"))
+    link_df = pd.read_csv(os.path.join(tmp_path, "link.csv"))
     centroids_array = np.array([7, 8, 11])
 
     net = link_df.copy()
@@ -225,7 +225,7 @@ def test_kaitang(test_data_path, test_folder):
     g.set_graph("fft")
 
     aem_mat = AequilibraeMatrix()
-    aem_mat.load(os.path.join(test_folder, "demand_a.aem"))
+    aem_mat.load(os.path.join(tmp_path, "demand_a.aem"))
     aem_mat.computational_view(["a"])
 
     assign_class = TrafficClass("class_a", g, aem_mat)

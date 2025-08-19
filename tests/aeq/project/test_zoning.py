@@ -43,7 +43,7 @@ def test_create_zoning_layer(coquimbo_example):
         "idx_zones_geometry_parent",
         "idx_zones_geometry_rowid",
     ]
-    with proj.db_connection as conn:
+    with proj.db_connection_spatial as conn:
         for table in tables:
             conn.execute(f"DROP TABLE IF EXISTS {table};")
         conn.execute("DELETE FROM attributes_documentation WHERE name_table LIKE 'zones'")

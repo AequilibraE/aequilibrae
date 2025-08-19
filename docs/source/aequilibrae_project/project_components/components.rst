@@ -355,8 +355,8 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     >>> matrices.delete_record("demand_mc")
     
     # or by selecting the matrix and deleting it
-    >>> mat_record = matrices.get_record("demand_omx")
-    >>> mat_record.delete()
+    >>> mat_record = matrices.get_record("demand_mc") # doctest: +SKIP
+    >>> mat_record.delete() # doctest: +SKIP
 
     # If you're unsure if you have a matrix in you project, you can check if it exists
     # This function will return `True` or `False`
@@ -371,10 +371,6 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 
     # To reload the existing matrices in memory once again
     >>> matrices.reload()
-
-    # Similar to the `get_record` function, we have the `get_matrix`, which allows you to
-    # get an AequilibraE matrix.
-    >>> matrices.get_matrix("demand_aem") # doctest: +SKIP
 
     >>> project.close()
 

@@ -1,8 +1,6 @@
-import sqlite3
+import json
 import uuid
 from itertools import combinations
-from os.path import join
-import json
 
 import numpy as np
 import pandas as pd
@@ -10,7 +8,6 @@ from scipy.spatial import Delaunay
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
-from aequilibrae.utils.db_utils import commit_and_close
 
 DELAUNAY_TABLE = "delaunay_network"
 
@@ -39,7 +36,7 @@ class DelaunayAnalysis:
         if source not in ["zones", "network"]:
             raise ValueError("Source must be 'zones' or 'network'")
 
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type ='table'", conn)
             if DELAUNAY_TABLE in tables.name.values:
                 if not overwrite:
@@ -90,7 +87,7 @@ class DelaunayAnalysis:
             conn.execute("update delaunay_network set distance=GeodesicLength(geometry);")
 
     def assign_matrix(self, matrix: AequilibraeMatrix, result_name: str):
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             sql = f"select link_id, direction, a_node, b_node, distance, 1 capacity from {DELAUNAY_TABLE}"
 
             df = pd.read_sql(sql, conn)

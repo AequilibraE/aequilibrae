@@ -33,7 +33,7 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.9, 3.10, 3.11 & 3.12, but we recommend using Python 3.11 or 3.12 for 
+AequilibraE is currently tested for Python 3.9, 3.10, 3.11, 3.12 & 3.13, but we recommend using Python 3.11 or 3.12 for
 development.
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or 

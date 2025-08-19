@@ -23,16 +23,17 @@ class HyperpathGenerating:
     :Arguments:
         **edges** (:obj:`pandas.DataFrame`): The edges of the graph.
 
-        **tail** (:obj:`str`): The column name for the tail of the edge (*Optional*, default is "tail").
+        **tail** (:obj:`str`, optional): The column name for the tail of the edge. Default is "tail".
 
-        **head** (:obj:`str`): The column name for the head of the edge (*Optional*, default is "head").
+        **head** (:obj:`str`, optional): The column name for the head of the edge. Default is "head".
 
-        **trav_time** (:obj:`str`): The column name for the travel time of the edge
-        (*Optional*, default is "trav_time").
+        **trav_time** (:obj:`str`, optional): The column name for the travel time of the edge.
+        Default is "trav_time".
 
-        **freq** (:obj:`str`): The column name for the frequency of the edge (*Optional*, default is "freq").
+        **freq** (:obj:`str`, optional): The column name for the frequency of the edge. Default is "freq".
 
-        **check_edges** (:obj:`bool`): If True, check the validity of the edges (*Optional*, default is False).
+        **check_edges** (:obj:`bool`, optional): If ``True``, check the validity of the edges.
+        Default is ``False``.
     """
 
     def __init__(
@@ -253,22 +254,24 @@ class HyperpathGenerating:
         """
         Assigns demand to the edges of the graph.
 
-        Assumes the ``*_column`` arguments are provided as numpy arrays that form a COO sprase matrix.
+        Assumes the `*_column` arguments are provided as numpy arrays that form a COO sprase matrix.
 
         :Arguments:
-            **origin_column** (:obj:`np.ndarray`): The column for the origin vertices (*Optional*, default is
-              "orig_vert_idx").
+            **origin_column** (:obj:`np.ndarray`, optional): The column for the origin vertices. 
+            Default is "orig_vert_idx".
 
-            **destination_column** (:obj:`np.ndarray`): The column or the destination vertices (*Optional*, default is
-              "dest_vert_idx").
+            **destination_column** (:obj:`np.ndarray`, optional): The column or the destination vertices. 
+            Default is "dest_vert_idx".
 
-            **demand_column** (:obj:`np.ndarray`): The column for the demand values (*Optional*, default is "demand").
+            **demand_column** (:obj:`np.ndarray`, optional): The column for the demand values.
+            Default is "demand".
 
-            **check_demand** (:obj:`bool`): If True, check the validity of the demand data (*Optional*, default is
-              ``False``).
+            **check_demand** (:obj:`bool`, optional): If ``True``, check the validity of the demand data.
+            Default is ``False``.
 
-            **threads** (:obj:`int`):The number of threads to use for computation (*Optional*, default is 0, using all
-        available threads).
+            **threads** (:obj:`int`, optional): The number of threads to use for computation. 
+            Default is ``0`` (using all available threads).
+
         """
 
         self.origin_column = origin_column.astype(np.uint32)
@@ -399,12 +402,13 @@ class HyperpathGenerating:
         Method fails if table exists
 
         :Arguments:
-            **table_name** (:obj:`str`): Name of the table to hold this assignment result
+            **table_name** (:obj:`str`): Name of the table to hold this assignment result.
 
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows.
+            Defaults to ``True``.
 
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to. Defaults to the active
-              project
+            **project** (:obj:`Project`, optional): Project we want to save the results to. 
+            Defaults to the active project
         """
 
         df = self._edges

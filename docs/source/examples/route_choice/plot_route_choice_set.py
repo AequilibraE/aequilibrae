@@ -96,7 +96,8 @@ choice_set = rc.get_results()
 # rc.execute_from_path_files(path)
 
 # %%
-# Or if we had externally computed route choice sets, we can use AequilibraEs assignment procedures by loading them with the ``execute_from_pandas` method.
+# Or if we had externally computed route choice sets, we can use AequilibraEs assignment procedures by 
+# loading them with the ``execute_from_pandas`` method.
 
 # rc.execute_from_pandas(path_files_df)
 
@@ -113,11 +114,11 @@ plot_routes = choice_set[(choice_set["origin id"] == 77011)]["route set"].values
 links = project.network.links.data
 
 # For ease of plot, we create a GeoDataFrame for each route in the choice set
-route_1 = links[links.link_id.isin(plot_routes[0])]
-route_2 = links[links.link_id.isin(plot_routes[1])]
-route_3 = links[links.link_id.isin(plot_routes[2])]
-route_4 = links[links.link_id.isin(plot_routes[3])]
-route_5 = links[links.link_id.isin(plot_routes[4])]
+route_1 = links[links.link_id.isin(np.absolute(plot_routes[0]))]
+route_2 = links[links.link_id.isin(np.absolute(plot_routes[1]))]
+route_3 = links[links.link_id.isin(np.absolute(plot_routes[2]))]
+route_4 = links[links.link_id.isin(np.absolute(plot_routes[3]))]
+route_5 = links[links.link_id.isin(np.absolute(plot_routes[4]))]
 
 nodes = project.network.nodes.data
 nodes = nodes[nodes["node_id"].isin([77011, 74089])]

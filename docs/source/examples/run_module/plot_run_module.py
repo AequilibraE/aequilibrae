@@ -95,7 +95,7 @@ with open(join(folder, "run", "__init__.py"), "a") as file:
 # %%
 # Now we add new parameters to our model
 
-p = Parameters(project)
+p = Parameters()
 p.parameters["run"]["create_delaunay"] = {}
 p.parameters["run"]["create_delaunay"]["source"] = "zones"
 p.parameters["run"]["create_delaunay"]["name"] = "demand_omx"
@@ -124,8 +124,6 @@ project.run.results_summary()
 # %%
 # Let's check what our Delaunay lines look like!
 
-import sqlite3
-import pandas as pd
 import geopandas as gpd
 
 # %%
@@ -133,7 +131,7 @@ import geopandas as gpd
 results = project.results.get_results("my_run_module_example").set_index("link_id")
 
 # %%
-with project.db_connection as conn:
+with project.db_connection_spatial as conn:
     links = gpd.read_postgis(
         "SELECT link_id, st_asBinary(geometry) geometry FROM delaunay_network", conn, geom_col="geometry", crs=4326
     )

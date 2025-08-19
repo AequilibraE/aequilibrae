@@ -4,8 +4,8 @@ from aequilibrae import Parameters
 
 
 @pytest.fixture(params=["nauru", "sioux_falls", "coquimbo"])
-def model_project(test_folder, request):
-    proj = create_example(str(test_folder / request.param), from_model=request.param)
+def model_project(tmp_path, request):
+    proj = create_example(str(tmp_path / request.param), from_model=request.param)
     yield proj
     proj.close()
 

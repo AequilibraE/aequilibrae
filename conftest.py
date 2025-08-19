@@ -5,13 +5,8 @@
 import faulthandler
 import logging
 import os
-import shutil
-import tempfile
 import uuid
-import zipfile
-from datetime import datetime
 from pathlib import Path
-from shutil import copytree
 
 import numpy as np
 import pandas as pd
@@ -20,7 +15,6 @@ from shapely.geometry import Polygon
 
 from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project.project_creation import remove_triggers
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
@@ -167,8 +161,8 @@ def project_path(test_folder):
 
 
 @pytest.fixture(autouse=True)
-def doctest_fixtures(doctest_namespace, tmp_path_factory, project_path):
-    doctest_namespace["project_path"] = str(project_path)
+def doctest_fixtures(doctest_namespace, tmp_path_factory, tmp_path):
+    doctest_namespace["project_path"] = tmp_path / "p"
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
     doctest_namespace["create_example"] = create_example
     doctest_namespace["Project"] = Project

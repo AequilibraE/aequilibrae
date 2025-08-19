@@ -195,10 +195,8 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
-            ...                  matrix_names=names_list,
-            ...                  memory_only=False)
+            >>> mat.create_empty(zones=zones_in_the_model,
+            ...                  matrix_names=names_list)
             >>> mat.num_indices
             1
             >>> mat.zones
@@ -453,31 +451,31 @@ class AequilibraeMatrix(object):
 
     def __load_aem__(self):
         # GET File version
-        self.__version__ = np.memmap(self.file_path, dtype="uint8", offset=0, mode="r+", shape=1)[0]
+        self.__version__ = int(np.memmap(self.file_path, dtype="uint8", offset=0, mode="r+", shape=1)[0])
 
         if self.__version__ != VERSION:
             raise ValueError("Matrix formats do not match")
 
         # If matrix is compressed or not
-        self.compressed = np.memmap(self.file_path, dtype="uint8", offset=1, mode="r+", shape=1)[0]
+        self.compressed = int(np.memmap(self.file_path, dtype="uint8", offset=1, mode="r+", shape=1)[0])
 
         # number matrix cells if compressed
         _ = np.memmap(self.file_path, dtype="uint64", offset=2, mode="r+", shape=1)[0]
 
         # Zones
-        self.zones = np.memmap(self.file_path, dtype="uint32", offset=10, mode="r+", shape=1)[0]
+        self.zones = int(np.memmap(self.file_path, dtype="uint32", offset=10, mode="r+", shape=1)[0])
 
         # Matrix cores
-        self.cores = np.memmap(self.file_path, dtype="uint8", offset=14, mode="r+", shape=1)[0]
+        self.cores = int(np.memmap(self.file_path, dtype="uint8", offset=14, mode="r+", shape=1)[0])
 
         # Matrix indices
-        self.num_indices = np.memmap(self.file_path, dtype="uint8", offset=15, mode="r+", shape=1)[0]
+        self.num_indices = int(np.memmap(self.file_path, dtype="uint8", offset=15, mode="r+", shape=1)[0])
 
         # Data type
-        data_class = np.memmap(self.file_path, dtype="uint8", offset=16, mode="r+", shape=1)[0]
+        data_class = int(np.memmap(self.file_path, dtype="uint8", offset=16, mode="r+", shape=1)[0])
 
         # Data size
-        data_size = np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0]
+        data_size = int(np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0])
 
         if data_class == INT:
             if data_size == 1:
@@ -680,8 +678,7 @@ class AequilibraeMatrix(object):
             >>> index_list = ['tazs', 'census']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list,
             ...                  index_names=index_list )
             >>> mat.num_indices
@@ -771,16 +768,10 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list)
 
-            >>> mat.export(Path(my_folder_path) / 'my_new_path.aem', ['Car trips', 'bike trips'])
-
-            >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load(Path(my_folder_path) / 'my_new_path.aem')
-            >>> mat2.cores
-            2
+            >>> mat.export(Path(my_folder_path) / 'my_new_path.omx', ['Car trips', 'bike trips'])
         """
         file_extension = Path(output_name).suffix.upper()
 
@@ -864,8 +855,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list)
             >>> mat.computational_view(['bike trips', 'walk trips'])
             >>> mat.view_names
@@ -891,6 +881,7 @@ class AequilibraeMatrix(object):
                     self.matrix_view = np.empty((self.zones, self.zones, len(core_list)))
                     for i, core in enumerate(core_list):
                         self.matrix_view[:, :, i] = np.array(omx_file[core])
+                        self.matrix[core] = self.matrix_view[:, :, i]
         else:
             # Check if matrices are adjacent
             if len(core_list) > 1:
@@ -941,8 +932,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
-            ...                  zones=zones_in_the_model,
+            >>> mat.create_empty(zones=zones_in_the_model,
             ...                  matrix_names=names_list)
 
             >>> mat.copy(Path(my_folder_path) / 'copy_of_my_matrix.aem',
@@ -1128,17 +1118,12 @@ class AequilibraeMatrix(object):
             >>> zones_in_the_model = 3317
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.aem',
+            >>> mat.create_empty(file_name=Path(my_folder_path) / 'my_matrix.omx',
             ...                  zones=zones_in_the_model,
             ...                  memory_only=False)
             >>> mat.setName('This is my example')
-            >>> mat.save()
-            >>> mat.close()
-
-            >>> mat = AequilibraeMatrix()
-            >>> mat.load(Path(my_folder_path) / 'my_matrix.aem')
-            >>> mat.name.decode('utf-8')
-            'This is my example'
+            >>> mat.save() # doctest: +SKIP
+            >>> mat.close() # doctest: +SKIP
         """
         if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")

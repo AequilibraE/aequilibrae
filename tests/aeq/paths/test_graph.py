@@ -19,6 +19,22 @@ def graph_for_project(project):
     return project.network.graphs["c"]
 
 
+def test_upper_case_variables(sioux_falls_example):
+    graph = graph_for_project(sioux_falls_example)
+    network = graph.network
+    network.columns = network.columns.str.upper()
+    g = Graph()
+    g.network = network
+    assert g.network.columns.tolist() == graph.network.columns.tolist(), "Graph columns are not lower case"
+
+    g.prepare_graph()
+    g.set_graph("DiStAnce")
+    assert g.cost_field == "distance", "Graph cost field is not set to distance lower case"
+
+    g.set_skimming("DiStAnce")
+    assert g.skim_fields == ["distance"], "Graph skim fields are not set to distance lower case"
+
+
 def test_prepare_graph(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     graph.prepare_graph(np.arange(5) + 1)
@@ -143,11 +159,10 @@ def test_transit_graph_od_node_mapping(transit_graph):
 
 
 @pytest.fixture(scope="function")
-def compressed_graph(test_data_path, test_folder):
-    test_folder.mkdir(parents=True, exist_ok=True)
-    zipfile.ZipFile(test_data_path / "KaiTang.zip").extractall(test_folder)
+def compressed_graph(test_data_path, tmp_path):
+    zipfile.ZipFile(test_data_path / "KaiTang.zip").extractall(tmp_path)
 
-    link_df = pd.read_csv(test_folder / "links_modified.csv")
+    link_df = pd.read_csv(tmp_path / "links_modified.csv")
     centroids_array = np.array([7, 8, 11])
 
     graph = Graph()

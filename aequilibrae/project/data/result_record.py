@@ -75,7 +75,7 @@ class ResultRecord(SafeClass):
             self._results_conn or self.project.results_connection as results_conn,
         ):
             project_conn.execute("DELETE FROM results WHERE table_name=?", [self.table_name])
-            results_conn.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+            results_conn.execute(f'DROP TABLE IF EXISTS "{self.table_name}"')
 
         self.__dict__["_exists"] = False
 
@@ -86,7 +86,7 @@ class ResultRecord(SafeClass):
             **df** (:obj:`pd.DataFrame`): DataFrame containing the results data.
         """
         with self._results_conn or self.project.results_connection as conn:
-            return pd.read_sql(f"SELECT * FROM {self.table_name}", conn)
+            return pd.read_sql(f'SELECT * FROM "{self.table_name}"', conn)
 
     def set_data(self, df: pd.DataFrame, **kwargs) -> None:
         """Set the results data corresponding to this record. Additionally saves this record.

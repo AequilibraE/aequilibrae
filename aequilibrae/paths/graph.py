@@ -141,7 +141,7 @@ class GraphBase(ABC):  # noqa: B024
 
     def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
-        Prepares the graph for a computation for a certain set of centroids
+        Prepares the graph for a computation for a certain set of centroids.
 
         Under the hood, if sets all centroids to have IDs from 1 through **n**,
         which should correspond to the index of the matrix being assigned.
@@ -151,8 +151,11 @@ class GraphBase(ABC):  # noqa: B024
         connectors.
 
         :Arguments:
-            **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
-            **remove_dead_ends** (:obj:`bool`): Whether or not to remove dead ends from the graph. (*Optional*, default is "True").
+            **centroids** (``np.ndarray`` or ``None``, optional): Array with centroid IDs. Mandatory type
+            ``Int64``, unique and positive.
+
+            **remove_dead_ends** (``bool``, optional): Whether or not to remove dead ends from the graph.
+            Defaults to ``True``.
         """
         self.__network_error_checking__()
 
@@ -297,10 +300,10 @@ class GraphBase(ABC):  # noqa: B024
             **destination** (:obj:`int`): destination for the path
 
             **early_exit** (:obj:`bool`): stop constructing the shortest path tree once the destination is found.
-            Doing so may cause subsequent calls to ``update_trace`` to recompute the tree. Default is ``False``.
+            Doing so may cause subsequent calls to 'update_trace' to recompute the tree. Default is ``False``.
 
             **a_star** (:obj:`bool`): whether or not to use A* over Dijkstra's algorithm.
-            When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
+            When ``True``, 'early_exit' is always ``True``. Default is ``False``.
 
             **heuristic** (:obj:`str`): heuristic to use if ``a_star`` is enabled. Default is ``None``.
         """
@@ -395,21 +398,25 @@ class GraphBase(ABC):  # noqa: B024
         :Arguments:
             **cost_field** (:obj:`str`): Field name. Must be numeric
         """
-        if cost_field not in self.graph.columns:
-            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
 
-        self.cost_field = cost_field
+        field = cost_field.lower()
+        if field not in self.graph.columns:
+            raise ValueError(
+                f"Field '{cost_field}' not found in graph columns. Available fields: {list(self.graph.columns)}"
+            )
+
+        self.cost_field = field
 
         # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
         if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
-            df = self.__graph_groupby.sum(numeric_only=True)[[cost_field]].reset_index()
-            self.compact_cost[df.index.values] = df[cost_field].values
+            df = self.__graph_groupby.sum(numeric_only=True)[[field]].reset_index()
+            self.compact_cost[df.index.values] = df[field].values
 
-        if self.graph[cost_field].dtype == self.__float_type:
-            self.cost = np.array(self.graph[cost_field].values, copy=True)
+        if self.graph[field].dtype == self.__float_type:
+            self.cost = np.array(self.graph[field].values, copy=True)
         else:
-            self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
+            self.cost = np.array(self.graph[field].values, dtype=self.__float_type)
             self.logger.warning("Cost field with wrong type. Converting to float64")
 
         self.__build_derived_properties()
@@ -431,6 +438,7 @@ class GraphBase(ABC):  # noqa: B024
             skim_fields = [skim_fields]
         elif not isinstance(skim_fields, list):
             raise ValueError("You need to provide a list of skims or the same of a single field")
+        skim_fields = [skim.lower() for skim in skim_fields]
 
         # Check if list of fields make sense
         k = [x for x in skim_fields if x not in self.graph.columns]
@@ -463,11 +471,10 @@ class GraphBase(ABC):  # noqa: B024
     def set_blocked_centroid_flows(self, block_centroid_flows) -> None:
         """
         Chooses whether we want to block paths to go through centroids or not.
-
-        Default value is ``True``
+        Default value is ``True``.
 
         :Arguments:
-            **block_centroid_flows** (:obj:`bool`): Blocking or not
+            **block_centroid_flows** (:obj:`bool`): Blocking or not paths to go through centroids.
         """
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("Blocking flows through centroids needs to be boolean")
@@ -482,7 +489,7 @@ class GraphBase(ABC):  # noqa: B024
         Saves graph to disk
 
         :Arguments:
-            **filename** (:obj:`str`): Path to file. Usual file extension is 'aeg'
+            **filename** (:obj:`str`): Path to file. Usual file extension is ``aeg``.
         """
         mygraph = {}
         mygraph["description"] = self.description
@@ -541,10 +548,10 @@ class GraphBase(ABC):  # noqa: B024
 
     def available_skims(self) -> List[str]:
         """
-        Returns graph fields that are available to be set as skims
+        Returns graph fields that are available to be set as skims.
 
         :Returns:
-            **list** (:obj:`str`): Field names
+            **list** (:obj:`str`): Skimmeable field names
         """
         return [x for x in self.graph.columns if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
 
@@ -635,6 +642,11 @@ class GraphBase(ABC):  # noqa: B024
         """
 
         return create_compressed_link_network_mapping(self)
+
+    def __setattr__(self, key, value):
+        if key == "network" and isinstance(value, pd.DataFrame):
+            value.columns = [col.lower() for col in value.columns]
+        super().__setattr__(key, value)
 
 
 class Graph(GraphBase):

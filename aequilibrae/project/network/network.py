@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import shapely.wkb
 import shapely.wkt
-from shapely.geometry import Polygon, box
 from shapely import union_all
+from shapely.geometry import Polygon, box
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
@@ -24,6 +24,7 @@ from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 
 class Network(WorkerThread):
@@ -312,6 +313,7 @@ class Network(WorkerThread):
                 modes = [modes]
 
             if limit_to_area is not None:
+                load_spatialite_extension(conn)
                 spatial_add = """ WHERE links.rowid in (
                                         select rowid from SpatialIndex where f_table_name = 'links' and
                                        search_frame = GeomFromWKB(?, 4326))"""
@@ -403,7 +405,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -413,7 +415,7 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull

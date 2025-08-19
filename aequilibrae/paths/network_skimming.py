@@ -18,8 +18,6 @@ sys.dont_write_bytecode = True
 
 
 class NetworkSkimming(WorkerThread):
-    signal = SIGNAL(object)
-
     """
 
     .. code-block:: python
@@ -27,12 +25,10 @@ class NetworkSkimming(WorkerThread):
         >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
         >>> project = create_example(project_path)
+        >>> project.network.build_graphs(modes=["c"])
 
-        >>> network = project.network
-        >>> network.build_graphs()
-
-        >>> graph = network.graphs['c']
-        >>> graph.set_graph(cost_field="distance")
+        >>> graph = project.network.graphs['c']
+        >>> graph.set_graph("distance")
         >>> graph.set_skimming("distance")
 
         >>> skm = NetworkSkimming(graph)
@@ -46,13 +42,12 @@ class NetworkSkimming(WorkerThread):
         >>> matrix = skm.results.skims
 
         # Or you can save the results to disk
-        >>> skm.save_to_project(os.path.join(project_path, 'matrices/skimming_result.omx'))
-
-        # Or specify the AequilibraE's matrix file format
-        >>> skm.save_to_project(os.path.join(project_path, 'matrices/skimming_result.aem'), 'aem')
+        >>> skm.save_to_project('skimming_result_omx', 'omx')
 
         >>> project.close()
     """
+
+    signal = SIGNAL(object)
 
     def __init__(self, graph, origins=None, project=None):
         WorkerThread.__init__(self, None)

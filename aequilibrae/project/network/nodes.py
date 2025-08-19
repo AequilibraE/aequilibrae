@@ -62,7 +62,7 @@ class Nodes(BasicTable):
             else:
                 self.__items[node.node_id] = self.__items.pop(node_id)
 
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             data = conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
         if data:
             data = dict(zip(self.__fields, data))
@@ -75,7 +75,7 @@ class Nodes(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             tl.load_structure(conn, "nodes")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
@@ -125,7 +125,7 @@ class Nodes(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
-        with self.project.db_connection as conn:
+        with self.project.db_connection_spatial as conn:
             df = pd.read_sql("SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", conn)
         return df
 

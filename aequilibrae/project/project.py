@@ -137,6 +137,12 @@ class Project:
     @property
     @contextmanager
     def db_connection(self):
+        with commit_and_close(self._project_database_path, spatial=False) as conn:
+            yield conn
+
+    @property
+    @contextmanager
+    def db_connection_spatial(self):
         with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
@@ -324,7 +330,7 @@ class Project:
         p.write_back()
 
         # Create actual tables
-        with self.db_connection as conn:
+        with self.db_connection_spatial as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables(self.logger, "network", conn=conn)
 

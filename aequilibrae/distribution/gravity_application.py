@@ -66,14 +66,13 @@ class GravityApplication:
         ...         "row_field": "productions",
         ...         "model": model,
         ...         "column_field": "attractions",
-        ...         "output": os.path.join(project_path, 'matrices/gravity_matrix.aem'),
         ...         "nan_as_zero":True
         ...         }
         >>> gravity = GravityApplication(**args)
 
         # Solve and save the outputs
         >>> gravity.apply()
-        >>> gravity.output.export(os.path.join(project_path, 'matrices/gravity_omx.omx'))
+        >>> gravity.output.export(project_path / 'matrices' / 'gravity_omx.omx')
 
         >>> project.close()
     """

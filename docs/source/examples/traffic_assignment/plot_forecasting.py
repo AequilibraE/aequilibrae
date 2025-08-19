@@ -163,7 +163,7 @@ from aequilibrae.distribution import GravityCalibration
 
 # %%
 # We need the demand matrix and to prepare it for computation
-demand = proj_matrices.get_matrix("demand_aem")
+demand = proj_matrices.get_matrix("demand_omx")
 demand.computational_view(["matrix"])
 
 # %%
@@ -266,7 +266,6 @@ ipf.fit()
 
 # %%
 # When saving our vector into the project, we'll get an output that it was recored
-ipf.save_to_project(name="demand_ipfd", file_name="demand_ipfd.aem")
 ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
 
 # %%
@@ -288,7 +287,6 @@ for function in ["power", "expo"]:
     model = SyntheticGravityModel()
     model.load(join(fldr, f"{function}_model.mod"))
 
-    outmatrix = join(proj_matrices.fldr, f"demand_{function}_model.aem")
     args = {
         "impedance": imped,
         "vectors": vectors,
@@ -318,7 +316,7 @@ logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR WITH SELECT LINK ANALYSIS
 # %%
 # Let's get our future demand matrix, which corresponds to the IPF result we just saved,
 # and see what is the core we ended up getting. It should be ``matrix``.
-demand = proj_matrices.get_matrix("demand_ipfd")
+demand = proj_matrices.get_matrix("demand_ipfd_omx")
 demand.names
 
 # %%
