@@ -40,7 +40,6 @@ def test_trigger_names():
         pth = base_pth / fldr / "triggers"
 
         for f in pth.glob("*.sql"):
-
             with open(pth / f, "r") as file:
                 lines = file.readlines()
             for line in lines:
