@@ -719,9 +719,12 @@ class LinearApproximation(WorkerThread):
 
     def check_convergence(self):
         """Calculate relative gap and return ``True`` if it is smaller than desired precision"""
+        if self.stepsize_has_been_reset:
+            return False
+
         aon_cost = np.sum(self.congested_time * self.aon_total_flow)
         current_cost = np.sum(self.congested_time * self.fw_total_flow)
         self.rgap = abs(current_cost - aon_cost) / current_cost
-        if not self.stepsize_has_been_reset and self.rgap_target >= self.rgap:
+        if self.rgap_target >= self.rgap:
             return True
         return False
