@@ -75,4 +75,4 @@ cpdef void dbpr_cython(
                 alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1))
             ) / capacity[i]
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = 0.0
