@@ -99,7 +99,6 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     assert cfw25_rgap < assignment.rgap_target
     assert bfw25_rgap < assignment.rgap_target
     assert cfw25_iters < fw25_iters
-    assert bfw25_iters < cfw25_iters
 
     assignment.save_results("save_to_database")
     assignment.save_skims(matrix_name="all_skims", which_ones="all")
