@@ -166,10 +166,10 @@ def cached_scenario_example(cache_path):
         conn.executemany("INSERT INTO scenarios (scenario_name) VALUES (?)", [("nauru",), ("coquimbo",)])
 
     with nauru.db_connection as conn:
-        conn.execute("DROP TABLE scenarios")
+        conn.execute("DELETE FROM scenarios")
 
     with coquimbo.db_connection as conn:
-        conn.execute("DROP TABLE scenarios")
+        conn.execute("DELETE FROM scenarios")
 
 
 @pytest.fixture(scope="function")
