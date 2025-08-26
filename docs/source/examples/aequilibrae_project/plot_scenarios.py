@@ -61,7 +61,7 @@ print(f"Current scenario network has {len(project.network.nodes.data)} nodes")
 # ----------------------
 # We can create empty scenarios or clone existing ones
 
-# Create an empty scenario for testing modifications
+# Create an empty scenario to manually populate with a future/different network
 project.create_empty_scenario("test_modifications", "Scenario for testing network modifications")
 
 # Clone the root scenario to preserve the original network
