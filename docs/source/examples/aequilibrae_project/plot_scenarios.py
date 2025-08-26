@@ -1,0 +1,167 @@
+"""
+.. _example_usage_scenarios:
+
+Project Scenarios
+=================
+
+In this example, we show how to use AequilibraE's scenario system to manage multiple model variants
+within a single project, using different example networks to demonstrate scenario isolation and management.
+"""
+# %%
+# .. admonition:: References
+#
+#   * :doc:`../../aequilibrae_project`
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.Project.list_scenarios`
+#     * :func:`aequilibrae.Project.switch_scenario`
+#     * :func:`aequilibrae.Project.create_empty_scenario`
+#     * :func:`aequilibrae.Project.clone_scenario`
+
+# %%
+
+# Imports
+from uuid import uuid4
+from tempfile import gettempdir
+from pathlib import Path
+from os.path import join
+import pandas as pd
+
+from aequilibrae.utils.create_example import create_example
+from aequilibrae import TrafficAssignment, TrafficClass
+
+# sphinx_gallery_thumbnail_path = '../source/_images/plot_scenarios.png'
+
+# %%
+
+# We create the example project inside our temp folder.
+fldr = Path(gettempdir()) / uuid4().hex
+project = create_example(fldr, "sioux_falls")
+
+
+# %%
+# Working with scenarios
+# ----------------------
+# Let's first see what scenarios exist in our project
+
+project.list_scenarios()
+
+# %%
+# The root scenario is always present and represents the base model.
+# Let's examine the current scenario's network
+
+print(f"Current scenario network has {len(project.network.links.data)} links")
+print(f"Current scenario network has {len(project.network.nodes.data)} nodes")
+
+# %%
+# Creating new scenarios
+# ----------------------
+# We can create empty scenarios or clone existing ones
+
+# Create an empty scenario for testing modifications
+project.create_empty_scenario("test_modifications", "Scenario for testing network modifications")
+
+# Clone the root scenario to preserve the original network
+project.clone_scenario("alternative_parameters", "Testing different assignment parameters")
+
+# %%
+# Let's see our updated scenario list
+
+project.list_scenarios()
+
+# %%
+# Switching between scenarios
+# ---------------------------
+# Each scenario operates independently with its own data
+
+# Switch to the cloned scenario
+project.switch_scenario("alternative_parameters")
+print(f"This scenario has {len(project.network.links.data)} links")
+
+# %%
+# Let's perform a traffic assignment in this scenario with different parameters
+
+# Build the network graph
+project.network.build_graphs(fields=["distance", "capacity_ab", "capacity_ba"], modes=["c"])
+graph = project.network.graphs["c"]
+graph.set_graph("distance")
+graph.set_blocked_centroid_flows(False)
+
+# Get the demand matrix
+mat = project.matrices.get_matrix("demand_omx")
+mat.computational_view()
+
+# Create traffic assignment with alternative parameters
+assigclass = TrafficClass("car", graph, mat)
+assignment = TrafficAssignment(project)
+assignment.add_class(assigclass)
+assignment.set_vdf("BPR")
+
+# Use different VDF parameters than we might use in the root scenario
+assignment.set_vdf_parameters({"alpha": 0.25, "beta": 6.0})  # More congested parameters
+assignment.set_capacity_field("capacity")
+assignment.set_time_field("distance")
+assignment.max_iter = 10
+assignment.set_algorithm("msa")
+
+assignment.execute()
+
+# Save results specific to this scenario
+assignment.save_results("alternative_assignment")
+
+print(f"Assignment completed. Total flow: {assigclass.results.total_link_loads.sum():.2f}")
+
+# %%
+# Switch to empty scenario for modifications
+project.switch_scenario("test_modifications")
+print(f"Empty scenario has {len(project.network.links.data)} links")
+
+# This scenario starts with an empty network, suitable for building from scratch
+# or testing specific network configurations
+
+# %%
+# Scenario isolation demonstration
+# --------------------------------
+# Let's switch back to root and show that scenarios are isolated
+
+project.switch_scenario("root")
+print(f"Back to root scenario with {len(project.network.links.data)} links")
+
+# Check results - only root scenario results should be visible
+root_results = project.results.list()
+print(f"Root scenario has {len(root_results)} result tables")
+
+# Switch to alternative scenario and check its results
+project.switch_scenario("alternative_parameters")
+alt_results = project.results.list()
+print(f"Alternative scenario has {len(alt_results)} result tables")
+
+# Each scenario maintains its own results database
+alternative_assignment_exists = "alternative_assignment" in alt_results["table_name"].values
+print(f"Alternative assignment result exists in this scenario: {alternative_assignment_exists}")
+
+# %%
+# Best practices for scenario management
+# --------------------------------------
+
+# Always return to root when doing project-wide operations
+project.switch_scenario("root")
+
+# List scenarios for reference
+final_scenarios = project.list_scenarios()
+print("\nFinal scenario summary:")
+for _, scenario in final_scenarios.iterrows():
+    project.switch_scenario(scenario['scenario_name'])
+    link_count = len(project.network.links.data)
+    result_count = len(project.results.list())
+    print(f"  {scenario['scenario_name']}: {link_count} links, {result_count} results")
+    print(f"    Description: {scenario['description']}")
+
+# %%
+# Clean up
+project.switch_scenario("root")  # Always end on root scenario
+mat.close()
+project.close()

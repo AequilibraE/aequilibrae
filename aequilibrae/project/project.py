@@ -388,11 +388,9 @@ class Project:
         p.write_back()
 
         # Create actual tables
-        with self.db_connection as conn:
+        with commit_and_close(db, spatial=True) as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables(self.logger, "network", conn=conn)
-
-        with commit_and_close(db, spatial=True) as conn:
             conn.execute("DROP TABLE IF EXISTS scenarios")
 
         with self.db_connection as conn:
@@ -400,7 +398,6 @@ class Project:
 
     def clone_scenario(self, scenario_name: str, description: str = ""):
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
-        pth = scenario_path / "run"
 
         if scenario_path.exists():
             raise FileExistsError(f"a file or directory of the name ({scenario_name}) already exists")
@@ -412,8 +409,8 @@ class Project:
                 ):
                     raise ValueError("a scenario of that name already exists")
 
-        pth.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(self.project_base_path / "run", pth)
+        shutil.copytree(self.project_base_path / "run", scenario_path / "run")
+        shutil.copytree(self.project_base_path / "matrices", scenario_path / "matrices")
 
         db = scenario_path / "project_database.sqlite"
         shutil.copyfile(self.path_to_file, db)
@@ -432,7 +429,7 @@ class Project:
         except FileNotFoundError:
             pass
 
-        shutil.copy(self.parameters.file, scenario_path)
+        shutil.copy(self.project_parameters.file, scenario_path)
 
         with commit_and_close(db, spatial=True) as conn:
             conn.execute("DROP TABLE IF EXISTS scenarios")
