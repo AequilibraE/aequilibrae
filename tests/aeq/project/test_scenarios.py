@@ -18,7 +18,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_traffic_assignment_scenarios(scenario_example, scenario):
-    scenario_example.switch_scenario(scenario)
+    scenario_example.use_scenario(scenario)
 
     # Build graphs for the scenario
     scenario_example.network.build_graphs(fields=["distance", "capacity_ab", "capacity_ba"], modes=["c"])

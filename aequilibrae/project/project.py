@@ -92,11 +92,11 @@ class Project:
 
     @property
     def project_base_path(self):
-        return self.scenario.base_path  # do we want to use the root scenario here?
+        return self.scenario.base_path
 
     @property
     def path_to_file(self):
-        return self.scenario.path_to_file  # do we want to use the root scenario here?
+        return self.scenario.path_to_file
 
     @property
     def about(self) -> About:
@@ -351,7 +351,7 @@ class Project:
         with self.db_connection as conn:
             return pd.read_sql("SELECT * FROM scenarios", conn)
 
-    def switch_scenario(self, scenario_name: str):
+    def use_scenario(self, scenario_name: str):
         if scenario_name == "root":
             self.scenario = self.root_scenario
         else:

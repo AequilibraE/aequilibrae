@@ -78,7 +78,7 @@ project.list_scenarios()
 # Each scenario operates independently with its own data
 
 # Switch to the cloned scenario
-project.switch_scenario("alternative_parameters")
+project.use_scenario("alternative_parameters")
 print(f"This scenario has {len(project.network.links.data)} links")
 
 # %%
@@ -116,7 +116,7 @@ print(f"Assignment completed. Total flow: {assigclass.results.total_link_loads.s
 
 # %%
 # Switch to empty scenario for modifications
-project.switch_scenario("test_modifications")
+project.use_scenario("test_modifications")
 print(f"Empty scenario has {len(project.network.links.data)} links")
 
 # This scenario starts with an empty network, suitable for building from scratch
@@ -127,7 +127,7 @@ print(f"Empty scenario has {len(project.network.links.data)} links")
 # --------------------------------
 # Let's switch back to root and show that scenarios are isolated
 
-project.switch_scenario("root")
+project.use_scenario("root")
 print(f"Back to root scenario with {len(project.network.links.data)} links")
 
 # Check results - only root scenario results should be visible
@@ -135,7 +135,7 @@ root_results = project.results.list()
 print(f"Root scenario has {len(root_results)} result tables")
 
 # Switch to alternative scenario and check its results
-project.switch_scenario("alternative_parameters")
+project.use_scenario("alternative_parameters")
 alt_results = project.results.list()
 print(f"Alternative scenario has {len(alt_results)} result tables")
 
@@ -148,13 +148,13 @@ print(f"Alternative assignment result exists in this scenario: {alternative_assi
 # --------------------------------------
 
 # Always return to root when doing project-wide operations
-project.switch_scenario("root")
+project.use_scenario("root")
 
 # List scenarios for reference
 final_scenarios = project.list_scenarios()
 print("\nFinal scenario summary:")
 for _, scenario in final_scenarios.iterrows():
-    project.switch_scenario(scenario['scenario_name'])
+    project.use_scenario(scenario['scenario_name'])
     link_count = len(project.network.links.data)
     result_count = len(project.results.list())
     print(f"  {scenario['scenario_name']}: {link_count} links, {result_count} results")
@@ -162,6 +162,6 @@ for _, scenario in final_scenarios.iterrows():
 
 # %%
 # Clean up
-project.switch_scenario("root")  # Always end on root scenario
+project.use_scenario("root")  # Always end on root scenario
 mat.close()
 project.close()
