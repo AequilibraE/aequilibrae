@@ -364,7 +364,6 @@ class Project:
 
     def create_empty_scenario(self, scenario_name: str, description: str = ""):
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
-        pth = scenario_path / "run"
 
         if scenario_path.exists():
             raise FileExistsError(f"a file or directory of the name ({scenario_name}) already exists")
@@ -376,8 +375,7 @@ class Project:
                 ):
                     raise ValueError("a scenario of that name already exists")
 
-        pth.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(demo_init_py, pth / "__init__.py")
+        scenario_path.mkdir(parents=True, exist_ok=True)
 
         db = scenario_path / "project_database.sqlite"
         shutil.copyfile(spatialite_database, db)
@@ -409,7 +407,6 @@ class Project:
                 ):
                     raise ValueError("a scenario of that name already exists")
 
-        shutil.copytree(self.project_base_path / "run", scenario_path / "run")
         shutil.copytree(self.project_base_path / "matrices", scenario_path / "matrices")
 
         db = scenario_path / "project_database.sqlite"
