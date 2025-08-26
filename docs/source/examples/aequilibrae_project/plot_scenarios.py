@@ -17,7 +17,7 @@ within a single project, using different example networks to demonstrate scenari
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.Project.list_scenarios`
-#     * :func:`aequilibrae.Project.switch_scenario`
+#     * :func:`aequilibrae.Project.use_scenario`
 #     * :func:`aequilibrae.Project.create_empty_scenario`
 #     * :func:`aequilibrae.Project.clone_scenario`
 

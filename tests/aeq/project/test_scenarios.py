@@ -54,7 +54,7 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_transit_assignment_scenarios(scenario_example, scenario):
-    scenario_example.switch_scenario(scenario)
+    scenario_example.use_scenario(scenario)
 
     data = Transit(scenario_example)
     try:
@@ -103,7 +103,7 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_matrices_scenarios(scenario_example, scenario):
-    scenario_example.switch_scenario(scenario)
+    scenario_example.use_scenario(scenario)
 
     matrices = scenario_example.matrices
     df = matrices.list()
@@ -119,7 +119,7 @@ def test_matrices_scenarios(scenario_example, scenario):
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_route_choice_scenarios(scenario_example, scenario):
-    scenario_example.switch_scenario(scenario)
+    scenario_example.use_scenario(scenario)
 
     scenario_example.network.build_graphs(fields=["distance"], modes=["c"])
     graph = scenario_example.network.graphs["c"]
@@ -145,7 +145,7 @@ def test_route_choice_scenarios(scenario_example, scenario):
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_results_scenarios(scenario_example, scenario):
-    scenario_example.switch_scenario(scenario)
+    scenario_example.use_scenario(scenario)
 
     results = scenario_example.results
     table_name = f"test_result_{scenario}"
@@ -182,7 +182,7 @@ def test_results_scenarios(scenario_example, scenario):
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_network_scenarios(scenario_example, scenario):
-    scenario_example.switch_scenario(scenario)
+    scenario_example.use_scenario(scenario)
 
     network = scenario_example.network
     links1 = network.links.data
@@ -194,7 +194,7 @@ def test_network_scenarios(scenario_example, scenario):
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
         other_scenario = other_scenarios[0]
-        scenario_example.switch_scenario(other_scenario)
+        scenario_example.use_scenario(other_scenario)
 
         links2 = network.links.data
         nodes2 = network.nodes.data
@@ -227,7 +227,7 @@ def test_network_scenarios(scenario_example, scenario):
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_scenario_result_isolation(scenario_example, scenario):
-    scenario_example.switch_scenario(scenario)
+    scenario_example.use_scenario(scenario)
 
     results = scenario_example.results
     table_name = f"isolation_test_{scenario}"
@@ -245,12 +245,12 @@ def test_scenario_result_isolation(scenario_example, scenario):
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
         other_scenario = other_scenarios[0]
-        scenario_example.switch_scenario(other_scenario)
+        scenario_example.use_scenario(other_scenario)
         results.reload()
 
         assert not results.check_exists(table_name)
 
-        scenario_example.switch_scenario(scenario)
+        scenario_example.use_scenario(scenario)
         results.reload()
 
         results.delete_record(table_name)
