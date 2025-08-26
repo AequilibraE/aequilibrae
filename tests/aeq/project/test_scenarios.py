@@ -226,7 +226,7 @@ def test_network_scenarios(scenario_example, scenario):
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
-def test_scenario_result_isloation(scenario_example, scenario):
+def test_scenario_result_isolation(scenario_example, scenario):
     scenario_example.switch_scenario(scenario)
 
     results = scenario_example.results

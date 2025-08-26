@@ -98,7 +98,7 @@ model, but there is still no support for manually or programmatically adding rou
 to a route system as of yet.
 
 Optionally a project can be configured with a **scenarios** folder. This allows the
-storage of many AequilbraE models within one directory, however it is intend to store
+storage of many AequilbraE models within one directory, however it is intended to store
 modifications of some other project. The scenario system is built around a hierarchical
 structure where the "root" scenario represents the base model, and additional scenarios
 are created as branches from this foundation. Users can create entirely new scenarios with
