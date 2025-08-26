@@ -65,7 +65,7 @@ print(f"Current scenario network has {len(project.network.nodes.data)} nodes")
 project.create_empty_scenario("test_modifications", "Scenario for testing network modifications")
 
 # Clone the root scenario to preserve the original network
-project.clone_scenario("alternative_parameters", "Testing different assignment parameters")
+project.clone_scenario("limited_capacity", "Testing different assignment parameters")
 
 # %%
 # Let's see our updated scenario list
@@ -78,11 +78,15 @@ project.list_scenarios()
 # Each scenario operates independently with its own data
 
 # Switch to the cloned scenario
-project.use_scenario("alternative_parameters")
+project.use_scenario("limited_capacity")
 print(f"This scenario has {len(project.network.links.data)} links")
 
+# Modify the network
+with project.db_connection as conn:
+    conn.execute("UPDATE links SET capacity_ab=capacity_ab/2, capacity_ba=capacity_ba/2 WHERE link_id > 20 AND link_id < 50")
+
 # %%
-# Let's perform a traffic assignment in this scenario with different parameters
+# Let's perform a traffic assignment in this scenario with lowered capacity
 
 # Build the network graph
 project.network.build_graphs(fields=["distance", "capacity_ab", "capacity_ba"], modes=["c"])
@@ -100,8 +104,7 @@ assignment = TrafficAssignment(project)
 assignment.add_class(assigclass)
 assignment.set_vdf("BPR")
 
-# Use different VDF parameters than we might use in the root scenario
-assignment.set_vdf_parameters({"alpha": 0.25, "beta": 6.0})  # More congested parameters
+assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
 assignment.set_capacity_field("capacity")
 assignment.set_time_field("distance")
 assignment.max_iter = 10
@@ -135,7 +138,7 @@ root_results = project.results.list()
 print(f"Root scenario has {len(root_results)} result tables")
 
 # Switch to alternative scenario and check its results
-project.use_scenario("alternative_parameters")
+project.use_scenario("limited_capacity")
 alt_results = project.results.list()
 print(f"Alternative scenario has {len(alt_results)} result tables")
 
