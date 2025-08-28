@@ -396,7 +396,9 @@ class Project:
                 conn.execute("DROP TABLE IF EXISTS scenarios")
 
             with self.db_connection as conn:
-                conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
+                conn.execute(
+                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description)
+                )
         finally:
             self.use_scenario(current_scenario)
 
@@ -440,6 +442,8 @@ class Project:
                 conn.execute("DROP TABLE IF EXISTS scenarios")
 
             with self.db_connection as conn:
-                conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
+                conn.execute(
+                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description)
+                )
         finally:
             self.use_scenario(current_scenario)
