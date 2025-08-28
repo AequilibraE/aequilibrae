@@ -21,6 +21,7 @@ class Scenario:
     reference their own database files.
     """
 
+    name: str
     base_path: pathlib.Path
     path_to_file: pathlib.Path
     logger: logging.Logger
@@ -30,6 +31,7 @@ class Scenario:
     matrices: Matrices
     results: Results
 
-    def __init__(self, base_path: pathlib.Path, path_to_file: pathlib.Path):
+    def __init__(self, name: str, base_path: pathlib.Path, path_to_file: pathlib.Path):
+        self.name = name
         self.base_path = base_path
         self.path_to_file = path_to_file

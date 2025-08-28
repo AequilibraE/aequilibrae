@@ -78,6 +78,7 @@ class Project:
         path_to_file = file_name
 
         self.root_scenario = Scenario(
+            name="root",
             base_path=base_path,
             path_to_file=path_to_file,
         )
@@ -175,6 +176,7 @@ class Project:
         base_path.mkdir(parents=True, exist_ok=True)
 
         self.root_scenario = Scenario(
+            name="root",
             base_path=base_path,
             path_to_file=path_to_file,
         )
@@ -356,18 +358,20 @@ class Project:
             self.scenario = self.root_scenario
         else:
             self.scenario = Scenario(
+                name=scenario_name,
                 base_path=self.root_scenario.base_path / "scenarios" / scenario_name,
                 path_to_file=self.root_scenario.base_path / "scenarios" / scenario_name / "project_database.sqlite",
             )
-            self.scenario.logger = self.__setup_logger()
-            self.__load_objects()
+
+        self.scenario.logger = self.__setup_logger()
+        self.__load_objects()
 
     def create_empty_scenario(self, scenario_name: str, description: str = ""):
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
 
-        if scenario_path.exists():
-            raise FileExistsError(f"a file or directory of the name ({scenario_name}) already exists")
-        else:
+        current_scenario = self.scenario.name
+        self.use_scenario("root")
+        try:
             with self.db_connection as conn:
                 if (
                     conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
@@ -375,31 +379,39 @@ class Project:
                 ):
                     raise ValueError("a scenario of that name already exists")
 
-        scenario_path.mkdir(parents=True, exist_ok=True)
+            scenario_path.mkdir(parents=True, exist_ok=True)
 
-        db = scenario_path / "project_database.sqlite"
-        shutil.copyfile(spatialite_database, db)
+            db = scenario_path / "project_database.sqlite"
+            shutil.copyfile(spatialite_database, db)
 
-        # Write parameters to the project folder
-        p = Parameters(path=scenario_path)
-        p.parameters["system"]["logging_directory"] = str(scenario_path)
-        p.write_back()
+            # Write parameters to the project folder
+            p = Parameters(path=scenario_path)
+            p.parameters["system"]["logging_directory"] = str(scenario_path)
+            p.write_back()
 
-        # Create actual tables
-        with commit_and_close(db, spatial=True) as conn:
-            conn.execute("PRAGMA foreign_keys = ON;")
-            initialize_tables(self.logger, "network", conn=conn)
-            conn.execute("DROP TABLE IF EXISTS scenarios")
+            # Create actual tables
+            with commit_and_close(db, spatial=True) as conn:
+                conn.execute("PRAGMA foreign_keys = ON;")
+                initialize_tables(self.logger, "network", conn=conn)
+                conn.execute("DROP TABLE IF EXISTS scenarios")
 
-        with self.db_connection as conn:
-            conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
+            with self.db_connection as conn:
+                conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
+        finally:
+            self.use_scenario(current_scenario)
 
     def clone_scenario(self, scenario_name: str, description: str = ""):
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
 
-        if scenario_path.exists():
-            raise FileExistsError(f"a file or directory of the name ({scenario_name}) already exists")
-        else:
+        current_scenario = self.scenario.name
+        matrices_path = self.matrices.fldr
+        project_db_path = self._project_database_path
+        transit_db_path = self._transit_database_path
+        results_db_path = self._results_database_path
+        parameters_path = self.project_parameters.file
+
+        self.use_scenario("root")
+        try:
             with self.db_connection as conn:
                 if (
                     conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
@@ -407,29 +419,27 @@ class Project:
                 ):
                     raise ValueError("a scenario of that name already exists")
 
-        shutil.copytree(self.project_base_path / "matrices", scenario_path / "matrices")
+            shutil.copytree(matrices_path, scenario_path / "matrices")
 
-        db = scenario_path / "project_database.sqlite"
-        shutil.copyfile(self.path_to_file, db)
+            db = scenario_path / "project_database.sqlite"
+            shutil.copyfile(project_db_path, db)
 
-        try:
-            shutil.copyfile(
-                self.project_base_path / "public_transport.sqlite", scenario_path / "public_transport.sqlite"
-            )
-        except FileNotFoundError:
-            pass
+            try:
+                shutil.copyfile(transit_db_path, scenario_path / "public_transport.sqlite")
+            except FileNotFoundError:
+                pass
 
-        try:
-            shutil.copyfile(
-                self.project_base_path / "results_database.sqlite", scenario_path / "results_database.sqlite"
-            )
-        except FileNotFoundError:
-            pass
+            try:
+                shutil.copyfile(results_db_path, scenario_path / "results_database.sqlite")
+            except FileNotFoundError:
+                pass
 
-        shutil.copy(self.project_parameters.file, scenario_path)
+            shutil.copy(parameters_path, scenario_path)
 
-        with commit_and_close(db, spatial=True) as conn:
-            conn.execute("DROP TABLE IF EXISTS scenarios")
+            with commit_and_close(db, spatial=True) as conn:
+                conn.execute("DROP TABLE IF EXISTS scenarios")
 
-        with self.db_connection as conn:
-            conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
+            with self.db_connection as conn:
+                conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description))
+        finally:
+            self.use_scenario(current_scenario)

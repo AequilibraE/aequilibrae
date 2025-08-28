@@ -255,3 +255,151 @@ def test_scenario_result_isolation(scenario_example, scenario):
 
         results.delete_record(table_name)
         assert not results.check_exists(table_name)
+
+
+@pytest.mark.parametrize("from_scenario", ["root", "nauru", "coquimbo"])
+def test_create_empty_scenario_from_different_scenarios(scenario_example, from_scenario):
+    """Test creating empty scenarios from different starting scenarios"""
+    scenario_example.use_scenario(from_scenario)
+
+    new_scenario_name = f"empty_from_{from_scenario}"
+    description = f"Empty scenario created from {from_scenario}"
+
+    scenario_example.create_empty_scenario(new_scenario_name, description)
+
+    # Verify scenario was registered in root
+    scenario_example.use_scenario("root")
+    scenarios = scenario_example.list_scenarios()
+    assert new_scenario_name in scenarios["scenario_name"].values
+
+    # Check description
+    scenario_row = scenarios[scenarios["scenario_name"] == new_scenario_name]
+    assert scenario_row.iloc[0]["description"] == description
+
+    # Switch to new scenario and verify it's empty
+    scenario_example.use_scenario(new_scenario_name)
+    assert len(scenario_example.network.links.data) == 0
+    assert len(scenario_example.network.nodes.data) == 0
+    assert len(scenario_example.matrices.list()) == 0
+    assert len(scenario_example.results.list()) == 0
+
+    # Verify scenario files exist
+    scenario_path = scenario_example.root_scenario.base_path / "scenarios" / new_scenario_name
+    assert scenario_path.exists()
+    assert (scenario_path / "project_database.sqlite").exists()
+    assert (scenario_path / "matrices").exists()
+
+
+@pytest.mark.parametrize("from_scenario", ["root", "nauru", "coquimbo"])
+def test_clone_scenario_from_different_scenarios(scenario_example, from_scenario):
+    """Test cloning scenarios from different starting scenarios"""
+    scenario_example.use_scenario(from_scenario)
+
+    # Get source scenario data for comparison
+    source_links = scenario_example.network.links.data.copy()
+    source_nodes = scenario_example.network.nodes.data.copy()
+    source_matrices = scenario_example.matrices.list().copy()
+    source_results = scenario_example.results.list().copy()
+
+    new_scenario_name = f"clone_from_{from_scenario}"
+    description = f"Cloned scenario from {from_scenario}"
+
+    scenario_example.clone_scenario(new_scenario_name, description)
+
+    # Verify scenario was registered in root
+    scenario_example.use_scenario("root")
+    scenarios = scenario_example.list_scenarios()
+    assert new_scenario_name in scenarios["scenario_name"].values
+
+    # Check description
+    scenario_row = scenarios[scenarios["scenario_name"] == new_scenario_name]
+    assert scenario_row.iloc[0]["description"] == description
+
+    # Switch to cloned scenario and verify data matches source
+    scenario_example.use_scenario(new_scenario_name)
+    cloned_links = scenario_example.network.links.data
+    cloned_nodes = scenario_example.network.nodes.data
+    cloned_matrices = scenario_example.matrices.list()
+    cloned_results = scenario_example.results.list()
+
+    # Compare data (should be identical)
+    pd.testing.assert_frame_equal(source_links, cloned_links)
+    pd.testing.assert_frame_equal(source_nodes, cloned_nodes)
+    pd.testing.assert_frame_equal(source_matrices, cloned_matrices)
+    pd.testing.assert_frame_equal(source_results, cloned_results)
+
+    # Verify scenario files exist
+    scenario_path = scenario_example.root_scenario.base_path / "scenarios" / new_scenario_name
+    assert scenario_path.exists()
+    assert (scenario_path / "project_database.sqlite").exists()
+    assert (scenario_path / "matrices").exists()
+
+
+def test_create_empty_scenario_duplicate_name(scenario_example):
+    """Test that creating scenario with duplicate name fails"""
+    scenario_example.use_scenario("root")
+
+    scenario_example.create_empty_scenario("test_duplicate", "First scenario")
+
+    # Attempt to create another with same name should fail
+    with pytest.raises(ValueError, match="a scenario of that name already exists"):
+        scenario_example.create_empty_scenario("test_duplicate", "Second scenario")
+
+
+def test_clone_scenario_duplicate_name(scenario_example):
+    """Test that cloning scenario with duplicate name fails"""
+    scenario_example.use_scenario("root")
+
+    scenario_example.clone_scenario("test_clone_duplicate", "First clone")
+
+    # Attempt to clone another with same name should fail
+    with pytest.raises(ValueError, match="a scenario of that name already exists"):
+        scenario_example.clone_scenario("test_clone_duplicate", "Second clone")
+
+
+def test_scenario_operations_return_to_original(scenario_example):
+    """Test that scenario operations return to the original scenario"""
+    original_scenario = "nauru"
+    scenario_example.use_scenario(original_scenario)
+
+    # Create empty scenario - should return to original
+    scenario_example.create_empty_scenario("test_return_empty", "Test return")
+    assert scenario_example.scenario.name == original_scenario
+
+    # Clone scenario - should return to original
+    scenario_example.clone_scenario("test_return_clone", "Test return")
+    assert scenario_example.scenario.name == original_scenario
+
+
+def test_scenario_isolation_after_creation(scenario_example):
+    """Test that new scenarios are properly isolated"""
+    scenario_example.use_scenario("root")
+
+    # Add some data to root
+    results = scenario_example.results
+    results.new_record("root_specific", "test", "test_id", description="Root only data")
+
+    # Create empty scenario
+    scenario_example.create_empty_scenario("isolated_empty", "Isolated test")
+    scenario_example.use_scenario("isolated_empty")
+
+    # Verify isolation
+    empty_results = scenario_example.results.list()
+    assert "root_specific" not in empty_results["table_name"].values if len(empty_results) > 0 else True
+
+    # Clone scenario
+    scenario_example.use_scenario("root")
+    scenario_example.clone_scenario("isolated_clone", "Isolated clone")
+    scenario_example.use_scenario("isolated_clone")
+
+    # Verify cloned data exists
+    clone_results = scenario_example.results.list()
+    assert "root_specific" in clone_results["table_name"].values if len(clone_results) > 0 else False
+
+    # Modify clone data shouldn't affect root
+    results = scenario_example.results
+    results.new_record("clone_specific", "test", "test_id", description="Clone only data")
+
+    scenario_example.use_scenario("root")
+    root_results = scenario_example.results.list()
+    assert "clone_specific" not in root_results["table_name"].values
