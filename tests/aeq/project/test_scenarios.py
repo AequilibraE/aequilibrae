@@ -385,7 +385,8 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Verify isolation
     empty_results = scenario_example.results.list()
-    assert "root_specific" not in empty_results["table_name"].values if len(empty_results) > 0 else True
+    if len(empty_results) > 0:
+        assert "root_specific" not in empty_results["table_name"].values
 
     # Clone scenario
     scenario_example.use_scenario("root")
@@ -394,7 +395,8 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Verify cloned data exists
     clone_results = scenario_example.results.list()
-    assert "root_specific" in clone_results["table_name"].values if len(clone_results) > 0 else False
+    assert len(clone_results) > 0, "No results found in cloned scenario"
+    assert "root_specific" in clone_results["table_name"].values, "'root_specific' not found in cloned scenario results"
 
     # Modify clone data shouldn't affect root
     results = scenario_example.results
