@@ -405,3 +405,21 @@ def test_scenario_isolation_after_creation(scenario_example):
     scenario_example.use_scenario("root")
     root_results = scenario_example.results.list()
     assert "clone_specific" not in root_results["table_name"].values
+
+
+@pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
+def test_scenario_run_module_persistance(scenario_example, scenario):
+    scenario_example.use_scenario(scenario)
+
+    # For the root module we should have one matrix in the summary
+    if scenario == "root":
+        assert "demand_omx" in scenario_example.run.matrix_summary()
+    else:
+        # For the others we shouldn't have any matrices, and the "run" dir shouldn't exist
+        assert len(scenario_example.run.matrix_summary()) == 0
+        assert not (scenario_example.project_base_path / "run").exists()
+
+
+def test_scenario_use_scenario_must_exists(scenario_example):
+    with pytest.raises(ValueError, match="scenario 'a scenario that doesn't exist' does not exist"):
+        scenario_example.use_scenario("a scenario that doesn't exist")

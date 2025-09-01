@@ -171,6 +171,9 @@ def cached_scenario_example(cache_path):
     with coquimbo.db_connection as conn:
         conn.execute("DELETE FROM scenarios")
 
+    shutil.rmtree(nauru.project_base_path / "run")
+    shutil.rmtree(coquimbo.project_base_path / "run")
+
 
 @pytest.fixture(scope="function")
 def scenario_example(cached_scenario_example, cache_path, tmp_path) -> Project:

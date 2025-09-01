@@ -295,7 +295,9 @@ class Project:
         Refer to ``run/__init__.py`` file within the project folder for documentation.
         """
         entry_points = self.parameters["run"]
-        module = import_file_as_module(self.project_base_path / "run" / "__init__.py", "aequilibrae.run", force=True)
+        module = import_file_as_module(
+            self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
+        )
 
         res = []
         sentinal = object()
@@ -354,6 +356,10 @@ class Project:
             return pd.read_sql("SELECT * FROM scenarios", conn)
 
     def use_scenario(self, scenario_name: str):
+        with commit_and_close(self.root_scenario.path_to_file, spatial=False) as conn:
+            if conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone() is None:
+                raise ValueError(f"scenario '{scenario_name}' does not exist")
+
         if scenario_name == "root":
             self.scenario = self.root_scenario
         else:
