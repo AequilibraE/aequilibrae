@@ -408,7 +408,7 @@ def test_scenario_isolation_after_creation(scenario_example):
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
-def test_scenario_run_module_persistance(scenario_example, scenario):
+def test_scenario_run_module_persistence(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
     # For the root module we should have one matrix in the summary
