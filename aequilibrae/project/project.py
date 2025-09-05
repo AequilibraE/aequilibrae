@@ -352,10 +352,23 @@ class Project:
         return logger
 
     def list_scenarios(self):
+        """
+        Lists the existing scenarios.
+
+        :Returns:
+            **scenarios** (:obj:`pd.DataFrame`): Pandas DataFrame with existing scenarios
+        """
         with self.db_connection as conn:
             return pd.read_sql("SELECT * FROM scenarios", conn)
 
     def use_scenario(self, scenario_name: str):
+        """
+        Switch the active scenario.
+
+        :Arguments:
+            **scenario_name** (:obj:`str`): name of the scenario to be activated
+
+        """
         with commit_and_close(self.root_scenario.path_to_file, spatial=False) as conn:
             if conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone() is None:
                 raise ValueError(f"scenario '{scenario_name}' does not exist")
@@ -373,6 +386,14 @@ class Project:
         self.__load_objects()
 
     def create_empty_scenario(self, scenario_name: str, description: str = ""):
+        """
+        Creates an empty scenario, without any links, nodes, and zones.
+
+        :Arguments:
+            **scenario_name** (:obj:`str`): scenario name
+
+            **description** (:obj:`str`): useful scenario description
+        """
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
 
         current_scenario = self.scenario.name
@@ -409,6 +430,14 @@ class Project:
             self.use_scenario(current_scenario)
 
     def clone_scenario(self, scenario_name: str, description: str = ""):
+        """
+        Clones the active scenario.
+
+        :Arguments:
+            **scenario_name** (:obj:`str`): scenario name
+
+            **description** (:obj:`str`): useful scenario description
+        """
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
 
         current_scenario = self.scenario.name

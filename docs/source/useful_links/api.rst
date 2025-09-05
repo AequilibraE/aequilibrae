@@ -22,8 +22,8 @@ Project Components
    About
    FieldEditor
    Log
-   Matrices
    Network
+   Scenario
    Zoning
 
 Project Objects
@@ -34,12 +34,23 @@ Project Objects
 
    Zone
 
+Project Data
+~~~~~~~~~~~~
+.. currentmodule:: aequilibrae.project.data
+.. autosummary::
+   :toctree: _generated/
+
+   matrices.Matrices
+   results.Results
+
 Project Tools
 ~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.project.tools
 .. autosummary::
    :toctree: _generated/
 
+   migration_manager.Migration
+   migration_manager.MigrationManager
    network_simplifier.NetworkSimplifier
 
 Network Data

@@ -16,10 +16,10 @@ within a single project, using different example networks to demonstrate scenari
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.Project.list_scenarios`
-#     * :func:`aequilibrae.Project.use_scenario`
-#     * :func:`aequilibrae.Project.create_empty_scenario`
-#     * :func:`aequilibrae.Project.clone_scenario`
+#     * :func:`aequilibrae.project.Project.list_scenarios`
+#     * :func:`aequilibrae.project.Project.use_scenario`
+#     * :func:`aequilibrae.project.Project.create_empty_scenario`
+#     * :func:`aequilibrae.project.Project.clone_scenario`
 
 # %%
 
@@ -27,8 +27,6 @@ within a single project, using different example networks to demonstrate scenari
 from uuid import uuid4
 from tempfile import gettempdir
 from pathlib import Path
-from os.path import join
-import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae import TrafficAssignment, TrafficClass
