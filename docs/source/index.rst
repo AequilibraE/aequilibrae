@@ -18,8 +18,7 @@ Python
 **Previous versions**: documentation for all AequilibraE's versions are available 
 :doc:`here <useful_links/version_history>`.
 
-**Useful links**: :doc:`useful_links/installation` | :doc:`useful_links/api` | 
-:doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history` | :doc:`_auto_examples/index`
+**Useful links**: :doc:`useful_links/installation` | :doc:`API Reference <useful_links/_autosummary/aequilibrae>` | :doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history` | :doc:`_auto_examples/index`
 
 |
 

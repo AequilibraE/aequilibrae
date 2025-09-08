@@ -470,9 +470,9 @@ cpdef void path_finding_a_star(long origin,
     """
     Based on the pseudocode presented at https://en.wikipedia.org/wiki/A*_search_algorithm#Pseudocode
     The following variables have been renamed to be consistent with out Dijkstra's implementation
-     - openSet: pqueue
-     - cameFrom: pred
-     - fScore: pqueue.Elements[idx].key, for some idx
+        - openSet: pqueue
+        - cameFrom: pred
+        - fScore: pqueue.Elements[idx].key, for some idx
     """
 
     cdef unsigned int M = pred.shape[0]
