@@ -229,7 +229,7 @@ class MigrationManager:
 
         A migration is applicable if all migrations before it (ordered by ID) have been applied or skipped.
 
-        If an out-of-order migration is detected a ``RuntimeError`` will raised and manual intervention will
+        If an out-of-order migration is detected a ``RuntimeError`` will be raised and manual intervention will
         be required.
 
         :Arguments:

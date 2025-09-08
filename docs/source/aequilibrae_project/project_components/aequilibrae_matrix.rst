@@ -62,7 +62,7 @@ The following methods allow you to check the data in you AequilibraE matrix.
            [1., 1., 1., 1., 1.]])
 
 More than dealing with stored project data, AequilibraE matrices are objects necessary to run procedures,
-such as traffic assignment. Since a matrix object can hold multiple matrices (i.,e. _matrix cores\_),
+such as traffic assignment. Since a matrix object can hold multiple matrices (i.e. _matrix cores\_),
 it is necessary to specify which matrices will be used in computation, dubbed a computational view in 
 AequilibraE, which sets matrix data in memory in a way it can be used in parallelized algorithms.
 
