@@ -34,7 +34,7 @@ The source files of this network are publicly available in the
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.Network.create_from_gmns`
+#     * :func:`aequilibrae.project.network.network.Network.create_from_gmns`
 
 # %%
 

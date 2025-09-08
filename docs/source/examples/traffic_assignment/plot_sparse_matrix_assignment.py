@@ -21,9 +21,9 @@ skim the last iteration after the assignment is done.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.TrafficClass`
-#     * :func:`aequilibrae.paths.TrafficAssignment`
+#     * :func:`aequilibrae.paths.graph`
+#     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
+#     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment`
 
 # %%
 

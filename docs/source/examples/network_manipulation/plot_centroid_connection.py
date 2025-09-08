@@ -14,7 +14,7 @@ We use Folium to visualize the resulting network.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.Zoning`
+#     * :func:`aequilibrae.project.zoning`
 
 # %%
 

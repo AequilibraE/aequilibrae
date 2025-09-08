@@ -16,7 +16,7 @@ a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.RouteChoice`
+#     * :func:`aequilibrae.paths.route_choice`
 
 # %%
 

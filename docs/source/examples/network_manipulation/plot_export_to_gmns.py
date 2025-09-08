@@ -18,7 +18,7 @@ in the GMNS repository on GitHub: https://github.com/zephyr-data-specs/GMNS
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.Network.export_to_gmns`
+#     * :func:`aequilibrae.project.network.network.Network.export_to_gmns`
 
 # %%
 

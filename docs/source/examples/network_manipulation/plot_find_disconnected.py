@@ -29,7 +29,7 @@ We use the Nauru example to find disconnected links.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.PathResults`
+#     * :func:`aequilibrae.paths.results.path_results`
 
 # %%
 

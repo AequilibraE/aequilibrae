@@ -17,10 +17,10 @@ We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetwor
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.TrafficClass`
-#     * :func:`aequilibrae.paths.TrafficAssignment` 
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+#     * :func:`aequilibrae.paths.graph`
+#     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
+#     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment` 
+#     * :func:`aequilibrae.matrix.aequilibrae_matrix`
 
 # %%
 

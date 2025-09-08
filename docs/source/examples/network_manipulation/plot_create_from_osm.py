@@ -18,7 +18,7 @@ This time we will use GeoPandas to visualize the network.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.Network.create_from_osm`
+#     * :func:`aequilibrae.project.network.network.Network.create_from_osm`
 
 # %%
 

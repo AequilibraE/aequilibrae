@@ -19,7 +19,6 @@ within a single project, using different example networks to demonstrate scenari
 #     * :func:`aequilibrae.project.Project.list_scenarios`
 #     * :func:`aequilibrae.project.Project.use_scenario`
 #     * :func:`aequilibrae.project.Project.create_empty_scenario`
-#     * :func:`aequilibrae.project.Project.clone_scenario`
 
 # %%
 

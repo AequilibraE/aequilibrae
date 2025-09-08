@@ -18,11 +18,11 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.transit.Transit`
-#     * :func:`aequilibrae.transit.TransitGraphBuilder`
-#     * :func:`aequilibrae.paths.TransitClass`
-#     * :func:`aequilibrae.paths.TransitAssignment`
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+#     * :func:`aequilibrae.transit.transit`
+#     * :func:`aequilibrae.transit.transit_graph_builder`
+#     * :func:`aequilibrae.paths.traffic_class.TransitClass`
+#     * :func:`aequilibrae.paths.traffic_assignment.TransitAssignment`
+#     * :func:`aequilibrae.matrix.aequilibrae_matrix`
 
 # %%
 
