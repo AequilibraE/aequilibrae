@@ -36,7 +36,7 @@ def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None
         run_queries_from_sql_file(conn, logger, qry_file)
 
 
-def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
+def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str, use_aequilibrae_prefix: bool = True) -> None:
     spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
         all_trigger_sets = file_list.readlines()
@@ -58,8 +58,12 @@ def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> N
 
                 m = re.search(create_drop_regex, qry)
                 if m:
+                    name = m.group(1).lower()
+                    if not use_aequilibrae_prefix:
+                        name = name.removeprefix("aequilibrae_")
+
                     try:
-                        conn.execute(f"drop trigger if exists {m.group(1).lower()}")
+                        conn.execute(f"drop trigger if exists {name}")
                     except Exception as e:
                         logger.error(f"Failed removing triggers table - > {e.args}")
                         logger.error(f"Point of failure - > {qry}")
