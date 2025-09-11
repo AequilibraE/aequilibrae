@@ -225,7 +225,7 @@ def bulk_connector_creation(
     new_connectors_sql = f"""
     INSERT INTO links
     (link_id, a_node, b_node, modes, direction, link_type, capacity_ab, capacity_ba, name, geometry)
-    VALUES(?,?,?,?,0,"centroid_connector",{INFINITE_CAPACITY},{INFINITE_CAPACITY},CONCAT('centroid connector zone ', ?2),GeomFromWKB(?, 4326))
+    VALUES(?,?,?,?,0,"centroid_connector",{INFINITE_CAPACITY},{INFINITE_CAPACITY},'centroid connector zone ' || ?2,GeomFromWKB(?, 4326))
     """
     with conn:
         conn.executemany(existing_connectors_sql, existing_connectors[["modes", "link_id"]].to_records(index=False))
