@@ -59,8 +59,7 @@ def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> N
                 m = re.search(create_drop_regex, qry)
                 if m:
                     try:
-                        conn.execute(f"drop trigger if exists {m.group(1).lower().removeprefix('aequilibrae_')}")
-                        logger.info(f"Removed {m.group(1).lower().removeprefix('aequilibrae_')}")
+                        conn.execute(f"drop trigger if exists {m.group(1).lower()}")
                     except Exception as e:
                         logger.error(f"Failed removing triggers table - > {e.args}")
                         logger.error(f"Point of failure - > {qry}")
