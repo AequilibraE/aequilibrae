@@ -11,7 +11,7 @@ from shapely.geometry import Point, Polygon, LineString, MultiLineString
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
-from aequilibrae.project.network.connector_creation import connector_creation
+from aequilibrae.project.network.connector_creation import connector_creation, bulk_connector_creation
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
@@ -125,8 +125,9 @@ class Zoning(BasicTable):
         else:
             self.project.logger.info("No new centroids added to the network")
 
-    def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True):
-        """Adds centroid connectors for the desired mode to the network file
+    def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True, bulk: bool = False):
+        """
+        Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting each zone centroid to one or more nodes selected from
         all those that satisfy the mode and link_types criteria and are inside the zone.
@@ -142,11 +143,14 @@ class Zoning(BasicTable):
             **mode_id** (:obj:`str`): Mode ID we are trying to connect
 
             **link_types** (:obj:`str`, *Optional*): String with all the link type IDs that can be considered.
-            eg: yCdR. Defaults to ALL link types
+                eg: yCdR. Defaults to ALL link types
 
             **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
 
             **limit_to_zone** (:obj:`bool`): Limits the search for nodes inside the zone. Defaults to ``True``.
+
+            **bulk** (:obj:`bool`, *Optional*): Whether to use the bulk connector method or not. This is method is
+                considerably faster for connecting a large amount of centroids but has a high runtime overhead.
         """
 
         proj_nodes = self.project.network.nodes.data
@@ -159,24 +163,48 @@ class Zoning(BasicTable):
 
         with self.project.db_connection_spatial as conn, warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
-            zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
-            for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
-                if zone_id not in centroids:
-                    self.project.logger.warning(f"Centroid for zone {zone_id} does not exist. Please create it first.")
-                    continue
 
-                zone = self.__items[zone_id]
-                area = zone.geometry if limit_to_zone else None
-                connector_creation(
-                    zone_id=zone_id,
-                    mode_id=mode_id,
-                    link_types=link_types,
-                    connectors=connectors,
-                    proj_nodes=proj_nodes,
-                    proj_links=link_data,
-                    network=self.project.network,
-                    conn=conn,
-                    delimiting_area=area,
+            if not bulk:
+                zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
+                for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
+                    if zone_id not in centroids:
+                        self.project.logger.warning(f"Centroid for zone {zone_id} does not exist. Please create it first.")
+                        continue
+
+                    zone = self.__items[zone_id]
+                    area = zone.geometry if limit_to_zone else None
+                    connector_creation(
+                        zone_id=zone_id,
+                        mode_id=mode_id,
+                        link_types=link_types,
+                        connectors=connectors,
+                        proj_nodes=proj_nodes,
+                        proj_links=link_data,
+                        network=self.project.network,
+                        conn=conn,
+                        delimiting_area=area,
+                    )
+            else:
+                if len(link_types) > 0:
+                    nodes = proj_nodes[proj_nodes.link_types.str.contains("|".join(list(link_types)))]
+                else:
+                    nodes = proj_nodes
+
+                zones = self.data
+                zones = zones[~zones.zone_id.isin(connected_centroids)]
+
+                if zones.empty:
+                    return
+
+                bulk_connector_creation(
+                    conn,
+                    nodes,
+                    link_data,
+                    zones,
+                    modes=[mode_id],
+                    k_connectors=connectors,
+                    projected_crs=None,
+                    limit_to_zone=limit_to_zone,
                 )
 
     def get_closest_zone(self, geometry: Union[Point, LineString, MultiLineString]) -> int:

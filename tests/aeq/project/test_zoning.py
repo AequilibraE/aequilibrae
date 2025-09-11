@@ -1,4 +1,5 @@
 from shapely.geometry import Polygon
+import pytest
 
 
 def zoning_setup(project):
@@ -19,11 +20,12 @@ def test_add_centroid(coquimbo_example):
     assert num_centroids > centroids, "Centroids should've been added."
 
 
-def test_connect_mode(coquimbo_example):
+@pytest.mark.parametrize("bulk", [True, False])
+def test_connect_mode(coquimbo_example, bulk):
     proj, _ = zoning_setup(coquimbo_example)
     links_before = proj.network.links.data.shape[0]
     proj.zoning.add_centroids()
-    proj.zoning.connect_mode(mode_id="c", connectors=1)
+    proj.zoning.connect_mode(mode_id="c", connectors=1, bulk=bulk)
     links_after = proj.network.links.data.shape[0]
     assert links_after > links_before, "Centroid connectors should've been added."
 
