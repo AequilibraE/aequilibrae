@@ -1,7 +1,7 @@
 import logging
 import time
 from sqlite3 import Connection
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -94,7 +94,7 @@ def bulk_connector_creation(
     k_connectors: int = 1,
     limit_to_zone: bool = True,
     distance_upper_bound: float = float("inf"),
-    projected_crs: str | int | None = None,
+    projected_crs: Union[str, int, None] = None,
 ):
     """
     Creates or updates centroid connectors between zone centroids and network nodes.
@@ -243,7 +243,7 @@ def k_nearest(
     centroids: gpd.GeoDataFrame,
     nodes: gpd.GeoDataFrame,
     distance_upper_bound: float,
-    crs: int | str,
+    crs: Union[int, str],
 ):
     """
     Finds the k nearest nodes to each centroid using a KDTree spatial index.
@@ -298,7 +298,7 @@ def k_nearest_in_zone(
     centroids: gpd.GeoDataFrame,
     nodes: gpd.GeoDataFrame,
     distance_upper_bound: float,
-    crs: int | str,
+    crs: Union[int, str],
 ):
     """
     Finds the k nearest nodes within each zone to the corresponding centroid.
