@@ -129,13 +129,16 @@ def bulk_connector_creation(
         **projected_crs** (:obj:`str | int`, `Optional`): Coordinate reference system for
         distance calculations. If None, uses the CRS from the input data.
     """
-    assert project_links.crs == project_nodes.crs == project_zones.crs, "mismatched CRS"
+    assert project_links.crs == project_nodes.crs == project_zones.crs, "Mismatched CRS"
+    assert modes, "Modes must be provided"
 
     centroid_mask = project_nodes.is_centroid == 1
     centroids = project_nodes.loc[centroid_mask, ["node_id", "geometry"]]
     nodes = project_nodes.loc[~centroid_mask, ["node_id", "modes", "geometry"]]
 
-    assert np.array_equal(np.unique(project_zones["zone_id"].to_numpy()), np.unique(centroids["node_id"].to_numpy()))
+    assert project_zones["zone_id"].isin(centroids["node_id"]).all(), (
+        "All provided zones must have their corresponding centroid provided"
+    )
 
     connectors = []
     for mode in modes:
@@ -162,6 +165,11 @@ def bulk_connector_creation(
     # We now need to combine the modes of the all node pairs, but we only care about the set of modes. Sorting is to
     # provide some sort of standard ordering.
     connectors = pd.concat(connectors).groupby(["a_node", "b_node"]).modes.apply(normalise_mode_strings).reset_index()
+    if connectors.empty:
+        raise ValueError(
+            f"No connects found for any modes ({modes}), ensure the modes are correct and the distance "
+            "bound matches the units of the CRS"
+        )
 
     # We need to find out which connectors already exist so we can update the links instead of inserting them.
     centroid_connectors = project_links[project_links.link_type == "centroid_connector"]
