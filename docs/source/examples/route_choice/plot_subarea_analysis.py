@@ -14,10 +14,10 @@ for a city in La Serena Metropolitan Area in Chile.
 .. seealso::
     Several functions, methods, classes and modules are used in this example:
 
-    * :func:`aequilibrae.paths.Graph`
-    * :func:`aequilibrae.paths.RouteChoice`
-    * :func:`aequilibrae.paths.SubAreaAnalysis`
-    * :func:`aequilibrae.matrix.AequilibraeMatrix`
+    * :func:`aequilibrae.paths.graph`
+    * :func:`aequilibrae.paths.route_choice`
+    * :func:`aequilibrae.paths.sub_area`
+    * :func:`aequilibrae.matrix.aequilibrae_matrix`
 """
 
 # %%

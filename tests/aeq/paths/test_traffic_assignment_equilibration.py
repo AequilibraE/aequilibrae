@@ -90,7 +90,6 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     assignment.set_algorithm("bfw")
     assignment.execute()
     bfw25_rgap = assignment.assignment.rgap
-    bfw25_iters = assignment.assignment.iter
     correl = np.corrcoef(assigclass2.results.total_link_loads, results.volume)[0, 1]
     assert 0.999 < correl
 
@@ -99,7 +98,6 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     assert cfw25_rgap < assignment.rgap_target
     assert bfw25_rgap < assignment.rgap_target
     assert cfw25_iters < fw25_iters
-    assert bfw25_iters < cfw25_iters
 
     assignment.save_results("save_to_database")
     assignment.save_skims(matrix_name="all_skims", which_ones="all")

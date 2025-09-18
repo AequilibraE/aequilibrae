@@ -6,6 +6,7 @@ sg_execution_times.rst
 _auto_examples
 _generated
 data_model
+_autosummary
 
 # User-specific stuff:
 .idea/**/workspace.xml

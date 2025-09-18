@@ -15,7 +15,7 @@ from TNTP.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.Graph`
+#     * :func:`aequilibrae.paths.graph`
 
 # %%
 

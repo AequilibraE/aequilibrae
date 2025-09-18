@@ -881,6 +881,7 @@ class AequilibraeMatrix(object):
                     self.matrix_view = np.empty((self.zones, self.zones, len(core_list)))
                     for i, core in enumerate(core_list):
                         self.matrix_view[:, :, i] = np.array(omx_file[core])
+                        self.matrix[core] = self.matrix_view[:, :, i]
         else:
             # Check if matrices are adjacent
             if len(core_list) > 1:

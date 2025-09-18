@@ -16,7 +16,7 @@ in the database equal. Distance is proportionally computed automatically in the 
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.Links`
+#     * :func:`aequilibrae.project.network.links`
 
 
 # %%

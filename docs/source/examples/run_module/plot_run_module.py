@@ -17,7 +17,7 @@ In this example we demonstrate how to use AequilibraE's run module using Sioux F
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :attr:`aequilibrae.project.Project.run`
+#     * :attr:`aequilibrae.project.project.Project.run`
 
 # %%
 

@@ -2,6 +2,9 @@ name: Tests on all platforms with linting
 
 on: [pull_request]
 
+env:
+  AEQ_SHOW_PROGRESS: "0"
+
 jobs:
   linting:
     runs-on: ubuntu-latest

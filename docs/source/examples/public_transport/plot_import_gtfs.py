@@ -12,8 +12,8 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.transit.Transit`
-#     * :func:`aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder`
+#     * :func:`aequilibrae.transit.transit`
+#     * :func:`aequilibrae.transit.lib_gtfs`
 
 # %%
 

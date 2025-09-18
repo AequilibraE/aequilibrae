@@ -658,6 +658,8 @@ class LinearApproximation(WorkerThread):
 
     def calculate_stepsize(self):
         """Calculate optimal stepsize in descent direction"""
+        self.stepsize_has_been_reset = False
+
         if self.algorithm == "msa":
             self.stepsize = 1.0 / self.iter
             return
@@ -685,7 +687,8 @@ class LinearApproximation(WorkerThread):
             # seems to work well in practice.
             if self.algorithm == "bfw":
                 self.betas.fill(-1)
-            if derivative_of_objective(0.0) < derivative_of_objective(1.0):
+
+            if abs(derivative_of_objective(0.0)) < abs(derivative_of_objective(1.0)):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
                     # works well in practice, however for a large number of iterations this might be too much so
@@ -697,7 +700,11 @@ class LinearApproximation(WorkerThread):
                     # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
                     self.conjugate_failed = True
-                    self.iteration_issue.append("Found bad conjugate direction step. Performing FW search. {e.args}")
+
+                    msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
+                    self.logger.warning(msg)
+                    self.iteration_issue.append(msg)
+
                     # By doing it recursively, we avoid doing the same AoN again
                     self.__calculate_step_direction()
                     self.calculate_stepsize()
@@ -705,11 +712,16 @@ class LinearApproximation(WorkerThread):
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0
+                self.logger.warning("Reset line search")
+                self.stepsize_has_been_reset = True
 
         assert 0 <= self.stepsize <= 1.0
 
     def check_convergence(self):
         """Calculate relative gap and return ``True`` if it is smaller than desired precision"""
+        if self.stepsize_has_been_reset:
+            return False
+
         aon_cost = np.sum(self.congested_time * self.aon_total_flow)
         current_cost = np.sum(self.congested_time * self.fw_total_flow)
         self.rgap = abs(current_cost - aon_cost) / current_cost

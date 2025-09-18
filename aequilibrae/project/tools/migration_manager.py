@@ -72,6 +72,7 @@ class Migration:
 
         :Arguments:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+
             **status** (:obj:`MigrationStatus`): Migration status enum.
         """
         res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
@@ -112,10 +113,11 @@ class Migration:
         in autocommit mode. If the migration then fails the database will be bad state.
 
         :Arguments:
-            **conn** (:obj:`sqlite3.Connection`): Main SQLite database connection. This is connection is used for the migrations
-              table and '.sql' migrations.
+            **conn** (:obj:`sqlite3.Connection`): Main SQLite database connection. This is connection
+            is used for the migrations table and '.sql' migrations.
+
             **connections** (:obj:`dict[str, sqlite3.Connection]`): All open SQLite connections. Passed as keyword
-              arguments for Python migrations.
+            arguments for Python migrations.
         """
         if self.type == "py":
             self._apply_python(connections)
@@ -146,12 +148,12 @@ class Migration:
 
 
 class MigrationManager:
-    """
-    Small utility class to manage, validate, and apply a set of ``Migration``s.
+    r"""
+    Small utility class to manage, validate, and apply a set of ``Migration``\s.
 
     :Arguments:
         **migration_file** (:obj:`pathlib.Path`): A path to a Python with which defines a global ``migrations`` variable
-            as a list of ``pathlib.Path`` to migrations.
+        as a list of ``pathlib.Path`` to migrations.
     """
 
     network_migration_file = (
@@ -227,10 +229,12 @@ class MigrationManager:
 
         A migration is applicable if all migrations before it (ordered by ID) have been applied or skipped.
 
-        If an out-of-order migration is detected a ``RuntimeError` will raised and manual intervention will be required.
+        If an out-of-order migration is detected a ``RuntimeError`` will be raised and manual intervention will
+        be required.
 
         :Arguments:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+
         """
         migrations = list(self.status(conn).items())
 
@@ -259,10 +263,13 @@ class MigrationManager:
 
         :Arguments:
             **main_conn** (:obj:`str`): Main SQLite database connection. This is connection is used for the migrations
-              table. Must be a key in ``connections``.
+            table. Must be a key in ``connections``.
+
             **skip** (:obj:`set[int]`): Set of migration IDs to skip.
+
             **connections** (:obj:`dict[str, Optional[AequilibraEConnection]]`): Dictionary mapping connection names to
-              `AequilibraEConnection` objects. These connections are used during the migration process.
+            `AequilibraEConnection` objects. These connections are used during the migration process.
+
         """
         if skip is None:
             skip = set()

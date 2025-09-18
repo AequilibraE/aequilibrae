@@ -20,10 +20,10 @@ We use Folium to visualize the resulting network.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.Links`
-#     * :func:`aequilibrae.project.network.Nodes` 
-#     * :func:`aequilibrae.project.network.Modes`
-#     * :func:`aequilibrae.project.network.LinkTypes` 
+#     * :func:`aequilibrae.project.network.links`
+#     * :func:`aequilibrae.project.network.nodes` 
+#     * :func:`aequilibrae.project.network.modes`
+#     * :func:`aequilibrae.project.network.link_types` 
 
 # %%
 

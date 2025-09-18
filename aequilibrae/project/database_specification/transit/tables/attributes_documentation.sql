@@ -22,4 +22,4 @@ CREATE TABLE  if not exists attributes_documentation (name_table  TEXT NOT NULL,
                                                       );
 
 --#
-CREATE INDEX idx_attributes ON attributes_documentation (name_table, attribute);
+CREATE INDEX IF NOT EXISTS idx_attributes ON attributes_documentation (name_table, attribute);

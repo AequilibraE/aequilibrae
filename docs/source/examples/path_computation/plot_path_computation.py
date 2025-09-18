@@ -10,8 +10,8 @@ In this example, we show how to perform path computation for Coquimbo, a city in
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.PathResults`
+#     * :func:`aequilibrae.paths.graph`
+#     * :func:`aequilibrae.paths.results.path_results`
 
 # %%
 # Imports

@@ -10,3 +10,4 @@ matrices
 migrations
 periods
 transit_graph_configs
+scenarios

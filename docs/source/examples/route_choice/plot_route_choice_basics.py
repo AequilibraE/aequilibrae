@@ -16,9 +16,9 @@ Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.RouteChoice`
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+#     * :func:`aequilibrae.paths.graph`
+#     * :func:`aequilibrae.paths.route_choice`
+#     * :func:`aequilibrae.matrix.aequilibrae_matrix`
 
 # %%
 

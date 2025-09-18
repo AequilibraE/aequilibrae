@@ -62,7 +62,7 @@ The following methods allow you to check the data in you AequilibraE matrix.
            [1., 1., 1., 1., 1.]])
 
 More than dealing with stored project data, AequilibraE matrices are objects necessary to run procedures,
-such as traffic assignment. Since a matrix object can hold multiple matrices (i.,e. _matrix cores_),
+such as traffic assignment. Since a matrix object can hold multiple matrices (i.e. _matrix cores\_),
 it is necessary to specify which matrices will be used in computation, dubbed a computational view in 
 AequilibraE, which sets matrix data in memory in a way it can be used in parallelized algorithms.
 
@@ -72,7 +72,7 @@ Case you're using matricial data from an OMX file, this step also loads the data
 
     >>> mat.computational_view(["only_ones"])
 
-You can also export AequilibraE matrices, with your chosen set of _matrix cores_, to different file 
+You can also export AequilibraE matrices, with your chosen set of _matrix cores\_, to different file 
 formats, such as CSV and OMX.
 
 .. code-block:: python

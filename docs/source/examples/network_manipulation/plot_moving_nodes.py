@@ -16,7 +16,7 @@ what happens to the links.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.Nodes`
+#     * :func:`aequilibrae.project.network.nodes`
 
 # %%
 

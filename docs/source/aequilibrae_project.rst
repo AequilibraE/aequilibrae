@@ -97,6 +97,17 @@ also created on-the-fly when the user imports a GTFS source into an AequilibraE
 model, but there is still no support for manually or programmatically adding routes
 to a route system as of yet.
 
+Optionally a project can be configured with a **scenarios** folder. This allows the
+storage of many AequilbraE models within one directory, however it is intended to store
+modifications of some other project. The scenario system is built around a hierarchical
+structure where the "root" scenario represents the base model, and additional scenarios
+are created as branches from this foundation. Users can create entirely new scenarios with
+empty networks or clone existing scenarios to explore modifications. Scenarios are
+automatically isolated from each other, ensuring that changes made in one scenario do not
+affect others. The system integrates with all existing AequilibraE functionality,
+including traffic assignment, transit modelling, matrix operations, and results
+management.
+
 In the following sections, we present the structure of each component of an AequilibraE project.
 
 .. toctree::

@@ -14,13 +14,13 @@ which are going to be the input of a future year assignnment with select link an
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.TrafficClass`
-#     * :func:`aequilibrae.paths.TrafficAssignment`
-#     * :func:`aequilibrae.distribution.Ipf`
-#     * :func:`aequilibrae.distribution.GravityCalibration`
-#     * :func:`aequilibrae.distribution.GravityApplication`
-#     * :func:`aequilibrae.distribution.SyntheticGravityModel`
+#     * :func:`aequilibrae.paths.graph`
+#     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
+#     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment`
+#     * :func:`aequilibrae.distribution.ipf`
+#     * :func:`aequilibrae.distribution.gravity_calibration`
+#     * :func:`aequilibrae.distribution.gravity_application`
+#     * :func:`aequilibrae.distribution.synthetic_gravity_model`
 
 # %%
 
