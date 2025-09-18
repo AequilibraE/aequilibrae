@@ -1,0 +1,34 @@
+name: Trigger dispatch
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  trigger-event:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Triggers test run on QAequilibraE
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          repository: aequilibrae/qaequilibrae
+          event-type: custom-event
+          client-payload: '{"ref": "develop"}'
+      
+      - name: Triggers test run on MapMatcher
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          repository: aequilibrae/mapmatcher
+          event-type: custom-event
+          client-payload: '{"ref": "develop"}'
+
+      - name: Triggers test run on Tradesman
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          repository: aequilibrae/tradesman
+          event-type: custom-event
+          client-payload: '{"ref": "develop"}'
