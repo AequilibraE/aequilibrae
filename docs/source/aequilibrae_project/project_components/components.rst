@@ -62,7 +62,7 @@ Each item in the 'links' table is a ``Link`` object.
 
 .. seealso::
     
-    * :func:`aequilibrae.project.network.Links`
+    * :func:`aequilibrae.project.network.links.Links`
         Class documentation 
     * :ref:`project_from_link_layer`
         Usage example
@@ -129,7 +129,7 @@ Each item in the 'nodes' table is a ``Node`` object.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.Nodes`
+    * :func:`aequilibrae.project.network.nodes.Nodes`
         Class documentation
     * :ref:`editing_network_nodes`
         Usage example
@@ -212,7 +212,7 @@ Each item in the 'zones' table is a ``Zone`` object.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Zoning`
+    * :func:`aequilibrae.project.zoning.Zoning`
         Class documentation
     * :ref:`create_zones`
         Usage example
@@ -253,7 +253,7 @@ this information, otherwise it will be lost.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.About`
+    * :func:`aequilibrae.project.about.About`
         Class documentation
     * :ref:`tables_about`
         Table documentation
@@ -299,7 +299,7 @@ All field descriptions are kept in the table 'attributes_documentation'.
 
 .. seealso::
 
-    *  :func:`aequilibrae.project.FieldEditor`
+    *  :func:`aequilibrae.project.field_editor.FieldEditor`
         Class documentation
 
 ``project.log``
@@ -327,7 +327,7 @@ It is possible to access the log file contents, as presented in the next code bl
 
 .. seealso::
     
-    * :func:`aequilibrae.project.Log`
+    * :func:`aequilibrae.log.Log`
         Class documentation
     * :ref:`useful-log-tips`
         Usage example
@@ -376,7 +376,7 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Matrices`
+    * :func:`aequilibrae.project.data.matrices.Matrices`
         Class documentation
     * :ref:`matrix_table`
         Table documentation
@@ -429,7 +429,7 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.LinkTypes`
+    * :func:`aequilibrae.project.network.link_types.LinkTypes`
         Class documentation
     * :ref:`tables_link_types`
         Table documentation
@@ -477,7 +477,7 @@ Each item in 'modes' table is a ``Mode`` object.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.Modes`
+    * :func:`aequilibrae.project.network.modes.Modes`
         Class documentation
     * :ref:`tables_modes`
         Table documentation
@@ -529,7 +529,7 @@ Each item in the 'periods' table is a ``Period`` object.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.Periods`
+    * :func:`aequilibrae.project.network.periods.Periods`
         Class documentation
     * :ref:`tables_period`
         Table documentation

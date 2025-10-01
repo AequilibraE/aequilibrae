@@ -41,7 +41,7 @@ platform that does not support both R-Tree and SpatiaLite.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Network.create_from_osm`
+    * :func:`aequilibrae.project.network.network.Network.create_from_osm`
         Function documentation
     * :ref:`plot_from_osm`
         Usage example
@@ -97,7 +97,7 @@ specification.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Network.create_from_gmns`
+    * :func:`aequilibrae.project.network.network.Network.create_from_gmns`
         Function documentation
     * :ref:`import_from_gmns`
         Usage example
@@ -139,7 +139,7 @@ You can find the GMNS specification
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Network.export_to_gmns`
+    * :func:`aequilibrae.project.network.network.Network.export_to_gmns`
         Function documentation
     * :ref:`export_to_gmns`
         Usage example

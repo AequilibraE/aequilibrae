@@ -140,7 +140,7 @@ required.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.Modes`
+    * :func:`aequilibrae.project.network.modes.Modes`
         Class documentation
     * :ref:`modes_network_data_model`
         Data model
@@ -267,7 +267,7 @@ required.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.LinkTypes`
+    * :func:`aequilibrae.project.network.link_types.LinkTypes`
        Class documentation
     * :ref:`link_types_network_data_model`
         Data model
@@ -291,7 +291,7 @@ You can check :ref:`this example <create_zones>` to learn how to add zones to yo
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Zone`
+    * :func:`aequilibrae.project.zone.Zone`
         Class documentation
     * :ref:`zones_network_data_model`
         Data model
@@ -318,7 +318,7 @@ types (AEM and OMX) without prejudice to functionality.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Matrices`
+    * :func:`aequilibrae.project.data.matrices.Matrices`
         Class documentation
     * :ref:`matrices_network_data_model`
         Data model
@@ -350,7 +350,7 @@ opportunities for version upgrades.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.About`
+    * :func:`aequilibrae.project.about.About`
         Class documentation
     * :ref:`about_network_data_model`
         Data model
@@ -413,7 +413,7 @@ Periods table
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.Periods`
+    * :func:`aequilibrae.project.network.periods.Periods`
         Class documentation
     * :ref:`periods_network_data_model`
         Data model

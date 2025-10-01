@@ -13,9 +13,9 @@ for the first time and it can take a little while.
 
 .. seealso::
 
-    * :func:`aequilibrae.transit.Transit`
+    * :func:`aequilibrae.transit.transit.Transit`
         Class documentation
-    * :func:`aequilibrae.transit.TransitGraphBuilder`
+    * :func:`aequilibrae.transit.transit_graph_builder.TransitGraphBuilder`
         Class documentation
 
 In the following sections, we'll dive deep into the tables existing in the public transport database.
