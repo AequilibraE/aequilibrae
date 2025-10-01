@@ -24,9 +24,9 @@ documentation.
 
 .. seealso::
     
-    * :func:`aequilibrae.distribution.SyntheticGravityModel`
+    * :func:`aequilibrae.distribution.synthetic_gravity_model.SyntheticGravityModel`
         Function documentation
-    * :func:`aequilibrae.distribution.GravityApplication`
+    * :func:`aequilibrae.distribution.gravity_application.GravityApplication`
         Function documentation
 
 
@@ -46,7 +46,7 @@ documentation.
 
 .. seealso::
     
-    * :func:`aequilibrae.distribution.GravityCalibration`
+    * :func:`aequilibrae.distribution.gravity_calibration.GravityCalibration`
         Function documentation
 
 .. 
@@ -68,7 +68,7 @@ IPF.
 
 .. seealso::
 
-    * :func:`aequilibrae.distribution.Ipf`
+    * :func:`aequilibrae.distribution.ipf.Ipf`
         Function documentation
     * :ref:`plot_ipf_without_model`
         Usage example

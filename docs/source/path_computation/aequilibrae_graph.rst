@@ -97,7 +97,6 @@ result in simplification beyond pure topological simplification.
     >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32), remove_dead_ends=False)
 
 
-
 Graphs from a model
 -------------------
 
@@ -177,9 +176,9 @@ not blocking flows through "centroids".**
 
 .. seealso::
 
-    * :func:`aequilibrae.paths.Graph`
+    * :func:`aequilibrae.paths.graph.Graph`
         Class documentation
-    * :func:`aequilibrae.paths.TransitGraph`
+    * :func:`aequilibrae.paths.graph.TransitGraph`
         Class documentation
 
 Blocking flows through centroids
