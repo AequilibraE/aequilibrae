@@ -205,6 +205,9 @@ Next, build the documentation in html format with the following commands run fro
     cd docs
     make html
 
+More information on writing and contributing to AequilibraE's documentation are available
+:ref:`in this page <guide_to_docs>`.
+
 Working with progress bars
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
