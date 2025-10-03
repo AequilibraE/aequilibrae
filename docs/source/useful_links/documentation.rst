@@ -8,7 +8,7 @@ Documentation
 AequilibraE's documentation is built with 
 `PyData Sphinx Theme <https://pydata-sphinx-theme.readthedocs.io/en/stable/>`_.
 
-In the following sections, we briefely present some useful documentation writing tips.
+In the following sections, we briefly present some useful documentation writing tips.
 
 conf.py file
 ------------
@@ -32,7 +32,7 @@ add/remove them at the TOML.
         "sphinx.ext.doctest",
         "sphinx_gallery.gen_gallery",  # renders the examples gallery
         "sphinx_design",  # adds grids and cards
-        "sphinx_copybutton",  # adds the coppy button to code blocks
+        "sphinx_copybutton",  # adds the copy button to code blocks
         "sphinx_git",  # adds SHA info to the version history
         "sphinx_tabs.tabs",  # adds tabs 
         "sphinx_subfigure",  # allows placing more than one figure side by side
@@ -108,7 +108,8 @@ is correct, otherwise no thumbnail is displayed.
 We can add `admonitions and directives <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#directives>`_
 to the example file.
 
-Check out `Sphinx-Gallery docs <https://sphinx-gallery.github.io/stable/syntax.html) or in one of the [examples in the gallery](https://sphinx-gallery.github.io/stable/auto_examples/index.html>`_
+Check out `Sphinx-Gallery docs <https://sphinx-gallery.github.io/stable/syntax.html>`_ or 
+one of the `examples in gallery <https://sphinx-gallery.github.io/stable/auto_examples/index.html>`_
 for more information.
 
 Version history
