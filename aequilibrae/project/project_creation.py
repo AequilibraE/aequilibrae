@@ -3,6 +3,8 @@ import re
 from os.path import join, dirname, realpath
 from sqlite3 import Connection
 from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
+
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
@@ -16,13 +18,24 @@ def initialize_tables(logger, db_type: str, conn: Connection) -> None:
 
 
 def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "tables")
+    base_folder = join(dirname(realpath(__file__)), "database_specification", db_type)
+    spec_folder = join(base_folder, "tables")
+
     with open(join(spec_folder, "table_list.txt"), "r") as file_list:
         all_tables = file_list.readlines()
+
     all_tables = [x.rstrip() for x in all_tables]
+
     for f in all_tables:
         qry_file = join(spec_folder, f"{f}.sql")
         run_queries_from_sql_file(conn, logger, qry_file)
+
+    # For a new database construction all present migrations should have already been applied implicitly by the new
+    # schema. So we mark them all as skipped.
+    mm = MigrationManager(join(base_folder, "migrations", "migrations.py"))
+    mm.mark_all_as_seen(conn)
+    for migration in mm.migrations.values():
+        migration.mark_as(conn, MigrationStatus.SKIPPED)
 
 
 def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
