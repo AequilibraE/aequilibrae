@@ -1,6 +1,6 @@
 import logging
 import re
-from os.path import join, dirname, realpath
+from pathlib import Path
 from sqlite3 import Connection
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
@@ -18,21 +18,21 @@ def initialize_tables(logger, db_type: str, conn: Connection) -> None:
 
 
 def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:
-    base_folder = join(dirname(realpath(__file__)), "database_specification", db_type)
-    spec_folder = join(base_folder, "tables")
+    base_folder = Path(__file__).resolve().parent / "database_specification" / db_type
+    spec_folder = base_folder / "tables"
 
-    with open(join(spec_folder, "table_list.txt"), "r") as file_list:
+    with open(spec_folder / "table_list.txt", "r") as file_list:
         all_tables = file_list.readlines()
 
     all_tables = [x.rstrip() for x in all_tables]
 
     for f in all_tables:
-        qry_file = join(spec_folder, f"{f}.sql")
+        qry_file = spec_folder / f"{f}.sql"
         run_queries_from_sql_file(conn, logger, qry_file)
 
     # For a new database construction all present migrations should have already been applied implicitly by the new
     # schema. So we mark them all as skipped.
-    mm = MigrationManager(join(base_folder, "migrations", "migrations.py"))
+    mm = MigrationManager(base_folder / "migrations" / "migrations.py")
     mm.mark_all_as_seen(conn)
     for migration in mm.migrations.values():
         migration.mark_as(conn, MigrationStatus.SKIPPED)
@@ -40,30 +40,29 @@ def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -
 
 def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
     """Adds consistency triggers to the project"""
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
-    with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
+    spec_folder = Path(__file__).resolve().parent / "database_specification" / db_type / "triggers"
+    with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
     for f in all_trigger_sets:
-        qry_file = join(spec_folder, f"{f}.sql")
+        qry_file = spec_folder / f"{f}.sql"
         run_queries_from_sql_file(conn, logger, qry_file)
 
 
 def remove_triggers(
     conn: Connection, logger: logging.Logger, db_type: str, use_aequilibrae_prefix: bool = True
 ) -> None:
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
-    with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
+    spec_folder = Path(__file__).resolve().parent / "database_specification" / db_type / "triggers"
+    with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
 
     create_drop_regex = re.compile(r"create\s+trigger\s+(\w+)", flags=re.I)
     for table in all_trigger_sets:
-        qry_file = join(spec_folder, f"{table.rstrip()}.sql")
+        qry_file = spec_folder / f"{table.rstrip()}.sql"
 
         with open(qry_file, "r") as sql_file:
             query_list = sql_file.read()
 
-        # Running one query/command at a time helps debugging in the case a particular command fails
         for cmd in query_list.split("--#"):
             for qry in cmd.split("\n"):
                 if qry[:2] == "--":
@@ -84,7 +83,7 @@ def remove_triggers(
                         logger.error(f"Point of failure - > {qry}")
 
 
-def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file: str) -> None:
+def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file: Path) -> None:
     with open(qry_file, "r") as sql_file:
         query_list = sql_file.read()
 
