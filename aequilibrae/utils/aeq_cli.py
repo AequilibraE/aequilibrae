@@ -1,7 +1,6 @@
 from pathlib import Path
 import os
-import enum
-import yaml
+from inspect import signature
 
 import click
 
@@ -23,21 +22,32 @@ def available_parameters():
     return p.parameters["run"]
 
 
-@cli.command(help="Load and return the AequilibraE run module")  # type: ignore
-@click.option("--function", type=click.Choice(list(available_parameters().keys())), required=False)
-def run(function):
-    current_dir = Path.cwd()
-
+@cli.command(help="Load and return the AequilibraE run module")
+@click.option("-d", "--project_dir", required=True, help="Project directory", default=os.getcwd)
+@click.option("-f", "--function", type=click.Choice(list(available_parameters().keys())), required=True)
+@click.argument("params", nargs=-1, required=False)
+def run(project_dir, function, params):
     project = Project()
-    project.open(current_dir)
+    project.open(project_dir)
 
     func = getattr(project.run, function)
-    result = func()
+    sig = signature(func)
+    kwargs = {}
+    if sig.parameters:
+        keys = list(sig.parameters.keys())
+        for i, par in enumerate(params):
+            kwargs[keys[i]] = par
+    result = func(**kwargs)
 
     click.echo(result)
 
     project.close()
 
 
+@cli.command(help="Update the AequilibraE command line interface")
+def update_cli():
+    pass
+
+
 if __name__ == "__main__":
-    cli()  # type: ignore
+    cli()
