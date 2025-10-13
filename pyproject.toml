@@ -88,6 +88,9 @@ build = [
 
 dev = ['aequilibrae[build, tests, docs]']
 
+[project.scripts]
+aeq = "aequilibrae.utils.aeq_cli:cli"
+
 [tool.setuptools.dynamic]
 version = { attr = "aequilibrae.version" }
 
