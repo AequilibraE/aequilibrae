@@ -1,11 +1,11 @@
-from pathlib import Path
 import os
+from pathlib import Path
 from inspect import signature
 
 import click
 
-from aequilibrae.project import Project
 from aequilibrae.parameters import Parameters
+from aequilibrae.project import Project
 
 
 @click.group(invoke_without_command=False)
@@ -22,7 +22,7 @@ def available_parameters():
     return p.parameters["run"]
 
 
-@cli.command(help="Load and return the AequilibraE run module")
+@cli.command(help="Load and return the AequilibraE run module for current directory.")
 @click.option("-d", "--project_dir", required=True, help="Project directory", default=os.getcwd)
 @click.option("-f", "--function", type=click.Choice(list(available_parameters().keys())), required=True)
 @click.argument("params", nargs=-1, required=False)
@@ -42,11 +42,6 @@ def run(project_dir, function, params):
     click.echo(result)
 
     project.close()
-
-
-@cli.command(help="Update the AequilibraE command line interface")
-def update_cli():
-    pass
 
 
 if __name__ == "__main__":
