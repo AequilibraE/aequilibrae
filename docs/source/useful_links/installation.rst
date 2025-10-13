@@ -115,3 +115,47 @@ modeling computers these days. In most cases 16Gb of RAM is enough even for
 large models (5,000+ zones). Computationally intensive procedures such as
 skimming and traffic assignment have been parallelized, so AequilibraE can make
 use of as many CPUs as there are available in the system for such procedures.
+
+Command Line Interface (CLI)
+----------------------------
+
+AequilibraE provides a convenient CLI (command line interface) for a few tasks
+in the run module.
+
+The main thing to know here is that this interface is available only from within
+an active Python virtual environment and, once such environment is active, the
+interface is available from any folder/directory.
+
+The available commands are:
+
+.. code-block:: console
+
+   aeq run
+   aeq list-functions
+
+A simple example for this would be:
+
+.. code-block:: console
+
+   aeq run -d "d:/my_aeq_project" -f custom_function_name param1 param2 param3
+   aeq list-functions -d "d:/my_aeq_project"
+
+The up-to-date configuration for which one of these commands is available by adding
+the parameter `--help` after the command you are interested in using.
+
+.. code-block:: console
+
+   aeq run --help
+
+   >>> Options:
+   >>>  -d, --project_dir TEXT          Project directory  [required]
+   >>>  -f, --function [matrix_summary|graph_summary|results_summary|example_function_with_kwargs]  [required]
+   >>>  --help                          Show this message and exit.
+
+.. code-block:: console
+
+   aeq list-functions --help
+
+   >>> Options:
+   >>>  -d, --project_dir TEXT          Project directory  [required]
+   >>>  --help                          Show this message and exit.

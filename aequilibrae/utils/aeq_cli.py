@@ -12,7 +12,7 @@ from aequilibrae.project import Project
 @click.pass_context
 def cli(ctx):
     if ctx.invoked_subcommand is None:
-        click.echo("You can only run procedures from the 'run' module.")
+        click.echo("You can only invoke commands run or list-functions")
 
 
 def available_parameters():
@@ -42,6 +42,14 @@ def run(project_dir, function, params):
     click.echo(result)
 
     project.close()
+
+
+@cli.command(help="List available functions in the run module.")
+@click.option("-d", "--project_dir", required=True, help="Project directory", default=os.getcwd)
+def list_functions(project_dir):
+    p = Parameters(Path(project_dir))
+
+    click.echo("Available functions: ", list(p.parameters["run"].keys()))
 
 
 if __name__ == "__main__":
