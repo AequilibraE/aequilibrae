@@ -140,7 +140,7 @@ A simple example for this would be:
    aeq run -d "d:/my_aeq_project" -f custom_function_name param1 param2 param3
    aeq list-functions -d "d:/my_aeq_project"
 
-The up-to-date configuration for which one of these commands is available by adding
+The up-to-date configuration for each of these commands is available by adding
 the parameter `--help` after the command you are interested in using.
 
 .. code-block:: console

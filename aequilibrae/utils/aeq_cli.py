@@ -1,4 +1,5 @@
 import os
+import pprint
 from pathlib import Path
 from inspect import signature
 
@@ -35,11 +36,12 @@ def run(project_dir, function, params):
     kwargs = {}
     if sig.parameters:
         keys = list(sig.parameters.keys())
-        for i, par in enumerate(params):
-            kwargs[keys[i]] = par
+        for key, par in zip(keys, params):
+            kwargs[key] = par
     result = func(**kwargs)
 
-    click.echo(result)
+    if result is not None:
+        click.echo(pprint.pprint(result))
 
     project.close()
 
@@ -49,7 +51,7 @@ def run(project_dir, function, params):
 def list_functions(project_dir):
     p = Parameters(Path(project_dir))
 
-    click.echo("Available functions: ", list(p.parameters["run"].keys()))
+    click.echo(f"Available functions: {list(p.parameters['run'].keys())}")
 
 
 if __name__ == "__main__":
