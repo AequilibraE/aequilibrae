@@ -256,7 +256,7 @@ class Project:
         """
         global_logger.info("Starting database upgrades")
         if ignore_project or ignore_transit or ignore_results:
-            warnings.warn("take care when ignoring a database during an upgrade")
+            warnings.warn("Take care when ignoring a database during an upgrade.")
 
         connections = {
             "project_conn": None,
