@@ -46,12 +46,7 @@ project = create_example(fldr)
 
 # %%
 # However, it is possible to upgrade only the project database.
-connections = {"project_conn": connect_spatialite(project._project_database_path)}
-mm = MigrationManager(MigrationManager.network_migration_file)
-with connections["project_conn"] as conn:
-    mm.mark_all_as_seen(conn)
-mm.upgrade("project_conn", connections=connections)
-connections["project_conn"].close()
+project.upgrade(ignore_transit=True, ignore_results=True)
 
 # %%
 # Finally, we close the project

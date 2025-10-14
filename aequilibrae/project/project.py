@@ -6,6 +6,7 @@ import sqlite3
 from collections import namedtuple
 from contextlib import contextmanager
 from pathlib import Path
+import warnings
 
 import pandas as pd
 
@@ -231,31 +232,53 @@ class Project:
         allows the user to read the log or clear it"""
         return Log(self.project_base_path)
 
-    def upgrade(self):
+    def upgrade(self, ignore_project: bool = False, ignore_transit: bool = False, ignore_results: bool = False):
         """
         Find and apply all applicable migrations.
 
         All database upgrades are applied within a single transaction.
 
-        If skipping a specific migration is required, use the ``aequilbrae.project.tools.MigrationManager`` object
+        Optionally ignore specific databases. This is useful when a database is known to be incompatible with some
+        migrations but you'd still like to upgrade the others. Take care when ignoring a database.
+
+        If skipping a specific migration is required, use the ``aequilibrae.project.tools.MigrationManager`` object
         directly. Consult it's documentation page for details. Take care when skipping migrations.
+
+        :Arguments:
+            **ignore_project** (:obj:`bool`, optional): Ignore the project database. No direct migrations will be
+                  applied. Defaults to False.
+            **ignore_transit** (:obj:`bool`, optional): Ignore the transit database. No direct migrations will be
+                  applied. Defaults to False.
+            **ignore_results** (:obj:`bool`, optional): Ignore the results database. No direct migrations will be
+                  applied. Defaults to False.
         """
         global_logger.info("Starting database upgrades")
+        if ignore_project or ignore_transit or ignore_results:
+            warnings.warn("take care when ignoring a database during an upgrade")
+
         connections = {
-            "project_conn": connect_spatialite(self._project_database_path),
+            "project_conn": None,
             "transit_conn": None,
             "results_conn": None,
         }
-        targets = [
-            (MigrationManager(MigrationManager.network_migration_file), "project_conn"),
-        ]
+        targets = []
 
-        if (self.project_base_path / "public_transport.sqlite").exists():
+        if not ignore_project:
+            targets.append((MigrationManager(MigrationManager.network_migration_file), "project_conn"))
+            connections["project_conn"] = connect_spatialite(self._project_database_path)
+        else:
+            global_logger.warning("Ignoring project database during upgrade")
+
+        if not ignore_transit and (self.project_base_path / "public_transport.sqlite").exists():
             targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
             connections["transit_conn"] = connect_spatialite(self._transit_database_path)
+        else:
+            global_logger.warning("Ignoring transit database during upgrade")
 
-        if (self.project_base_path / "results_database.sqlite").exists():
+        if not ignore_results and (self.project_base_path / "results_database.sqlite").exists():
             connections["results_conn"] = safe_connect(self._results_database_path)
+        else:
+            global_logger.warning("Ignoring results database during upgrade")
 
         try:
             for mm, main_conn in targets:
