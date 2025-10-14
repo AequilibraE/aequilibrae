@@ -15,10 +15,9 @@ This is useful when you need to use the latest AequilibraE's database schemas or
 
 # %%
 # .. seealso::
-#     Several functions, methods, classes and modules are used in this example:
+#     Functions used in this example:
 #
 #     * :func:`aequilibrae.project.project.Project.upgrade`
-#     * :func:`aequilibrae.project.tools.migration_manager.MigrationManager`
 
 # %%
 
