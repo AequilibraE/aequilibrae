@@ -239,7 +239,9 @@ class Project:
         All database upgrades are applied within a single transaction.
 
         Optionally ignore specific databases. This is useful when a database is known to be incompatible with some
-        migrations but you'd still like to upgrade the others. Take care when ignoring a database.
+        migrations but you'd still like to upgrade the others. Take care when ignoring a database. For a particular
+        version of aequilibrae, it is assumed that all migrations have been applied successfully or the project was
+        created with the latest schema, skipping/ignoring migrations will likely lead to issues/broken assumptions.
 
         If skipping a specific migration is required, use the ``aequilibrae.project.tools.MigrationManager`` object
         directly. Consult it's documentation page for details. Take care when skipping migrations.
