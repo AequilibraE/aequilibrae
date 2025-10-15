@@ -45,6 +45,9 @@ dependencies = [
 [project.license]
 file = "LICENSE.TXT"
 
+[project.scripts]
+aeq = "aequilibrae.project.tools.cli:cli"
+
 [project.optional-dependencies]
 
 docs = [
