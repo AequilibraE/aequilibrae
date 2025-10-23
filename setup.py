@@ -11,7 +11,7 @@ from setuptools import setup, find_packages
 from setuptools.discovery import FlatLayoutPackageFinder
 from multiprocessing import cpu_count
 
-include_dirs = [np.get_include()]
+include_dirs = [np.get_include(), join("aequilibrae", "utils", "cython"), join("aequilibrae", "utils", "cpp")]
 libraries = []
 library_dirs = []
 
@@ -95,9 +95,18 @@ ext_mod_coo_demand = Extension(
     **extension_args,
 )
 
-ext_mod_atomic_signal = Extension(
-    "aequilibrae.utils.cython.atomic_signal",
-    [join("aequilibrae", "utils", "cython", "atomic_signal.pyx")],
+ext_mod_bridge = Extension(
+    "aequilibrae.utils.cython.bridge",
+    [
+        join("aequilibrae", "utils", "cython", "bridge.pyx"),
+        join("aequilibrae", "utils", "cpp", "aeq_log.cpp")
+    ],
+    **extension_args,
+)
+
+ext_mod_bar = Extension(
+    "aequilibrae.utils.cython.bridge",
+    [join("aequilibrae", "utils", "cython", "bar.pyx")],
     **extension_args,
 )
 
@@ -112,14 +121,15 @@ if __name__ == "__main__":
             [
                 ext_mod_aon,
                 ext_mod_ipf,
-                ext_mod_put,
-                ext_mod_rc,
+                # ext_mod_put,
+                # ext_mod_rc,
                 ext_mod_coo_demand,
                 ext_mod_rc_ll_results,
                 ext_mod_rc_set_results,
                 ext_mod_graph_building,
                 ext_mod_sparse_matrix,
-                ext_mod_atomic_signal,
+                ext_mod_bridge,
+                ext_mod_bar,
             ],
             compiler_directives={"language_level": "3str"},
             nthreads=min(60, cpu_count()),  # Windows does not do well with more than 60 threads
