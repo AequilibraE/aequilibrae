@@ -11,7 +11,8 @@ from libcpp.utility cimport pair
 cdef extern from "<utility>" namespace "std" nogil:
     pair[T, U] make_pair[T, U](T&& t, U&& u)
 
-
+# We use a niche piece of syntax here to make Cython generate a header we can use in C++ for this class
+# https://cython.readthedocs.io/en/latest/src/userguide/extension_types.html#name-specification-clause
 cdef public class Bridge [object Bridge, type Bridge_t]:
     cdef:
         public object task
@@ -56,8 +57,6 @@ cdef extern from "aeq_log.h":
     void log"AEQ_LOG"(Bridge bridge, int lvl, string msg_exp) noexcept nogil
 
     string f "aeq_format_string"(...) noexcept nogil
-
-    void cpp_function_that_logs(Bridge b) noexcept nogil
 
 
 cdef public void _c_to_python_log_bridge"aeq_c_to_python_log_bridge"(Bridge b, int level, string msg) noexcept nogil

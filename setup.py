@@ -99,13 +99,12 @@ ext_mod_bridge = Extension(
     "aequilibrae.utils.cython.bridge",
     [
         join("aequilibrae", "utils", "cython", "bridge.pyx"),
-        join("aequilibrae", "utils", "cpp", "aeq_log.cpp")
     ],
     **extension_args,
 )
 
 ext_mod_bar = Extension(
-    "aequilibrae.utils.cython.bridge",
+    "aequilibrae.utils.cython.bar",
     [join("aequilibrae", "utils", "cython", "bar.pyx")],
     **extension_args,
 )
@@ -122,7 +121,7 @@ if __name__ == "__main__":
                 ext_mod_aon,
                 ext_mod_ipf,
                 # ext_mod_put,
-                # ext_mod_rc,
+                ext_mod_rc,
                 ext_mod_coo_demand,
                 ext_mod_rc_ll_results,
                 ext_mod_rc_set_results,

@@ -50,11 +50,10 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         self._stop.store(True, memory_order.memory_order_relaxed)
 
     def new_bar(self, *args, **kwargs):
-        idx = len(self.bars)
         bar = Bar(*args, **kwargs)
 
         self.bars.append(bar)
-        return idx, bar
+        return bar
 
     cdef bool should_stop(Bridge self) noexcept nogil:
         return self._stop.load(memory_order.memory_order_relaxed)
@@ -96,7 +95,7 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         #  - Update progress bars.
 
         try:
-            with logging_redirect_tqdm(loggers=[self.__logger]):
+            with logging_redirect_tqdm(loggers=[logging.getLogger()]):
                 while not self.should_stop():
                     with nogil:
                          msleep(100)
@@ -147,6 +146,7 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
 
     def __enter__(self):
         self.start()
+        return self
 
     def __exit__(self, *_):
         self.stop()
@@ -203,7 +203,7 @@ def long_running(bridge: Bridge):
 
                 msleep(threadid() * 100)
                 log(bridge, WARNING, f("Hello from thread ", threadid(), "! i: ", i))
-                cpp_function_that_logs(bridge)
+                # cpp_function_that_logs(bridge)
                 bar.inc()
             else:
                 log(bridge, WARNING, f("Exited normally"))

@@ -2,7 +2,9 @@
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.utils.cython.atomic_signal cimport AtomicSignal
+from aequilibrae.utils.cython.bridge cimport Bridge, log, f, DEBUG, msleep, _c_to_python_log_bridge
+from aequilibrae.utils.cython.bar cimport Bar
+
 
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
@@ -153,7 +155,6 @@ cdef class RouteChoiceSet:
         return [tuple(x) for x in results["route set"]]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
-    @AtomicSignal.progress_bar(1.0, msg="{}/{} OD pairs processed")
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -177,7 +178,7 @@ cdef class RouteChoiceSet:
         beta: float = 1.0,
         cutoff_prob: float = 0.0,
         *,
-        signal: AtomicSignal
+        bridge: Bridge
     ):
         """Compute the a route set for a list of OD pairs.
 
@@ -226,7 +227,7 @@ cdef class RouteChoiceSet:
             if self.nodes_to_indices_view[dest] == -1:
                 raise ValueError(f"Destination {dest} is not present within the compact graph")
 
-        signal.set_total(len(demand.df))
+        cdef Bar bar = bridge.new_bar("{}/{} ODs processed", len(demand.df))
 
         cdef:
             long long origin_index, dest_index
@@ -297,9 +298,10 @@ cdef class RouteChoiceSet:
                 for i in prange(<long int>demand.ods.size(), schedule="guided"):
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
+                    log(bridge, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
 
                     if origin_index == dest_index:
-                        signal.inc()
+                        bar.inc()
                         continue
 
                     if self.block_flows_through_centroids:
@@ -383,7 +385,7 @@ cdef class RouteChoiceSet:
                             self.b_nodes_view,
                         )
 
-                    signal.inc()
+                    bar.inc()
 
                 del route_set
 

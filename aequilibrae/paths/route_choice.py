@@ -23,6 +23,10 @@ from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.cython.bridge import Bridge
+
+
+logger = logging.getLogger(__name__)
 
 
 class RouteChoice:
@@ -53,7 +57,7 @@ class RouteChoice:
         proj = project or get_active_project(must_exist=False)
         self.project = proj
 
-        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
+        # self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
 
         self.cores: int = 0
         self.graph = graph
@@ -277,18 +281,20 @@ class RouteChoice:
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        return self.__rc.run(
-            origin,
-            destination,
-            self.demand.shape,
-            demand=demand,
-            bfsle=self.algorithm == "bfsle",
-            path_size_logit=bool(demand),
-            cores=self.cores,
-            where=str(self.where) if self.where is not None else None,
-            sl_link_loading=self.sl_link_loading,
-            **self.parameters,
-        )
+        with Bridge(logger) as bridge:
+            return self.__rc.run(
+                origin,
+                destination,
+                self.demand.shape,
+                demand=demand,
+                bfsle=self.algorithm == "bfsle",
+                path_size_logit=bool(demand),
+                cores=self.cores,
+                where=str(self.where) if self.where is not None else None,
+                sl_link_loading=self.sl_link_loading,
+                bridge=bridge,
+                **self.parameters,
+            )
 
     def execute(self, perform_assignment: bool = True) -> None:
         """
@@ -307,16 +313,18 @@ class RouteChoice:
 
         self.procedure_date = str(datetime.today())
 
-        self.__rc.batched(
-            self.demand,
-            self._selected_links,
-            bfsle=self.algorithm == "bfsle",
-            path_size_logit=perform_assignment,
-            cores=self.cores,
-            where=str(self.where) if self.where is not None else None,
-            sl_link_loading=self.sl_link_loading,
-            **self.parameters,
-        )
+        with Bridge(logger) as bridge:
+            self.__rc.batched(
+                self.demand,
+                self._selected_links,
+                bfsle=self.algorithm == "bfsle",
+                path_size_logit=perform_assignment,
+                cores=self.cores,
+                where=str(self.where) if self.where is not None else None,
+                sl_link_loading=self.sl_link_loading,
+                bridge=bridge,
+                **self.parameters,
+            )
 
     def execute_from_path_files(self, path_files: Union[pathlib.Path, str], recompute_psl: bool = False) -> None:
         """
@@ -426,8 +434,8 @@ class RouteChoice:
         return info
 
     def log_specification(self):
-        self.logger.info("Route Choice specification")
-        self.logger.info(self._config)
+        logger.info("Route Choice specification")
+        logger.info(self._config)
 
     def get_results(self) -> pd.DataFrame:
         """

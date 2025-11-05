@@ -1,5 +1,5 @@
-#ifndef _AEQ_LOG_H
-#define _AEQ_LOG_H
+#ifndef AEQ_LOG_H
+#define AEQ_LOG_H
 
 // Includes required by bridge.h
 #include <atomic>
@@ -7,7 +7,8 @@
 #include <deque>
 #include <string>
 #include <sstream>
-#include "bridge.h"  // This header is generated when bridge.pyx is cythonized
+// Can't include here because duplicate declarations?
+// #include "bridge.h"  // This header is generated when bridge.pyx is cythonized
 
 #define AEQ_LOG(bridge, level, msg_exp)                                        \
   do {                                                                         \
@@ -24,6 +25,4 @@ std::string aeq_format_string(Args &&...args) {
   return oss.str();
 }
 
-void cpp_function_that_logs(struct Bridge *b);
-
-#endif  // _AEQ_LOG_H
+#endif  // AEQ_LOG_H
