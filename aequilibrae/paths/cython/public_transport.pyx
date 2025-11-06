@@ -2,6 +2,7 @@
 
 import multiprocessing
 import socket
+import logging
 from pathlib import Path
 import json
 
@@ -12,11 +13,13 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.utils.db_utils import commit_and_close
 
-from aequilibrae.utils.cython.atomic_signal cimport AtomicSignal
+from aequilibrae.utils.cython.bridge cimport Bridge
 
 include 'hyperpath.pyx'
 
 from typing import Union
+
+logger = logging.getLogger(__name__)
 
 
 class HyperpathGenerating:
@@ -310,7 +313,7 @@ class HyperpathGenerating:
 
         self.skim_matrix = np.zeros((n_centroids, n_centroids, n_skim_cols))
 
-        with AtomicSignal(1.0, "{}/{} destinations processed" + (" (skimming)" if self._skimming else "")) as signal:
+        with Bridge(logger) as bridge:
             compute_SF_in_parallel(
                 self._indptr[:],
                 self._edge_idx[:],
@@ -337,7 +340,7 @@ class HyperpathGenerating:
                 self._skimming,
                 self._is_travel_time,
                 len(self._skim_cols_names),
-                signal
+                bridge
             )
 
         if self._skimming:

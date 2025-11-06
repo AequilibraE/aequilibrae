@@ -104,7 +104,7 @@ def cached_empty_no_triggers_project(cache_path):
 @pytest.fixture
 def empty_no_triggers_project(empty_project, tmp_path) -> Project:
     with empty_project.db_connection as conn:
-        remove_triggers(conn, empty_project.logger, db_type="network")
+        remove_triggers(conn, db_type="network")
         tables = ["nodes", "links"]
         for tbl in tables:
             conn.execute(f"DELETE FROM {tbl}")

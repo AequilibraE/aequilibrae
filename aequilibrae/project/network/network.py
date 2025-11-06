@@ -1,5 +1,6 @@
 import math
 from typing import Dict, Optional
+import logging
 
 import numpy as np
 import pandas as pd
@@ -8,7 +9,6 @@ import shapely.wkt
 from shapely import union_all
 from shapely.geometry import Polygon, box
 
-from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
@@ -25,6 +25,8 @@ from aequilibrae.project.project_creation import req_link_flds, req_node_flds, p
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
+
+logger = logging.getLogger(__name__)
 
 
 class Network(WorkerThread):
@@ -44,7 +46,6 @@ class Network(WorkerThread):
 
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
-        self.logger = project.logger
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
         self.links = Links(self)
@@ -175,11 +176,11 @@ class Network(WorkerThread):
             bbox, report = placegetter(place_name)
             if bbox is None:
                 msg = f'We could not find a reference for place name "{place_name}"'
-                self.logger.warning(msg)
+                logger.warning(msg)
                 return
             for i in report:
                 if "PLACE FOUND" in i:
-                    self.logger.info(i)
+                    logger.info(i)
             model_area = box(*bbox)
             west, south, east, north = bbox
 
@@ -209,18 +210,18 @@ class Network(WorkerThread):
                     subarea = box(xmin, ymin, xmax, ymax)
                     if subarea.intersects(model_area):
                         polygons.append(subarea)
-        self.logger.info("Downloading data")
-        dwnloader = OSMDownloader(polygons, modes, logger=self.logger)
+        logger.info("Downloading data")
+        dwnloader = OSMDownloader(polygons, modes)
         dwnloader.signal = self.signal
         dwnloader.doWork()
 
-        self.logger.info("Building Network")
+        logger.info("Building Network")
         self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
 
         self.builder.signal = self.signal
         self.builder.doWork()
 
-        self.logger.info("Network built successfully")
+        logger.info("Network built successfully")
 
     def create_from_gmns(
         self,
@@ -250,7 +251,7 @@ class Network(WorkerThread):
         gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
         gmns_builder.doWork()
 
-        self.logger.info("Network built successfully")
+        logger.info("Network built successfully")
 
     def export_to_gmns(self, path: str):
         """
@@ -263,7 +264,7 @@ class Network(WorkerThread):
         gmns_exporter = GMNSExporter(self, path)
         gmns_exporter.doWork()
 
-        self.logger.info("Network exported successfully")
+        logger.info("Network exported successfully")
 
     def build_graphs(self, fields: list = None, modes: list = None, limit_to_area: Polygon = None) -> None:
         """Builds graphs for all modes currently available in the model
@@ -354,7 +355,7 @@ class Network(WorkerThread):
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)
             if centroids is None:
-                get_logger().warning("Your graph has no centroids")
+                logger.warning("Your graph has no centroids")
             g.lonlat_index = lonlat.loc[g.all_nodes]
             self.graphs[m] = g
 

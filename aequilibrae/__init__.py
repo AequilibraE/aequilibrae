@@ -1,6 +1,6 @@
 import os
+import logging
 
-from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
 from aequilibrae.log import Log
@@ -26,4 +26,7 @@ from aequilibrae import paths
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
 version = "1.5.0"
 
-os.environ["CYSIGNALS_CRASH_QUIET"] = os.environ.get("CYSIGNALS_CRASH_QUIET", "1")
+if "AEQ_CRASH_LOUD" not in os.environ:
+    os.environ["CYSIGNALS_CRASH_QUIET"] = "1"
+
+logger = logging.getLogger(__name__)

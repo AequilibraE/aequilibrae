@@ -1,4 +1,5 @@
 from copy import deepcopy
+import logging
 
 import geopandas as gpd
 import shapely.wkb
@@ -7,6 +8,8 @@ from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.link import Link
 from aequilibrae.project.table_loader import TableLoader
+
+logger = logging.getLogger(__name__)
 
 
 class Links(BasicTable):
@@ -120,7 +123,7 @@ class Links(BasicTable):
             with self.project.db_connection_spatial as conn:
                 d = conn.execute("Delete from Links where link_id=?", [link_id]).rowcount
         if d:
-            self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
+            logger.warning(f"Link {link_id} was successfully removed from the project database")
         else:
             self.__existence_error(link_id)
 

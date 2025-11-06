@@ -1,5 +1,4 @@
 import pathlib
-import logging
 
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
@@ -24,7 +23,6 @@ class Scenario:
     name: str
     base_path: pathlib.Path
     path_to_file: pathlib.Path
-    logger: logging.Logger
 
     about: About
     network: Network

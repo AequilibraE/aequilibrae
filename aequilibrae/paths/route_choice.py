@@ -57,8 +57,6 @@ class RouteChoice:
         proj = project or get_active_project(must_exist=False)
         self.project = proj
 
-        # self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
-
         self.cores: int = 0
         self.graph = graph
         self.demand = self.__init_demand()

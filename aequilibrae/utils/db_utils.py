@@ -4,9 +4,11 @@ from os import PathLike
 from pathlib import Path
 from sqlite3 import Connection, connect
 from typing import Union
+import logging
 
 import pandas as pd
-from aequilibrae import logger
+
+logger = logging.getLogger(__name__)
 
 
 class AequilibraEConnection(sqlite3.Connection):

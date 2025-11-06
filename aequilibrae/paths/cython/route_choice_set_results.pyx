@@ -10,8 +10,9 @@ import pandas as pd
 import numpy as np
 
 import cython
+import logging
 
-from aequilibrae.log import logger
+logger = logging.getLogger(__name__)
 
 
 @cython.embedsignature(True)

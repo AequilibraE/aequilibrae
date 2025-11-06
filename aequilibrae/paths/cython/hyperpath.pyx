@@ -13,7 +13,8 @@ cimport numpy as cnp
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
-from aequilibrae.utils.cython.atomic_signal cimport AtomicSignal
+from aequilibrae.utils.cython.bridge cimport Bridge, log, f
+from aequilibrae.utils.cython.bar cimport Bar
 
 ctypedef cnp.float64_t DATATYPE_t
 DATATYPE_PY = np.float64
@@ -209,7 +210,7 @@ cdef void compute_SF_in_parallel(
     bint skimming,
     bint is_travel_time,
     size_t n_skim_cols,
-    AtomicSignal signal,
+    Bridge bridge,
 ) noexcept nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     cdef:
@@ -246,7 +247,7 @@ cdef void compute_SF_in_parallel(
             destination_vertex_indices_view.shape[0]
         )
 
-    signal.set_total(total)
+    cdef Bar bar = bridge.new_bar("{}/{} destinations processed" + (" (skimming)" if skimming else ""), total=total)
 
     with parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
@@ -275,7 +276,7 @@ cdef void compute_SF_in_parallel(
                 destination_vertex = rest_of_destinations_view[i - destination_vertex_indices_view.shape[0]]
 
             if nodes_to_indices[destination_vertex] == -1:
-                signal.inc()
+                bar.inc()
                 continue  # Completely disconnected nodes have an index of -1
 
             if i < destination_vertex_indices_view.shape[0]:
@@ -329,7 +330,7 @@ cdef void compute_SF_in_parallel(
                 skimming,
                 is_travel_time
             )
-            signal.inc()
+            bar.inc()
 
         free(thread_demand_origins)
         free(thread_demand_values)

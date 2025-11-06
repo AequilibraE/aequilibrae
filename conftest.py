@@ -27,3 +27,8 @@ def doctest_fixtures(doctest_namespace, tmp_path_factory, tmp_path):
     doctest_namespace["np"] = np
     doctest_namespace["Path"] = Path
     doctest_namespace["Polygon"] = Polygon
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_env():
+    os.environ["AEQ_SHOW_PROGRESS"] = "FALSE"

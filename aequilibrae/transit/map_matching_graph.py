@@ -3,6 +3,7 @@ import math
 from copy import deepcopy
 from os.path import isfile, join
 from tempfile import gettempdir
+import logging
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,6 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.ops import substring
 
-from aequilibrae.log import logger
 from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
@@ -21,6 +21,8 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 GRAPH_VERSION = 1
 CONNECTOR_SPEED = 1
+
+logger = logging.getLogger(__name__)
 
 
 class MMGraph(WorkerThread):
@@ -47,7 +49,6 @@ class MMGraph(WorkerThread):
         self.__all_links = {}
         self.distance_to_project = -1
         self.df = pd.DataFrame([])
-        self.logger = logger
         self.signal = lib_gtfs.signal
 
     def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200):
@@ -59,7 +60,7 @@ class MMGraph(WorkerThread):
             **distance_to_project** (:obj:`float`, *Optional*): Radius search for links to break at the stops.
             Defaults to 50m
         """
-        self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
+        logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
 
         self.mode_id = mode_id
         self.distance_to_project = distance_to_project
@@ -76,7 +77,7 @@ class MMGraph(WorkerThread):
                           distance, ST_AsText(ST_Reverse(geometry)) wkt from links
                           WHERE INSTR(links.modes, "{self.__mode}")>0 AND direction<=0;"""
 
-            self.logger.debug("  Reading links from physical network")
+            logger.debug("  Reading links from physical network")
             self.df = pd.read_sql(get_qry, conn)
 
         if not self.df.shape[0]:
@@ -102,7 +103,7 @@ class MMGraph(WorkerThread):
 
     def __build_graph_from_cache(self):
         msg = f"Loading map-matching graph from disk for mode_id={self.mode_id} (Step: 8/12)"
-        self.logger.info(msg)
+        logger.info(msg)
         self.signal.emit(["set_text", msg])
 
         net = pd.read_csv(self.__df_file)
@@ -116,7 +117,7 @@ class MMGraph(WorkerThread):
 
     def __build_graph_from_scratch(self):
         msg = f"Creating map-matching graph from scratch for mode_id={self.mode_id} (Step: 8/12)"
-        self.logger.info(msg)
+        logger.info(msg)
         self.signal.emit(["set_text", msg])
 
         self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=self.df.wkt.apply(shapely.wkt.loads))

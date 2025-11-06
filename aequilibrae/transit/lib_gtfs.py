@@ -1,5 +1,6 @@
 from contextlib import closing
 from copy import deepcopy
+import logging
 
 import geopandas as gpd
 import pandas as pd
@@ -7,7 +8,7 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
 
-from aequilibrae.context import get_active_project, get_logger
+from aequilibrae.context import get_active_project
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
@@ -15,6 +16,8 @@ from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
+
+logger = logging.getLogger(__name__)
 
 
 class GTFSRouteSystemBuilder(WorkerThread):
@@ -45,7 +48,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
         self.day = day
-        self.logger = get_logger()
         with self.project.transit_connection as conn:
             self.gtfs_data = GTFSReader(conn)
         self.srid = get_srid()
@@ -66,7 +68,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__has_taz = len(self.project.zoning.all_zones()) > 0
 
         if file_path is not None:
-            self.logger.info(f"Creating GTFS feed object for {file_path}")
+            logger.info(f"Creating GTFS feed object for {file_path}")
             self.gtfs_data.set_feed_path(file_path)
             self.gtfs_data._set_capacities(self.__default_capacities)
             self.gtfs_data._set_pces(self.__default_pces)
@@ -150,7 +152,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
                 if msg is not None:
-                    self.logger.warning(msg)
+                    logger.warning(msg)
 
     def set_agency_identifier(self, agency_id: str) -> None:
         """Adds agency ID to this GTFS for use on import.
@@ -197,7 +199,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.gtfs_data.load_data(service_date)
 
-        self.logger.info("  Building data structures")
+        logger.info("  Building data structures")
 
         self.__build_data()
 
@@ -208,15 +210,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.execute_import()
 
     def execute_import(self):
-        self.logger.debug("Starting execute_import")
+        logger.debug("Starting execute_import")
 
         if self.__target_date__ is not None:
             self.load_date(self.__target_date__)
         if not self.select_routes:
-            self.logger.warning(f"Nothing to import for {self.gtfs_data.agency.agency} on {self.day}")
+            logger.warning(f"Nothing to import for {self.gtfs_data.agency.agency} on {self.day}")
             return
 
-        self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
+        logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
 
         self.save_to_disk()
 
@@ -265,10 +267,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
             msg = "    Some stops are outside the zoning system. Check the result on a map and see the log for info"
-            self.logger.warning(msg)
+            logger.warning(msg)
 
     def __build_data(self):
-        self.logger.debug("Starting __build_data")
+        logger.debug("Starting __build_data")
         self.__get_routes_by_date()
 
         self.select_stops.clear()
@@ -296,7 +298,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for trip in new_trips:
                 trip.pattern_id = c.pattern_lookup[trip.pattern_hash]
                 trip.get_trip_id()
-                self.logger.debug(f"Trip ID generated is {trip.trip_id} for pattern {trip.pattern_id}")
+                logger.debug(f"Trip ID generated is {trip.trip_id} for pattern {trip.pattern_id}")
                 if trip.pattern_id in self.select_patterns:
                     continue
 
@@ -307,7 +309,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             route.pattern_id = trip.pattern_id
 
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
-        self.logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
+        logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
         p = Pattern(route.route_id, self)
         p.pattern_id = trip.pattern_id
         p.route = trip.route
@@ -358,18 +360,18 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     def __error_logging(self, titles, values):
         for i, j in zip(titles, values):
-            self.logger.error(f"- {i}: {j}")
+            logger.error(f"- {i}: {j}")
 
     def __warning_logging(self, titles, values):
         for i, j in zip(titles, values):
-            self.logger.warning(f"- {i}: {j}")
+            logger.warning(f"- {i}: {j}")
 
     def __fail(self, msg: str) -> None:
-        self.logger.error(msg)
+        logger.error(msg)
         raise Exception(msg)
 
     def __get_routes_by_date(self):
-        self.logger.debug("Starting __get_routes_by_date")
+        logger.debug("Starting __get_routes_by_date")
 
         routes = {}
         for route_id, route in self.gtfs_data.routes.items():
@@ -384,7 +386,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                         routes[route_id] = route
                         break
         if not routes:
-            self.logger.warning("NO ROUTES OPERATING FOR THIS DATE")
+            logger.warning("NO ROUTES OPERATING FOR THIS DATE")
 
         for route_id, route in routes.items():
             route.agency = self.gtfs_data.agency.agency

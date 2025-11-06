@@ -1,4 +1,5 @@
 import os
+import logging
 from os.path import isfile, join
 
 import pandas as pd
@@ -7,13 +8,14 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.project.table_loader import TableLoader
 
+logger = logging.getLogger(__name__)
+
 
 class Matrices:
     """Gateway into the matrices available/recorded in the model"""
 
     def __init__(self, project):
         self.project = project
-        self.logger = project.logger
         self.__items = {}
         self.__fields = []
 
@@ -48,7 +50,7 @@ class Matrices:
             remove = [nm for nm, file in mats if not isfile(join(self.fldr, file))]
 
             if remove:
-                self.logger.warning(f"Matrix records not found in disk cleaned from database: {','.join(remove)}")
+                logger.warning(f"Matrix records not found in disk cleaned from database: {','.join(remove)}")
 
                 remove = [[x] for x in remove]
                 conn.executemany("DELETE from matrices where name=?;", remove)
@@ -62,7 +64,7 @@ class Matrices:
         new_files = [x for x in new_files if os.path.splitext(x.lower())[1] in [".omx", ".aem"]]
 
         if new_files:
-            self.logger.warning(f"New matrix found on disk. Added to the database: {','.join(new_files)}")
+            logger.warning(f"New matrix found on disk. Added to the database: {','.join(new_files)}")
 
         for fl in new_files:
             mat = AequilibraeMatrix()
@@ -190,7 +192,7 @@ class Matrices:
         mr = MatrixRecord(tp, self.project)
         mr.save()
         self.__items[name.lower()] = mr
-        self.logger.warning("Matrix Record has been saved to the database")
+        logger.warning("Matrix Record has been saved to the database")
         return mr
 
     def _clear(self):

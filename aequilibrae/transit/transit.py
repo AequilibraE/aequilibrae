@@ -2,11 +2,11 @@ import os
 import shutil
 import sqlite3
 import warnings
+import logging
 from typing import Dict, List
 
 import pandas as pd
 
-from aequilibrae.log import logger
 from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
@@ -16,6 +16,8 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import read_and_close
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+logger = logging.getLogger(__name__)
 
 
 class Transit(WorkerThread):
@@ -44,7 +46,6 @@ class Transit(WorkerThread):
         super().__init__(None)
 
         self.project = project
-        self.logger = logger
         self.periods = project.network.periods
 
         self.create_transit_database()
@@ -87,7 +88,7 @@ class Transit(WorkerThread):
         if not os.path.exists(self.project._transit_database_path):
             shutil.copyfile(spatialite_database, self.project._transit_database_path)
             with self.project.transit_connection as conn:
-                initialize_tables(self.logger, "transit", conn=conn)
+                initialize_tables("transit", conn=conn)
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

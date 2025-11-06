@@ -22,6 +22,8 @@ if False:
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
+logger = logging.getLogger(__name__)
+
 
 class LinearApproximation(WorkerThread):
     signal = SIGNAL(object)
@@ -29,7 +31,6 @@ class LinearApproximation(WorkerThread):
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
         self.signal.emit(["set_text", "Linear Approximation"])
-        self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
         self.project_path = project.project_base_path if project else gettempdir()
 
@@ -468,8 +469,8 @@ class LinearApproximation(WorkerThread):
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
             self.aons[c._id].signal = self.signal
 
-        self.logger.info(f"{self.algorithm} Assignment STATS")
-        self.logger.info("Iteration, RelativeGap, stepsize")
+        logger.info(f"{self.algorithm} Assignment STATS")
+        logger.info("Iteration, RelativeGap, stepsize")
 
         msg = "Equilibrium Assignment"
         for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
@@ -600,7 +601,7 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
 
-            self.logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
+            logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
                 self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
@@ -625,8 +626,8 @@ class LinearApproximation(WorkerThread):
             c.congested_time = self.congested_time
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
-            self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
-        self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
+            logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
+        logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         self.signal.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
@@ -672,7 +673,7 @@ class LinearApproximation(WorkerThread):
             min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
             self.stepsize = min_res.root
             if not min_res.converged:
-                self.logger.warning("Descent direction stepsize finder has not converged")
+                logger.warning("Descent direction stepsize finder has not converged")
 
             self.conjugate_failed = False
 
@@ -690,7 +691,7 @@ class LinearApproximation(WorkerThread):
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
                     # works well in practice, however for a large number of iterations this might be too much so
                     # use this heuristic instead.
-                    self.logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
                     self.stepsize = tiny_step
                 else:
                     self.stepsize = 0.0
@@ -699,7 +700,7 @@ class LinearApproximation(WorkerThread):
                     self.conjugate_failed = True
 
                     msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
-                    self.logger.warning(msg)
+                    logger.warning(msg)
                     self.iteration_issue.append(msg)
 
                     # By doing it recursively, we avoid doing the same AoN again
@@ -709,7 +710,7 @@ class LinearApproximation(WorkerThread):
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0
-                self.logger.warning("Reset line search")
+                logger.warning("Reset line search")
                 self.stepsize_has_been_reset = True
 
         assert 0 <= self.stepsize <= 1.0

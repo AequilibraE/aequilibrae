@@ -1,3 +1,4 @@
+import logging
 from sqlite3 import Connection
 from typing import List, Tuple, Optional
 
@@ -13,6 +14,8 @@ from .link import Link
 from .mode_correspondence import mode_correspondence
 
 DEAD_END_RUN = 40
+
+logger = logging.getLogger(__name__)
 
 
 class Pattern(BasicPTElement):
@@ -40,7 +43,6 @@ class Pattern(BasicPTElement):
         self.total_capacity = None
         self.__srid = get_srid()
         self.__geolinks = gtfs_feed.geo_links
-        self.__logger = gtfs_feed.logger
 
         self.__feed = gtfs_feed
         # For map matching
@@ -134,7 +136,7 @@ class Pattern(BasicPTElement):
         if self.__map_matched:
             return
         self.__map_matched = True
-        self.__logger.debug(f"Map-matching pattern ID {self.pattern_id}")
+        logger.debug(f"Map-matching pattern ID {self.pattern_id}")
 
         if not self.__feed.graphs:
             self.__feed.builds_link_graphs_with_broken_stops()
@@ -144,13 +146,13 @@ class Pattern(BasicPTElement):
         self.__map_matching_error.clear()
         df = self.__map_matching_complete_path_building()
         if df.shape[0] == 0:
-            self.__logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
+            logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
             return
         self.full_path = df.link_id.to_list()
         self.fpath_dir = df.dir.to_list()
         self.__assemble__mm_shape(df)
         self.__build_pattern_mapping()
-        self.__logger.info(f"Map-matched pattern {self.pattern_id}")
+        logger.info(f"Map-matched pattern {self.pattern_id}")
 
     # TODO: consider improving the link selection for discount applying an overlay and use a cost proportional to the
     # link length in the route (raw_shape) buffer.
@@ -182,7 +184,7 @@ class Pattern(BasicPTElement):
 
         for i, stop in enumerate(candidate_stops):
             node_o = stop.__map_matching_id__[self.route_type]
-            self.__logger.debug(f"Computing paths between {node_o} and {node0}")
+            logger.debug(f"Computing paths between {node_o} and {node0}")
             res.compute_path(node_o, int(node0), early_exit=False)
             # Get skims, as proxy for connectivity, for all stops other than the origin
             other_nodes = stop_node_idxs[:i] + stop_node_idxs[i + 1 :]
@@ -194,7 +196,7 @@ class Pattern(BasicPTElement):
                 break
 
         if not connected_stops:
-            self.__logger.critical(f"Route completely disconnected. {self.route}/{self.route_id}")
+            logger.critical(f"Route completely disconnected. {self.route}/{self.route_id}")
             return empty_frame
 
         graph.cost = np.array(graph.graph.distance)
@@ -208,7 +210,7 @@ class Pattern(BasicPTElement):
 
         if len(connected_stops) == 2:
             nstop = connected_stops[1].__map_matching_id__[self.route_type]
-            self.__logger.debug(f"Computing paths between {fstop.__map_matching_id__[self.route_type]} and {nstop}")
+            logger.debug(f"Computing paths between {fstop.__map_matching_id__[self.route_type]} and {nstop}")
             res.compute_path(fstop.__map_matching_id__[self.route_type], int(nstop), early_exit=True)
             if res.milepost is None:
                 return empty_frame
@@ -229,7 +231,7 @@ class Pattern(BasicPTElement):
             if not_last:
                 following_stop = connected_stops[idx + 2]
                 n_end = following_stop.__map_matching_id__[self.route_type]
-            self.__logger.debug(f"Computing paths between {start} and {end}")
+            logger.debug(f"Computing paths between {start} and {end}")
             res.compute_path(start, int(end), early_exit=True)
             connection_candidates = graph.network[graph.network.a_node == end].b_node.values
             min_cost = np.inf
@@ -263,7 +265,7 @@ class Pattern(BasicPTElement):
                     path_directions.extend(list(res.path_link_directions[:]))
                     path_distances.extend(list(res.milepost[1:] - res.milepost[:-1])[:])
             else:
-                self.__logger.debug(f"Failed path computation when map-matching {self.pattern_id}")
+                logger.debug(f"Failed path computation when map-matching {self.pattern_id}")
                 return empty_frame
             start = res.path_nodes[-2] if len(res.path_nodes) > 3 else start
 
@@ -326,7 +328,7 @@ class Pattern(BasicPTElement):
         :Returns:
         """
         if not self.__map_matching_error:
-            self.__logger.debug("No map-matching error recorded for this pattern")
+            logger.debug("No map-matching error recorded for this pattern")
             return None
 
         if what_to_get not in self.__map_matching_error:

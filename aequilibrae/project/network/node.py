@@ -1,3 +1,4 @@
+import logging
 from sqlite3 import Connection
 from typing import Optional
 
@@ -5,6 +6,8 @@ from shapely.geometry import Polygon
 from .safe_class import SafeClass
 from .connector_creation import connector_creation
 from ...utils.spatialite_utils import load_spatialite_extension
+
+logger = logging.getLogger(__name__)
 
 
 class Node(SafeClass):
@@ -77,13 +80,13 @@ class Node(SafeClass):
 
         new_id = int(new_id)
         if new_id == self.node_id:
-            self._logger.warning("This is already the node number")
+            logger.warning("This is already the node number")
             return
 
         with self.project.db_connection as conn:
             conn.execute("Update Nodes set node_id=? where node_id=?", [new_id, self.node_id])
 
-        self._logger.info(f"Node {self.node_id} was renumbered to {new_id}")
+        logger.info(f"Node {self.node_id} was renumbered to {new_id}")
         self.__dict__["node_id"] = new_id
         self.__original__["node_id"] = new_id
 
@@ -102,7 +105,7 @@ class Node(SafeClass):
                     txts.append(f'"{key}"=?')
 
         if not data:
-            self._logger.warning(f"Nothing to update for node {self.node_id}")
+            logger.warning(f"Nothing to update for node {self.node_id}")
             return [], ""
 
         txts = ",".join(txts) + " where node_id=?"
@@ -144,7 +147,7 @@ class Node(SafeClass):
             **area** (:obj:`Polygon`, *Optional*): Area limiting the search for connectors
         """
         if self.is_centroid != 1 or self.__original__["is_centroid"] != 1:
-            self._logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
+            logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
         connector_creation(

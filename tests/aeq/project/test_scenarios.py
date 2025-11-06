@@ -15,6 +15,8 @@ from aequilibrae.utils.create_example import create_example
 from aequilibrae.transit import Transit
 from aequilibrae.matrix import AequilibraeMatrix
 
+from aequilibrae.utils.cython.bridge import Bridge
+
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_traffic_assignment_scenarios(scenario_example, scenario):
@@ -131,7 +133,8 @@ def test_route_choice_scenarios(scenario_example, scenario):
         a, b = graph.centroids[0], graph.centroids[-1]
         shape = (graph.num_zones, graph.num_zones)
 
-        results = rc.run(int(a), int(b), shape, max_routes=3, max_depth=2)
+        with Bridge() as bridge:
+            results = rc.run(int(a), int(b), shape, max_routes=3, max_depth=2, bridge=bridge)
 
         assert isinstance(results, list)
         assert len(results) <= 3

@@ -4,6 +4,7 @@ import re
 import string
 from collections import defaultdict
 from copy import deepcopy
+import logging
 
 import numpy as np
 import pandas as pd
@@ -12,9 +13,10 @@ import shapely.wkt
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
 
-from aequilibrae import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.db_utils import commit_and_close
+
+logger = logging.getLogger(__name__)
 
 
 def __dfs(graph, start):

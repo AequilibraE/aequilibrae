@@ -13,6 +13,8 @@ from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
 
+logger = logging.getLogger(__name__)
+
 
 class GravityApplication:
     """Applies a synthetic gravity model.
@@ -127,7 +129,6 @@ class GravityApplication:
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
         self.output = None  # type: AequilibraeMatrix
         self.gap = np.inf
-        self.logger = logging.getLogger("aequilibrae")
         self.procedure_date = ""
         self.procedure_id = ""
         self.__ipf = None  # type: Ipf

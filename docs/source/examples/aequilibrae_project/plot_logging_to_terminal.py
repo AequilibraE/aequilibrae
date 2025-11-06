@@ -34,3 +34,8 @@ logger.addHandler(stdout_handler)
 
 # %%
 project.close()
+
+
+# FIXME update this example with the new logging system, need to include stream handler details
+
+raise Exception("new logging example needed")

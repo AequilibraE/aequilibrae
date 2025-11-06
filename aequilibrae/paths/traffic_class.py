@@ -1,4 +1,5 @@
 import warnings
+import logging
 from copy import deepcopy
 from typing import Union, List, Tuple, Dict
 from abc import ABC, abstractmethod
@@ -9,6 +10,8 @@ import pandas as pd
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
+
+logger = logging.getLogger(__name__)
 
 
 class TransportClassBase(ABC):  # noqa: B024
@@ -30,7 +33,6 @@ class TransportClassBase(ABC):  # noqa: B024
             raise TypeError("Matrix's computational view need to be of type np.float64")
         self._config = {}
         self.graph = graph
-        self.logger = graph.logger
         self.matrix = matrix
         self._id = name
 
@@ -138,11 +140,11 @@ class TrafficClass(TransportClassBase):
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
         if np.any(np.isnan(self.graph.graph[field_name].values)):
-            self.logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
+            logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
         if self.graph.graph[field_name].min() < 0:
             msg = f"Cost field {field_name} has negative values. That is not allowed"
-            self.logger.error(msg)
+            logger.error(msg)
             raise ValueError(msg)
 
     def set_vot(self, value_of_time: float) -> None:

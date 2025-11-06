@@ -33,6 +33,7 @@ from tempfile import gettempdir
 from uuid import uuid4
 
 from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.logging_utils import basic_config
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 # sphinx_gallery_thumbnail_path = '../source/_images/sparse_matrix.png'
@@ -43,7 +44,12 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
-logger = project.logger
+
+# %%
+
+# We'll also apply a basic logging configuration.
+
+basic_config()
 
 # %%
 # Traffic assignment

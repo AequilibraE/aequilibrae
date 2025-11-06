@@ -1,4 +1,7 @@
+import logging
 from .safe_class import SafeClass
+
+logger = logging.getLogger(__name__)
 
 
 class Period(SafeClass):
@@ -64,7 +67,7 @@ class Period(SafeClass):
             raise ValueError("You cannot renumber, or renumber another period to the default period.")
 
         if new_id == self.period_id:
-            self._logger.warning("This is already the period number")
+            logger.warning("This is already the period number")
             return
 
         with self.project.db_connection as conn:
@@ -72,7 +75,7 @@ class Period(SafeClass):
                 conn.execute("Update periods set period_id=? where period_id=?", [new_id, self.period_id])
             finally:
                 conn.commit()
-        self._logger.info(f"Period {self.period_id} was renumbered to {new_id}")
+        logger.info(f"Period {self.period_id} was renumbered to {new_id}")
         self.__dict__["period_id"] = new_id
         self.__original__["period_id"] = new_id
 
@@ -86,7 +89,7 @@ class Period(SafeClass):
             txts.append(f'"{key}"')
 
         if not data:
-            self._logger.warning(f"Nothing to update for period {self.period_id}")
+            logger.warning(f"Nothing to update for period {self.period_id}")
             return [], ""
 
         values = ",".join("?" * len(txts))

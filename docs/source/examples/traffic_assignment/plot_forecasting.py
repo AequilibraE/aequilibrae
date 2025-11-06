@@ -32,6 +32,8 @@ from tempfile import gettempdir
 import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.logging_utils import basic_config
+
 # sphinx_gallery_thumbnail_number = 3
 # %%
 
@@ -39,7 +41,12 @@ from aequilibrae.utils.create_example import create_example
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
-logger = project.logger
+
+# %%
+
+# We'll also apply a basic logging configuration.
+
+basic_config()
 
 # %%
 # Traffic assignment with skimming

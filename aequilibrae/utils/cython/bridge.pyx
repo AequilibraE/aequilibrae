@@ -30,12 +30,17 @@ cdef:
 
 @cython.final
 cdef public class Bridge [object Bridge, type Bridge_t]:
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: Optional[logging.Logger] = None):
         self.task = None
         self._stop.store(False, memory_order.memory_order_relaxed)
 
-        self.__level = logger.level
-        self.__logger = logger
+        self.__logger = logger or logging.getLogger()
+        self.__level = self.__logger.level
+        if logger is None:
+            self.__logger.warn(
+                "AequilibraE Bridge is using the root logger. To prevent broken progress bars, ensure either progress "
+                "bars are disabled (set AEQ_SHOW_PROGRESS=FALSE), or all StreamHandlers utilise AequilibraEStreamHandler"
+            )
 
         self.__exception_queue = queue.SimpleQueue()
 
@@ -110,20 +115,20 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         #  - Update progress bars.
 
         try:
-            with logging_redirect_tqdm(loggers=[logging.getLogger()]):
-                while not self.should_stop():
-                    with nogil:
-                         msleep(100)
-                         lock.lock()
+            while not self.should_stop():
+                with nogil:
+                     msleep(500)
+                     lock.lock()
 
-                    self.__unsafe_consume_log_queue()
+                self.__unsafe_consume_log_queue()
 
-                    lock.unlock()
+                lock.unlock()
 
-                    sig_check()
+                sig_check()
 
-                    for bar in self.bars:
-                        bar.refresh()
+                for bar in self.bars:
+                    bar.refresh()
+
 
         except KeyboardInterrupt as e:
             self.__exception_queue.put((type(e), e.args))
@@ -188,31 +193,3 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         except queue.Empty:
             pass
 
-
-def long_running(bridge: Bridge):
-    cdef Bar bar
-    idx, bar = bridge.new_bar(total=100)
-
-    cdef int i = 0
-    try:
-        with nogil:
-            for i in prange(100):
-                if bridge.should_stop():
-                    log(bridge, WARNING, f("We've been asked to stop"))
-                    break
-
-                # if i == 50:
-                #     bridge.stop()
-                #     bridge.log(WARNING, f("STOP!"))
-                #     break
-
-                msleep(threadid() * 100)
-                log(bridge, WARNING, f("Hello from thread ", threadid(), "! i: ", i))
-                # cpp_function_that_logs(bridge)
-                bar.inc()
-            else:
-                log(bridge, WARNING, f("Exited normally"))
-                pass
-
-    finally:
-        bar.finish()

@@ -21,6 +21,8 @@ from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.db_utils import commit_and_close
 
+logger = logging.getLogger(__name__)
+
 
 class AssignmentBase(ABC):
     def __init__(self, project=None):
@@ -31,7 +33,6 @@ class AssignmentBase(ABC):
         self.project = proj
 
         self.parameters = proj.parameters if proj else Parameters().parameters
-        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
 
         self.classes: List[TrafficClass] = []
         self.algorithm: str = None
@@ -572,12 +573,12 @@ class TrafficAssignment(AssignmentBase):
         return True
 
     def log_specification(self):
-        self.logger.info("Traffic Class specification")
+        logger.info("Traffic Class specification")
         for cls in self.classes:
-            self.logger.info(str(cls.info))
+            logger.info(str(cls.info))
 
-        self.logger.info("Traffic Assignment specification")
-        self.logger.info(self._config)
+        logger.info("Traffic Assignment specification")
+        logger.info(self._config)
 
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite
@@ -1005,12 +1006,12 @@ class TransitAssignment(AssignmentBase):
         return info
 
     def log_specification(self):
-        self.logger.info("Transit Class specification")
+        logger.info("Transit Class specification")
         for cls in self.classes:
-            self.logger.info(str(cls.info))
+            logger.info(str(cls.info))
 
-        self.logger.info("Transit Assignment specification")
-        self.logger.info(self._config)
+        logger.info("Transit Assignment specification")
+        logger.info(self._config)
 
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite

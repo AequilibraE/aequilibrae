@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import logging
 from typing import Optional
 
 import pandas as pd
@@ -8,6 +9,8 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.result_record import ResultRecord
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.utils.db_utils import add_column_unless_exists, commit_and_close
+
+logger = logging.getLogger(__name__)
 
 
 class Results:
@@ -27,7 +30,6 @@ class Results:
             **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the results database
         """
         self.project = project
-        self.logger = project.logger
         self.__items = {}
         self.__fields = []
 
@@ -75,11 +77,11 @@ class Results:
                 is not None
             }
             if remove:
-                self.logger.warning(f"Results records not found in results database: {','.join(remove)}")
+                logger.warning(f"Results records not found in results database: {','.join(remove)}")
 
                 project_conn.executemany("DELETE FROM results WHERE table_name=?;", [(x,) for x in remove])
             else:
-                self.logger.info("No result records to remove")
+                logger.info("No result records to remove")
 
     def update_database(self) -> None:
         """Adds records to the results table for results found in the results database."""
@@ -95,14 +97,14 @@ class Results:
         new_results = existing_results - existing_records
 
         if new_results:
-            self.logger.warning(
+            logger.warning(
                 f"New results found in the results database. Added to the database: {','.join(new_results)}"
             )
             for table in new_results:
                 rec = self.new_record(table)
                 rec.save()
         else:
-            self.logger.info("No new result records to add")
+            logger.info("No new result records to add")
 
     def list(self) -> pd.DataFrame:
         """List of all results available.
@@ -224,7 +226,7 @@ class Results:
         rr = ResultRecord(tp, self.project, project_conn=self.__project_conn, results_conn=self.__results_conn)
         rr.save()
         self.__items[table_name] = rr
-        self.logger.warning("ResultRecord has been saved to the database")
+        logger.warning("ResultRecord has been saved to the database")
         return rr
 
     def _clear(self) -> None:
