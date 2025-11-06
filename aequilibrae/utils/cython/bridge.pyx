@@ -41,6 +41,21 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
 
         self.bars = []
 
+        # Previously we used a global cdef function that forwarded its arguments to "self._log". This was necessary
+        # because "self._log" cannot be accessed directly from C without going through the Cython vtable. While we can
+        # assign it a known C name, that only changes the C name within the vtable. The idea was that the global
+        # function could call "bridge._log", with Cython handling the details. This worked well, but required the global
+        # function to be cimported into other modules because Cython only initialises objects from another extension
+        # module that are cimported. If the user selectively imports using "from ... cimport ...", not all attributes
+        # are imported and initialised. This creates an unusual situation at the C level where everything is declared
+        # (because bridge.pxd is inserted into the extension module with all its declarations) but not
+        # initialised. Instead, we export the function via a function pointer on the Bridge object. C attributes do not
+        # need to be obtained through the vtable because cdef classes must inherit and define all C attributes of their
+        # parents. Additionally, we can use "self._log" directly instead of a wrapper function because Bridge is
+        # final. We can then access this function pointer from the AEQ_LOG macro. All this assumes that AEQ_LOG calls
+        # the class method correctly and nothing fancy is required.
+        self.__log_wrapper_func = self._log
+
     def start(self):
         self.__level = self.__logger.level
         self.task = threading.Thread(target=self.loop)
@@ -172,16 +187,6 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
             raise e
         except queue.Empty:
             pass
-
-
-# This function is given a static C name so that we can call it from the expanded macro. We don't call the Bridge.log
-# function directly within the macro because it is hidden in the Cython VTable and has a mangled name. We could access
-# it directly but it's considered an implemented detail. So we use this as a small wrapper to let Cython figure things
-# out for us. This function is entirely transparent to the Cython and C++ compiler. Cython is able to figure out the C
-# function that this calls and the C++ compiler should inline this entirely as there is nothing else in the generated
-# functions body.
-cdef public inline void _c_to_python_log_bridge(Bridge b, int level, string msg) noexcept nogil:
-    b._log(level, msg)
 
 
 def long_running(bridge: Bridge):

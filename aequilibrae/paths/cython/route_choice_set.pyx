@@ -2,7 +2,7 @@
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.utils.cython.bridge cimport Bridge, log, f, DEBUG, msleep, _c_to_python_log_bridge
+from aequilibrae.utils.cython.bridge cimport Bridge, log, f, DEBUG, msleep
 from aequilibrae.utils.cython.bar cimport Bar
 
 

@@ -21,6 +21,7 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
 
         object __logger
         int __level "c_level"
+        void (*__log_wrapper_func"log_wrapper_func")(Bridge, int, string)
         object __exception_queue
 
         mutex __log_queue_mutex
@@ -49,7 +50,7 @@ cdef extern from *:
     void msleep "aeq_sleep"(int milliseconds) noexcept nogil
 
 
-cdef extern from "aeq_log.h":
+cdef extern from "_aeq_log.h":
     # We lie to the Cython compiler here, Cython thinks this is a C function but it's actually a macro. We give the
     # arguments types so that Cython can attempt to enforce them for us. This lets us have statically checked types for
     # the arguments. Admittedly the errors Cython raises aren't descriptive, and when call from Python the type check is
@@ -59,7 +60,6 @@ cdef extern from "aeq_log.h":
     string f "aeq_format_string"(...) noexcept nogil
 
 
-cdef public void _c_to_python_log_bridge"aeq_c_to_python_log_bridge"(Bridge b, int level, string msg) noexcept nogil
 cdef public:
     int DEBUG"AEQ_LOG_DEBUG"
     int INFO"AEQ_LOG_INFO"
