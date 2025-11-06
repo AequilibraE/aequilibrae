@@ -277,6 +277,9 @@ cdef class RouteChoiceSet:
         unreachable_ods: list[tuple[int]] = []
 
         for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
+            if bridge.should_stop():
+                break
+
             demand._initalise_c_data(grouped_demand_df)
 
             self.results = RouteChoiceSetResults(
@@ -296,6 +299,9 @@ cdef class RouteChoiceSet:
                 thread_id = threadid()
                 found_zero_cost = False  # Make the variable thread local
                 for i in prange(<long int>demand.ods.size(), schedule="guided"):
+                    if bridge.should_stop():
+                        break
+
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
                     log(bridge, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
