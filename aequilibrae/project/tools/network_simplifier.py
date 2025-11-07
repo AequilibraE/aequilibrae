@@ -192,9 +192,7 @@ class NetworkSimplifier(WorkerThread):
         new_layer.refresh()
         new_dist = new_layer.data.geometry.length.sum()
 
-        logger.warning(
-            f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}"
-        )
+        logger.warning(f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}")
         self.link_layer = new_layer.data
 
     def collapse_links_into_nodes(self, links: List[int]):

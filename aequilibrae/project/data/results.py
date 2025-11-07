@@ -97,9 +97,7 @@ class Results:
         new_results = existing_results - existing_records
 
         if new_results:
-            logger.warning(
-                f"New results found in the results database. Added to the database: {','.join(new_results)}"
-            )
+            logger.warning(f"New results found in the results database. Added to the database: {','.join(new_results)}")
             for table in new_results:
                 rec = self.new_record(table)
                 rec.save()

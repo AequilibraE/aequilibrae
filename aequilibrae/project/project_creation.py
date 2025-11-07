@@ -38,9 +38,7 @@ def add_triggers(conn: Connection, db_type: str) -> None:
         run_queries_from_sql_file(conn, qry_file)
 
 
-def remove_triggers(
-    conn: Connection, db_type: str, use_aequilibrae_prefix: bool = True
-) -> None:
+def remove_triggers(conn: Connection, db_type: str, use_aequilibrae_prefix: bool = True) -> None:
     spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
         all_trigger_sets = file_list.readlines()

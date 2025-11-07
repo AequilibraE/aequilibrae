@@ -147,8 +147,6 @@ class Zone(SafeClass):
             row_count += conn.execute(sql, data).rowcount
 
             if row_count:
-                logger.warning(
-                    f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}"
-                )
+                logger.warning(f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}")
             else:
                 self.project.warning("No centroid connectors for this mode")

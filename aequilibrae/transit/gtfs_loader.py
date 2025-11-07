@@ -123,9 +123,7 @@ class GTFSReader(WorkerThread):
                     logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
                     stop_times = self.stop_times[trip.trip]
                     if stop_times.shape[0] != len(trip.stops):
-                        logger.error(
-                            f"Trip {trip.trip_id} has a different number of stop_times than actual stops."
-                        )
+                        logger.error(f"Trip {trip.trip_id} has a different number of stop_times than actual stops.")
 
                     if not stop_times.arrival_time.is_monotonic_increasing:
                         stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = np.nan

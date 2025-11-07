@@ -402,7 +402,7 @@ def test_known_results(route_choice_setup, cost):
     demand.df = demand.df.loc[nodes].fillna(0.0)
 
     with Bridge() as b:
-        rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, bridge=b,)
+        rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, bridge=b)
 
     link_loads = rc.get_link_loading()
     table = rc.get_results()
@@ -449,7 +449,9 @@ def test_select_link(route_choice_setup, cost):
         rc.batched(
             demand,
             {
-                "sl1": frozenset(frozenset((x,)) for x in graph.graph.set_index("link_id").loc[[23, 26]].__compressed_id__),
+                "sl1": frozenset(
+                    frozenset((x,)) for x in graph.graph.set_index("link_id").loc[[23, 26]].__compressed_id__
+                ),
                 "sl2": frozenset(frozenset((x,)) for x in graph.graph.set_index("link_id").loc[[11]].__compressed_id__),
             },
             max_routes=20,
