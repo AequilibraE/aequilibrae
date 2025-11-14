@@ -1,7 +1,5 @@
 from multiprocessing import set_start_method
 
-set_start_method("fork")
-
 import os
 import uuid
 from pathlib import Path
@@ -15,6 +13,8 @@ from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
+
+set_start_method("fork")
 
 
 @pytest.fixture(autouse=True)
