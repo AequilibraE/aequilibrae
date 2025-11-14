@@ -1,3 +1,7 @@
+from multiprocessing import set_start_method
+
+set_start_method("fork")
+
 import os
 import uuid
 from pathlib import Path
