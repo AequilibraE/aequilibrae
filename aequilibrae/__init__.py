@@ -21,5 +21,16 @@ from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResult
 
 from aequilibrae import paths
 
+from multiprocessing import set_start_method
+import sys
+
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
 version = "1.5.0"
+
+# On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
+if sys.platform == "darwin":
+    try:
+        set_start_method("fork")
+    except RuntimeError:
+        # start method has already been set
+        pass
