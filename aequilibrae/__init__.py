@@ -1,3 +1,6 @@
+import sys
+from multiprocessing import set_start_method, get_start_method
+
 from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
@@ -21,16 +24,15 @@ from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResult
 
 from aequilibrae import paths
 
-from multiprocessing import set_start_method
-import sys
-
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
 version = "1.5.0"
 
 # On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
-if sys.platform == "darwin":
+if sys.platform == "darwin" and get_start_method(allow_none=True) != "fork":
     try:
         set_start_method("fork")
     except RuntimeError:
-        # start method has already been set
-        pass
+        logger.critical(
+            "multiprocessing start method already set. On MacOS, AequilibraE requires the 'fork' start method. "
+            "AequilibraE may crash when using procedures that utilise multiprocessing or progress bars."
+        )
