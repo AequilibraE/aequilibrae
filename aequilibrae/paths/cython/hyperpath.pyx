@@ -211,7 +211,7 @@ cdef void compute_SF_in_parallel(
     bint is_travel_time,
     size_t n_skim_cols,
     Bridge bridge,
-) noexcept nogil:
+):
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     cdef:
         cnp.uint32_t *thread_demand_origins
@@ -249,7 +249,7 @@ cdef void compute_SF_in_parallel(
 
     cdef Bar bar = bridge.new_bar("{}/{} destinations processed" + (" (skimming)" if skimming else ""), total=total)
 
-    with parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
+    with nogil, parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
         thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so

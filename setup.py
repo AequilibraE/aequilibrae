@@ -120,7 +120,7 @@ if __name__ == "__main__":
             [
                 ext_mod_aon,
                 ext_mod_ipf,
-                # ext_mod_put,
+                ext_mod_put,
                 ext_mod_rc,
                 ext_mod_coo_demand,
                 ext_mod_rc_ll_results,
