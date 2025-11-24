@@ -32,7 +32,7 @@ Installation
 macOS
 ^^^^^
 
-AequilibraE no longer provides wheel files for macOS. To build AequilibraE from source, you will need to:
+AequilibraE does not provide pre-built wheel files for macOS. When installing from PyPi, the source distribution will be used and the library will be compiled locally. AequilibraE can also be built from source. For both methods you will need to:
 
 1. Install LLVM or another C/C++ compiler with OpenMP support: ``brew install llvm``
 2. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
