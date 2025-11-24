@@ -1,9 +1,9 @@
-import os
-import yaml
-from copy import deepcopy
 import logging
-import pathlib
+from pathlib import Path
 from typing import Optional
+
+import yaml
+
 from aequilibrae.context import get_active_project
 
 
@@ -48,10 +48,9 @@ class Parameters:
         >>> project.close()
     """
 
-    _default: dict
-    file_default: str
+    file_default: str = Path(__file__).parent / "parameters.yml"
 
-    def __init__(self, path: Optional[pathlib.Path] = None):
+    def __init__(self, path: Optional[Path] = None):
         """Loads parameters from file."""
         self.file = None
         if path is not None:
@@ -68,7 +67,7 @@ class Parameters:
             logger = logging.getLogger("aequilibrae")
             logger.warning("No pre-existing parameter file exists for this project. Will use default")
 
-            self.parameters = deepcopy(self._default)
+            self.parameters = self.default
 
     def write_back(self):
         """Writes the parameters back to file"""
@@ -77,10 +76,11 @@ class Parameters:
 
     def restore_default(self):
         """Restores parameters to generic default"""
-        self.parameters = self._default
+        self.parameters = self.default
         self.write_back()
 
-
-Parameters.file_default = os.path.join(os.path.dirname(os.path.realpath(__file__)), "parameters.yml")
-with open(Parameters.file_default, "r") as yml:
-    Parameters._default = yaml.safe_load(yml)
+    @classmethod
+    @property
+    def default(cls):
+        with open(cls.file_default, "r") as yml:
+            return yaml.safe_load(yml)

@@ -11,6 +11,6 @@ def model_project(tmp_path, request):
 
 
 def test_create_example(model_project):
-    par = Parameters._default
+    par = Parameters.default
     parproj = model_project.parameters
     assert par.keys() == parproj.keys(), "Wrong parameter keys for example project"
