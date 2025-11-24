@@ -34,7 +34,7 @@ macOS
 
 AequilibraE no longer provides wheel files for macOS. To build AequilibraE from source, you will need to:
 
-1. Install LLVM: ``brew install llvm``
+1. Install LLVM or another C/C++ compiler with OpenMP support: ``brew install llvm``
 2. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
 3. Update the DYLD_LIBRARY_PATH to include libspatialite: ``export DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH``
 
