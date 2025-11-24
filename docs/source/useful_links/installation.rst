@@ -29,6 +29,15 @@ Installation
 
   The Windows App Store ships a version of Python that contains an sqlite dll that does not support the loading of extensions. This means that Spatialite will not be loaded, and therefore AequilibraE will not work properly.
 
+macOS
+^^^^^
+
+AequilibraE no longer provides wheel files for macOS. To build AequilibraE from source, you will need to:
+
+1. Install LLVM: ``brew install llvm``
+2. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
+3. Update the DYLD_LIBRARY_PATH to include libspatialite: ``export DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH``
+
 .. _dependencies:
 
 Dependencies

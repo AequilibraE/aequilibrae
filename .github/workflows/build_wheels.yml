@@ -40,7 +40,7 @@ jobs:
       cancel-in-progress: true
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-13, ubuntu-24.04-arm]
+        os: [ubuntu-latest, windows-latest, ubuntu-24.04-arm] # macos-latest, macos-13
 
     steps:
       - uses: actions/checkout@v4
