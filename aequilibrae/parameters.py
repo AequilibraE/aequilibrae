@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from typing import Optional
+from copy import deepcopy
 
 import yaml
 
@@ -49,6 +50,7 @@ class Parameters:
     """
 
     file_default: Path = Path(__file__).parent / "parameters.yml"
+    _default: dict
 
     def __init__(self, path: Optional[Path] = None):
         """Loads parameters from file."""
@@ -67,7 +69,7 @@ class Parameters:
             logger = logging.getLogger("aequilibrae")
             logger.warning("No pre-existing parameter file exists for this project. Will use default")
 
-            self.parameters = self.default
+            self.parameters = deepcopy(self._default)
 
     def write_back(self):
         """Writes the parameters back to file"""
@@ -79,7 +81,10 @@ class Parameters:
         self.parameters = self.default
         self.write_back()
 
-    @property
-    def default(self):
-        with open(self.file_default, "r") as yml:
+    @classmethod
+    def load_default(cls):
+        with open(cls.file_default, "r") as yml:
             return yaml.safe_load(yml)
+
+
+Parameters._default = Parameters.load_default()
