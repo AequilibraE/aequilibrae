@@ -79,8 +79,7 @@ class Parameters:
         self.parameters = self.default
         self.write_back()
 
-    @classmethod
     @property
-    def default(cls):
-        with open(cls.file_default, "r") as yml:
+    def default(self):
+        with open(self.file_default, "r") as yml:
             return yaml.safe_load(yml)
