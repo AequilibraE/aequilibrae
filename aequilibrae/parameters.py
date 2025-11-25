@@ -48,7 +48,7 @@ class Parameters:
         >>> project.close()
     """
 
-    file_default: str = Path(__file__).parent / "parameters.yml"
+    file_default: Path = Path(__file__).parent / "parameters.yml"
 
     def __init__(self, path: Optional[Path] = None):
         """Loads parameters from file."""
