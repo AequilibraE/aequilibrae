@@ -78,7 +78,7 @@ class Parameters:
 
     def restore_default(self):
         """Restores parameters to generic default"""
-        self.parameters = self.default
+        self.parameters = deepcopy(self._default)
         self.write_back()
 
     @classmethod
