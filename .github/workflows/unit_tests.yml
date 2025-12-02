@@ -49,6 +49,13 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Set macOS C compiler
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install llvm
+        export CXX=/opt/homebrew/opt/llvm/bin/clang++
+        export CC=/opt/homebrew/opt/llvm/bin/clang
+      
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip uv
