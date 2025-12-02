@@ -54,6 +54,7 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         brew install llvm
+        brew install hdf5
 
     - name: Install dependencies (not macOS)
       if: matrix.os != 'macos-latest'
@@ -69,6 +70,7 @@ jobs:
       env:
         CXX: /opt/homebrew/opt/llvm/bin/clang++
         CC: /opt/homebrew/opt/llvm/bin/clang
+        HDF5_DIR: /opt/homebrew/opt/hdf5
 
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'
