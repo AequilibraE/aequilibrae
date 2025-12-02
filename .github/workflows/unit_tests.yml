@@ -58,12 +58,12 @@ jobs:
     - name: Install dependencies (not macOS)
       if: matrix.os != 'macos-latest'
       run: |
-        uv pip install -e .[dev]
+        uv pip install --system -e .[dev]
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        uv pip install -e .[dev]    
+        uv pip install --system -e .[dev]    
       env:
         CXX: /opt/homebrew/opt/llvm/bin/clang++
         CC: /opt/homebrew/opt/llvm/bin/clang
@@ -74,7 +74,7 @@ jobs:
         sudo apt update
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev
-        pip3 install spatialite
+        uv pip install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Download spatialite on Windows
