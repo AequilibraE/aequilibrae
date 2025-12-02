@@ -53,15 +53,14 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         brew install llvm
-        export CXX=/opt/homebrew/opt/llvm/bin/clang++
-        export CC=/opt/homebrew/opt/llvm/bin/clang
-        which $CXX
-        which $CC
       
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip uv
         python -m uv pip install -e .[dev]
+      env:
+        CXX: /opt/homebrew/opt/llvm/bin/clang++
+        CC: /opt/homebrew/opt/llvm/bin/clang
 
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'
