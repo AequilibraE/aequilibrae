@@ -59,10 +59,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip uv
         python -m uv pip install -e .[dev]
+      if: matrix.os == 'macos-latest'
       env:
         CXX: /opt/homebrew/opt/llvm/bin/clang++
         CC: /opt/homebrew/opt/llvm/bin/clang
-      if: matrix.os == 'macos-latest'
 
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'
