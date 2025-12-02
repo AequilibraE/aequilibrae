@@ -58,12 +58,15 @@ jobs:
     - name: Install dependencies (not macOS)
       if: matrix.os != 'macos-latest'
       run: |
-        uv pip install --system -e .[dev]
+        uv venv .venv
+        source .venv/bin/activate
+        uv pip install -e .[dev]
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        uv pip install --system -e .[dev]    
+        source .venv/bin/activate
+        uv pip install -e .[dev]    
       env:
         CXX: /opt/homebrew/opt/llvm/bin/clang++
         CC: /opt/homebrew/opt/llvm/bin/clang
@@ -79,7 +82,9 @@ jobs:
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
-      run:  python tests/setup_windows_spatialite.py
+      run: |
+        source .venv/Scripts/activate
+        python tests/setup_windows_spatialite.py
 
     - name: Runs test
       run: pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
