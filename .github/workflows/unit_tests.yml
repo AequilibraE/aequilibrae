@@ -55,6 +55,8 @@ jobs:
         brew install llvm
         export CXX=/opt/homebrew/opt/llvm/bin/clang++
         export CC=/opt/homebrew/opt/llvm/bin/clang
+        which $CXX
+        which $CC
       
     - name: Install dependencies
       run: |
