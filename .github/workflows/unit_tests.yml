@@ -50,10 +50,11 @@ jobs:
       with:
           python-version: ${{ matrix.python-version }}
 
-    - name: Set macOS C compiler
+    - name: Download llvm and spatialite tools on macOS
       if: matrix.os == 'macos-latest'
       run: |
         brew install llvm
+        brew install spatialite-tools
 
     - name: Install dependencies (windows)
       if: matrix.os == 'windows-latest'
@@ -112,3 +113,5 @@ jobs:
       run: |
         source .venv/bin/activate
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+      env:
+        DYLD_LIBRARY_PATH: /opt/homebrew/opt/:$DYLD_LIBRARY_PATH
