@@ -114,4 +114,4 @@ jobs:
         source .venv/bin/activate
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
       env:
-        DYLD_LIBRARY_PATH: /opt/homebrew/opt/:$DYLD_LIBRARY_PATH
+        DYLD_LIBRARY_PATH: /opt/homebrew/lib:$DYLD_LIBRARY_PATH
