@@ -85,6 +85,7 @@ jobs:
         sudo apt update
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev
+        source .venv/bin/activate
         uv pip install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
@@ -94,5 +95,20 @@ jobs:
         .venv/Scripts/activate
         python tests/setup_windows_spatialite.py
 
-    - name: Runs test
-      run: pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+    - name: Runs test (windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        .venv/Scripts/activate
+        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+    
+    - name: Runs test (linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        source .venv/bin/activate
+        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+
+    - name: Runs test (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        source .venv/bin/activate
+        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
