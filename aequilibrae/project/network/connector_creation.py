@@ -136,9 +136,9 @@ def bulk_connector_creation(
     centroids = project_nodes.loc[centroid_mask, ["node_id", "geometry"]]
     nodes = project_nodes.loc[~centroid_mask, ["node_id", "modes", "geometry"]]
 
-    assert (
-        project_zones["zone_id"].isin(centroids["node_id"]).all()
-    ), "All provided zones must have their corresponding centroid provided"
+    assert project_zones["zone_id"].isin(centroids["node_id"]).all(), (
+        "All provided zones must have their corresponding centroid provided"
+    )
 
     connectors = []
     for mode in modes:
