@@ -74,7 +74,7 @@ jobs:
         CC: /opt/homebrew/opt/llvm/bin/clang
 
     - name: Runs test (Windows & Linux)
-      if: matrix.os !== 'macos-latest'
+      if: matrix.os != 'macos-latest'
       run: uv run pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
     - name: Runs test (macOS)
