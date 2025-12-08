@@ -153,6 +153,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
             )
             route_types = [e for e in route_types if e in mode_correspondence]
 
+            if not route_types:
+                self.logger.warning("No valid route_types remain after filtering")
+                return
+
         for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):
             if pat.route_type in route_types:
                 pat.map_match()
