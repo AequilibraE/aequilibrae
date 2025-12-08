@@ -19,9 +19,9 @@ jobs:
         architecture: ['x64']
         os: [windows-latest, macos-latest]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set Python environment
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
         architecture: ${{ matrix.architecture }}
@@ -37,7 +37,7 @@ jobs:
         os: [ ubuntu-latest, windows-latest, macos-13]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3

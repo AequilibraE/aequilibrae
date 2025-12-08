@@ -24,7 +24,7 @@ description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
-requires-python = ">=3.10" # match classifiers above and black version below
+requires-python = ">=3.10" # match classifiers above and ruff version below
 
 dependencies = [
   "numpy>=1.26",  # Required because of our "NPY_TARGET_VERSION"
