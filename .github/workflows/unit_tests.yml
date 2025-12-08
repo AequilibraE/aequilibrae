@@ -79,6 +79,5 @@ jobs:
 
     - name: Runs test (macOS)
       if: matrix.os == 'macos-latest'
-      run: uv run pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
-      env:
-        DYLD_LIBRARY_PATH: /opt/homebrew/lib:$DYLD_LIBRARY_PATH
+      run: |
+      ulimit -n 10240 && /opt/homebrew/lib:$DYLD_LIBRARY_PATH uv run pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
