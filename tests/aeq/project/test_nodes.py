@@ -32,7 +32,7 @@ def test_save(sioux_falls_example):
         coords.append([x, y])
         node.geometry = Point([x, y])
     nodes.save()
-    for nd, crd in zip(chosen, coords):
+    for nd, crd in zip(chosen, coords, strict=True):
         x, y = crd
         with read_and_close(sioux_falls_example.path_to_file, spatial=True) as conn:
             sql = f"Select is_centroid, asBinary(geometry) from nodes where node_id={nd};"

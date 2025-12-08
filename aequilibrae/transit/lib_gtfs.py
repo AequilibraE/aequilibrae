@@ -355,11 +355,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
         return MultiLineString(shapes)
 
     def __error_logging(self, titles, values):
-        for i, j in zip(titles, values):
+        for i, j in zip(titles, values, strict=True):
             self.logger.error(f"- {i}: {j}")
 
     def __warning_logging(self, titles, values):
-        for i, j in zip(titles, values):
+        for i, j in zip(titles, values, strict=True):
             self.logger.warning(f"- {i}: {j}")
 
     def __fail(self, msg: str) -> None:

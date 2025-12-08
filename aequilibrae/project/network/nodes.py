@@ -65,7 +65,7 @@ class Nodes(BasicTable):
         with self.project.db_connection_spatial as conn:
             data = conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
         if data:
-            data = dict(zip(self.__fields, data))
+            data = dict(zip(self.__fields, data, strict=True))
             node = Node(data, self.project)
             self.__items[node.node_id] = node
             return node

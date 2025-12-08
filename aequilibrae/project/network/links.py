@@ -163,7 +163,7 @@ class Links(BasicTable):
         with self.project.db_connection_spatial as conn:
             data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
-            return dict(zip(self.__fields, data))
+            return dict(zip(self.__fields, data, strict=True))
         raise ValueError("Link_id does not exist on the network")
 
     def __new_link_id(self):

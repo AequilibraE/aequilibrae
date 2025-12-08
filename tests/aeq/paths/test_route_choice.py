@@ -463,8 +463,8 @@ def test_select_link(route_choice_setup, cost):
 
     m = sl_od_matrices["sl1"]["all ones"].to_scipy()
     m2 = sl_od_matrices["sl2"]["all ones"].to_scipy()
-    assert set(zip(*(m.toarray() > 0.0001).nonzero())) == {(o - 1, d - 1) for o, d in ods}
-    assert set(zip(*(m2.toarray() > 0.0001).nonzero())) == {(20 - 1, 4 - 1), (5 - 1, 3 - 1)}
+    assert set(zip(*(m.toarray() > 0.0001).nonzero(), strict=True)) == {(o - 1, d - 1) for o, d in ods}
+    assert set(zip(*(m2.toarray() > 0.0001).nonzero(), strict=True)) == {(20 - 1, 4 - 1), (5 - 1, 3 - 1)}
 
     u = sl_link_loads["sl1"]["all ones"]
     u2 = sl_link_loads["sl2"]["all ones"]
