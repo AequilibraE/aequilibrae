@@ -22,9 +22,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(
-        self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None
-    ):  # noqa: B006
+    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -357,11 +355,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
         return MultiLineString(shapes)
 
     def __error_logging(self, titles, values):
-        for i, j in zip(titles, values):
+        for i, j in zip(titles, values, strict=True):
             self.logger.error(f"- {i}: {j}")
 
     def __warning_logging(self, titles, values):
-        for i, j in zip(titles, values):
+        for i, j in zip(titles, values, strict=True):
             self.logger.warning(f"- {i}: {j}")
 
     def __fail(self, msg: str) -> None:

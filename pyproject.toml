@@ -13,7 +13,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -25,21 +24,21 @@ description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
-requires-python = ">=3.9" # match classifiers above and black version below
+requires-python = ">=3.10" # match classifiers above and ruff version below
 
 dependencies = [
-  "numpy<1.99; python_version <= '3.10'",
-  "numpy>=2.0; python_version >= '3.11'",
+  "numpy>=1.26",  # Required because of our "NPY_TARGET_VERSION"
   "scipy>=1.4",
   "pyaml",
   "requests",
-  "pandas",
+  "pandas<3",
   "pyproj",
   "rtree",
   "pyarrow",
   "openmatrix",
   "geopandas",
-  "tqdm"
+  "tqdm",
+  "tables>=3.10.1"  # Require pytables that requires NumPy 2.0 at build time, so we can support NumPy 1.26 at runtime
 ]
 
 [project.license]
@@ -73,18 +72,12 @@ tests = [
   "pytest-subtests",
   "pytest-random-order",
   "coveralls",
-  "ruff==0.9.10",
-  "black==25.1.0",
+  "ruff==0.14.8",
   "wheel",
 ]
 
-build = [
-  "setuptools",
-  "numpy<1.99; python_version <= '3.10'",
-  "numpy>=2.0; python_version >= '3.11'",
-  "cython",
-  "wheel"
-]
+# Build system requirement should match
+build = ["setuptools", "numpy>=2.0", "cython", "wheel"]
 
 dev = ['aequilibrae[build, tests, docs]']
 
@@ -108,14 +101,6 @@ aequilibrae = "aequilibrae"
         "database_specification/transit/triggers/*.*",
         "database_specification/transit/migrations/*.*",
     ]
-
-
-[tool.black]
-line-length = 120
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
-include = '\.pyi?$'
-extend-exclude = '''docs/*'''
-
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
@@ -158,16 +143,16 @@ exclude = [
 ]
 line-length = 120
 lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint.mccabe]
 max-complexity = 20
 
 [tool.cibuildwheel]
-build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*", "cp313-*"]
+build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*"]
 
-# We do not build wheels for Python 3.6 or 3.7, for 32-bit in either Linux or Windows, or for macOS
-skip = ["cp36-*", "cp37-*", "cp38-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*", "*-macosx*"]
+# We do not build wheels for old versions of Python, for 32-bit in either Linux or Windows, or for macOS
+skip = ["cp36-*", "cp37-*", "cp38-*", "cp39-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*", "*-macosx*"]
 
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"

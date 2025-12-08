@@ -235,7 +235,7 @@ class GMNSBuilder:
             y_points = [int(x[1]) for x in list(geom.coords)]
 
             lons, lats = transformer.transform(x_points, y_points)
-            new_points = list(zip(np.around(lons, decimals=10), np.around(lats, decimals=10)))
+            new_points = list(zip(np.around(lons, decimals=10), np.around(lats, decimals=10), strict=True))
 
             self.link_df.loc[idx, "geometry"] = LineString(new_points).wkt
 
@@ -387,7 +387,7 @@ class GMNSBuilder:
                 }
                 for line in uses
             ]
-            groups_dict = dict(zip(self.uses_df.use_group.map(str.upper), uses))
+            groups_dict = dict(zip(self.uses_df.use_group.map(str.upper), uses, strict=True))
         else:
             groups_dict = {}
 

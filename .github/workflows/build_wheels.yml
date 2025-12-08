@@ -17,7 +17,7 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build SDist
         run: pipx run build --sdist
@@ -43,7 +43,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, ubuntu-24.04-arm] # macos-latest, macos-13
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3

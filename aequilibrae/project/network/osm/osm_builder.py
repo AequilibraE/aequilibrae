@@ -96,7 +96,7 @@ class OSMBuilder(WorkerThread):
                 # This is because it is faster to do this way and then have all the data repeated
                 # when doing the join with the link fields below
                 intersecs = np.where(node_indices > 1)[0]
-                for i, j in zip(intersecs[:-1], intersecs[1:]):
+                for i, j in zip(intersecs[:-1], intersecs[1:], strict=True):
                     geometries.append([idx, self._build_geometry(link.nodes[i : j + 1])])
 
         # Builds the link Geo dataframe

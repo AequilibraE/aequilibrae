@@ -15,7 +15,7 @@ def write_shapes(patterns: List[Pattern], folder_path: str):
         points = [Point(pt) for pt in pat.shape.coords]
         lons = [pt.x for pt in points]
         lats = [pt.y for pt in points]
-        distances = [0] + [x.distance(y) for x, y in zip(points[:-1], points[1:])]
+        distances = [0] + [x.distance(y) for x, y in zip(points[:-1], points[1:], strict=True)]
         dt = pd.DataFrame(
             {
                 "shape_id": pat.pattern_id,

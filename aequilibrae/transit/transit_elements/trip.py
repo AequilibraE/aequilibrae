@@ -58,7 +58,7 @@ class Trip(BasicPTElement):
         self.source_time = []
 
     def _populate(self, record: tuple, headers: list) -> None:
-        for key, value in zip(headers, record):
+        for key, value in zip(headers, record, strict=True):
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in Trips.txt is unknown field for that file on GTFS")
             key = "trip" if key == "trip_id" else key
@@ -75,7 +75,7 @@ class Trip(BasicPTElement):
         sql = """insert into trips_schedule (trip_id, seq, arrival, departure)
                                             values (?, ?, ?, ?)"""
         data = []
-        for i, (arr, dep) in enumerate(zip(self.arrivals, self.departures)):
+        for i, (arr, dep) in enumerate(zip(self.arrivals, self.departures, strict=True)):
             data.append([self.trip_id, i, arr, dep])
         conn.executemany(sql, data)
         if commit:

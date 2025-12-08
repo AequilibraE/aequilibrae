@@ -29,7 +29,7 @@ class Mode:
             self.__dict__["mode_id"] = mode_id
             self.__original__["mode_id"] = mode_id
         else:
-            for k, v in zip(self.__fields, dt):
+            for k, v in zip(self.__fields, dt, strict=True):
                 self.__dict__[k] = v
                 self.__original__[k] = v
 

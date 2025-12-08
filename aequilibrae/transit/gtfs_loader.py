@@ -132,7 +132,7 @@ class GTFSReader(WorkerThread):
                     diffs = np.diff(stop_times.arrival_time.values)
 
                     stop_geos = [self.stops[x].geo for x in trip.stops]
-                    distances = np.array([x.distance(y) for x, y in zip(stop_geos[:-1], stop_geos[1:])])
+                    distances = np.array([x.distance(y) for x, y in zip(stop_geos[:-1], stop_geos[1:], strict=True)])
 
                     times = np.copy(stop_times.arrival_time.values)
                     source_time = np.zeros_like(stop_times.arrival_time.values)
@@ -256,7 +256,7 @@ class GTFSReader(WorkerThread):
         for shape_id in simple_progress(all_shape_ids, self.signal, "Loading shapes (Step: 4/12)"):
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
-            shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
+            shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"], strict=True)))
             self.shapes[shape_id] = shape
 
     def __load_trips_table(self):

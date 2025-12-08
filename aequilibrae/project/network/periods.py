@@ -68,7 +68,7 @@ class Periods(BasicTable):
         with self.project.db_connection as conn:
             data = conn.execute(f"{self.sql} where period_id=?", [period_id]).fetchone()
         if data:
-            data = dict(zip(self.__fields, data))
+            data = dict(zip(self.__fields, data, strict=True))
             period = Period(data, self.project)
             self.__items[period.period_id] = period
             return period
@@ -107,7 +107,7 @@ class Periods(BasicTable):
         if dt > 0:
             raise Exception("period_id already exists. Failed to create it")
 
-        data = {key: None for key in self.__fields}
+        data = dict.fromkeys(self.__fields)
         data["period_id"] = period_id
         data["period_start"] = start
         data["period_end"] = end

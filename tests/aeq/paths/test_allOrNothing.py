@@ -44,9 +44,9 @@ def test_skimming_on_assignment(sioux_falls_example):
     assig = allOrNothing("name", matrix, graph, res)
     assig.execute()
 
-    assert (
-        res.skims.distance.sum() == 0
-    ), "skimming for nothing during assignment returned something different than zero"
+    assert res.skims.distance.sum() == 0, (
+        "skimming for nothing during assignment returned something different than zero"
+    )
 
     res.prepare(graph, matrix)
     assig = allOrNothing("name", matrix, graph, res)
