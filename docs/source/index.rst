@@ -1,60 +1,151 @@
-.. AequilibraE documentation master file, created by
-   sphinx-quickstart on Fri Jul  6 17:02:38 2018.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+:html_theme.sidebar_secondary.remove:
 
-===========
-AequilibraE
-===========
+.. raw:: html
 
-AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the 
-resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
+    <style type="text/css">
+         .bd-main .bd-content .bd-article-container {max-width: 80%;}
+         .big-font {
+             font-size: var(--pst-font-size-h5);
+             font-weight: bolder;
+         }
+    </style>
 
-**Download documentation**: :download:`HTML <_static/AequilibraE.zip>` | :download:`PDF <_static/latex/AequilibraE.pdf>`
+Python
+======
 
-**Previous versions**: documentation for AequilibraE's versions before 0.9.0 are available :ref:`here <versionhistory>`.
+**Download documentation**: :download:`HTML <https://www.aequilibrae.com/latest/python/aequilibrae.zip>` | :download:`PDF <_static/latex/aequilibrae.pdf>`
 
-**Useful links**: :ref:`installation` | :ref:`validation` | :ref:`developing_aequilibrae` | :ref:`support` | 
-:ref:`history_of_aequilibrae`
+**Previous versions**: documentation for all AequilibraE's versions are available 
+:doc:`here <useful_links/version_history>`.
+
+**Useful links**: :doc:`useful_links/installation` | :doc:`API Reference <useful_links/_autosummary/aequilibrae>` | :doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history` | :doc:`_auto_examples/index`
+
+|
+
+.. grid::
+
+  .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
+
+      .. rst-class:: big-font 
+
+          :doc:`The AequilibraE Project <aequilibrae_project>`
+
+      Get to know the structure of an AequilibraE project
+      +++
+      :doc:`_auto_examples/aequilibrae_project/index`
+
+  .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
+
+      .. rst-class:: big-font 
+
+          :doc:`Run module <run_module>`
+
+      Run entire model pipelines from AequilibraE
+      +++
+      :doc:`_auto_examples/run_module/index`
+
+  .. grid-item-card::
+      :text-align: center
+      :class-footer: sd-bg-light sd-font-weight-bold
+
+      .. rst-class:: big-font 
+
+          :doc:`Network Manipulation <network_manipulation>`
+
+      Create and edit networks and models
+      +++
+      :doc:`_auto_examples/network_manipulation/index`
 
 .. grid::
 
-    .. grid-item-card:: :material-outlined:`folder;1.5em` Examples
-        :link: _auto_examples/index
-        :link-type: any
-        :text-align: center
-        
-        A series of examples on how to use AequilibraE, from building a model from scratch
-        to editing an existing, performing trip distribution or traffic assignment to analyzing
-        results.
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
 
-    .. grid-item-card:: :material-outlined:`menu_book;1.5em` Modeling with AequilibraE
-        :link: modeling_with_aequilibrae
-        :link-type: any
-        :text-align: center
-        
-        An in-depth guide to modeling with AequilibraE, including the concepts that guide its
-        development and user-experience.
+    .. rst-class:: big-font 
+      
+      :doc:`Distribution Procedures <distribution_procedures>`
+
+    Calibrate and apply gravity models and perform IPF
+    +++
+    :doc:`_auto_examples/distribution_procedures/index`
+
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
+
+    .. rst-class:: big-font 
+      
+      :doc:`path_computation`
+
+    Create skim matrices and compute the shortest path
+    +++
+    :doc:`_auto_examples/path_computation/index`
+
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
+
+    .. rst-class:: big-font 
+      
+      :doc:`Traffic Assignment <static_traffic_assignment>`
+
+    Run traffic allocation.
+    +++
+    :doc:`_auto_examples/traffic_assignment/index`
 
 .. grid::
-    
-    .. grid-item-card:: :material-outlined:`build;1.5em` API References
-        :link: api_reference
-        :link-type: ref
-        :text-align: center
-        
-        Reference guide to AequilibraE's API.
 
-    .. grid-item-card:: :material-outlined:`person;1.5em` Not a programmer?
-        :link: https://www.aequilibrae.com/qgis/latest/
-        :text-align: center
-        
-        Take me to the GUI!
+  .. grid-item-card:: 
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
+
+    .. rst-class:: big-font 
+
+      :doc:`Public Transport <public_transport>`
+
+    Add a transit feed or run transit assignment
+    +++
+    :doc:`_auto_examples/public_transport/index`
+
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
+
+    .. rst-class:: big-font 
+      
+      :doc:`Route Choice <route_choice>`
+
+    Explore the route choice models.
+    +++
+    :doc:`_auto_examples/route_choice/index`
+
+  .. grid-item-card::
+    :text-align: center
+    :class-footer: sd-bg-light sd-font-weight-bold
+
+    .. rst-class:: big-font 
+      
+      :doc:`other_applications`
+
+    Explore other applcations of AequilibraE!
+    +++
+    :doc:`_auto_examples/other_applications/index`
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
-   _auto_examples/index
-   modeling_with_aequilibrae
-   api
+   aequilibrae_project
+   run_module
+   network_manipulation
+   distribution_procedures
+   path_computation
+   static_traffic_assignment
+   public_transport
+   route_choice
+   other_applications

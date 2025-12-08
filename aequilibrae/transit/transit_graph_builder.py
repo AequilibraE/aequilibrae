@@ -18,13 +18,14 @@ import pyproj
 import shapely
 import shapely.ops
 import json
+import sqlite3
+from pandas.api.types import is_integer_dtype
+
 from aequilibrae.utils.geo_utils import haversine
-from aequilibrae.project.database_connection import database_connection
 from scipy.spatial import KDTree, minkowski_distance
 from shapely.geometry import Point
 
 from aequilibrae.paths import PathResults
-from aequilibrae.context import get_active_project
 from aequilibrae.paths import TransitGraph
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
@@ -44,21 +45,6 @@ SF_EDGE_COLS = [
 ]
 
 
-def shift_duplicate_geometry(df, shift=0.00001):
-    """Shift stacked geometry by some fraction of ``shift`` vertically."""
-
-    def _shift_points(group_df, shift):
-        points = shapely.from_wkb(group_df.geometry.values)
-        count = len(points)
-        for i, x in enumerate(points):
-            points[i] = shapely.Point(x.x, x.y + (i + 1) * shift / count)
-
-        group_df.geometry = shapely.to_wkb(points)
-        return group_df
-
-    return df.groupby(by="geometry", group_keys=False).apply(_shift_points, shift)
-
-
 class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
@@ -67,21 +53,27 @@ class TransitGraphBuilder:
 
         **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
 
-        **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
+        **time_margin** (:obj:`int`): Time margin, extends the start and end times by `time_margin`
+        ([start, end] becomes [start - time_margin, end + time_margin]), in order to include more trips
+        when computing mean values. Defaults to ``0``.
 
-        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
+        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations.
+        Defaults to ``EPSG:3857``, Spherical Mercator.
 
-        **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
+        **num_threads** (:obj:`int`): Number of threads to be used where possible.
+        Defaults to ``-1`` (using all available threads).
 
-        **seed** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
+        **seed** (:obj:`int`): Deprecated. No longer in use.
 
-        **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation, in order to avoid colocated nodes. Defaults to ``True``.
+        **geometry_noise** (:obj:`bool`): Deprecated. No longer in use.
 
-        **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
+        **noise_coef** (:obj:`float`): Deprecated. No longer in use.
 
-        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``False``.
+        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations.
+        Defaults to ``False``.
 
-        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``False``.
+        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations.
+        Defaults to ``False``.
 
         **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
 
@@ -94,14 +86,14 @@ class TransitGraphBuilder:
 
     def __init__(
         self,
-        public_transport_conn,
+        project,
         period_id: int = 1,
         time_margin: int = 0,
         projected_crs: str = "EPSG:3857",
         num_threads: int = -1,
-        seed: int = 124,
-        geometry_noise: bool = True,
-        noise_coef: float = 1.0e-5,
+        seed: int = None,
+        geometry_noise: bool = None,
+        noise_coef: float = None,
         with_inner_stop_transfers: bool = False,
         with_outer_stop_transfers: bool = False,
         with_walking_edges: bool = True,
@@ -110,16 +102,13 @@ class TransitGraphBuilder:
         connector_method: str = "nearest_neighbour",
         max_connectors_per_zone: int = -1,
     ):
-        self.pt_conn = public_transport_conn  # sqlite connection
-        self.pt_conn.enable_load_extension(True)
-        self.pt_conn.load_extension("mod_spatialite")
-
-        self.project_conn = database_connection("project_database")
+        self.project = project
 
         self.period_id = period_id
-        start, end = self.project_conn.execute(
-            "SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]
-        ).fetchall()[0]
+        with self.project.db_connection as conn:
+            start, end = conn.execute(
+                "SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]
+            ).fetchall()[0]
 
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
@@ -162,12 +151,12 @@ class TransitGraphBuilder:
             self.__projected_crs, self.__global_crs, always_xy=True
         ).transform
 
-        # Add some spatial noise so that stop, boarding and aligthing vertices
-        # are not colocated
-        self.seed = seed
-        self.rng = np.random.default_rng(seed=self.seed)
-        self.geometry_noise = geometry_noise
-        self.noise_coef = noise_coef
+        if seed is not None or geometry_noise is not None or noise_coef is not None:
+            warnings.warn(
+                "the 'seed', 'geometry_noise', and 'noise_coef' arguments are depreciated and no longer in use. "
+                "Duplicate geometries are allowed within the public transport database.",
+                DeprecationWarning,
+            )
 
         # graph parameters
         self.uniform_dwell_time = 30
@@ -189,9 +178,6 @@ class TransitGraphBuilder:
         self.__config_attrs = [
             "period_id",
             "projected_crs",
-            "seed",
-            "geometry_noise",
-            "noise_coef",
             # "uniform_dwell_time",
             # "alighting_penalty",
             # "a_tiny_time_duration",
@@ -213,12 +199,17 @@ class TransitGraphBuilder:
         """Add zones as ODs.
 
         :Arguments:
-            **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
+            **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information.
+            Columns must include `zone_id` and `geometry`.
 
-            **from_crs** (:obj:`str`): The CRS of the ``geometry`` column of ``zones``. If not provided it's assumed that the geometry is already in ``self.projected_crs``. If provided, the geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
+            **from_crs** (:obj:`str`): The CRS of the `geometry` column of `zones`. If not provided
+            it's assumed that the geometry is already in ``self.projected_crs``. If provided, the
+            geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
         """
         if "zone_id" not in zones.columns or "geometry" not in zones.columns:
             raise KeyError("zone_id and geometry must be columns in zones")
+        elif not (is_integer_dtype(zones.zone_id.dtype) and zones.zone_id.min() > 0):
+            raise ValueError("'zone_id' must consist of integers greater than 0")
 
         if zones.geometry.dtype is str or zones.geometry.dtype is bytes:
             geometry = shapely.from_wkt(zones.geometry.values)
@@ -242,7 +233,7 @@ class TransitGraphBuilder:
 
         self.zones = pd.DataFrame(
             {
-                "zone_id": zones.zone_id.copy(deep=True).astype(str),
+                "zone_id": zones.zone_id.copy(deep=True).astype(int),
                 "geometry": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in geometry]),
                 "centroids": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in centroids]),
             }
@@ -263,7 +254,7 @@ class TransitGraphBuilder:
         """
 
         # we select route links for the pattern_ids in the given time range
-        sql = f"""SELECT distinct
+        route_links_sql = f"""SELECT distinct
             trips.pattern_id,
             route_links.seq,
             CAST(from_stop AS TEXT) from_stop,
@@ -275,17 +266,21 @@ class TransitGraphBuilder:
         WHERE
             departure>={self.start}
             AND arrival<={self.end}"""
-        route_links = pd.read_sql(
-            sql=sql,
-            con=self.pt_conn,
-        )
 
-        # create a routes table
-        sql = "SELECT pattern_id, CAST(shortname AS TEXT) shortname FROM routes"
-        routes = pd.read_sql(
-            sql=sql,
-            con=self.pt_conn,
-        )
+        routes_sql = "SELECT pattern_id, CAST(shortname AS TEXT) shortname FROM routes"
+
+        with self.project.transit_connection as conn:
+            route_links = pd.read_sql(
+                sql=route_links_sql,
+                con=conn,
+            )
+
+            # create a routes table
+            routes = pd.read_sql(
+                sql=routes_sql,
+                con=conn,
+            )
+
         # we create a line id by concatenating the route short name with the pattern_id
         routes["line_id"] = routes["shortname"] + "_" + routes["pattern_id"].astype(str)
 
@@ -330,7 +325,9 @@ class TransitGraphBuilder:
             sql = """SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id"""
-        tt = pd.read_sql(sql=sql, con=self.pt_conn)
+
+        with self.project.transit_connection as conn:
+            tt = pd.read_sql(sql=sql, con=conn)
 
         # compute the travel time on the segments
         tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
@@ -341,7 +338,7 @@ class TransitGraphBuilder:
         tt.dropna(how="any", inplace=True)
         tt[["last_departure", "last_trip_id", "last_pattern_id"]] = tt[
             ["last_departure", "last_trip_id", "last_pattern_id"]
-        ].astype(int)
+        ].astype(np.uint64)
 
         tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "trav_time"] = np.nan
         tt.dropna(subset="trav_time", inplace=True)
@@ -385,10 +382,12 @@ class TransitGraphBuilder:
         # start from the trip_schedule table
         sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
-        mh = pd.read_sql(sql=sql, con=self.pt_conn)
+
+        with self.project.transit_connection as conn:
+            mh = pd.read_sql(sql=sql, con=conn)
+            trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=conn)
 
         # merge the trips schedules with pattern ids
-        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
         mh = pd.merge(mh, trips, on="trip_id", how="left")
         mh.sort_values(by=["pattern_id", "seq", "trip_id", "arrival"], inplace=True)
         mh["headway"] = mh["arrival"].diff()
@@ -444,7 +443,8 @@ class TransitGraphBuilder:
         """Create stop vertices."""
         # select all stops
         sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsBinary(geometry) AS geometry FROM stops"
-        stop_vertices = pd.read_sql(sql=sql, con=self.pt_conn)
+        with self.project.transit_connection as conn:
+            stop_vertices = pd.read_sql(sql=sql, con=conn)
 
         # filter stops that are used on the given time range
         stops_ids = pd.concat((self.__line_segments.from_stop, self.__line_segments.to_stop), axis=0).unique()
@@ -452,12 +452,13 @@ class TransitGraphBuilder:
 
         # uniform attributes
         stop_vertices["line_seg_idx"] = -1
+        stop_vertices["taz_id"] = -1
         stop_vertices["node_type"] = "stop"
 
         self.__stop_vertices = stop_vertices
 
     def _create_boarding_vertices(self):
-        """Create boarding vertices with noise, if enabled."""
+        """Create boarding vertices."""
         boarding_vertices = self.__line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
         boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
         boarding_vertices = pd.merge(
@@ -465,22 +466,13 @@ class TransitGraphBuilder:
         )
 
         # uniform attributes
+        boarding_vertices["taz_id"] = -1
         boarding_vertices["node_type"] = "boarding"
-
-        # add noise
-        if self.geometry_noise:
-            boarding_vertices["x"] = boarding_vertices.geometry.map(lambda c: shapely.wkb.loads(c).x)
-            boarding_vertices["y"] = boarding_vertices.geometry.map(lambda c: shapely.wkb.loads(c).y)
-            n_boarding = len(boarding_vertices)
-            boarding_vertices["x"] += self.noise_coef * (self.rng.random(n_boarding) - 0.5)
-            boarding_vertices["y"] += self.noise_coef * (self.rng.random(n_boarding) - 0.5)
-            boarding_vertices["geometry"] = boarding_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
-            boarding_vertices.drop(["x", "y"], axis=1, inplace=True)
 
         self.__boarding_vertices = boarding_vertices
 
     def _create_alighting_vertices(self):
-        """Create alighting vertices with noise, if enabled."""
+        """Create alighting vertices."""
         alighting_vertices = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
         alighting_vertices = pd.merge(
@@ -488,17 +480,8 @@ class TransitGraphBuilder:
         )
 
         # uniform attributes
+        alighting_vertices["taz_id"] = -1
         alighting_vertices["node_type"] = "alighting"
-
-        # add noise
-        if self.geometry_noise:
-            alighting_vertices["x"] = alighting_vertices.geometry.map(lambda c: shapely.wkb.loads(c).x)
-            alighting_vertices["y"] = alighting_vertices.geometry.map(lambda c: shapely.wkb.loads(c).y)
-            n_alighting = len(alighting_vertices)
-            alighting_vertices["x"] += self.noise_coef * (self.rng.random(n_alighting) - 0.5)
-            alighting_vertices["y"] += self.noise_coef * (self.rng.random(n_alighting) - 0.5)
-            alighting_vertices["geometry"] = alighting_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
-            alighting_vertices.drop(["x", "y"], axis=1, inplace=True)
 
         self.__alighting_vertices = alighting_vertices
 
@@ -509,10 +492,9 @@ class TransitGraphBuilder:
         If ``self.blocking_centroid_flow`` is ``True``, a distinction is made between ``origin`` and ``destination`` vertices. Otherwise, they are both classified as ``od``.
         """
         if "zones" not in self.__dict__:
-            project = get_active_project(True)
             self.add_zones(
                 pd.DataFrame(
-                    [(x.zone_id, x.geometry) for x in project.zoning.all_zones().values()],
+                    [(x.zone_id, x.geometry) for x in self.project.zoning.all_zones().values()],
                     columns=["zone_id", "geometry"],
                 )
             )
@@ -525,7 +507,6 @@ class TransitGraphBuilder:
 
             # uniform attributes
             origin_vertices["node_type"] = "origin"
-            origin_vertices["line_seg_idx"] = -1
 
             destination_vertices = origin_vertices.copy(deep=True)
             destination_vertices["node_type"] = "destination"
@@ -539,7 +520,10 @@ class TransitGraphBuilder:
 
             # uniform attributes
             od_vertices["node_type"] = "od"
-            od_vertices["line_seg_idx"] = -1
+
+        od_vertices["line_seg_idx"] = -1
+        od_vertices["stop_id"] = ""
+        od_vertices["line_id"] = ""
 
         self.__od_vertices = od_vertices
 
@@ -570,12 +554,12 @@ class TransitGraphBuilder:
         """Graph vertices creation as a dataframe.
 
         Vertices have the following attributes:
-            - node_id (:obj:`int`),
+            - node_id (:obj:`int`): Equal to the ``taz_id`` for centroids/origins. Contiguous after,
             - node_type (:obj:`str`): Either 'stop', 'boarding', 'alighting', 'od', 'origin', or 'destination',
             - stop_id (:obj:`str`): Only applies to 'stop', 'boarding' and 'alighting' vertices,
             - line_id (:obj:`str`): Only applies to 'boarding' and 'alighting' vertices,
             - line_seg_idx (:obj:`int`): Only applies to 'boarding' and 'alighting' vertices,
-            - taz_id (:obj:`str`): Only applies to 'origin', 'destination', and 'od' nodes,
+            - taz_id (:obj:`int`): Only applies to 'origin', 'destination', and 'od' nodes, ``-1`` elsewhere,
             - geometry (:obj:`str`): Geometry object in WKB (well known binary).
         """
         self._create_line_segments()
@@ -597,18 +581,25 @@ class TransitGraphBuilder:
 
         # reset index and copy it to column
         self.vertices.reset_index(drop=True, inplace=True)
-        self.vertices.index.name = "index"
-        self.vertices["node_id"] = self.vertices.index + 1
+
+        o_vertices = self.__od_vertices[self.__od_vertices.node_type.isin(["origin", "od"])]
+        node_id_min = o_vertices.taz_id.max() + 1
+        self.vertices["node_id"] = np.hstack(
+            (
+                o_vertices.taz_id.to_numpy(),
+                np.arange(node_id_min, node_id_min + len(self.vertices) - len(o_vertices)),
+            )
+        )
+
         self.vertices = self.vertices[SF_VERTEX_COLS]
         self.create_od_node_mapping()
 
         # data types
-        self.vertices.node_id = self.vertices.node_id.astype(int)
-        self.vertices["node_type"] = self.vertices["node_type"].astype("category")
+        self.vertices.node_id = self.vertices.node_id.astype("int64")
         self.vertices.stop_id = self.vertices.stop_id.fillna("").astype(str)
         self.vertices.line_id = self.vertices.line_id.fillna("").astype(str)
-        self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int32")
-        self.vertices.taz_id = self.vertices.taz_id.fillna("").astype(str)
+        self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int64")
+        self.vertices.taz_id = self.vertices.taz_id.astype("int64")
 
     def _create_on_board_edges(self):
         """Create on board edges."""
@@ -755,11 +746,12 @@ class TransitGraphBuilder:
 
         Nearest neighbour: Creates edges between every stop and its nearest OD.
 
-        Overlapping regions: Creates edges between all stops that lying within the circle centred on each OD whose radius is the distance to the next nearest OD.
+        Overlapping regions: Creates edges between all stops that lying within the circle
+        centred on each OD whose radius is the distance to the next nearest OD.
 
         :Arguments:
-           **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour".
-           Defaults to ``overlapping_regions``.
+           **method** (:obj:`str`): Must either be `overlapping_regions`, or `nearest_neighbour`.
+           Defaults to `overlapping_regions`.
 
            **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not.
            Defaults to ``True``.
@@ -954,7 +946,9 @@ class TransitGraphBuilder:
         SELECT CAST(stop_id as TEXT) stop_id, CAST(parent_station as TEXT) parent_station FROM stops
         WHERE parent_station IS NOT NULL AND parent_station <> ''
         """
-        stops = pd.read_sql(sql=sql, con=self.pt_conn)
+        with self.project.transit_connection as conn:
+            stops = pd.read_sql(sql=sql, con=conn)
+
         stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
         # we only keep the stations which contain at least 2 stops
@@ -1039,77 +1033,82 @@ class TransitGraphBuilder:
     def _create_walking_edges(self):
         """Create walking edges between distinct stops of each station."""
 
-        sql = "SELECT COUNT(*) FROM stops WHERE parent_station IS NOT NULL AND parent_station <> ''"
-        station_count = self.pt_conn.execute(sql).fetchone()[0]
+        parent_station_sql = "SELECT COUNT(*) FROM stops WHERE parent_station IS NOT NULL AND parent_station <> ''"
+        stops_sql = """
+        SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
+        WHERE parent_station IS NOT NULL AND parent_station <> ''
+        """
 
-        if station_count > 0:
-            sql = """
-            SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
-            WHERE parent_station IS NOT NULL AND parent_station <> ''
-            """
-            stops = pd.read_sql(sql=sql, con=self.pt_conn)
+        with self.project.transit_connection as conn:
+            station_count = conn.execute(parent_station_sql).fetchone()[0]
+            if not station_count > 0:
+                return
 
-            print(stops)
-            stops.drop_duplicates(inplace=True)
-            stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
+            stops = pd.read_sql(sql=stops_sql, con=conn)
 
-            # we only keep the stations which contain at least 2 stops
-            stations = stations[stations["stop_count"] > 1]
-            station_list = stations["parent_station"].values
-            stops = stops[stops.parent_station.isin(station_list)]
+        stops.drop_duplicates(inplace=True)
+        stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
-            # tail vertex
-            o_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
-                columns={"geometry": "o_geometry", "node_id": "b_node"}
-            )
-            o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
-            o_walking.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
+        # we only keep the stations which contain at least 2 stops
+        stations = stations[stations["stop_count"] > 1]
+        station_list = stations["parent_station"].values
+        stops = stops[stops.parent_station.isin(station_list)]
 
-            # head vertex
-            d_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
-                columns={"geometry": "d_geometry", "node_id": "a_node"}
-            )
-            d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
-            d_walking.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
+        # tail vertex
+        o_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
+            columns={"geometry": "o_geometry", "node_id": "b_node"}
+        )
+        o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
+        o_walking.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
 
-            walking_edges = pd.merge(o_walking, d_walking, on="parent_station", how="inner")
+        # head vertex
+        d_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
+            columns={"geometry": "d_geometry", "node_id": "a_node"}
+        )
+        d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
+        d_walking.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
 
-            # remove entries that share the same stop
-            walking_edges = walking_edges.loc[walking_edges["o_stop_id"] != walking_edges["d_stop_id"]]
-            walking_edges.drop("parent_station", axis=1, inplace=True)
+        walking_edges = pd.merge(o_walking, d_walking, on="parent_station", how="inner")
 
-            # uniform attributes
-            walking_edges["line_seg_idx"] = -1
-            walking_edges["link_type"] = "walking"
-            walking_edges["freq"] = np.inf
-            walking_edges["direction"] = 1
+        # remove entries that share the same stop
+        walking_edges = walking_edges.loc[walking_edges["o_stop_id"] != walking_edges["d_stop_id"]]
+        walking_edges.drop("parent_station", axis=1, inplace=True)
 
-            # compute the walking time
-            o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
-            d_geometry = shapely.from_wkb(walking_edges.d_geometry.values)
-            o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
-            d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
+        # uniform attributes
+        walking_edges["line_seg_idx"] = -1
+        walking_edges["link_type"] = "walking"
+        walking_edges["freq"] = np.inf
+        walking_edges["direction"] = 1
 
-            distance = haversine(o_lon, o_lat, d_lon, d_lat)
+        # compute the walking time
+        o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
+        d_geometry = shapely.from_wkb(walking_edges.d_geometry.values)
+        o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
+        d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
 
-            walking_edges["trav_time"] = distance / self.walking_speed
-            walking_edges["trav_time"] *= self.walk_time_factor
+        distance = haversine(o_lon, o_lat, d_lon, d_lat)
 
-            # cleanup
-            walking_edges.drop(
-                ["o_geometry", "d_geometry"],
-                axis=1,
-                inplace=True,
-            )
+        walking_edges["trav_time"] = distance / self.walking_speed
+        walking_edges["trav_time"] *= self.walk_time_factor
+        walking_edges.loc[walking_edges["trav_time"] < self.a_tiny_time_duration, "trav_time"] = (
+            self.a_tiny_time_duration
+        )
 
-            self.__walking_edges = walking_edges
+        # cleanup
+        walking_edges.drop(
+            ["o_geometry", "d_geometry"],
+            axis=1,
+            inplace=True,
+        )
+
+        self.__walking_edges = walking_edges
 
     def _create_edges(self):
         """Graph edges creation as a Dataframe.
 
         Edges have the following attributes:
-            - type (:obj:`str`): Either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer', 'outer_transfer',
-              'access_connector', "egress_connector" or 'walking',
+            - type (:obj:`str`): Either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer',
+              'outer_transfer', 'access_connector', "egress_connector" or 'walking',
             - line_id (:obj:`str`): Only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges,
             - stop_id (:obj:`str`),
             - line_seg_idx (:obj:`int`): Only applies to 'on-board', 'boarding' and 'alighting' edges,
@@ -1151,7 +1150,6 @@ class TransitGraphBuilder:
 
         # reset index and copy it to column
         self.edges.reset_index(drop=True, inplace=True)
-        self.edges.index.name = "index"
         self.edges["link_id"] = self.edges.index + 1
         for col in SF_EDGE_COLS:
             if col not in self.edges:
@@ -1159,12 +1157,11 @@ class TransitGraphBuilder:
         self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
-        self.edges["link_type"] = self.edges["link_type"].astype("category")
         self.edges.line_id = self.edges.line_id.fillna("").astype(str)
         self.edges.stop_id = self.edges.stop_id.fillna("").astype(str)
-        self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1).astype("int32")
-        self.edges.b_node = self.edges.b_node.astype("int32")
-        self.edges.a_node = self.edges.a_node.astype("int32")
+        self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1).astype("int64")
+        self.edges.b_node = self.edges.b_node.astype("int64")
+        self.edges.a_node = self.edges.a_node.astype("int64")
         self.edges.trav_time = self.edges.trav_time.astype(float)
         self.edges.freq = self.edges.freq.astype(float)
         self.edges.o_line_id = self.edges.o_line_id.fillna("").astype(str)
@@ -1173,6 +1170,17 @@ class TransitGraphBuilder:
 
     def create_graph(self):
         """Create the SF transit graph (vertices and edges)."""
+
+        all_present = True
+        tables = ["stops", "routes", "route_links", "trips", "trips_schedule"]
+        with self.project.transit_connection as conn:
+            for table in tables:
+                sql = f"SELECT COUNT(*) FROM {table}"
+                all_present &= conn.execute(sql).fetchone()[0] > 0
+
+        if not all_present:
+            raise ValueError("cannot build a transit graph without a GTFS import")
+
         self._create_vertices()
         self._create_edges()
 
@@ -1189,7 +1197,8 @@ class TransitGraphBuilder:
         Project graphs must be built for the "connector project match" method.
 
         :Arguments:
-           **method** (:obj:`str`): Must be either "direct" or "connector project match". If method is "direct", ``graph`` argument is ignored.
+           **method** (:obj:`str`): Must be either `direct` or `connector project match`.
+           If method is `direct`, `graph` argument is ignored.
 
            **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
@@ -1210,13 +1219,12 @@ class TransitGraphBuilder:
             ]
         elif method == "connector project match":
             # Check validity of project and nodes database
-            project = get_active_project(must_exist=True)
             warnings.warn(
                 'In its current implementation, the "connector project match" method may take a while for large networks.'
             )
 
-            nodes = project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
-            links = project.network.links.data[["link_id", "geometry"]].set_index("link_id")
+            nodes = self.project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
+            links = self.project.network.links.data[["link_id", "geometry"]].set_index("link_id")
 
             if len(nodes) == 0:
                 raise ValueError(
@@ -1238,22 +1246,25 @@ class TransitGraphBuilder:
                 for row in self.edges[other_rows].itertuples()
             ]
 
-            lines = self.__connector_project_match(connector_rows, project, nodes, links, graph)
+            lines = self.__connector_project_match(connector_rows, self.project, nodes, links, graph)
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
-        """Create line string geometry for ``connector_rows`` that matches the line strings in
+        """Create line string geometry for `connector_rows` that matches the line strings in
         ``project.network.graphs[graph_key]``.
 
         :Arguments:
-           **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges`` to create line strings for.
+           **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges``
+           to create line strings for.
 
            **project** (:obj:`Aequilibrae.project.Project`): Reference to the project to pull the graph from.
 
-           **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes. Must have columns ``geometry``, and an index of ``node_id``s.
+           **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes.
+           Must have columns `geometry`, and an index of `node_id`\'s.
 
-           **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links. Must have columns ``geometry``, and an index of ``link_id``s.
+           **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links.
+           Must have columns `geometry`, and an index of `link_id`\'s.
 
            **graph_key** (:obj:`str`): The key of the ``project.network.graphs`` graph to use for path finding.
         """
@@ -1314,117 +1325,167 @@ class TransitGraphBuilder:
             lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
         return lines
 
-    def create_additional_db_fields(self):
-        """Create the additional required entries in the tables."""
+    def create_additional_db_fields(self, conn: sqlite3.Connection = None):
+        """
+        Create the additional required entries in the tables.
+
+        :Arguments:
+            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+        """
         # This graph requires some additional tables and fields in order to store all our information.
         # Currently it mimics what we are storing in the df
 
-        self.pt_conn.executemany(
-            """
-            INSERT OR IGNORE INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
-            """,
-            [
-                ("on-board", "o", "From boarding to alighting"),
-                ("boarding", "b", "From stop to boarding"),
-                ("alighting", "a", "From alighting to stop"),
-                ("dwell", "d", "From alighting to boarding"),
-                ("access_connector", "A", ""),
-                ("egress_connector", "e", ""),
-                ("inner_transfer", "t", "Transfer edge within station, from alighting to boarding"),
-                ("outer_transfer", "T", "Transfer edge outside of a station, from alighting to boarding"),
-                ("walking", "w", "Walking, from stop or walking to stop or walking"),
-            ],
-        )
+        with conn or self.project.transit_connection as conn:
+            conn.executemany(
+                """
+                INSERT OR IGNORE INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
+                """,
+                [
+                    ("on-board", "o", "From boarding to alighting"),
+                    ("boarding", "b", "From stop to boarding"),
+                    ("alighting", "a", "From alighting to stop"),
+                    ("dwell", "d", "From alighting to boarding"),
+                    ("access_connector", "A", ""),
+                    ("egress_connector", "e", ""),
+                    ("inner_transfer", "t", "Transfer edge within station, from alighting to boarding"),
+                    ("outer_transfer", "T", "Transfer edge outside of a station, from alighting to boarding"),
+                    ("walking", "w", "Walking, from stop or walking to stop or walking"),
+                ],
+            )
 
-        self.pt_conn.commit()
-
-    def save_vertices(self, robust=True):
+    def save_vertices(self, robust=None, conn: sqlite3.Connection = None):
         """
         Write the vertices DataFrame to the public transport database.
 
-        Within the database nodes may not exist at the exact same point in space, provide ``robust=True`` to move the nodes slightly.
+        Within the database nodes may not exist at the exact same point in space, provide
+        ``robust=True`` to move the nodes slightly.
 
         :Arguments:
-           **robust** (:obj:`bool`): Whether to move stack nodes slightly before saving. Defaults to ``True``.
-        """
-        duplicated = self.vertices.geometry.duplicated()
+            **robust** (:obj:`bool`): Deprecated. No longer in use.
 
-        if not robust and not duplicated.empty:
+            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+        """
+        if robust is not None:
             warnings.warn(
-                "Duplicated geometry was detected but robust was disabled, verticies that share the same geometry will not be saved.",
-                warnings.RuntimeWarning,
+                "the 'robust' argument is depreciated and no longer in use. Duplicate geometries are allowed within the public transport database.",
+                DeprecationWarning,
             )
 
-        if robust and not duplicated.empty:
-            df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
-            self.vertices.loc[df.index, "geometry"] = df.geometry
+        with conn or self.project.transit_connection as conn:
+            if conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
+                raise ValueError(
+                    f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})"
+                )
 
-        # The below query is formatted to line the columns up The order of the tuples should be the same
-        # as the order of the columns.
-        #
-        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
-        #     the index and following fields being the column values.
-        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
-        self.pt_conn.executemany(
-            f"""\
-            INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
-            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
-            """,
-            (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
-                index=False, name=None
-            ),
-        )
+            df = self.vertices[SF_VERTEX_COLS]
+            conn.executemany(
+                f"""\
+                INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes,period_id)
+                VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),'t',{self.period_id});
+                """,
+                df.itertuples(index=False, name=None),
+            )
 
-        self.pt_conn.commit()
+    @staticmethod
+    def remove_vertices(pt_conn: sqlite3.Connection, period_id: int):
+        """
+        Remove a transit graph's vertices from the public transport database specified by it's `period_id`.
 
-    def save_edges(self, recreate_line_geometry=False):
+        :Arguments:
+            **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+
+            **period_id** (:obj:`int`): ``period_id`` to remove.
+
+        """
+        with pt_conn as conn:
+            conn.execute("DELETE FROM nodes where period_id=?", (period_id,))
+
+    def save_edges(self, recreate_line_geometry=False, conn: sqlite3.Connection = None):
         """
         Save the contents of self.edges to the public transport database.
 
-        If no geometry for the edges is present or `recreate_line_geometry` is True, direct lines will be created.
+        If no geometry for the edges is present or `recreate_line_geometry` is ``True``, direct lines will be created.
 
         :Arguments:
-           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
+           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges
+           as direct lines. Defaults to ``False``.
+
+           **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         # We need to generate the geometry for each edge, this may take a bit
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
-        # In order to save the line strings from connector project matching we need to disable some smart node creation.
-        # It will be restored to its previous value once we are done here.
-        val = self.pt_conn.execute(
-            "SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'"
-        ).fetchone()[0]
-        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
-        self.pt_conn.executemany(
-            f"""\
-            INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
-            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
-            """,
-            self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
-        )
+        with conn or self.project.transit_connection as conn:
+            if conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
+                raise ValueError("cannot save links into a database with existing links in the same period")
 
-        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
-        self.pt_conn.commit()
+            df = self.edges[SF_EDGE_COLS + ["geometry"]]
+            conn.executemany(
+                f"""\
+                INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_id)
+                VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),'t',{self.period_id});
+                """,
+                df.itertuples(index=False, name=None),
+            )
 
-    def save_config(self):
-        sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
-        self.project_conn.execute(sql, [self.period_id, json.dumps(self.config)])
-        self.project_conn.commit()
+    @staticmethod
+    def remove_edges(pt_conn: sqlite3.Connection, period_id: int):
+        """
+        Remove a transit graph's edges from the public transport database specified by it's `period_id`.
 
-    def save(self, robust=True):
+        :Arguments:
+            **pt_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+
+            **period_id** (:obj:`int`): `period_id` to remove.
+
+        """
+        with pt_conn as conn:
+            conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
+
+    def save_config(self, conn: sqlite3.Connection = None):
+        with conn or self.project.db_connection as conn:
+            sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
+            conn.execute(sql, [self.period_id, json.dumps(self.config)])
+
+    @staticmethod
+    def remove_config(conn: sqlite3.Connection, period_id: int):
+        """
+        Remove a transit graph configuration from the project database specified by it's `period_id`.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): Connection to the ``project.sqlite`` database.
+
+            **period_id** (:obj:`int`): `period_id` key for the `transit_graph_configs` table.
+
+        """
+        with conn as conn:
+            sql = "DELETE FROM transit_graph_configs WHERE period_id = ?"
+            conn.execute(sql, [period_id])
+
+    def save(self, robust=True, pt_conn: sqlite3.Connection = None, project_conn: sqlite3.Connection = None):
         """Save the current graph to the public transport database.
 
         :Arguments:
-           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
+            **robust** (:obj:`bool`): Deprecated. No longer in use.
+
+            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+
+            **project_conn** (:obj:`sqlite.Connection`): Optional project connection to use
         """
-        self.create_additional_db_fields()
-        self.save_vertices(robust=robust)
-        self.save_edges()
-        self.save_config()
+        self.create_additional_db_fields(conn=pt_conn)
+        self.save_vertices(robust=robust, conn=pt_conn)
+        self.save_edges(conn=pt_conn)
+        self.save_config(conn=project_conn)
+
+    @classmethod
+    def remove(cls, pt_conn: sqlite3.Connection, project_conn: sqlite3.Connection, period_id: int):
+        cls.remove_edges(pt_conn, period_id)
+        cls.remove_vertices(pt_conn, period_id)
+        cls.remove_config(project_conn, period_id)
 
     def to_transit_graph(self) -> TransitGraph:
-        """Create an AequilibraE (:obj:`TransitGraph`) object from an SF graph builder."""
+        """Create an AequilibraE ``TransitGraph`` object from an SF graph builder."""
 
         # TODO: Better required link type detections
         # link_type_diff = set(self.edges.link_type.unique()) ^ {'access_connector', 'alighting', 'boarding', 'dwell', 'egress_connector', 'inner_transfer', 'on-board'}
@@ -1444,7 +1505,8 @@ class TransitGraphBuilder:
                     if self.blocking_centroid_flows
                     else (self.vertices.node_type == "od")
                 )
-            ].node_id.values
+            ].node_id.values,
+            remove_dead_ends=False,
         )
         g.set_graph("trav_time")
         g.set_blocked_centroid_flows(True)
@@ -1453,7 +1515,7 @@ class TransitGraphBuilder:
         return g
 
     @classmethod
-    def from_db(cls, public_transport_conn, period_id: int, **kwargs):
+    def from_db(cls, project, period_id: int, **kwargs):
         """
         Create a SF graph instance from an existing database save.
 
@@ -1463,28 +1525,45 @@ class TransitGraphBuilder:
         All arguments are forwarded to the constructor.
 
         :Arguments:
-           **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+           **project** (:obj:`Project`): AequilbraE project to use.
+
+           **period_id** (:obj:`int`): Period ID to use.
         """
-        project_conn = database_connection("project_database")
-        config = json.loads(
-            project_conn.execute(
+        with project.db_connection as project_conn:
+            config = project_conn.execute(
                 "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]
-            ).fetchone()[0]
-        )
+            ).fetchone()
+
+        if config is None:
+            raise ValueError(f"no transit graph configuration found for 'period_id={period_id}'")
+
+        config = json.loads(config[0])
         config.update(kwargs)
 
-        graph = cls(public_transport_conn, **config)
+        graph = cls(project, **config)
 
-        # FIXME Load specific period_id graph from dynamic table
-        graph.vertices = pd.read_sql_query(
-            sql=f"SELECT {','.join(SF_VERTEX_COLS)} FROM nodes;",
-            con=public_transport_conn,
-        )
+        with project.transit_connection as public_transport_conn:
+            graph.vertices = pd.read_sql_query(
+                sql=f'SELECT {",".join(SF_VERTEX_COLS[:-1])}, ST_asBinary("geometry") as geometry FROM nodes WHERE period_id={period_id};',
+                con=public_transport_conn,
+            )
 
-        graph.edges = pd.read_sql_query(
-            sql=f"SELECT {','.join(SF_EDGE_COLS)} FROM links;",
-            con=public_transport_conn,
-        )
+            graph.edges = pd.read_sql_query(
+                sql=f'SELECT {",".join(SF_EDGE_COLS)}, ST_asBinary("geometry") as geometry FROM links WHERE period_id={period_id};',
+                con=public_transport_conn,
+            )
+
+        graph.vertices.node_id = graph.vertices.node_id.astype("int64")
+        graph.vertices.line_seg_idx = graph.vertices.line_seg_idx.astype("int64")
+
+        graph.edges.line_id = graph.edges.line_id.fillna("").astype(str)
+        graph.edges.stop_id = graph.edges.stop_id.fillna("").astype(str)
+        graph.edges.line_seg_idx = graph.edges.line_seg_idx.astype("int64")
+        graph.edges.b_node = graph.edges.b_node.astype("int64")
+        graph.edges.a_node = graph.edges.a_node.astype("int64")
+        graph.edges.direction = graph.edges.direction.astype("int8")
+
+        graph.create_od_node_mapping()
 
         return graph
 

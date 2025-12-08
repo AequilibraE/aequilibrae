@@ -1,3 +1,0 @@
-Editing networks
-----------------
-

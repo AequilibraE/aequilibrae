@@ -1,6 +1,4 @@
 from .safe_class import SafeClass
-from ...utils.db_utils import commit_and_close
-from ...utils.spatialite_utils import connect_spatialite
 
 
 class Period(SafeClass):
@@ -8,11 +6,9 @@ class Period(SafeClass):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path, "coquimbo")
 
-        >>> proj = Project.from_path("/tmp/test_project")
-
-        >>> all_periods = proj.network.periods
+        >>> all_periods = project.network.periods
 
         # We can just get one link in specific
         >>> period1 = all_periods.get(1)
@@ -20,11 +16,7 @@ class Period(SafeClass):
         # We can find out which fields exist for the period
         >>> which_fields_do_we_have = period1.data_fields()
 
-        # It succeeds if the period_id already does not exist
-        >>> period1.renumber(998877)
-
-        # We can just save the period
-        >>> period1.save()
+        >>> project.close()
     """
 
     def __init__(self, dataset, project):
@@ -33,10 +25,13 @@ class Period(SafeClass):
         self.__fields = list(dataset.keys())
         self._table = "periods"
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.period_id=}, {self.period_start=}, {self.period_end=}, {self.period_description=})"
+
     def save(self):
         """Saves period to database"""
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             if self.period_id != self.__original__["period_id"]:
                 raise ValueError("One cannot change the period_id")
 
@@ -72,7 +67,7 @@ class Period(SafeClass):
             self._logger.warning("This is already the period number")
             return
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             try:
                 conn.execute("Update periods set period_id=? where period_id=?", [new_id, self.period_id])
             finally:

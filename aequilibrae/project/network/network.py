@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import shapely.wkb
 import shapely.wkt
+from shapely import union_all
 from shapely.geometry import Polygon, box
-from shapely.ops import unary_union
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
@@ -22,24 +22,24 @@ from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
-from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.signal import SIGNAL
-from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 
-class Network:
+class Network(WorkerThread):
     """
     Network class. Member of an AequilibraE Project
     """
-
-    netsignal = SIGNAL(object)
 
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
     protected_fields = protected_fields
     link_types: LinkTypes = None
+    signal = SIGNAL(object)
 
     def __init__(self, project) -> None:
+        WorkerThread.__init__(self, None)
         from aequilibrae.paths import Graph
 
         self.graphs = {}  # type: Dict[Graph]
@@ -59,7 +59,7 @@ class Network:
             :obj:`list`: List of all fields that can be skimmed
         """
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
         ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
@@ -109,7 +109,7 @@ class Network:
             :obj:`list`: List of all modes
         """
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
@@ -121,7 +121,7 @@ class Network:
         clean=True,
     ) -> None:
         """
-        Downloads the network from Open-Street Maps
+        Downloads the network from OpenStreetMap (OSM)
 
         :Arguments:
             **area** (:obj:`Polygon`, *Optional*): Polygon for which the network will be downloaded. If not provided,
@@ -138,34 +138,19 @@ class Network:
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
-
-            >>> p = Project()
-            >>> p.new("/tmp/new_project")
-
-            # We now choose a different overpass endpoint (say a deployment in your local network)
-            >>> par = Parameters()
-            >>> par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
-
-            # Because we have our own server, we can set a bigger area for download (in M2)
-            >>> par.parameters['osm']['max_query_area_size'] = 10000000000
-
-            # And have no pause between successive queries
-            >>> par.parameters['osm']['sleeptime'] = 0
-
-            # Save the parameters to disk
-            >>> par.write_back()
+            >>> project = Project()
+            >>> project.new(project_path)
 
             # Now we can import the network for any place we want
-            # p.network.create_from_osm(place_name="my_beautiful_hometown")
+            >>> project.network.create_from_osm(place_name="my_beautiful_hometown") # doctest: +SKIP
 
-            >>> p.close()
+            >>> project.close()
         """
 
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
             conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
 
@@ -226,13 +211,13 @@ class Network:
                         polygons.append(subarea)
         self.logger.info("Downloading data")
         dwnloader = OSMDownloader(polygons, modes, logger=self.logger)
-        dwnloader.downloading = self.netsignal
+        dwnloader.signal = self.signal
         dwnloader.doWork()
 
         self.logger.info("Building Network")
         self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
 
-        self.builder.building = self.netsignal
+        self.builder.signal = self.signal
         self.builder.doWork()
 
         self.logger.info("Network built successfully")
@@ -280,7 +265,7 @@ class Network:
 
         self.logger.info("Network exported successfully")
 
-    def build_graphs(self, fields: list = None, modes: list = None) -> None:
+    def build_graphs(self, fields: list = None, modes: list = None, limit_to_area: Polygon = None) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
@@ -293,20 +278,25 @@ class Network:
             **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
             database, it may be useful to generate only those we need
 
-        To use the *fields* parameter, a minimalistic option is the following
+            **limit_to_area** (:obj:`Polygon`, *Optional*): When working with a very large model area, you may want to
+            filter your database to a small area for your computation, which you can do by providing a polygon.
+            The search is limited to a spatial index search, so it is very fast but NOT PRECISE.
+
+        To use the 'fields' parameter, a minimalistic option is the following
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
+            >>> project = create_example(project_path)
 
-            >>> p = Project.from_path("/tmp/test_project")
             >>> fields = ['distance']
-            >>> p.network.build_graphs(fields, modes = ['c', 'w'])
+            >>> project.network.build_graphs(fields, modes = ['c', 'w'])
+
+            >>> project.close()
 
         """
         from aequilibrae.paths import Graph
 
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             if fields is None:
                 field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
@@ -322,18 +312,37 @@ class Network:
             elif isinstance(modes, str):
                 modes = [modes]
 
+            if limit_to_area is not None:
+                load_spatialite_extension(conn)
+                spatial_add = """ WHERE links.rowid in (
+                                        select rowid from SpatialIndex where f_table_name = 'links' and
+                                       search_frame = GeomFromWKB(?, 4326))"""
+
             sql = f"select {','.join(all_fields)} from links"
 
-            df = pd.read_sql(sql, conn).fillna(value=np.nan)
-            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
-            sql = "select node_id from nodes where is_centroid=1 order by node_id;"
-            centroids = np.array([i[0] for i in conn.execute(sql).fetchall()], np.uint32)
+            sql_centroids = "select node_id from nodes where is_centroid=1 order by node_id;"
+            centroids = np.array([i[0] for i in conn.execute(sql_centroids).fetchall()], np.uint32)
             centroids = centroids if centroids.shape[0] else None
+
+            with pd.option_context("future.no_silent_downcasting", True):
+                if limit_to_area is None:
+                    df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
+                else:
+                    sql += spatial_add
+                    df = (
+                        pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                        .fillna(value=np.nan)
+                        .infer_objects(False)
+                    )
+
+                    # We filter to centroids existing in our filtered area
+                    centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+
+            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[valid_fields]
         for m in modes:
-
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
             # the compressed graph representation is created)
             net = pd.DataFrame(data, copy=True)
@@ -396,7 +405,7 @@ class Network:
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection_spatial as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -406,12 +415,12 @@ class Network:
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection_spatial as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
-        return unary_union(links).convex_hull
+        return union_all(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c

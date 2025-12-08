@@ -1,3 +1,4 @@
+import sqlite3
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -5,6 +6,61 @@ from sqlite3 import Connection, connect
 from typing import Union
 
 import pandas as pd
+from aequilibrae import logger
+
+
+class AequilibraEConnection(sqlite3.Connection):
+    """
+    This custom factory class intends to solve the issue of premature commits when trying to use manual transaction control.
+
+    After ``manual_transaction`` is called, context manager enters and exits are tracked via their depth, the
+    ``sqlite3.Connection`` is placed into manual transaction control and a transaction is started. If another
+    transaction is already in progress an RuntimeError is raised.
+    When exiting with depth == 0, the normal context manager enter and exit is called.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.__manual_transaction: bool = False
+        self.__depth: int = 0
+        self.__isolation_level = self.isolation_level
+
+    def manual_transaction(self):
+        if self.__manual_transaction:
+            raise RuntimeError(
+                "cannot start a manual transaction while another manual transaction is already in progress"
+            )
+        elif self.in_transaction:
+            raise RuntimeError("cannot start a manual transaction while in another transaction")
+
+        logger.debug("Manual transaction control enabled")
+        self.__depth = 0
+        self.__manual_transaction = True
+        self.__isolation_level = self.isolation_level
+        self.isolation_level = None
+        self.execute("BEGIN")
+        return self
+
+    def __enter__(self):
+        if self.__manual_transaction:
+            self.__depth += 1
+
+            return super().__enter__() if self.__depth == 1 else self
+        else:
+            return super().__enter__()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.__manual_transaction:
+            self.__depth -= 1
+
+            if self.__depth <= 0:
+                self.__manual_transaction = False
+                res = super().__exit__(exc_type, exc_value, traceback)
+                self.isolation_level = self.__isolation_level
+                return res
+        else:
+            return super().__exit__(exc_type, exc_value, traceback)
 
 
 def list_tables_in_db(conn: Connection):
@@ -15,14 +71,14 @@ def list_tables_in_db(conn: Connection):
 
 def safe_connect(filepath: PathLike, missing_ok=False):
     if Path(filepath).exists() or missing_ok or str(filepath) == ":memory:":
-        return connect(filepath)
-    raise FileNotFoundError(f"Attempting to open non-existant SQLite database: {filepath}")
+        return connect(filepath, factory=AequilibraEConnection)
+    raise FileNotFoundError(f"Attempting to open non-existent SQLite database: {filepath}")
 
 
 class commit_and_close:
     """A context manager for sqlite connections which closes and commits."""
 
-    def __init__(self, db: Union[str, Path, Connection], commit: bool = True, missing_ok: bool = False):
+    def __init__(self, db: Union[str, Path, Connection], commit: bool = True, missing_ok: bool = False, spatial=False):
         """
         :Arguments:
 
@@ -32,9 +88,21 @@ class commit_and_close:
 
             **missing_ok** (:obj:`bool`): Boolean indicating that the db is not expected to exist yet
         """
-        if isinstance(db, str) or isinstance(db, Path):
-            db = safe_connect(db, missing_ok)
-        self.conn = db
+        from aequilibrae.utils.spatialite_utils import connect_spatialite, load_spatialite_extension
+
+        if spatial:
+            if isinstance(db, Connection):
+                load_spatialite_extension(db)
+                self.conn = db
+            elif not isinstance(db, (str, PathLike)):
+                raise Exception("You must provide a database path to connect to spatialite")
+            else:
+                self.conn = connect_spatialite(db, missing_ok)
+        elif isinstance(db, (str, PathLike)):
+            self.conn = safe_connect(db, missing_ok)
+        else:
+            self.conn = db
+
         self.commit = commit
 
     def __enter__(self):
@@ -49,9 +117,9 @@ class commit_and_close:
         self.conn.close()
 
 
-def read_and_close(filepath):
+def read_and_close(filepath, spatial=False):
     """A context manager for sqlite connections (alias for `commit_and_close(db,commit=False))`."""
-    return commit_and_close(filepath, commit=False)
+    return commit_and_close(filepath, commit=False, spatial=spatial)
 
 
 def read_sql(sql, filepath, **kwargs):

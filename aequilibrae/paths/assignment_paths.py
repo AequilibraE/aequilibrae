@@ -2,6 +2,7 @@ import os
 from typing import Dict, List
 import numpy as np
 import pandas as pd
+import json
 from aequilibrae.context import get_active_project
 
 
@@ -35,9 +36,9 @@ class AssignmentResultsTable(object):
         self.procedure_report = self._parse_procedure_report()
 
     def _read_assignment_results(self) -> pd.DataFrame:
-        conn = self.project.connect()
-        results_df = pd.read_sql("SELECT * FROM 'results'", conn)
-        conn.close()
+        with self.project.db_connection as conn:
+            results_df = pd.read_sql("SELECT * FROM 'results'", conn)
+
         res = results_df.loc[results_df.table_name == self.table_name]
         assert len(res) == 1, f"Found {len(res)} assignment result with this table name, need exactly one"
         return res
@@ -46,9 +47,7 @@ class AssignmentResultsTable(object):
         rep_with_replacement = (
             self.assignment_results["procedure_report"].values[0].replace("inf", "np.inf").replace("nan", "np.nan")
         )
-        report = eval(rep_with_replacement)
-        report["convergence"] = eval(report["convergence"])
-        report["setup"] = eval(report["setup"])
+        report = json.loads(rep_with_replacement)
         return report
 
     def get_traffic_class_names_and_id(self) -> List[TrafficClassIdentifier]:
@@ -57,13 +56,7 @@ class AssignmentResultsTable(object):
 
 
 class AssignmentPaths(object):
-    """Class for accessing path files optionally generated during assignment.
-
-    .. code-block:: python
-
-        paths = AssignmentPath(table_name_with_assignment_results)
-        paths.get_path_for_destination(origin, destination, iteration, traffic_class_id)
-    """
+    """Class for accessing path files optionally generated during assignment."""
 
     def __init__(self, table_name: str, project=None) -> None:
         """

@@ -3,8 +3,6 @@ from sqlite3 import IntegrityError
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class LinkTypes:
@@ -13,11 +11,9 @@ class LinkTypes:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path)
 
-        >>> p = Project.from_path("/tmp/test_project")
-
-        >>> link_types = p.network.link_types
+        >>> link_types = project.network.link_types
 
         # We can get a dictionary of link types in the model
         >>> all_link_types = link_types.all_types()
@@ -56,6 +52,7 @@ class LinkTypes:
         >>> new_type.lane_capacity = 1100
         >>> new_type.save()
 
+        >>> project.close()
     """
 
     def __init__(self, net):
@@ -64,7 +61,7 @@ class LinkTypes:
         self.logger = net.project.logger
 
         tl = TableLoader()
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection as conn:
             link_types_list = tl.load_table(conn, "link_types")
         existing_list = [lt["link_type_id"] for lt in link_types_list]
 
@@ -110,9 +107,10 @@ class LinkTypes:
             if lt.link_type.lower() == link_type.lower():
                 return lt
 
+    @property
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
-        return FieldEditor(self.project.project_base_path, "link_types")
+        return FieldEditor(self.project, "link_types")
 
     def all_types(self) -> dict:
         """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""

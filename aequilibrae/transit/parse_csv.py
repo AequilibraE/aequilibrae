@@ -29,7 +29,7 @@ def parse_csv(file_name: str, column_order=[]):  # noqa B006
     titles = tot.pop(0)
     csvfile.close()
     if tot:
-        data = np.core.records.fromrecords(tot, names=[x.lower() for x in titles])
+        data = np.rec.fromrecords(tot, names=[x.lower() for x in titles])
     else:
         return empty()
 
@@ -48,14 +48,15 @@ def parse_csv(file_name: str, column_order=[]):  # noqa B006
                 column_order[c] = object
             else:
                 if data[c].dtype.char.upper() in ["U", "S"]:
-                    data[c][data[c] == ""] = "0"
+                    mask = data[c] == ""
+                    data[c] = np.where(mask, "0", data[c])
 
         new_data_dt = [(f, column_order[f]) for f in col_names]
 
         if int(data.shape.__len__()) > 0:
             # handle the case of int data given as a float string
             for j, (_, dtype) in enumerate(new_data_dt):
-                if dtype == int:
+                if dtype is int:
                     for item in data:
                         item[j] = item[j].split(".")[0]
 

@@ -5,7 +5,7 @@ from typing import List, Union, Tuple
 import requests
 
 from aequilibrae.parameters import Parameters
-from .osm_params import http_headers
+from .osm_params import default_headers
 
 
 def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
@@ -40,7 +40,7 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
     time.sleep(pause_duration)
     start_time = time.time()
     report.append(f"Requesting {prepared_url} with timeout={timeout}")
-    response = requests.get(url, params=params, timeout=timeout, headers=http_headers)
+    response = requests.get(url, params=params, timeout=timeout, headers=default_headers())
 
     # get the response size and the domain, log result
     size_kb = len(response.content) / 1000.0

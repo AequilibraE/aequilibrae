@@ -29,15 +29,18 @@ cdef class COO(Sparse):
 
     @staticmethod
     cdef void init_f64_struct(COO_f64_struct &struct) noexcept nogil
+
     @staticmethod
     cdef void init_f32_struct(COO_f32_struct &struct) noexcept nogil
 
     @staticmethod
     cdef object from_f64_struct(COO_f64_struct &struct)
+
     @staticmethod
     cdef object from_f32_struct(COO_f32_struct &struct)
 
     @staticmethod
     cdef void f64_struct_append(COO_f64_struct &struct, size_t i, size_t j, double v) noexcept nogil
+
     @staticmethod
     cdef void f32_struct_append(COO_f32_struct &struct, size_t i, size_t j, float v) noexcept nogil

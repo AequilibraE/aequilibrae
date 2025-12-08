@@ -15,7 +15,6 @@ from shapely.geometry import LineString, Point
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 def __dfs(graph, start):
@@ -56,7 +55,7 @@ class GMNSBuilder:
         self.nodes = net.nodes
         self.link_types = net.link_types
         self.modes = net.modes
-        self.__pth_file = net.project.path_to_file
+        self.__path_file = net.project.path_to_file
 
         self.link_df = pd.read_csv(link_path).fillna("")
         self.node_df = pd.read_csv(node_path).fillna("")
@@ -225,6 +224,7 @@ class GMNSBuilder:
 
         # For node table
         lons, lats = transformer.transform(self.node_df.loc[:, "x_coord"], self.node_df.loc[:, "y_coord"])
+        self.node_df = self.node_df.astype({"x_coord": np.float64, "y_coord": np.float64})
         self.node_df.loc[:, "x_coord"] = np.around(lons, decimals=10)
         self.node_df.loc[:, "y_coord"] = np.around(lats, decimals=10)
 
@@ -388,16 +388,17 @@ class GMNSBuilder:
                 for line in uses
             ]
             groups_dict = dict(zip(self.uses_df.use_group.map(str.upper), uses))
-            resolved_groups = resolve_recusive_dict(groups_dict)
         else:
             groups_dict = {}
+
+        resolved_groups = resolve_recusive_dict(groups_dict)
 
         modes_list = [
             pattern.sub(lambda x: "_" + char_replaces[x.group()], s).replace("+", "").replace("-", "_")
             for s in modes_list
         ]
 
-        with commit_and_close(connect_spatialite(self.__pth_file)) as conn:
+        with commit_and_close(self.__path_file) as conn:
             existing_modes = dict(conn.execute("select mode_name, mode_id from modes").fetchall())
 
         # Invert the resolved_groups dictionary, we're interested in which use_groups contain our "use"
@@ -525,7 +526,7 @@ class GMNSBuilder:
         )
         n_params_list = aeq_nodes_df.to_records(index=False)
 
-        with commit_and_close(connect_spatialite(self.__pth_file)) as conn:
+        with commit_and_close(self.__path_file, spatial=True) as conn:
             conn.executemany(n_query, n_params_list)
 
             l_query = "insert into links(" + ", ".join(list(links_fields.keys())) + ")"

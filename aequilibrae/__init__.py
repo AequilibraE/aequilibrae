@@ -1,7 +1,6 @@
-import tempfile
-import os
-import glob
 import sys
+from multiprocessing import set_start_method, get_start_method
+
 from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
@@ -10,14 +9,8 @@ from aequilibrae import matrix
 from aequilibrae import transit
 from aequilibrae import project
 
-try:
-    from aequilibrae.paths.AoN import path_computation
-except Exception as e:
-    global_logger.warning(f"Failed to import compiled modules. {e.args}")
-    raise
-
 from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae import distribution
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.traffic_class import TrafficClass
@@ -31,21 +24,15 @@ from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResult
 
 from aequilibrae import paths
 
-name = "aequilibrae"
+# When updating the version, one must also update the docs/source/useful_links/version_history.rst file
+version = "1.5.0"
 
-
-def setup():
-    sys.dont_write_bytecode = True
-    cleaning()
-
-
-def cleaning():
-    p = tempfile.gettempdir() + "/aequilibrae_*"
-    for f in glob.glob(p):
-        try:
-            os.unlink(f)
-        except Exception as err:
-            global_logger.warning(err.__str__())
-
-
-setup()
+# On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
+if sys.platform == "darwin" and get_start_method(allow_none=True) != "fork":
+    try:
+        set_start_method("fork")
+    except RuntimeError:
+        logger.critical(
+            "multiprocessing start method already set. On MacOS, AequilibraE requires the 'fork' start method. "
+            "AequilibraE may crash when using procedures that utilise multiprocessing or progress bars."
+        )

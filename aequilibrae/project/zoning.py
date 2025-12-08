@@ -1,33 +1,31 @@
+import warnings
 from copy import deepcopy
-from os.path import join, realpath
+from pathlib import Path
 from typing import Union, Dict
 
+import geopandas as gpd
 import pandas as pd
-
 import shapely.wkb
+from shapely import union_all
 from shapely.geometry import Point, Polygon, LineString, MultiLineString
-from shapely.ops import unary_union
 
 from aequilibrae.project.basic_table import BasicTable
-from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.data_loader import DataLoader
+from aequilibrae.project.network.connector_creation import connector_creation, bulk_connector_creation
+from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
-from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.geo_index import GeoIndex
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Zoning(BasicTable):
     """
-    Access to the API resources to manipulate the zones table in the project
+    Access to the API resources to manipulate the 'zones' table in the project
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-
-        >>> project = Project.from_path("/tmp/test_project")
-
+        >>> project = create_example(project_path)
 
         >>> zoning = project.zoning
 
@@ -36,13 +34,11 @@ class Zoning(BasicTable):
         >>> zone_downtown.employment = 10039
         >>> zone_downtown.save()
 
-        # changing the value for an existing value/field
-        >>> project.about.scenario_name = 'Just a better scenario name'
-        >>> project.about.write_back()
-
         # We can also add one more field to the table
         >>> fields = zoning.fields
         >>> fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
+
+        >>> project.close()
     """
 
     def __init__(self, network):
@@ -59,7 +55,7 @@ class Zoning(BasicTable):
         """Creates a new zone
 
         :Returns:
-            **zone** (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
+            **zone** (:obj:`Zone`): A new zone object populated only with ``zone_id`` (but not saved in the model yet)
         """
 
         if zone_id in self.__items:
@@ -75,8 +71,8 @@ class Zoning(BasicTable):
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.__has_zoning():
-            qry_file = join(realpath(__file__), "database_specification", "tables", "zones.sql")
-            with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
+            with self.network.project.db_connection_spatial as conn:
                 run_queries_from_sql_file(conn, self.project.logger, qry_file)
             self.__load()
         else:
@@ -88,30 +84,136 @@ class Zoning(BasicTable):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.network.project.db_connection_spatial as conn:
             dt = conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
-        return unary_union(polygons)
+        return union_all(polygons)
 
     def get(self, zone_id: str) -> Zone:
-        """Get a zone from the model by its **zone_id**"""
+        """Get a zone from the model by its ``zone_id``"""
         if zone_id not in self.__items:
             raise ValueError(f"Zone {zone_id} does not exist in the model")
         return self.__items[zone_id]
 
     def all_zones(self) -> dict:
-        """Returns a dictionary with all Zone objects available in the model. *zone_id* as key"""
+        """Returns a dictionary with all Zone objects available in the model, using ``zone_id`` as key"""
         return self.__items
 
     def save(self):
         for item in self.__items.values():
             item.save()
 
+    def add_centroids(self, robust=True):
+        """Adds automatic centroids to the network file. It adds centroids to all zones that do not have one
+        Centroid is added to the geographic centroid of the zone.
+
+        :Arguments:
+            **robust** (:obj:`bool`, *Optional*): Moves the centroid location around to avoid node conflict.
+            Defaults to ``True``.
+        """
+        i = 0
+        with self.project.db_connection_spatial as conn:
+            existing_centroids = pd.read_sql("SELECT node_id from Nodes where is_centroid = 1", conn).node_id.to_numpy()
+            for zone_id in simple_progress(self.__items.keys(), SIGNAL(object), "Connecting zones"):
+                if zone_id in existing_centroids:
+                    continue
+                zone = self.__items[zone_id]
+                zone.add_centroid(zone.geometry.centroid, robust)
+                i += 1
+        if i > 0:
+            self.project.logger.info(f"{i} new centroids added to the network")
+        else:
+            self.project.logger.info("No new centroids added to the network")
+
+    def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True, bulk: bool = False):
+        """
+        Adds centroid connectors for the desired mode to the network file
+
+        Centroid connectors are created by connecting each zone centroid to one or more nodes selected from
+        all those that satisfy the mode and link_types criteria and are inside the zone.
+
+        The selection of the nodes that will be connected is done simply by searching for the node closest to each
+        zone centroid, or the N closest nodes to the centroid.
+
+        If fewer candidates than required connectors are found, all candidates are connected.
+
+        CENTROIDS THAT ARE CURRENTLY CONNECTED ARE SKIPPED ALTOGETHER
+
+        :Arguments:
+            **mode_id** (:obj:`str`): Mode ID we are trying to connect
+
+            **link_types** (:obj:`str`, *Optional*): String with all the link type IDs that can be considered.
+                eg: yCdR. Defaults to ALL link types
+
+            **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
+
+            **limit_to_zone** (:obj:`bool`): Limits the search for nodes inside the zone. Defaults to ``True``.
+
+            **bulk** (:obj:`bool`, *Optional*): Whether to use the bulk connector method or not. This is method is
+                considerably faster for connecting a large amount of centroids but has a high runtime overhead.
+        """
+
+        proj_nodes = self.project.network.nodes.data
+        links = self.project.network.links
+
+        centroids = proj_nodes.reset_index().query("is_centroid == 1", engine="python").node_id.to_numpy()
+        link_data = links.data
+        centroid_conn = link_data.query("a_node in @centroids and modes.str.contains(@mode_id)", engine="python")
+        connected_centroids = centroid_conn.a_node.to_numpy()
+
+        with self.project.db_connection_spatial as conn, warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
+
+            if not bulk:
+                zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
+                for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
+                    if zone_id not in centroids:
+                        self.project.logger.warning(
+                            f"Centroid for zone {zone_id} does not exist. Please create it first."
+                        )
+                        continue
+
+                    zone = self.__items[zone_id]
+                    area = zone.geometry if limit_to_zone else None
+                    connector_creation(
+                        zone_id=zone_id,
+                        mode_id=mode_id,
+                        link_types=link_types,
+                        connectors=connectors,
+                        proj_nodes=proj_nodes,
+                        proj_links=link_data,
+                        network=self.project.network,
+                        conn=conn,
+                        delimiting_area=area,
+                    )
+            else:
+                if len(link_types) > 0:
+                    nodes = proj_nodes[proj_nodes.link_types.str.contains("|".join(list(link_types)))]
+                else:
+                    nodes = proj_nodes
+
+                zones = self.data
+                zones = zones[~zones.zone_id.isin(connected_centroids)]
+
+                if zones.empty:
+                    return
+
+                bulk_connector_creation(
+                    conn,
+                    nodes,
+                    link_data,
+                    zones,
+                    modes=[mode_id],
+                    k_connectors=connectors,
+                    projected_crs=None,
+                    limit_to_zone=limit_to_zone,
+                )
+
     def get_closest_zone(self, geometry: Union[Point, LineString, MultiLineString]) -> int:
         """Returns the zone in which the given geometry is located.
 
-            If the geometry is not fully enclosed by any zone, the zone closest to
-            the geometry is returned
+        If the geometry is not fully enclosed by any zone, the zone closest to
+        the geometry is returned
 
         :Arguments:
             **geometry** (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
@@ -135,13 +237,13 @@ class Zoning(BasicTable):
             self.__geo_index.insert(feature_id=zone_id, geometry=zone.geometry)
 
     def __has_zoning(self):
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.network.project.db_connection as conn:
             dt = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
         return any("zone" in x[0].lower() for x in dt)
 
     def __load(self):
         tl = TableLoader()
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.network.project.db_connection_spatial as conn:
             zones_list = tl.load_table(conn, "zones")
         self.__fields = deepcopy(tl.fields)
 
@@ -166,11 +268,11 @@ class Zoning(BasicTable):
         return zone
 
     @property
-    def data(self) -> pd.DataFrame:
+    def data(self) -> gpd.GeoDataFrame:
         """Returns all zones data as a Pandas DataFrame
 
         :Returns:
-            **table** (:obj:`DataFrame`): Pandas DataFrame with all the zones, complete with Geometry
+            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
         """
         dl = DataLoader(self.project.path_to_file, "zones")
         return dl.load_table()

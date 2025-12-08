@@ -2,17 +2,17 @@ import logging
 import re
 from os.path import join, dirname, realpath
 from sqlite3 import Connection
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.utils.db_utils import commit_and_close
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ["ogc_fid", "geometry"]
 
 
-def initialize_tables(project, db_type: str) -> None:
-    conn = database_connection(db_type)
-    create_base_tables(conn, project.logger, db_type)
-    add_triggers(conn, project.logger, db_type)
+def initialize_tables(logger, db_type: str, conn: Connection) -> None:
+    with conn as conn:
+        create_base_tables(conn, logger, db_type)
+        add_triggers(conn, logger, db_type)
 
 
 def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:
@@ -36,7 +36,9 @@ def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None
         run_queries_from_sql_file(conn, logger, qry_file)
 
 
-def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
+def remove_triggers(
+    conn: Connection, logger: logging.Logger, db_type: str, use_aequilibrae_prefix: bool = True
+) -> None:
     spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
         all_trigger_sets = file_list.readlines()
@@ -58,12 +60,15 @@ def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> N
 
                 m = re.search(create_drop_regex, qry)
                 if m:
+                    name = m.group(1).lower()
+                    if not use_aequilibrae_prefix:
+                        name = name.removeprefix("aequilibrae_")
+
                     try:
-                        conn.execute(f"drop trigger if exists {m.group(1).lower()}")
+                        conn.execute(f"drop trigger if exists {name}")
                     except Exception as e:
                         logger.error(f"Failed removing triggers table - > {e.args}")
                         logger.error(f"Point of failure - > {qry}")
-        conn.commit()
 
 
 def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file: str) -> None:
@@ -79,4 +84,22 @@ def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file
             logger.error(msg)
             logger.info(cmd)
             raise e
-    conn.commit()
+
+
+def recreate_columns(conn: Connection, logger: logging.Logger, table: str, old_table: str) -> dict[str, str]:
+    """
+    Recreate columns for a table if any were added. Returns a dict of the old column names to type
+    """
+    columns = conn.execute(f"SELECT name, type FROM PRAGMA_TABLE_INFO('{old_table}') AS table_info").fetchall()
+    columns = {f"{x[0]}": x[1] for x in columns if x[0]}
+
+    orig_columns = conn.execute(f"SELECT name, type FROM PRAGMA_TABLE_INFO('{table}') AS table_info").fetchall()
+    orig_columns = {f"{x[0]}" for x in orig_columns}
+
+    new_columns = {k: v for k, v in columns.items() if k not in orig_columns}
+    logger.info(f"Found {len(new_columns)} new columns: {list(new_columns.keys())}")
+    sql = "ALTER TABLE {} ADD COLUMN {} {};"
+    for k, v in new_columns.items():
+        conn.execute(sql.format(table, k, v))
+
+    return columns

@@ -1,7 +1,6 @@
 from typing import Union
 
 from aequilibrae.project.network.mode import Mode
-from aequilibrae.utils.db_utils import commit_and_close
 from .safe_class import SafeClass
 
 
@@ -10,14 +9,12 @@ class Link(SafeClass):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path)
 
-        >>> proj = Project.from_path("/tmp/test_project")
-
-        >>> all_links = proj.network.links
+        >>> all_links = project.network.links
 
         # Let's get a mode to work with
-        >>> modes = proj.network.modes
+        >>> modes = project.network.modes
         >>> car_mode = modes.get('c')
 
         # We can just get one link in specific
@@ -43,6 +40,8 @@ class Link(SafeClass):
         # We can just save the link
         >>> link1.save()
         >>> link2.save()
+
+        >>> project.close()
     """
 
     def __init__(self, dataset, project):
@@ -55,17 +54,17 @@ class Link(SafeClass):
 
     def delete(self):
         """Deletes link from database"""
-        with commit_and_close(self.connect_db()) as conn:
+        with self.project.db_connection as conn:
             conn.execute(f'DELETE FROM links where link_id="{self.link_id}"')
         self.__stil_exists = False
 
-    def save(self):
+    def save(self, conn=None):
         """Saves link to database"""
 
         data, sql = self._save_new_with_geometry() if self.__new else self.__save_existing_link()
 
         if data:
-            with commit_and_close(self.connect_db()) as conn:
+            with conn or self.project.db_connection_spatial as conn:
                 conn.execute(sql, data)
 
         self.__new = False

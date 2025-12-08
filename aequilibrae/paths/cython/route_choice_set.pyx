@@ -18,26 +18,29 @@ from openmp cimport omp_get_max_threads
 from libcpp.memory cimport shared_ptr
 
 from typing import Tuple
+import itertools
+import warnings
 
 import numpy as np
-import pyarrow as pa
 import pandas as pd
 
 
 """This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen, 'Route
 Choice Sets for Very High-Resolution Data'.  https://doi.org/10.1080/18128602.2012.671383
 
-A rough overview of the algorithm is as follows.  1. Prepare the initial graph, this is depth 0 with no links removed.
-    2. Find a short path, P. If P is not empty add P to the path set.  3. For all links p in P, remove p from E,
-    compounding with the previously removed links.  4. De-duplicate the sub-graphs, we only care about unique
-    sub-graphs.  5. Go to 2.
+A rough overview of the algorithm is as follows.
+    1. Prepare the initial graph, this is depth 0 with no links removed.
+    2. Find a short path, P. If P is not empty add P to the path set.
+    3. For all links p in P, remove p from E, compounding with the previously removed links.
+    4. De-duplicate the sub-graphs, we only care about unique sub-graphs.
+    5. Go to 2.
 
 Details: The general idea of the algorithm is pretty simple, as is the implementation. The caveats here is that there is
 a lot of cpp interop and memory management. A description of the purpose of variables is in order:
 
 route_set: See route_choice.pxd for full type signature. It's an unordered set (hash set) of pointers to vectors of link
 IDs. It uses a custom hashing function and comparator. The hashing function is defined in a string that in inlined
-directly into the output ccp. This is done allow declaring of the `()` operator, which is required and AFAIK not
+directly into the output cpp. This is done allow declaring of the `()` operator, which is required and AFAIK not
 possible in Cython. The hash is designed to dereference then hash order dependent vectors. One isn't provided by
 stdlib. The comparator simply dereferences the pointer and uses the vector comparator. It's designed to store the
 outputted paths. Heap allocated (needs to be returned).
@@ -143,13 +146,10 @@ cdef class RouteChoiceSet:
         self.batched(demand_coo, {}, *args, **kwargs)
         where = kwargs.get("where", None)
         if where is not None:
-            schema = self.psl_schema if kwargs.get("path_size_logit", False) else self.schema
-            results = pa.dataset.dataset(
-                where, format="parquet", partitioning=pa.dataset.HivePartitioning(schema)
-            ).to_table()
+            results = RouteChoiceSetResults.read_dataset(where)
         else:
             results = self.get_results()
-        return [tuple(x) for x in results.column("route set").to_pylist()]
+        return [tuple(x) for x in results["route set"]]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
@@ -157,23 +157,23 @@ cdef class RouteChoiceSet:
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
     def batched(
-            self,
-            demand: GeneralisedCOODemand,
-            select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
-            sl_link_loading: bool = True,
-            max_routes: int = 0,
-            max_depth: int = 0,
-            max_misses: int = 100,
-            seed: int = 0,
-            cores: int = 0,
-            a_star: bool = True,
-            bfsle: bool = True,
-            penalty: float = 1.0,
-            where: Optional[str] = None,
-            store_results: bool = True,
-            path_size_logit: bool = False,
-            beta: float = 1.0,
-            cutoff_prob: float = 0.0,
+        self,
+        demand: GeneralisedCOODemand,
+        select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+        sl_link_loading: bool = True,
+        max_routes: int = 0,
+        max_depth: int = 0,
+        max_misses: int = 100,
+        seed: int = 0,
+        cores: int = 0,
+        a_star: bool = True,
+        bfsle: bool = True,
+        penalty: float = 1.0,
+        where: Optional[str] = None,
+        store_results: bool = True,
+        path_size_logit: bool = False,
+        beta: float = 1.0,
+        cutoff_prob: float = 0.0,
     ):
         """Compute the a route set for a list of OD pairs.
 
@@ -199,7 +199,7 @@ cdef class RouteChoiceSet:
         """
         cdef:
             long long origin, dest
-            size_t i
+            long int i
 
         if select_links is None:
             select_links = {}
@@ -228,7 +228,7 @@ cdef class RouteChoiceSet:
             unsigned int c_max_depth = max_depth
             unsigned int c_max_misses = max_misses
             unsigned int c_seed = seed
-            unsigned int c_cores = cores if cores > 0 else omp_get_max_threads()
+            long int c_cores = cores if cores > 0 else omp_get_max_threads()
 
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
             double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
@@ -247,9 +247,9 @@ cdef class RouteChoiceSet:
             # interface.
             long long [:, :] _reached_first_matrix
 
-        # self.a_star = a_star
+            unsigned char [:, :] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
 
-        pa.set_io_thread_count(c_cores)
+            # self.a_star = a_star
 
         if self.a_star:
             _reached_first_matrix = np.zeros((c_cores, 1), dtype=np.int64)  # Dummy array to allow slicing
@@ -260,9 +260,14 @@ cdef class RouteChoiceSet:
             RouteSet_t *route_set
             shared_ptr[vector[double]] prob_vec
             int thread_id
+            bint found_zero_cost
 
         demand._initalise_col_names()
         self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
+
+        # These are accessed with the gil and used for error reporting
+        zero_cost_ods: list[tuple[int]] = []
+        unreachable_ods: list[tuple[int]] = []
 
         for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
             demand._initalise_c_data(grouped_demand_df)
@@ -282,7 +287,8 @@ cdef class RouteChoiceSet:
             with nogil, parallel(num_threads=c_cores):
                 route_set = new RouteSet_t()
                 thread_id = threadid()
-                for i in prange(demand.ods.size()):
+                found_zero_cost = False  # Make the variable thread local
+                for i in prange(<long int>demand.ods.size(), schedule="guided"):
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
 
@@ -313,6 +319,7 @@ cdef class RouteChoiceSet:
                             conn_matrix[thread_id],
                             b_nodes_matrix[thread_id],
                             _reached_first_matrix[thread_id],
+                            destinations_matrix[thread_id],
                             penalty,
                             c_seed,
                         )
@@ -330,6 +337,7 @@ cdef class RouteChoiceSet:
                             conn_matrix[thread_id],
                             b_nodes_matrix[thread_id],
                             _reached_first_matrix[thread_id],
+                            destinations_matrix[thread_id],
                             penalty,
                             c_seed,
                         )
@@ -338,11 +346,9 @@ cdef class RouteChoiceSet:
                     # routes. This is done to simplify memory management later on.
                     route_vec = self.results.get_route_vec(i)
                     RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
-                    # We now drop all references to those raw pointers. The unique pointers now own those vectors.
-                    route_set.clear()
 
                     if path_size_logit:
-                        prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
+                        prob_vec = self.results.compute_result(i, d(route_vec), &found_zero_cost, thread_id)
                         self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
                         self.ll_results.sl_link_load_single_route_set(
                             i, d(route_vec),
@@ -351,6 +357,14 @@ cdef class RouteChoiceSet:
                             dest_index,
                             thread_id
                         )
+
+
+                    if d(route_vec).size() == 0 or found_zero_cost:
+                        with gil:
+                            if found_zero_cost:
+                                zero_cost_ods.append(tuple(demand.ods[i]))
+                            if d(route_vec).size() == 0:
+                                unreachable_ods.append(tuple(demand.ods[i]))
 
                     if self.block_flows_through_centroids:
                         blocking_centroid_flows(
@@ -378,6 +392,131 @@ cdef class RouteChoiceSet:
             self.get_sl_link_loading(cores=c_cores)
             self.get_sl_od_matrices()
 
+        if zero_cost_ods:
+            warnings.warn(
+                f"found zero cost routes for OD pairs, the entire route set has been masked for: {zero_cost_ods}"
+            )
+        if unreachable_ods:
+            warnings.warn(
+                f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}"
+            )
+
+    def assign_from_df(
+        self,
+        graph: pd.DataFrame,
+        df: pd.DataFrame,
+        demand: GeneralisedCOODemand,
+        select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+        recompute_psl: bool = False,
+        sl_link_loading: bool = True,
+        store_results: bool = True,
+        beta: float = 1.0,
+        cutoff_prob: float = 0.0,
+    ):
+        cdef:
+            long int c_cores = 1  # Single threaded only due to high python interop, this shoud be fast anyway
+            int thread_id = 0
+
+            # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
+            double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
+
+        for _, route_list in df["route set"].items():
+            if not isinstance(route_list, (list, np.ndarray)):
+                raise TypeError(f"route sets must be a list or Numpy array, found {type(route_list)}")
+
+        # We want to enforce that if the demand matrix cell is non-cell for an OD pair, then at least one route exists to assign to it
+        demand_df = demand.df.assign(idx=np.arange(len(demand.df)))
+        demand_df = demand_df[demand_df.index.get_level_values(0) != demand_df.index.get_level_values(1)]
+
+        df = df.set_index(demand_df.index.names)
+        if not demand_df.index.drop_duplicates().isin(df.index).all():
+            raise KeyError("not all origin and destinations IDs from the demand matrix are present within the path files")
+
+        # We also store those indices along side the route sets themselves so it's easier to keep track
+        df = demand_df[["idx"]].merge(df, how="left", left_index=True, right_index=True).reset_index()
+        gb = df.groupby(by="idx")
+
+        # In order to map the network link IDs to compressed links we'll use the graph
+        graph_to_compressed = graph[["link_id", "direction"]].prod(axis=1).reset_index().set_index(0)
+
+        # Now we initialise the demand matrix and prepare to insert the route sets
+        demand._initalise_col_names()
+        demand._initalise_c_data(None)
+
+        self.results = RouteChoiceSetResults(
+            demand,
+            scaled_cutoff_prob,
+            beta,
+            self.num_links,
+            self.cost_view,
+            self.mapping_idx,
+            self.mapping_data,
+            store_results=store_results,
+            perform_assignment=True,
+        )
+
+        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
+
+        cdef:
+            vector[long long] *route
+            bint found_zero_cost
+
+        # We iterate over the OD pairs in the path files
+        for od_idx, df in gb:
+            # We obtain a reference to the route vector, we then need to insert the right *compressed* link IDs
+            route_vec = self.results.get_route_vec(od_idx)
+
+            # If we are reusing the probabilities then we need to a similar thing for this
+            if not recompute_psl:
+                prob_vec = self.results.get_prob_vec(od_idx)
+
+            d(route_vec).reserve(len(df))
+            for _, row in df.iterrows():
+                # We find the indices for the compressed id that corresponds to the direction link id pair (as a
+                # product)
+                compressed_link_indices = graph_to_compressed.loc[row["route set"]]["index"].to_numpy()
+
+                route = new vector[long long]()
+                # Then use itertools.groupby to de-duplicate them without modifying the order. The order is not required
+                # for assignment but it is if we wish to output this route set again.
+                for compressed_link_id, _ in itertools.groupby(graph.__compressed_id__.iloc[compressed_link_indices]):
+                    route.push_back(compressed_link_id)
+
+                d(route_vec).emplace_back(route)
+                if not recompute_psl:
+                    d(prob_vec).push_back(row["probability"])
+
+            # If we are recomputing the probabilities then we do so here. This also has the side effect of recompute the
+            # cost, masking, and path overlap with new parameters
+            if recompute_psl:
+                prob_vec = self.results.compute_result(od_idx, d(route_vec), &found_zero_cost, thread_id)
+
+            # We have now have both the route and probability vectors restored so we can do LL and SLL.
+            self.ll_results.link_load_single_route_set(od_idx, d(route_vec), d(prob_vec), thread_id)
+
+            origin_index = self.nodes_to_indices_view[demand.ods[od_idx].first]
+            dest_index = self.nodes_to_indices_view[demand.ods[od_idx].second]
+            self.ll_results.sl_link_load_single_route_set(
+                od_idx,
+                d(route_vec),
+                d(prob_vec),
+                origin_index,
+                dest_index,
+                thread_id
+            )
+
+        # Clean up and reduce any results from the threaded storage
+        self.ll_results.reduce_link_loading()
+        self.ll_results.reduce_sl_link_loading()
+        self.ll_results.reduce_sl_od_matrix()
+
+        self.get_link_loading(cores=c_cores)
+        self.get_sl_link_loading(cores=c_cores)
+        self.get_sl_od_matrices()
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
     @cython.initializedcheck(False)
     cdef void path_find(
         RouteChoiceSet self,
@@ -387,7 +526,8 @@ cdef class RouteChoiceSet:
         long long [:] thread_predecessors,
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first
+        long long [:] _thread_reached_first,
+        unsigned char [:] thread_destinations
     ) noexcept nogil:
         """Small wrapper around path finding, thread locals should be passes as arguments."""
         if self.a_star:
@@ -406,9 +546,11 @@ cdef class RouteChoiceSet:
                 EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
             )
         else:
+            thread_destinations[dest_index] = True
             path_finding(
                 origin_index,
-                dest_index,
+                thread_destinations,
+                1,  # Single destination
                 thread_cost,
                 thread_b_nodes,
                 self.graph_fs_view,
@@ -417,6 +559,7 @@ cdef class RouteChoiceSet:
                 thread_conn,
                 _thread_reached_first
             )
+            thread_destinations[dest_index] = False
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -435,6 +578,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
+        unsigned char [:] thread_destinations,
         double penalty,
         unsigned int seed
     ) noexcept nogil:
@@ -453,6 +597,7 @@ cdef class RouteChoiceSet:
             # Local variables, Cython doesn't allow conditional declarations
             vector[long long] *vec
             pair[RouteSet_t.iterator, bool] status
+            pair[LinkSet_t.iterator, bool] banned_status
             unsigned int miss_count = 0
             long long p, connector
 
@@ -460,6 +605,12 @@ cdef class RouteChoiceSet:
             bint lp = penalty != 1.0
             vector[double] *penalised_cost = <vector[double] *>nullptr
             vector[double] *next_penalised_cost = <vector[double] *>nullptr
+
+            # Because we can have duplicate banned link sets, the insertion may fail, in that case we free the set
+            # immediately. However, by doing so we then can't tell (without a method to track it), which sets have
+            # already been freed in the queue if we happened to early exit from it, so we use another variable to just
+            # free the remaining items in the queue.
+            bool free_remaining = False
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
@@ -484,7 +635,12 @@ cdef class RouteChoiceSet:
             if queue.size() + route_set.size() >= max_routes:
                 shuffle(queue.begin(), queue.end(), rng)
 
+            next_queue.clear()
             for banned in queue:
+                if free_remaining:
+                    del banned
+                    continue
+
                 if lp:
                     # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link
                     # penalisation,
@@ -504,11 +660,16 @@ cdef class RouteChoiceSet:
                     thread_predecessors,
                     thread_conn,
                     thread_b_nodes,
-                    _thread_reached_first
+                    _thread_reached_first,
+                    thread_destinations
                 )
 
                 # Mark this set of banned links as seen
-                removed_links.insert(banned)
+                banned_status = removed_links.insert(banned)
+                if not banned_status.second:
+                    # If we failed to insert this banned set then an equal set already exists within the removed links
+                    del banned
+                    banned = d(banned_status.first)
 
                 # If the destination is reachable we must build the path and readd
                 if thread_predecessors[dest_index] >= 0:
@@ -540,20 +701,26 @@ cdef class RouteChoiceSet:
                         new_banned = new unordered_set[long long](d(banned))
                         new_banned.insert(connector)
                         # If we've already seen this set of removed links before we already know what the path is and
-                        # its in our route set
+                        # its in our route set.
                         if removed_links.find(new_banned) != removed_links.end():
                             del new_banned
                         else:
                             next_queue.push_back(new_banned)
 
-                    # The deduplication of routes occurs here
+                    # The de-duplication of routes occurs here
                     status = route_set.insert(vec)
-                    miss_count = miss_count + (not status.second)
+                    if not status.second:
+                        del vec  # If the insertion failed, free this vector, we already have one that is equal to it
+                        miss_count = miss_count + 1
+
                     if miss_count > max_misses or route_set.size() >= max_routes:
-                        break
+                        free_remaining = True
+                        continue  # This condition will be hit again at the start of the loop, we just don't want to
+                                  # iterate over the rest of the things in queue when we know there is not more space.
+                else:
+                    pass
 
             queue.swap(next_queue)
-            next_queue.clear()
 
             if lp:
                 # Update the penalised_cost vector, since next_penalised_cost is always the one updated we just need to
@@ -564,7 +731,11 @@ cdef class RouteChoiceSet:
         for banned in queue:
             del banned
 
-        # We should also free all the sets in removed_links, we don't be needing them
+        # We should also free all the sets in next_queue, we don't be needing them.  We remove next_queue before
+        # removed_links because we just swapped it with queue, and removed_links contains a subset of those that were
+        # added to queue (pre-swap). It may share elements so we make sure to erase them from the set before freeing
+        # them to avoid a use-after free.
+
         for banned in removed_links:
             del banned
 
@@ -590,6 +761,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
+        unsigned char [:] thread_destinations,
         double penalty,
         unsigned int seed
     ) noexcept nogil:
@@ -617,7 +789,8 @@ cdef class RouteChoiceSet:
                 thread_predecessors,
                 thread_conn,
                 thread_b_nodes,
-                _thread_reached_first
+                _thread_reached_first,
+                thread_destinations
             )
 
             if thread_predecessors[dest_index] >= 0:
@@ -637,22 +810,25 @@ cdef class RouteChoiceSet:
 
                 # To prevent runaway algorithms if we find N duplicate routes we should stop
                 status = route_set.insert(vec)
-                miss_count = miss_count + (not status.second)
+                if not status.second:
+                    del vec  # If the insertion failed, free this vector, we already have one that is equal to it
+                    miss_count = miss_count + 1
+
                 if miss_count > max_misses:
                     break
             else:
                 break
 
-    def get_results(self):  # Cython doesn't like this type annotation... -> pa.Table:
+    def get_results(self):
         """
         :Returns:
-            **route sets** (:obj:`pyarrow.Table`): Returns a table of OD pairs to lists of link IDs for
+            **route sets** (:obj:`pa.DataFrame`): Returns a table of OD pairs to lists of link IDs for
                 each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
         """
         if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
-        return self.results.make_table_from_results()
+        return self.results.make_df_from_results()
 
     def get_link_loading(RouteChoiceSet self, cores: int = 0):
         """
@@ -692,3 +868,15 @@ cdef class RouteChoiceSet:
             raise RuntimeError("Link loading results not computed yet")
 
         return self.ll_results.sl_od_matrices_structs_to_objects()
+
+    def write_path_files(RouteChoiceSet self, where):
+        """
+        Write the path-files to the directory specified
+
+        :Arguments:
+            **where** (:obj:`pathlib.Path`): Directory to save the dataset to.
+        """
+        if self.results is None:
+            raise RuntimeError("Route Choice results not computed yet")
+
+        self.results.write(where)

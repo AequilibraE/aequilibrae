@@ -1,12 +1,10 @@
 from libcpp.vector cimport vector
 from libcpp.utility cimport move
-from libcpp cimport nullptr
 from cython.operator cimport dereference as d
 
 import scipy.sparse
 import numpy as np
 import openmatrix as omx
-import cython
 
 cdef class Sparse:
     """

@@ -1,6 +1,4 @@
-:orphan:
+All Examples
+============
 
-Examples
-========
-
-A series of different examples using AequilibraE's main features
+This page contains all of AequilibraE's examples in just one place.

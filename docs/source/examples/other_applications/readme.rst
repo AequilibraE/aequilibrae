@@ -1,2 +1,5 @@
-Other Applications
-------------------
+Examples
+--------
+
+Other applcations
+~~~~~~~~~~~~~~~~~

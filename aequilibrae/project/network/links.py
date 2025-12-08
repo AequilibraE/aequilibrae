@@ -1,14 +1,12 @@
 from copy import deepcopy
 
-import pandas as pd
+import geopandas as gpd
 import shapely.wkb
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.link import Link
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Links(BasicTable):
@@ -17,17 +15,17 @@ class Links(BasicTable):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path)
 
-        >>> proj = Project.from_path("/tmp/test_project")
-
-        >>> all_links = proj.network.links
+        >>> all_links = project.network.links
 
         # We can just get one link in specific
         >>> link = all_links.get(1)
 
         # We can save changes for all links we have edited so far
         >>> all_links.save()
+
+        >>> project.close()
     """
 
     __max_id = -1
@@ -108,7 +106,7 @@ class Links(BasicTable):
         return link
 
     def delete(self, link_id: int) -> None:
-        """Removes the link with **link_id** from the project
+        """Removes the link with link_id from the project
 
         :Arguments:
             **link_id** (:obj:`int`): Id of a link to delete
@@ -119,7 +117,7 @@ class Links(BasicTable):
             link = self.__items.pop(link_id)  # type: Link
             link.delete()
         else:
-            with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            with self.project.db_connection_spatial as conn:
                 d = conn.execute("Delete from Links where link_id=?", [link_id]).rowcount
         if d:
             self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
@@ -129,18 +127,18 @@ class Links(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection_spatial as conn:
             self.__max_id = conn.execute("select coalesce(max(link_id),0) from Links").fetchone()[0]
             tl.load_structure(conn, "links")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
     @property
-    def data(self) -> pd.DataFrame:
+    def data(self) -> gpd.GeoDataFrame:
         """Returns all links data as a Pandas DataFrame
 
         :Returns:
-            **table** (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
+            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
         """
         dl = DataLoader(self.project.path_to_file, "links")
         return dl.load_table()
@@ -162,7 +160,7 @@ class Links(BasicTable):
         raise ValueError(f"Link {link_id} does not exist in the model")
 
     def __link_data(self, link_id: int) -> dict:
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.project.db_connection_spatial as conn:
             data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
             return dict(zip(self.__fields, data))

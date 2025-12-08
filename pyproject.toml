@@ -1,18 +1,125 @@
+[build-system]
+requires = ["setuptools", "numpy>=2.0", "cython", "wheel"]
+
+[project]
+authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Other Audience",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dynamic = ["version"]
+description = "A package for transportation modeling"
+maintainers = [{ name = "AequilibraE contributors" }]
+name = "aequilibrae"
+readme = "README.md"
+requires-python = ">=3.9" # match classifiers above and black version below
+
+dependencies = [
+  "numpy<1.99; python_version <= '3.10'",
+  "numpy>=2.0; python_version >= '3.11'",
+  "scipy>=1.4",
+  "pyaml",
+  "requests",
+  "pandas",
+  "pyproj",
+  "rtree",
+  "pyarrow",
+  "openmatrix",
+  "geopandas",
+  "tqdm"
+]
+
+[project.license]
+file = "LICENSE.TXT"
+
+[project.optional-dependencies]
+
+docs = [
+  "enum34",
+  "Sphinx",
+  "pydata-sphinx-theme",
+  "sphinx_autodoc_annotation",
+  "matplotlib",
+  "folium",
+  "mapclassify",
+  "sphinx-gallery",
+  "sphinx-copybutton",
+  "sphinx-design",
+  "sphinx-git",
+  "nbconvert",
+  "sphinx-tabs",
+  "sphinx-subfigure"
+]
+
+tests = [
+  "setuptools",
+  "codecov",
+  "pytest",
+  "pytest-xdist",
+  "pytest-cov",
+  "pytest-subtests",
+  "pytest-random-order",
+  "coveralls",
+  "ruff==0.9.10",
+  "black==25.1.0",
+  "wheel",
+]
+
+build = [
+  "setuptools",
+  "numpy<1.99; python_version <= '3.10'",
+  "numpy>=2.0; python_version >= '3.11'",
+  "cython",
+  "wheel"
+]
+
+dev = ['aequilibrae[build, tests, docs]']
+
+[tool.setuptools.dynamic]
+version = { attr = "aequilibrae.version" }
+
+[tool.setuptools.package-dir]
+aequilibrae = "aequilibrae"
+
+[tool.setuptools.package-data]
+    "aequilibrae.reference_files"= ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"]
+    "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
+    "aequilibrae.distribution"= ["cython/*.pyx"]
+    "aequilibrae.matrix"= ["*.pyx", "*.pxd"]
+    "aequilibrae"= ["./parameters.yml"]
+    "aequilibrae.project"= [
+        "database_specification/network/tables/*.*",
+        "database_specification/network/triggers/*.*",
+        "database_specification/network/migrations/*.*",
+        "database_specification/transit/tables/*.*",
+        "database_specification/transit/triggers/*.*",
+        "database_specification/transit/migrations/*.*",
+    ]
+
+
 [tool.black]
 line-length = 120
-target-version = ['py39', 'py310', 'py311', 'py312']
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 include = '\.pyi?$'
 extend-exclude = '''docs/*'''
 
 
-[build-system]
-requires = ["setuptools", "numpy<1.99", "cython", "pyarrow==16.1.0", "wheel"]
-
-
 [tool.ruff]
-
-select = ["B", "C", "E", "F", "W"]
-ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
+lint.select = ["B", "C", "E", "F", "W"]
+lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
 exclude = [
     ".idea",
     "__pycache__",
@@ -50,39 +157,17 @@ exclude = [
     ".venv312",
 ]
 line-length = 120
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py39"
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 20
 
 [tool.cibuildwheel]
-# While we test this facility we we will only build for 3.10
-#build = ["cp310-*"]
-build = ["cp39-*","cp310-*", "cp311-*", "cp312-*"]
+build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*", "cp313-*"]
 
-# We do not build wheels for Python 3.6 or 3.7, or for 32-bit in either Linux or Windows
-skip = ["cp36-*", "cp37-*", "cp38-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*"]
-test-skip = ""
-
-archs = ["auto"]
-build-frontend = "default"
-config-settings = {}
-dependency-versions = "pinned"
-environment = {}
-environment-pass = []
-build-verbosity = 0
-
-before-all = ""
-before-build = ""
-repair-wheel-command = ""
-
-test-command = ""
-before-test = ""
-test-requires = []
-test-extras = []
-
-container-engine = "docker"
+# We do not build wheels for Python 3.6 or 3.7, for 32-bit in either Linux or Windows, or for macOS
+skip = ["cp36-*", "cp37-*", "cp38-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*", "*-macosx*"]
 
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
@@ -90,17 +175,14 @@ manylinux-pypy_x86_64-image = "manylinux_2_28"
 manylinux-pypy_aarch64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.linux]
-archs = ["auto", "aarch64"]
-build = ["cp310-*", "cp311-*", "cp312-*"]
-repair-wheel-command = [
-  "auditwheel repair -w {dest_dir} {wheel} --exclude libarrow.so.1601 --exclude libarrow_python.so"
-]
+archs = ["auto"]
+build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*"]
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} "
 
 [tool.cibuildwheel.macos]
-archs = ["arm64"]
-#archs = ["x86_64"]
-environment = { CC="gcc-12", CXX="g++-12" }
-repair-wheel-command = "delocate-wheel -vv --ignore-missing-dependencies --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+archs = ["auto"]
+environment = { MACOSX_DEPLOYMENT_TARGET = "14.0" }
+repair-wheel-command = "delocate-wheel -vv --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
 
 [tool.cython-lint]
 max-line-length = 120

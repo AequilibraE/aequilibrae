@@ -13,8 +13,8 @@ class Stop(BasicPTElement):
     """Transit stop as read from the GTFS feed"""
 
     def __init__(self, agency_id: int, record: tuple, headers: list):
-        self.stop_id = -1
         self.stop = ""
+        self.stop_id = -1
         self.stop_code = ""
         self.stop_name = ""
         self.stop_desc = ""
@@ -22,11 +22,12 @@ class Stop(BasicPTElement):
         self.stop_lon: float = None
         self.stop_street = ""
         self.zone = ""
-        self.zone_id = None
+        self.zone_id = None  # Corresponds to transit_fare_zone
         self.stop_url = ""
         self.location_type = 0
         self.parent_station = ""
         self.stop_timezone = ""
+        self.wheelchair_boarding: int = None
 
         # Not part of GTFS
         self.taz = None
@@ -49,14 +50,12 @@ class Stop(BasicPTElement):
 
         if None not in [self.stop_lon, self.stop_lat]:
             self.geo = Point(self.stop_lon, self.stop_lat)
-        if len(str(self.zone_id)) == 0:
-            self.zone_id = None
 
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
         sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
-                                    parent_station, description, street, fare_zone_id, transit_zone, route_type, geometry)
+                                    parent_station, description, street, zone_id, transit_fare_zone, route_type, geometry)
                  values (?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data
@@ -76,8 +75,8 @@ class Stop(BasicPTElement):
             self.parent_station,
             self.stop_desc,
             self.stop_street,
-            self.zone_id,
             self.taz,
+            self.zone,
             int(self.route_type),
             self.geo.wkb,
             self.srid,

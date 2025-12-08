@@ -4,6 +4,7 @@ from typing import Union, List, Tuple, Dict
 from abc import ABC, abstractmethod
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
@@ -49,11 +50,11 @@ class TransportClassBase(ABC):  # noqa: B024
         }
         if len(matrix.view_names) == 1:
             mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :]) for nm in matrix.view_names
+                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :])) for nm in matrix.view_names
             }
         else:
             mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i]) for i, nm in enumerate(matrix.view_names)
+                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i])) for i, nm in enumerate(matrix.view_names)
             }
         self._config["Matrix"] = str(mat_config)
 
@@ -68,26 +69,25 @@ class TrafficClass(TransportClassBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-        >>> from aequilibrae.matrix import AequilibraeMatrix
         >>> from aequilibrae.paths import TrafficClass
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
         >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
         >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
-        >>> graph.set_blocked_centroid_flows(True)
+        >>> graph.set_blocked_centroid_flows(False)
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = AequilibraeMatrix()
         >>> demand = proj_matrices.get_matrix("demand_omx")
-        >>> demand.computational_view(['matrix'])
+        >>> demand.computational_view()
 
         >>> tc = TrafficClass("car", graph, demand)
         >>> tc.set_pce(1.3)
+
+        >>> project.close()
     """
 
     def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:
@@ -112,6 +112,7 @@ class TrafficClass(TransportClassBase):
         self.results = AssignmentResults()
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
+        self.congested_time = np.array([])
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -189,6 +190,25 @@ class TrafficClass(TransportClassBase):
             self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
         self._config["select_links"] = str(links)
 
+    def skim_congested(self, skim_fields=None):
+        """
+        Skims the congested network. The user can add a list of skims to be computed, which
+        will be added to the congested time and the assignment cost from the last iteration of
+        the assignment.
+
+        :Arguments:
+            **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
+        """
+        self.graph.graph = self.graph.graph.assign(
+            __assignment_cost__=self.graph.cost, __congested_time__=self.congested_time
+        )
+        skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]
+        pre_fields = self.graph.skim_fields
+        self.graph.set_skimming(skims)
+        skimmer = self.graph.compute_skims()
+        self.graph.set_skimming(pre_fields)
+        return skimmer
+
     def __setattr__(self, key, value):
         if key not in [
             "graph",
@@ -206,13 +226,14 @@ class TrafficClass(TransportClassBase):
             "fixed_cost_field",
             "_selected_links",
             "_config",
+            "congested_time",
         ]:
             raise KeyError(f"Traffic Class does not have '{key}'")
         self.__dict__[key] = value
 
 
 class TransitClass(TransportClassBase):
-    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix, matrix_core: str = None):
+    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
         super().__init__(name, graph, matrix)
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()
