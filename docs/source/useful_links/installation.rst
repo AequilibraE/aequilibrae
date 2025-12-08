@@ -38,6 +38,8 @@ AequilibraE does not provide pre-built wheel files for macOS. When installing fr
 2. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
 3. Update the DYLD_LIBRARY_PATH to include libspatialite: ``export DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH``
 
+AequilibraE may also require raising the "open files" limit, this can be achieved with ``ulimit -n 10240``. This should be placed in ``.zshrc`` or similar user shell configuration file.
+
 .. _dependencies:
 
 Dependencies
