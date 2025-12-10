@@ -25,7 +25,7 @@ from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResult
 from aequilibrae import paths
 
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
-version = "1.5.0"
+version = "1.5.1"
 
 # On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
 if sys.platform == "darwin" and get_start_method(allow_none=True) != "fork":
