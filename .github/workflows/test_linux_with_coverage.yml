@@ -38,7 +38,7 @@ jobs:
             --cov-report=markdown-append:$GITHUB_STEP_SUMMARY \
             --dist=loadscope \
             --numprocesses=4 \
-            --random-order
+            --random-order \
             --verbose
 
       - uses: actions/upload-artifact@v4
