@@ -19,8 +19,7 @@ cdef void _remove_dead_ends(
     signed char [:] directions,
     long long [:] in_degree,
     long long [:] out_degree,
-    uint8_t
- [:] burnt_links,
+    uint8_t [:] burnt_links,
 ) noexcept nogil:
     cdef:
         long long b_node
