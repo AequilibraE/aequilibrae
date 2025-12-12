@@ -85,6 +85,5 @@ jobs:
         uv run pytest tests/ \
         --durations=50 \
         --dist=loadscope\
-        -n 4 \
         --random-order \
         --verbose
