@@ -80,4 +80,5 @@ jobs:
     - name: Runs test (macOS)
       if: matrix.os == 'macos-latest'
       run: |
+        uv pip uninstall pytest-xdist
         DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH uv run pytest tests/ --durations=50 --random-order --verbose
