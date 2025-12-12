@@ -20,7 +20,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Download spatialite on Linux
-        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt update
           sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
@@ -28,10 +27,6 @@ jobs:
 
       - name: Install Python and create virtual environment
         run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed
-
-      - name: Compile library
-        run: |
-          uv pip install .[dev]
 
       - name: Generate coverage report
         run: |
