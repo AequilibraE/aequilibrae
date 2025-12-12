@@ -80,10 +80,10 @@ jobs:
     - name: Runs test (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        ulimit -a && ulimit -n 10240 && ulimit -a && \
+        ulimit -a && \
         DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH \
         uv run pytest tests/ \
         --durations=50 \
-        --dist=loadscope\
+        --dist=loadscope \
         --random-order \
         --verbose
