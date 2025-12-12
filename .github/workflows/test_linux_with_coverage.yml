@@ -30,7 +30,8 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          uv run pytest tests/ \
+          uv run --extra tests \
+            pytest tests/ \
             --cov=aequilibrae \
             --cov-branch \
             --cov-report=term-missing \
