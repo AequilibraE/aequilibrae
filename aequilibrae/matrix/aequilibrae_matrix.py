@@ -981,7 +981,9 @@ class AequilibraeMatrix(object):
         if not memory_only:
             output.matrices.flush()
         self.computational_view(orig_mat_view)
-        output.computational_view([core for core, old_name in zip(mnames, mcores, strict=True) if old_name in orig_mat_view])
+        output.computational_view(
+            [core for core, old_name in zip(mnames, mcores, strict=True) if old_name in orig_mat_view]
+        )
         return output
 
     def rows(self) -> np.ndarray:
