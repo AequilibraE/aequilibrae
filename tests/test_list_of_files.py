@@ -12,9 +12,9 @@ def test_files_are_listed():
         files_on_disk = sorted(x.stem for x in pth.glob("*.sql"))
         with open(pth / "table_list.txt") as f:
             table_list = sorted(line.strip().lower() for line in f if line.strip())
-        assert (
-            files_on_disk == table_list
-        ), f"SQL files on disk are different from listed as project tables in {fldr}:[{files_on_disk}]"
+        assert files_on_disk == table_list, (
+            f"SQL files on disk are different from listed as project tables in {fldr}:[{files_on_disk}]"
+        )
         assert len(files_on_disk) > 0
 
 
@@ -26,9 +26,9 @@ def test_trigger_files_are_listed():
         files_on_disk = sorted(x.stem for x in pth.glob("*.sql"))
         with open(pth / "triggers_list.txt") as f:
             table_list = sorted(line.strip().lower() for line in f if line.strip())
-        assert (
-            files_on_disk == table_list
-        ), f"SQL files on disk are different from listed trigger files in {fldr}:[{files_on_disk}]"
+        assert files_on_disk == table_list, (
+            f"SQL files on disk are different from listed trigger files in {fldr}:[{files_on_disk}]"
+        )
         assert len(files_on_disk) > 0
 
 

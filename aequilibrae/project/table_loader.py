@@ -9,7 +9,7 @@ class TableLoader:
 
     def load_table(self, conn: Connection, table_name: str) -> List[dict]:
         self.__get_table_struct(conn, table_name)
-        return [dict(zip(self.fields, row)) for row in conn.execute(self.sql).fetchall()]
+        return [dict(zip(self.fields, row, strict=True)) for row in conn.execute(self.sql).fetchall()]
 
     def load_structure(self, conn: Connection, table_name: str) -> None:
         self.__get_table_struct(conn, table_name)

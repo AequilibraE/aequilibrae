@@ -383,7 +383,7 @@ class AequilibraeMatrix(object):
                 )
 
                 # Copy all cores
-                for ncore, core in zip(core_names, do_cores):
+                for ncore, core in zip(core_names, do_cores, strict=True):
                     self.matrix[ncore][:, :] = np.array(src[core])[:, :]
                 self.__flush(self.matrices)
 
@@ -981,7 +981,7 @@ class AequilibraeMatrix(object):
         if not memory_only:
             output.matrices.flush()
         self.computational_view(orig_mat_view)
-        output.computational_view([core for core, old_name in zip(mnames, mcores) if old_name in orig_mat_view])
+        output.computational_view([core for core, old_name in zip(mnames, mcores, strict=True) if old_name in orig_mat_view])
         return output
 
     def rows(self) -> np.ndarray:

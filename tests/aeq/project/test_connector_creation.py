@@ -44,9 +44,9 @@ def test_bulk_connector_creation_single_mode(coquimbo_example, initial_state):
 
     # Should have connectors
     new_connectors = updated_links[updated_links.link_type == "centroid_connector"]
-    assert len(new_connectors) >= len(
-        initial_state["initial_connectors"]
-    ), "Should have at least as many connectors as before"
+    assert len(new_connectors) >= len(initial_state["initial_connectors"]), (
+        "Should have at least as many connectors as before"
+    )
 
     # Check new connectors properties
     added_connectors = new_connectors[~new_connectors.link_id.isin(initial_state["initial_connectors"].link_id)]
@@ -115,9 +115,9 @@ def test_bulk_connector_creation_k_connectors(coquimbo_example, initial_state, k
     for centroid_id in centroid_node_ids:
         centroid_connectors = added_connectors[added_connectors.a_node == centroid_id]
         # Should have at most k_connectors (may be fewer if not enough nodes available)
-        assert (
-            len(centroid_connectors) <= k_connectors
-        ), f"Centroid {centroid_id} should have at most {k_connectors} connectors"
+        assert len(centroid_connectors) <= k_connectors, (
+            f"Centroid {centroid_id} should have at most {k_connectors} connectors"
+        )
 
 
 @pytest.mark.parametrize("limit_to_zone", [True, False])

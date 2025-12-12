@@ -280,13 +280,13 @@ def test_multi_iteration(select_link_setup, algorithm):
     assignment_results = assignclass.results.get_load_results()
     sl_results = assignclass.results.get_sl_results()
 
-    assert (
-        abs(assignment_results["matrix_ab"].loc[1] - sl_results["sl_1_1_matrix_ab"].loc[1]) < 1e-6
-    ), f"Select link results differ to that of the assignment ({algorithm})"
+    assert abs(assignment_results["matrix_ab"].loc[1] - sl_results["sl_1_1_matrix_ab"].loc[1]) < 1e-6, (
+        f"Select link results differ to that of the assignment ({algorithm})"
+    )
 
-    assert (
-        abs(assignment_results["matrix_ab"].loc[5] - sl_results["sl_5_1_matrix_ab"].loc[5]) < 1e-6
-    ), f"Select link results differ to that of the assignment ({algorithm})"
+    assert abs(assignment_results["matrix_ab"].loc[5] - sl_results["sl_5_1_matrix_ab"].loc[5]) < 1e-6, (
+        f"Select link results differ to that of the assignment ({algorithm})"
+    )
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):

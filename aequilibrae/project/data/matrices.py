@@ -185,7 +185,7 @@ class Matrices:
             mat.close()
             del mat
 
-        tp = {key: None for key in self.__fields}
+        tp = dict.fromkeys(self.__fields)
         tp["name"] = name
         tp["file_name"] = file_name
         tp["cores"] = cores

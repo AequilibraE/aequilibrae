@@ -65,7 +65,7 @@ class Nodes(BasicTable):
         with self.project.db_connection_spatial as conn:
             data = conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
         if data:
-            data = dict(zip(self.__fields, data))
+            data = dict(zip(self.__fields, data, strict=True))
             node = Node(data, self.project)
             self.__items[node.node_id] = node
             return node
@@ -97,7 +97,7 @@ class Nodes(BasicTable):
         if ct > 0:
             raise Exception("Node_id already exists. Failed to create it")
 
-        data = {key: None for key in self.__fields}
+        data = dict.fromkeys(self.__fields)
         data["node_id"] = node_id
         data["is_centroid"] = 1
         node = Node(data, self.project)

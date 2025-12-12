@@ -25,9 +25,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(
-        self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None
-    ):  # noqa: B006
+    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -130,7 +128,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.__do_execute_map_matching = allow
 
-    def map_match(self, route_types=[3]) -> None:  # noqa: B006
+    def map_match(self, route_types=(3,)) -> None:
         """Performs map-matching for all routes of one or more types.
 
         Defaults to map-matching Bus routes (type 3) only.
@@ -139,13 +137,24 @@ class GTFSRouteSystemBuilder(WorkerThread):
         `route_type here <https://gtfs.org/documentation/schedule/reference/#routestxt>`_.
 
         :Arguments:
-            **route_types** (:obj:`List[int]` or :obj:`Tuple[int]`): Default is [3], for bus only
+            **route_types** (:obj:`List[int]` or :obj:`Tuple[int]`): Default is ``(3,)``, for bus only
         """
         if not isinstance(route_types, list) and not isinstance(route_types, tuple):
             raise TypeError("Route_types must be list or tuple")
 
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
+
+        if any(e not in mode_correspondence for e in route_types):
+            missing_route_types = [e for e in route_types if e not in mode_correspondence]
+            logger.warning(
+                f"Skipping the following route_types as they have no corresponding road mode: {missing_route_types}"
+            )
+            route_types = [e for e in route_types if e in mode_correspondence]
+
+            if not route_types:
+                logger.warning("No valid route_types remain after filtering")
+                return
 
         for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):
             if pat.route_type in route_types:
@@ -359,11 +368,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
         return MultiLineString(shapes)
 
     def __error_logging(self, titles, values):
-        for i, j in zip(titles, values):
+        for i, j in zip(titles, values, strict=True):
             logger.error(f"- {i}: {j}")
 
     def __warning_logging(self, titles, values):
-        for i, j in zip(titles, values):
+        for i, j in zip(titles, values, strict=True):
             logger.warning(f"- {i}: {j}")
 
     def __fail(self, msg: str) -> None:

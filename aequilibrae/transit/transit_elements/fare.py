@@ -29,7 +29,7 @@ class Fare:
 
     def populate(self, record: tuple, headers: list) -> None:
         """Adds fare information."""
-        for key, value in zip(headers, record):
+        for key, value in zip(headers, record, strict=True):
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in Routes.txt is unknown field for that file on GTFS")
 
