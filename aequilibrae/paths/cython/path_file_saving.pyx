@@ -40,8 +40,8 @@ cpdef void save_path_file(long origin_index,
             size_of_path_arrays.push_back(<long long> path_data.size())
 
     # get a view on data underlying vector, then as numpy array. avoids copying.
-    cdef long long[::1] numpy_array = np.asarray(<long long[:path_data.size()]>path_data.data())
-    cdef long long[::1] numpy_array_ind = np.asarray(<long long[:size_of_path_arrays.size()]>size_of_path_arrays.data())
+    numpy_array = np.asarray(<long long[:path_data.size()]>path_data.data())
+    numpy_array_ind = np.asarray(<long long[:size_of_path_arrays.size()]>size_of_path_arrays.data())
 
     table1 = pd.DataFrame({"data": numpy_array})
     table2 = pd.DataFrame({"data": numpy_array_ind})
