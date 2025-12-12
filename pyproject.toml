@@ -38,7 +38,6 @@ dependencies = [
   "openmatrix",
   "geopandas",
   "tqdm",
-  "tables>=3.10.1"  # Require pytables that requires NumPy 2.0 at build time, so we can support NumPy 1.26 at runtime
 ]
 
 [project.license]
