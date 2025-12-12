@@ -53,7 +53,7 @@ class allOrNothing(WorkerThread):
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
         )
         mat = self.matrix.matrix_view
-        # pool = ThreadPool(self.results.cores)
+        pool = ThreadPool(self.results.cores)
         all_threads = {"count": 0}
         for orig in self.matrix.index:
             i = int(self.graph.nodes_to_indices[orig])
@@ -61,10 +61,9 @@ class allOrNothing(WorkerThread):
                 if self.graph.fs[i] == self.graph.fs[i + 1]:
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
-                    # pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
-                    self.func_assig_thread(orig, all_threads)
-        # pool.close()
-        # pool.join()
+                    pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
+        pool.close()
+        pool.join()
         val = self.matrix.index.shape[0]
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {val}/{self.matrix.zones}"
         self.signal.emit(["set_text", msg])

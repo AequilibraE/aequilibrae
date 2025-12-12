@@ -15,7 +15,7 @@ cpdef void save_path_file(long origin_index,
                           long long [:] conn,
                           str path_file,
                           str index_file,
-                          bint write_feather):
+                          bint write_feather) noexcept:
 
     cdef long long node, predecessor, connector
     cdef vector[long long] path_data
