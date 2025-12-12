@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "numpy>=2.0", "cython", "wheel"]
+requires = ["setuptools", "cython", "wheel"]
 
 [project]
 authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
@@ -27,7 +27,7 @@ readme = "README.md"
 requires-python = ">=3.10" # match classifiers above and ruff version below
 
 dependencies = [
-  "numpy>=1.26",  # Required because of our "NPY_TARGET_VERSION"
+  "numpy>=1.26",
   "scipy>=1.4",
   "pyaml",
   "requests",
@@ -38,7 +38,6 @@ dependencies = [
   "openmatrix",
   "geopandas",
   "tqdm",
-  "tables>=3.10.1"  # Require pytables that requires NumPy 2.0 at build time, so we can support NumPy 1.26 at runtime
 ]
 
 [project.license]
@@ -77,7 +76,7 @@ tests = [
 ]
 
 # Build system requirement should match
-build = ["setuptools", "numpy>=2.0", "cython", "wheel"]
+build = ["setuptools", "cython", "wheel"]
 
 dev = ['aequilibrae[build, tests, docs]']
 

@@ -8,12 +8,12 @@ assignment model for transit networks. Transportation Research Part B 23(2),
 
 cimport cython
 import numpy as np
-cimport numpy as cnp
+from libc.stdint cimport int64_t, uint8_t, uint32_t, uint64_t
 
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
-ctypedef cnp.float64_t DATATYPE_t
+ctypedef double DATATYPE_t
 DATATYPE_PY = np.float64
 
 cdef DATATYPE_t DATATYPE_INF = <DATATYPE_t>np.finfo(dtype=DATATYPE_PY).max
@@ -60,19 +60,19 @@ include 'pq_4ary_heap.pyx'  # priority queue
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
 cdef void _coo_tocsc_uint32(
-    cnp.uint32_t [::1] Ai,
-    cnp.uint32_t [::1] Aj,
-    cnp.uint32_t [::1] Ax,
-    cnp.uint32_t [::1] Bp,
-    cnp.uint32_t [::1] Bi,
-    cnp.uint32_t [::1] Bx
+    uint32_t [::1] Ai,
+    uint32_t [::1] Aj,
+    uint32_t [::1] Ax,
+    uint32_t [::1] Bp,
+    uint32_t [::1] Bi,
+    uint32_t [::1] Bx
 ) noexcept nogil:
 
     cdef:
         size_t i, col, dest
         size_t n_vert = <size_t>(Bp.shape[0] - 1)
         size_t n_edge = <size_t>Bi.shape[0]
-        cnp.uint32_t temp, cumsum, last
+        uint32_t temp, cumsum, last
 
     for i in range(n_edge):
         Bp[<size_t>Aj[i]] += 1
@@ -82,7 +82,7 @@ cdef void _coo_tocsc_uint32(
         temp = Bp[i]
         Bp[i] = cumsum
         cumsum += temp
-    Bp[<size_t>n_vert] = <cnp.uint32_t>n_edge
+    Bp[<size_t>n_vert] = <uint32_t>n_edge
 
     for i in range(n_edge):
         col  = <size_t>Aj[i]
@@ -102,7 +102,7 @@ cdef void _coo_tocsc_uint32(
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void argsort(cnp.float64_t *data, cnp.uint32_t *order, size_t n) noexcept nogil:
+cdef void argsort(double *data, uint32_t *order, size_t n) noexcept nogil:
     """
     Wrapper of the C function qsort
     source: https://github.com/jcrudy/cython-argsort/tree/master/cyargsort
@@ -122,7 +122,7 @@ cdef void argsort(cnp.float64_t *data, cnp.uint32_t *order, size_t n) noexcept n
 
     # Copy indices from index tracking array to output array.
     for i in range(n):
-        order[i] = <cnp.uint32_t>order_struct[i].index
+        order[i] = <uint32_t>order_struct[i].index
 
     # Free index tracking array.
     free(order_struct)
@@ -182,65 +182,65 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
 cdef void compute_SF_in_parallel(
-    cnp.uint32_t[::1] indptr_view,  # column csc format
-    cnp.uint32_t[::1] edge_idx_view,
-    cnp.float64_t[::1] trav_time_view,
-    cnp.float64_t[::1] freq_view,
-    cnp.uint32_t[::1] tail_view,
-    cnp.uint32_t[::1] head_view,
-    cnp.uint32_t[:] d_vert_ids_view,  # destination vertices
-    cnp.uint32_t[:] destination_vertex_indices_view,
-    cnp.uint32_t[:] rest_of_destinations_view,  # Used when skimming to lookup the rest of the destinations to skim from
-    cnp.uint32_t[::1] o_vert_ids_view,  # origin vertices
-    cnp.float64_t[::1] demand_vls_view,  # volume
-    cnp.float64_t[::1] edge_volume_view,
+    uint32_t[::1] indptr_view,  # column csc format
+    uint32_t[::1] edge_idx_view,
+    double[::1] trav_time_view,
+    double[::1] freq_view,
+    uint32_t[::1] tail_view,
+    uint32_t[::1] head_view,
+    uint32_t[:] d_vert_ids_view,  # destination vertices
+    uint32_t[:] destination_vertex_indices_view,
+    uint32_t[:] rest_of_destinations_view,  # Used when skimming to lookup the rest of the destinations to skim from
+    uint32_t[::1] o_vert_ids_view,  # origin vertices
+    double[::1] demand_vls_view,  # volume
+    double[::1] edge_volume_view,
     size_t vertex_count,
     size_t edge_count,
     int num_threads,
-    cnp.float64_t[:, ::1] skim_col_view,
-    cnp.float64_t[::1] u_i_vec_view,
-    cnp.float64_t[:, :, ::1] skim_matrix,
-    cnp.int64_t[::1] origin_ids,
-    cnp.uint32_t[::1] o_indices,
-    cnp.int64_t[::1] od_index_to_taz_index,
-    cnp.int64_t[::1] nodes_to_indices,
+    double[:, ::1] skim_col_view,
+    double[::1] u_i_vec_view,
+    double[:, :, ::1] skim_matrix,
+    int64_t[::1] origin_ids,
+    uint32_t[::1] o_indices,
+    int64_t[::1] od_index_to_taz_index,
+    int64_t[::1] nodes_to_indices,
     bint skimming,
     bint is_travel_time,
     size_t n_skim_cols,
 ) noexcept nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     cdef:
-        cnp.uint32_t *thread_demand_origins
-        cnp.float64_t *thread_demand_values
-        cnp.float64_t *thread_edge_volume
+        uint32_t *thread_demand_origins
+        double *thread_demand_values
+        double *thread_edge_volume
         size_t demand_size
 
-        cnp.float64_t *thread_u_i_vec
-        cnp.float64_t *thread_f_i_vec
-        cnp.float64_t *thread_u_j_c_a_vec
-        cnp.float64_t *thread_v_i_vec
-        cnp.uint8_t *thread_h_a_vec
-        cnp.uint32_t *thread_edge_indices
+        double *thread_u_i_vec
+        double *thread_f_i_vec
+        double *thread_u_j_c_a_vec
+        double *thread_v_i_vec
+        uint8_t *thread_h_a_vec
+        uint32_t *thread_edge_indices
 
-        cnp.float64_t *thread_skim_i_vec
-        cnp.float64_t *thread_skim_j_vec
+        double *thread_skim_i_vec
+        double *thread_skim_j_vec
 
         # This is a shared buffer, all threads will write into separate slices depending on their threadid.
         # When writing all threads must increment!
-        cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
+        double *edge_volume = <double *> calloc(num_threads, sizeof(double) * edge_count)
 
-        cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(num_threads * sizeof(cnp.float64_t) * vertex_count)
+        double *u_i_vec_out = <double *> malloc(num_threads * sizeof(double) * vertex_count)
 
-        cnp.float64_t *skim_i_vec_out = <cnp.float64_t *> calloc(
-            num_threads, sizeof(cnp.float64_t) * vertex_count * n_skim_cols)
+        double *skim_i_vec_out = <double *> calloc(
+            num_threads, sizeof(double) * vertex_count * n_skim_cols)
 
         int i  # openmp on windows requires iterator variable have signed type
         size_t k, j
-        cnp.int64_t destination_vertex
+        int64_t destination_vertex
 
     with parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
-        thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
-        thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
+        thread_demand_origins = <uint32_t  *> malloc(sizeof(uint32_t)  * d_vert_ids_view.shape[0])
+        thread_demand_values  = <double *> malloc(sizeof(double) * d_vert_ids_view.shape[0])
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
         # we can safely read and write without collisions.
         thread_edge_volume  = &edge_volume[threadid() * edge_count]
@@ -248,13 +248,13 @@ cdef void compute_SF_in_parallel(
 
         thread_skim_i_vec = &skim_i_vec_out[threadid() * vertex_count * n_skim_cols]
 
-        thread_f_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-        thread_u_j_c_a_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * edge_count)
-        thread_v_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-        thread_h_a_vec      = <cnp.uint8_t   *> malloc(sizeof(cnp.uint8_t)   * edge_count)
-        thread_edge_indices = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * edge_count)
+        thread_f_i_vec      = <double *> malloc(sizeof(double) * vertex_count)
+        thread_u_j_c_a_vec  = <double *> malloc(sizeof(double) * edge_count)
+        thread_v_i_vec      = <double *> malloc(sizeof(double) * vertex_count)
+        thread_h_a_vec      = <uint8_t   *> malloc(sizeof(uint8_t)   * edge_count)
+        thread_edge_indices = <uint32_t  *> malloc(sizeof(uint32_t)  * edge_count)
 
-        thread_skim_j_vec = <cnp.float64_t *> calloc(edge_count, sizeof(cnp.float64_t) * n_skim_cols)
+        thread_skim_j_vec = <double *> calloc(edge_count, sizeof(double) * n_skim_cols)
 
         for i in prange(
                 destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
@@ -352,32 +352,32 @@ cdef void compute_SF_in_parallel(
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
 cdef void compute_SF_in(
-    cnp.uint32_t[::1] csc_indptr,
-    cnp.uint32_t[::1] csc_edge_idx,
-    cnp.float64_t[::1] c_a_vec,  # travel time
-    cnp.float64_t[::1] f_a_vec,  # freq
-    cnp.uint32_t[::1] tail_indices,
-    cnp.uint32_t[::1] head_indices,
-    cnp.uint32_t *demand_indices,
-    cnp.float64_t *demand_values,
+    uint32_t[::1] csc_indptr,
+    uint32_t[::1] csc_edge_idx,
+    double[::1] c_a_vec,  # travel time
+    double[::1] f_a_vec,  # freq
+    uint32_t[::1] tail_indices,
+    uint32_t[::1] head_indices,
+    uint32_t *demand_indices,
+    double *demand_values,
     size_t demand_size,
-    cnp.float64_t *v_a_vec,
-    cnp.float64_t *u_i_vec,
-    cnp.float64_t *f_i_vec,
-    cnp.float64_t *u_j_c_a_vec,
-    cnp.float64_t *v_i_vec,
-    cnp.uint8_t *h_a_vec,
-    cnp.uint32_t *edge_indices,
+    double *v_a_vec,
+    double *u_i_vec,
+    double *f_i_vec,
+    double *u_j_c_a_vec,
+    double *v_i_vec,
+    uint8_t *h_a_vec,
+    uint32_t *edge_indices,
     size_t vertex_count,
     int dest_vert_index,
-    cnp.float64_t[:, ::1] skim_col_vec,
-    cnp.float64_t *skim_i_vec,
-    cnp.float64_t *skim_j_vec,
+    double[:, ::1] skim_col_vec,
+    double *skim_i_vec,
+    double *skim_j_vec,
     size_t n_skim_cols,
-    cnp.float64_t[:, :, ::1] skim_matrix,
-    cnp.int64_t[::1] origin_ids,
-    cnp.uint32_t[::1] o_indices,
-    cnp.int64_t[::1] od_index_to_taz_index,
+    double[:, :, ::1] skim_matrix,
+    int64_t[::1] origin_ids,
+    uint32_t[::1] o_indices,
+    int64_t[::1] od_index_to_taz_index,
     bint skimming,
     bint is_travel_time,
 ) noexcept nogil:
@@ -386,7 +386,7 @@ cdef void compute_SF_in(
         size_t edge_count = <size_t>tail_indices.shape[0]
         DATATYPE_t u_r, u_i
         size_t i, j, h_a_count
-        cnp.uint32_t vert_idx
+        uint32_t vert_idx
         int cent_dest
         double tmp
 
@@ -499,19 +499,19 @@ cdef void compute_SF_in(
 @cython.cdivision(True)
 @cython.initializedcheck(False)
 cdef void _SF_in_first_pass_full(
-    cnp.uint32_t[::1] csc_indptr,
-    cnp.uint32_t[::1] csc_edge_idx,
-    cnp.float64_t[::1] c_a_vec,  # travel time
-    cnp.float64_t[::1] f_a_vec,  # freq
-    cnp.uint32_t[::1] tail_indices,
-    cnp.float64_t *u_i_vec,
-    cnp.float64_t *f_i_vec,
-    cnp.float64_t *u_j_c_a_vec,
-    cnp.uint8_t *h_a_vec,
+    uint32_t[::1] csc_indptr,
+    uint32_t[::1] csc_edge_idx,
+    double[::1] c_a_vec,  # travel time
+    double[::1] f_a_vec,  # freq
+    uint32_t[::1] tail_indices,
+    double *u_i_vec,
+    double *f_i_vec,
+    double *u_j_c_a_vec,
+    uint8_t *h_a_vec,
     int dest_vert_index,
-    cnp.float64_t[:, ::1] skim_col_vec,
-    cnp.float64_t *skim_i_vec,
-    cnp.float64_t *skim_j_vec,
+    double[:, ::1] skim_col_vec,
+    double *skim_i_vec,
+    double *skim_j_vec,
     size_t n_skim_cols,
     size_t vertex_count,
 ) noexcept nogil:
@@ -525,8 +525,8 @@ cdef void _SF_in_first_pass_full(
         DATATYPE_t u_j_c_a, u_i, f_i, beta, u_i_new, f_a
         DATATYPE_t skim_i, skim_j, skim_i_new, beta_skim
 
-        cnp.float64_t *skim_i_new_vec = <cnp.float64_t *> malloc(n_skim_cols * sizeof(cnp.float64_t))
-        cnp.float64_t *skim_j_new_vec = <cnp.float64_t *> malloc(n_skim_cols * sizeof(cnp.float64_t))
+        double *skim_i_new_vec = <double *> malloc(n_skim_cols * sizeof(double))
+        double *skim_j_new_vec = <double *> malloc(n_skim_cols * sizeof(double))
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
@@ -633,13 +633,13 @@ cdef void _SF_in_first_pass_full(
 @cython.cdivision(True)
 @cython.initializedcheck(False)
 cdef void _SF_in_second_pass(
-    cnp.uint32_t *edge_indices,
-    cnp.uint32_t[::1] tail_indices,
-    cnp.uint32_t[::1] head_indices,
-    cnp.float64_t *v_i_vec,
-    cnp.float64_t *v_a_vec,
-    cnp.float64_t *f_i_vec,
-    cnp.float64_t[::1] f_a_vec,
+    uint32_t *edge_indices,
+    uint32_t[::1] tail_indices,
+    uint32_t[::1] head_indices,
+    double *v_i_vec,
+    double *v_a_vec,
+    double *f_i_vec,
+    double[::1] f_a_vec,
     size_t h_a_count
 ) noexcept nogil:
 
