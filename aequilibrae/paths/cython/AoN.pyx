@@ -112,7 +112,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         select_link = True
 
     # Now we do all procedures with NO GIL
-    with nogil:
+    if True:
         if block_flows_through_centroids:  # Unblocks the centroid if that is the case
             b = 0
             blocking_centroid_flows(b,
