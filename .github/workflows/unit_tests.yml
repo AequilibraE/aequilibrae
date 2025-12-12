@@ -32,8 +32,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13']
-        # os: [windows-latest, ubuntu-latest, macos-latest]
-        os: [macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
 
       max-parallel: 20
     steps:
@@ -81,11 +80,4 @@ jobs:
     - name: Runs test (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        ulimit -a && \
-        DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH \
-        uv run pytest tests/ \
-        --durations=50 \
-        --dist=loadscope \
-        -n 4 \
-        --random-order \
-        --verbose
+        DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH uv run pytest tests/ --durations=50 --random-order --verbose
