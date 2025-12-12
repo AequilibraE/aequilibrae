@@ -1,3 +1,4 @@
+import logging
 import pathlib
 
 from aequilibrae.project.about import About
@@ -29,7 +30,10 @@ class Scenario:
     matrices: Matrices
     results: Results
 
-    def __init__(self, name: str, base_path: pathlib.Path, path_to_file: pathlib.Path):
+    log_handler: logging.StreamHandler
+
+    def __init__(self, name: str, base_path: pathlib.Path, path_to_file: pathlib.Path, log_handler: logging.StreamHandler):
         self.name = name
         self.base_path = base_path
         self.path_to_file = path_to_file
+        self.log_handler = log_handler

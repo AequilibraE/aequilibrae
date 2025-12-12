@@ -2,6 +2,7 @@ import json
 import pathlib
 import tempfile
 import unittest
+import logging
 from datetime import datetime
 
 import numpy as np
@@ -426,3 +427,71 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
 def test_scenario_use_scenario_must_exists(scenario_example):
     with pytest.raises(ValueError, match="scenario 'a scenario that doesn't exist' does not exist"):
         scenario_example.use_scenario("a scenario that doesn't exist")
+
+
+def test_logging_scenario_isolation(scenario_example):
+    """Test that logs are written to the correct scenario folder and isolated when switching."""
+    logger = logging.getLogger("aequilibrae")
+    logger.setLevel(logging.INFO)
+
+    # 1. Start in Root Scenario
+    scenario_example.use_scenario("root")
+    root_msg_1 = "Log message specifically for ROOT phase 1"
+    logger.info(root_msg_1)
+
+    # Verify file existence and content for root
+    root_log_path = scenario_example.scenario.base_path / "aequilibrae.log"
+    assert root_log_path.exists()
+    assert root_msg_1 in root_log_path.read_text()
+
+    # 2. Switch to 'coquimbo' scenario
+    scenario_example.use_scenario("coquimbo")
+    coquimbo_msg = "Log message specifically for COQUIMBO"
+    logger.info(coquimbo_msg)
+
+    # Verify file existence and content for coquimbo
+    coquimbo_log_path = scenario_example.scenario.base_path / "aequilibrae.log"
+    assert coquimbo_log_path.exists()
+    coquimbo_content = coquimbo_log_path.read_text()
+    assert coquimbo_msg in coquimbo_content
+    # Verify isolation: Root message should NOT be in Coquimbo log
+    assert root_msg_1 not in coquimbo_content
+
+    # 3. Switch back to Root
+    scenario_example.use_scenario("root")
+    root_msg_2 = "Log message specifically for ROOT phase 2"
+    logger.info(root_msg_2)
+
+    # Verify root log updated
+    root_content = root_log_path.read_text()
+    assert root_msg_2 in root_content
+    # Verify isolation: Coquimbo message should NOT be in Root log
+    assert coquimbo_msg not in root_content
+
+
+def test_logging_new_scenario_creation(scenario_example):
+    """Test that creating and entering a new empty scenario initialises logging correctly."""
+    scenario_example.use_scenario("root")
+    logger = logging.getLogger("aequilibrae")
+    logger.setLevel(logging.INFO)
+
+    new_scen_name = "test_logging_empty"
+    scenario_example.create_empty_scenario(new_scen_name, "Testing log creation")
+
+    # Switch to the new scenario
+    scenario_example.use_scenario(new_scen_name)
+
+    # Log a message in the new scenario
+    test_msg = "Hello from the new empty scenario"
+    logger.info(test_msg)
+
+    # Check the file in the new scenario folder
+    log_path = scenario_example.scenario.base_path / "aequilibrae.log"
+
+    assert log_path.exists()
+    assert test_msg in log_path.read_text()
+
+    # Ensure this message didn't bleed into the root log
+    root_log_path = scenario_example.root_scenario.base_path / "aequilibrae.log"
+    if root_log_path.exists():
+        assert test_msg not in root_log_path.read_text()

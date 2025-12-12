@@ -26,6 +26,7 @@ from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close, safe_connect
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.utils.logging_utils import default_log_file_config
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,13 @@ class Project:
             name="root",
             base_path=base_path,
             path_to_file=path_to_file,
+            log_handler=logging.FileHandler(base_path / "aequilibrae.log")
         )
         self.scenario = self.root_scenario
+
+        # It's possible that if two projects are open at once this could duplicate mix the log outputs, but we don't
+        # have anything to support having more than one project open at a time so we'll assume it's fine.
+        default_log_file_config(self.scenario.log_handler)
 
         self.activate()
 
@@ -175,8 +181,12 @@ class Project:
             name="root",
             base_path=base_path,
             path_to_file=path_to_file,
+            log_handler=logging.FileHandler(base_path / "aequilibrae.log")
         )
         self.scenario = self.root_scenario
+
+        default_log_file_config(self.scenario.log_handler)
+
         self.activate()
 
         self.__create_empty_network()
@@ -202,6 +212,7 @@ class Project:
 
             logger.info(f"Closed project on {self.project_base_path}")
 
+            logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
         except (sqlite3.ProgrammingError, AttributeError):
             logger.warning(f"This project at {self.project_base_path} is already closed")
             raise  # FIXME something goes wrong above
@@ -375,14 +386,20 @@ class Project:
             if conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone() is None:
                 raise ValueError(f"scenario '{scenario_name}' does not exist")
 
+        logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
+
         if scenario_name == "root":
             self.scenario = self.root_scenario
         else:
+            path = self.root_scenario.base_path / "scenarios" / scenario_name
             self.scenario = Scenario(
                 name=scenario_name,
-                base_path=self.root_scenario.base_path / "scenarios" / scenario_name,
-                path_to_file=self.root_scenario.base_path / "scenarios" / scenario_name / "project_database.sqlite",
+                base_path=path,
+                path_to_file=path / "project_database.sqlite",
+                log_handler=logging.FileHandler(path / "aequilibrae.log")
             )
+
+        default_log_file_config(self.scenario.log_handler)
 
         self.__load_objects()
 
