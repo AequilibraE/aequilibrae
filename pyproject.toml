@@ -27,7 +27,7 @@ readme = "README.md"
 requires-python = ">=3.10" # match classifiers above and ruff version below
 
 dependencies = [
-  "numpy>=1.26",
+  "numpy",
   "scipy>=1.4",
   "pyaml",
   "requests",
