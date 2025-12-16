@@ -268,6 +268,9 @@ cdef void compute_SF_in_parallel(
         thread_skim_j_vec = <double *> calloc(edge_count, sizeof(double) * n_skim_cols)
 
         for i in prange(total):
+            if bridge.should_stop():
+                break
+
             if i < destination_vertex_indices_view.shape[0]:
                 destination_vertex = destination_vertex_indices_view[i]
             else:

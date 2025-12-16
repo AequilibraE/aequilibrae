@@ -13,8 +13,10 @@ cdef class Bar:
         self.set_total(total)
         self.set_counter(0)
 
+        self.__total_old = self.__counter_old = 0
+
         self.__signal = SIGNAL(object)
-        self.__signal.emit(["start", total, self.msg.format(0, total)])
+        self.refresh()
 
     cpdef inline void set_total(self, uint64_t total) noexcept nogil:
         self.__total.store(total, memory_order.memory_order_relaxed)
