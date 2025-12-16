@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
-cimport numpy as np
 cimport cython
 
 from libcpp.queue cimport queue
+from libc.stdint cimport int32_t, int64_t, uint8_t, uint32_t
 
 
 @cython.wraparound(False)
@@ -19,7 +19,7 @@ cdef void _remove_dead_ends(
     signed char [:] directions,
     long long [:] in_degree,
     long long [:] out_degree,
-    np.uint8_t [:] burnt_links,
+    uint8_t [:] burnt_links,
 ) noexcept nogil:
     cdef:
         long long b_node
@@ -417,10 +417,10 @@ def create_compressed_link_network_mapping(graph):
         long long[:] b
         long long[:] values
         signed char[:] directions
-        np.uint32_t[:] idx
-        np.int64_t[::] data
-        np.int32_t[:] node_mapping
-        np.int64_t[:, :] non_duplicated
+        uint32_t[:] idx
+        int64_t[::] data
+        int32_t[:] node_mapping
+        int64_t[:, :] non_duplicated
         signed char direction
 
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't

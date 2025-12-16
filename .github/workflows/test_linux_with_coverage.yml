@@ -8,28 +8,41 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
-    env:
-      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
         python-version: [3.11]
     steps:
-    - uses: actions/checkout@v6
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install libsqlite3-mod-spatialite
-        sudo apt install -y libspatialite-dev
-        pip3 install uv
-        uv venv ./venv_test
-        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-    - name: Compile library
-      run: |
-        source ./venv_test/bin/activate
-        uv pip install .[dev]
-        python setup.py build_ext --inplace
+      - uses: actions/checkout@v6
 
-    - name: Generate coverage report
-      run: |
-        source ./venv_test/bin/activate
-        python -m pytest --cov=aequilibrae -n 4 tests/ 
+      - name: Set Python environment
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download spatialite on Linux
+        run: |
+          sudo apt update
+          sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
+          sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+
+      - name: Install Python and create virtual environment
+        run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed
+
+      - name: Generate coverage report
+        run: |
+          uv run --extra tests \
+            pytest tests/ \
+            --cov=aequilibrae \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-report=html:cov_html \
+            --cov-report=markdown-append:$GITHUB_STEP_SUMMARY \
+            --dist=loadscope \
+            --numprocesses=4 \
+            --random-order \
+            --verbose
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: html-coverage-artifact
+          path: ./cov_html/

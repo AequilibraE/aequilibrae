@@ -3,7 +3,6 @@ import platform
 from os.path import join
 import os
 
-import numpy as np
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 from setuptools import Extension
@@ -11,9 +10,7 @@ from setuptools import setup, find_packages
 from setuptools.discovery import FlatLayoutPackageFinder
 from multiprocessing import cpu_count
 
-include_dirs = [np.get_include(), join("aequilibrae", "utils", "cython"), join("aequilibrae", "utils", "cpp")]
-libraries = []
-library_dirs = []
+include_dirs = [join("aequilibrae", "utils", "cython"), join("aequilibrae", "utils", "cpp")]
 
 is_win = "WINDOWS" in platform.platform().upper()
 is_mac = any(e in platform.platform().upper() for e in ["MACOS", "DARWIN"])
@@ -38,10 +35,7 @@ if os.getenv("AEQ_ASAN"):
 extension_args = {
     "extra_compile_args": compile_args,
     "extra_link_args": link_args,
-    "define_macros": [("NPY_TARGET_VERSION", "NPY_1_26_API_VERSION")],
     "include_dirs": include_dirs,
-    "libraries": libraries,
-    "library_dirs": library_dirs,
     "language": "c++",
 }
 

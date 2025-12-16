@@ -1,9 +1,7 @@
 # cython: language_level=3
 import os
 
-cimport numpy as np
 
-# include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'bpr2.pyx'

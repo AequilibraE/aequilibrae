@@ -1,11 +1,12 @@
 import numpy as np
-cimport numpy as cnp
+from libc.stdint cimport int64_t
+
 
 DTYPE = np.float64
-ctypedef cnp.float64_t DTYPE_t
+ctypedef double DTYPE_t
 
 ITYPE = np.int64
-ctypedef cnp.int64_t ITYPE_t
+ctypedef int64_t ITYPE_t
 
 # EPS is the precision of DTYPE
 cdef DTYPE_t DTYPE_EPS = 1E-15
