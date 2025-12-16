@@ -180,3 +180,16 @@ def scenario_example(cached_scenario_example, cache_path, tmp_path) -> Project:
     project = cached_model("scenario_project", cache_path, tmp_path)
     yield project
     project.close()
+
+
+@pytest.fixture(scope="session")
+def cached_st_varent(test_data_path, cache_path):
+    # Zip includes top-level "St_Varent" dir.
+    zipfile.ZipFile(test_data_path / "St_Varent_issue307.zip").extractall(cache_path)
+
+
+@pytest.fixture(scope="function")
+def st_varent(cached_st_varent, cache_path, tmp_path) -> Project:
+    project = cached_model("St_Varent", cache_path, tmp_path)
+    yield project
+    project.close()

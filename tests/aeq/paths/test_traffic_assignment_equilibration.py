@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
+from aequilibrae.utils.logging_utils import basic_config
 
 
 @pytest.fixture(scope="function")
@@ -41,6 +42,8 @@ def assignment(project):
 
 @pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
 def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type):
+    basic_config()
+
     if matrix_type == "memonly":
         matrix = matrix.copy(memory_only=True)
 
