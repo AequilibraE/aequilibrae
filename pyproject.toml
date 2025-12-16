@@ -38,6 +38,7 @@ dependencies = [
   "openmatrix",
   "geopandas",
   "tqdm",
+  "cysignals",
 ]
 
 [project.license]
