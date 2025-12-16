@@ -28,7 +28,9 @@ class AequilibraETQDMStreamHandler(logging.StreamHandler):
             self.handleError(record)
 
 
-AequilibraEStreamHandler = AequilibraETQDMStreamHandler if tqdm is not None and not inside_qgis else logging.StreamHandler
+AequilibraEStreamHandler = (
+    AequilibraETQDMStreamHandler if tqdm is not None and not inside_qgis else logging.StreamHandler
+)
 
 
 def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEFAULT_FORMAT):

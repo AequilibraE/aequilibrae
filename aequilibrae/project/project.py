@@ -83,7 +83,7 @@ class Project:
             name="root",
             base_path=base_path,
             path_to_file=path_to_file,
-            log_handler=logging.FileHandler(base_path / "aequilibrae.log")
+            log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
         )
         self.scenario = self.root_scenario
 
@@ -181,7 +181,7 @@ class Project:
             name="root",
             base_path=base_path,
             path_to_file=path_to_file,
-            log_handler=logging.FileHandler(base_path / "aequilibrae.log")
+            log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
         )
         self.scenario = self.root_scenario
 
@@ -396,7 +396,7 @@ class Project:
                 name=scenario_name,
                 base_path=path,
                 path_to_file=path / "project_database.sqlite",
-                log_handler=logging.FileHandler(path / "aequilibrae.log")
+                log_handler=logging.FileHandler(path / "aequilibrae.log"),
             )
 
         default_log_file_config(self.scenario.log_handler)
