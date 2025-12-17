@@ -66,11 +66,15 @@ def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEF
 
     :Returns:
         **handler** (:obj:`logging.Handler`): The handler attached to the 'aequilibrae' logger. If the logger already
-            has handlers, returns None.
+            has a handler writing to standard out or standard error, returns None.
     """
     logger = logging.getLogger("aequilibrae")
 
-    if logger.hasHandlers():
+    if any(
+            isinstance(handler, logging.StreamHandler)
+            and handler.stream == sys.stderr or handler.stream == sys.stdout
+            for handler in logger.handlers
+    ):
         return
 
     # We disable log propagation up the chain because we don't want the handlers installed on the root logger messing

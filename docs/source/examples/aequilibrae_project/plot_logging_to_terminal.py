@@ -57,7 +57,8 @@ logger.debug("This is a debug message with a custom format.")
 
 # %%
 # Note that we removed the first handler that ``basic_config`` added otherwise the message will appear twice. If the
-# ``"aequilibrae"`` has any loggers then ``basic_config`` will do not do anything.
+# ``"aequilibrae"`` has any handlers writing to standard out or standard error then ``basic_config`` will do not do
+# anything.
 
 # %%
 # Configuring Specific Modules
