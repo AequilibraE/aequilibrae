@@ -14,11 +14,6 @@ import threading
 import logging
 import queue
 
-from tqdm.contrib.logging import logging_redirect_tqdm
-
-
-from cython.parallel cimport parallel, threadid, prange
-
 
 cdef:
     int DEBUG = logging.DEBUG
