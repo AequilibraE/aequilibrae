@@ -25,6 +25,25 @@ cdef:
 
 @cython.final
 cdef public class Bridge [object Bridge, type Bridge_t]:
+    """
+    Thread-safe bridge for logging and progress reporting from C/Cython nogil contexts back to Python.
+
+    This class runs a background thread that monitors a thread-safe queue for log messages generated in concurrent C++
+    or Cython code execution. It ensures that logs are dispatched back to the main Python thread.
+
+    The bridge also handles refreshing progress bars and propagating exceptions back to the main Python thread.
+
+    It is designed to be used as a context manager.
+
+    :Arguments:
+        **logger** (:obj:`logging.Logger`, optional): The Python logger instance to which messages will
+            be dispatched. If None, the root logger is used.
+
+    :Attributes:
+        **task** (:obj:`threading.Thread`): The background thread handle running the monitoring loop.
+        **bars** (:obj:`list`): A list of active :obj:`Bar` instances being monitored.
+    """
+
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.task = None
         self._stop.store(False, memory_order.memory_order_relaxed)
@@ -57,6 +76,9 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         self.__log_wrapper_func = self._log
 
     def start(self):
+        """
+        Starts the background monitoring thread.
+        """
         self.__level = self.__logger.level
         self.task = threading.Thread(target=self.loop)
         self.task.start()
@@ -65,6 +87,14 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         self._stop.store(True, memory_order.memory_order_relaxed)
 
     def new_bar(self, *args, **kwargs):
+        """
+        Creates and registers a new progress bar.
+
+        The arguments passed here are forwarded directly to the :obj:`Bar` constructor.
+
+        :Returns:
+            **bar** (:obj:`Bar`): The newly created progress bar instance attached to this bridge.
+        """
         bar = Bar(*args, **kwargs)
 
         self.bars.append(bar)
@@ -123,7 +153,6 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
 
                 for bar in self.bars:
                     bar.refresh()
-
 
         except KeyboardInterrupt as e:
             self.__exception_queue.put((type(e), e.args))
