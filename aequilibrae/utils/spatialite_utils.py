@@ -74,9 +74,8 @@ def load_spatialite_extension(conn: Connection):
                 directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
                 conn.load_extension(os.path.join(directory, "mod_spatialite"))
                 return
-            except OperationalError:
-                pass
-        raise e
+            except OperationalError as e2:
+                raise e2 from e
 
 
 def is_spatialite(conn):
