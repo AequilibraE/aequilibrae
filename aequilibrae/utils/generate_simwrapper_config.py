@@ -1,7 +1,13 @@
+<<<<<<< HEAD
 from pathlib import Path
 import yaml
 import geopandas as gpd
 import pandas as pd
+=======
+import os
+import yaml
+import geopandas as gpd
+>>>>>>> 1ae1a49b57f6fab710149424d79b81015e197627
 
 class SimwrapperConfigGenerator:
     """
@@ -9,6 +15,7 @@ class SimwrapperConfigGenerator:
     minimal manual work.
     """
     def __init__(self, output_dir = "simwrapper"):
+<<<<<<< HEAD
         """ Initialise the config generator and create output directories.
 
         :Arguments:
@@ -37,6 +44,11 @@ class SimwrapperConfigGenerator:
         self.output_dir.mkdir(exist_ok=True) # base
         self.data_dir.mkdir(exist_ok=True) # data
 
+=======
+        self.project = None
+        self.data_dir = os.path.join(output_dir, "data")
+        self.output_dir = output_dir
+>>>>>>> 1ae1a49b57f6fab710149424d79b81015e197627
 
     def set_project(self, project):
         """Set project the .yaml is describing.
@@ -47,6 +59,7 @@ class SimwrapperConfigGenerator:
         self.project = project
 
     def export_network_stats(self):
+<<<<<<< HEAD
         """ Export basic network stats to csv. currently links and nodes.
         """
         #access links table
@@ -71,16 +84,44 @@ class SimwrapperConfigGenerator:
 
     def export_project_stats(self):
         """ Export project level statistics"""
+=======
+        links_obj = self.project.network.links # get link networks
+        links_df = links_obj.data # geodataframe w link geometries + attributes
+
+        link_count = len(links_df)
+        with open(self.output_dir+"linkstats.csv", "w") as f:
+            f.write("Link Count,"+str(link_count))
+
+
+
+    def export_project_stats(self):
+>>>>>>> 1ae1a49b57f6fab710149424d79b81015e197627
         self.export_network_stats()
 
     def generate_config(self):
         """Create the SimWrapper .yaml dashboard configuration.
 
+<<<<<<< HEAD
+=======
+            - Validates the project
+            - Exports required data files
+            - Builds and writes the dashboard .yaml
+        
+        Directory structure for files generated:
+            simwrapper/
+            ├── data/
+            │   ├── links.geojson
+            │   ├── link_type_summary.csv
+            │   └── other_stats.csv
+            └── dashboard.yaml
+
+>>>>>>> 1ae1a49b57f6fab710149424d79b81015e197627
         """
         # if no project stop
         if self.project == None:
             raise RuntimeError("You need to set the project via set_project(project) first")
         
+<<<<<<< HEAD
         self._ensure_directories()
         
         # export data
@@ -122,6 +163,10 @@ class SimwrapperConfigGenerator:
 
 
 
+=======
+        self.export_project_stats()
+        
+>>>>>>> 1ae1a49b57f6fab710149424d79b81015e197627
 
 
 
