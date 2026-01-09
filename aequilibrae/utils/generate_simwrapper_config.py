@@ -39,6 +39,24 @@ class SimwrapperConfigGenerator:
         self.output_dir.mkdir(exist_ok=True)  # base
         self.data_dir.mkdir(exist_ok=True)  # data
 
+    def _add_to_generated_files(self, key, path):
+        """Add file to self.generated_files"""
+        self.generated_files[key] = Path(path)
+
+    def _export_simple_stats(self, csv_name, stats_dict):
+        """
+        Export a one row csv from stats dictionairy and add file to generated files.
+        
+        :Arguments:
+        **name** (:obj:`str`): name of export
+        **stats_dict** (:obj:`dict`): key:value stats to write
+        """
+        df = pd.DataFrame([stats_dict]) 
+        output_file = self.data_dir/ f"{csv_name}.csv"  #output file path
+        df.to_csv(output_file, index=False)
+
+        self._add_to_generated_files(csv_name, output_file)
+
     def export_link_stats(self):
         """ Export simple about network's links."""
         links_obj = self.project.network.links
@@ -46,20 +64,20 @@ class SimwrapperConfigGenerator:
 
         stats = {
             "link_count": len(links_df), 
-            "link_type_count": links_df["link_type"].nunique()            
+            "link_type_count": links_df["type"].nunique()            
         }
 
         self._export_simple_stats("link_stats", stats)
 
 
-    def export_link_stats(self):
+    def export_node_stats(self):
         """ Export simple stats about network's nodes."""
         nodes_obj = self.project.network.nodes
         nodes_df = nodes_obj.data
 
         stats = {
             "node_count": len(nodes_df), 
-            "node_type_count": nodes_df["link_type"].nunique()            
+            "node_type_count": nodes_df["type"].nunique()            
         }
 
         self._export_simple_stats("node_stats", stats)
@@ -134,24 +152,8 @@ class SimwrapperConfigGenerator:
             and self.project.network.skims is not None
             and len(self.project.network.skims.data) > 0
         )
-    
-    def _add_to_generated_files(self, key, path):
-        """Add file to self.generated_files"""
-        self.generated_files[key] = Path(path)
 
-    def _export_simple_stats(self, csv_name, stats_dict):
-        """
-        Export a one row csv from stats dictionairy and add file to generated files.
-        
-        :Arguments:
-        **name** (:obj:`str`): name of export
-        **stats_dict** (:obj:`dict`): key:value stats to write
-        """
-        df = pd.DataFrame([stats_dict]) 
-        output_file = self.data_dir/ f"{csv_name}.csv"  #output file path
-        df.to_csv(output_file, index=False)
 
-        self._add_to_generated_files(csv_name, output_file)
 
     
 

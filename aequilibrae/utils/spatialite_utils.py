@@ -51,7 +51,7 @@ def _connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False):
 
 def load_spatialite_extension(conn: Connection):
     conn.enable_load_extension(True)
-    conn.load_extension("mod_spatialite")
+    conn.load_extension("/opt/homebrew/lib/mod_spatialite")
 
 
 def is_spatialite(conn):
