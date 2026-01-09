@@ -14,6 +14,7 @@ class SimwrapperConfigGenerator:
         """Initialise the config generator and create output directories.
 
         :Arguments:
+            **output_dir** (:obj:`Project`, *Optional*): Aequilibrae Project being transferred
             **output_dir** (:obj:`str`, *Optional*): Root directory for SimWrapper outputs
         """
         self.project = project
@@ -27,44 +28,52 @@ class SimwrapperConfigGenerator:
 
         Structure:
         PROJECT-DIRECTORY/
-            data/               # Data files referenced by configs
+            simwrapper_data/    # Data files referenced by configs
                 linkstats.csv   # CSV of link properties/metrics
                 other_stats.csv # Additional CSV outputs
                 ...             
             dashboard-*.yaml    # Dashboard configuration file(s)
         """
-        self.data_dir = self.output_dir / "data"  # make subcategories
+        self.data_dir = self.output_dir / "simwrapper_data"  # make subcategories
 
         self.output_dir.mkdir(exist_ok=True)  # base
         self.data_dir.mkdir(exist_ok=True)  # data
 
-    def export_network_stats(self):
-        """Export basic network stats to csv. currently links and nodes."""
-        # access links table
+    def export_link_stats(self):
+        """ Export simple about network's links."""
         links_obj = self.project.network.links
         links_df = links_obj.data
 
-        # access notes table
+        stats = {
+            "link_count": len(links_df), 
+            "link_type_count": links_df["link_type"].nunique()            
+        }
+
+        self._export_simple_stats("link_stats", stats)
+
+
+    def export_link_stats(self):
+        """ Export simple stats about network's nodes."""
         nodes_obj = self.project.network.nodes
         nodes_df = nodes_obj.data
 
-        # build stats into a dataframe
         stats = {
-            "link_count": len(links_df), 
-            "node_count": len(nodes_df)
-                 }
-        
-        df = pd.DataFrame([stats])
+            "node_count": len(nodes_df), 
+            "node_type_count": nodes_df["link_type"].nunique()            
+        }
 
-        # write output file
-        output_file = self.data_dir / "linkstats.csv"
-        df.to_csv(output_file, index=False)
+        self._export_simple_stats("node_stats", stats)
 
-        # save stats
 
     def export_project_stats(self):
-        """Export project level statistics"""
-        self.export_network_stats()
+        """ Export basic network stats to csv. currently links and nodes because 
+        that is all that is in Chicago model. More helpers can be made as needed. """
+
+        if self._has_links():
+            self.export_link_stats()
+
+        if self._has_zones():
+            self.export_node_stats()
 
     def generate_config(self):
         """Create the SimWrapper .yaml dashboard configuration."""
@@ -80,6 +89,7 @@ class SimwrapperConfigGenerator:
     def _write_yamls(self):
         pass
 
+
     def _has_links(self):
         """Checks if project has a network with links"""
         return (
@@ -87,6 +97,15 @@ class SimwrapperConfigGenerator:
             and hasattr(self.project, "network")
             and self.project.network.links is not None
             and len(self.project.network.links.data) > 0
+        )
+    
+    def _has_nodes(self):
+        """Checks if project has a network with nodes"""
+        return (
+            self.project is not None
+            and hasattr(self.project, "network")
+            and self.project.network.nodes is not None
+            and len(self.project.network.nodes.data) > 0
         )
 
     def _has_zones(self):
@@ -119,5 +138,21 @@ class SimwrapperConfigGenerator:
     def _add_to_generated_files(self, key, path):
         """Add file to self.generated_files"""
         self.generated_files[key] = Path(path)
+
+    def _export_simple_stats(self, csv_name, stats_dict):
+        """
+        Export a one row csv from stats dictionairy and add file to generated files.
+        
+        :Arguments:
+        **name** (:obj:`str`): name of export
+        **stats_dict** (:obj:`dict`): key:value stats to write
+        """
+        df = pd.DataFrame([stats_dict]) 
+        output_file = self.data_dir/ f"{csv_name}.csv"  #output file path
+        df.to_csv(output_file, index=False)
+
+        self._add_to_generated_files(csv_name, output_file)
+
+    
 
     
