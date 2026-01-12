@@ -110,13 +110,44 @@ class SimwrapperConfigGenerator:
                 "title": "insert title",
                 "description": "insert description"
             },
-            "layout": []
+            "layout": {}
         }
 
+
+        config["layout"]["row0"] = [
+            {
+                "type": "whatever",
+                "title": "whatnot",
+                "content": (
+                    "bla bla bla"
+                )
+            }
+        ]
+
+        config["layout"]["row1"] = [
+            {
+                "type": "whatever",
+                "title": "whatnot",
+                "content": (
+                    "bla bla bla"
+                )
+            }
+        ]
+
+        config["layout"]["rowTitle"] = [
+            {
+                "type": "the type",
+                "file": "file dir"
+            }
+        ]
+
         # add available stats
+
+        stats_rows = []
+
         # links
         if "link_stats" in self.generated_files:
-            config["layout"].append({
+            stats_rows.append({
                 "title": "Link Statistics", 
                 "type": "table",
                 "file": str(self.generated_files["link_stats"].relative_to(self.output_dir))
@@ -124,11 +155,14 @@ class SimwrapperConfigGenerator:
 
         # nodes
         if "node_stats" in self.generated_files:
-            config["layout"].append({
+            stats_rows.append({
                 "title": "Node Statistics", 
                 "type": "table",
                 "file": str(self.generated_files["node_stats"].relative_to(self.output_dir))
             })
+
+        if stats_rows:
+            config["layout"]["rowStats"] = stats_rows
 
         return config
 
