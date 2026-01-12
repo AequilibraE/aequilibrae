@@ -64,7 +64,7 @@ class SimwrapperConfigGenerator:
 
         stats = {
             "link_count": len(links_df), 
-            "link_type_count": links_df["type"].nunique()            
+            "link_type_count": links_df["link_type"].nunique()            
         }
 
         self._export_simple_stats("link_stats", stats)
@@ -76,8 +76,7 @@ class SimwrapperConfigGenerator:
         nodes_df = nodes_obj.data
 
         stats = {
-            "node_count": len(nodes_df), 
-            "node_type_count": nodes_df["type"].nunique()            
+            "node_count": len(nodes_df)           
         }
 
         self._export_simple_stats("node_stats", stats)
@@ -99,10 +98,13 @@ class SimwrapperConfigGenerator:
         self.export_project_stats()
 
         # build yaml
+        self._write_yamls()
+
         # write dashboard.yaml
 
     def _build_dashboard_config(self):
         """ Build dashboard configuration for simwrapper"""
+
         config = {
             "header": {
                 "title": "insert title",
@@ -110,6 +112,25 @@ class SimwrapperConfigGenerator:
             },
             "layout": []
         }
+
+        # add available stats
+        # links
+        if "link_stats" in self.generated_files:
+            config["layout"].append({
+                "title": "Link Statistics", 
+                "type": "table",
+                "file": str(self.generated_files["link_stats"].relative_to(self.output_dir))
+            })
+
+        # nodes
+        if "node_stats" in self.generated_files:
+            config["layout"].append({
+                "title": "Node Statistics", 
+                "type": "table",
+                "file": str(self.generated_files["node_stats"].relative_to(self.output_dir))
+            })
+
+        return config
 
     def _write_yamls(self):
         """Write yamls """
