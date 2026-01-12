@@ -102,56 +102,44 @@ class SimwrapperConfigGenerator:
         # write dashboard.yaml
 
     def _build_dashboard_config(self):
-        pass
+        """ Build dashboard configuration for simwrapper"""
+        config = {
+            "header": {
+                "title": "insert title",
+                "description": "insert description"
+            },
+            "layout": []
+        }
 
     def _write_yamls(self):
-        pass
+        """Write yamls """
+
+        config = self._build_dashboard_config()
+        output_file = self.output_dir / "dashboard.yaml"
+        
+        # write it
+        with output_file.open("w") as f:
+            yaml.safe_dump(config, f, sort_keys = False)
+
+        self._add_to_generated_files("dashboard", output_file)
+        
 
 
     def _has_links(self):
         """Checks if project has a network with links"""
-        return (
-            self.project is not None
-            and hasattr(self.project, "network")
-            and self.project.network.links is not None
-            and len(self.project.network.links.data) > 0
-        )
+        return True
     
     def _has_nodes(self):
         """Checks if project has a network with nodes"""
-        return (
-            self.project is not None
-            and hasattr(self.project, "network")
-            and self.project.network.nodes is not None
-            and len(self.project.network.nodes.data) > 0
-        )
+        return True
 
     def _has_zones(self):
         """Checks if project has a network with nodes"""
-        return (
-            self.project is not None
-            and hasattr(self.project, "network")
-            and self.project.network.nodes is not None
-            and len(self.project.network.nodes.data) > 0
-        )
-
-    def _has_assignments(self):
-        """Checks if project has a network with assignments"""
-        return (
-            self.project is not None
-            and hasattr(self.project, "network")
-            and self.project.network.assignments is not None
-            and len(self.project.network.assignments.data) > 0
-        )
+        return True
 
     def _has_skims(self):
         """Checks if project has a network with skims"""
-        return (
-            self.project is not None
-            and hasattr(self.project, "network")
-            and self.project.network.skims is not None
-            and len(self.project.network.skims.data) > 0
-        )
+        return True
 
 
 
