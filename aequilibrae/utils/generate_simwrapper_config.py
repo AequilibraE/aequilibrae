@@ -102,9 +102,8 @@ class SimwrapperConfigGenerator:
 
         # write dashboard.yaml
 
-    def _build_dashboard_config(self):
-        """ Build dashboard configuration for simwrapper"""
-
+    def _dashboard_skeleton(self):
+        """ What is always in yaml """
         config = {
             "header": {
                 "title": "insert title",
@@ -113,36 +112,26 @@ class SimwrapperConfigGenerator:
             "layout": {}
         }
 
+        return config
 
-        config["layout"]["row0"] = [
-            {
-                "type": "whatever",
-                "title": "whatnot",
-                "content": (
-                    "bla bla bla"
-                )
-            }
-        ]
+    def _intro_row(self):
+        """ Project details """
+        config = {
+            "introRow": [
+                {
+                    "type": "text",
+                    "title": "insert title",
+                    "content": (
+                        " bla bla bla"
+                    )
+                }
+            ]
+        }
 
-        config["layout"]["row1"] = [
-            {
-                "type": "whatever",
-                "title": "whatnot",
-                "content": (
-                    "bla bla bla"
-                )
-            }
-        ]
+        return config
 
-        config["layout"]["rowTitle"] = [
-            {
-                "type": "the type",
-                "file": "file dir"
-            }
-        ]
-
-        # add available stats
-
+    def _stats_rows(self):
+        """ stats rows """
         stats_rows = []
 
         # links
@@ -161,8 +150,43 @@ class SimwrapperConfigGenerator:
                 "file": str(self.generated_files["node_stats"].relative_to(self.output_dir))
             })
 
-        if stats_rows:
-            config["layout"]["rowStats"] = stats_rows
+        return stats_rows
+    
+    def _entire_network_row(self):
+        """
+        Docstring for _entire_network_row
+        
+        :param self: Description
+        """
+        config = {
+            "introRow": [
+                {
+                    "type": "aequilibrae",
+                    "title": "Entire Network",
+                    "database": self.project_base_path(),
+                    "view": "map",
+                    "height": 10,
+                    "width": 6,
+                    "center": [-87.6298, 41.8781], # coordinates for Chicago, Illinois
+                    "zoom": 10,
+                    "projection": "EPSG:32719"
+                }
+            ]
+        }
+
+        return config
+
+
+    def _build_dashboard_config(self):
+        """ Build dashboard configuration for simwrapper"""
+
+        config = self._dashboard_skeleton()
+
+        config["layout"]["introRow"] = self._intro_row()
+
+        # add available stats
+        if self._stats_rows():
+            config["layout"]["statsRow"] = self._stats_rows()
 
         return config
 
