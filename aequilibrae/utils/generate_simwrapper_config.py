@@ -153,40 +153,56 @@ class SimwrapperConfigGenerator:
         return stats_rows
     
     def _entire_network_row(self):
-        """
-        Docstring for _entire_network_row
-        
-        :param self: Description
-        """
+        """ Builds yaml config for map of entire network """
+        config = [
+            {
+                "type": "aequilibrae",
+                "title": "Entire Network",
+                "database": "project_database.sqlite",
+                "view": "map",
+                "height": 10,
+                "width": 6,
+                "center": [-87.6298, 41.8781], # coordinates for Chicago, Illinois currently hardcoded
+                "zoom": 10,
+                "projection": "EPSG:32719" # coordinate system?
+
+                # default colours etc for now
+                "defaults": {
+                    "fillColor": "#6f6f6f",
+                    "lineColor": "#FF6600",
+                    "lineWidth": 2,
+                    "pointRadius": 4
+            }
+        ] 
+
+        return config
+    
+    def _links_info_row(self):
+        """ Builds yaml config for panel to show attributes of selected link """
         config = {
-            "introRow": [
-                {
-                    "type": "aequilibrae",
-                    "title": "Entire Network",
-                    "database": self.project_base_path(),
-                    "view": "map",
-                    "height": 10,
-                    "width": 6,
-                    "center": [-87.6298, 41.8781], # coordinates for Chicago, Illinois
-                    "zoom": 10,
-                    "projection": "EPSG:32719"
-                }
-            ]
+            "type": "linkInfo",
+            "database": "project_database.sqlite",
+            "table": "links"
         }
 
         return config
 
-
     def _build_dashboard_config(self):
-        """ Build dashboard configuration for simwrapper"""
+        """ Build full dashboard configuration for simwrapper"""
 
-        config = self._dashboard_skeleton()
+        config = self._dashboard_skeleton() 
 
         config["layout"]["introRow"] = self._intro_row()
 
         # add available stats
         if self._stats_rows():
             config["layout"]["statsRow"] = self._stats_rows()
+
+        if self._entire_network_row():
+            config["layout"]["entireNetworkRow"] = self._entire_network_row()
+
+        if self._linksInfoRow():
+            config["layout"]["linkInfoRow"] = self._links_info_row()
 
         return config
 
