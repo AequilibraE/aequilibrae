@@ -51,9 +51,14 @@ class SimwrapperConfigGenerator:
         **name** (:obj:`str`): name of export
         **stats_dict** (:obj:`dict`): key:value stats to write
         """
-        df = pd.DataFrame([stats_dict]) 
+        rows = list(stats_dict.items())
+
         output_file = self.data_dir/ f"{csv_name}.csv"  #output file path
-        df.to_csv(output_file, index=False)
+
+        # manually bc needs to be saved as columns of metrics and column of values for simwrapper to read it right 
+        with open(output_file, "w", newline="") as f:
+            for key, value in rows:
+                f.write(f"{key},{value}\n")
 
         self._add_to_generated_files(csv_name, output_file)
 
@@ -138,16 +143,16 @@ class SimwrapperConfigGenerator:
         if "link_stats" in self.generated_files:
             stats_rows.append({
                 "title": "Link Statistics", 
-                "type": "table",
-                "file": str(self.generated_files["link_stats"].relative_to(self.output_dir))
+                "type": "tile",
+                "dataset": str(self.generated_files["link_stats"]) #output_dir/simwrapper_data/link_stats.csv
             })
 
         # nodes
         if "node_stats" in self.generated_files:
             stats_rows.append({
                 "title": "Node Statistics", 
-                "type": "table",
-                "file": str(self.generated_files["node_stats"].relative_to(self.output_dir))
+                "type": "tile",
+                "dataset": str(self.generated_files["node_stats"]) #output_dir/simwrapper_data/link_stats.csv
             })
 
         return stats_rows
@@ -164,7 +169,7 @@ class SimwrapperConfigGenerator:
                 "width": 6,
                 "center": [-87.6298, 41.8781], # coordinates for Chicago, Illinois currently hardcoded
                 "zoom": 10,
-                "projection": "EPSG:32719" # coordinate system?
+                "projection": "EPSG:32719", # coordinate system?
 
                 # default colours etc for now
                 "defaults": {
@@ -178,7 +183,7 @@ class SimwrapperConfigGenerator:
                     "nodes_centroids": {
                         "table": "nodes",
                         "geometry": "point",
-                        "sqlFilter": "is_centroid=1"
+                        "sqlFilter": "is_centroid=1",
                         "style": {
                             "fillColor": "#FF6600",
                             "pointRadius": 120
@@ -194,8 +199,8 @@ class SimwrapperConfigGenerator:
                         },
                     },
                 },
-            },
-        ] 
+            }
+        ]
 
         return config
     
@@ -273,7 +278,7 @@ class SimwrapperConfigGenerator:
         if self._entire_network_row():
             config["layout"]["entireNetworkRow"] = self._entire_network_row()
 
-        if self._linksInfoRow():
+        if self._links_info_row():
             config["layout"]["linkInfoRow"] = self._links_info_row()
 
         return config
