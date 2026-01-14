@@ -172,18 +172,90 @@ class SimwrapperConfigGenerator:
                     "lineColor": "#FF6600",
                     "lineWidth": 2,
                     "pointRadius": 4
-            }
+                },
+
+                "layers": {
+                    "nodes_centroids": {
+                        "table": "nodes",
+                        "geometry": "point",
+                        "sqlFilter": "is_centroid=1"
+                        "style": {
+                            "fillColor": "#FF6600",
+                            "pointRadius": 120
+                        },
+                    },
+                    "nodes_regular": {
+                        "table": "nodes",
+                        "geometry": "point",
+                        "sqlFilter": "is_centroid=0",
+                        "style": {
+                            "fillColor": "#cacaca",
+                            "pointRadius": 35
+                        },
+                    },
+                },
+            },
         ] 
 
         return config
     
     def _links_info_row(self):
         """ Builds yaml config for panel to show attributes of selected link """
-        config = {
-            "type": "linkInfo",
-            "database": "project_database.sqlite",
-            "table": "links"
-        }
+        config = [
+            {
+                "type": "aequilibrae",
+                "title": "Link Types",
+                "database": "project_database.sqlite",
+                "view": "map",
+                "height": 10,
+                "width": 3,
+                "center": [-87.6298, 41.8781],
+                "zoom": 10,
+
+                "defaults": {
+                    "lineWidth": 4,
+                },
+
+                "legend": [
+                    {"subtitle": "Link Types"},
+                    {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
+                    {"label": "Road", "color": "#74BBCD", "shape": "line"},
+                    {
+                        "label": "Centroid Connector",
+                        "color": "#99637f",
+                        "shape": "line",
+                    },
+                ],
+
+                # Layer definitions for link-type styling
+                "layers": {
+                    "links": {
+                        "table": "links",
+                        "geometry": "line",
+
+                        # Style links based on link_type column
+                        "style": {
+                            "lineColor": {
+                                "column": "link_type",
+                                "colors": {
+                                    3: "#99637f",   # centroid connector
+                                    2: "#C3A34B",   # freeway
+                                    1: "#74BBCD",   # road
+                                },
+                            },
+                            "lineWidth": {
+                                "column": "link_type",
+                                "widths": {
+                                    3: 20,
+                                    2: 80,
+                                    1: 20,
+                                },
+                            },
+                        },
+                    }
+                },
+            }
+        ]
 
         return config
 
