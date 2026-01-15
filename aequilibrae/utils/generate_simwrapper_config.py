@@ -46,14 +46,21 @@ class SimwrapperConfigGenerator:
         """Add file to self.generated_files"""
         self.generated_files[key] = Path(path)
 
-    def _get_project_center(self):
-        """ Finds center coordinates of project """
+    def _get_links_bounds_box(self):
+        """ 
+        Compute box around all coordinates in links table of project.
+        
+        Queries spatial database to find max and min x and y coords across all link geomerties
+        to return overall network links' reach.
 
+        Returns bounding box values (xmin, ymin, xmax, ymax)
+
+        """
         with self.project.db_connection_spatial as conn:
 
             cursor = conn.cursor() # database cursor to make sql query
 
-            # compute box of all coordinates in links table of project
+            # compute box around all coordinates in links table of project
             cursor.execute(
             """
             SELECT
@@ -65,7 +72,14 @@ class SimwrapperConfigGenerator:
             """
             )
 
-            row = cursor.fetchone() # fetch the single row returned by query
+            row = cursor.fetchone() # fetch the single row returned by query (ie bounding box values)
+        
+        return row
+
+    def _get_project_center(self):
+        """ Finds center coordinates of project """
+        
+        row = self._get_links_bounds_box() 
 
         if row is None or any(value is None for value in row):
             return [0,0] # if cant find coordinates bc of missing link vals, will make this better though but works for now
@@ -84,22 +98,7 @@ class SimwrapperConfigGenerator:
         max_zoom = 15
         min_zoom = 5
 
-        with self.project.db_connection_spatial as conn:
-
-            cursor = conn.cursor() # database cursor to make sql query
-
-            cursor.execute(
-                """
-                SELECT
-                    MIN(MBRMinX(geometry)) AS xmin,
-                    MIN(MBRMinY(geometry)) AS ymin,
-                    MAX(MBRMaxX(geometry)) AS xmax,
-                    MAX(MBRMaxY(geometry)) AS ymax
-                FROM links
-                """
-            )
-            
-            row = cursor.fetchone() # fetch the single row returned by query
+        row = self._get_links_bounds_box()
 
         if row is None or any(value is None for value in row):
             return 10 # if cant find coordinates bc of missing link vals, will make this better though but works for now
