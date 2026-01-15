@@ -2,6 +2,7 @@ from pathlib import Path
 import yaml
 import geopandas as gpd
 import pandas as pd
+import math
 
 
 class SimwrapperConfigGenerator:
@@ -22,6 +23,7 @@ class SimwrapperConfigGenerator:
         self.generated_files = {} 
         self._create_directories()
         self.center = self._get_project_center()
+        self.zoom = self._get_project_zoom()
 
     def _create_directories(self):
         """
@@ -45,7 +47,7 @@ class SimwrapperConfigGenerator:
         self.generated_files[key] = Path(path)
 
     def _get_project_center(self):
-        """ Find center coordinates of project """
+        """ Finds center coordinates of project """
 
         with self.project.db_connection_spatial as conn:
 
@@ -74,15 +76,61 @@ class SimwrapperConfigGenerator:
         center = [(xmin + xmax)/2, (ymin + ymax)/2] # [horizontal center, vertical center] == [longitude ,latitude]
 
         return center
+    
+    def _get_project_zoom(self):
+        """ Finds a reasonable zoom level based on project links' reach"""
 
+        # just to keep things reasonable
+        max_zoom = 15
+        min_zoom = 5
+
+        with self.project.db_connection_spatial as conn:
+
+            cursor = conn.cursor() # database cursor to make sql query
+
+            cursor.execute(
+                """
+                SELECT
+                    MIN(MBRMinX(geometry)) AS xmin,
+                    MIN(MBRMinY(geometry)) AS ymin,
+                    MAX(MBRMaxX(geometry)) AS xmax,
+                    MAX(MBRMaxY(geometry)) AS ymax
+                FROM links
+                """
+            )
+            
+            row = cursor.fetchone() # fetch the single row returned by query
+
+        if row is None or any(value is None for value in row):
+            return 10 # if cant find coordinates bc of missing link vals, will make this better though but works for now
+        
+        xmin, ymin, xmax, ymax = row
+
+        x_span = abs(xmax - xmin)
+        y_span = abs(ymax - ymin)
+
+        max_span = max(x_span, y_span) # use larger of two so we see everything
+
+        if max_span <= 0:
+            return 10 # if invalid values, clearly not a negative distance we want
+        
+        # calculate ~ zoom:
+        # at zoom of 0 the world is ~360degrees wide
+        # each increment doubles the resolution
+        zoom = int(round(math.log2(360/max_span)))
+
+        # fix this within the allowed range
+        zoom = max(min_zoom, min(max_zoom, zoom))
+
+        return zoom
 
     def _export_simple_stats(self, csv_name, stats_dict):
         """
         Export a one row csv from stats dictionairy and add file to generated files.
         
         :Arguments:
-        **name** (:obj:`str`): name of export
-        **stats_dict** (:obj:`dict`): key:value stats to write
+            **name** (:obj:`str`): name of export
+            **stats_dict** (:obj:`dict`): key:value stats to write
         """
         rows = list(stats_dict.items())
 
@@ -201,7 +249,7 @@ class SimwrapperConfigGenerator:
                 "height": 10,
                 "width": 6,
                 "center": self.center,
-                "zoom": 10,
+                "zoom": self.zoom,
                 "projection": "EPSG:32719", # coordinate system?
 
                 # default colours etc for now
@@ -248,7 +296,7 @@ class SimwrapperConfigGenerator:
                 "height": 10,
                 "width": 3,
                 "center": [-87.6298, 41.8781],
-                "zoom": 10,
+                "zoom": self.zoom,
 
                 "defaults": {
                     "lineWidth": 4,
