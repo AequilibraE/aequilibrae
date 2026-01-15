@@ -21,6 +21,7 @@ class SimwrapperConfigGenerator:
         self.output_dir = Path(output_dir)
         self.generated_files = {} 
         self._create_directories()
+        self.center = self._get_project_center()
 
     def _create_directories(self):
         """
@@ -42,6 +43,38 @@ class SimwrapperConfigGenerator:
     def _add_to_generated_files(self, key, path):
         """Add file to self.generated_files"""
         self.generated_files[key] = Path(path)
+
+    def _get_project_center(self):
+        """ Find center coordinates of project """
+
+        with self.project.db_connection_spatial as conn:
+
+            cursor = conn.cursor() # database cursor to make sql query
+
+            # compute box of all coordinates in links table of project
+            cursor.execute(
+            """
+            SELECT
+                MIN(MBRMinX(geometry)) AS xmin,
+                MIN(MBRMinY(geometry)) AS ymin,
+                MAX(MBRMaxX(geometry)) AS xmax,
+                MAX(MBRMaxY(geometry)) AS ymin
+            FROM links
+            """
+            )
+
+            row = cursor.fetchone() # fetch the single row returned by query
+
+        if row is None or any(value is None for value in row):
+            return [0,0] # if cant find coordinates bc of missing link vals, will make this better though but works for now
+        
+        xmin, ymin, xmax, ymax = row
+
+        # find center on each axis 
+        center = [(xmin + xmax)/2, (ymin + ymax)/2] # [horizontal center, vertical center] == [longitude ,latitude]
+
+        return center
+
 
     def _export_simple_stats(self, csv_name, stats_dict):
         """
@@ -68,8 +101,8 @@ class SimwrapperConfigGenerator:
         links_df = links_obj.data
 
         stats = {
-            "link_count": len(links_df), 
-            "link_type_count": links_df["link_type"].nunique()            
+            "Link count": len(links_df), 
+            "Link type count": links_df["link_type"].nunique()            
         }
 
         self._export_simple_stats("link_stats", stats)
@@ -81,7 +114,7 @@ class SimwrapperConfigGenerator:
         nodes_df = nodes_obj.data
 
         stats = {
-            "node_count": len(nodes_df)           
+            "Node count": len(nodes_df)           
         }
 
         self._export_simple_stats("node_stats", stats)
@@ -167,7 +200,7 @@ class SimwrapperConfigGenerator:
                 "view": "map",
                 "height": 10,
                 "width": 6,
-                "center": [-87.6298, 41.8781], # coordinates for Chicago, Illinois currently hardcoded
+                "center": self.center,
                 "zoom": 10,
                 "projection": "EPSG:32719", # coordinate system?
 
@@ -295,7 +328,6 @@ class SimwrapperConfigGenerator:
 
         self._add_to_generated_files("dashboard", output_file)
         
-
 
     def _has_links(self):
         """Checks if project has a network with links"""
