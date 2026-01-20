@@ -67,7 +67,7 @@ class SimwrapperConfigGenerator:
                 MIN(MBRMinX(geometry)) AS xmin,
                 MIN(MBRMinY(geometry)) AS ymin,
                 MAX(MBRMaxX(geometry)) AS xmax,
-                MAX(MBRMaxY(geometry)) AS ymin
+                MAX(MBRMaxY(geometry)) AS ymax
             FROM links
             """
             )
@@ -194,6 +194,7 @@ class SimwrapperConfigGenerator:
                 "title": "insert title",
                 "description": "insert description"
             },
+
             "layout": {}
         }
 
@@ -294,7 +295,7 @@ class SimwrapperConfigGenerator:
                 "view": "map",
                 "height": 10,
                 "width": 3,
-                "center": [-87.6298, 41.8781],
+                "center": self.center,
                 "zoom": self.zoom,
 
                 "defaults": {
@@ -391,6 +392,39 @@ class SimwrapperConfigGenerator:
     def _has_skims(self):
         """Checks if project has a network with skims"""
         return True
+    
+    # rows
+    def _charts_row(self):
+        """ need to add parameters"""
+        pass
+
+    def _histograms_row(self):
+        """ need to add parameters"""
+        pass
+
+    def _results_map_row(self):
+        """ need to add parameters"""
+        pass
+
+    def _attribute_map_row(self):
+        """ need to add parameters"""
+        pass
+
+    def _custom_stats_row(self):
+        """ need to add parameters"""
+        pass
+
+    def _documentation_row(self):
+        """ need to add parameters"""
+        pass
+
+    def _intro_row(self):
+        """ need to add parameters"""
+        pass
+
+    def _header_row(self):
+        """ need to add parameters"""
+        pass
 
 
 
