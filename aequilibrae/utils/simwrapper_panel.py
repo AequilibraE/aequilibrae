@@ -20,11 +20,15 @@ class SimwrapperPanel():
 
         return panel
 
-
 class TilePanel(SimwrapperPanel):
     def __init__(self, title, dataset, height=None, width=None):
         super().__init__("tile", title, height=height, width=width)
         self.dataset = dataset
+
+    def to_dict(self):
+        panel = super().to_dict()
+
+        panel["dataset"] = self.dataset
 
 # my = TilePanel(title, dataset)
 
@@ -58,8 +62,46 @@ class AequilibraEMapPanel(SimwrapperPanel):
 
         self.defaults = None
         self.extra_databases = None
+        self.layers = {}
+        self.legend = None
 
     def set_defaults(self, defaults_dict):
         self.defaults = defaults_dict
 
-    
+    def add_layer(self, name, layer_dict):
+        self.layers[name] = layer_dict
+
+    def set_legend(self, legend_list):
+        self.legend = legend_list
+
+    def set_extra_databases(self, database_dict):
+        self.extra_databases = database_dict
+
+    def to_dict(self):
+        panel = super().to_dict()
+
+        panel["database"] = self.database
+        panel["view"] = self.view
+
+        if self.center:
+            panel["center"] = self.center
+
+        if self.zoom:
+            panel["zoom"] = self.zoom
+
+        if self.projection:
+            panel["projection"] = self.projection
+
+        if self.defaults:
+            panel["defaults"] = self.defaults
+
+        if self.legend:
+            panel["legend"] = self.legend
+
+        if self.extra_databases:
+            panel["extraDatabases"] = self.extra_databases
+
+        if self.layers:
+            panel["layers"] = self.layers
+
+        return panel
