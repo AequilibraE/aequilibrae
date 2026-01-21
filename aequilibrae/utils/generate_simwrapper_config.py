@@ -4,6 +4,8 @@ import geopandas as gpd
 import pandas as pd
 import math
 
+from simwrapper_panel import SimwrapperPanel, TilePanel, TextPanel, AequilibraEMapPanel
+
 
 class SimwrapperConfigGenerator:
     """
@@ -202,88 +204,58 @@ class SimwrapperConfigGenerator:
 
     def _intro_row(self):
         """ Project details """
-        config = {
-            "introRow": [
-                {
-                    "type": "text",
-                    "title": "insert title",
-                    "content": (
-                        " bla bla bla"
-                    )
-                }
-            ]
-        }
-
-        return config
+        return [TextPanel(title="title", data="intro")]
 
     def _stats_rows(self):
         """ stats rows """
-        stats_rows = []
+        panels = []
 
         # links
         if "link_stats" in self.generated_files:
-            stats_rows.append({
-                "title": "Link Statistics", 
-                "type": "tile",
-                "dataset": str(self.generated_files["link_stats"]) #output_dir/simwrapper_data/link_stats.csv
-            })
+            panels.append(TilePanel("Link Statistics", str(self.generated_files["link_stats"]))) #output_dir/simwrapper_data/link_stats.csv))
 
         # nodes
         if "node_stats" in self.generated_files:
-            stats_rows.append({
-                "title": "Node Statistics", 
-                "type": "tile",
-                "dataset": str(self.generated_files["node_stats"]) #output_dir/simwrapper_data/link_stats.csv
-            })
+            panels.append(TilePanel("Node Statistics", str(self.generated_files["node_stats"])))
 
-        return stats_rows
+        return panels
     
     def _entire_network_row(self):
         """ Builds yaml config for map of entire network """
-        config = [
-            {
-                "type": "aequilibrae",
-                "title": "Entire Network",
-                "database": "project_database.sqlite",
-                "view": "map",
-                "height": 10,
-                "width": 6,
-                "center": self.center,
-                "zoom": self.zoom,
-                "projection": "EPSG:32719", # coordinate system?
 
-                # default colours etc for now
-                "defaults": {
-                    "fillColor": "#6f6f6f",
-                    "lineColor": "#FF6600",
-                    "lineWidth": 2,
-                    "pointRadius": 4
-                },
+        panel = AequilibraEMapPanel("Entire Network", height=10, width=6, center=self.center, 
+                                    zoom=self.zoom, projection="EPSG:32719")
+        
+        panel.set_defaults({
+            "fillColor": "#6f6f6f",
+            "lineColor": "#FF6600",
+            "lineWidth": 2,
+            "pointRadius": 4,
+        })
 
-                "layers": {
-                    "nodes_centroids": {
+        panel.add_layer("nodes_centroids",
+                        {
                         "table": "nodes",
                         "geometry": "point",
                         "sqlFilter": "is_centroid=1",
                         "style": {
                             "fillColor": "#FF6600",
                             "pointRadius": 120
-                        },
-                    },
-                    "nodes_regular": {
+                            }
+                        })
+        
+        panel.add_layer("nodes_regular", 
+                        {
                         "table": "nodes",
                         "geometry": "point",
                         "sqlFilter": "is_centroid=0",
                         "style": {
                             "fillColor": "#cacaca",
                             "pointRadius": 35
-                        },
-                    },
-                },
-            }
-        ]
-
-        return config
+                            }
+                        })
+        
+        return [panel]
     
     def _links_info_row(self):
         """ Builds yaml config for panel to show attributes of selected link """
@@ -415,10 +387,6 @@ class SimwrapperConfigGenerator:
         pass
 
     def _documentation_row(self):
-        """ need to add parameters"""
-        pass
-
-    def _intro_row(self):
         """ need to add parameters"""
         pass
 
