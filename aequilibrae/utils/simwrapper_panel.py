@@ -1,4 +1,5 @@
 class SimwrapperPanel():
+    """ Base class for all simwrapper panels"""
     def __init__(self, type, title, height=None, width=None):
         self.type = type
         self.title = title
@@ -6,7 +7,7 @@ class SimwrapperPanel():
         self.width = width
 
     def to_dict(self):
-        """returns dictionairy representation of the panel"""
+        """Returns dictionairy representation of the panel"""
         panel = {
             "type": self.type,
             "title": self.title,
@@ -26,6 +27,7 @@ class TilePanel(SimwrapperPanel):
         self.dataset = dataset
 
     def to_dict(self):
+        """Returns dictionairy representation of the panel"""
         panel = super().to_dict()
 
         panel["dataset"] = self.dataset
@@ -39,6 +41,7 @@ class TextPanel(SimwrapperPanel):
         self.is_file = is_file
 
     def to_dict(self):
+        """Returns dictionairy representation of the panel"""
         panel = super().to_dict()
 
         if self.is_file:
@@ -66,18 +69,23 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.legend = None
 
     def set_defaults(self, defaults_dict):
+        """ Sets default visuals for map layers"""
         self.defaults = defaults_dict
 
     def add_layer(self, name, layer_dict):
+        """ Adds a layer definition under the given name"""
         self.layers[name] = layer_dict
 
     def set_legend(self, legend_list):
+        """ Sets legend configuration for the map"""
         self.legend = legend_list
 
     def set_extra_databases(self, database_dict):
+        """ Registers extra databases used by map """
         self.extra_databases = database_dict
 
     def to_dict(self):
+        """Returns dictionairy representation of the panel"""
         panel = super().to_dict()
 
         panel["database"] = self.database
