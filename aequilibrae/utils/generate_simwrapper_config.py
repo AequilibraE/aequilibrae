@@ -181,16 +181,16 @@ class SimwrapperConfigGenerator:
 
     def generate_config(self):
         """Create the SimWrapper .yaml dashboard configuration."""
-        # export data
+
+        # export all project data
         self.export_project_stats()
 
-        # build yaml
+        # build yaml 
         self._write_yamls()
 
-        # write dashboard.yaml
-
     def _dashboard_skeleton(self):
-        """ What is always in yaml """
+        """ Defines header and layout structure for yaml and returns the basic config skeleton """
+
         config = {
             "header": {
                 "title": "insert title",
@@ -203,18 +203,19 @@ class SimwrapperConfigGenerator:
         return config
 
     def _intro_row(self):
-        """ Project details """
+        """ resturns project details text panel"""
+
         return [TextPanel(title="title", data="intro")]
 
     def _stats_rows(self):
-        """ stats rows """
+        """ returns stats rows panels"""
         panels = []
 
-        # links
+        ## add links stats tile if available
         if "link_stats" in self.generated_files:
             panels.append(TilePanel("Link Statistics", str(self.generated_files["link_stats"]))) #output_dir/simwrapper_data/link_stats.csv))
 
-        # nodes
+        # add nodes stats tile if available
         if "node_stats" in self.generated_files:
             panels.append(TilePanel("Node Statistics", str(self.generated_files["node_stats"])))
 
@@ -223,9 +224,11 @@ class SimwrapperConfigGenerator:
     def _entire_network_row(self):
         """ Builds yaml config for map of entire network """
 
+        # aequilibrae panel with center and zoom
         panel = AequilibraEMapPanel("Entire Network", height=10, width=6, center=self.center, 
                                     zoom=self.zoom, projection="EPSG:32719")
         
+        # set default styling
         panel.set_defaults({
             "fillColor": "#6f6f6f",
             "lineColor": "#FF6600",
@@ -233,6 +236,7 @@ class SimwrapperConfigGenerator:
             "pointRadius": 4,
         })
 
+        # add centroid nodes layer
         panel.add_layer("nodes_centroids",
                         {
                         "table": "nodes",
@@ -244,6 +248,7 @@ class SimwrapperConfigGenerator:
                             }
                         })
         
+        # add regular nodes layer
         panel.add_layer("nodes_regular", 
                         {
                         "table": "nodes",
@@ -255,14 +260,17 @@ class SimwrapperConfigGenerator:
                             }
                         })
         
+        # retun panel inside a list
         return [panel]
     
     def _links_info_row(self):
         """ Builds yaml config for panel to show attributes of selected link """
 
+        # map panel
         panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, 
                                     zoom=self.zoom)
         
+        # set legend 
         panel.set_legend([
             {"subtitle": "Link Types"},
             {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
@@ -274,6 +282,7 @@ class SimwrapperConfigGenerator:
             }
         ])
 
+        # add links layer styled by link type
         panel.add_layer("links",
             {"table": "links",
             "geometry": "line",
@@ -292,10 +301,11 @@ class SimwrapperConfigGenerator:
         return panel
 
     def _build_dashboard_config(self):
-        """ Build full dashboard configuration for simwrapper"""
+        """ Builds and returns full dashboard configuration for simwrapper"""
 
-        config = self._dashboard_skeleton() 
+        config = self._dashboard_skeleton() # based config
 
+        # dashboard rows
         rows = {
             "introRow": self._intro_row(),
             "statsRow": self._stats_row(),
@@ -304,12 +314,14 @@ class SimwrapperConfigGenerator:
 
         }
 
+        # convert panels to dicts and add to config
         for name, panels in rows.items():
             if panels:
                 panel_dicts = []
                 for p in panels:
                     panel_dicts.append(p.to_dict())
                 config["layout"][name] = panel_dicts
+
 
         return config
 
@@ -343,34 +355,6 @@ class SimwrapperConfigGenerator:
         """Checks if project has a network with skims"""
         return True
     
-    # rows
-    def _charts_row(self):
-        """ need to add parameters"""
-        pass
-
-    def _histograms_row(self):
-        """ need to add parameters"""
-        pass
-
-    def _results_map_row(self):
-        """ need to add parameters"""
-        pass
-
-    def _attribute_map_row(self):
-        """ need to add parameters"""
-        pass
-
-    def _custom_stats_row(self):
-        """ need to add parameters"""
-        pass
-
-    def _documentation_row(self):
-        """ need to add parameters"""
-        pass
-
-    def _header_row(self):
-        """ need to add parameters"""
-        pass
 
 
 
