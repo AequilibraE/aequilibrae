@@ -124,7 +124,7 @@ class SimwrapperConfigGenerator:
 
     def _export_simple_stats(self, csv_name, stats_dict):
         """
-        Export a one row csv from stats dictionairy and add file to generated files.
+        Export a one row csv from stats dictionary and add file to generated files.
 
         :Arguments:
             **name** (:obj:`str`): name of export
@@ -301,6 +301,35 @@ class SimwrapperConfigGenerator:
 
         return [panel]
 
+    def _capacity_map_row(self):
+        """ Map showing links styled by capacity"""
+        panel = AequilibraEMapPanel(
+            title="Link Capacity",
+            height=10,
+            width=6,
+            center=self.center,
+            zoom=self.zoom
+        )
+
+        panel.set_defaults({"lineWidth": 3})
+
+        # add links layer styled by capacity
+        capacity_styling = {
+                "lineColor": {
+                    "column": "capacity",
+                    "palette": "Viridis",
+                    "dataRange": [0, 10000]
+                }
+            }
+
+        panel.add_layer("links", {
+            "table": "links",
+            "geometry": "line",
+            "style": capacity_styling
+        })
+
+        return [panel]
+
     def _build_dashboard_config(self):
         """ Builds and returns full dashboard configuration for simwrapper"""
 
@@ -312,6 +341,7 @@ class SimwrapperConfigGenerator:
             "statsRow": self._stats_rows(),
             "entireNetworkRow": self._entire_network_row(),
             "linksInfoRow": self._links_info_row(),
+            "capacityMapRow": self._capacity_map_row(),
         }
 
         # convert panels to dicts and add to config
