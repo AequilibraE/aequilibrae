@@ -259,85 +259,63 @@ class SimwrapperConfigGenerator:
     
     def _links_info_row(self):
         """ Builds yaml config for panel to show attributes of selected link """
-        config = [
+
+        panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, 
+                                    zoom=self.zoom)
+        
+        panel.set_legend([
+            {"subtitle": "Link Types"},
+            {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
+            {"label": "Road", "color": "#74BBCD", "shape": "line"},
             {
-                "type": "aequilibrae",
-                "title": "Link Types",
-                "database": "project_database.sqlite",
-                "view": "map",
-                "height": 10,
-                "width": 3,
-                "center": self.center,
-                "zoom": self.zoom,
-
-                "defaults": {
-                    "lineWidth": 4,
-                },
-
-                "legend": [
-                    {"subtitle": "Link Types"},
-                    {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
-                    {"label": "Road", "color": "#74BBCD", "shape": "line"},
-                    {
-                        "label": "Centroid Connector",
-                        "color": "#99637f",
-                        "shape": "line",
-                    },
-                ],
-
-                # Layer definitions for link-type styling
-                "layers": {
-                    "links": {
-                        "table": "links",
-                        "geometry": "line",
-
-                        # Style links based on link_type column
-                        "style": {
-                            "lineColor": {
-                                "column": "link_type",
-                                "colors": {
-                                    3: "#99637f",   # centroid connector
-                                    2: "#C3A34B",   # freeway
-                                    1: "#74BBCD",   # road
-                                },
-                            },
-                            "lineWidth": {
-                                "column": "link_type",
-                                "widths": {
-                                    3: 20,
-                                    2: 80,
-                                    1: 20,
-                                },
-                            },
-                        },
-                    }
-                },
+                "label": "Centroid Connector",
+                "color": "#99637f",
+                "shape": "line",
             }
-        ]
+        ])
 
-        return config
+        panel.add_layer("links",
+            {"table": "links",
+            "geometry": "line",
+            "style": {
+                "lineColor": {
+                    "column": "link_type",
+                    "colors": {
+                        3: "#99637f",
+                        2: "#C3A34B",
+                        1: "#74BBCD",
+                    },
+                }
+            }
+        })
+
+        return panel
 
     def _build_dashboard_config(self):
         """ Build full dashboard configuration for simwrapper"""
 
         config = self._dashboard_skeleton() 
 
-        config["layout"]["introRow"] = self._intro_row()
+        rows = {
+            "introRow": self._intro_row(),
+            "statsRow": self._stats_row(),
+            "entireNetworkRow": self._entire_network_row(),
+            "linksInfoRow": self._links_info_row(),
 
-        # add available stats
-        if self._stats_rows():
-            config["layout"]["statsRow"] = self._stats_rows()
+        }
 
-        if self._entire_network_row():
-            config["layout"]["entireNetworkRow"] = self._entire_network_row()
-
-        if self._links_info_row():
-            config["layout"]["linkInfoRow"] = self._links_info_row()
+        for name, panels in rows.items():
+            if panels:
+                panel_dicts = []
+                for p in panels:
+                    panel_dicts.append(p.to_dict())
+                config["layout"][name] = panel_dicts
 
         return config
 
     def _write_yamls(self):
         """Write yamls """
+        self.export_project_stats()
 
         config = self._build_dashboard_config()
         output_file = self.output_dir / "dashboard.yaml"
