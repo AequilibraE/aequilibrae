@@ -4,7 +4,7 @@ import geopandas as gpd
 import pandas as pd
 import math
 
-from simwrapper_panel import SimwrapperPanel, TilePanel, TextPanel, AequilibraEMapPanel
+from aequilibrae.utils.simwrapper_panel import SimwrapperPanel, TilePanel, TextPanel, AequilibraEMapPanel
 
 
 class SimwrapperConfigGenerator:
@@ -36,7 +36,7 @@ class SimwrapperConfigGenerator:
             simwrapper_data/    # Data files referenced by configs
                 linkstats.csv   # CSV of link properties/metrics
                 other_stats.csv # Additional CSV outputs
-                ...             
+                ...
             dashboard-*.yaml    # Dashboard configuration file(s)
         """
         self.data_dir = self.output_dir / "simwrapper_data"  # make subcategories
@@ -51,7 +51,6 @@ class SimwrapperConfigGenerator:
     def _get_links_bounds_box(self):
         """ 
         Compute box around all coordinates in links table of project.
-        
         Queries spatial database to find max and min x and y coords across all link geomerties
         to return overall network links' reach.
 
@@ -75,24 +74,22 @@ class SimwrapperConfigGenerator:
             )
 
             row = cursor.fetchone() # fetch the single row returned by query (ie bounding box values)
-        
         return row
 
     def _get_project_center(self):
         """ Finds center coordinates of project """
-        
         row = self._get_links_bounds_box() 
 
         if row is None or any(value is None for value in row):
             return [0,0] # if cant find coordinates bc of missing link vals, will make this better though but works for now
-        
+
         xmin, ymin, xmax, ymax = row
 
         # find center on each axis 
         center = [(xmin + xmax)/2, (ymin + ymax)/2] # [horizontal center, vertical center] == [longitude ,latitude]
 
         return center
-    
+
     def _get_project_zoom(self):
         """ Finds a reasonable zoom level based on project links' reach"""
 
@@ -104,7 +101,7 @@ class SimwrapperConfigGenerator:
 
         if row is None or any(value is None for value in row):
             return 10 # if cant find coordinates bc of missing link vals, will make this better though but works for now
-        
+
         xmin, ymin, xmax, ymax = row
 
         x_span = abs(xmax - xmin)
@@ -114,7 +111,7 @@ class SimwrapperConfigGenerator:
 
         if max_span <= 0:
             return 10 # if invalid values, clearly not a negative distance we want
-        
+
         # calculate ~ zoom:
         # at zoom of 0 the world is ~360degrees wide
         # each increment doubles the resolution
@@ -128,7 +125,7 @@ class SimwrapperConfigGenerator:
     def _export_simple_stats(self, csv_name, stats_dict):
         """
         Export a one row csv from stats dictionairy and add file to generated files.
-        
+
         :Arguments:
             **name** (:obj:`str`): name of export
             **stats_dict** (:obj:`dict`): key:value stats to write
@@ -151,7 +148,7 @@ class SimwrapperConfigGenerator:
 
         stats = {
             "Link count": len(links_df), 
-            "Link type count": links_df["link_type"].nunique()            
+            "Link type count": links_df["link_type"].nunique()
         }
 
         self._export_simple_stats("link_stats", stats)
@@ -163,7 +160,7 @@ class SimwrapperConfigGenerator:
         nodes_df = nodes_obj.data
 
         stats = {
-            "Node count": len(nodes_df)           
+            "Node count": len(nodes_df)
         }
 
         self._export_simple_stats("node_stats", stats)
@@ -220,56 +217,59 @@ class SimwrapperConfigGenerator:
             panels.append(TilePanel("Node Statistics", str(self.generated_files["node_stats"])))
 
         return panels
-    
+
     def _entire_network_row(self):
         """ Builds yaml config for map of entire network """
 
         # aequilibrae panel with center and zoom
         panel = AequilibraEMapPanel("Entire Network", height=10, width=6, center=self.center, 
                                     zoom=self.zoom, projection="EPSG:32719")
-        
+
         # set default styling
-        panel.set_defaults({
+        default_style = {
             "fillColor": "#6f6f6f",
             "lineColor": "#FF6600",
             "lineWidth": 2,
             "pointRadius": 4,
-        })
+        }
+        panel.set_defaults( default_style)
 
         # add centroid nodes layer
+        centroid_node_style = {
+                            "fillColor": "#FF6600",
+                            "pointRadius": 120
+                            }
         panel.add_layer("nodes_centroids",
                         {
                         "table": "nodes",
                         "geometry": "point",
                         "sqlFilter": "is_centroid=1",
-                        "style": {
-                            "fillColor": "#FF6600",
-                            "pointRadius": 120
-                            }
+                        "style": centroid_node_style
                         })
-        
+
         # add regular nodes layer
+        regular_node_style = {
+                            "fillColor": "#cacaca",
+                            "pointRadius": 35
+                            }
         panel.add_layer("nodes_regular", 
                         {
                         "table": "nodes",
                         "geometry": "point",
                         "sqlFilter": "is_centroid=0",
-                        "style": {
-                            "fillColor": "#cacaca",
-                            "pointRadius": 35
-                            }
+                        "style": regular_node_style
                         })
-        
+
         # retun panel inside a list
         return [panel]
-    
+
     def _links_info_row(self):
         """ Builds yaml config for panel to show attributes of selected link """
 
         # map panel
         panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, 
                                     zoom=self.zoom)
-        
+
         # set legend 
         panel.set_legend([
             {"subtitle": "Link Types"},
@@ -283,22 +283,23 @@ class SimwrapperConfigGenerator:
         ])
 
         # add links layer styled by link type
+        link_type_by_colour = {
+                        3: "#99637f",
+                        2: "#C3A34B",
+                        1: "#74BBCD",
+                    }
         panel.add_layer("links",
             {"table": "links",
             "geometry": "line",
             "style": {
                 "lineColor": {
                     "column": "link_type",
-                    "colors": {
-                        3: "#99637f",
-                        2: "#C3A34B",
-                        1: "#74BBCD",
-                    },
+                    "colors": link_type_by_colour,
                 }
             }
         })
 
-        return panel
+        return [panel]
 
     def _build_dashboard_config(self):
         """ Builds and returns full dashboard configuration for simwrapper"""
@@ -308,10 +309,9 @@ class SimwrapperConfigGenerator:
         # dashboard rows
         rows = {
             "introRow": self._intro_row(),
-            "statsRow": self._stats_row(),
+            "statsRow": self._stats_rows(),
             "entireNetworkRow": self._entire_network_row(),
             "linksInfoRow": self._links_info_row(),
-
         }
 
         # convert panels to dicts and add to config
@@ -331,18 +331,18 @@ class SimwrapperConfigGenerator:
 
         config = self._build_dashboard_config()
         output_file = self.output_dir / "dashboard.yaml"
-        
+
         # write it
         with output_file.open("w") as f:
             yaml.safe_dump(config, f, sort_keys = False)
 
         self._add_to_generated_files("dashboard", output_file)
-        
+
 
     def _has_links(self):
         """Checks if project has a network with links"""
         return True
-    
+
     def _has_nodes(self):
         """Checks if project has a network with nodes"""
         return True
@@ -354,10 +354,3 @@ class SimwrapperConfigGenerator:
     def _has_skims(self):
         """Checks if project has a network with skims"""
         return True
-    
-
-
-
-    
-
-    

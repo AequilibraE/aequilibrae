@@ -32,6 +32,8 @@ class TilePanel(SimwrapperPanel):
 
         panel["dataset"] = self.dataset
 
+        return panel
+
 # my = TilePanel(title, dataset)
 
 class TextPanel(SimwrapperPanel):
@@ -48,6 +50,8 @@ class TextPanel(SimwrapperPanel):
             panel["file"] = self.data
         else:
             panel["content"] = self.data
+
+        return panel
 
 # my = TextPanel(title, data=text, is_file=False, height=None, width=None)    
 
