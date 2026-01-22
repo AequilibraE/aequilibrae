@@ -319,6 +319,12 @@ class SimwrapperConfigGenerator:
                     "column": "capacity",
                     "palette": "Viridis",
                     "dataRange": [0, 10000]
+                },
+
+                "lineWidth": {
+                    "column": "capacity_ab",
+                    "scale": [2, 25],          # pixels on screen
+                    "dataRange": [0, 10000]    # capacity values
                 }
             }
 
@@ -340,8 +346,7 @@ class SimwrapperConfigGenerator:
             "introRow": self._intro_row(),
             "statsRow": self._stats_rows(),
             "entireNetworkRow": self._entire_network_row(),
-            "linksInfoRow": self._links_info_row(),
-            "capacityMapRow": self._capacity_map_row(),
+            "linkTypeAndCapasityRow": self._links_info_row() + self._capacity_map_row(),
         }
 
         # convert panels to dicts and add to config
