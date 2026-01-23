@@ -311,26 +311,37 @@ class SimwrapperConfigGenerator:
             zoom=self.zoom
         )
 
-        panel.set_defaults({"lineWidth": 3})
+        # need write legend, but not sure how to determine how this chooses color
+        # panel.set_legend([
+        #     {"subtitle": "Link Capacities"},
+        #     {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
+        #     {"label": "Road", "color": "#74BBCD", "shape": "line"},
+        #     {
+        #         "label": "Centroid Connector",
+        #         "color": "#99637f",
+        #         "shape": "line",
+        #     }
+        # ])
 
         # add links layer styled by capacity
         capacity_styling = {
                 "lineColor": {
-                    "column": "capacity",
-                    "palette": "Viridis",
-                    "dataRange": [0, 10000]
+                    "column": "capacity_ab",
+                    "palette": "SunsetDark",
+                    "dataRange": [0, 10000],
                 },
 
                 "lineWidth": {
                     "column": "capacity_ab",
-                    "scale": [2, 25],          # pixels on screen
-                    "dataRange": [0, 10000]    # capacity values
+                    "dataRange": [0, 1000],
+                    "widthRange": [1, 150],
                 }
             }
 
         panel.add_layer("links", {
             "table": "links",
             "geometry": "line",
+            "sqlFilter": "link_type != 3",
             "style": capacity_styling
         })
 
