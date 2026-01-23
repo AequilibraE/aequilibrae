@@ -337,7 +337,7 @@ class SimwrapperConfigGenerator:
         panel.add_layer("links", {
             "table": "links",
             "geometry": "line",
-            "sqlFilter": "link_type != 3",
+            #"sqlFilter": "link_type != 3",
             "style": capacity_styling,
         })
 
