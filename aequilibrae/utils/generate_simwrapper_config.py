@@ -343,6 +343,110 @@ class SimwrapperConfigGenerator:
 
         return [panel]
 
+    def _scenario_metric_map(self, title, results_table, metric_column, legend, data_range, palette="Temps", width_by_link_type=True):
+        """makes scenario comparison map for a network's performance metric'
+
+        :Arguments:
+            **title** (:obj:`str`): panel title
+            **results_table** (:obj:`str`): results table to join to links
+            **metric_column** (:obj:`str`): metric to use for link colouring
+            **legend** (:obj:`list`): legend def for the map
+            **data_range** (:obj:`list`): value range used for colour scale
+            **palette** (:obj:`str`, *Optional*): colour palette to use
+            **width_by_link_type** (:obj:`bool`, *Optional*): vary line width by link type????????? weird
+        """
+
+        panel = AequilibraEMapPanel(
+            title=title,
+            height=10,
+            width=3,
+            center=self.center,
+            zoom=self.zoom,
+            projection="EPSG:32719",
+        )
+
+        # add extra db
+        panel.set_extra_databases({
+            "results": "results_database.sqlite"
+        })
+
+        # defaultstyling
+        panel.set_defaults({
+            "fillColor": "#6f6f6f",
+            "lineColor": "#FF6600",
+            "lineWidth": 2,
+            "pointRadius": 4,
+        })
+
+        panel.set_legend(legend)
+
+        # links layer styling
+        style = {
+            "lineColor": {
+                "column": metric_column,
+                "palette": palette,
+                "dataRange": data_range,
+            }
+        }
+
+        # link type by line width?? made optional bc weird, but example yaml does this
+        if width_by_link_type:
+            style["lineWidth"] = {
+                "column": "link_type",
+                "widths": {
+                    3: 20,
+                    2: 40,
+                    1: 20,
+                }
+            }
+
+        # add links layer
+        panel.add_layer("links", {
+            "table": "links",
+            "geometry": "line",
+            "join": {
+                "database": "results",
+                "table": results_table,
+                "leftKey": "link_id",
+                "rightKey": "link_id",
+                "type": "left",
+            },
+            "style": style,
+        })
+
+        return panel
+
+    def _delay_factor_comp_row(self):
+        """ Builds side by side comparison of base case vs active/transit delay factor map panels"""
+
+        legend = [
+            {"subtitle": "Delay Factor"},
+            {"label": "1", "color": "#009392", "size": 4, "shape": "line"},
+            {"label": "2", "color": "#e9e29c", "size": 4, "shape": "line"},
+            {"label": ">3", "color": "#cf597e", "size": 4, "shape": "line"},
+        ]
+
+        # base case delay factor map
+        base = self._scenario_metric_map(
+            title="base case delay factor",
+            results_table="base_case",
+            metric_column="Delay_factor_Max",
+            legend=legend,
+            data_range=[1, 3],
+        )
+
+
+        # transit/active friendly delay factor map
+        tat = self._scenario_metric_map(
+            title="transit/active friendly delay factor",
+            results_table="transit_and_active_friendly",
+            metric_column="Delay_factor_Max",
+            legend=legend,
+            data_range=[1, 3],
+        )
+
+        return [base, tat]
+
     def _build_dashboard_config(self):
         """ Builds and returns full dashboard configuration for simwrapper"""
 
@@ -354,6 +458,7 @@ class SimwrapperConfigGenerator:
             "statsRow": self._stats_rows(),
             "entireNetworkRow": self._entire_network_row(),
             "linkTypeAndCapasityRow": self._links_info_row() + self._capacity_map_row(),
+            "delayFactorCompRow": self._delay_factor_comp_row(),
         }
 
         # convert panels to dicts and add to config
