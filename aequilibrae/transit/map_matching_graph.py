@@ -4,20 +4,20 @@ from copy import deepcopy
 from os.path import isfile, join
 from tempfile import gettempdir
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import shapely.wkt
-from shapely.geometry import LineString
-from shapely.geometry import Point
-from shapely.ops import substring
-
 from aequilibrae.log import logger
+from aequilibrae.paths import Graph
 from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
 from aequilibrae.transit.transit_elements import mode_correspondence
 from aequilibrae.utils.aeq_signal import simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from shapely.geometry import LineString
+from shapely.geometry import Point
+from shapely.ops import substring
 
 GRAPH_VERSION = 1
 CONNECTOR_SPEED = 1
@@ -26,11 +26,13 @@ CONNECTOR_SPEED = 1
 class MMGraph(WorkerThread):
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
 
-    def __init__(self, lib_gtfs):
+    def __init__(self, lib_gtfs, link_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame):
         WorkerThread.__init__(self, None)
 
         self.project = lib_gtfs.project
-        self.stops = lib_gtfs.gtfs_data.stops
+        self.df = self.rename_geo(link_gdf)
+        self.stops = self.rename_geo(stops_gdf).to_crs(self.df.crs)
+        self.__length_unit = self.df.crs.axis_info[0].unit_name
         self.lib_gtfs = lib_gtfs
         self._idx = None
         self.max_link_id = -1
@@ -46,11 +48,16 @@ class MMGraph(WorkerThread):
         self.node_corresp = []
         self.__all_links = {}
         self.distance_to_project = -1
-        self.df = pd.DataFrame([])
         self.logger = logger
         self.signal = lib_gtfs.signal
 
-    def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200):
+    @staticmethod
+    def rename_geo(gdf):
+        if gdf.active_geometry_name != "geo":
+            return gdf.rename_geometry("geo")
+        return gdf
+
+    def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200, modename="bus"):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
 
         :Arguments:
@@ -61,28 +68,13 @@ class MMGraph(WorkerThread):
         """
         self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
 
+        if not self.df.shape[0]:
+            return Graph()
+
         self.mode_id = mode_id
         self.distance_to_project = distance_to_project
         self.__mode = mode_correspondence[self.mode_id]
         self.__mm_graph_file = join(gettempdir(), f"map_matching_graph_{self.__agency}_{self.__mode}.csv")
-        modename = self.project.network.modes.get(self.__mode).mode_name
-
-        with self.project.db_connection_spatial as conn:
-            get_qry = f"""Select link_id, a_node, b_node, max(speed_ab, speed_ba) speed,
-                          distance, ST_AsText(geometry) wkt from links
-                          WHERE INSTR(links.modes, "{self.__mode}")>0 AND direction>=0
-                          UNION ALL
-                          Select  link_id * -1 , b_node a_node, a_node b_node, max(speed_ab, speed_ba) speed,
-                          distance, ST_AsText(ST_Reverse(geometry)) wkt from links
-                          WHERE INSTR(links.modes, "{self.__mode}")>0 AND direction<=0;"""
-
-            self.logger.debug("  Reading links from physical network")
-            self.df = pd.read_sql(get_qry, conn)
-
-        if not self.df.shape[0]:
-            from aequilibrae.paths import Graph
-
-            return Graph()
 
         # We do some wrangling to save the graph to disk, in case we need to run this more than once
         authvalue = hashlib.md5()
@@ -115,11 +107,11 @@ class MMGraph(WorkerThread):
         return self.__graph_from_broken_net(centroids, net)
 
     def __build_graph_from_scratch(self):
-        msg = f"Creating map-matching graph from scratch for mode_id={self.mode_id} (Step: 8/12)"
-        self.logger.info(msg)
+        msg = f"Creating map-matching graph from scratch for mode_id={self.mode_id}"
+        self.logger.debug(msg)
         self.signal.emit(["set_text", msg])
 
-        self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=self.df.wkt.apply(shapely.wkt.loads))
+        self.df = self.df.assign(original_id=self.df.link_id, is_connector=0)
         self.df.loc[self.df.link_id < 0, "link_id"] = self.df.link_id * -1 + self.df.link_id.max() + 1
 
         # We make sure all link IDs are in proper order
@@ -274,7 +266,6 @@ class MMGraph(WorkerThread):
             self.__all_links[connector.link_id] = connector
 
     def __graph_from_broken_net(self, centroids, net):
-        from aequilibrae.paths import Graph
 
         net_data = pd.DataFrame(
             {
@@ -301,3 +292,12 @@ class MMGraph(WorkerThread):
         g.set_skimming(["distance"])
         g.set_blocked_centroid_flows(True)
         return g
+
+
+def dist_meters(geom1, unit="metre"):
+    if unit == "metre":
+        return connector_geo.length
+    elif unit == "degree":
+        connector_geo.length * math.pi * 6371000 / 180
+    else:
+        raise ValueError("Unit not recognized")

@@ -32,6 +32,7 @@ dependencies = [
   "pyaml",
   "requests",
   "pandas<3",
+  "shapely>=2.0",
   "pyproj",
   "rtree",
   "pyarrow",
