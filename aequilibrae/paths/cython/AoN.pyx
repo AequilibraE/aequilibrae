@@ -366,10 +366,10 @@ def update_path_trace(results, destination, graph):
         results.path_nodes = None
 
         # If the predecessor is -1 and early exit was enabled we cannot differentiate between an unreachable node and
-        # one we just didn't see yet. We need to recompute the tree with the new destination If `a_star` was enabled
-        # then the stored tree has no guarantees and may not be useful due to the heuristic used TODO: revisit with
-        # heuristic specific reuse logic
-        if results.predecessors[dest_index] == -1 and results._early_exit or results._a_star:
+        # one we just didn't see yet. We need to recompute the tree with the new destination.
+        # By Dijkstra's proof, if a node was scanned, its shortest path has been found, even with early exit or A*.
+        # So we only recompute if the destination wasn't found AND early exit was enabled.
+        if results.predecessors[dest_index] == -1 and results._early_exit:
             results.compute_path(results.origin, destination, early_exit=results.early_exit, a_star=results.a_star)
 
         # By the invariant hypothesis presented at

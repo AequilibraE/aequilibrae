@@ -64,6 +64,7 @@ class PathResults:
         self._early_exit = self.early_exit
         self._a_star = self.a_star
         self._heuristic = "equirectangular"
+        self._inside_update_trace = False
 
     def compute_path(
             self,
@@ -97,16 +98,21 @@ class PathResults:
         if a_star and self.graph.lonlat_index.empty:
             raise Exception("You need to supply a lon/lat index to graph.prepare_graph to use A*")
 
+        # Compute what the effective early_exit value would be
+        effective_early_exit = early_exit or a_star
+        
+        # Skip optimization if we're being called from update_trace to avoid infinite recursion
         if (
-            origin == self.origin
-            and early_exit == self.early_exit
+            not self._inside_update_trace
+            and origin == self.origin
+            and effective_early_exit == self.early_exit
             and a_star == self.a_star
             and (heuristic is None or heuristic == self._heuristic)
         ):
             self.update_trace(destination)
             return
 
-        self.early_exit = self._early_exit = early_exit or a_star
+        self.early_exit = self._early_exit = effective_early_exit
         self.a_star = self._a_star = a_star
         if heuristic is not None:
             self.set_heuristic(heuristic)
@@ -161,6 +167,8 @@ class PathResults:
             self.path_nodes = None
             self.path_link_directions = None
             self.milepost = None
+            self.origin = None
+            self.destination = None
             self._early_exit = self.early_exit = False
             self._a_star = self.a_star = False
             self._heuristic = "equirectangular"
@@ -176,7 +184,8 @@ class PathResults:
         `destination` has already been found, if not the shortest path tree will be recomputed with the `early_exit`
         argument passed on.
 
-        If the previously computed path had `a_star` enabled, `update_trace` always recompute the path.
+        If the previously computed path had `a_star` enabled, the tree will be recomputed only if the destination
+        was not found in the previous computation (since A* always uses early exit internally).
 
         :Arguments:
             **destination** (:obj:`int`): ID of the node we are computing the path too
@@ -187,7 +196,11 @@ class PathResults:
         if destination >= self.graph.nodes_to_indices.shape[0]:
             raise ValueError("destination out of the range of node numbers in the graph")
 
-        update_path_trace(self, destination, self.graph)
+        try:
+            self._inside_update_trace = True
+            update_path_trace(self, destination, self.graph)
+        finally:
+            self._inside_update_trace = False
 
         self.__skim_path()
 
