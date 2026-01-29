@@ -2,7 +2,6 @@ from typing import Union, List
 
 import numpy as np
 from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
-
 from aequilibrae.paths.graph import Graph
 
 
@@ -67,12 +66,12 @@ class PathResults:
         self._heuristic = "equirectangular"
 
     def compute_path(
-        self,
-        origin: int,
-        destination: int,
-        early_exit: bool = False,
-        a_star: bool = False,
-        heuristic: Union[str, None] = None,
+            self,
+            origin: int,
+            destination: int,
+            early_exit: bool = False,
+            a_star: bool = False,
+            heuristic: Union[str, None] = None,
     ) -> None:
         """Computes the path between two nodes in the network.
 
@@ -98,15 +97,15 @@ class PathResults:
         if a_star and self.graph.lonlat_index.empty:
             raise Exception("You need to supply a lon/lat index to graph.prepare_graph to use A*")
 
+        if origin == self.origin:
+            self.update_trace(destination)
+            return
         self.early_exit = self._early_exit = early_exit or a_star
         self.a_star = self._a_star = a_star
         if heuristic is not None:
             self.set_heuristic(heuristic)
         path_computation(origin, destination, self.graph, self)
-        if self.graph.skim_fields:
-            self.skims.fill(np.inf)
-            self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
-            self.skims[self.skims > self.__graph_sum] = np.inf
+        self.__skim_path()
 
     def prepare(self, graph: Graph) -> None:
         """
@@ -184,6 +183,8 @@ class PathResults:
 
         update_path_trace(self, destination, self.graph)
 
+        self.__skim_path()
+
     def set_heuristic(self, heuristic: str) -> None:
         """
         Set the heuristics to be used in A*. Must be one of `get_heuristics()`.
@@ -199,3 +200,9 @@ class PathResults:
     def get_heuristics(self) -> List[str]:
         """Return the availiable heuristics."""
         return list(HEURISTIC_MAP.keys())
+
+    def __skim_path(self):
+        if self.graph.skim_fields:
+            self.skims.fill(np.inf)
+            self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
+            self.skims[self.skims > self.__graph_sum] = np.inf
