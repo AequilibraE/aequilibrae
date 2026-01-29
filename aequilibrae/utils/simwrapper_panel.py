@@ -1,5 +1,15 @@
 class SimwrapperPanel():
-    """ Base class for all simwrapper panels"""
+    """ Base class for all simwrapper panels
+
+    :Arguments:
+        **type** (:obj:`str`): panel type
+        **title** (:obj:`str`): title to show in the dashboard
+        **height** (:obj:`int`, *Optional*): panel height
+        **width** (:obj:`int`, *Optional*): panel width
+
+    :Example:
+        panel = SimwrapperPanel("text", "My Panel", height=3, width=6)
+    """
     def __init__(self, type, title, height=None, width=None):
         self.type = type
         self.title = title
@@ -7,7 +17,7 @@ class SimwrapperPanel():
         self.width = width
 
     def to_dict(self):
-        """Returns dictionairy representation of the panel"""
+        """Returns dictionary representation of the panel"""
         panel = {
             "type": self.type,
             "title": self.title,
@@ -22,28 +32,51 @@ class SimwrapperPanel():
         return panel
 
 class TilePanel(SimwrapperPanel):
+    """
+    Panel used to display tabular summary statistics.
+
+    :Arguments:
+        **title** (:obj:`str`): title
+        **dataset** (:obj:`str`): path to csv dataset used by tile
+        **height** (:obj:`int`, *Optional*): panel height
+        **width** (:obj:`int`, *Optional*): p[anel width
+
+    :Example:
+        panel = TilePanel("Summary Statistics", "data/summary.csv", height=3)
+    """
     def __init__(self, title, dataset, height=None, width=None):
         super().__init__("tile", title, height=height, width=width)
         self.dataset = dataset
 
     def to_dict(self):
-        """Returns dictionairy representation of the panel"""
+        """Returns dictionary representation of the panel"""
         panel = super().to_dict()
 
         panel["dataset"] = self.dataset
 
         return panel
 
-# my = TilePanel(title, dataset)
-
 class TextPanel(SimwrapperPanel):
+    """
+    Panel for displaying text content.
+
+    :Arguments:
+        **title** (:obj:`str`): title
+        **data** (:obj:`str`): text content or file path
+        **is_file** (:obj:`bool`, *Optional*): if data is a file reference
+        **height** (:obj:`int`, *Optional*): panel height
+        **width** (:obj:`int`, *Optional*): panel width
+
+    :Example:
+        panel = TextPanel("Overview", "text/overview.md", is_file=True)
+    """
     def __init__(self, title, data, is_file=False, height=None, width=None):
         super().__init__("text", title, height=height, width=width)
         self.data = data
         self.is_file = is_file
 
     def to_dict(self):
-        """Returns dictionairy representation of the panel"""
+        """Returns dictionary representation of the panel"""
         panel = super().to_dict()
 
         if self.is_file:
@@ -53,10 +86,23 @@ class TextPanel(SimwrapperPanel):
 
         return panel
 
-# my = TextPanel(title, data=text, is_file=False, height=None, width=None)    
-
-# my = AequilibraEMapPanel(title, database, view, height, width, center, zoom, projection) 
 class AequilibraEMapPanel(SimwrapperPanel):
+    """
+    Panel for rendering interactive AequilibraE network maps.
+
+    :Arguments:
+        **title** (:obj:`str`): title
+        **database** (:obj:`str`, *Optional*): project database
+        **view** (:obj:`str`, *Optional*): panel view type
+        **height** (:obj:`int`, *Optional*): panel height
+        **width** (:obj:`int`, *Optional*): panel width
+        **center** (:obj:`list`, *Optional*): map center coordinates
+        **zoom** (:obj:`int`, *Optional*): initial zoom level
+        **projection** (:obj:`str`, *Optional*): coordinate reference system
+
+    :Example:
+        panel = AequilibraEMapPanel(title, database, view, height, width, center, zoom, projection)
+    """
     def __init__(self, title, database="project_database.sqlite", view="map", height=None, width=None, 
                          center=None, zoom=None, projection=None):
         super().__init__("aequilibrae", title, height=height, width=width)
@@ -89,7 +135,7 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.extra_databases = database_dict
 
     def to_dict(self):
-        """Returns dictionairy representation of the panel"""
+        """Returns dictionary representation of the panel"""
         panel = super().to_dict()
 
         panel["database"] = self.database

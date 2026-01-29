@@ -182,7 +182,7 @@ class SimwrapperConfigGenerator:
         # export all project data
         self.export_project_stats()
 
-        # build yaml 
+        # build yaml
         self._write_yamls()
 
     def _dashboard_skeleton(self):
@@ -485,7 +485,6 @@ class SimwrapperConfigGenerator:
 
         self._add_to_generated_files("dashboard", output_file)
 
-
     def _has_links(self):
         """Checks if project has a network with links"""
         return True
@@ -498,6 +497,6 @@ class SimwrapperConfigGenerator:
         """Checks if project has a network with nodes"""
         return True
 
-    def _has_skims(self):
+    def _has_matrices(self):
         """Checks if project has a network with skims"""
         return True
