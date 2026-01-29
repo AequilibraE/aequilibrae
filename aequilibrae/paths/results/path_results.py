@@ -172,6 +172,7 @@ class PathResults:
             self._early_exit = self.early_exit = False
             self._a_star = self.a_star = False
             self._heuristic = "equirectangular"
+            self._inside_update_trace = False
 
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")
@@ -184,8 +185,9 @@ class PathResults:
         `destination` has already been found, if not the shortest path tree will be recomputed with the `early_exit`
         argument passed on.
 
-        If the previously computed path had `a_star` enabled, the tree will be recomputed only if the destination
-        was not found in the previous computation (since A* always uses early exit internally).
+        If the previous computation used early exit (either explicitly or via A*), the tree will be recomputed only
+        if the destination was not found in the previous computation. This is based on Dijkstra's correctness
+        guarantee: once a node is scanned, its shortest path has been found.
 
         :Arguments:
             **destination** (:obj:`int`): ID of the node we are computing the path too

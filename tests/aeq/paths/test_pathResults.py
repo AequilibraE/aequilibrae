@@ -131,34 +131,42 @@ def test_compute_path_optimization(p_results):
     r.compute_path(origin, 2, early_exit=False, a_star=False)
     predecessors_full = r.predecessors.copy()
     
-    r.compute_path(origin, 10, early_exit=True, a_star=False)
+    # Use a more distant destination to ensure different exploration patterns
+    r.compute_path(origin, dest, early_exit=True, a_star=False)
     predecessors_early_exit = r.predecessors.copy()
     
-    # With early_exit, fewer nodes should be explored
+    # With early_exit to a distant destination, fewer nodes should be explored
     # Count of non-(-1) predecessors should differ
-    assert np.count_nonzero(predecessors_full != -1) != np.count_nonzero(predecessors_early_exit != -1)
+    assert np.count_nonzero(predecessors_full != -1) > np.count_nonzero(predecessors_early_exit != -1)
     
     # Test 3: Changing a_star should trigger recomputation
     r.reset()
     r.compute_path(origin, 2, early_exit=False, a_star=False)
-    path_no_astar = list(r.path)
+    predecessors_no_astar = r.predecessors.copy()
     
     r.compute_path(origin, 2, early_exit=False, a_star=True, heuristic="haversine")
-    path_with_astar = list(r.path)
+    predecessors_with_astar = r.predecessors.copy()
     
-    # Paths might be the same, but at least verify computation completed
+    # With A* enabled, the exploration pattern may differ (A* uses heuristic)
+    # Verify both computations completed successfully
     assert r.path is not None
+    # A* may explore fewer nodes due to heuristic guidance
+    assert np.count_nonzero(predecessors_no_astar != -1) >= np.count_nonzero(predecessors_with_astar != -1)
     
     # Test 4: Changing heuristic should trigger recomputation
     r.reset()
-    r.compute_path(origin, 2, early_exit=False, a_star=True, heuristic="haversine")
+    r.compute_path(origin, dest, early_exit=False, a_star=True, heuristic="haversine")
     predecessors_haversine = r.predecessors.copy()
+    path_haversine = list(r.path)
     
-    r.compute_path(origin, 2, early_exit=False, a_star=True, heuristic="equirectangular")
+    r.compute_path(origin, dest, early_exit=False, a_star=True, heuristic="equirectangular")
     predecessors_equirectangular = r.predecessors.copy()
+    path_equirectangular = list(r.path)
     
-    # Different heuristics should result in recomputation
+    # Different heuristics may result in different exploration patterns
+    # Both should produce valid paths (though they may be the same shortest path)
     assert r.path is not None
+    assert path_haversine == path_equirectangular  # Shortest path should be the same
     
     # Test 5: Same heuristic (or None) should not trigger recomputation of algorithm
     # Note: With early_exit, if destination was not found in previous tree, recomputation
