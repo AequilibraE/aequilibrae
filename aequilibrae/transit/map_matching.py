@@ -30,10 +30,12 @@ def map_match_route(graph: Graph, route_stops: gpd.GeoDataFrame, route_shape: Li
     likely_links = graph_discount(route_shape, graph.network)
     graph.cost[(graph.graph.link_id.isin(likely_links)) & (graph.graph.is_connector == 0)] *= 0.1
 
-    fstop = route_stops.index.iat[0]
+    fstop = int(route_stops.index.iat[0])
+
+    res = graph.compute_path(fstop, int(route_stops.index.iat[-1]))
+    res1 = graph.compute_path(fstop, int(route_stops.index.iat[-1]))
 
     if len(connected_stops) == 2:
-        res = graph.compute_path(fstop, route_stops.index.iat[1])
         if res.milepost is None:
             return pd.DataFrame([])
         pdist = list(res.milepost[1:-1] - res.milepost[:-2])[1:]
@@ -41,27 +43,28 @@ def map_match_route(graph: Graph, route_stops: gpd.GeoDataFrame, route_shape: Li
         pdirecs = list(res.path_link_directions[1:-1])
         return build_path_df(graph, pdirecs, pdist, plnks)
 
+    access_links = graph.network[graph.network.a_node.isin(route_stops.index)]
     path_links, path_directions, path_distances = [], [], []
-    res.compute_path()
-    for stop_id, stop in route_stops.loc[1:, :].iterrows():
-        end = tstop.__map_matching_id__[self.route_type]
+    for i in range(1, route_stops.shape[0] ):
+        tstop = int(route_stops.index.iat[i])
+        res.compute_path(fstop, tstop)
 
-        not_last = idx + 2 <= len(connected_stops) - 1
-
+        not_last = i < route_stops.shape[0] -1
         if not_last:
-            following_stop = connected_stops[idx + 2]
-            n_end = following_stop.__map_matching_id__[self.route_type]
-        self.__logger.debug(f"Computing paths between {start} and {end}")
-        res.compute_path(fstop, int(end), early_exit=True)
-        connection_candidates = graph.network[graph.network.a_node == end].b_node.values
+            # Get the following stop
+            n_stop = route_stops.index.iat[i + 1]
+
+        self.__logger.debug(f"Computing paths between {fstop} and {tstop}")
+        res.compute_path(fstop, tstop, early_exit=True)
+        connection_candidates = access_links[graph.network.a_node == end].b_node.values
         min_cost = np.inf
         access_node = -1
         follow_val = 0
         for connec in connection_candidates:
-            if connec == start:
+            if int(connec) == start:
                 continue
             if not_last:
-                res1.compute_path(int(connec), int(n_end), early_exit=True)
+                res1.compute_path(int(connec), int(n_stop), early_exit=True)
                 if res1.milepost is None:
                     continue
                 follow_val = res1.milepost[-1]
