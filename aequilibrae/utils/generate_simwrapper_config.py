@@ -22,7 +22,7 @@ class SimwrapperConfigGenerator:
         """
         self.project = project
         self.output_dir = Path(output_dir)
-        self.generated_files = {} 
+        self.generated_files = {}
         self._create_directories()
         self.center = self._get_project_center()
         self.zoom = self._get_project_zoom()
@@ -49,7 +49,7 @@ class SimwrapperConfigGenerator:
         self.generated_files[key] = Path(path)
 
     def _get_links_bounds_box(self):
-        """ 
+        """
         Compute box around all coordinates in links table of project.
         Queries spatial database to find max and min x and y coords across all link geomerties
         to return overall network links' reach.
@@ -58,12 +58,11 @@ class SimwrapperConfigGenerator:
 
         """
         with self.project.db_connection_spatial as conn:
-
-            cursor = conn.cursor() # database cursor to make sql query
+            cursor = conn.cursor()  # database cursor to make sql query
 
             # compute box around all coordinates in links table of project
             cursor.execute(
-            """
+                """
             SELECT
                 MIN(MBRMinX(geometry)) AS xmin,
                 MIN(MBRMinY(geometry)) AS ymin,
@@ -73,25 +72,28 @@ class SimwrapperConfigGenerator:
             """
             )
 
-            row = cursor.fetchone() # fetch the single row returned by query (ie bounding box values)
+            row = cursor.fetchone()  # fetch the single row returned by query (ie bounding box values)
         return row
 
     def _get_project_center(self):
-        """ Finds center coordinates of project """
-        row = self._get_links_bounds_box() 
+        """Finds center coordinates of project"""
+        row = self._get_links_bounds_box()
 
         if row is None or any(value is None for value in row):
-            return [0,0] # if cant find coordinates bc of missing link vals, will make this better though but works for now
+            return [
+                0,
+                0,
+            ]  # if cant find coordinates bc of missing link vals, will make this better though but works for now
 
         xmin, ymin, xmax, ymax = row
 
-        # find center on each axis 
-        center = [(xmin + xmax)/2, (ymin + ymax)/2] # [horizontal center, vertical center] == [longitude ,latitude]
+        # find center on each axis
+        center = [(xmin + xmax) / 2, (ymin + ymax) / 2]  # [horizontal center, vertical center] == [longitude ,latitude]
 
         return center
 
     def _get_project_zoom(self):
-        """ Finds a reasonable zoom level based on project links' reach"""
+        """Finds a reasonable zoom level based on project links' reach"""
 
         # just to keep things reasonable
         max_zoom = 15
@@ -100,22 +102,24 @@ class SimwrapperConfigGenerator:
         row = self._get_links_bounds_box()
 
         if row is None or any(value is None for value in row):
-            return 10 # if cant find coordinates bc of missing link vals, will make this better though but works for now
+            return (
+                10  # if cant find coordinates bc of missing link vals, will make this better though but works for now
+            )
 
         xmin, ymin, xmax, ymax = row
 
         x_span = abs(xmax - xmin)
         y_span = abs(ymax - ymin)
 
-        max_span = max(x_span, y_span) # use larger of two so we see everything
+        max_span = max(x_span, y_span)  # use larger of two so we see everything
 
         if max_span <= 0:
-            return 10 # if invalid values, clearly not a negative distance we want
+            return 10  # if invalid values, clearly not a negative distance we want
 
         # calculate ~ zoom:
         # at zoom of 0 the world is ~360degrees wide
         # each increment doubles the resolution
-        zoom = int(round(math.log2(360/max_span)))
+        zoom = int(round(math.log2(360 / max_span)))
 
         # fix this within the allowed range
         zoom = max(min_zoom, min(max_zoom, zoom))
@@ -132,9 +136,9 @@ class SimwrapperConfigGenerator:
         """
         rows = list(stats_dict.items())
 
-        output_file = self.data_dir/ f"{csv_name}.csv"  #output file path
+        output_file = self.data_dir / f"{csv_name}.csv"  # output file path
 
-        # manually bc needs to be saved as columns of metrics and column of values for simwrapper to read it right 
+        # manually bc needs to be saved as columns of metrics and column of values for simwrapper to read it right
         with open(output_file, "w", newline="") as f:
             for key, value in rows:
                 f.write(f"{key},{value}\n")
@@ -142,33 +146,26 @@ class SimwrapperConfigGenerator:
         self._add_to_generated_files(csv_name, output_file)
 
     def export_link_stats(self):
-        """ Export simple about network's links."""
+        """Export simple about network's links."""
         links_obj = self.project.network.links
         links_df = links_obj.data
 
-        stats = {
-            "Link count": len(links_df), 
-            "Link type count": links_df["link_type"].nunique()
-        }
+        stats = {"Link count": len(links_df), "Link type count": links_df["link_type"].nunique()}
 
         self._export_simple_stats("link_stats", stats)
 
-
     def export_node_stats(self):
-        """ Export simple stats about network's nodes."""
+        """Export simple stats about network's nodes."""
         nodes_obj = self.project.network.nodes
         nodes_df = nodes_obj.data
 
-        stats = {
-            "Node count": len(nodes_df)
-        }
+        stats = {"Node count": len(nodes_df)}
 
         self._export_simple_stats("node_stats", stats)
 
-
     def export_project_stats(self):
-        """ Export basic network stats to csv. currently links and nodes because 
-        that is all that is in Chicago model. More helpers can be made as needed. """
+        """Export basic network stats to csv. currently links and nodes because
+        that is all that is in Chicago model. More helpers can be made as needed."""
 
         if self._has_links():
             self.export_link_stats()
@@ -186,31 +183,26 @@ class SimwrapperConfigGenerator:
         self._write_yamls()
 
     def _dashboard_skeleton(self):
-        """ Defines header and layout structure for yaml and returns the basic config skeleton """
+        """Defines header and layout structure for yaml and returns the basic config skeleton"""
 
-        config = {
-            "header": {
-                "title": "insert title",
-                "description": "insert description"
-            },
-
-            "layout": {}
-        }
+        config = {"header": {"title": "insert title", "description": "insert description"}, "layout": {}}
 
         return config
 
     def _intro_row(self):
-        """ resturns project details text panel"""
+        """resturns project details text panel"""
 
         return [TextPanel(title="title", data="intro")]
 
     def _stats_rows(self):
-        """ returns stats rows panels"""
+        """returns stats rows panels"""
         panels = []
 
         ## add links stats tile if available
         if "link_stats" in self.generated_files:
-            panels.append(TilePanel("Link Statistics", str(self.generated_files["link_stats"]))) #output_dir/simwrapper_data/link_stats.csv))
+            panels.append(
+                TilePanel("Link Statistics", str(self.generated_files["link_stats"]))
+            )  # output_dir/simwrapper_data/link_stats.csv))
 
         # add nodes stats tile if available
         if "node_stats" in self.generated_files:
@@ -219,11 +211,12 @@ class SimwrapperConfigGenerator:
         return panels
 
     def _entire_network_row(self):
-        """ Builds yaml config for map of entire network """
+        """Builds yaml config for map of entire network"""
 
         # aequilibrae panel with center and zoom
-        panel = AequilibraEMapPanel("Entire Network", height=10, width=6, center=self.center, 
-                                    zoom=self.zoom, projection="EPSG:32719")
+        panel = AequilibraEMapPanel(
+            "Entire Network", height=10, width=6, center=self.center, zoom=self.zoom, projection="EPSG:32719"
+        )
 
         # set default styling
         default_style = {
@@ -232,118 +225,110 @@ class SimwrapperConfigGenerator:
             "lineWidth": 2,
             "pointRadius": 4,
         }
-        panel.set_defaults( default_style)
+        panel.set_defaults(default_style)
 
         # add centroid nodes layer
-        centroid_node_style = {
-                            "fillColor": "#FF6600",
-                            "pointRadius": 120
-                            }
-        panel.add_layer("nodes_centroids",
-                        {
-                        "table": "nodes",
-                        "geometry": "point",
-                        "sqlFilter": "is_centroid=1",
-                        "style": centroid_node_style
-                        })
+        centroid_node_style = {"fillColor": "#FF6600", "pointRadius": 120}
+        panel.add_layer(
+            "nodes_centroids",
+            {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=1", "style": centroid_node_style},
+        )
 
         # add regular nodes layer
-        regular_node_style = {
-                            "fillColor": "#cacaca",
-                            "pointRadius": 35
-                            }
-        panel.add_layer("nodes_regular", 
-                        {
-                        "table": "nodes",
-                        "geometry": "point",
-                        "sqlFilter": "is_centroid=0",
-                        "style": regular_node_style
-                        })
+        regular_node_style = {"fillColor": "#cacaca", "pointRadius": 35}
+        panel.add_layer(
+            "nodes_regular",
+            {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=0", "style": regular_node_style},
+        )
 
         # retun panel inside a list
         return [panel]
 
     def _links_info_row(self):
-        """ Builds yaml config for panel to show attributes of selected link """
+        """Builds yaml config for panel to show attributes of selected link"""
 
         # map panel
-        panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, 
-                                    zoom=self.zoom)
+        panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, zoom=self.zoom)
 
-        # set legend 
-        panel.set_legend([
-            {"subtitle": "Link Types"},
-            {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
-            {"label": "Road", "color": "#74BBCD", "shape": "line"},
-            {
-                "label": "Centroid Connector",
-                "color": "#99637f",
-                "shape": "line",
-            }
-        ])
+        # set legend
+        panel.set_legend(
+            [
+                {"subtitle": "Link Types"},
+                {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
+                {"label": "Road", "color": "#74BBCD", "shape": "line"},
+                {
+                    "label": "Centroid Connector",
+                    "color": "#99637f",
+                    "shape": "line",
+                },
+            ]
+        )
 
         # add links layer styled by link type
         link_type_by_colour = {
-                        3: "#99637f",
-                        2: "#C3A34B",
-                        1: "#74BBCD",
+            3: "#99637f",
+            2: "#C3A34B",
+            1: "#74BBCD",
+        }
+        panel.add_layer(
+            "links",
+            {
+                "table": "links",
+                "geometry": "line",
+                "style": {
+                    "lineColor": {
+                        "column": "link_type",
+                        "colors": link_type_by_colour,
                     }
-        panel.add_layer("links",
-            {"table": "links",
-            "geometry": "line",
-            "style": {
-                "lineColor": {
-                    "column": "link_type",
-                    "colors": link_type_by_colour,
-                }
-            }
-        })
+                },
+            },
+        )
 
         return [panel]
 
     def _capacity_map_row(self):
-        """ Map showing links styled by capacity"""
-        panel = AequilibraEMapPanel(
-            title="Link Capacity",
-            height=10,
-            width=6,
-            center=self.center,
-            zoom=self.zoom
-        )
+        """Map showing links styled by capacity"""
+        panel = AequilibraEMapPanel(title="Link Capacity", height=10, width=6, center=self.center, zoom=self.zoom)
 
-        panel.set_legend([
-            {"subtitle": "Link Capacity"},
-            {"label": "0 - 1,000", "color": "#2C115F", "size": 2, "shape": "line"},
-            {"label": "1,000 - 3,000", "color": "#721F81", "size": 4, "shape": "line"},
-            {"label": "3,000 - 6,000", "color": "#B73779", "size": 6, "shape": "line"},
-            {"label": "6,000 - 10,000", "color": "#F1605D", "size": 8, "shape": "line"},
-        ])
+        panel.set_legend(
+            [
+                {"subtitle": "Link Capacity"},
+                {"label": "0 - 1,000", "color": "#2C115F", "size": 2, "shape": "line"},
+                {"label": "1,000 - 3,000", "color": "#721F81", "size": 4, "shape": "line"},
+                {"label": "3,000 - 6,000", "color": "#B73779", "size": 6, "shape": "line"},
+                {"label": "6,000 - 10,000", "color": "#F1605D", "size": 8, "shape": "line"},
+            ]
+        )
 
         # add links layer styled by capacity
         capacity_styling = {
-                "lineColor": {
-                    "column": "capacity_ab",
-                    "palette": "SunsetDark",
-                    "dataRange": [0, 1000],
-                },
+            "lineColor": {
+                "column": "capacity_ab",
+                "palette": "SunsetDark",
+                "dataRange": [0, 1000],
+            },
+            "lineWidth": {
+                "column": "capacity_ab",
+                "dataRange": [0, 1000],
+                "widthRange": [1, 200],
+            },
+        }
 
-                "lineWidth": {
-                    "column": "capacity_ab",
-                    "dataRange": [0, 1000],
-                    "widthRange": [1, 200],
-                }
-            }
-
-        panel.add_layer("links", {
-            "table": "links",
-            "geometry": "line",
-            #"sqlFilter": "link_type != 3",
-            "style": capacity_styling,
-        })
+        panel.add_layer(
+            "links",
+            {
+                "table": "links",
+                "geometry": "line",
+                # "sqlFilter": "link_type != 3",
+                "style": capacity_styling,
+            },
+        )
 
         return [panel]
 
-    def _scenario_metric_map(self, title, results_table, metric_column, legend, data_range, palette="Temps", width_by_link_type=True):
+    def _scenario_metric_map(
+        self, title, results_table, metric_column, legend, data_range, palette="Temps", width_by_link_type=True
+    ):
         """makes scenario comparison map for a network's performance metric'
 
         :Arguments:
@@ -366,17 +351,17 @@ class SimwrapperConfigGenerator:
         )
 
         # add extra db
-        panel.set_extra_databases({
-            "results": "results_database.sqlite"
-        })
+        panel.set_extra_databases({"results": "results_database.sqlite"})
 
         # defaultstyling
-        panel.set_defaults({
-            "fillColor": "#6f6f6f",
-            "lineColor": "#FF6600",
-            "lineWidth": 2,
-            "pointRadius": 4,
-        })
+        panel.set_defaults(
+            {
+                "fillColor": "#6f6f6f",
+                "lineColor": "#FF6600",
+                "lineWidth": 2,
+                "pointRadius": 4,
+            }
+        )
 
         panel.set_legend(legend)
 
@@ -397,27 +382,54 @@ class SimwrapperConfigGenerator:
                     3: 20,
                     2: 40,
                     1: 20,
-                }
+                },
             }
 
         # add links layer
-        panel.add_layer("links", {
-            "table": "links",
-            "geometry": "line",
-            "join": {
-                "database": "results",
-                "table": results_table,
-                "leftKey": "link_id",
-                "rightKey": "link_id",
-                "type": "left",
+        panel.add_layer(
+            "links",
+            {
+                "table": "links",
+                "geometry": "line",
+                "join": {
+                    "database": "results",
+                    "table": results_table,
+                    "leftKey": "link_id",
+                    "rightKey": "link_id",
+                    "type": "left",
+                },
+                "style": style,
             },
-            "style": style,
-        })
+        )
 
         return panel
 
+    def _metric_comp_row(self, title, metric, tables):
+        """Builds side by side comparison of base case vs active/transit metric map panels"""
+
+        legend = [
+            {"subtitle": metric},
+            {"label": "Low", "color": "#009392", "size": 4, "shape": "line"},
+            {"label": "Medium", "color": "#e9e29c", "size": 4, "shape": "line"},
+            {"label": "High", "color": "#cf597e", "size": 4, "shape": "line"},
+        ]
+
+        row = []
+
+        for table in tables:
+            panel = self._scenario_metric_map(
+                title=f"{table} {title}",
+                results_table=table,
+                metric_column=metric,
+                legend=legend,
+                data_range=[1, 3],
+            )
+            row.append(panel)
+
+        return row
+
     def _delay_factor_comp_row(self):
-        """ Builds side by side comparison of base case vs active/transit delay factor map panels"""
+        """Builds side by side comparison of base case vs active/transit delay factor map panels"""
 
         legend = [
             {"subtitle": "Delay Factor"},
@@ -435,7 +447,6 @@ class SimwrapperConfigGenerator:
             data_range=[1, 3],
         )
 
-
         # transit/active friendly delay factor map
         tat = self._scenario_metric_map(
             title="transit/active friendly delay factor",
@@ -448,9 +459,9 @@ class SimwrapperConfigGenerator:
         return [base, tat]
 
     def _build_dashboard_config(self):
-        """ Builds and returns full dashboard configuration for simwrapper"""
+        """Builds and returns full dashboard configuration for simwrapper"""
 
-        config = self._dashboard_skeleton() # based config
+        config = self._dashboard_skeleton()  # based config
 
         # dashboard rows
         rows = {
@@ -458,8 +469,13 @@ class SimwrapperConfigGenerator:
             "statsRow": self._stats_rows(),
             "entireNetworkRow": self._entire_network_row(),
             "linkTypeAndCapasityRow": self._links_info_row() + self._capacity_map_row(),
-            "delayFactorCompRow": self._delay_factor_comp_row(),
         }
+
+        res_df = self.project.results.list()
+        results_tables = res_df["table_name"].tolist()
+        # if we have results table, add a delay factor comparison
+        if len(results_tables) > 0:
+            rows["delayFactorComparisonRow"] = self._metric_comp_row("delay factor", "Delay_factor_Max", results_tables)
 
         # convert panels to dicts and add to config
         for name, panels in rows.items():
@@ -469,11 +485,10 @@ class SimwrapperConfigGenerator:
                     panel_dicts.append(p.to_dict())
                 config["layout"][name] = panel_dicts
 
-
         return config
 
     def _write_yamls(self):
-        """Write yamls """
+        """Write yamls"""
         self.export_project_stats()
 
         config = self._build_dashboard_config()
@@ -481,7 +496,7 @@ class SimwrapperConfigGenerator:
 
         # write it
         with output_file.open("w") as f:
-            yaml.safe_dump(config, f, sort_keys = False)
+            yaml.safe_dump(config, f, sort_keys=False)
 
         self._add_to_generated_files("dashboard", output_file)
 
