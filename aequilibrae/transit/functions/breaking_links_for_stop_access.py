@@ -157,6 +157,10 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
 
     broken_links = pd.concat([untouched_links, new_segments_gdf], ignore_index=True)
 
+    broken_links = broken_links.assign(original_id=broken_links.link_id)
+    broken_links["link_id"] = np.zeros(broken_links.shape[0] + 1)
+    broken_links["distance"] = broken_links.geometry.length
+
     new_points_gdf = gpd.GeoDataFrame(new_points, columns=['node_id', 'geometry'], crs=links.crs)
 
     return broken_links, new_points_gdf

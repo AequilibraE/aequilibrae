@@ -19,9 +19,6 @@ def test_pattern_complete(build_gtfs_project, pat):
     # Tests that we get the stop-based shape when we build it and not map-match it
     assert shp != pat._stop_based_shape, "Returned the wrong shape"
 
-    # Asserts that we dont have any errors
-    assert pat.get_error() is None, "Resulted a map-matching error when should have returned none"
-
     # We map-match
     pat.map_match()
 

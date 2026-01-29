@@ -3,6 +3,7 @@ import pickle
 import uuid
 import warnings
 from abc import ABC
+from copy import deepcopy
 from datetime import datetime
 from os.path import join
 from typing import List, Optional, Tuple, Union
@@ -138,6 +139,16 @@ class GraphBase(ABC):  # noqa: B024
             return self.__float_type
         else:
             raise ValueError("It must be either a int or a float")
+
+    def reverse(self):
+        g = deepcopy(self)
+        g.network = g.network.rename(columns={"a_node": "b_node", "b_node": "a_node"})
+        g.prepare_graph(self.centroids)
+        if self.cost_field:
+            g.set_graph(self.cost_field)
+        if self.skim_fields:
+            g.set_skimming(self.skim_fields)
+        return g
 
     def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
@@ -284,12 +295,12 @@ class GraphBase(ABC):  # noqa: B024
         return all_nodes, num_nodes, nodes_to_indices, fs, df
 
     def compute_path(
-        self,
-        origin: int,
-        destination: int,
-        early_exit: bool = False,
-        a_star: bool = False,
-        heuristic: Union[str, None] = None,
+            self,
+            origin: int,
+            destination: int,
+            early_exit: bool = False,
+            a_star: bool = False,
+            heuristic: Union[str, None] = None,
     ):
         """
         Returns the results from path computation result holder.

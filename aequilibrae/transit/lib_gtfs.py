@@ -12,11 +12,12 @@ from aequilibrae.log import logger
 from aequilibrae.context import get_active_project
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
+from aequilibrae.transit.transit_elements import Link, Pattern, mode_corresp
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
+from aequilibrae.transit.route_map_matcher import RouteMapMatcher
 
 
 class GTFSRouteSystemBuilder(WorkerThread):
@@ -50,12 +51,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
         with self.project.transit_connection as conn:
             self.gtfs_data = GTFSReader(conn)
         self.srid = get_srid()
-        self.transformer = None
-        self.wgs84 = pyproj.Proj("epsg:4326")
+        self.mm_transformer: Transformer
         self.trip_by_service = {}
         self.patterns = {}
-        self.graphs = {}
-        self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
+        self.map_matchers = {} # Dict[str, RouteMapMatcher]
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
@@ -146,12 +145,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
-        if any(e not in mode_correspondence for e in route_types):
-            missing_route_types = [e for e in route_types if e not in mode_correspondence]
+        if any(e not in mode_corresp for e in route_types):
+            missing_route_types = [e for e in route_types if e not in mode_corresp]
             self.logger.warning(
                 f"Skipping the following route_types as they have no corresponding road mode: {missing_route_types}"
             )
-            route_types = [e for e in route_types if e in mode_correspondence]
+            route_types = [e for e in route_types if e in mode_corresp]
 
             if not route_types:
                 self.logger.warning("No valid route_types remain after filtering")
@@ -288,7 +287,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_patterns.clear()
 
         if self.__do_execute_map_matching:
-            self.builds_link_graphs_with_broken_stops()
+            self.builds_map_matchers()
 
         msg = f"Loading data for {self.day} (Step: 9/12) - "
         c = Constants()
@@ -425,7 +424,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.load_date(service_date)
         return self.gtfs_data.fare_attributes
 
-    def builds_link_graphs_with_broken_stops(self):
+    def builds_map_matchers(self):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
 
         :Arguments:
@@ -437,12 +436,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         stop_data = []
         for stop in self.select_stops.values():
-            stop_data.append([stop.stop_id, mode_correspondence[stop.route_type],stop.geo])
+            stop_data.append([stop.stop_id, mode_corresp[stop.route_type], stop.geo])
         df = pd.DataFrame(stop_data, columns=["stop_id", "mode_type", "geometry"])
         all_stops_gdf = gpd.GeoDataFrame(df[["stop_id", "mode_type"]], geometry=df.geometry).set_crs(self.srid)
 
-        for pt_mode in set(mode_correspondence.values()):
-            if pt_mode in self.graphs:
+        for pt_mode in set(mode_corresp.values()):
+            if pt_mode in self.map_matchers:
                 continue
             link_gdf = all_link_gdf[~all_link_gdf.modes.str.contains(pt_mode)]
             filtered_nodes = np.hstack([link_gdf.a_node.values, link_gdf.b_node.values])
@@ -452,4 +451,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             if link_gdf.shape[0] == 0 or nodes_gdf.shape[0] == 0 or stops_gdf.shape[0] == 0:
                 continue
             mm = MMGraph(link_gdf, nodes_gdf, stops_gdf)
-            self.graphs[mode] = mm.build_graph_with_broken_stops()
+            graph = mm.build_graph_with_broken_stops()
+            self.map_matchers[pt_mode] = RouteMapMatcher(graph)
+            self.mm_transformer = Transformer.from_crs(self.srid, mm.crs, always_xy=True)

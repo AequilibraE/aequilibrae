@@ -46,7 +46,6 @@ class GTFSReader(WorkerThread):
         self.fare_attributes = {}
         self.feed_dates = []
         self.data_arrays = {}
-        self.wgs84 = pyproj.Proj("epsg:4326")
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.logger = get_logger()

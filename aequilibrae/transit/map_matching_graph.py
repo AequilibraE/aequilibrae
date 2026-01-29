@@ -39,7 +39,7 @@ class MMGraph(WorkerThread):
             **distance_to_project** (:obj:`float`, *Optional*): Radius search for links to break at the stops.
             Defaults to 50m
         """
-        self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
+        self.logger.debug("Called build_graph_with_broken_stops")
 
         if not self.links.shape[0]:
             return Graph()
@@ -48,7 +48,7 @@ class MMGraph(WorkerThread):
         return self.graph
 
     def __build_graph_from_scratch(self):
-        self.logger.debug(f"Creating map-matching graph")
+        self.logger.debug("Creating map-matching graph")
 
         broken_links, new_nodes = split_links_at_stops(self.links, self.stops, self.dist_thresh)
 
