@@ -351,9 +351,7 @@ def update_path_trace(results, destination, graph):
 
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
-    :param skimming: if we will skim for all nodes or not
-    :param early_exit: Exit Dijkstra's once the destination has been found if the shortest path tree must be
-        reconstructed.
+    :param destination: New destination for path computation
     """
     cdef long long p, origin_index, dest_index, connector
 
