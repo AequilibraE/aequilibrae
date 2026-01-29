@@ -4,9 +4,8 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import shapely
-from aequilibrae.utils.geo_utils import utm_crs_for_gdf
-from shapely.ops import substring
 from shapely import Point
+from shapely.ops import substring
 
 
 def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, tolerance: float = 50) -> gpd.GeoDataFrame:
@@ -28,10 +27,8 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
     start_node_id = max(links.a_node.max(), links.b_node.max())
 
     # --- Step 0: Make sure we are operating in metres  ---
-    if links.crs.axis_info[0].unit_name != "metre":
-        utm_zone = utm_crs_for_gdf(links)
-        stops = stops.to_crs(utm_zone)
-        links = links.to_crs(utm_zone)
+    for df in [stops, links]:
+        assert df.crs.axis_info[0].unit_name == 'metre', "Both GeoDataFrames must be in a CRS with metre units."
 
     # --- Step 1: Matching Points to Lines (Same as before) ---
     # Buffer and intersection

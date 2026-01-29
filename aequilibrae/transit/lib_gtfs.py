@@ -2,6 +2,7 @@ from contextlib import closing
 from copy import deepcopy
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pyproj
 from pyproj import Transformer
@@ -23,7 +24,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None):  # noqa: B006
+    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None,
+                 pces=None):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -430,18 +432,24 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **mode_id** (:obj:`int`): Mode ID for which we will build the graph for
         """
 
-        route_types = list({r.route_type for r in self.select_routes.values()})
-        route_types = [
-            mode_id
-            for mode_id in route_types
-            if mode_id in mode_correspondence and mode_correspondence[mode_id] not in self.graphs
-        ]
-        if not route_types:
-            return
-        mm = MMGraph(self)
-        for mode_id in route_types:
-            mode = mode_correspondence[mode_id]
-            graph = mm.build_graph_with_broken_stops(mode_id)
-            if graph.num_links <= 0:
+        all_link_gdf = self.project.network.links.data
+        all_nodes_gdf = self.project.network.nodes.data
+
+        stop_data = []
+        for stop in self.select_stops.values():
+            stop_data.append([stop.stop_id, mode_correspondence[stop.route_type],stop.geo])
+        df = pd.DataFrame(stop_data, columns=["stop_id", "mode_type", "geometry"])
+        all_stops_gdf = gpd.GeoDataFrame(df[["stop_id", "mode_type"]], geometry=df.geometry).set_crs(self.srid)
+
+        for pt_mode in set(mode_correspondence.values()):
+            if pt_mode in self.graphs:
                 continue
-            self.graphs[mode] = graph
+            link_gdf = all_link_gdf[~all_link_gdf.modes.str.contains(pt_mode)]
+            filtered_nodes = np.hstack([link_gdf.a_node.values, link_gdf.b_node.values])
+            nodes_gdf = all_nodes_gdf[~all_nodes_gdf.node_id.isin(filtered_nodes)]
+            stops_gdf = all_stops_gdf[all_stops_gdf.mode_type == pt_mode]
+
+            if link_gdf.shape[0] == 0 or nodes_gdf.shape[0] == 0 or stops_gdf.shape[0] == 0:
+                continue
+            mm = MMGraph(link_gdf, nodes_gdf, stops_gdf)
+            self.graphs[mode] = mm.build_graph_with_broken_stops()

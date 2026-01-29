@@ -1,63 +1,36 @@
-import hashlib
-import math
-from copy import deepcopy
-from os.path import isfile, join
-from tempfile import gettempdir
-
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from aequilibrae.log import logger
 from aequilibrae.paths import Graph
-from aequilibrae.project.zoning import GeoIndex
-from aequilibrae.transit.constants import DRIVING_SIDE
-from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
-from aequilibrae.transit.transit_elements import mode_correspondence
-from aequilibrae.utils.aeq_signal import simple_progress
+from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
+from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from shapely.geometry import LineString
-from shapely.geometry import Point
-from shapely.ops import substring
-
-GRAPH_VERSION = 1
-CONNECTOR_SPEED = 1
 
 
 class MMGraph(WorkerThread):
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
 
-    def __init__(self, lib_gtfs, link_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame):
+    def __init__(self, link_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame,
+                 distance_to_project=50):
         WorkerThread.__init__(self, None)
 
-        self.project = lib_gtfs.project
-        self.df = self.rename_geo(link_gdf)
-        self.stops = self.rename_geo(stops_gdf).to_crs(self.df.crs)
-        self.__length_unit = self.df.crs.axis_info[0].unit_name
-        self.lib_gtfs = lib_gtfs
-        self._idx = None
-        self.max_link_id = -1
-        self.max_node_id = -1
-        self.mode = ""
-        self.modename = ""
-        self.mode_id = -1
-        self.__mode = ""
-        self.__df_file = ""
-        self.__agency = lib_gtfs.gtfs_data.agency.agency
-        self.__centroids_file = ""
-        self.__mm_graph_file = ""
+        utm_zone = metre_crs_for_gdf(link_gdf)
+        self.links = self.__rename_geo(link_gdf).to_crs(utm_zone)
+        self.stops = self.__rename_geo(stops_gdf).to_crs(utm_zone)
+        self.nodes = self.__rename_geo(nodes_gdf).to_crs(utm_zone)
+
+        self.dist_thresh = distance_to_project
         self.node_corresp = []
         self.__all_links = {}
-        self.distance_to_project = -1
-        self.logger = logger
-        self.signal = lib_gtfs.signal
+        self.graph = Graph()
 
     @staticmethod
-    def rename_geo(gdf):
-        if gdf.active_geometry_name != "geo":
-            return gdf.rename_geometry("geo")
+    def __rename_geo(gdf):
+        if gdf.active_geometry_name != "geometry":
+            return gdf.rename_geometry("geometry")
         return gdf
 
-    def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200, modename="bus"):
+    def build_graph_with_broken_stops(self):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
 
         :Arguments:
@@ -68,236 +41,45 @@ class MMGraph(WorkerThread):
         """
         self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
 
-        if not self.df.shape[0]:
+        if not self.links.shape[0]:
             return Graph()
 
-        self.mode_id = mode_id
-        self.distance_to_project = distance_to_project
-        self.__mode = mode_correspondence[self.mode_id]
-        self.__mm_graph_file = join(gettempdir(), f"map_matching_graph_{self.__agency}_{self.__mode}.csv")
-
-        # We do some wrangling to save the graph to disk, in case we need to run this more than once
-        authvalue = hashlib.md5()
-        authvalue.update(str(distance_to_project).encode())
-        authvalue.update(str(GRAPH_VERSION).encode())
-        authvalue.update("".join([str(x) for x in self.stops.keys()]).encode())
-        authvalue.update("".join([str(x) for x in self.df.link_id.values]).encode())
-        authvalue.update(modename.encode())
-        graph_hash = authvalue.hexdigest()
-
-        self.__df_file = join(gettempdir(), f"{graph_hash}_df.zip")
-        self.__centroids_file = join(gettempdir(), f"{graph_hash}_centroids.zip")
-        if isfile(self.__df_file) and isfile(self.__centroids_file):
-            return self.__build_graph_from_cache()
-
-        return self.__build_graph_from_scratch()
-
-    def __build_graph_from_cache(self):
-        msg = f"Loading map-matching graph from disk for mode_id={self.mode_id} (Step: 8/12)"
-        self.logger.info(msg)
-        self.signal.emit(["set_text", msg])
-
-        net = pd.read_csv(self.__df_file)
-        centroid_corresp = pd.read_csv(self.__centroids_file)
-        centroids = np.copy(centroid_corresp.centroid_id.values)
-        centroid_corresp.set_index("node_id", inplace=True)
-        for stop in self.stops.values():
-            stop.__map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
-
-        return self.__graph_from_broken_net(centroids, net)
+        self.__build_graph_from_scratch()
+        return self.graph
 
     def __build_graph_from_scratch(self):
-        msg = f"Creating map-matching graph from scratch for mode_id={self.mode_id}"
-        self.logger.debug(msg)
-        self.signal.emit(["set_text", msg])
+        self.logger.debug(f"Creating map-matching graph")
 
-        self.df = self.df.assign(original_id=self.df.link_id, is_connector=0)
-        self.df.loc[self.df.link_id < 0, "link_id"] = self.df.link_id * -1 + self.df.link_id.max() + 1
+        broken_links, new_nodes = split_links_at_stops(self.links, self.stops, self.dist_thresh)
 
-        # We make sure all link IDs are in proper order
-        self.max_link_id = self.df.link_id.max() + 1
-        self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
+        # To build connectors, let's get all nodes together
+        # and connect stops to them within the threshold distance
+        nodes = pd.concat([self.nodes[["node_id", "geometry"]], new_nodes], ignore_index=True)
 
-        # Build initial index
-        self._idx = GeoIndex()
-        msg = "Building graphs - Indexing links (Step: 8/12)"
-        for _, record in simple_progress(self.df.iterrows(), self.signal, msg):
-            self._idx.insert(feature_id=record.link_id, geometry=record.geo)
+        stops = self.stops[["stop_id", "geometry"]]
+        joined = stops.sjoin_nearest(nodes, how="left", distance_col="dist_to_node", max_distance=self.dist_thresh)
 
-        # We will progressively break links at stops' projection
-        # But only on the right side of the link (no boarding at the opposing link's side)
-        centroids = []
-        self.node_corresp = []
-        self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
-        self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
+        geos = joined[["node_id"]].merge(nodes[["node_id", "geometry"]], on="node_id", how="left")[["geometry"]]
+        connector_geo = joined[["stop_id", "geometry"]].shortest_line(geos).set_crs(self.links.crs)
 
-        msg = "Building graphs - Breaking links (Step: 8/12)"
-        for stop_id, stop in simple_progress(self.stops.items(), self.signal, msg):
-            stop.__map_matching_id__[self.mode_id] = self.max_node_id
-            self.node_corresp.append([stop_id, self.max_node_id])
-            centroids.append(stop.__map_matching_id__[self.mode_id])
-            self.max_node_id += 1
-            self.connect_node(stop)
-        self.df = pd.concat([pd.DataFrame(rec).transpose() for rec in self.__all_links.values()])
+        df = joined[["stop_id", "node_id"]].rename(columns={"node_id": "a_node", "stop_id": "b_node"})
+        connectors = gpd.GeoDataFrame(df, geometry=connector_geo)
 
-        self.df = self.df[self.df.to_remove == 0]
-        fltr = self.df.speed > 0
-        self.df.loc[fltr, "free_flow_time"] = self.df.distance[fltr] / self.df.speed[fltr]
+        min_speed = min(self.links.speed_ab.min(), self.links.speed_ba.min())
+        connectors = connectors.assign(direction=0, link_id=np.arange(df.shape[0]) + 1 + self.links.link_id.max(),
+                                       is_connector=1, speed_ab=min_speed, speed_ba=min_speed,
+                                       distance=1.2 * (connectors.connector_geo.length ** 1.3))
 
-        cols = [
-            "link_id",
-            "a_node",
-            "b_node",
-            "direction",
-            "free_flow_time",
-            "distance",
-            "is_connector",
-            "closest",
-            "original_id",
-        ]
-        net = self.df[cols]
-        # Caches the graph outputs
-        net.reset_index(inplace=True, drop=True)
-        net = net.drop_duplicates(subset=["a_node", "b_node"])
-        net.to_csv(self.__df_file, index=False)
-        cols.append("wkt")
-        self.df[cols].to_csv(self.__mm_graph_file, index=False)
-        pd.DataFrame(self.node_corresp, columns=["node_id", "centroid_id"]).to_csv(self.__centroids_file)
-        return self.__graph_from_broken_net(centroids, net)
+        connectors = connectors.assign(time_ab=connectors.distance / connectors.speed_ab,
+                                       time_ba=connectors.distance / connectors.speed_ba)
 
-    def connect_node(self, stop) -> None:
-        list_nearest = list(self._idx.nearest(stop.geo, 30))
+        net_data = pd.concat([broken_links, connectors], ignore_index=True)
+        net_gdf = gpd.GeoDataFrame(net_data, geometry="geometry", crs=self.links.crs)
+        self.__graph_from_broken_net(net_gdf)
 
-        is_closest = 1
-        conn_found = 0
-        distances = []
-        for lid in list_nearest:
-            lgeo = self.__all_links[lid].geo
-            distances.append(stop.geo.distance(lgeo) * math.pi * 6371000 / 180)
-
-        # Sort by distance to the stop
-        nearest = pd.DataFrame({"dist": distances, "link_id": list_nearest}).sort_values(by="dist")
-        criterium = min(5 * nearest.dist.min(), self.distance_to_project)
-        criterium = criterium if nearest.dist.min() < 250 else nearest.dist.min()
-        nearest = nearest[nearest.dist <= max(criterium, nearest.dist.min())].link_id.tolist()
-
-        for counter, link_id in enumerate(nearest):
-            wrong_side = 0
-            link = self.__all_links[link_id]
-
-            link_geo = link.geo  # Linestring
-
-            # We disregard links beyond the threshold, but maintain the closest link to ensure connectivity
-
-            if link_geo.boundary.is_empty:
-                first = Point([link_geo.coords.xy[0][0], link_geo.coords.xy[1][0]])
-                last = Point([link_geo.coords.xy[0][-1], link_geo.coords.xy[1][-1]])
-            else:
-                first = link_geo.boundary.geoms[0]
-                last = link_geo.boundary.geoms[1]
-
-            proj_point = link_geo.project(stop.geo)
-            corr_proj = proj_point * math.pi * 6371000 / 180
-            break_point = link_geo.interpolate(proj_point)
-            connector_geo = LineString([stop.geo, break_point])
-            conn_length = connector_geo.length * math.pi * 6371000 / 180
-
-            if conn_length > 0:
-                p = break_point if corr_proj > 0 else last
-                az_link = compute_line_bearing((first.x, first.y), (p.x, p.y))
-                az_connector = compute_line_bearing((stop.geo.x, stop.geo.y), (break_point.x, break_point.y))
-                if (az_link - az_connector) * DRIVING_SIDE < 0:
-                    wrong_side = 1  # We are on the WRONG side
-
-            if corr_proj <= 1.0:  # If within one meter of the end of the link, let's go with the existing node
-                break_point = first
-                intersec_node = link.a_node
-            elif corr_proj >= (link_geo.length * math.pi * 6371000 / 180) - 1.0:
-                break_point = last
-                intersec_node = link.b_node
-            else:
-                link.to_remove = 1
-                self._idx.delete(link_id, link_geo)
-                intersec_node = self.max_node_id
-                self.max_node_id += 1
-
-                # Create the first portion of the link
-                fp = deepcopy(link)
-                fp.link_id = self.max_link_id
-                fp.b_node = intersec_node
-                fp.to_remove = 0
-                fp.geo = substring(link_geo, 0, proj_point)
-                fp.wkt = fp.geo.wkt
-                fp.distance = fp.geo.length * math.pi * 6371000 / 180
-                self._idx.insert(fp.link_id, fp.geo)
-                self.max_link_id += 1
-                self.__all_links[fp.link_id] = fp
-
-                # Create the second portion of the link
-                lp = deepcopy(link)
-                lp.link_id = self.max_link_id
-                lp.a_node = intersec_node
-                lp.geo = substring(link_geo, proj_point, link_geo.length)
-                lp.wkt = lp.geo.wkt
-                lp.distance = lp.geo.length * math.pi * 6371000 / 180
-                lp.to_remove = 0
-                self._idx.insert(lp.link_id, lp.geo)
-                self.max_link_id += 1
-                self.__all_links[lp.link_id] = lp
-
-            # Add the connector
-            connector_geo = LineString([stop.geo, break_point])
-            connector = deepcopy(link)
-            connector.link_id = self.max_link_id
-            connector.original_id = -1
-            connector.a_node = stop.__map_matching_id__[self.mode_id]
-            connector.b_node = intersec_node
-            connector.wrong_side = wrong_side
-            connector.direction = 0
-            connector.to_remove = 0
-            connector.geo = connector_geo
-            connector.wkt = connector_geo.wkt
-            connector.distance = connector_geo.length * math.pi * 6371000 / 180
-            connector.is_connector = 1  # We make sure that the closest connector cannot be turned off
-            connector.closest = is_closest
-            self.max_link_id += 1
-            is_closest = 0
-            conn_found += 1
-            self.__all_links[connector.link_id] = connector
-
-    def __graph_from_broken_net(self, centroids, net):
-
-        net_data = pd.DataFrame(
-            {
-                "distance": net.distance.astype(float),
-                "direction": net.direction.astype(np.int8),
-                "a_node": net.a_node.astype(int),
-                "b_node": net.b_node.astype(int),
-                "link_id": net.link_id.astype(int),
-                "is_connector": net.is_connector.astype(int),
-                "original_id": net.original_id.astype(int),
-                "closest": net.closest.astype(int),
-                "free_flow_time": net.free_flow_time.astype(float),
-            }
-        )
-
-        fltr = net.is_connector == 1
-        net_data.loc[fltr, "distance"] = 1.2 * (net_data[fltr].distance ** 1.3)  # Already penalize it a bit
-        net_data.loc[fltr, "free_flow_time"] = ((net_data[fltr].distance / 1000) / CONNECTOR_SPEED) * 60
-
-        g = Graph()
-        g.network = net_data
-        g.prepare_graph(np.array(centroids))
-        g.set_graph("free_flow_time")
-        g.set_skimming(["distance"])
-        g.set_blocked_centroid_flows(True)
-        return g
-
-
-def dist_meters(geom1, unit="metre"):
-    if unit == "metre":
-        return connector_geo.length
-    elif unit == "degree":
-        connector_geo.length * math.pi * 6371000 / 180
-    else:
-        raise ValueError("Unit not recognized")
+    def __graph_from_broken_net(self, net_data):
+        self.graph.network = net_data
+        self.graph.prepare_graph(np.array(self.stops.stop_id.values))
+        self.graph.set_graph("distance")
+        self.graph.set_skimming(["distance", "time"])
+        self.graph.set_blocked_centroid_flows(True)

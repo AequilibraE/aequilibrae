@@ -21,7 +21,11 @@ def haversine(lon1, lat1, lon2, lat2):
     return distance_m
 
 
-def utm_crs_for_gdf(gdf):
+def metre_crs_for_gdf(gdf):
+    length_unit = gdf.crs.axis_info[0].unit_name
+    if length_unit and length_unit.lower() == "metre":
+        return gdf.crs
+
     xmin, ymin, xmax, ymax = gdf.total_bounds
     lon = (xmin + xmax) / 2
     lat = (ymin + ymax) / 2
