@@ -97,7 +97,12 @@ class PathResults:
         if a_star and self.graph.lonlat_index.empty:
             raise Exception("You need to supply a lon/lat index to graph.prepare_graph to use A*")
 
-        if origin == self.origin and early_exit == self.early_exit and a_star == self.a_star:
+        if (
+            origin == self.origin
+            and early_exit == self.early_exit
+            and a_star == self.a_star
+            and (heuristic is None or heuristic == self._heuristic)
+        ):
             self.update_trace(destination)
             return
 
@@ -199,7 +204,7 @@ class PathResults:
         self._heuristic = heuristic
 
     def get_heuristics(self) -> List[str]:
-        """Return the availiable heuristics."""
+        """Return the available heuristics."""
         return list(HEURISTIC_MAP.keys())
 
     def __skim_path(self):
