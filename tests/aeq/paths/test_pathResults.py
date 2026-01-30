@@ -212,6 +212,30 @@ def test_compute_path_with_skimming_optimization(p_results):
     assert r.skims[10] == skim_value_10
 
 
+def test_numpy_integer_types(p_results):
+    """Test that compute_path and update_trace accept numpy integer types"""
+    r = p_results["r"]
+
+    # Test compute_path with numpy integer types
+    r.compute_path(np.int32(origin), np.int64(dest), early_exit=False)
+    assert r.path is not None
+
+    # Test update_trace with numpy integer types
+    r.update_trace(np.int32(2))
+    assert r.path is not None
+
+    # Test with np.int16
+    r.compute_path(np.int16(origin), np.int16(10), early_exit=False)
+    assert r.path is not None
+
+    # Test that non-integer types are still rejected
+    with pytest.raises(TypeError, match="destination needs to be an integer"):
+        r.update_trace(5.5)
+
+    with pytest.raises(TypeError, match="destination needs to be an integer"):
+        r.update_trace("5")
+
+
 # --- Blocking triangle network tests ---
 
 

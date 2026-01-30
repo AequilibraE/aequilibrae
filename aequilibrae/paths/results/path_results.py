@@ -192,7 +192,7 @@ class PathResults:
         :Arguments:
             **destination** (:obj:`int`): ID of the node we are computing the path too
         """
-        if not isinstance(destination, int):
+        if not isinstance(destination, (int, np.integer)):
             raise TypeError("destination needs to be an integer")
 
         if destination >= self.graph.nodes_to_indices.shape[0]:
