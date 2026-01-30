@@ -2,9 +2,8 @@ from pathlib import Path
 import yaml
 import geopandas as gpd
 import pandas as pd
-import math
 
-from aequilibrae.utils.simwrapper_panel import SimwrapperPanel, TilePanel, TextPanel, AequilibraEMapPanel
+from aequilibrae.utils.simwrapper.simwrapper_panel import SimwrapperPanel, TilePanel, TextPanel, AequilibraEMapPanel
 from aequilibrae.utils.simwrapper.simwrapper_utils import get_project_center, get_project_zoom
 
 class SimwrapperConfigGenerator:
@@ -48,62 +47,6 @@ class SimwrapperConfigGenerator:
         """Add file to self.generated_files"""
         self.generated_files[key] = Path(path)
 
-    def _export_simple_stats(self, csv_name, stats_dict):
-        """
-        Export a one row csv from stats dictionary and add file to generated files.
-
-        :Arguments:
-            **name** (:obj:`str`): name of export
-            **stats_dict** (:obj:`dict`): key:value stats to write
-        """
-        rows = list(stats_dict.items())
-
-        output_file = self.data_dir / f"{csv_name}.csv"  # output file path
-
-        # manually bc needs to be saved as columns of metrics and column of values for simwrapper to read it right
-        with open(output_file, "w", newline="") as f:
-            for key, value in rows:
-                f.write(f"{key},{value}\n")
-
-        self._add_to_generated_files(csv_name, output_file)
-
-    def export_link_stats(self):
-        """Export simple about network's links."""
-        links_obj = self.project.network.links
-        links_df = links_obj.data
-
-        stats = {"Link count": len(links_df), "Link type count": links_df["link_type"].nunique()}
-
-        self._export_simple_stats("link_stats", stats)
-
-    def export_node_stats(self):
-        """Export simple stats about network's nodes."""
-        nodes_obj = self.project.network.nodes
-        nodes_df = nodes_obj.data
-
-        stats = {"Node count": len(nodes_df)}
-
-        self._export_simple_stats("node_stats", stats)
-
-    def export_project_stats(self):
-        """Export basic network stats to csv. currently links and nodes because
-        that is all that is in Chicago model. More helpers can be made as needed."""
-
-        if self._has_links():
-            self.export_link_stats()
-
-        if self._has_zones():
-            self.export_node_stats()
-
-    def generate_config(self):
-        """Create the SimWrapper .yaml dashboard configuration."""
-
-        # export all project data
-        self.export_project_stats()
-
-        # build yaml
-        self._write_yamls()
-
     def _dashboard_skeleton(self):
         """Defines header and layout structure for yaml and returns the basic config skeleton"""
 
@@ -118,19 +61,18 @@ class SimwrapperConfigGenerator:
 
     def _stats_rows(self):
         """returns stats rows panels"""
-        panels = []
+        dataset = [{"key": "Link Count",
+                    "value":
+                        {"database": "project_database.sqlite",
+                         "query": "SELECT COUNT(*) FROM links"}},
+                    {"key": "Node Count",
+                    "value":
+                        {"database": "project_database.sqlite",
+                         "query": "SELECT COUNT(*) FROM nodes"}}]
 
-        ## add links stats tile if available
-        if "link_stats" in self.generated_files:
-            panels.append(
-                TilePanel("Link Statistics", str(self.generated_files["link_stats"]))
-            )  # output_dir/simwrapper_data/link_stats.csv))
+        panel = TilePanel("Network Size", dataset)
 
-        # add nodes stats tile if available
-        if "node_stats" in self.generated_files:
-            panels.append(TilePanel("Node Statistics", str(self.generated_files["node_stats"])))
-
-        return panels
+        return [panel]
 
     def _entire_network_row(self):
         """Builds yaml config for map of entire network"""
@@ -409,10 +351,8 @@ class SimwrapperConfigGenerator:
 
         return config
 
-    def _write_yamls(self):
+    def write_yamls(self):
         """Write yamls"""
-        self.export_project_stats()
-
         config = self._build_dashboard_config()
         output_file = self.output_dir / "dashboard.yaml"
 

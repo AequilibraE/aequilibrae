@@ -1,3 +1,5 @@
+import math
+
 def get_links_bounds_box(project):
     """
     Compute box around all coordinates in links table of project.
