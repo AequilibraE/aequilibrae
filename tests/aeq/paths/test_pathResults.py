@@ -105,79 +105,76 @@ def test_update_trace(p_results):
 def test_compute_path_optimization(p_results):
     """Test that compute_path optimization logic correctly reuses computations when appropriate"""
     r = p_results["r"]
-    g = p_results["g"]
-    
+
     # Test 1: Same origin, same settings, different destinations should reuse computation
     r.compute_path(origin, 2, early_exit=False, a_star=False)
     path_to_2 = list(r.path)
     nodes_to_2 = list(r.path_nodes)
     predecessors_after_first = r.predecessors.copy()
-    
+
     # Compute path to different destination with same origin and settings
     # This should trigger update_trace, not full recomputation
     r.compute_path(origin, 10, early_exit=False, a_star=False)
     path_to_10 = list(r.path)
     nodes_to_10 = list(r.path_nodes)
     predecessors_after_second = r.predecessors.copy()
-    
+
     # Predecessors should be identical (no recomputation occurred)
     assert np.array_equal(predecessors_after_first, predecessors_after_second)
     # But paths should be different
     assert path_to_2 != path_to_10
     assert nodes_to_2 != nodes_to_10
-    
+
     # Test 2: Changing early_exit should trigger recomputation
     r.reset()
     r.compute_path(origin, 2, early_exit=False, a_star=False)
     predecessors_full = r.predecessors.copy()
-    
+
     # Use a more distant destination to ensure different exploration patterns
     r.compute_path(origin, dest, early_exit=True, a_star=False)
     predecessors_early_exit = r.predecessors.copy()
-    
+
     # With early_exit to a distant destination, fewer nodes should be explored
     # Count of non-(-1) predecessors should differ
     assert np.count_nonzero(predecessors_full != -1) > np.count_nonzero(predecessors_early_exit != -1)
-    
+
     # Test 3: Changing a_star should trigger recomputation
     r.reset()
     r.compute_path(origin, 2, early_exit=False, a_star=False)
     predecessors_no_astar = r.predecessors.copy()
-    
+
     r.compute_path(origin, 2, early_exit=False, a_star=True, heuristic="haversine")
     predecessors_with_astar = r.predecessors.copy()
-    
+
     # With A* enabled, the exploration pattern may differ (A* uses heuristic)
     # Verify both computations completed successfully
     assert r.path is not None
     # A* may explore fewer nodes due to heuristic guidance
     assert np.count_nonzero(predecessors_no_astar != -1) >= np.count_nonzero(predecessors_with_astar != -1)
-    
+
     # Test 4: Changing heuristic should trigger recomputation
     r.reset()
     r.compute_path(origin, dest, early_exit=False, a_star=True, heuristic="haversine")
-    predecessors_haversine = r.predecessors.copy()
     path_haversine = list(r.path)
-    
+
     r.compute_path(origin, dest, early_exit=False, a_star=True, heuristic="equirectangular")
-    predecessors_equirectangular = r.predecessors.copy()
     path_equirectangular = list(r.path)
-    
+
     # Different heuristics may result in different exploration patterns
     # Both should produce valid paths (though they may be the same shortest path)
     assert r.path is not None
     assert path_haversine == path_equirectangular  # Shortest path should be the same
-    
+
     # Test 5: Same heuristic (or None) should not trigger recomputation of algorithm
     # Note: With early_exit, if destination was not found in previous tree, recomputation
     # is necessary but uses update_trace path which may call compute_path internally
     r.reset()
     r.compute_path(origin, 2, early_exit=False, a_star=True, heuristic="haversine")
-    
+
     # Call again with same heuristic (None should use current)
     # This should use update_trace optimization path
     r.compute_path(origin, 2, early_exit=False, a_star=True, heuristic=None)
-    
+
     # Since we're asking for the same destination and settings, no full recomputation needed
     # The path should be valid
     assert r.path is not None
@@ -187,29 +184,29 @@ def test_compute_path_with_skimming_optimization(p_results):
     """Test that skims are correctly updated through the update_trace path"""
     g = p_results["g"]
     g.set_skimming("free_flow_time")
-    
+
     r = PathResults()
     r.prepare(g)
-    
+
     # Compute path to first destination
     r.compute_path(origin, 2, early_exit=False)
     skim_value_2 = r.skims[2]
     assert r.milepost[-1] == skim_value_2
-    
+
     # Compute path to second destination with same origin
     # This should use update_trace optimization
     r.compute_path(origin, 10, early_exit=False)
     skim_value_10 = r.skims[10]
     assert r.milepost[-1] == skim_value_10
-    
+
     # Verify skim for first destination is still correct
     assert r.skims[2] == skim_value_2
-    
+
     # Compute to a third destination
     r.compute_path(origin, dest, early_exit=False)
     skim_value_dest = r.skims[dest]
     assert r.milepost[-1] == skim_value_dest
-    
+
     # All previous skims should still be correct
     assert r.skims[2] == skim_value_2
     assert r.skims[10] == skim_value_10

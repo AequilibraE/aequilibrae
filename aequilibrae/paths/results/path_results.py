@@ -100,7 +100,7 @@ class PathResults:
 
         # Compute what the effective early_exit value would be
         effective_early_exit = early_exit or a_star
-        
+
         # Skip optimization if we're being called from update_trace to avoid infinite recursion
         if (
             not self._inside_update_trace
