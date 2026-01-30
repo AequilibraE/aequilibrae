@@ -16,7 +16,6 @@ from aequilibrae.transit.transit_elements import Link, Pattern, mode_corresp
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .gtfs_loader import GTFSReader
-from .map_matching_graph import MMGraph
 from aequilibrae.transit.route_map_matcher import RouteMapMatcher
 
 
@@ -159,9 +158,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):
             if pat.route_type in route_types:
                 pat.map_match()
-                msg = pat.get_error("stop_from_pattern")
-                if msg is not None:
-                    self.logger.warning(msg)
 
     def set_agency_identifier(self, agency_id: str) -> None:
         """Adds agency ID to this GTFS for use on import.
@@ -443,14 +439,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
         for pt_mode in set(mode_corresp.values()):
             if pt_mode in self.map_matchers:
                 continue
-            link_gdf = all_link_gdf[~all_link_gdf.modes.str.contains(pt_mode)]
+            link_gdf = all_link_gdf[all_link_gdf.modes.str.contains(pt_mode)]
             filtered_nodes = np.hstack([link_gdf.a_node.values, link_gdf.b_node.values])
-            nodes_gdf = all_nodes_gdf[~all_nodes_gdf.node_id.isin(filtered_nodes)]
+            nodes_gdf = all_nodes_gdf[all_nodes_gdf.node_id.isin(filtered_nodes)]
             stops_gdf = all_stops_gdf[all_stops_gdf.mode_type == pt_mode]
 
             if link_gdf.shape[0] == 0 or nodes_gdf.shape[0] == 0 or stops_gdf.shape[0] == 0:
                 continue
-            mm = MMGraph(link_gdf, nodes_gdf, stops_gdf)
-            graph = mm.build_graph_with_broken_stops()
-            self.map_matchers[pt_mode] = RouteMapMatcher(graph)
-            self.mm_transformer = Transformer.from_crs(self.srid, mm.crs, always_xy=True)
+            rmm = RouteMapMatcher(link_gdf, nodes_gdf, stops_gdf) #type: ignore
+            rmm.initialize_graph()
+            self.map_matchers[pt_mode] = rmm
+
+            self.mm_transformer = Transformer.from_crs(self.srid, self.map_matchers[pt_mode].crs, always_xy=True)

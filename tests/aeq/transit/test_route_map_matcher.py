@@ -20,10 +20,10 @@ def test_break_links_with_stops(route_system_builder):
     route_system_builder.load_date("2016-04-13")
 
     s = [[i, x.geo] for i, x in enumerate(route_system_builder.select_stops.values())]
-    df = pd.DataFrame(s, columns=["index", "geometry"])
+    df = pd.DataFrame(s, columns=["stop_id", "geometry"])
 
-    stops = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
-    links = route_system_builder.project.network.links.data
+    stops = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326").to_crs(3857)
+    links = route_system_builder.project.network.links.data.to_crs(3857)
 
     broken_links, new_nodes = split_links_at_stops(stops, links, tolerance=20)
 
