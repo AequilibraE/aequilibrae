@@ -291,9 +291,18 @@ class RouteMapMatcher:
         return gdf.sjoin(geolinks, how="inner", predicate="contains").link_id.tolist()
 
     def assemble_shape(self, df: pd.DataFrame):
+        """Assembles a LineString shape from the matched path links.
+
+        Args:
+            df: DataFrame with 'link_id' and 'dir' columns from map_match_route()
+
+        Returns:
+            LineString: The assembled route shape
+        """
         lines = self.graph.network[["original_id", "geometry"]].rename(columns={"original_id": "link_id"})
         df = lines.merge(df.assign(sequence=np.arange(df.shape[0])), on="link_id", how="inner").sort_values("sequence")
-        shapes = [rec.geometry if rec.dir < 0 else rec.geometry.reverse() for _, rec in df.iterrows()]
+        # dir < 0 means BA direction (reverse), dir >= 0 means AB direction (forward)
+        shapes = [rec.geometry.reverse() if rec.dir < 0 else rec.geometry for _, rec in df.iterrows()]
         return linemerge(shapes)
 
     @staticmethod
