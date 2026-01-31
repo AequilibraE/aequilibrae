@@ -121,12 +121,12 @@ class RouteMapMatcher:
         if self.check_connectivity:
             # We check if all the stops are connected:
             centroids = self.graph.centroids
-        self.graph.prepare_graph(centroids=route_stops.stop_id.to_numpy())
-        skims = self.graph.compute_skims()
-        self.graph.prepare_graph(centroids=centroids)
-        if skims.results.skims.distance.max() >= 1.0e308:
-            self.__logger.critical("Route is not completely connected.")
-            return [], []
+            self.graph.prepare_graph(centroids=route_stops.stop_id.to_numpy())
+            skims = self.graph.compute_skims()
+            self.graph.prepare_graph(centroids=centroids)
+            if skims.results.skims.distance.max() >= 1.0e308:
+                self.__logger.critical("Route is not completely connected.")
+                return [], []
 
         # We discount the likely links for this route to favor them in the map-matching
         self.graph.cost = np.array(self.graph.graph[self.graph.cost_field])
