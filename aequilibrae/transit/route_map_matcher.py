@@ -136,7 +136,7 @@ class RouteMapMatcher:
 
         current_stop = int(route_stops.stop_id.iat[0])
 
-        res = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]))
+        res = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]), early_exit=True)
 
         if route_stops.shape[0] == 2:
             if res.milepost is None:
@@ -171,7 +171,7 @@ class RouteMapMatcher:
 
             # Let's see if we can reach the following stop while going through the next one
             # Whis would save us some path computation
-            res.compute_path(current_stop, following_stop, early_exit=True)
+            res.compute_path(current_stop, following_stop, early_exit=False)
             indices_in_a = np.where(np.isin(connection_candidates, res.path_nodes))[0]
             if indices_in_a.shape[0] > 0:
                 # We found a candidate that is already in the path to the following stop
@@ -186,7 +186,7 @@ class RouteMapMatcher:
                 indices = np.where(np.isin(res.path_nodes, connection_candidates))[0]
                 first_leg_costs = res.milepost[indices]
 
-                res_reverse = self.reverse_graph.compute_path(following_stop, next_stop)
+                res_reverse = self.reverse_graph.compute_path(following_stop, next_stop, early_exit=True)
                 indices = np.where(np.isin(res_reverse.path_nodes, connection_candidates))[0]
                 second_leg_costs = res_reverse.milepost[indices]
 

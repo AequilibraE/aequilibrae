@@ -97,10 +97,6 @@ class PathResults:
         if a_star and self.graph.lonlat_index.empty:
             raise Exception("You need to supply a lon/lat index to graph.prepare_graph to use A*")
 
-        if origin == self.origin and early_exit == self.early_exit and a_star == self.a_star:
-            self.update_trace(destination)
-            return
-
         self.early_exit = self._early_exit = early_exit or a_star
         self.a_star = self._a_star = a_star
         if heuristic is not None:
@@ -176,7 +172,7 @@ class PathResults:
         :Arguments:
             **destination** (:obj:`int`): ID of the node we are computing the path too
         """
-        if not isinstance(destination, int):
+        if not isinstance(destination, (int, np.integer)):
             raise TypeError("destination needs to be an integer")
 
         if destination >= self.graph.nodes_to_indices.shape[0]:
