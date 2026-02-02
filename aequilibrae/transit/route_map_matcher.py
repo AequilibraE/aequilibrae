@@ -102,13 +102,11 @@ class RouteMapMatcher:
 
     def __graph_from_broken_net(self, net_data):
         self.graph.network = net_data
-        self.graph.prepare_graph(np.array(self.stops.stop_id.values))
-        self.available_stops = self.stop_ids["real_stop_id"][
-            self.stop_ids.stop_id.isin(self.graph.centroids)].to_numpy()
-
-        # We make sure to exclude any stops that are not in the graph
-        mask = np.isin(self.graph.centroids, self.graph.all_nodes)  # boolean mask
-        self.graph.prepare_graph(self.graph.centroids[mask])
+        centroids = np.array(self.stops.stop_id.values)
+        all_nodes = np.unique(np.hstack([self.graph.network.a_node.to_numpy(), self.graph.network.b_node.to_numpy()]))
+        centroids = centroids[np.isin(centroids, all_nodes)]
+        self.graph.prepare_graph(centroids)
+        self.available_stops = self.stop_ids["real_stop_id"][self.stop_ids.stop_id.isin(centroids)].to_numpy()
 
         self.graph.set_graph("distance")
         self.graph.set_skimming(["distance", "time"])
