@@ -321,6 +321,20 @@ class SimwrapperConfigGenerator:
         )
 
         return [base, tat]
+    
+    def _assignment_convergence_plot(self, results_dataframe):
+        """
+        {table name: [iterations]}
+        {table name: [relative gap]}
+        """
+        iterations = {}
+        r_gaps = {}
+
+        for index, row in results_dataframe.iterrows():
+            table_name = row["table_name"]
+
+            procedure_report = row["procedure_report"]
+            print(procedure_report)
 
     def _build_dashboard_config(self):
         """Builds and returns full dashboard configuration for simwrapper"""
@@ -340,6 +354,7 @@ class SimwrapperConfigGenerator:
         # if we have results table, add a delay factor comparison
         if len(results_tables) > 0:
             rows["delayFactorComparisonRow"] = self._metric_comp_row("delay factor", "Delay_factor_Max", results_tables)
+            rows["assignmentConvergencePlot"] = self._assignment_convergence_plot(res_df)
 
         # convert panels to dicts and add to config
         for name, panels in rows.items():
