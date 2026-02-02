@@ -53,7 +53,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.mm_transformer: Transformer
         self.trip_by_service = {}
         self.patterns = {}
-        self.map_matchers = {} # Dict[str, RouteMapMatcher]
+        self.map_matchers = {}  # Dict[str, RouteMapMatcher]
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
@@ -155,8 +155,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 self.logger.warning("No valid route_types remain after filtering")
                 return
 
-        for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):
+        for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):  # type:Pattern
             if pat.route_type in route_types:
+                print(pat.pattern_id)
                 pat.map_match()
 
     def set_agency_identifier(self, agency_id: str) -> None:
@@ -448,7 +449,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             if link_gdf.shape[0] == 0 or nodes_gdf.shape[0] == 0 or stops_gdf.shape[0] == 0:
                 continue
-            rmm = RouteMapMatcher(link_gdf, nodes_gdf, stops_gdf) #type: ignore
+            rmm = RouteMapMatcher(link_gdf, nodes_gdf, stops_gdf)  # type: ignore
             rmm.initialize_graph()
             self.map_matchers[pt_mode] = rmm
 

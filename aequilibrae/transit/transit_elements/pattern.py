@@ -108,8 +108,9 @@ class Pattern(BasicPTElement):
 
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""
-        shp = self._stop_based_shape if self.raw_shape is None else self.raw_shape
-        return shp
+        if self.shape is None:
+            return self._stop_based_shape if self.raw_shape is None else self.raw_shape
+        return self.shape
 
     def map_match(self):
         """Map matches the route into the network, considering its appropriate shape.
@@ -157,7 +158,7 @@ class Pattern(BasicPTElement):
             return
         self.shape = map_matcher.assemble_shape(df)
         self.__build_pattern_mapping(df)
-        self.__logger.info(f"Map-matched pattern {self.pattern_id}")
+        self.__logger.debug(f"Map-matched pattern {self.pattern_id}")
 
     def __build_pattern_mapping(self, df):
         # We find what is the position along routes that we have for each stop and make sure they are always growing

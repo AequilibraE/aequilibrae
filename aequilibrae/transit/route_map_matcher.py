@@ -57,7 +57,11 @@ class RouteMapMatcher:
         self.__build_graph_from_scratch()
 
     def map_match_route(self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None):
-        path_directions, path_links = self._build_full_path_on_broken_links(route_stops, route_shape)
+        if np.all(np.isin(route_stops.stop_id.values, self.available_stops)):
+            path_directions, path_links = self._build_full_path_on_broken_links(route_stops, route_shape)
+        else:
+            path_directions, path_links = [], []
+
         return self._build_path_df(path_directions, path_links)
 
     def __build_graph_from_scratch(self):
@@ -99,6 +103,13 @@ class RouteMapMatcher:
     def __graph_from_broken_net(self, net_data):
         self.graph.network = net_data
         self.graph.prepare_graph(np.array(self.stops.stop_id.values))
+        self.available_stops = self.stop_ids["real_stop_id"][
+            self.stop_ids.stop_id.isin(self.graph.centroids)].to_numpy()
+
+        # We make sure to exclude any stops that are not in the graph
+        mask = np.isin(self.graph.centroids, self.graph.all_nodes)  # boolean mask
+        self.graph.prepare_graph(self.graph.centroids[mask])
+
         self.graph.set_graph("distance")
         self.graph.set_skimming(["distance", "time"])
         self.graph.set_blocked_centroid_flows(True)
@@ -118,10 +129,14 @@ class RouteMapMatcher:
         route_stops = route_stops.rename(columns={"stop_id": "real_stop_id"})
         route_stops = route_stops.merge(self.stop_ids, on="real_stop_id")
 
+        if not np.all(np.isin(route_stops.real_stop_id.values, self.available_stops)):
+            self.__logger.critical("Route is not completely connected.")
+            return [], []
+
         if self.check_connectivity:
             # We check if all the stops are connected:
             centroids = self.graph.centroids
-            self.graph.prepare_graph(centroids=route_stops.stop_id.to_numpy())
+            self.graph.prepare_graph(centroids=np.unique(route_stops.stop_id.to_numpy()))
             skims = self.graph.compute_skims()
             self.graph.prepare_graph(centroids=centroids)
             if skims.results.skims.distance.max() >= 1.0e308:
@@ -183,10 +198,17 @@ class RouteMapMatcher:
                 # That is MUCH easier done with the reserve graph, though
 
                 res.update_trace(next_stop)
-                indices = np.where(np.isin(res.path_nodes, connection_candidates))[0]
+                if res.path_nodes is None or res.path_nodes.shape[0] == 0:
+                    logging.debug("Failed to find path to the next stop")
+                    return [], []
+                idx_where = np.where(np.isin(res.path_nodes, connection_candidates))
+                indices = idx_where[0]
                 first_leg_costs = res.milepost[indices]
 
                 res_reverse = self.reverse_graph.compute_path(following_stop, next_stop, early_exit=True)
+                if res_reverse.path_nodes is None or res_reverse.path_nodes.shape[0] == 0:
+                    logging.debug("Failed to find path to the following stop")
+                    return [], []
                 indices = np.where(np.isin(res_reverse.path_nodes, connection_candidates))[0]
                 second_leg_costs = res_reverse.milepost[indices]
 
