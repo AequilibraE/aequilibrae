@@ -336,6 +336,15 @@ class SimwrapperConfigGenerator:
             json_string = json_string.encode().decode("unicode_escape")
 
         data: dict = json.loads(json_string) # parsing json
+
+        # double encoded json case
+        if isinstance(data, str):
+            data = json.loads(data)
+
+        # if still a string
+        if not isinstance(data, dict):
+            return [], []
+
         convergence = data.get("convergence", {}) # get convergence block
 
         iteration = convergence.get("iteration", [])
