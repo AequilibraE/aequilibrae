@@ -2,6 +2,8 @@ from pathlib import Path
 import yaml
 import geopandas as gpd
 import pandas as pd
+import json
+import csv
 
 from aequilibrae.utils.simwrapper.simwrapper_panel import SimwrapperPanel, TilePanel, TextPanel, AequilibraEMapPanel
 from aequilibrae.utils.simwrapper.simwrapper_utils import get_project_center, get_project_zoom
@@ -321,20 +323,77 @@ class SimwrapperConfigGenerator:
         )
 
         return [base, tat]
-    
+
+    def _parse_convergence_json(self, json_string):
+        """ Parse procedure_report json and extract iteration and rgap arrays"""
+        if not json_string:
+            return [], []
+
+        if json_string.startswith('{\\"'):
+            json_string = json_string.encode().decode("unicode_escape")
+
+        data = json.loads(json_string)
+        convergence = data.get("convergence", {})
+
+        return (
+            convergence.get("iteration", []),
+            convergence.get("rgap", []),
+        )
+
+    def _export_convergence_csv(self, results_dfataframe):
+        """ 
+        export assignment convergence data for all result tables into a single CSV.
+
+        outputs: iteration, rgap, series
+        """
+        rows = []
+
+        for _, row in results_dfataframe.iterrows():
+            table_name = row["table_name"]
+            procedure_report = row.get("procedure_report")
+
+            iteration, rgap = self._parse_convergence_json(procedure_report)
+
+            if not iteration or not rgap:
+                continue  # skip tables with no convergence data
+
+            if len(iteration) != len(rgap):
+                raise ValueError(f"Iteration/RGAP length mismatch for {table_name}")
+
+            for it, rg in zip(iteration, rgap, strict=True):
+                rows.append({
+                    "iteration": it,
+                    "rgap": rg,
+                    "series": table_name,
+                })
+
+        if not rows:
+            return None
+
+        output_path = self.data_dir / "assignment_convergence.csv"
+
+        with output_path.open("w", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["iteration", "rgap", "series"]
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+
+        self._add_to_generated_files("assignment_convergence", output_path)
+        return output_path
+
+
+
     def _assignment_convergence_plot(self, results_dataframe):
         """
         {table name: [iterations]}
         {table name: [relative gap]}
+
+        export json
+        build panel
+        return panel
         """
-        iterations = {}
-        r_gaps = {}
 
-        for index, row in results_dataframe.iterrows():
-            table_name = row["table_name"]
-
-            procedure_report = row["procedure_report"]
-            print(procedure_report)
 
     def _build_dashboard_config(self):
         """Builds and returns full dashboard configuration for simwrapper"""
