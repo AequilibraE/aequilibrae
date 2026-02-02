@@ -326,19 +326,23 @@ class SimwrapperConfigGenerator:
 
     def _parse_convergence_json(self, json_string):
         """ Parse procedure_report json and extract iteration and rgap arrays"""
+
+        # if no procedure report
         if not json_string:
             return [], []
 
+        # if stored as excaped string unescape
         if json_string.startswith('{\\"'):
             json_string = json_string.encode().decode("unicode_escape")
 
-        data = json.loads(json_string)
-        convergence = data.get("convergence", {})
+        data: dict = json.loads(json_string) # parsing json
+        convergence = data.get("convergence", {}) # get convergence block
 
-        return (
-            convergence.get("iteration", []),
-            convergence.get("rgap", []),
-        )
+        iteration = convergence.get("iteration", [])
+        rgap = convergence.get("rgap", [])
+
+        # return iteration and rgap arrays
+        return (iteration, rgap,)
 
     def _export_convergence_csv(self, results_dfataframe):
         """ 
@@ -352,14 +356,17 @@ class SimwrapperConfigGenerator:
             table_name = row["table_name"]
             procedure_report = row.get("procedure_report")
 
+            # extract cinveregnce arrays
             iteration, rgap = self._parse_convergence_json(procedure_report)
 
             if not iteration or not rgap:
                 continue  # skip tables with no convergence data
 
+            # all same lengths
             if len(iteration) != len(rgap):
                 raise ValueError(f"Iteration/RGAP length mismatch for {table_name}")
 
+            # append rows
             for it, rg in zip(iteration, rgap, strict=True):
                 rows.append({
                     "iteration": it,
@@ -372,6 +379,7 @@ class SimwrapperConfigGenerator:
 
         output_path = self.data_dir / "assignment_convergence.csv"
 
+        # write csv
         with output_path.open("w", newline="") as f:
             writer = csv.DictWriter(
                 f, fieldnames=["iteration", "rgap", "series"]
@@ -382,18 +390,50 @@ class SimwrapperConfigGenerator:
         self._add_to_generated_files("assignment_convergence", output_path)
         return output_path
 
-
-
     def _assignment_convergence_plot(self, results_dataframe):
-        """
-        {table name: [iterations]}
-        {table name: [relative gap]}
+        """ returns vegalite convergence plot panel """
 
-        export json
-        build panel
-        return panel
-        """
+        csv_path = self._export_convergence_csv(results_dataframe) 
 
+        # skip if no convergence data
+        if csv_path is None:
+            return None
+
+        # panel wrapper
+        panel = SimwrapperPanel(
+            type="vega",
+            title="Assignment Convergence",
+            height=6,
+            width=6,
+        )
+
+        panel.spec = {
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "data": {
+                "url": str(csv_path),
+                "format": {"type": "csv"},
+            },
+            "mark": {"type": "line", "point": False},
+            "encoding": {
+                "x": {
+                    "field": "iteration",
+                    "type": "quantitative",
+                    "title": "Iteration",
+                },
+                "y": {
+                    "field": "rgap",
+                    "type": "quantitative",
+                    "title": "Relative Gap",
+                },
+                "color": {
+                    "field": "series",
+                    "type": "nominal",
+                    "title": "Scenario",
+                },
+            },
+        }
+
+        return [panel]
 
     def _build_dashboard_config(self):
         """Builds and returns full dashboard configuration for simwrapper"""
