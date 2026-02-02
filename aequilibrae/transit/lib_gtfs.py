@@ -432,6 +432,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         stop_data = []
         for stop in self.select_stops.values():
+            if stop.route_type not in mode_corresp:
+                continue
             stop_data.append([stop.stop_id, mode_corresp[stop.route_type], stop.geo])
         df = pd.DataFrame(stop_data, columns=["stop_id", "mode_type", "geometry"])
         all_stops_gdf = gpd.GeoDataFrame(df[["stop_id", "mode_type"]], geometry=df.geometry).set_crs(self.srid)
