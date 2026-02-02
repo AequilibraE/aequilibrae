@@ -5,7 +5,7 @@ import urllib
 import warnings
 from os.path import basename, join
 from pathlib import Path
-from sqlite3 import Connection, register_adapter
+from sqlite3 import Connection, register_adapter, OperationalError
 from tempfile import gettempdir
 from typing import Optional
 from zipfile import ZipFile
@@ -51,7 +51,31 @@ def _connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False):
 
 def load_spatialite_extension(conn: Connection):
     conn.enable_load_extension(True)
-    conn.load_extension("/opt/homebrew/lib/mod_spatialite")
+    directory = os.environ.get("AEQ_SPATIALITE_DIR")
+
+    # Try loading from specific directory first
+    if directory:
+        try:
+            conn.load_extension(os.path.join(directory, "mod_spatialite"))
+            return
+        except OperationalError:
+            global_logger.error(
+                f"Environment variable 'AEQ_SPATIALITE_DIR' was provided ({directory}), "
+                "but mod_spatialite could not be loaded from this directory. Trying system path"
+            )
+
+    try:
+        conn.load_extension("mod_spatialite")
+    except OperationalError as e:
+        if is_windows():
+            ensure_spatialite_binaries()
+            try:
+                # Retry after potential download
+                directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
+                conn.load_extension(os.path.join(directory, "mod_spatialite"))
+                return
+            except OperationalError as e2:
+                raise e2 from e
 
 
 def is_spatialite(conn):
@@ -74,7 +98,12 @@ def ensure_spatialite_binaries() -> None:
 
     if not _dll_already_exists(directory):
         global_logger.info(f"mod_spatialite.dll not found in {directory} attempting to download")
-        _download_and_extract_spatialite(directory)
+        try:
+            _download_and_extract_spatialite(directory)
+            os.environ["AEQ_SPATIALITE_DIR"] = directory
+        except Exception as e:
+            global_logger.error(f"Failed to download Spatialite binaries: {e}")
+            raise e
 
     set_known_spatialite_folder(directory)
 
