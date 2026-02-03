@@ -1,17 +1,17 @@
 from sqlite3 import Connection
-from typing import List, Tuple, Optional
+from typing import List
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import shapely.ops
 from shapely.geometry import LineString
+from shapely.ops import transform
 
-from aequilibrae.paths import PathResults
 from aequilibrae.transit.functions.get_srid import get_srid
 from .basic_element import BasicPTElement
 from .link import Link
 from .mode_correspondence import mode_corresp
-from shapely.ops import transform
 
 DEAD_END_RUN = 40
 
@@ -144,25 +144,26 @@ class Pattern(BasicPTElement):
 
         df = pd.DataFrame({"stop_id": [stop.stop_id for stop in self.stops],
                            "geometry": [stop.geo for stop in self.stops]})
-        map_matcher = self.__feed.map_matchers[mode_corresp[self.route_type]] #type: RouteMapMatcher
+        map_matcher = self.__feed.map_matchers[mode_corresp[self.route_type]]  # type: RouteMapMatcher
 
         stops = gpd.GeoDataFrame(df, geometry="geometry", crs=f"EPSG:{self.__srid}").to_crs(map_matcher.crs)
 
         route_shape = self.raw_shape
         if route_shape is not None:
             route_shape = transform(self.__feed.mm_transformer.transform, route_shape)
-        df = map_matcher.map_match_route(stops, route_shape)
+        df = map_matcher.map_match_route(stops, route_shape, self.pattern_id)
 
         if df.shape[0] == 0:
             self.__logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
             return
-        self.shape = map_matcher.assemble_shape(df)
+
+        self.shape = shapely.ops.transform(self.__feed.mm_transform_rev.transform, map_matcher.assemble_shape(df))
         self.__build_pattern_mapping(df)
         self.__logger.debug(f"Map-matched pattern {self.pattern_id}")
 
     def __build_pattern_mapping(self, df):
         # We find what is the position along routes that we have for each stop and make sure they are always growing
-        df_net = df.assign(seq= np.arange(df.shape[0]), pattern_id=self.pattern_id, srid=4326)
+        df_net = df.assign(seq=np.arange(df.shape[0]), pattern_id=self.pattern_id, srid=4326)
 
         df_net = df_net.merge(self.__geolinks[["link_id", "geometry"]], on="link_id", how="inner")
         df_net.sort_values("seq", inplace=True)

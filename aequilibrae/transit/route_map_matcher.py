@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 from typing import Optional
 
 import geopandas as gpd
@@ -56,7 +55,9 @@ class RouteMapMatcher:
 
         self.__build_graph_from_scratch()
 
-    def map_match_route(self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None):
+    def map_match_route(self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None,
+                        pattern_id: Optional[str] = None):
+
         if np.all(np.isin(route_stops.stop_id.values, self.available_stops)):
             path_directions, path_links = self._build_full_path_on_broken_links(route_stops, route_shape)
         else:

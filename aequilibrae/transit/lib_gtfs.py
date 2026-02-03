@@ -454,3 +454,4 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.map_matchers[pt_mode] = rmm
 
             self.mm_transformer = Transformer.from_crs(self.srid, self.map_matchers[pt_mode].crs, always_xy=True)
+            self.mm_transform_rev = Transformer.from_crs(self.map_matchers[pt_mode].crs, self.srid, always_xy=True)
