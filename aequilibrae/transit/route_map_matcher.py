@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 from typing import Optional
 
 import geopandas as gpd
@@ -18,13 +19,12 @@ DEAD_END_RUN = 40
 
 class RouteMapMatcher:
     def __init__(self, link_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame,
-                 distance_to_project=50, check_connectivity=True):
+                 distance_to_project=50):
         WorkerThread.__init__(self, None)
 
         utm_zone = metre_crs_for_gdf(link_gdf)
 
         self.logger = get_logger()
-        self.check_connectivity = check_connectivity
 
         self.links = self.__rename_geo(link_gdf).to_crs(utm_zone)
         stops_gdf = self.__rename_geo(stops_gdf).to_crs(utm_zone).rename(columns={"stop_id": "real_stop_id"})
@@ -130,16 +130,6 @@ class RouteMapMatcher:
         if not np.all(np.isin(route_stops.real_stop_id.values, self.available_stops)):
             self.__logger.critical("Route is not completely connected.")
             return [], []
-
-        if self.check_connectivity:
-            # We check if all the stops are connected:
-            centroids = self.graph.centroids
-            self.graph.prepare_graph(centroids=np.unique(route_stops.stop_id.to_numpy()))
-            skims = self.graph.compute_skims()
-            self.graph.prepare_graph(centroids=centroids)
-            if skims.results.skims.distance.max() >= 1.0e308:
-                self.__logger.critical("Route is not completely connected.")
-                return [], []
 
         # We discount the likely links for this route to favor them in the map-matching
         self.graph.cost = np.array(self.graph.graph[self.graph.cost_field])
@@ -286,6 +276,10 @@ class RouteMapMatcher:
                     df.reset_index(drop=True, inplace=True)
                     has_issues = True
                     break
+
+        df.dropna(subset=["original_id"], inplace=True)
+        df["original_id"] = df["original_id"].astype(int)
+
         return df.rename(columns={"original_id": "link_id", "direction": "dir"})
 
     def __graph_discount(self, route_shape: LineString) -> list:
