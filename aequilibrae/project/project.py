@@ -197,7 +197,7 @@ class Project:
             return
 
         try:
-            with self.project.db_connection as conn:
+            with self.db_connection as conn:
                 conn.commit()
             clean(self)
             for obj in [self.parameters, self.network]:
@@ -302,6 +302,8 @@ class Project:
         self.scenario.about = About(self)
         self.scenario.matrices = Matrices(self)
         self.scenario.results = Results(self)
+        self.scenario.transit = Transit(self)
+        self.scenario.zoning = Zoning(self.scenario.network)
 
     @property
     def project_parameters(self) -> Parameters:
@@ -345,7 +347,7 @@ class Project:
 
     @property
     def zoning(self):
-        return Zoning(self.network)
+        return self.scenario.zoning
 
     def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
