@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import csv
 
-from aequilibrae.utils.simwrapper.simwrapper_panel import SimwrapperPanel, TilePanel, TextPanel, AequilibraEMapPanel
+from aequilibrae.utils.simwrapper.simwrapper_panel import SimwrapperPanel, ConvergencePanel, TilePanel, TextPanel, AequilibraEMapPanel
 from aequilibrae.utils.simwrapper.simwrapper_utils import get_project_center, get_project_zoom
 
 class SimwrapperConfigGenerator:
@@ -440,45 +440,23 @@ class SimwrapperConfigGenerator:
     def _assignment_convergence_plot(self, results_dataframe):
         """ returns vegalite convergence plot panel """
 
+        #  export convergence csv
         csv_path = self._export_convergence_csv(results_dataframe)
 
         # skip if no convergence data
         if csv_path is None:
             return None
 
+        vega_spec = self._write_convergence_vega_spec(csv_path)
+
         # panel wrapper
-        panel = SimwrapperPanel(
+        panel = ConvergencePanel(
             type="vega",
             title="Assignment Convergence",
+            config=vega_spec,
             height=6,
             width=6,
         )
-
-        panel.spec = {
-            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-            "data": {
-                "url": str(csv_path),
-                "format": {"type": "csv"},
-            },
-            "mark": {"type": "line", "point": False},
-            "encoding": {
-                "x": {
-                    "field": "iteration",
-                    "type": "quantitative",
-                    "title": "Iteration",
-                },
-                "y": {
-                    "field": "rgap",
-                    "type": "quantitative",
-                    "title": "Relative Gap",
-                },
-                "color": {
-                    "field": "series",
-                    "type": "nominal",
-                    "title": "Scenario",
-                },
-            },
-        }
 
         return [panel]
 

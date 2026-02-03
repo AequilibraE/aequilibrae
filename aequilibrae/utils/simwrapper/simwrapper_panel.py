@@ -31,6 +31,20 @@ class SimwrapperPanel():
 
         return panel
 
+class ConvergencePanel(SimwrapperPanel):
+    def __init__(self, title, config, height=None, width=None):
+        super().__init__("vega", title, height=height, width=width)
+        self.config = config
+
+    def to_dict(self):
+        """Returns dictionary representation of the panel"""
+        panel = super().to_dict()
+
+        panel["config"] = self.config
+
+        return panel
+
+
 class TilePanel(SimwrapperPanel):
     """
     Panel used to display tabular summary statistics.
