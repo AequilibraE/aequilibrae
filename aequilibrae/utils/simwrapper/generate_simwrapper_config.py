@@ -422,6 +422,9 @@ class SimwrapperConfigGenerator:
                     "field": "rgap",
                     "type": "quantitative",
                     "title": "Relative Gap",
+                    "scale": {
+                        "type": "log"
+                    }
                 },
                 "color": {
                     "field": "series",
