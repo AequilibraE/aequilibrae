@@ -324,6 +324,31 @@ class SimwrapperConfigGenerator:
 
         return [base, tat]
 
+    def _voc_comp_row(self, results_tables):
+        """builds side by side comparison of Vehicles / Capacity maps for all scenarios"""
+
+        legend = [
+            {"subtitle": "Vehicles / Capacity"},
+            {"label": "0", "color": "#009392", "size": 4, "shape": "line"},
+            {"label": "1", "color": "#e9e29c", "size": 4, "shape": "line"},
+            {"label": ">2", "color": "#cf597e", "size": 4, "shape": "line"},
+        ]
+
+        row = []
+
+        for table in results_tables:
+            panel = self._scenario_metric_map(
+                title=f"{table} vehicles / capacity",
+                results_table=table,
+                metric_column="VOC_max",
+                legend=legend,
+                data_range=[0, 2],
+            )
+            row.append(panel)
+
+        return row
+
+
     def _parse_convergence_json(self, json_string):
         """ Parse procedure_report json and extract iteration and rgap arrays"""
 
@@ -480,6 +505,7 @@ class SimwrapperConfigGenerator:
         # if we have results table, add a delay factor comparison
         if len(results_tables) > 0:
             rows["delayFactorComparisonRow"] = self._metric_comp_row("delay factor", "Delay_factor_Max", results_tables)
+            rows["vocComparisonRow"] = self._voc_comp_row(results_tables)
             rows["assignmentConvergencePlot"] = self._assignment_convergence_plot(res_df)
 
         # convert panels to dicts and add to config
