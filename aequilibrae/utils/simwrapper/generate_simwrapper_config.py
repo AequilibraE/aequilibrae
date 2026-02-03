@@ -354,7 +354,7 @@ class SimwrapperConfigGenerator:
         return (iteration, rgap,)
 
     def _export_convergence_csv(self, results_dfataframe):
-        """ 
+        """
         export assignment convergence data for all result tables into a single CSV.
 
         outputs: iteration, rgap, series
@@ -399,10 +399,48 @@ class SimwrapperConfigGenerator:
         self._add_to_generated_files("assignment_convergence", output_path)
         return output_path
 
+    def _write_convergence_vega_spec(self, csv_path):
+        """writes vegalite spec for assignment convergence, returns path to this"""
+
+        # where to save it
+        path = self.output_dir/"assignment_convergence.vega.json"
+
+        spec = {
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "data": {
+                "url": str(csv_path),
+                "format": {"type": "csv"},
+            },
+            "mark": {"type": "line", "point": False},
+            "encoding": {
+                "x": {
+                    "field": "iteration",
+                    "type": "quantitative",
+                    "title": "Iteration",
+                },
+                "y": {
+                    "field": "rgap",
+                    "type": "quantitative",
+                    "title": "Relative Gap",
+                },
+                "color": {
+                    "field": "series",
+                    "type": "nominal",
+                    "title": "Scenario",
+                },
+            },
+        }
+
+        # write vega json
+        with open(path, "w") as f:
+            json.dump(spec, f, indent=2)
+
+        return path.name
+
     def _assignment_convergence_plot(self, results_dataframe):
         """ returns vegalite convergence plot panel """
 
-        csv_path = self._export_convergence_csv(results_dataframe) 
+        csv_path = self._export_convergence_csv(results_dataframe)
 
         # skip if no convergence data
         if csv_path is None:
