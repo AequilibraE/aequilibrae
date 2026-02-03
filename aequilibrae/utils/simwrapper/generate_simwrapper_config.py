@@ -45,6 +45,21 @@ class SimwrapperConfigGenerator:
         self.output_dir.mkdir(exist_ok=True)  # base
         self.data_dir.mkdir(exist_ok=True)  # data
 
+    def _find_project_title(self):
+        """ Generate  project title from the project folder name, otherwise returns "AequilibraE Project" """
+
+        try:
+            folder_name = self.project.project_base_path.name
+            title = folder_name.replace("_", " ").title()
+
+            if not title.strip():
+                raise ValueError
+
+            return title
+
+        except Exception:
+            return "AequilibraE Project"
+
     def _add_to_generated_files(self, key, path):
         """Add file to self.generated_files"""
         self.generated_files[key] = Path(path)
@@ -52,7 +67,7 @@ class SimwrapperConfigGenerator:
     def _dashboard_skeleton(self):
         """Defines header and layout structure for yaml and returns the basic config skeleton"""
 
-        config = {"header": {"title": "insert title", "description": "insert description"}, "layout": {}}
+        config = {"header": {"title": self._find_project_title(), "description": "insert description"}, "layout": {}}
 
         return config
 
