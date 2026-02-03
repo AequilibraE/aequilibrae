@@ -403,7 +403,7 @@ class SimwrapperConfigGenerator:
         """writes vegalite spec for assignment convergence, returns path to this"""
 
         # where to save it
-        path = self.output_dir/"assignment_convergence.vega.json"
+        path = self.output_dir/"simwrapper_data"/"assignment_convergence.vega.json"
 
         spec = {
             "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
@@ -451,9 +451,8 @@ class SimwrapperConfigGenerator:
 
         # panel wrapper
         panel = ConvergencePanel(
-            type="vega",
             title="Assignment Convergence",
-            config=vega_spec,
+            config="simwrapper/simwrapper_data/"+vega_spec,
             height=6,
             width=6,
         )
