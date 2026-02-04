@@ -337,7 +337,7 @@ class RouteMapMatcher:
                 seg = list(reversed(seg))
                 seg = seg[1:]
             coords.extend(seg)
-        return shape
+        return LineString(coords)
 
     @staticmethod
     def __rename_geo(gdf):
