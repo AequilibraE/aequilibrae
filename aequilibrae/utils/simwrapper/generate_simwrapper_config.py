@@ -96,17 +96,25 @@ class SimwrapperConfigGenerator:
 
         # aequilibrae panel with center and zoom
         panel = AequilibraEMapPanel(
-            "Entire Network", height=10, width=6, center=self.center, zoom=self.zoom, projection="EPSG:32719"
+            "Entire Network",
+            height=10, width=6,
+            center=self.center,
+            zoom=self.zoom,
+            projection="EPSG:32719",
         )
 
+        # set legend
+        panel.set_legend(
+            [
+                {"label": "Link", "color": "#4c72b0", "shape": "line"},
+                {"label": "Centroid Node", "color": "#FF6600", "shape": "line"},
+                {"label": "Regular Node", "color": "#cacaca", "shape": "line",},
+            ]
+        )
+
+
         # set default styling
-        default_style = {
-            "fillColor": "#6f6f6f",
-            "lineColor": "#FF6600",
-            "lineWidth": 2,
-            "pointRadius": 4,
-        }
-        panel.set_defaults(default_style)
+        self._set_default_defaults(panel)
 
         # add link nodes layer
         link_style = {"lineColor": "#4c72b0", "lineWidth": 2,}
@@ -145,6 +153,18 @@ class SimwrapperConfigGenerator:
         # retun panel inside a list
         return [panel]
 
+    def _set_default_defaults(self, panel):
+        """ Set default default such that we can see when user hasnt specified colors"""
+
+        panel.set_defaults(
+            {
+                "fillColor": "##00ffef",
+                "lineColor": "##ffff00",
+                "lineWidth": 2,
+                "pointRadius": 4,
+            }
+        )
+
     def _links_info_row(self):
         """Builds yaml config for panel to show attributes of selected link"""
 
@@ -157,11 +177,7 @@ class SimwrapperConfigGenerator:
                 {"subtitle": "Link Types"},
                 {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
                 {"label": "Road", "color": "#74BBCD", "shape": "line"},
-                {
-                    "label": "Centroid Connector",
-                    "color": "#99637f",
-                    "shape": "line",
-                },
+                {"label": "Centroid Connector", "color": "#99637f", "shape": "line",},
             ]
         )
 
@@ -255,14 +271,7 @@ class SimwrapperConfigGenerator:
         panel.set_extra_databases({"results": "results_database.sqlite"})
 
         # defaultstyling
-        panel.set_defaults(
-            {
-                "fillColor": "#6f6f6f",
-                "lineColor": "#FF6600",
-                "lineWidth": 2,
-                "pointRadius": 4,
-            }
-        )
+        self._set_default_defaults(panel)
 
         panel.set_legend(legend)
 
