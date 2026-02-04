@@ -108,18 +108,38 @@ class SimwrapperConfigGenerator:
         }
         panel.set_defaults(default_style)
 
+        # add link nodes layer
+        link_style = {"lineColor": "#4c72b0", "lineWidth": 2,}
+        panel.add_layer(
+            "links",
+            {"table": "links",
+            "geometry": "line",
+            "style": link_style,
+            "legend": {
+                "title": "Network Elements",
+                "label": "Links",
+                "symbol": "line",},
+            },
+        )
+
         # add centroid nodes layer
         centroid_node_style = {"fillColor": "#FF6600", "pointRadius": 120}
         panel.add_layer(
             "nodes_centroids",
-            {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=1", "style": centroid_node_style},
+            {"table": "nodes",
+             "geometry": "point",
+             "sqlFilter": "is_centroid=1",
+             "style": centroid_node_style},
         )
 
         # add regular nodes layer
         regular_node_style = {"fillColor": "#cacaca", "pointRadius": 35}
         panel.add_layer(
             "nodes_regular",
-            {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=0", "style": regular_node_style},
+            {"table": "nodes",
+             "geometry": "point",
+             "sqlFilter": "is_centroid=0",
+             "style": regular_node_style},
         )
 
         # retun panel inside a list
