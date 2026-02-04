@@ -1,10 +1,11 @@
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from shapely import LineString
+from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import linemerge
 
 from aequilibrae.context import get_logger
@@ -305,7 +306,7 @@ class RouteMapMatcher:
         # Find all links that intersect this buffer
         return gdf.sjoin(geolinks, how="inner", predicate="contains").link_id.tolist()
 
-    def assemble_shape(self, df: pd.DataFrame):
+    def assemble_shape(self, df: pd.DataFrame, enforce_single_parts =True) -> Union[LineString, MultiLineString]:
         """Assembles a LineString shape from the matched path links.
 
         Args:
@@ -314,11 +315,29 @@ class RouteMapMatcher:
         Returns:
             LineString: The assembled route shape
         """
-        lines = self.graph.network[["original_id", "geometry"]].rename(columns={"original_id": "link_id"})
-        df = lines.merge(df.assign(sequence=np.arange(df.shape[0])), on="link_id", how="inner").sort_values("sequence")
+        if df.empty:
+            return LineString()
+        df_ = self.links[["link_id", "geometry"]].merge(df.assign(sequence=np.arange(df.shape[0])), on="link_id",
+                                                        how="inner").sort_values("sequence")
+        df_.reset_index(drop=True, inplace=True)
         # dir < 0 means BA direction (reverse), dir >= 0 means AB direction (forward)
-        shapes = [rec.geometry.reverse() if rec.dir < 0 else rec.geometry for _, rec in df.iterrows()]
-        return linemerge(shapes)
+        shapes = [rec.geometry.reverse() if rec["dir"] < 0 else rec.geometry for _, rec in df_.iterrows()]
+
+        shape = linemerge(shapes)
+        if isinstance(shape, LineString) or not enforce_single_parts:
+            return shape
+
+        # If linemerge returned MultiLineString, we need to connect the parts to force it to be a single LineString
+        coords = list(shapes[0].coords)
+        for geom in shapes[1:]:
+            seg = list(geom.coords)
+            if np.allclose(coords[-1], seg[0]):
+                seg = seg[1:]
+            elif np.allclose(coords[-1], seg[-1]):
+                seg = list(reversed(seg))
+                seg = seg[1:]
+            coords.extend(seg)
+        return shape
 
     @staticmethod
     def __rename_geo(gdf):
