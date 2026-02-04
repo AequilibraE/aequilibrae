@@ -157,7 +157,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):  # type:Pattern
             if pat.route_type in route_types:
-                print(pat.pattern_id)
                 pat.map_match()
 
     def set_agency_identifier(self, agency_id: str) -> None:
