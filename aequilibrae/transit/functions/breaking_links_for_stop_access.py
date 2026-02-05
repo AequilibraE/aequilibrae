@@ -21,9 +21,12 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
         tolerance: Search radius.
 
     Returns:
-        GeoDataFrame: A new GeoDataFrame of the provided lines, where some have been split.
-                      Contains updated "a_node", "b_node", and "geometry".
-                      Original link attributes are preserved (duplicated for splits).
+        List[GeoDataFrame]: A list containing two GeoDataFrames:
+            - broken_links: The provided links where some have been split at stop locations.
+              Contains updated "a_node", "b_node", and "geometry". Original link attributes are
+              preserved (duplicated for splits).
+            - new_nodes: Point geometries representing the new nodes created at split locations,
+              with IDs starting from `start_node_id`.
     """
 
     start_node_id = max(links.a_node.max(), links.b_node.max(), stops.stop_id.max()) + 1
