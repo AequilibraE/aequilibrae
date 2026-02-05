@@ -112,10 +112,6 @@ class SimwrapperConfigGenerator:
             ]
         )
 
-
-        # set default styling
-        self._set_default_defaults(panel)
-
         # add link nodes layer
         link_style = {"lineColor": "#4c72b0", "lineWidth": 2,}
         panel.add_layer(
@@ -153,17 +149,6 @@ class SimwrapperConfigGenerator:
         # retun panel inside a list
         return [panel]
 
-    def _set_default_defaults(self, panel):
-        """ Set default default such that we can see when user hasnt specified colors"""
-
-        panel.set_defaults(
-            {
-                "fillColor": "##00ffef",
-                "lineColor": "##ffff00",
-                "lineWidth": 2,
-                "pointRadius": 4,
-            }
-        )
 
     def _links_info_row(self):
         """Builds yaml config for panel to show attributes of selected link"""
@@ -269,9 +254,6 @@ class SimwrapperConfigGenerator:
 
         # add extra db
         panel.set_extra_databases({"results": "results_database.sqlite"})
-
-        # defaultstyling
-        self._set_default_defaults(panel)
 
         panel.set_legend(legend)
 

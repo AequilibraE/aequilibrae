@@ -118,7 +118,7 @@ class AequilibraEMapPanel(SimwrapperPanel):
         panel = AequilibraEMapPanel(title, database, view, height, width, center, zoom, projection)
     """
     def __init__(self, title, database="project_database.sqlite", view="map", height=None, width=None, 
-                         center=None, zoom=None, projection=None):
+                         center=None, zoom=None, projection=None, defaults_dict=None):
         super().__init__("aequilibrae", title, height=height, width=width)
 
         self.database = database
@@ -126,11 +126,30 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.center = center
         self.zoom = zoom
         self.projection = projection
+        self.defaults_dict = defaults_dict
 
-        self.defaults = None
+        if defaults_dict is not None:
+            self._set_default_defaults()
+        else:
+            self._set_defaults(self.defaults_dict)
+
         self.extra_databases = None
         self.layers = {}
         self.legend = None
+
+    def _set_default_defaults(self):
+        """
+        Set default default such that we can see when user hasnt specified colors. This is a debug tool purposefully 
+        made ridiculous.
+        """
+        self.set_defaults(
+            {
+                "fillColor": "##00ffef",
+                "lineColor": "##ffff00",
+                "lineWidth": 500,
+                "pointRadius": 20,
+            }
+        )
 
     def set_defaults(self, defaults_dict):
         """ Sets default visuals for map layers"""
