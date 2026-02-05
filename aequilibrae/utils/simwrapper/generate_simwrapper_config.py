@@ -543,12 +543,12 @@ class SimwrapperConfigGenerator:
         # styling based on pce_tot
         style = {
             "lineColor": {
-                "column": "pce_tot",
+                "column": "PCE_tot",
                 "palette": "Turbo",
                 "dataRange": [0, 5000],
             },
             "lineWidth": {
-                "column": "pce_tot",
+                "column": "PCE_tot",
                 "dataRange": [0, 5000],
                 "widthRange": [1, 20],
             },
