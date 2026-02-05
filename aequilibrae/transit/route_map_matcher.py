@@ -150,7 +150,7 @@ class RouteMapMatcher:
                 return [], []
             plnks = list(res.path[1:-1])
             pdirecs = list(res.path_link_directions[1:-1])
-            return plnks, pdirecs
+            return pdirecs, plnks
 
         access_links = self.graph.network[self.graph.network.a_node.isin(route_stops.stop_id.values)]
         path_links, path_directions = [], []
