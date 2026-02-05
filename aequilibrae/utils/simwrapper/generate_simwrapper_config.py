@@ -336,7 +336,7 @@ class SimwrapperConfigGenerator:
             results_table="base_case",
             metric_column="Delay_factor_Max",
             legend=legend,
-            data_range=[1, 3],
+            data_range=[1, 1.00005],
         )
 
         # transit/active friendly delay factor map
@@ -345,7 +345,7 @@ class SimwrapperConfigGenerator:
             results_table="transit_and_active_friendly",
             metric_column="Delay_factor_Max",
             legend=legend,
-            data_range=[1, 3],
+            data_range=[1, 1.00005],
         )
 
         return [base, tat]
@@ -513,63 +513,30 @@ class SimwrapperConfigGenerator:
 
         return [panel]
 
-    def _flow_map_row(self):
-        """
-        Map of links styled by assigned flows (pce_tot).
-        """
+    def _flow_map_row(self, results_tables):
+        """ Map of links styled by assigned flows (PCE_tot) """
 
-        panel = AequilibraEMapPanel(
-            title="Link Flows (PCE)",
-            height=10,
-            width=6,
-            center=self.center,
-            zoom=self.zoom,
-            projection="EPSG:32719",
-        )
+        legend = [
+            {"subtitle": "Flows"},
+            {"label": "Low", "color": "#009392", "size": 4, "shape": "line"},
+            {"label": "Medium", "color": "#e9e29c", "size": 4, "shape": "line"},
+            {"label": "High", "color": "#cf597e", "size": 4, "shape": "line"},
+        ]
 
-        # add results database so we can join flow results
-        panel.set_extra_databases({"results": "results_database.sqlite"})
+        row = []
 
-        panel.set_legend(
-            [
-                {"subtitle": "Flow (PCE)"},
-                {"label": "Low", "color": "#2C7BB6", "size": 2, "shape": "line"},
-                {"label": "Medium", "color": "#ABD9E9", "size": 4, "shape": "line"},
-                {"label": "High", "color": "#FDAE61", "size": 6, "shape": "line"},
-                {"label": "Very High", "color": "#D7191C", "size": 8, "shape": "line"},
-            ]
-        )
+        for table in results_tables:
+            panel = self._scenario_metric_map(
+                title=f"{table} flows",
+                results_table=table,
+                metric_column="PCE_tot",
+                legend=legend,
+                data_range=[0, 1500],
+                width_by_link_type=False,
+            )
+            row.append(panel)
 
-        # styling based on pce_tot
-        style = {
-            "lineColor": {
-                "column": "PCE_tot",
-                "palette": "Turbo",
-                "dataRange": [0, 5000],
-            },
-            "lineWidth": {
-                "column": "PCE_tot",
-                "dataRange": [0, 5000],
-                "widthRange": [1, 20],
-            },
-        }
-
-        # add link layer joined to base-case results
-        panel.add_layer(
-            "links",
-            {"table": "links",
-            "geometry": "line",
-            "join": {
-                "database": "results",
-                "table": "base_case",
-                "leftKey": "link_id",
-                "rightKey": "link_id",
-                "type": "left",},
-            "style": style,
-            },
-        )
-
-        return [panel]
+        return row
 
 
     def _build_dashboard_config(self):
@@ -590,7 +557,7 @@ class SimwrapperConfigGenerator:
 
         # if we have results table, add relevant panels to dashboard
         if len(results_tables) > 0:
-            rows["flowMapRow"] = self._flow_map_row()
+            rows["flowMapRow"] = self._flow_map_row(results_tables)
             rows["delayFactorComparisonRow"] = self._metric_comp_row("delay factor", "Delay_factor_Max", results_tables)
             rows["vocComparisonRow"] = self._voc_comp_row(results_tables)
             rows["assignmentConvergencePlot"] = self._assignment_convergence_plot(res_df)
