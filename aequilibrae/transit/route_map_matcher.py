@@ -187,7 +187,7 @@ class RouteMapMatcher:
                 # Find the best network node to exit this stop from
                 # We evaluate all connector links from this stop and choose the one
                 # that minimizes total cost (current path + estimated cost to next stop)
-                # That is MUCH easier done with the reserve graph, though
+                # That is MUCH easier done with the reverse graph, though
 
                 res.update_trace(next_stop)
                 if res.path_nodes is None or res.path_nodes.shape[0] == 0:
