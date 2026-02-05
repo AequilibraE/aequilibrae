@@ -30,7 +30,8 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
 
     # --- Step 0: Make sure we are operating in metres  ---
     for df in [stops, links]:
-        assert df.crs.axis_info[0].unit_name == "metre", "Both GeoDataFrames must be in a CRS with metre units."
+        assert df.crs.axis_info[0].unit_name.lower() in ["metre", "meter"], \
+            "Both GeoDataFrames must be in a CRS with metre/meter units."
 
     # --- Step 1: Matching Points to Lines (Same as before) ---
     # Buffer and intersection
