@@ -308,7 +308,7 @@ class RouteMapMatcher:
         # Find all links that intersect this buffer
         return gdf.sjoin(geolinks, how="inner", predicate="contains").link_id.tolist()
 
-    def assemble_shape(self, df: pd.DataFrame, enforce_single_parts =True) -> Union[LineString, MultiLineString]:
+    def assemble_shape(self, df: pd.DataFrame, enforce_single_parts=True) -> Union[LineString, MultiLineString]:
         """Assembles a LineString shape from the matched path links.
 
         Args:
