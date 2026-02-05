@@ -370,9 +370,9 @@ class SimwrapperConfigGenerator:
 
         legend = [
             {"subtitle": "Vehicles / Capacity"},
-            {"label": "0", "color": "#009392", "size": 4, "shape": "line"},
-            {"label": "1", "color": "#e9e29c", "size": 4, "shape": "line"},
-            {"label": ">2", "color": "#cf597e", "size": 4, "shape": "line"},
+            {"label": "low", "color": "#009392", "size": 4, "shape": "line"},
+            {"label": "medium", "color": "#e9e29c", "size": 4, "shape": "line"},
+            {"label": "high", "color": "#cf597e", "size": 4, "shape": "line"},
         ]
 
         row = []
@@ -383,7 +383,7 @@ class SimwrapperConfigGenerator:
                 results_table=table,
                 metric_column="VOC_max",
                 legend=legend,
-                data_range=[0, 2],
+                data_range=[0, 0.05],
             )
             row.append(panel)
 
