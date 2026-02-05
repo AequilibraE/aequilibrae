@@ -132,7 +132,7 @@ class RouteMapMatcher:
         route_stops = route_stops.merge(self.stop_ids, on="real_stop_id")
 
         if not np.all(np.isin(route_stops.real_stop_id.values, self.available_stops)):
-            self.__logger.critical("Route is not completely connected.")
+            self.logger.critical("Route is not completely connected.")
             return [], []
 
         # We discount the likely links for this route to favor them in the map-matching
