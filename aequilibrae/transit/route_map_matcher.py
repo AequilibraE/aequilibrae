@@ -58,6 +58,8 @@ class RouteMapMatcher:
 
     def map_match_route(self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None,
                         pattern_id: Optional[str] = None):
+        # `pattern_id` is accepted for API compatibility and reserved for future use (e.g., logging/filtering).
+        _ = pattern_id
 
         if np.all(np.isin(route_stops.stop_id.values, self.available_stops)):
             path_directions, path_links = self._build_full_path_on_broken_links(route_stops, route_shape)
