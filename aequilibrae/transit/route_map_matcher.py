@@ -177,7 +177,7 @@ class RouteMapMatcher:
                 continue
 
             # Let's see if we can reach the following stop while going through the next one
-            # Whis would save us some path computation
+            # This would save us some path computation
             res.compute_path(current_stop, following_stop, early_exit=False)
             indices_in_a = np.where(np.isin(connection_candidates, res.path_nodes))[0]
             if indices_in_a.shape[0] > 0:
