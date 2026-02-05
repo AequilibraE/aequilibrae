@@ -89,7 +89,7 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
 
     if valid_splits.empty:
         logging.debug("No valid splits found within tolerance? The map-matching will likely fail.")
-        return links.copy()
+        return [links.copy(), gpd.GeoDataFrame([], columns=["node_id", "geometry"], crs=links.crs)]
 
     # Identify unique split locations per link
     # A point maps to (link_id, distance).
