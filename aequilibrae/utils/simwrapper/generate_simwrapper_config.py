@@ -106,23 +106,38 @@ class SimwrapperConfigGenerator:
         # set legend
         panel.set_legend(
             [
-                {"label": "Link", "color": "#4c72b0", "shape": "line"},
+                {"label": "Regular Links", "color": "#4c72b0", "shape": "line"},
+                {"label": "Centroid Connectors", "color": "#9c72b0", "shape": "line"},
                 {"label": "Centroid Node", "color": "#FF6600", "shape": "line"},
                 {"label": "Regular Node", "color": "#cacaca", "shape": "line",},
             ]
         )
 
-        # add link nodes layer
-        link_style = {"lineColor": "#4c72b0", "lineWidth": 2,}
+        # non-centroid connector links
         panel.add_layer(
-            "links",
-            {"table": "links",
-            "geometry": "line",
-            "style": link_style,
-            "legend": {
-                "title": "Network Elements",
-                "label": "Links",
-                "symbol": "line",},
+            "links_regular",
+            {
+                "table": "links",
+                "geometry": "line",
+                "sqlFilter": "link_type != 3",
+                "style": {
+                    "lineColor": "#4C78A8",
+                    "lineWidth": 2,
+                },
+            },
+        )
+
+        # centroid connector links
+        panel.add_layer(
+            "links_centroid_connectors",
+            {
+                "table": "links",
+                "geometry": "line",
+                "sqlFilter": "link_type = 3",
+                "style": {
+                    "lineColor": "#9c72b0",
+                    "lineWidth": 3,
+                },
             },
         )
 
