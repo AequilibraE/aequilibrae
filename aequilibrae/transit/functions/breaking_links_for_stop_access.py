@@ -13,7 +13,7 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
     gpd.GeoDataFrame]:
     """
     Breaks links at the closest points for the nodes (transit stops) nearby, within a certain tolerance.
-    New nodes are created at split points with IDs starting from `start_node_id`.
+    New nodes are created at split points with IDs continuing from the maximum of the existing `a_node` and `b_node` values.
 
     Args:
         stops: GeoDataFrame of points
