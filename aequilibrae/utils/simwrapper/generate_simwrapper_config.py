@@ -383,7 +383,7 @@ class SimwrapperConfigGenerator:
                 results_table=table,
                 metric_column="VOC_max",
                 legend=legend,
-                data_range=[0, 0.05],
+                data_range=[0.5, 1.5],
             )
             row.append(panel)
 
