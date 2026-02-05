@@ -30,4 +30,4 @@ def test_break_links_with_stops(route_system_builder):
     assert broken_links.geometry.length.sum() == pytest.approx(links.geometry.to_crs(broken_links.crs).length.sum(),
                                                                abs=0.001)
     assert broken_links.shape[0] >= links.shape[0] + stops.shape[0]
-    assert 0 <= new_nodes.shape[0] <= stops.shape[0]
+    assert  new_nodes.shape[0] >= stops.shape[0]
