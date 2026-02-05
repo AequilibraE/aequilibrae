@@ -513,6 +513,65 @@ class SimwrapperConfigGenerator:
 
         return [panel]
 
+    def _flow_map_row(self):
+        """
+        Map of links styled by assigned flows (pce_tot).
+        """
+
+        panel = AequilibraEMapPanel(
+            title="Link Flows (PCE)",
+            height=10,
+            width=6,
+            center=self.center,
+            zoom=self.zoom,
+            projection="EPSG:32719",
+        )
+
+        # add results database so we can join flow results
+        panel.set_extra_databases({"results": "results_database.sqlite"})
+
+        panel.set_legend(
+            [
+                {"subtitle": "Flow (PCE)"},
+                {"label": "Low", "color": "#2C7BB6", "size": 2, "shape": "line"},
+                {"label": "Medium", "color": "#ABD9E9", "size": 4, "shape": "line"},
+                {"label": "High", "color": "#FDAE61", "size": 6, "shape": "line"},
+                {"label": "Very High", "color": "#D7191C", "size": 8, "shape": "line"},
+            ]
+        )
+
+        # styling based on pce_tot
+        style = {
+            "lineColor": {
+                "column": "pce_tot",
+                "palette": "Turbo",
+                "dataRange": [0, 5000],
+            },
+            "lineWidth": {
+                "column": "pce_tot",
+                "dataRange": [0, 5000],
+                "widthRange": [1, 20],
+            },
+        }
+
+        # add link layer joined to base-case results
+        panel.add_layer(
+            "links",
+            {"table": "links",
+            "geometry": "line",
+            "join": {
+                "database": "results",
+                "table": "base_case",
+                "leftKey": "link_id",
+                "rightKey": "link_id",
+                "type": "left",},
+            "style": style,
+            },
+        )
+
+        return [panel]
+
+
     def _build_dashboard_config(self):
         """Builds and returns full dashboard configuration for simwrapper"""
 
@@ -528,8 +587,10 @@ class SimwrapperConfigGenerator:
 
         res_df = self.project.results.list()
         results_tables = res_df["table_name"].tolist()
-        # if we have results table, add a delay factor comparison
+
+        # if we have results table, add relevant panels to dashboard
         if len(results_tables) > 0:
+            rows["flowMapRow"] = self._flow_map_row()
             rows["delayFactorComparisonRow"] = self._metric_comp_row("delay factor", "Delay_factor_Max", results_tables)
             rows["vocComparisonRow"] = self._voc_comp_row(results_tables)
             rows["assignmentConvergencePlot"] = self._assignment_convergence_plot(res_df)

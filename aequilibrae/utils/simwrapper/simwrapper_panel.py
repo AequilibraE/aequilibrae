@@ -118,7 +118,7 @@ class AequilibraEMapPanel(SimwrapperPanel):
         panel = AequilibraEMapPanel(title, database, view, height, width, center, zoom, projection)
     """
     def __init__(self, title, database="project_database.sqlite", view="map", height=None, width=None, 
-                         center=None, zoom=None, projection=None, defaults_dict=None):
+                         center=None, zoom=None, projection=None, defaults_dict={}):
         super().__init__("aequilibrae", title, height=height, width=width)
 
         self.database = database
@@ -128,10 +128,10 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.projection = projection
         self.defaults_dict = defaults_dict
 
-        if defaults_dict is not None:
+        if defaults_dict != {}:
             self._set_default_defaults()
         else:
-            self._set_defaults(self.defaults_dict)
+            self.set_defaults(self.defaults_dict)
 
         self.extra_databases = None
         self.layers = {}
