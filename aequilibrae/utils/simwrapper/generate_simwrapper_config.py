@@ -122,7 +122,7 @@ class SimwrapperConfigGenerator:
                 "sqlFilter": "link_type != 3",
                 "style": {
                     "lineColor": "#4C78A8",
-                    "lineWidth": 2,
+                    "lineWidth": 2
                 },
             },
         )
@@ -197,7 +197,7 @@ class SimwrapperConfigGenerator:
                         "column": "link_type",
                         "colors": link_type_by_colour,
                     },
-                    "lineWidth": 10
+                    "lineWidth": 10,
                 },
             },
         )
