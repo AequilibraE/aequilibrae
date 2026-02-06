@@ -1,5 +1,5 @@
-class SimwrapperPanel():
-    """ Base class for all simwrapper panels
+class SimwrapperPanel:
+    """Base class for all simwrapper panels
 
     :Arguments:
         **type** (:obj:`str`): panel type
@@ -10,6 +10,7 @@ class SimwrapperPanel():
     :Example:
         panel = SimwrapperPanel("text", "My Panel", height=3, width=6)
     """
+
     def __init__(self, type, title, height=None, width=None):
         self.type = type
         self.title = title
@@ -30,6 +31,7 @@ class SimwrapperPanel():
             panel["width"] = self.width
 
         return panel
+
 
 class ConvergencePanel(SimwrapperPanel):
     def __init__(self, title, config, height=None, width=None):
@@ -58,6 +60,7 @@ class TilePanel(SimwrapperPanel):
     :Example:
         panel = TilePanel("Summary Statistics", "data/summary.csv", height=3)
     """
+
     def __init__(self, title, dataset, height=None, width=None):
         super().__init__("tile", title, height=height, width=width)
         self.dataset = dataset
@@ -69,6 +72,7 @@ class TilePanel(SimwrapperPanel):
         panel["dataset"] = self.dataset
 
         return panel
+
 
 class TextPanel(SimwrapperPanel):
     """
@@ -84,6 +88,7 @@ class TextPanel(SimwrapperPanel):
     :Example:
         panel = TextPanel("Overview", "text/overview.md", is_file=True)
     """
+
     def __init__(self, title, data, is_file=False, height=None, width=None):
         super().__init__("text", title, height=height, width=width)
         self.data = data
@@ -100,6 +105,7 @@ class TextPanel(SimwrapperPanel):
 
         return panel
 
+
 class AequilibraEMapPanel(SimwrapperPanel):
     """
     Panel for rendering interactive AequilibraE network maps.
@@ -107,7 +113,6 @@ class AequilibraEMapPanel(SimwrapperPanel):
     :Arguments:
         **title** (:obj:`str`): title
         **database** (:obj:`str`, *Optional*): project database
-        **view** (:obj:`str`, *Optional*): panel view type
         **height** (:obj:`int`, *Optional*): panel height
         **width** (:obj:`int`, *Optional*): panel width
         **center** (:obj:`list`, *Optional*): map center coordinates
@@ -117,12 +122,20 @@ class AequilibraEMapPanel(SimwrapperPanel):
     :Example:
         panel = AequilibraEMapPanel(title, database, view, height, width, center, zoom, projection)
     """
-    def __init__(self, title, database="project_database.sqlite", view="map", height=None, width=None,
-                         center=None, zoom=None, projection=None):
+
+    def __init__(
+        self,
+        title,
+        database="project_database.sqlite",
+        height=None,
+        width=None,
+        center=None,
+        zoom=None,
+        projection=None,
+    ):
         super().__init__("aequilibrae", title, height=height, width=width)
 
         self.database = database
-        self.view = view
         self.center = center
         self.zoom = zoom
         self.projection = projection
@@ -134,10 +147,12 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.legend = None
 
     def set_defaults(self, defaults_dict=None):
-        """ Sets default visuals for map layers"""
+        """Sets default visuals for map layers"""
         if defaults_dict:
             available_keys = {"fillColor", "lineColor", "lineWidth", "pointRadius"}
-            assert not available_keys ^ defaults_dict.keys(), f"Defaults dictionary can only contain the following keys: " + ", ".join(available_keys)
+            assert not available_keys ^ defaults_dict.keys(), (
+                f"Defaults dictionary can only contain the following keys: " + ", ".join(available_keys)
+            )
 
             self.defaults = defaults_dict
         else:
@@ -150,15 +165,15 @@ class AequilibraEMapPanel(SimwrapperPanel):
             }
 
     def add_layer(self, name, layer_dict):
-        """ Adds a layer definition under the given name"""
+        """Adds a layer definition under the given name"""
         self.layers[name] = layer_dict
 
     def set_legend(self, legend_list):
-        """ Sets legend configuration for the map"""
+        """Sets legend configuration for the map"""
         self.legend = legend_list
 
     def set_extra_databases(self, database_dict):
-        """ Registers extra databases used by map """
+        """Registers extra databases used by map"""
         self.extra_databases = database_dict
 
     def to_dict(self):
@@ -166,7 +181,6 @@ class AequilibraEMapPanel(SimwrapperPanel):
         panel = super().to_dict()
 
         panel["database"] = self.database
-        panel["view"] = self.view
 
         if self.center:
             panel["center"] = self.center
@@ -191,3 +205,53 @@ class AequilibraEMapPanel(SimwrapperPanel):
 
         return panel
 
+
+class AequilibraEResultsMapPanel(AequilibraEMapPanel):
+    """
+    Panel for rendering interactive AequilibraE network maps with results layers.
+
+    :Arguments:
+        **title** (:obj:`str`): title
+    """
+
+    def __init__(
+        self,
+        title,
+        project_database="project_database.sqlite",
+        results_database="results_database.sqlite",
+        colour_metric=None,
+        width_metric=None,
+        height=None,
+        width=None,
+        center=None,
+        zoom=None,
+        projection=None,
+    ):
+        super().__init__(
+            title, project_database, height=height, width=width, center=center, zoom=zoom, projection=projection
+        )
+
+        self.results_database = results_database
+        self.colour_metric = colour_metric
+        self.width_metric = width_metric
+
+        super().set_extra_databases({"results": self.results_database})
+        super().set_legend = self.build_legend()
+
+        self.set_colour_styling()
+        self.set_width_styling()
+
+    def build_legend(self):
+        pass
+
+    def set_colour_styling(self):
+        self.colour_style = {
+            "lineColor": {
+                "column": self.colour_metric,
+                "palette": palette,
+                "dataRange": data_range,
+            }
+        }
+
+    def set_width_styling(self):
+        pass
