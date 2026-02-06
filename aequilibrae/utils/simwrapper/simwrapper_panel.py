@@ -126,7 +126,6 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.center = center
         self.zoom = zoom
         self.projection = projection
-        self.defaults_dict = defaults_dict
 
         self.set_defaults()
 
@@ -134,11 +133,11 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.layers = {}
         self.legend = None
 
-    def set_defaults(self, defaults_dict):
+    def set_defaults(self, defaults_dict=None):
         """ Sets default visuals for map layers"""
         if defaults_dict:
             available_keys = {"fillColor", "lineColor", "lineWidth", "pointRadius"}
-            assert not available_keys ^ defaults_dict.keys(), f"Defaults dictionary can only contain the following keys: " + ", ".join(available_keys))
+            assert not available_keys ^ defaults_dict.keys(), f"Defaults dictionary can only contain the following keys: " + ", ".join(available_keys)
 
             self.defaults = defaults_dict
         else:
@@ -191,3 +190,4 @@ class AequilibraEMapPanel(SimwrapperPanel):
             panel["layers"] = self.layers
 
         return panel
+

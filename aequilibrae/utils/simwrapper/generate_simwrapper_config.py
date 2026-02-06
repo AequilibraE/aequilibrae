@@ -196,7 +196,8 @@ class SimwrapperConfigGenerator:
                     "lineColor": {
                         "column": "link_type",
                         "colors": link_type_by_colour,
-                    }
+                    },
+                    "lineWidth": 10
                 },
             },
         )
@@ -244,7 +245,7 @@ class SimwrapperConfigGenerator:
         return [panel]
 
     def _scenario_metric_map(
-        self, title, results_table, metric_column, legend, data_range, palette="Temps", width_by_link_type=True
+        self, title, results_table, metric_column, legend, data_range, palette="Temps", width_by_link_type=True, width_by_metric=None
     ):
         """makes scenario comparison map for a network's performance metric'
 
@@ -290,6 +291,13 @@ class SimwrapperConfigGenerator:
                     2: 40,
                     1: 20,
                 },
+            }
+
+        if width_by_metric:
+            style["lineWidth"] = {
+                "column": width_by_metric,
+                "dataRange": [0, 500], # change depending on project/ guess better
+                "widthRange": [10, 250]
             }
 
         # add links layer
@@ -544,10 +552,11 @@ class SimwrapperConfigGenerator:
             panel = self._scenario_metric_map(
                 title=f"{table} flows",
                 results_table=table,
-                metric_column="PCE_tot",
+                metric_column="VOC_max",
                 legend=legend,
                 data_range=[0, 1500],
                 width_by_link_type=False,
+                width_by_metric="PCE_tot"
             )
             row.append(panel)
 
