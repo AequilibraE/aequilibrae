@@ -117,8 +117,8 @@ class AequilibraEMapPanel(SimwrapperPanel):
     :Example:
         panel = AequilibraEMapPanel(title, database, view, height, width, center, zoom, projection)
     """
-    def __init__(self, title, database="project_database.sqlite", view="map", height=None, width=None, 
-                         center=None, zoom=None, projection=None, defaults_dict={}):
+    def __init__(self, title, database="project_database.sqlite", view="map", height=None, width=None,
+                         center=None, zoom=None, projection=None):
         super().__init__("aequilibrae", title, height=height, width=width)
 
         self.database = database
@@ -128,32 +128,27 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.projection = projection
         self.defaults_dict = defaults_dict
 
-        if defaults_dict != {}:
-            self._set_default_defaults()
-        else:
-            self.set_defaults(self.defaults_dict)
+        self.set_defaults()
 
         self.extra_databases = None
         self.layers = {}
         self.legend = None
 
-    def _set_default_defaults(self):
-        """
-        Set default default such that we can see when user hasnt specified colors. This is a debug tool purposefully 
-        made ridiculous.
-        """
-        self.set_defaults(
-            {
-                "fillColor": "##00ffef",
-                "lineColor": "##ffff00",
+    def set_defaults(self, defaults_dict):
+        """ Sets default visuals for map layers"""
+        if defaults_dict:
+            available_keys = {"fillColor", "lineColor", "lineWidth", "pointRadius"}
+            assert not available_keys ^ defaults_dict.keys(), f"Defaults dictionary can only contain the following keys: " + ", ".join(available_keys))
+
+            self.defaults = defaults_dict
+        else:
+            # fallback to some default values if none provided
+            self.defaults = {
+                "fillColor": "#00ffef",
+                "lineColor": "#ffff00",
                 "lineWidth": 500,
                 "pointRadius": 20,
             }
-        )
-
-    def set_defaults(self, defaults_dict):
-        """ Sets default visuals for map layers"""
-        self.defaults = defaults_dict
 
     def add_layer(self, name, layer_dict):
         """ Adds a layer definition under the given name"""
