@@ -11,6 +11,7 @@ from aequilibrae.utils.simwrapper.simwrapper_panel import (
     TilePanel,
     TextPanel,
     AequilibraEMapPanel,
+    AequilibraEResultsMapPanel,
 )
 from aequilibrae.utils.simwrapper.simwrapper_utils import get_project_center, get_project_zoom
 
@@ -184,11 +185,7 @@ class SimwrapperConfigGenerator:
                 {"subtitle": "Link Types"},
                 {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
                 {"label": "Road", "color": "#74BBCD", "shape": "line"},
-                {
-                    "label": "Centroid Connector",
-                    "color": "#99637f",
-                    "shape": "line",
-                },
+                {"label": "Centroid Connector", "color": "#99637f", "shape": "line",},
             ]
         )
 
@@ -338,25 +335,17 @@ class SimwrapperConfigGenerator:
 
         return panel
 
-    def _metric_comp_row(self, title, metric, tables):
-        """Builds side by side comparison of base case vs active/transit metric map panels"""
-
-        legend = [
-            {"subtitle": metric},
-            {"label": "Low", "color": "#009392", "size": 4, "shape": "line"},
-            {"label": "Medium", "color": "#e9e29c", "size": 4, "shape": "line"},
-            {"label": "High", "color": "#cf597e", "size": 4, "shape": "line"},
-        ]
+    def _delay_factor_row(self, results_tables):
+        """Builds delay factor comparison panels"""
 
         row = []
 
-        for table in tables:
-            panel = self._scenario_metric_map(
-                title=f"{table} {title}",
+        for table in results_tables:
+            panel = AequilibraEResultsMapPanel(
+                title=f"{table} Delay Factor",
                 results_table=table,
-                metric_column=metric,
-                legend=legend,
-                data_range=[1, 3],
+                colour_metric = "Delay_factor_Max",
+                width_metric = "capacity_ab"
             )
             row.append(panel)
 
@@ -365,22 +354,13 @@ class SimwrapperConfigGenerator:
     def _voc_comp_row(self, results_tables):
         """builds side by side comparison of Vehicles / Capacity maps for all scenarios"""
 
-        legend = [
-            {"subtitle": "Vehicles / Capacity"},
-            {"label": "low", "color": "#009392", "size": 4, "shape": "line"},
-            {"label": "medium", "color": "#e9e29c", "size": 4, "shape": "line"},
-            {"label": "high", "color": "#cf597e", "size": 4, "shape": "line"},
-        ]
-
         row = []
 
         for table in results_tables:
-            panel = self._scenario_metric_map(
+            panel = AequilibraEResultsMapPanel(
                 title=f"{table} vehicles / capacity",
                 results_table=table,
-                metric_column="VOC_max",
-                legend=legend,
-                data_range=[0.5, 1.5],
+                colour_metric = "VOC_max"
             )
             row.append(panel)
 
@@ -523,24 +503,14 @@ class SimwrapperConfigGenerator:
     def _flow_map_row(self, results_tables):
         """Map of links styled by assigned flows (PCE_tot)"""
 
-        legend = [
-            {"subtitle": "Flows"},
-            {"label": "Low", "color": "#009392", "size": 4, "shape": "line"},
-            {"label": "Medium", "color": "#e9e29c", "size": 4, "shape": "line"},
-            {"label": "High", "color": "#cf597e", "size": 4, "shape": "line"},
-        ]
-
         row = []
 
         for table in results_tables:
-            panel = self._scenario_metric_map(
-                title=f"{table} flows",
+            panel = AequilibraEResultsMapPanel(
+                title=f"{table} flow",
                 results_table=table,
-                metric_column="VOC_max",
-                legend=legend,
-                data_range=[0, 1500],
-                width_by_link_type=False,
-                width_by_metric="PCE_tot",
+                colour_metric = "VOC_max",
+                width_metric = "POC_tot"
             )
             row.append(panel)
 
@@ -565,7 +535,7 @@ class SimwrapperConfigGenerator:
         # if we have results table, add relevant panels to dashboard
         if len(results_tables) > 0:
             rows["flowMapRow"] = self._flow_map_row(results_tables)
-            rows["delayFactorComparisonRow"] = self._metric_comp_row("delay factor", "Delay_factor_Max", results_tables)
+            rows["delayFactorComparisonRow"] = self._delay_factor_row(results_tables)
             rows["vocComparisonRow"] = self._voc_comp_row(results_tables)
             rows["assignmentConvergencePlot"] = self._assignment_convergence_plot(res_df)
 

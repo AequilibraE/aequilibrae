@@ -226,6 +226,8 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         center=None,
         zoom=None,
         projection=None,
+        palette="Temps",
+        results_table=None
     ):
         super().__init__(
             title, project_database, height=height, width=width, center=center, zoom=zoom, projection=projection
@@ -234,24 +236,86 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         self.results_database = results_database
         self.colour_metric = colour_metric
         self.width_metric = width_metric
+        self.palette = palette
+        self.results_table = results_table
+
 
         super().set_extra_databases({"results": self.results_database})
-        super().set_legend = self.build_legend()
+        super().set_legend(self.build_legend())
 
-        self.set_colour_styling()
-        self.set_width_styling()
+        self.set_colour_styling([0, 10])
+        self.set_width_styling([0, 10])
+
+        self.add_layer()
 
     def build_legend(self):
-        pass
+        legend = []
 
-    def set_colour_styling(self):
-        self.colour_style = {
-            "lineColor": {
-                "column": self.colour_metric,
-                "palette": palette,
-                "dataRange": data_range,
+        if self.width_metric:
+            legend.append({"subtitle": self.width_metric})
+            legend.append({"label": "Low", "color": "#FFFFFF", "size": 1, "shape": "line"})
+            legend.append({"label": "Medium", "color": "#FFFFFF", "size": 5, "shape": "line"})
+            legend.append({"label": "High", "color": "#FFFFFF", "size": 10, "shape": "line"})
+
+        if self.colour_metric:
+            legend.append({"subtitle": self.colour_metric})
+            legend.append({"label": "Low", "color": "#009392", "size": 5, "shape": "line"})
+            legend.append({"label": "Medium", "color": "#e9e29c", "size": 5, "shape": "line"})
+            legend.append({"label": "High", "color": "#cf597e", "size": 5, "shape": "line"})
+
+        return legend
+
+    def set_colour_styling(self, data_range):
+
+        if self.colour_metric:
+            self.colour_style = {
+                "lineColor": {
+                    "column": self.colour_metric,
+                    "palette": self.palette,
+                    "dataRange": data_range,
+                }
             }
-        }
+        else:
+            self.colour_style = {
+                "lineColor": "#000"
+            }
 
-    def set_width_styling(self):
-        pass
+    def set_width_styling(self, data_range):
+        if self.width_metric:
+            self.width_style = {
+                "lineWidth": {
+                    "column": self.width_metric,
+                    "dataRange": data_range,
+                    "widthRange": [10, 250],
+                }
+            }
+        else:
+            self.width_style = {
+                "lineWidth": 20
+            }
+
+
+    def add_layer(self):
+
+        super().add_layer(
+            "links",
+            {
+                "table": "links",
+                "geometry": "line",
+                "join": {
+                    "database": "results",
+                    "table": self.results_table,
+                    "leftKey": "link_id",
+                    "rightKey": "link_id",
+                    "type": "left",
+                },
+                "style": [self.colour_style, self.width_style],
+            },
+        )
+
+    def to_dict(self):
+        """Returns dictionary representation of the panel"""
+        panel = super().to_dict()
+
+        return panel
+
