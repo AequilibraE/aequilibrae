@@ -5,8 +5,15 @@ import pandas as pd
 import json
 import csv
 
-from aequilibrae.utils.simwrapper.simwrapper_panel import SimwrapperPanel, ConvergencePanel, TilePanel, TextPanel, AequilibraEMapPanel
+from aequilibrae.utils.simwrapper.simwrapper_panel import (
+    SimwrapperPanel,
+    ConvergencePanel,
+    TilePanel,
+    TextPanel,
+    AequilibraEMapPanel,
+)
 from aequilibrae.utils.simwrapper.simwrapper_utils import get_project_center, get_project_zoom
+
 
 class SimwrapperConfigGenerator:
     """
@@ -46,7 +53,7 @@ class SimwrapperConfigGenerator:
         self.data_dir.mkdir(exist_ok=True)  # data
 
     def _find_project_title(self):
-        """ Generate  project title from the project folder name, otherwise returns "AequilibraE Project" """
+        """Generate  project title from the project folder name, otherwise returns "AequilibraE Project" """
 
         try:
             folder_name = self.project.project_base_path.name
@@ -78,14 +85,16 @@ class SimwrapperConfigGenerator:
 
     def _stats_rows(self):
         """returns stats rows panels"""
-        dataset = [{"key": "Link Count",
-                    "value":
-                        {"database": "project_database.sqlite",
-                         "query": "SELECT COUNT(*) FROM links"}},
-                    {"key": "Node Count",
-                    "value":
-                        {"database": "project_database.sqlite",
-                         "query": "SELECT COUNT(*) FROM nodes"}}]
+        dataset = [
+            {
+                "key": "Link Count",
+                "value": {"database": "project_database.sqlite", "query": "SELECT COUNT(*) FROM links"},
+            },
+            {
+                "key": "Node Count",
+                "value": {"database": "project_database.sqlite", "query": "SELECT COUNT(*) FROM nodes"},
+            },
+        ]
 
         panel = TilePanel("Network Size", dataset)
 
@@ -97,7 +106,8 @@ class SimwrapperConfigGenerator:
         # aequilibrae panel with center and zoom
         panel = AequilibraEMapPanel(
             "Entire Network",
-            height=10, width=6,
+            height=10,
+            width=6,
             center=self.center,
             zoom=self.zoom,
             projection="EPSG:32719",
@@ -109,7 +119,11 @@ class SimwrapperConfigGenerator:
                 {"label": "Regular Links", "color": "#4c72b0", "shape": "line"},
                 {"label": "Centroid Connectors", "color": "#9c72b0", "shape": "line"},
                 {"label": "Centroid Node", "color": "#FF6600", "shape": "line"},
-                {"label": "Regular Node", "color": "#cacaca", "shape": "line",},
+                {
+                    "label": "Regular Node",
+                    "color": "#cacaca",
+                    "shape": "line",
+                },
             ]
         )
 
@@ -145,25 +159,18 @@ class SimwrapperConfigGenerator:
         centroid_node_style = {"fillColor": "#FF6600", "pointRadius": 120}
         panel.add_layer(
             "nodes_centroids",
-            {"table": "nodes",
-             "geometry": "point",
-             "sqlFilter": "is_centroid=1",
-             "style": centroid_node_style},
+            {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=1", "style": centroid_node_style},
         )
 
         # add regular nodes layer
         regular_node_style = {"fillColor": "#cacaca", "pointRadius": 35}
         panel.add_layer(
             "nodes_regular",
-            {"table": "nodes",
-             "geometry": "point",
-             "sqlFilter": "is_centroid=0",
-             "style": regular_node_style},
+            {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=0", "style": regular_node_style},
         )
 
         # retun panel inside a list
         return [panel]
-
 
     def _links_info_row(self):
         """Builds yaml config for panel to show attributes of selected link"""
@@ -177,7 +184,11 @@ class SimwrapperConfigGenerator:
                 {"subtitle": "Link Types"},
                 {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
                 {"label": "Road", "color": "#74BBCD", "shape": "line"},
-                {"label": "Centroid Connector", "color": "#99637f", "shape": "line",},
+                {
+                    "label": "Centroid Connector",
+                    "color": "#99637f",
+                    "shape": "line",
+                },
             ]
         )
 
@@ -245,7 +256,15 @@ class SimwrapperConfigGenerator:
         return [panel]
 
     def _scenario_metric_map(
-        self, title, results_table, metric_column, legend, data_range, palette="Temps", width_by_link_type=True, width_by_metric=None
+        self,
+        title,
+        results_table,
+        metric_column,
+        legend,
+        data_range,
+        palette="Temps",
+        width_by_link_type=True,
+        width_by_metric=None,
     ):
         """makes scenario comparison map for a network's performance metric'
 
@@ -296,8 +315,8 @@ class SimwrapperConfigGenerator:
         if width_by_metric:
             style["lineWidth"] = {
                 "column": width_by_metric,
-                "dataRange": [0, 500], # change depending on project/ guess better
-                "widthRange": [10, 250]
+                "dataRange": [0, 500],  # change depending on project/ guess better
+                "widthRange": [10, 250],
             }
 
         # add links layer
@@ -343,36 +362,6 @@ class SimwrapperConfigGenerator:
 
         return row
 
-    def _delay_factor_comp_row(self):
-        """Builds side by side comparison of base case vs active/transit delay factor map panels"""
-
-        legend = [
-            {"subtitle": "Delay Factor"},
-            {"label": "1", "color": "#009392", "size": 4, "shape": "line"},
-            {"label": "2", "color": "#e9e29c", "size": 4, "shape": "line"},
-            {"label": ">3", "color": "#cf597e", "size": 4, "shape": "line"},
-        ]
-
-        # base case delay factor map
-        base = self._scenario_metric_map(
-            title="base case delay factor",
-            results_table="base_case",
-            metric_column="Delay_factor_Max",
-            legend=legend,
-            data_range=[1, 1.00005],
-        )
-
-        # transit/active friendly delay factor map
-        tat = self._scenario_metric_map(
-            title="transit/active friendly delay factor",
-            results_table="transit_and_active_friendly",
-            metric_column="Delay_factor_Max",
-            legend=legend,
-            data_range=[1, 1.00005],
-        )
-
-        return [base, tat]
-
     def _voc_comp_row(self, results_tables):
         """builds side by side comparison of Vehicles / Capacity maps for all scenarios"""
 
@@ -397,9 +386,8 @@ class SimwrapperConfigGenerator:
 
         return row
 
-
     def _parse_convergence_json(self, json_string):
-        """ Parse procedure_report json and extract iteration and rgap arrays"""
+        """Parse procedure_report json and extract iteration and rgap arrays"""
 
         # if no procedure report
         if not json_string:
@@ -409,7 +397,7 @@ class SimwrapperConfigGenerator:
         if json_string.startswith('{\\"'):
             json_string = json_string.encode().decode("unicode_escape")
 
-        data: dict = json.loads(json_string) # parsing json
+        data: dict = json.loads(json_string)  # parsing json
 
         # double encoded json case
         if isinstance(data, str):
@@ -419,13 +407,16 @@ class SimwrapperConfigGenerator:
         if not isinstance(data, dict):
             return [], []
 
-        convergence = data.get("convergence", {}) # get convergence block
+        convergence = data.get("convergence", {})  # get convergence block
 
         iteration = convergence.get("iteration", [])
         rgap = convergence.get("rgap", [])
 
         # return iteration and rgap arrays
-        return (iteration, rgap,)
+        return (
+            iteration,
+            rgap,
+        )
 
     def _export_convergence_csv(self, results_dfataframe):
         """
@@ -451,11 +442,13 @@ class SimwrapperConfigGenerator:
 
             # append rows
             for it, rg in zip(iteration, rgap, strict=True):
-                rows.append({
-                    "iteration": it,
-                    "rgap": rg,
-                    "series": table_name,
-                })
+                rows.append(
+                    {
+                        "iteration": it,
+                        "rgap": rg,
+                        "series": table_name,
+                    }
+                )
 
         if not rows:
             return None
@@ -464,9 +457,7 @@ class SimwrapperConfigGenerator:
 
         # write csv
         with output_path.open("w", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["iteration", "rgap", "series"]
-            )
+            writer = csv.DictWriter(f, fieldnames=["iteration", "rgap", "series"])
             writer.writeheader()
             writer.writerows(rows)
 
@@ -477,7 +468,7 @@ class SimwrapperConfigGenerator:
         """writes vegalite spec for assignment convergence, returns path to this"""
 
         # where to save it
-        path = self.output_dir/"simwrapper_data"/"assignment_convergence.vega.json"
+        path = self.output_dir / "simwrapper_data" / "assignment_convergence.vega.json"
 
         spec = {
             "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
@@ -492,14 +483,7 @@ class SimwrapperConfigGenerator:
                     "type": "quantitative",
                     "title": "Iteration",
                 },
-                "y": {
-                    "field": "rgap",
-                    "type": "quantitative",
-                    "title": "Relative Gap",
-                    "scale": {
-                        "type": "log"
-                    }
-                },
+                "y": {"field": "rgap", "type": "quantitative", "title": "Relative Gap", "scale": {"type": "log"}},
                 "color": {
                     "field": "series",
                     "type": "nominal",
@@ -515,7 +499,7 @@ class SimwrapperConfigGenerator:
         return path.name
 
     def _assignment_convergence_plot(self, results_dataframe):
-        """ returns vegalite convergence plot panel """
+        """returns vegalite convergence plot panel"""
 
         #  export convergence csv
         csv_path = self._export_convergence_csv(results_dataframe)
@@ -529,7 +513,7 @@ class SimwrapperConfigGenerator:
         # panel wrapper
         panel = ConvergencePanel(
             title="Assignment Convergence",
-            config="simwrapper/simwrapper_data/"+vega_spec,
+            config="simwrapper/simwrapper_data/" + vega_spec,
             height=6,
             width=6,
         )
@@ -537,7 +521,7 @@ class SimwrapperConfigGenerator:
         return [panel]
 
     def _flow_map_row(self, results_tables):
-        """ Map of links styled by assigned flows (PCE_tot) """
+        """Map of links styled by assigned flows (PCE_tot)"""
 
         legend = [
             {"subtitle": "Flows"},
@@ -556,12 +540,11 @@ class SimwrapperConfigGenerator:
                 legend=legend,
                 data_range=[0, 1500],
                 width_by_link_type=False,
-                width_by_metric="PCE_tot"
+                width_by_metric="PCE_tot",
             )
             row.append(panel)
 
         return row
-
 
     def _build_dashboard_config(self):
         """Builds and returns full dashboard configuration for simwrapper"""
@@ -606,19 +589,3 @@ class SimwrapperConfigGenerator:
             yaml.safe_dump(config, f, sort_keys=False)
 
         self._add_to_generated_files("dashboard", output_file)
-
-    def _has_links(self):
-        """Checks if project has a network with links"""
-        return True
-
-    def _has_nodes(self):
-        """Checks if project has a network with nodes"""
-        return True
-
-    def _has_zones(self):
-        """Checks if project has a network with nodes"""
-        return True
-
-    def _has_matrices(self):
-        """Checks if project has a network with skims"""
-        return True
