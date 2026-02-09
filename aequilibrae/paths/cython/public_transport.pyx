@@ -284,9 +284,8 @@ class HyperpathGenerating:
         if threads is None:
             threads = 0  # Default to all threads
 
-        # initialize the column storing the resulting edge volumes
-        self._edges["volume"] = 0.0
-        volume = self._edges["volume"].to_numpy(copy=True)
+        # Pandas 3+ can expose read-only buffers; use a writable array for Cython and assign back after.
+        volume = np.zeros(self._edges.shape[0], dtype=DATATYPE_PY)
 
         # travel time is computed but not saved into an array in the following
         self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)

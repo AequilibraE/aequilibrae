@@ -275,7 +275,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     directions = df.direction.to_numpy(copy=True)
 
     link_idx = np.empty(link_id_max + 1, dtype=np.int64)
-    link_idx[link_ids] = np.arange(df.shape[0])
+    link_idx[df.link_id] = np.arange(df.shape[0])
 
     nodes = np.hstack([a_nodes, b_nodes])
     links = np.hstack([link_ids, link_ids])
@@ -456,7 +456,8 @@ def create_compressed_link_network_mapping(graph):
     # This should be possible to parallelise, each thread gets a segment of the bincount below, they compute their
     # respective idx and data, then the end i value from the first segment is added to the idx of the segment after and
     # so on. Then the idx and data values are concatenated
-    for compressed_id, count in enumerate(np.bincount(filtered["__compressed_id__"].to_numpy(copy=True))):
+    compressed_ids = filtered["__compressed_id__"].to_numpy(copy=True)
+    for compressed_id, count in enumerate(np.bincount(compressed_ids)):
         # We separate the easy un-compressible link path from the compressible link path
         # gb.get_group and those sorted searches are rather slow
         if count == 1:
