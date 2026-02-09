@@ -6,6 +6,7 @@ from libcpp.memory cimport shared_ptr, make_shared
 from cython.operator cimport dereference as d
 from cython.operator cimport postincrement as inc
 
+import importlib.util
 import pandas as pd
 import numpy as np
 
@@ -98,15 +99,15 @@ cdef class RouteChoiceSetResults:
 
         engine_name = pd.get_option("io.parquet.engine")
         if engine_name == "auto":
-            try:
-                import pyarrow  # noqa: F401
+            if importlib.util.find_spec("pyarrow") is not None:
                 engine_name = "pyarrow"
-            except ImportError:
-                try:
-                    import fastparquet  # noqa: F401
-                    engine_name = "fastparquet"
-                except ImportError as exc:
-                    raise RuntimeError("No supported parquet engine available for writing route choice results") from exc
+            elif importlib.util.find_spec("fastparquet") is not None:
+                engine_name = "fastparquet"
+            else:
+                raise RuntimeError(
+                    "No supported parquet engine (pyarrow or fastparquet) available. "
+                    "Please install one with: pip install pyarrow OR pip install fastparquet"
+                )
 
         if engine_name == "pyarrow":
             kwargs = dict(
