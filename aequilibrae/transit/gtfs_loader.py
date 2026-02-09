@@ -378,11 +378,11 @@ class GTFSReader(WorkerThread):
         df = pd.DataFrame(stoptimes)
         for col in ["arrival_time", "departure_time"]:
             df2 = df[col].str.split(":", expand=True)
-            df2.fillna(0, inplace=True)
+            df2.fillna("0", inplace=True)
             df2.columns = ["h", "m", "s"]
-            df2.loc[df2.h.str.len() < 1, "h"] = 0
-            df2.loc[df2.m.str.len() < 1, "m"] = 0
-            df2.loc[df2.s.str.len() < 1, "s"] = 0
+            df2.loc[df2.h.str.len() < 1, "h"] = "0"
+            df2.loc[df2.m.str.len() < 1, "m"] = "0"
+            df2.loc[df2.s.str.len() < 1, "s"] = "0"
             df2 = df2.assign(sec=0)
             df2.loc[:, "sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
             stoptimes[col] = df2.sec.values

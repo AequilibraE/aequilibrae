@@ -286,6 +286,7 @@ class HyperpathGenerating:
 
         # initialize the column storing the resulting edge volumes
         self._edges["volume"] = 0.0
+        volume = self._edges["volume"].to_numpy(copy=True)
 
         # travel time is computed but not saved into an array in the following
         self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
@@ -320,9 +321,9 @@ class HyperpathGenerating:
             rest_of_destinations[:],
             self.origin_column[:],
             self.demand_column[:],
-            self._edges["volume"].values,
+            volume,
             self.vertex_count,
-            self._edges["volume"].shape[0],
+            volume.shape[0],
             (multiprocessing.cpu_count() if threads < 1 else threads),
             self._skim_cols[:],
             self.u_i_vec,
@@ -335,6 +336,8 @@ class HyperpathGenerating:
             self._is_travel_time,
             len(self._skim_cols_names)
         )
+
+        self._edges["volume"] = volume
 
         if self._skimming:
             fmax = np.finfo(dtype="float64").max
