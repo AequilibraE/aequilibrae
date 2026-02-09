@@ -96,15 +96,26 @@ cdef class RouteChoiceSetResults:
     def write(self, where):
         table = self.make_df_from_results()
 
-        engine = pd.io.parquet.get_engine('auto').__class__
-        if (engine.__module__, engine.__name__) == ("pandas.io.parquet", "PyArrowImpl"):
+        engine_name = pd.get_option("io.parquet.engine")
+        if engine_name == "auto":
+            try:
+                import pyarrow  # noqa: F401
+                engine_name = "pyarrow"
+            except ImportError:
+                try:
+                    import fastparquet  # noqa: F401
+                    engine_name = "fastparquet"
+                except ImportError as exc:
+                    raise RuntimeError("No supported parquet engine available for writing route choice results") from exc
+
+        if engine_name == "pyarrow":
             kwargs = dict(
                 # can't provide partitioning_flavor and partition_cols through the Pandas API
                 use_threads=True,
                 existing_data_behavior="overwrite_or_ignore",
                 file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
             )
-        elif (engine.__module__, engine.__name__) == ("pandas.io.parquet", "FastParquetImpl"):
+        elif engine_name == "fastparquet":
             logger.info("FastParquet back-end doesn't support individual partition logging, writing table now...")
             kwargs = dict(
                 file_scheme="hive",
