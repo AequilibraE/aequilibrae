@@ -182,11 +182,11 @@ class GTFSReader(WorkerThread):
                             times[1:] += df.add_time[:].astype(int)
 
                     assert min(times[1:] - times[:-1]) > 0
-                    stop_times.arrival_time.values[:] = times[:].astype(int)
-                    stop_times.departure_time.values[:] = times[:].astype(int)
-                    stop_times.source_time.values[:] = source_time[:].astype(int)
-                    trip.arrivals = stop_times.arrival_time.values
-                    trip.departures = stop_times.departure_time.values
+                    stop_times.loc[:, "arrival_time"] = times[:].astype(int)
+                    stop_times.loc[:, "departure_time"] = times[:].astype(int)
+                    stop_times.loc[:, "source_time"] = source_time[:].astype(int)
+                    trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
+                    trip.departures = stop_times.departure_time.to_numpy(copy=True)
 
         if total_fast:
             self.logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
