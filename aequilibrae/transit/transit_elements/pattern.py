@@ -1,16 +1,17 @@
 from sqlite3 import Connection
-from typing import List, Tuple, Optional
+from typing import List
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import shapely.ops
 from shapely.geometry import LineString
+from shapely.ops import transform
 
-from aequilibrae.paths import PathResults
 from aequilibrae.transit.functions.get_srid import get_srid
 from .basic_element import BasicPTElement
 from .link import Link
-from .mode_correspondence import mode_correspondence
+from .mode_correspondence import mode_corresp
 
 DEAD_END_RUN = 40
 
@@ -61,7 +62,6 @@ class Pattern(BasicPTElement):
         self.__curr_net_nodes_from_stops = []
         self.__net_links_from_stops = []
         self.__net_nodes_from_stops = []
-        self.__mm_fail_position = -1
         self.__map_matched = False
         self.shape_length = -1
 
@@ -108,8 +108,9 @@ class Pattern(BasicPTElement):
 
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""
-        shp = self._stop_based_shape if self.raw_shape is None else self.raw_shape
-        return shp
+        if self.shape is None:
+            return self._stop_based_shape if self.raw_shape is None else self.raw_shape
+        return self.shape
 
     def map_match(self):
         """Map matches the route into the network, considering its appropriate shape.
@@ -136,210 +137,36 @@ class Pattern(BasicPTElement):
         self.__map_matched = True
         self.__logger.debug(f"Map-matching pattern ID {self.pattern_id}")
 
-        if not self.__feed.graphs:
-            self.__feed.builds_link_graphs_with_broken_stops()
-        if self.route_type not in mode_correspondence or mode_correspondence[self.route_type] not in self.__feed.graphs:
+        if not self.__feed.map_matchers:
+            self.__feed.builds_map_matchers()
+        if self.route_type not in mode_corresp or mode_corresp[self.route_type] not in self.__feed.map_matchers:
             return
 
-        self.__map_matching_error.clear()
-        df = self.__map_matching_complete_path_building()
+        df = pd.DataFrame({"stop_id": [stop.stop_id for stop in self.stops],
+                           "geometry": [stop.geo for stop in self.stops]})
+        map_matcher = self.__feed.map_matchers[mode_corresp[self.route_type]]  # type: RouteMapMatcher
+
+        stops = gpd.GeoDataFrame(df, geometry="geometry", crs=f"EPSG:{self.__srid}").to_crs(map_matcher.crs)
+
+        route_shape = self.raw_shape
+        if route_shape is not None:
+            route_shape = transform(self.__feed.mm_transformer.transform, route_shape)
+        df = map_matcher.map_match_route(stops, route_shape, self.pattern_id)
+
         if df.shape[0] == 0:
             self.__logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
             return
-        self.full_path = df.link_id.to_list()
-        self.fpath_dir = df.dir.to_list()
-        self.__assemble__mm_shape(df)
-        self.__build_pattern_mapping()
-        self.__logger.info(f"Map-matched pattern {self.pattern_id}")
 
-    # TODO: consider improving the link selection for discount applying an overlay and use a cost proportional to the
-    # link length in the route (raw_shape) buffer.
-    def __graph_discount(self):
-        buff = gpd.GeoSeries(self.raw_shape, crs="EPSG:4326").to_crs(3857).buffer(20).geometry
-        gdf = gpd.GeoDataFrame(geometry=buff.to_crs(4326), crs=self.__geolinks.crs)
-        gdf = self.__geolinks.overlay(gdf, how="intersection")
+        self.shape = shapely.ops.transform(self.__feed.mm_transform_rev.transform, map_matcher.assemble_shape(df))
+        self.__build_pattern_mapping(df)
+        self.__logger.debug(f"Map-matched pattern {self.pattern_id}")
 
-        gdf = gdf.loc[gdf.modes.str.contains(mode_correspondence[self.route_type])]
-        return gdf.link_id.tolist()
-
-    def __map_matching_complete_path_building(self):
-        mode_ = mode_correspondence[self.route_type]
-        # We get the graph for our job
-        graph = self.__feed.graphs[mode_]
-        empty_frame = pd.DataFrame([])
-
-        # We search for disconnected stops:
-        candidate_stops = list(self.stops)
-        stop_node_idxs = [stop.__map_matching_id__[self.route_type] for stop in candidate_stops]
-
-        node0 = graph.network.a_node[~graph.network.a_node.isin(graph.centroids)].min()
-        connected_stops = []
-
-        res = PathResults()
-        res.prepare(graph)
-        res1 = PathResults()
-        res1.prepare(graph)
-
-        for i, stop in enumerate(candidate_stops):
-            node_o = stop.__map_matching_id__[self.route_type]
-            self.__logger.debug(f"Computing paths between {node_o} and {node0}")
-            res.compute_path(node_o, int(node0), early_exit=False)
-            # Get skims, as proxy for connectivity, for all stops other than the origin
-            other_nodes = stop_node_idxs[:i] + stop_node_idxs[i + 1 :]
-            dest_skim = res.skims[other_nodes, 0]
-            if dest_skim.min() < 1.0e308:
-                candidate_stops = candidate_stops[i:]
-                connected_stops = [stop for i, stop in enumerate(candidate_stops[1:]) if dest_skim[i] < 1.0e308]
-                connected_stops = [candidate_stops[0]] + connected_stops
-                break
-
-        if not connected_stops:
-            self.__logger.critical(f"Route completely disconnected. {self.route}/{self.route_id}")
-            return empty_frame
-
-        graph.cost = np.array(graph.graph.distance)
-        likely_links = self.__graph_discount()
-        graph.cost[graph.graph.original_id.abs().isin(likely_links)] *= 0.1
-
-        fstop = connected_stops[0]
-
-        if len(connected_stops) == 1:
-            return empty_frame
-
-        if len(connected_stops) == 2:
-            nstop = connected_stops[1].__map_matching_id__[self.route_type]
-            self.__logger.debug(f"Computing paths between {fstop.__map_matching_id__[self.route_type]} and {nstop}")
-            res.compute_path(fstop.__map_matching_id__[self.route_type], int(nstop), early_exit=True)
-            if res.milepost is None:
-                return empty_frame
-            pdist = list(res.milepost[1:-1] - res.milepost[:-2])[1:]
-            plnks = list(res.path[1:-1])
-            pdirecs = list(res.path_link_directions[1:-1])
-            return self.__build_path_df(graph, pdirecs, pdist, plnks)
-
-        path_links = []
-        path_directions = []
-        path_distances = []
-        start = fstop.__map_matching_id__[self.route_type]
-        for idx, tstop in enumerate(connected_stops[1:]):
-            end = tstop.__map_matching_id__[self.route_type]
-
-            not_last = idx + 2 <= len(connected_stops) - 1
-
-            if not_last:
-                following_stop = connected_stops[idx + 2]
-                n_end = following_stop.__map_matching_id__[self.route_type]
-            self.__logger.debug(f"Computing paths between {start} and {end}")
-            res.compute_path(start, int(end), early_exit=True)
-            connection_candidates = graph.network[graph.network.a_node == end].b_node.values
-            min_cost = np.inf
-            access_node = -1
-            follow_val = 0
-            for connec in connection_candidates:
-                if connec == start:
-                    continue
-                if not_last:
-                    res1.compute_path(int(connec), int(n_end), early_exit=True)
-                    if res1.milepost is None:
-                        continue
-                    follow_val = res1.milepost[-1]
-                estimate = follow_val + res.skims[connec, 0]
-                if estimate < min_cost:
-                    min_cost = estimate
-                    access_node = connec
-            if access_node >= 0:
-                res.update_trace(int(access_node))
-                shift = 1 if not_last else 0
-                if len(res.path) <= 1 + shift:
-                    # Stop connectors only
-                    continue
-
-                if not_last:
-                    path_links.extend(list(res.path[:-1]))
-                    path_directions.extend(list(res.path_link_directions[:-1]))
-                    path_distances.extend(list(res.milepost[1:] - res.milepost[:-1])[1:])
-                else:
-                    path_links.extend(list(res.path[:]))
-                    path_directions.extend(list(res.path_link_directions[:]))
-                    path_distances.extend(list(res.milepost[1:] - res.milepost[:-1])[:])
-            else:
-                self.__logger.debug(f"Failed path computation when map-matching {self.pattern_id}")
-                return empty_frame
-            start = res.path_nodes[-2] if len(res.path_nodes) > 3 else start
-
-        # Connection to the last stop
-        return self.__build_path_df(graph, path_directions, path_distances, path_links)
-
-    def __build_path_df(self, graph, path_directions, path_distances, path_links):
-        corresp = pd.DataFrame(graph.network[["link_id", "original_id"]])
-        if not path_links:
-            return pd.DataFrame({"link_id": [], "dir": []})
-        result = pd.DataFrame(
-            {
-                "link_id": path_links[1:],
-                "direction": path_directions[1:],
-                "sequence": np.arange(len(path_links) - 1),
-                "distance": path_distances[1:],
-            }
-        )
-        df = result.merge(corresp, on="link_id", how="left")
-        df.sort_values(by=["sequence"], inplace=True)  # We just guarantee that we haven't messed up anything
-        df = df[(df.original_id.shift(-1) != df.original_id) | (df.direction.shift(-1) != df.direction)]
-
-        crit1 = df.original_id.shift(1) != df.original_id
-        crit2 = df.original_id.shift(-1) != df.original_id
-        df = df[(crit1 & crit2) | (df.distance > DEAD_END_RUN)]
-
-        df = df[["original_id", "direction"]]
-        df.columns = ["link_id", "dir"]
-        df.loc[df.link_id > 0, "dir"] = 1
-        df.loc[df.link_id < 0, "dir"] = -1
-        df.reset_index(drop=True, inplace=True)
-        has_issues = True
-        while has_issues:
-            # We eliminate multiple backs-and-forth on links
-            has_issues = False
-            for i in range(0, df.shape[0] - 2):
-                if df.loc[i : i + 2, "link_id"].abs().unique().shape[0] == 1:
-                    df.drop(index=[i, i + 1], inplace=True)
-                    df.reset_index(drop=True, inplace=True)
-                    has_issues = True
-                    break
-        return df
-
-    def __assemble__mm_shape(self, df: pd.DataFrame):
-        shape = []  # type: List[Tuple[float, float]]
-
-        for _, rec in df.iterrows():
-            line_geo = self.__geolinks.loc[self.__geolinks.link_id == abs(rec.link_id)].geometry.values[0]
-            coords = list(line_geo.coords)[::-1] if rec.link_id < 0 else list(line_geo.coords)
-            data = coords[1:] if shape else coords
-            shape.extend(data)
-        self.shape = LineString(shape)
-
-    def get_error(self, what_to_get="culprit") -> Optional[tuple]:
-        """Returns information on the area of the network a map-matching error occurred
-
-        :Arguments:
-           *what_to_get* (:obj:`str`): The object you want returned. Options are 'culprit' and 'partial_path'
-
-        :Returns:
-        """
-        if not self.__map_matching_error:
-            self.__logger.debug("No map-matching error recorded for this pattern")
-            return None
-
-        if what_to_get not in self.__map_matching_error:
-            return None
-        return self.__map_matching_error[what_to_get]
-
-    def __build_pattern_mapping(self):
+    def __build_pattern_mapping(self, df):
         # We find what is the position along routes that we have for each stop and make sure they are always growing
-        self.pattern_mapping = pd.DataFrame(
-            {"seq": np.arange(len(self.full_path)), "link_id": np.abs(self.full_path), "dir": self.fpath_dir}
-        )
-        self.pattern_mapping = self.pattern_mapping.assign(pattern_id=self.pattern_id, srid=4326)
-        links_with_geo = self.__geolinks.assign(wkb=self.__geolinks.geometry.to_wkb())
-        links_with_geo = links_with_geo[["link_id", "wkb"]]
+        df_net = df.assign(seq=np.arange(df.shape[0]), pattern_id=self.pattern_id, srid=4326)
 
-        self.pattern_mapping = self.pattern_mapping.merge(links_with_geo, on="link_id", how="left")
+        df_net = df_net.merge(self.__geolinks[["link_id", "geometry"]], on="link_id", how="inner")
+        df_net.sort_values("seq", inplace=True)
+        df_net = gpd.GeoDataFrame(df_net, geometry="geometry", crs=self.__geolinks.crs)
+        df_net = df_net.assign(wkb=df_net.geometry.to_wkb()).drop(columns=["geometry"])
+        self.pattern_mapping = df_net[["pattern_id", "seq", "link_id", "wkb", "dir", "srid"]]

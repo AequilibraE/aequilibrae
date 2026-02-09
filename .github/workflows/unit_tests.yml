@@ -60,7 +60,7 @@ jobs:
         uv run tests/setup_windows_spatialite.py
 
     - name: Install Python and create virtual environment
-      run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed
+      run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear
 
     - name: Install dependencies (Windows & Linux)
       if: matrix.os != 'macos-latest'
