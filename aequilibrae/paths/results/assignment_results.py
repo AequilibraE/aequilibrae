@@ -139,11 +139,11 @@ class AssignmentResults(AssignmentResultsBase):
         self.lids = graph.graph.link_id.to_numpy(copy=True)
         self.direcs = graph.graph.direction.to_numpy(copy=True)
         self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
-        self.crosswalk[graph.graph.__supernet_id__.to_numpy(copy=True)] = graph.graph.__compressed_id__.to_numpy(
-            copy=True
-        )
-        self._graph_ids = graph.graph.__supernet_id__.to_numpy(copy=True)
-        self._graph_compressed_ids = graph.graph.__compressed_id__.to_numpy(copy=True)
+        supernet_ids = graph.graph.__supernet_id__.to_numpy(copy=True)
+        compressed_ids = graph.graph.__compressed_id__.to_numpy(copy=True)
+        self.crosswalk[supernet_ids] = compressed_ids
+        self._graph_ids = supernet_ids
+        self._graph_compressed_ids = compressed_ids
         self.__redim()
         self._graph_id = graph._id
 
