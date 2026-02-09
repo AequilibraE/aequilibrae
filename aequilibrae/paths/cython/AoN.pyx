@@ -63,8 +63,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph.compact_fs
     cdef double [:] g_view = graph.compact_cost
-    cdef long long [:] ids_graph_view = graph.compact_graph.id.values
-    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
+    cdef long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=True)
+    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=True)
 
     if skims > 0:
         gskim = graph.compact_skims
@@ -221,10 +221,10 @@ def path_computation(origin, destination, graph, results):
     # In order to release the GIL for this procedure, we create all the
     # memory views we will need
     cdef double [:] g_view = graph.cost
-    cdef long long [:] original_b_nodes_view = graph.graph.b_node.values
+    cdef long long [:] original_b_nodes_view = graph.graph.b_node.to_numpy(copy=True)
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    cdef long long [:] ids_graph_view = graph.graph.id.values
+    cdef long long [:] ids_graph_view = graph.graph.id.to_numpy(copy=True)
     block_flows_through_centroids = graph.block_centroid_flows
 
     cdef long long [:] predecessors_view = results.predecessors
@@ -241,8 +241,8 @@ def path_computation(origin, destination, graph, results):
     cdef long long [:] nodes_to_indices_view
     cdef Heuristic heuristic
     if results.a_star:
-        lat_view = graph.lonlat_index.lat.values
-        lon_view = graph.lonlat_index.lon.values
+        lat_view = graph.lonlat_index.lat.to_numpy(copy=True)
+        lon_view = graph.lonlat_index.lon.to_numpy(copy=True)
         nodes_to_indices_view = graph.nodes_to_indices
         heuristic = HEURISTIC_MAP[results._heuristic]
 
@@ -440,8 +440,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph_fs
     cdef double [:] g_view = graph.compact_cost
-    cdef long long [:] ids_graph_view = graph.compact_graph.id.values
-    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
+    cdef long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=True)
+    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=True)
     cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
 
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]

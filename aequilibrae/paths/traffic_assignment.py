@@ -654,24 +654,44 @@ class TrafficAssignment(AssignmentBase):
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
-        agg["Preload_AB"].values[m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
-        agg["Preload_BA"].values[m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        preload_ab = agg["Preload_AB"].to_numpy(copy=True)
+        preload_ba = agg["Preload_BA"].to_numpy(copy=True)
+        preload_ab[m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
+        preload_ba[m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        agg["Preload_AB"] = preload_ab
+        agg["Preload_BA"] = preload_ba
         agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
-        agg["Congested_Time_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
-        agg["Congested_Time_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
+        congested_ab = agg["Congested_Time_AB"].to_numpy(copy=True)
+        congested_ba = agg["Congested_Time_BA"].to_numpy(copy=True)
+        congested_ab[m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
+        congested_ba[m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
+        agg["Congested_Time_AB"] = congested_ab
+        agg["Congested_Time_BA"] = congested_ba
         agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        agg["Delay_factor_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
-        agg["Delay_factor_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
+        delay_ab = agg["Delay_factor_AB"].to_numpy(copy=True)
+        delay_ba = agg["Delay_factor_BA"].to_numpy(copy=True)
+        delay_ab[m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
+        delay_ba[m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
+        agg["Delay_factor_AB"] = delay_ab
+        agg["Delay_factor_BA"] = delay_ba
         agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
-        agg["VOC_AB"].values[m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
-        agg["VOC_BA"].values[m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
+        voc_ab = agg["VOC_AB"].to_numpy(copy=True)
+        voc_ba = agg["VOC_BA"].to_numpy(copy=True)
+        voc_ab[m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
+        voc_ba[m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
+        agg["VOC_AB"] = voc_ab
+        agg["VOC_BA"] = voc_ba
         agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
-        agg["PCE_AB"].values[m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
-        agg["PCE_BA"].values[m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
+        pce_ab = agg["PCE_AB"].to_numpy(copy=True)
+        pce_ba = agg["PCE_BA"].to_numpy(copy=True)
+        pce_ab[m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
+        pce_ba[m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
+        agg["PCE_AB"] = pce_ab
+        agg["PCE_BA"] = pce_ba
         agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
