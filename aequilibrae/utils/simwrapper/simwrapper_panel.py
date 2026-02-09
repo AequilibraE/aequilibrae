@@ -61,15 +61,19 @@ class TilePanel(SimwrapperPanel):
         panel = TilePanel("Summary Statistics", "data/summary.csv", height=3)
     """
 
-    def __init__(self, title, dataset, height=None, width=None):
+    def __init__(self, title, dataset, height=None, width=None, palette=None):
         super().__init__("tile", title, height=height, width=width)
         self.dataset = dataset
+        self.palette = palette
 
     def to_dict(self):
         """Returns dictionary representation of the panel"""
         panel = super().to_dict()
 
         panel["dataset"] = self.dataset
+
+        if self.palette:
+            panel["palette"] = self.palette
 
         return panel
 

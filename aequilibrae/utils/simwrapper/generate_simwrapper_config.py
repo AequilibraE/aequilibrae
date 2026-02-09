@@ -89,15 +89,17 @@ class SimwrapperConfigGenerator:
         dataset = [
             {
                 "key": "Link Count",
-                "value": {"database": "project_database.sqlite", "query": "SELECT COUNT(*) FROM links"},
+                "value": {"database": "project_database.sqlite",
+                          "query": "SELECT printf('%,d', COUNT(*)) FROM links"},
             },
             {
                 "key": "Node Count",
-                "value": {"database": "project_database.sqlite", "query": "SELECT COUNT(*) FROM nodes"},
+                "value": {"database": "project_database.sqlite",
+                          "query": "SELECT printf('%,d', COUNT(*)) FROM nodes"},
             },
         ]
 
-        panel = TilePanel("Network Size", dataset)
+        panel = TilePanel("Network Size", dataset, "monochrome")
 
         return [panel]
 
