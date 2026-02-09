@@ -17,10 +17,10 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 DEAD_END_RUN = 40
 
 
-class RouteMapMatcher:
+class RouteMapMatcher(WorkerThread):
     def __init__(self, link_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame,
                  distance_to_project=50):
-        WorkerThread.__init__(self, None)
+        super().__init__(self, None)
 
         utm_zone = metre_crs_for_gdf(link_gdf)
 
