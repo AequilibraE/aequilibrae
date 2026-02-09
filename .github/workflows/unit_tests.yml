@@ -16,7 +16,7 @@ jobs:
       - name: Set Python environment
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.13'
 
       - uses: astral-sh/ruff-action@v3
         with:
@@ -31,7 +31,7 @@ jobs:
       cancel-in-progress: true
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
         os: [windows-latest, ubuntu-latest, macos-latest]
 
       max-parallel: 20
