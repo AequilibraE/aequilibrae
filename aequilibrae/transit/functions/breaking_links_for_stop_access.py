@@ -85,7 +85,10 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
     valid_splits = df_result[
         (df_result["dist_along"] > epsilon) &
         (df_result["dist_along"] < (df_result["line_length"] - epsilon))
-        ].copy()
+    valid_splits = df_result[
+        (df_result["dist_along"] > epsilon) &
+        (df_result["dist_along"] < (df_result["line_length"] - epsilon))
+    ].copy()
 
     if valid_splits.empty:
         logging.debug("No valid splits found within tolerance? The map-matching will likely fail.")

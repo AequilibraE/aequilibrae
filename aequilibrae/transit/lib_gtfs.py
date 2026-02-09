@@ -54,7 +54,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.mm_transformer: Transformer
         self.trip_by_service = {}
         self.patterns = {}
-        self.map_matchers = {}  # Dict[str, RouteMapMatcher]
+        self.map_matchers: dict[str, RouteMapMatcher] = {}
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
