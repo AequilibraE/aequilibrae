@@ -377,9 +377,10 @@ def network_setup(request):
         result["vertices"] = create_vertices(n)
         result["edges"] = create_edges(n, seed=seed)
 
-        delay_base = result["edges"].delay_base.values
+        delay_base = result["edges"].delay_base.to_numpy(copy=True)
         indices = np.where(delay_base == 0.0)
         delay_base[indices] = 1.0
+        result["edges"]["delay_base"] = delay_base
         freq_base = 1.0 / delay_base
         freq_base[indices] = np.inf
         result["edges"]["freq_base"] = freq_base
