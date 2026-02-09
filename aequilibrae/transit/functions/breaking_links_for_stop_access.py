@@ -75,7 +75,7 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
     dist_along = shapely.line_locate_point(line_geoms, point_geoms)
 
     df_result["dist_along"] = dist_along
-    df_result["line_length"] = df_result["geometry_line"].apply(lambda x: x.length)
+    df_result["line_length"] = df_result.geometry_line.length
 
     # --- Step 2: Prepare Splits ---
 

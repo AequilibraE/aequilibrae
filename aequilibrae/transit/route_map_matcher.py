@@ -157,11 +157,11 @@ class RouteMapMatcher:
 
         is_first = True
         for i in range(1, route_stops.shape[0]):
-            next_stop = int(route_stops.stop_id[i])
+            next_stop = int(route_stops.stop_id.iat[i])
             is_not_last = i < route_stops.shape[0] - 1
 
             # Get the next stop for look-ahead path estimation (if not at the end)
-            following_stop = int(route_stops.stop_id[i + 1]) if is_not_last else None
+            following_stop = int(route_stops.stop_id.iat[i + 1]) if is_not_last else None
             logging.debug(f"Computing path from node {current_stop} to stop {next_stop}")
 
             connection_candidates = access_links[access_links.a_node == next_stop].b_node.values
@@ -255,12 +255,13 @@ class RouteMapMatcher:
 
         # Remove consecutive links with same original_id and direction
         # (these are internal graph subdivisions of the same physical link)
-        df = df[(df.original_id.shift(-1) != df.original_id) | (df.direction.shift(-1) != df.direction)]
+        df = df[(df.original_id.shift(-1, fill_value=-1) != df.original_id) | (
+                df.direction.shift(-1, fill_value=-1) != df.direction)]
 
         # Filter out isolated short segments (likely noise or dead-end detours)
         # Keep a link if it differs from both neighbors OR if it's long enough
-        crit_differs_prev = df.original_id.shift(1) != df.original_id
-        crit_differs_next = df.original_id.shift(-1) != df.original_id
+        crit_differs_prev = df.original_id.shift(1, fill_value=-1) != df.original_id
+        crit_differs_next = df.original_id.shift(-1, fill_value=-1) != df.original_id
         df = df[(crit_differs_prev & crit_differs_next) | (df.distance > DEAD_END_RUN)]
 
         # Prepare final output with direction based on link sign
@@ -277,7 +278,7 @@ class RouteMapMatcher:
                 # Check if three consecutive rows are all the same link
                 if df.loc[i: i + 2, "original_id"].unique().shape[0] == 1:
                     df.drop(index=[i, i + 1], inplace=True)
-                    df.reset_index(drop=True, inplace=True)
+                    df.index = pd.RangeIndex(df.shape[0])
                     has_issues = True
                     break
 

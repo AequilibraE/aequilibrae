@@ -17,6 +17,7 @@ from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .gtfs_loader import GTFSReader
 from aequilibrae.transit.route_map_matcher import RouteMapMatcher
+from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 
 
 class GTFSRouteSystemBuilder(WorkerThread):
@@ -430,6 +431,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
         all_link_gdf = self.project.network.links.data
         all_nodes_gdf = self.project.network.nodes.data
 
+        utm_zone = metre_crs_for_gdf(all_link_gdf)
+        self.mm_transformer = Transformer.from_crs(self.srid, utm_zone, always_xy=True)
+        self.mm_transform_rev = Transformer.from_crs(utm_zone, self.srid, always_xy=True)
+
         stop_data = []
         for stop in self.select_stops.values():
             if stop.route_type not in mode_corresp:
@@ -451,6 +456,3 @@ class GTFSRouteSystemBuilder(WorkerThread):
             rmm = RouteMapMatcher(link_gdf, nodes_gdf, stops_gdf)  # type: ignore
             rmm.initialize_graph()
             self.map_matchers[pt_mode] = rmm
-
-            self.mm_transformer = Transformer.from_crs(self.srid, self.map_matchers[pt_mode].crs, always_xy=True)
-            self.mm_transform_rev = Transformer.from_crs(self.map_matchers[pt_mode].crs, self.srid, always_xy=True)
