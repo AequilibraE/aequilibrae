@@ -51,7 +51,7 @@ for all currently supported Python versions and major platforms.
 .. _installing_spatialite:
 
 SpatiaLite
-++++++++++
+^^^^^^^^^^
 
 Although the presence of SpatiaLite is rather ubiquitous in the GIS ecosystem,
 it has to be installed separately from Python or AequilibraE in any platform.
