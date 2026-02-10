@@ -208,12 +208,12 @@ class SimwrapperConfigGenerator:
 
         # build and set legend
         legend = [{"subtitle": "Link Types"}]
-        for link_type in link_types:
-            legend.append({
-                "label": f"{link_type_names.get(link_type)}",
-                "colour": f"{colour_map[link_type]}",
-                "shape": "line"
-            })
+        for i, lt in enumerate(link_types):
+            x = link_type_names.get(lt)
+            legend.append({"label": f"{x.link_type}",
+                           "color": f"{colours[i]}",
+                           "shape": "line"})
+ 
 
         panel.set_legend(legend)
 
