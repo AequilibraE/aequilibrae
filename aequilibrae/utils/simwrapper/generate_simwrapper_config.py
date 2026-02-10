@@ -98,6 +98,24 @@ class SimwrapperConfigGenerator:
         ]
         return base[:n]
 
+    def _truncate_results_tables(self, results_tables, max_tables=3):
+        """Returns truncated results list and note noting truncation occurred """
+
+        if len(results_tables) <= max_tables:
+            return results_tables, False
+
+        return results_tables[:max_tables], True
+    
+    def _results_truncation_notice(self, shown, total):
+        return TextPanel(
+            title="Please Note",
+            data=(
+                f"Showing {shown} of {total} result scenarios.\n\n"
+                "Additional scenarios were omitted to keep the dashboard readable."
+            ),
+            height=2,
+            width=6,
+        )
     def _stats_rows(self):
         """returns stats rows panels"""
         dataset = [
@@ -201,7 +219,7 @@ class SimwrapperConfigGenerator:
         link_type_names = self.project.network.link_types
 
         colours = self._categorical_palette(len(link_types))
-        colour_map = dict(zip(link_types, colours))
+        colour_map = dict(zip(link_types, colours, strict=True))
 
         # map panel
         panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, zoom=self.zoom)
@@ -226,7 +244,7 @@ class SimwrapperConfigGenerator:
                 "style": {
                     "lineColor": {
                         "column": "link_type",
-                        "colors": colour_map,
+                        "palette": colour_map,
                     },
                     "lineWidth": 10,
                 },
@@ -554,6 +572,13 @@ class SimwrapperConfigGenerator:
 
         res_df = self.project.results.list()
         results_tables = res_df["table_name"].tolist()
+
+        results_tables, truncated = self._truncate_results_tables(results_tables)
+
+        if truncated:
+            rows["resultsNoticeRow"] = [
+                self._results_truncation_notice(len(results_tables), len(res_df))
+            ]
 
         # if we have results table, add relevant panels to dashboard
         if len(results_tables) > 0:
