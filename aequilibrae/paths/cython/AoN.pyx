@@ -12,6 +12,10 @@ include 'path_file_saving.pyx'
 include 'connectivity.pyx'
 
 
+def _ensure_writable(arr):
+    return arr if arr.flags.writeable else arr.copy()
+
+
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
     cdef long nodes, orig, block_flows_through_centroids, classes, b, origin_index, zones, links
@@ -63,12 +67,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph.compact_fs
     cdef double [:] g_view = graph.compact_cost
-    ids_graph = graph.compact_graph.id.to_numpy(copy=False)
-    if not ids_graph.flags.writeable:
-        ids_graph = ids_graph.copy()
-    original_b_nodes = graph.compact_graph.b_node.to_numpy(copy=False)
-    if not original_b_nodes.flags.writeable:
-        original_b_nodes = original_b_nodes.copy()
+    ids_graph = _ensure_writable(graph.compact_graph.id.to_numpy(copy=False))
+    original_b_nodes = _ensure_writable(graph.compact_graph.b_node.to_numpy(copy=False))
     cdef long long [:] ids_graph_view = ids_graph
     cdef long long [:] original_b_nodes_view = original_b_nodes
 
@@ -227,15 +227,11 @@ def path_computation(origin, destination, graph, results):
     # In order to release the GIL for this procedure, we create all the
     # memory views we will need
     cdef double [:] g_view = graph.cost
-    original_b_nodes = graph.graph.b_node.to_numpy(copy=False)
-    if not original_b_nodes.flags.writeable:
-        original_b_nodes = original_b_nodes.copy()
+    original_b_nodes = _ensure_writable(graph.graph.b_node.to_numpy(copy=False))
     cdef long long [:] original_b_nodes_view = original_b_nodes
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    ids_graph = graph.graph.id.to_numpy(copy=False)
-    if not ids_graph.flags.writeable:
-        ids_graph = ids_graph.copy()
+    ids_graph = _ensure_writable(graph.graph.id.to_numpy(copy=False))
     cdef long long [:] ids_graph_view = ids_graph
     block_flows_through_centroids = graph.block_centroid_flows
 
@@ -253,12 +249,8 @@ def path_computation(origin, destination, graph, results):
     cdef long long [:] nodes_to_indices_view
     cdef Heuristic heuristic
     if results.a_star:
-        lat_view = graph.lonlat_index.lat.to_numpy(copy=False)
-        if not lat_view.flags.writeable:
-            lat_view = lat_view.copy()
-        lon_view = graph.lonlat_index.lon.to_numpy(copy=False)
-        if not lon_view.flags.writeable:
-            lon_view = lon_view.copy()
+        lat_view = _ensure_writable(graph.lonlat_index.lat.to_numpy(copy=False))
+        lon_view = _ensure_writable(graph.lonlat_index.lon.to_numpy(copy=False))
         nodes_to_indices_view = graph.nodes_to_indices
         heuristic = HEURISTIC_MAP[results._heuristic]
 
@@ -456,12 +448,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph_fs
     cdef double [:] g_view = graph.compact_cost
-    ids_graph = graph.compact_graph.id.to_numpy(copy=False)
-    if not ids_graph.flags.writeable:
-        ids_graph = ids_graph.copy()
-    original_b_nodes = graph.compact_graph.b_node.to_numpy(copy=False)
-    if not original_b_nodes.flags.writeable:
-        original_b_nodes = original_b_nodes.copy()
+    ids_graph = _ensure_writable(graph.compact_graph.id.to_numpy(copy=False))
+    original_b_nodes = _ensure_writable(graph.compact_graph.b_node.to_numpy(copy=False))
     cdef long long [:] ids_graph_view = ids_graph
     cdef long long [:] original_b_nodes_view = original_b_nodes
     cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
