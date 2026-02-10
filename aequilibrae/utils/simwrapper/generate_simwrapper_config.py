@@ -84,6 +84,20 @@ class SimwrapperConfigGenerator:
 
         return [TextPanel(title="title", data="intro")]
 
+    def _get_link_types(self):
+        """ returns list of link types in network"""
+        return self.project.network.link_types.all_types()
+
+    def _categorical_palette(self, n):
+        """Returns n visually distinct colors"""
+
+        base = [
+            "#4C78A8", "#F58518", "#E45756",
+            "#72B7B2", "#54A24B", "#EECA3B",
+            "#B279A2", "#FF9DA6", "#9D755D",
+        ]
+        return base[:n]
+
     def _stats_rows(self):
         """returns stats rows panels"""
         dataset = [
@@ -178,25 +192,32 @@ class SimwrapperConfigGenerator:
     def _links_info_row(self):
         """Builds yaml config for panel to show attributes of selected link"""
 
+        link_types = self._get_link_types()
+
+        # if there are no links types map nothing
+        if not link_types:
+            return []
+
+        link_type_names = self.project.network.link_types
+
+        colours = self._categorical_palette(len(link_types))
+        colour_map = dict(zip(link_types, colours))
+
         # map panel
         panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, zoom=self.zoom)
 
-        # set legend
-        panel.set_legend(
-            [
-                {"subtitle": "Link Types"},
-                {"label": "Freeway", "color": "#C3A34B", "shape": "line"},
-                {"label": "Road", "color": "#74BBCD", "shape": "line"},
-                {"label": "Centroid Connector", "color": "#99637f", "shape": "line",},
-            ]
-        )
+        # build and set legend
+        legend = [{"subtitle": "Link Types"}]
+        for link_type in link_types:
+            legend.append({
+                "label": f"{link_type_names.get(link_type)}",
+                "colour": f"{colour_map[link_type]}",
+                "shape": "line"
+            })
+
+        panel.set_legend(legend)
 
         # add links layer styled by link type
-        link_type_by_colour = {
-            3: "#99637f",
-            2: "#C3A34B",
-            1: "#74BBCD",
-        }
         panel.add_layer(
             "links",
             {
@@ -205,7 +226,7 @@ class SimwrapperConfigGenerator:
                 "style": {
                     "lineColor": {
                         "column": "link_type",
-                        "colors": link_type_by_colour,
+                        "colors": colour_map,
                     },
                     "lineWidth": 10,
                 },
