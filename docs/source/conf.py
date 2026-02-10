@@ -71,6 +71,7 @@ extensions = [
 ]
 
 if int(sphinx.__version__.split(".")[0]) >= 9:
+    # sphinx-tabs fails with Sphinx 9+ (KeyError: backrefs), so omit it.
     extensions = [ext for ext in extensions if ext != "sphinx_tabs.tabs"]
 
 sphinx_tabs_disable_tab_closing = True
