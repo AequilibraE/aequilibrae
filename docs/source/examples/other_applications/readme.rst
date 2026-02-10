@@ -2,4 +2,4 @@ Examples
 --------
 
 Other applications
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
