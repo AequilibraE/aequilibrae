@@ -82,6 +82,7 @@ sphinx_gallery_conf = {
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
     "capture_repr": ("_repr_html_", "__repr__"),
     "remove_config_comments": True,
+    # Skip example execution in docs builds where spatialite is unavailable.
     "plot_gallery": False,
     "parallel": 5,
 }
@@ -107,6 +108,7 @@ language = "en"
 # This pattern also affects html_static_path and html_extra_path .
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # Suppress docutils/toc/highlighting warnings emitted by legacy docs and notebooks.
+# Suppress legacy warnings from missing references/assets in the published docs set.
 suppress_warnings = [
     "docutils",
     "toc.not_included",
@@ -116,6 +118,7 @@ suppress_warnings = [
     "ref.doc",
     "ref.ref",
 ]
+# Mock setup modules that invoke setup() when imported during autodoc.
 autodoc_mock_imports = [
     "aequilibrae.distribution.setup_ipf",
     "aequilibrae.paths.setup_assignment",
