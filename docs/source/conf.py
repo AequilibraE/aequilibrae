@@ -101,6 +101,7 @@ language = "en"
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+# Suppress docutils/toc/highlighting warnings emitted by legacy docs and notebooks.
 suppress_warnings = ["docutils", "toc.not_included", "misc.highlighting_failure"]
 
 # The name of the Pygments (syntax highlighting) style to use.
