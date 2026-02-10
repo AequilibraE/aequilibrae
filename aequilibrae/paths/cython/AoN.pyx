@@ -13,6 +13,7 @@ include 'connectivity.pyx'
 
 
 def _ensure_writable(arr):
+    """Ensure NumPy array is writable for Cython memoryviews."""
     return arr if arr.flags.writeable else arr.copy()
 
 
@@ -67,10 +68,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph.compact_fs
     cdef double [:] g_view = graph.compact_cost
-    ids_graph = _ensure_writable(graph.compact_graph.id.to_numpy(copy=False))
-    original_b_nodes = _ensure_writable(graph.compact_graph.b_node.to_numpy(copy=False))
-    cdef long long [:] ids_graph_view = ids_graph
-    cdef long long [:] original_b_nodes_view = original_b_nodes
+    cdef long long [:] ids_graph_view = _ensure_writable(graph.compact_graph.id.to_numpy(copy=False))
+    cdef long long [:] original_b_nodes_view = _ensure_writable(graph.compact_graph.b_node.to_numpy(copy=False))
 
     if skims > 0:
         gskim = graph.compact_skims
@@ -227,12 +226,10 @@ def path_computation(origin, destination, graph, results):
     # In order to release the GIL for this procedure, we create all the
     # memory views we will need
     cdef double [:] g_view = graph.cost
-    original_b_nodes = _ensure_writable(graph.graph.b_node.to_numpy(copy=False))
-    cdef long long [:] original_b_nodes_view = original_b_nodes
+    cdef long long [:] original_b_nodes_view = _ensure_writable(graph.graph.b_node.to_numpy(copy=False))
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    ids_graph = _ensure_writable(graph.graph.id.to_numpy(copy=False))
-    cdef long long [:] ids_graph_view = ids_graph
+    cdef long long [:] ids_graph_view = _ensure_writable(graph.graph.id.to_numpy(copy=False))
     block_flows_through_centroids = graph.block_centroid_flows
 
     cdef long long [:] predecessors_view = results.predecessors
@@ -448,10 +445,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph_fs
     cdef double [:] g_view = graph.compact_cost
-    ids_graph = _ensure_writable(graph.compact_graph.id.to_numpy(copy=False))
-    original_b_nodes = _ensure_writable(graph.compact_graph.b_node.to_numpy(copy=False))
-    cdef long long [:] ids_graph_view = ids_graph
-    cdef long long [:] original_b_nodes_view = original_b_nodes
+    cdef long long [:] ids_graph_view = _ensure_writable(graph.compact_graph.id.to_numpy(copy=False))
+    cdef long long [:] original_b_nodes_view = _ensure_writable(graph.compact_graph.b_node.to_numpy(copy=False))
     cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
 
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
