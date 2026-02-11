@@ -1,4 +1,4 @@
---@ The *matrices* table holds information about all matrices that exists in the 
+--@ The *matrices* table holds information about all matrices that exists in the
 --@ project *matrix* folder.
 --@
 --@ The **name** field presents the name of the table.
