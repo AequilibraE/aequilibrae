@@ -131,13 +131,13 @@ class Ipf:
         # check balancing:
         sum_rows = np.nansum(row_data)
         sum_cols = np.nansum(col_data)
-        self.__col_vector = col_data.to_numpy(copy=True) * (sum_rows / sum_cols)
-        self.__row_vector = row_data.to_numpy(copy=True)
+        self.__col_vector = col_data.to_numpy() # No need to be editable
+        self.__row_vector = row_data.to_numpy() # No need to be editable
         if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
             self.error = "Vectors are not balanced"
         else:
             # guarantees that they are precisely balanced
-            self.__col_vector = col_data.to_numpy(copy=True) * (sum_rows / sum_cols)
+            self.__col_vector = col_data.to_numpy() * (sum_rows / sum_cols)
 
     def __check_parameters(self):
         for i in self.__required_parameters:
