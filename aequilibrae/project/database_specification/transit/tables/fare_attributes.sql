@@ -17,7 +17,7 @@
 --@ 
 --@ **transfer** indicates the number of transfers permitted on the fare
 --@ 
---@ **transfer_duration** indicates the length of time in seconds before a 
+--@ **transfer_duration** indicates the length of time in seconds before a
 --@ transfer expires.
 
 create TABLE IF NOT EXISTS fare_attributes (
