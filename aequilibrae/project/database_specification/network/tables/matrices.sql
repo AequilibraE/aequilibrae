@@ -10,7 +10,7 @@
 --@ The **procedure** field holds the name of the procedure that generated
 --@ the result (e.g.: Traffic Assignment).
 --@
---@ The **procedure_id** field holds an unique alphanumeric identifier for
+--@ The **procedure_id** field holds a unique alphanumeric identifier for
 --@ this procedure.
 --@
 --@ The **timestamp** field holds the information when the procedure was executed.
