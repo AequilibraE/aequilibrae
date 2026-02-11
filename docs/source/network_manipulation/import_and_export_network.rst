@@ -132,7 +132,7 @@ back at the AequilibraE project.
     When a node is identified as a centroid in the AequilibraE nodes table, this
     information is transmitted to the GMNS node table by means of the field
     'node_type', which is set to 'centroid' in this case. The 'node_type' field
-    is an optinal field listed in the GMNS node table specification.
+    is an optional field listed in the GMNS node table specification.
 
 You can find the GMNS specification
 `here <https://github.com/zephyr-data-specs/GMNS/tree/develop/docs/spec>`_.
@@ -143,4 +143,3 @@ You can find the GMNS specification
         Function documentation
     * :ref:`export_to_gmns`
         Usage example
-

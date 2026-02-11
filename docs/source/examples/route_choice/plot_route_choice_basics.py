@@ -153,7 +153,7 @@ rc = RouteChoice(graph)
 print(rc.default_parameters)
 
 # %%
-# Let's add the demand. If it's not provided, link loading cannot be preformed.
+# Let's add the demand. If it's not provided, link loading cannot be performed.
 rc.add_demand(mat)
 
 # %%

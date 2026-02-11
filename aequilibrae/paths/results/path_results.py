@@ -195,7 +195,7 @@ class PathResults:
         self._heuristic = heuristic
 
     def get_heuristics(self) -> List[str]:
-        """Return the availiable heuristics."""
+        """Return the available heuristics."""
         return list(HEURISTIC_MAP.keys())
 
     def __skim_path(self):

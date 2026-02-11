@@ -214,7 +214,7 @@ class TransitGraphBuilder:
         if zones.geometry.dtype is str or zones.geometry.dtype is bytes:
             geometry = shapely.from_wkt(zones.geometry.values)
         # Check if the supplied zones df is from geopandas without import geopandas.
-        # We check __mro__ incase of inheritance. https://stackoverflow.com/a/63337375/14047443
+        # We check __mro__ in case of inheritance. https://stackoverflow.com/a/63337375/14047443
         elif "GeometryDtype" in [t.__name__ for t in type(zones.geometry.dtype).__mro__] or all(
             isinstance(x, shapely.geometry.base.BaseGeometry) for x in zones.geometry
         ):

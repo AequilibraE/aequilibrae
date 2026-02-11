@@ -119,7 +119,7 @@ class AssignmentBase(ABC):
         self.classes.append(transport_class)
 
     def _check_field(self, field: str, allow_zeros=False) -> None:
-        """Throws expection if field is invalid."""
+        """Throws exception if field is invalid."""
         if not self.classes:
             raise ValueError("You need add at least one transport class first")
 
@@ -525,7 +525,7 @@ class TrafficAssignment(AssignmentBase):
         self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
         self.preloads[name] = self.preloads[name].fillna(0)
 
-        # Enable preload to be added before or after specifyig the algorithm
+        # Enable preload to be added before or after specifying the algorithm
         if self.assignment is not None:
             if self.assignment.preload is None:
                 self.assignment.preload = self.preloads[name].to_numpy()

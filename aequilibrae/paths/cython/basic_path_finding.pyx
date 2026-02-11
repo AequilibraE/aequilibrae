@@ -405,8 +405,8 @@ cdef inline double haversine_heuristic(double lat1, double lon1, double lat2, do
     Arguments:
         **lat1** (:obj:`double`): Latitude of destination
         **lon1** (:obj:`double`): Longitude of destination
-        **lat2** (:obj:`double`): Latitude of node to evalutate
-        **lon2** (:obj:`double`): Longitude of node to evalutate
+        **lat2** (:obj:`double`): Latitude of node to evaluate
+        **lon2** (:obj:`double`): Longitude of node to evaluate
         **data** (:obj:`void*`): This void pointer should hold a precomputed cos(lat1) as a double
 
     Returns the distance between (lat1, lon1) and (lat2, lon2).

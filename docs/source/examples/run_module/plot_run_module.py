@@ -117,7 +117,7 @@ project.run.create_delaunay()
 
 # %%
 # Creating Delaunay lines also creates a ``results_database.sqlite`` that contains the
-# result of the all-or-nothing algorithim that generated the output. We can check
+# result of the all-or-nothing algorithm that generated the output. We can check
 # the existing results in the results_database using the ``results_summary`` method.
 project.run.results_summary()
 

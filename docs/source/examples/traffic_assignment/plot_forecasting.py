@@ -265,7 +265,7 @@ ipf = Ipf(**args)
 ipf.fit()
 
 # %%
-# When saving our vector into the project, we'll get an output that it was recored
+# When saving our vector into the project, we'll get an output that it was recorded
 ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
 
 # %%

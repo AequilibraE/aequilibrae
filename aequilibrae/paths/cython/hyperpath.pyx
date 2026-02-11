@@ -332,8 +332,8 @@ cdef void compute_SF_in_parallel(
         free(thread_edge_indices)
         free(thread_skim_j_vec)
 
-    # Accumulate results into output buffer. This could parallelised over the output indexes but
-    # the lose of spacial locality may not be worth it.
+    # Accumulate results into output buffer. This could be parallelised over the output indexes but
+    # the loss of spatial locality may not be worth it.
     for i in range(num_threads):
         for j in range(edge_count):
             edge_volume_view[j] += edge_volume[i * edge_count + j]

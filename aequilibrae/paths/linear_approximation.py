@@ -519,7 +519,7 @@ class LinearApproximation(WorkerThread):
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
-                                c.results.select_link_loading[name],  # ouput matrix
+                                c.results.select_link_loading[name],  # output matrix
                                 np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )

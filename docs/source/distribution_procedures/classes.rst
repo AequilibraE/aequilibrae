@@ -8,7 +8,7 @@ AequilibraE's distribution module comprises three different classes: ``GravityAp
 ----------------------
 
 This class, as its own name explains, applies a synthetic gravity model, using one of the available
-deterrence funcions: ``EXPO``, ``POWER``, or ``GAMMA``. It requires some parameters, such as:
+deterrence functions: ``EXPO``, ``POWER``, or ``GAMMA``. It requires some parameters, such as:
 
 * Synthetic gravity model (which is an instance of ``SyntheticGravityModel``)
 * Impedance matrix (``AequilibraeMatrix``);
@@ -16,10 +16,10 @@ deterrence funcions: ``EXPO``, ``POWER``, or ``GAMMA``. It requires some paramet
 * Row and column fields, which are the names of the fields that contain the data for row and column
   totals.
 
-The synthetic gravity model instance can be either created or loaded, if you have already calibared
+The synthetic gravity model instance can be either created or loaded, if you have already calibrated
 a model.
 
-Plase check other arguments and parameters that are passed to ``GravityApplication`` in its 
+Please check other arguments and parameters that are passed to ``GravityApplication`` in its 
 documentation.
 
 .. seealso::
@@ -35,13 +35,13 @@ documentation.
 
 Calibrate the model consists in checking if all the parameters set are appropriate. This class,
 as its own name explains, calibrates a traditional gravity model, using one of the available
-deterrence funcions: ``EXPO``, ``POWER``, or ``GAMMA``. It requires some arguments such as:
+deterrence functions: ``EXPO``, ``POWER``, or ``GAMMA``. It requires some arguments such as:
 
 * Matrix containing the base trips (``AequilibraeMatrix``);
 * Impedance matrix (``AequilibraeMatrix``);
 * Deterrence function name.
 
-Plase check other arguments and parameters that are passed to ``GravityCalibration`` in its 
+Please check other arguments and parameters that are passed to ``GravityCalibration`` in its 
 documentation.
 
 .. seealso::
@@ -58,7 +58,7 @@ documentation.
 ``Ipf``
 -------
 
-IPF is an acronym for Iterative Proportial Fitting, also known as Fratar or Furness. The IPF 
+IPF is an acronym for Iterative Proportional Fitting, also known as Fratar or Furness. The IPF 
 procedure is used to "distribute" future trips based on a growth factor. The procedure can be 
 run with or without an AequilibraE model, with the latter using one of AequilibraE matrices 
 or NumPy arrays as data input.

@@ -160,7 +160,7 @@ class GMNSBuilder:
                 f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
             )
 
-        # Getting information from some optinal GMNS fields
+        # Getting information from some optional GMNS fields
 
         gmns_name = self.l_equiv["name"]
         name_list = (

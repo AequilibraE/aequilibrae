@@ -16,7 +16,7 @@ from aequilibrae.log import global_logger
 from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
-# Setup adapaters so that we can read/write numpy types directly to DB
+# Setup adapters so that we can read/write numpy types directly to DB
 register_adapter(np.int64, int)
 register_adapter(np.int32, int)
 register_adapter(np.float32, float)

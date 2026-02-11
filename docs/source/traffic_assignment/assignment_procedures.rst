@@ -45,7 +45,7 @@ assigned. There are three pieces of information that are required in the instant
     >>> tc_car = TrafficClass("car", graph_car, matrix_car)
     >>> tc_truck = TrafficClass("truck", graph_truck, matrix_truck)
 
-It is also possible to modify the default values for the following parameters of a traffic classe by using a 
+It is also possible to modify the default values for the following parameters of a traffic class by using a 
 method call:
 
 * **Passenger-car equivalent** (PCE) is the standard way of modeling multi-class traffic assignment 

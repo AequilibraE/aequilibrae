@@ -156,7 +156,7 @@ Each item in the 'zones' table is a ``Zone`` object.
     >>> project_zones.fields.all_fields() # doctest: +ELLIPSIS
     ['area', 'employment', 'geometry', 'name', 'parking_spots', 'population', 'zone_id']
 
-    # Now let's get a zone and modifiy it
+    # Now let's get a zone and modify it
     >>> zone = project_zones.get(40)
     
     # By disconnecting the transit mode
@@ -222,7 +222,7 @@ Each item in the 'zones' table is a ``Zone`` object.
 -----------------
 
 This class provides an interface for editing the 'about' table of a project. We can add new fields or
-edit the existing ones as necessary, but everytime you add or modify a field, you have to write back
+edit the existing ones as necessary, but every time you add or modify a field, you have to write back
 this information, otherwise it will be lost.
 
 .. doctest::
@@ -277,7 +277,7 @@ This class is directly accessed from within the corresponding module one wants t
     >>> node_fields = project.network.nodes.fields
 
     # To add a new field to the 'nodes' table
-    >>> node_fields.add("my_new_field", "this is an example of AequilibraE's funcionalities", "TEXT")
+    >>> node_fields.add("my_new_field", "this is an example of AequilibraE's functionalities", "TEXT")
 
     # Don't forget to save these modifications
     >>> node_fields.save()
@@ -315,12 +315,12 @@ It is possible to access the log file contents, as presented in the next code bl
 
     >>> project_log = project.log()
 
-    # Returns a list with all entires in the log file.
+    # Returns a list with all entries in the log file.
     >>> print(project_log.contents()) # doctest: +ELLIPSIS
     ['2021-01-01 15:52:03,945;aequilibrae;INFO ; Created project on D:/release/Sample models/nauru', ...]
 
     # If your project's log is getting cluttered, it is possible to clear it. 
-    # Use this option wiesly once the deletion of data in the log file can't be undone.
+    # Use this option wisely once the deletion of data in the log file can't be undone.
     >>> project_log.clear()
 
     >>> project.close()
@@ -335,7 +335,7 @@ It is possible to access the log file contents, as presented in the next code bl
 ``project.matrices``
 --------------------
 
-This method ia a gateway to all the matrices available in the model, which allows us to update the
+This method is a gateway to all the matrices available in the model, which allows us to update the
 records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord`` object.
 
 .. doctest::
@@ -406,7 +406,7 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 
     # To create a new field in the 'link_types' table, you can call the function `fields`
     # to return a FieldEditor instance, which can be edited
-    >>> link_types.fields.add("my_new_field", "this is an example of AequilibraE's funcionalities", "TEXT")
+    >>> link_types.fields.add("my_new_field", "this is an example of AequilibraE's functionalities", "TEXT")
 
     # You can also remove a LinkType from a project using its `link_type_id`
     >>> link_types.delete("A")
