@@ -371,7 +371,7 @@ class TrafficAssignment(AssignmentBase):
         (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
         The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it. Users should supply ``8 * tau``
-        to match other common usages. Additionally the standard ``0.25`` factor can be overridden by supply the 'alpha'
+        to match other common usages. Additionally the standard ``0.25`` factor can be overridden by supplying the 'alpha'
         parameter.
 
         :Arguments:
