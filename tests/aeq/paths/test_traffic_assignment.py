@@ -130,13 +130,14 @@ def test_set_algorithm(assignment, assigclass):
 
 
 @pytest.mark.parametrize(
-    "vdf,parameters", [
+    "vdf,parameters",
+    [
         *[(k, {"alpha": "b", "beta": "power"}) for k in all_vdf_functions if k != "akcelik"],
         ("akcelik", {"alpha": "b", "tau": "power"}),
         *[(k, {"alpha": 0.15, "beta": 4.0}) for k in all_vdf_functions if k != "akcelik"],
         ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0}),
         ("akcelik", {"tau": 0.1 * 8.0}),
-    ]
+    ],
 )
 def test_set_vdf_parameters(assignment, assigclass, vdf, parameters):
     with pytest.raises(RuntimeError):

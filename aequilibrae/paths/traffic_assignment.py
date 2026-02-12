@@ -391,15 +391,9 @@ class TrafficAssignment(AssignmentBase):
         pars = []
 
         if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
-            parameter_mins = {
-                "alpha": 0.0,
-                "beta": 1.0
-            }
+            parameter_mins = {"alpha": 0.0, "beta": 1.0}
         elif self.vdf.function == "AKCELIK":
-            parameter_mins = {
-                "alpha": 0.0,
-                "tau": 0.0
-            }
+            parameter_mins = {"alpha": 0.0, "tau": 0.0}
         else:
             raise ValueError(f"unknown vdf function {self.vdf.function}")
 
