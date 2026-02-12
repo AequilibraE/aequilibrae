@@ -1,6 +1,17 @@
-from aequilibrae.paths.AoN import bpr, delta_bpr, bpr2, delta_bpr2, conical, delta_conical, inrets, delta_inrets
+from aequilibrae.paths.AoN import (
+    bpr,
+    delta_bpr,
+    bpr2,
+    delta_bpr2,
+    conical,
+    delta_conical,
+    inrets,
+    delta_inrets,
+    akcelik,
+    delta_akcelik,
+)
 
-all_vdf_functions = ["bpr", "bpr2", "conical", "inrets"]
+all_vdf_functions = ["bpr", "bpr2", "conical", "inrets", "akcelik"]
 
 
 class VDF:
@@ -12,7 +23,7 @@ class VDF:
 
         >>> vdf = VDF()
         >>> vdf.functions_available()
-        ['bpr', 'bpr2', 'conical', 'inrets']
+        ['bpr', 'bpr2', 'conical', 'inrets', 'akcelik']
 
     """
 
@@ -37,6 +48,9 @@ class VDF:
             elif value == "INRETS":
                 self.__dict__["apply_vdf"] = inrets
                 self.__dict__["apply_derivative"] = delta_inrets
+            elif value == "AKCELIK":
+                self.__dict__["apply_vdf"] = akcelik
+                self.__dict__["apply_derivative"] = delta_akcelik
             else:
                 raise ValueError("VDF function not available")
         else:

@@ -370,40 +370,56 @@ class TrafficAssignment(AssignmentBase):
         Parameter values can be scalars (same values for the entire network) or network field names
         (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
+        The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it. Users should supply ``8 * tau``
+        to match other common usages. Additionally the standard ``0.25`` factor can be overridden by supply the 'alpha'
+        parameter.
+
         :Arguments:
             **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
-
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
             raise RuntimeError(
                 "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
             )
+
+        # In literature 0.25 is not provided as a parameter. We allow it but default to 0.25 if it wasn't provided.
+        if self.vdf.function == "AKCELIK":
+            par["alpha"] = par.get("alpha", 0.25)
+
         self.__dict__["vdf_parameters"] = par
         self._config["VDF parameters"] = par
         pars = []
+
         if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
-            for p1 in ["alpha", "beta"]:
-                if p1 not in par:
-                    raise ValueError(f"{p1} should exist in the set of parameters provided")
-                p = par[p1]
-                if isinstance(self.vdf_parameters[p1], str):
-                    c = self.classes[0]
-                    array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-                    array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
-                else:
-                    array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
-                    array.fill(self.vdf_parameters[p1])
-                pars.append(array)
+            parameter_mins = {
+                "alpha": 0.0,
+                "beta": 1.0
+            }
+        elif self.vdf.function == "AKCELIK":
+            parameter_mins = {
+                "alpha": 0.0,
+                "tau": 0.0
+            }
+        else:
+            raise ValueError(f"unknown vdf function {self.vdf.function}")
 
-                if np.any(np.isnan(array)):
-                    raise ValueError(f"At least one {p1} is NaN")
+        for p1, minimum in parameter_mins.items():
+            if p1 not in par:
+                raise ValueError(f"{p1} should exist in the set of parameters provided")
+            p = par[p1]
+            if isinstance(self.vdf_parameters[p1], str):
+                c = self.classes[0]
+                array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+                array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
+            else:
+                array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+                array.fill(self.vdf_parameters[p1])
+            pars.append(array)
 
-                if p1 == "alpha":
-                    if array.min() < 0:
-                        raise ValueError(f"At least one {p1} is smaller than zero")
-                else:
-                    if array.min() < 1:
-                        raise ValueError(f"At least one {p1} is smaller than one. Results will make no sense")
+            if np.any(np.isnan(array)):
+                raise ValueError(f"At least one {p1} is NaN")
+            elif array.min() < minimum:
+                raise ValueError(f"At least one {p1} is less than {minimum}")
 
         self.__dict__["vdf_parameters"] = pars
         self._config["VDF function"] = self.vdf.function.lower()
