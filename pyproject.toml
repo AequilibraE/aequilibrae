@@ -150,8 +150,7 @@ max-complexity = 20
 
 [tool.coverage.report]
 fail_under = 75
-show_missing = True
-
+show_missing = true
 
 [tool.coverage.html]
 directory = "coverage_html_report"
