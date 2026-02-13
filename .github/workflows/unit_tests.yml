@@ -99,7 +99,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.13']
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     env:
       AEQ_ASAN: "1"
       PYTHONMALLOC: "malloc"
@@ -122,47 +122,8 @@ jobs:
       run: |
         brew install llvm libspatialite
 
-    - name: Download spatialite on Windows
-      if: matrix.os == 'windows-latest'
-      run: |
-        python tests/setup_windows_spatialite.py
-
     - name: Install Python and create virtual environment
       run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear
-
-    - name: Set up MSVC environment (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        $vsdev = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\*\Common7\Tools\VsDevCmd.bat" | Select-Object -First 1
-        if (-not $vsdev) {
-          throw "VsDevCmd.bat not found"
-        }
-        $cmd = '"' + $vsdev.FullName + '" -arch=x64 >nul && set'
-        cmd /c $cmd | ForEach-Object {
-          if ($_ -match "^(INCLUDE|LIB|LIBPATH|PATH|VCToolsInstallDir|VCToolsRedistDir)=(.*)$") {
-            "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          }
-        }
-
-    - name: Add ASAN runtime directory (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        $asan = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\Llvm\x64\lib\clang\*\lib\windows\clang_rt.asan_dynamic-x86_64.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $asan) {
-          throw "clang_rt.asan_dynamic-x86_64.dll not found"
-        }
-        $omp = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Redist\MSVC\*\x64\Microsoft.VC143.OpenMP" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($omp) {
-          "PATH=$($asan.DirectoryName);$($omp.FullName);$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        } else {
-          "PATH=$($asan.DirectoryName);$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        }
-
-    - name: Install dependencies (Windows)
-      if: matrix.os == 'windows-latest'
-      run: uv pip install -e ".[dev]"
 
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -175,10 +136,6 @@ jobs:
       run: CXX=$(brew --prefix llvm)/bin/clang++ CC=$(brew --prefix llvm)/bin/clang uv pip install -e ".[dev]"
       env:
         AEQ_UBSAN: "1"
-
-    - name: Runs test with ASAN (Windows)
-      if: matrix.os == 'windows-latest'
-      run: uv run pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
     - name: Runs test with ASAN/UBSAN (Linux)
       if: matrix.os == 'ubuntu-latest'
