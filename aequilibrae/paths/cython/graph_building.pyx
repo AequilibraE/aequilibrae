@@ -14,9 +14,9 @@ cdef void _remove_dead_ends(
     long long [:] graph_fs,
     long long [:] all_nodes,
     long long [:] nodes_to_indices,
-    long long [:] a_nodes,
-    long long [:] b_nodes,
-    signed char [:] directions,
+    const long long [:] a_nodes,
+    const long long [:] b_nodes,
+    const signed char [:] directions,
     long long [:] in_degree,
     long long [:] out_degree,
     uint8_t [:] burnt_links,
@@ -134,9 +134,9 @@ cdef long long _build_compressed_graph(
     long long[:] link_idx,
     long long[:] links_index,
     long long[:] link_edge,
-    long long[:] a_nodes,
-    long long[:] b_nodes,
-    signed char[:] directions,
+    const long long[:] a_nodes,
+    const long long[:] b_nodes,
+    const signed char[:] directions,
     long long link_id_max,
     long long[:] simplified_links,
     signed char[:] simplified_directions,
@@ -423,13 +423,13 @@ def create_compressed_link_network_mapping(graph):
 
     cdef:
         long long i, j, a_node, x, b_node, tmp, compressed_id, non_duplicated_idx
-        long long[:] b
-        long long[:] values
-        signed char[:] directions
+        const long long[:] b
+        const long long[:] values
+        const signed char[:] directions
         uint32_t[:] idx
         int64_t[::] data
         int32_t[:] node_mapping
-        int64_t[:, :] non_duplicated
+        const int64_t[:, :] non_duplicated
         signed char direction
 
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't

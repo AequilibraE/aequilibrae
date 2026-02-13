@@ -62,8 +62,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph.compact_fs
     cdef double [:] g_view = graph.compact_cost
-    cdef long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
-    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
+    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
 
     if skims > 0:
         gskim = graph.compact_skims
