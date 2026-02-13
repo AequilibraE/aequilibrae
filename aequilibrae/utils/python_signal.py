@@ -69,7 +69,7 @@ class PythonSignal:  # type: ignore
         elif action == "start":
             if missing_tqdm and not inside_qgis:
                 self.deactivate = True
-                warnings.warn("No progress bars will be shown. Please install tqdm to see them")
+                warnings.warn("No progress bars will be shown. Please install tqdm to see them", stacklevel=2)
                 return
 
             # Close any existing bars

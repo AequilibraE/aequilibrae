@@ -118,7 +118,7 @@ def ensure_spatialite_binaries() -> None:
         shutil.copyfile(join(directory, "proj.db"), join(projdb_dir, "proj.db"))
     except Exception as e:
         msg = f"Could not put the proj.db file in the expected place. {e.args}"
-        warnings.warn(msg)
+        warnings.warn(msg, stacklevel=2)
         global_logger.warning(msg)
 
 

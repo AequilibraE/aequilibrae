@@ -709,7 +709,7 @@ class AequilibraeMatrix(object):
     def __getattr__(self, mat_name: str):
         if mat_name in object.__dict__:
             if mat_name == "matrix" and self.__omx:
-                warnings.warn("You can't access OMX matrix cores like that")
+                warnings.warn("You can't access OMX matrix cores like that", stacklevel=2)
                 return
             return self.__dict__[mat_name]
 

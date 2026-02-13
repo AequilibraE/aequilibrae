@@ -16,7 +16,7 @@ def test_create_from_osm(empty_project):
         osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]
 
         if osmids == 0:
-            warn("COULD NOT RETRIEVE DATA FROM OSM")
+            warn("COULD NOT RETRIEVE DATA FROM OSM", stacklevel=2)
             return
 
         if osmids >= lks:

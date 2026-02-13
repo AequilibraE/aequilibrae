@@ -26,7 +26,7 @@ class NetworkSimplifier(WorkerThread):
         self.network = self.project.network
         self.link_layer = self.network.links.data
 
-        warnings.warn("This will alter your database in place. Make sure you have a backup.")
+        warnings.warn("This will alter your database in place. Make sure you have a backup.", stacklevel=2)
 
     def simplify(self, graph: Graph, max_speed_ratio: float = 1.1):
         """
@@ -96,7 +96,7 @@ class NetworkSimplifier(WorkerThread):
 
             new_geo = linemerge(geos)
             if not isinstance(new_geo, LineString):
-                warnings.warn(f"Failed to merge geometry for superlink around link {rec.link_id}")
+                warnings.warn(f"Failed to merge geometry for superlink around link {rec.link_id}", stacklevel=2)
                 continue
 
             break_into = ceil(new_geo.length)

@@ -164,7 +164,7 @@ class TrafficClass(TransportClassBase):
         self._selected_links = {}
         for name, link_set in links.items():
             if len(name.split(" ")) != 1:
-                warnings.warn("Input string name has a space in it. Replacing with _")
+                warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
                 name = str.join("_", name.split(" "))
 
             link_ids = []
@@ -182,7 +182,7 @@ class TrafficClass(TransportClassBase):
                     if comp_id in link_ids:
                         warnings.warn(
                             "Two input links map to the same compressed link in the network"
-                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}", stacklevel=2
                         )
                     else:
                         link_ids.append(comp_id)
