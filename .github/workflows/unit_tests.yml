@@ -105,7 +105,6 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
     env:
       AEQ_ASAN: "1"
-      AEQ_UBSAN: "1"
       PYTHONMALLOC: "malloc"
     steps:
     - uses: actions/checkout@v6
@@ -134,14 +133,21 @@ jobs:
     - name: Install Python and create virtual environment
       run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear
 
-    - name: Install dependencies (Windows & Linux)
-      if: matrix.os != 'macos-latest'
+    - name: Install dependencies (Windows)
+      if: matrix.os == 'windows-latest'
       run: uv pip install -e ".[dev]"
+
+    - name: Install dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: uv pip install -e ".[dev]"
+      env:
+        AEQ_UBSAN: "1"
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: uv pip install -e ".[dev]"
       env:
+        AEQ_UBSAN: "1"
         CXX: /opt/homebrew/opt/llvm/bin/clang++
         CC: /opt/homebrew/opt/llvm/bin/clang
 
