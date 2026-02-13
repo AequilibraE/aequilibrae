@@ -138,22 +138,15 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        $search_roots = @(
-          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\LLVM\x64\lib\clang",
-          "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\LLVM\x64\lib\clang",
-          "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\LLVM\x64\lib\clang",
-          "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\LLVM\x64\lib\clang",
-          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC",
-          "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC",
-          "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC",
-          "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC"
+        $candidate_globs = @(
+          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC\*\bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll",
+          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\bin\clang_rt.asan_dynamic-x86_64.dll",
+          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\lib\clang\*\lib\windows\clang_rt.asan_dynamic-x86_64.dll"
         )
         $asan_dll = $null
-        foreach ($root in $search_roots) {
-          if (Test-Path $root) {
-            $asan_dll = Get-ChildItem $root -Filter "clang_rt.asan_dynamic-x86_64.dll" -Recurse -Depth 6 | Select-Object -First 1
-            if ($asan_dll) { break }
-          }
+        foreach ($glob in $candidate_globs) {
+          $asan_dll = Get-ChildItem -Path $glob -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($asan_dll) { break }
         }
         if (-not $asan_dll) {
           throw "ASAN runtime DLL not found. Verify VS2022 C++ tooling is available on the runner."
