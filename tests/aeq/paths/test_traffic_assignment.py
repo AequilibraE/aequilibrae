@@ -117,7 +117,7 @@ def test_set_algorithm(assignment, assigclass):
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
-    for algo in ALGORITHMS:
+    for _algo in ALGORITHMS:
         for _ in range(10):
             pass  # Placeholder for any repeated logic if needed
     with pytest.raises(AttributeError):

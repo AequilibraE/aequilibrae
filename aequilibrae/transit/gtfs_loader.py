@@ -462,7 +462,7 @@ class GTFSReader(WorkerThread):
         for route_type, pce in self.__pces__.items():
             routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
-        for i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
+        for _i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
             r = Route(self.agency.agency_id)
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r

@@ -153,7 +153,7 @@ def test_upgrade(migrations_file, connections, main_connection):
 
     # Check all migrations were applied
     status = manager.status(connections[main_connection])
-    for id, stat in status.items():
+    for _id, stat in status.items():
         assert stat == MigrationStatus.APPLIED
 
     # Check tables were created
