@@ -2,6 +2,9 @@ name: Tests on all platforms with linting
 
 on: [pull_request]
 
+permissions:
+  contents: read
+
 env:
   AEQ_SHOW_PROGRESS: "0"
 
