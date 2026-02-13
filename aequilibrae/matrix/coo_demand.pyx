@@ -95,8 +95,8 @@ cdef class GeneralisedCOODemand:
         self.f32.clear()
 
         cdef:
-            double[::1] f64_array
-            float[::1] f32_array
+            const double[::1] f64_array
+            const float[::1] f32_array
             vector[double] *f64_vec
             vector[float] *f32_vec
 
