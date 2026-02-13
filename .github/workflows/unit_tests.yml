@@ -130,6 +130,12 @@ jobs:
     - name: Install Python and create virtual environment
       run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear
 
+    - name: Set up MSVC environment (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
     - name: Install dependencies (Windows)
       if: matrix.os == 'windows-latest'
       run: uv pip install -e ".[dev]"
