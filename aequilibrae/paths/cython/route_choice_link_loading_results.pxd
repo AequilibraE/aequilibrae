@@ -87,7 +87,7 @@ cdef class LinkLoadingResults:
         LinkLoadingResults self,
         vector[unique_ptr[vector[double]]] &f64_link_loading,
         vector[unique_ptr[vector[float]]] &f32_link_loading,
-        long long[:] compressed_id_view,
+        const long long[:] compressed_id_view,
         int cores
     )
 
@@ -108,6 +108,6 @@ cdef class LinkLoadingResults:
     ) noexcept nogil
     cdef void reduce_sl_link_loading(LinkLoadingResults self)
     cdef void reduce_sl_od_matrix(LinkLoadingResults self)
-    cdef object link_loading_to_objects(self, long long[:] compressed_id_view, int cores)
-    cdef object sl_link_loading_to_objects(self, long long[:] compressed_id_view, int cores)
+    cdef object link_loading_to_objects(self, const long long[:] compressed_id_view, int cores)
+    cdef object sl_link_loading_to_objects(self, const long long[:] compressed_id_view, int cores)
     cdef object sl_od_matrices_structs_to_objects(LinkLoadingResults self)

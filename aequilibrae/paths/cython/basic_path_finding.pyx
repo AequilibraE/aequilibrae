@@ -171,7 +171,7 @@ cdef void blocking_centroid_flows(int action,
                                   long long centroids,
                                   long long [:] fs,
                                   long long [:] temp_b_nodes,
-                                  long long [:] real_b_nodes) noexcept nogil:
+                                  const long long [:] real_b_nodes) noexcept nogil:
     cdef long long i
 
     if action == 1:  # We are unblocking
@@ -281,7 +281,7 @@ cpdef int path_finding(
     long long [:] csr_indices,
     long long [:] graph_fs,
     long long [:] pred,
-    long long [:] ids,
+    const long long [:] ids,
     long long [:] connectors,
     long long [:] reached_first
 ) noexcept nogil:
@@ -464,7 +464,7 @@ cpdef void path_finding_a_star(long origin,
                                double [:] lats,
                                double [:] lons,
                                long long [:] pred,
-                               long long [:] ids,
+                               const long long [:] ids,
                                long long [:] connectors,
                                Heuristic heuristic) noexcept nogil:
     """
