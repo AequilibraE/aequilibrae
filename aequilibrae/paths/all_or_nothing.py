@@ -4,14 +4,12 @@ from multiprocessing.dummy import Pool as ThreadPool
 import numpy as np
 from aequilibrae.paths.AoN import one_to_all, assign_link_loads
 
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .multi_threaded_aon import MultiThreadedAoN
 
 if False:
-    from .results import AssignmentResults
-    from .graph import Graph
+    pass
 
 
 class allOrNothing(WorkerThread):

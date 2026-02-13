@@ -3,7 +3,6 @@ import json
 import logging
 import pathlib
 import socket
-import sqlite3
 import warnings
 from collections.abc import Hashable
 from datetime import datetime
@@ -22,7 +21,6 @@ from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class RouteChoice:

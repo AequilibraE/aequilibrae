@@ -4,7 +4,6 @@ from warnings import warn
 import pytest
 from shapely.geometry import box, Polygon
 
-from aequilibrae.project import Project
 
 
 def test_create_from_osm(empty_project):

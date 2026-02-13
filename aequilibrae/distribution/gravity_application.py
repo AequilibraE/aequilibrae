@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime
 from time import perf_counter
 from uuid import uuid4

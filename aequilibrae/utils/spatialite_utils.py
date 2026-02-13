@@ -7,7 +7,6 @@ from os.path import basename, join
 from pathlib import Path
 from sqlite3 import Connection, register_adapter, OperationalError
 from tempfile import gettempdir
-from typing import Optional
 from zipfile import ZipFile
 
 import numpy as np

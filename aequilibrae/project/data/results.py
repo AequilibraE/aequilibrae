@@ -4,10 +4,8 @@ from typing import Optional
 
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.result_record import ResultRecord
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import add_column_unless_exists, commit_and_close
 
 
 class Results:

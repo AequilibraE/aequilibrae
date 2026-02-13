@@ -5,7 +5,7 @@ from typing import Optional
 from aequilibrae import Project, logger
 from aequilibrae.transit import Transit
 from aequilibrae.context import get_active_project
-from aequilibrae.project.project_creation import add_triggers, remove_triggers, recreate_columns
+from aequilibrae.project.project_creation import add_triggers, remove_triggers
 
 import numpy as np
 

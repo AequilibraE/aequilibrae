@@ -3,7 +3,6 @@ import os
 from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
-from typing import List, Dict
 
 import numpy as np
 from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
@@ -14,10 +13,6 @@ from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.traffic_class import TrafficClass
-
-if False:
-    from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread

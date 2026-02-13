@@ -2,8 +2,7 @@ import sqlite3
 from typing import Optional
 import pathlib
 
-from aequilibrae import Project, logger
-from aequilibrae.context import get_active_project
+from aequilibrae import logger
 
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 

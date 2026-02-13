@@ -7,13 +7,11 @@ from typing import Dict
 
 import numpy as np
 import pandas as pd
-import pyproj
 from pyproj import Transformer
 from shapely.geometry import LineString
 
 from aequilibrae.context import get_logger
 from aequilibrae.transit.column_order import column_order
-from aequilibrae.transit.constants import AGENCY_MULTIPLIER
 from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv

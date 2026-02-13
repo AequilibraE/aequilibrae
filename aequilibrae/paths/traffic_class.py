@@ -1,10 +1,9 @@
 import warnings
 from copy import deepcopy
 from typing import Union, List, Tuple, Dict
-from abc import ABC, abstractmethod
+from abc import ABC
 
 import numpy as np
-import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase

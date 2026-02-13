@@ -23,7 +23,6 @@ from pandas.api.types import is_integer_dtype
 
 from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import KDTree, minkowski_distance
-from shapely.geometry import Point
 
 from aequilibrae.paths import PathResults
 from aequilibrae.paths import TransitGraph

@@ -1,17 +1,12 @@
 import random
-import sqlite3
 import string
-from os.path import join, isfile
-from pathlib import Path
 from random import choice
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
 from aequilibrae.paths.vdf import all_vdf_functions
-from ...data import siouxfalls_project
 
 
 @pytest.fixture(scope="function")

@@ -1,12 +1,10 @@
 import sqlite3
-import json
 from typing import Optional
 
 from aequilibrae import Project, logger
 from aequilibrae.context import get_active_project
 from aequilibrae.project.data import Results
 
-import pandas as pd
 
 
 def migrate(

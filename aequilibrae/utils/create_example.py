@@ -1,6 +1,5 @@
 import zipfile
 import os
-from os.path import dirname, join
 from pathlib import Path
 from typing import List
 

@@ -1,5 +1,4 @@
 import logging
-import time
 from sqlite3 import Connection
 from typing import Optional, Union
 
@@ -9,7 +8,6 @@ import geopandas as gpd
 from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon
 
-from aequilibrae.utils.db_utils import commit_and_close
 
 INFINITE_CAPACITY = 99999
 

@@ -1,6 +1,6 @@
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
+from aequilibrae import TrafficAssignment, TrafficClass
 
 
 @pytest.fixture(scope="function")

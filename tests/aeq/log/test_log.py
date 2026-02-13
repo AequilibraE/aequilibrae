@@ -1,7 +1,6 @@
 import os
 from logging import FileHandler
 
-import pytest
 from aequilibrae import Project
 
 

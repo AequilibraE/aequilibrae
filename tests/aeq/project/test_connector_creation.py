@@ -1,10 +1,6 @@
-import geopandas as gpd
-import numpy as np
-import pandas as pd
 import pytest
 from shapely.geometry import LineString, Point
 
-from aequilibrae.project import Project
 from aequilibrae.project.network.connector_creation import bulk_connector_creation
 
 

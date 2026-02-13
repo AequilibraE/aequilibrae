@@ -19,7 +19,6 @@ from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.utils.core_setter import set_cores
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class AssignmentBase(ABC):

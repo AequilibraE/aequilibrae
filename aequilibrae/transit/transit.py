@@ -1,7 +1,6 @@
 import os
 import shutil
 import sqlite3
-import warnings
 from typing import Dict, List
 
 import pandas as pd
@@ -13,7 +12,6 @@ from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
-from aequilibrae.utils.db_utils import read_and_close
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
