@@ -138,9 +138,25 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        $asan_dll = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022" -Filter "clang_rt.asan_dynamic-x86_64.dll" -Recurse | Select-Object -First 1
+        $search_roots = @(
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\LLVM\x64\lib\clang",
+          "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\LLVM\x64\lib\clang",
+          "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\LLVM\x64\lib\clang",
+          "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\LLVM\x64\lib\clang",
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC",
+          "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC",
+          "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC",
+          "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC"
+        )
+        $asan_dll = $null
+        foreach ($root in $search_roots) {
+          if (Test-Path $root) {
+            $asan_dll = Get-ChildItem $root -Filter "clang_rt.asan_dynamic-x86_64.dll" -Recurse -Depth 6 | Select-Object -First 1
+            if ($asan_dll) { break }
+          }
+        }
         if (-not $asan_dll) {
-          throw "clang_rt.asan_dynamic-x86_64.dll not found"
+          throw "ASAN runtime DLL not found. Verify VS2022 C++ tooling is available on the runner."
         }
         "PATH=$($asan_dll.DirectoryName);$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
