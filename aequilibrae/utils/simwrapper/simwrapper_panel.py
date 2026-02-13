@@ -1,3 +1,10 @@
+import sqlite3
+
+import numpy as np
+
+from aequilibrae.utils.simwrapper.simwrapper_utils import pretty_round
+
+
 class SimwrapperPanel:
     """Base class for all simwrapper panels
 
@@ -217,11 +224,14 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
 
     :Arguments:
         **title** (:obj:`str`): title
+        **project** (:obj:`Project`, *Optional*): AequilibraE project, used to compute data ranges from percentiles.
+            If not provided, data ranges default to [0, 1].
     """
 
     def __init__(
         self,
         title,
+        project=None,
         project_database="project_database.sqlite",
         results_database="results_database.sqlite",
         colour_metric=None,
@@ -232,7 +242,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         zoom=None,
         projection=None,
         palette="Temps",
-        results_table=None
+        results_table=None,
     ):
         super().__init__(
             title, project_database, height=height, width=width, center=center, zoom=zoom, projection=projection
@@ -244,29 +254,78 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         self.palette = palette
         self.results_table = results_table
 
-
         super().set_extra_databases({"results": self.results_database})
-        super().set_legend(self.build_legend())
 
-        self.set_colour_styling([0, 2])
-        self.set_width_styling([0, 2])
+        colour_range = self._compute_data_range(project, self.colour_metric)
+        width_range = self._compute_data_range(project, self.width_metric)
+
+        super().set_legend(self.build_legend(colour_range, width_range))
+
+        self.set_colour_styling(colour_range)
+        self.set_width_styling(width_range)
 
         self.add_layer()
 
-    def build_legend(self):
+    def _compute_data_range(self, project, metric, lower_pct=5, upper_pct=95):
+        """Compute a pretty-rounded data range from the 5th and 95th percentiles.
+
+        :Arguments:
+            **project**: AequilibraE project with results_connection
+            **metric** (:obj:`str`): column name to compute range for
+            **lower_pct** (:obj:`int`): lower percentile (default 5)
+            **upper_pct** (:obj:`int`): upper percentile (default 95)
+
+        :Returns:
+            **list**: [lower_bound, upper_bound] rounded to pretty numbers
+        """
+        if not metric or not project or not self.results_table:
+            return [0, 1]
+
+        try:
+            with project.results_connection as conn:
+                cursor = conn.execute(f"SELECT [{metric}] FROM [{self.results_table}] WHERE [{metric}] IS NOT NULL")
+                values = np.array([row[0] for row in cursor.fetchall()], dtype=float)
+        except (sqlite3.OperationalError, Exception):
+            return [0, 1]
+
+        if len(values) == 0:
+            return [0, 1]
+
+        p_low = float(np.percentile(values, lower_pct))
+        p_high = float(np.percentile(values, upper_pct))
+
+        # If the range is essentially zero, return a trivial range
+        if p_high - p_low < 1e-12:
+            return [0, max(1, pretty_round(p_high, "up"))]
+
+        lower = pretty_round(p_low, "down")
+        upper = pretty_round(p_high, "up")
+
+        # Snap small values near zero to zero
+        span = upper - lower
+        if span > 0 and abs(lower) / span < 0.05:
+            lower = 0
+
+        return [lower, upper]
+
+    def build_legend(self, colour_range, width_range):
         legend = []
 
         if self.width_metric:
+            w_min, w_max = width_range
+            w_mean = (w_min + w_max) / 2
             legend.append({"subtitle": self.width_metric})
-            legend.append({"label": "Low", "color": "#FFFFFF", "size": 1, "shape": "line"})
-            legend.append({"label": "Medium", "color": "#FFFFFF", "size": 5, "shape": "line"})
-            legend.append({"label": "High", "color": "#FFFFFF", "size": 10, "shape": "line"})
+            legend.append({"label": str(w_min), "color": "#444444", "size": 1, "shape": "line"})
+            legend.append({"label": str(w_mean), "color": "#444444", "size": 5, "shape": "line"})
+            legend.append({"label": str(w_max), "color": "#444444", "size": 10, "shape": "line"})
 
         if self.colour_metric:
+            c_min, c_max = colour_range
+            c_mean = (c_min + c_max) / 2
             legend.append({"subtitle": self.colour_metric})
-            legend.append({"label": "Low", "color": "#009392", "size": 5, "shape": "line"})
-            legend.append({"label": "Medium", "color": "#e9e29c", "size": 5, "shape": "line"})
-            legend.append({"label": "High", "color": "#cf597e", "size": 5, "shape": "line"})
+            legend.append({"label": str(c_min), "color": "#009392", "size": 5, "shape": "line"})
+            legend.append({"label": str(c_mean), "color": "#e9e29c", "size": 5, "shape": "line"})
+            legend.append({"label": str(c_max), "color": "#cf597e", "size": 5, "shape": "line"})
 
         return legend
 
@@ -281,9 +340,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
                 }
             }
         else:
-            self.colour_style = {
-                "lineColor": "#000"
-            }
+            self.colour_style = {"lineColor": "#000000"}
 
     def set_width_styling(self, data_range):
         if self.width_metric:
@@ -295,10 +352,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
                 }
             }
         else:
-            self.width_style = {
-                "lineWidth": 20
-            }
-
+            self.width_style = {"lineWidth": 10}
 
     def add_layer(self):
 
@@ -314,7 +368,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
                     "rightKey": "link_id",
                     "type": "left",
                 },
-                "style": [self.colour_style, self.width_style],
+                "style": self.colour_style | self.width_style,
             },
         )
 
@@ -323,4 +377,3 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         panel = super().to_dict()
 
         return panel
-

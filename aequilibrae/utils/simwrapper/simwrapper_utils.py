@@ -1,5 +1,41 @@
 import math
 
+
+def pretty_round(value, direction="up"):
+    """Round a value to a 'pretty' number (1, 2, 5 multiples of powers of 10).
+
+    :Arguments:
+        **value** (:obj:`float`): value to round
+        **direction** (:obj:`str`): 'up' to ceil, 'down' to floor
+
+    :Returns:
+        **float**: the rounded pretty number
+    """
+    if value == 0:
+        return 0
+
+    sign = 1 if value >= 0 else -1
+    abs_val = abs(value)
+
+    exponent = math.floor(math.log10(abs_val))
+    mantissa = abs_val / (10**exponent)
+
+    pretty_steps = [1, 2, 5, 10]
+
+    if direction == "up":
+        chosen = next((s for s in pretty_steps if s >= mantissa), 10)
+    else:
+        chosen = next((s for s in reversed(pretty_steps) if s <= mantissa), 1)
+
+    result = sign * chosen * (10**exponent)
+
+    # Snap to zero if the result is very small compared to a "normal" scale
+    if abs(result) < 1e-10:
+        return 0
+
+    return result
+
+
 def get_links_bounds_box(project):
     """
     Compute box around all coordinates in links table of project.
@@ -27,6 +63,7 @@ def get_links_bounds_box(project):
         row = cursor.fetchone()  # fetch the single row returned by query (ie bounding box values)
     return row
 
+
 def get_project_center(project):
     """Finds center coordinates of project"""
     row = get_links_bounds_box(project)
@@ -44,6 +81,7 @@ def get_project_center(project):
 
     return center
 
+
 def get_project_zoom(project):
     """Finds a reasonable zoom level based on project links' reach"""
 
@@ -54,9 +92,7 @@ def get_project_zoom(project):
     row = get_links_bounds_box(project)
 
     if row is None or any(value is None for value in row):
-        return (
-            10  # if cant find coordinates bc of missing link vals, will make this better though but works for now
-        )
+        return 10  # if cant find coordinates bc of missing link vals, will make this better though but works for now
 
     xmin, ymin, xmax, ymax = row
 

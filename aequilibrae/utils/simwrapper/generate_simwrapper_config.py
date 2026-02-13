@@ -85,21 +85,27 @@ class SimwrapperConfigGenerator:
         return [TextPanel(title="title", data="intro")]
 
     def _get_link_types(self):
-        """ returns list of link types in network"""
+        """returns list of link types in network"""
         return self.project.network.link_types.all_types()
 
     def _categorical_palette(self, n):
         """Returns n visually distinct colors"""
 
         base = [
-            "#4C78A8", "#F58518", "#E45756",
-            "#72B7B2", "#54A24B", "#EECA3B",
-            "#B279A2", "#FF9DA6", "#9D755D",
+            "#4C78A8",
+            "#F58518",
+            "#E45756",
+            "#72B7B2",
+            "#54A24B",
+            "#EECA3B",
+            "#B279A2",
+            "#FF9DA6",
+            "#9D755D",
         ]
         return base[:n]
 
     def _truncate_results_tables(self, results_tables, max_tables=3):
-        """Returns truncated results list and note noting truncation occurred """
+        """Returns truncated results list and note noting truncation occurred"""
 
         if len(results_tables) <= max_tables:
             return results_tables, False
@@ -116,22 +122,21 @@ class SimwrapperConfigGenerator:
             height=2,
             width=6,
         )
+
     def _stats_rows(self):
         """returns stats rows panels"""
         dataset = [
             {
                 "key": "Link Count",
-                "value": {"database": "project_database.sqlite",
-                          "query": "SELECT printf('%,d', COUNT(*)) FROM links"},
+                "value": {"database": "project_database.sqlite", "query": "SELECT printf('%,d', COUNT(*)) FROM links"},
             },
             {
                 "key": "Node Count",
-                "value": {"database": "project_database.sqlite",
-                          "query": "SELECT printf('%,d', COUNT(*)) FROM nodes"},
+                "value": {"database": "project_database.sqlite", "query": "SELECT printf('%,d', COUNT(*)) FROM nodes"},
             },
         ]
 
-        panel = TilePanel("Network Size", dataset, height = 1, colors="monochrome")
+        panel = TilePanel("Network Size", dataset, height=1, colors="monochrome")
 
         return [panel]
 
@@ -165,10 +170,7 @@ class SimwrapperConfigGenerator:
                 "table": "links",
                 "geometry": "line",
                 "sqlFilter": "link_type != 3",
-                "style": {
-                    "lineColor": "#4C78A8",
-                    "lineWidth": 2
-                },
+                "style": {"lineColor": "#4C78A8", "lineWidth": 2},
             },
         )
 
@@ -226,10 +228,7 @@ class SimwrapperConfigGenerator:
         # build and set legend
         legend = [{"subtitle": "Link Types"}]
         for i, lt in enumerate(link_types):
-            legend.append({"label": f"{lt}",
-                           "color": f"{colours[i]}",
-                           "shape": "line"})
- 
+            legend.append({"label": f"{lt}", "color": f"{colours[i]}", "shape": "line"})
 
         panel.set_legend(legend)
 
@@ -382,9 +381,10 @@ class SimwrapperConfigGenerator:
         for table in results_tables:
             panel = AequilibraEResultsMapPanel(
                 title=f"{table} Delay Factor",
+                project=self.project,
                 results_table=table,
-                colour_metric = "Delay_factor_Max",
-                width_metric = "capacity_ab"
+                colour_metric="Delay_factor_Max",
+                width_metric="capacity_ab",
             )
             row.append(panel)
 
@@ -397,9 +397,7 @@ class SimwrapperConfigGenerator:
 
         for table in results_tables:
             panel = AequilibraEResultsMapPanel(
-                title=f"{table} vehicles / capacity",
-                results_table=table,
-                colour_metric = "VOC_max"
+                title=f"{table} vehicles / capacity", project=self.project, results_table=table, colour_metric="VOC_max"
             )
             row.append(panel)
 
@@ -547,9 +545,10 @@ class SimwrapperConfigGenerator:
         for table in results_tables:
             panel = AequilibraEResultsMapPanel(
                 title=f"{table} flow",
+                project=self.project,
                 results_table=table,
-                colour_metric = "VOC_max",
-                width_metric = "PCE_tot"
+                colour_metric="VOC_max",
+                width_metric="PCE_tot",
             )
             row.append(panel)
 
@@ -574,9 +573,7 @@ class SimwrapperConfigGenerator:
         results_tables, truncated = self._truncate_results_tables(results_tables)
 
         if truncated:
-            rows["resultsNoticeRow"] = [
-                self._results_truncation_notice(len(results_tables), len(res_df))
-            ]
+            rows["resultsNoticeRow"] = [self._results_truncation_notice(len(results_tables), len(res_df))]
 
         # if we have results table, add relevant panels to dashboard
         if len(results_tables) > 0:
