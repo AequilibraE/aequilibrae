@@ -1,7 +1,7 @@
 from typing import Union, List
 
 import numpy as np
-from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
+from aequilibrae.paths.cython.AoN import update_path_trace, path_computation, HEURISTIC_MAP
 from aequilibrae.paths.graph import Graph
 
 

@@ -1,5 +1,5 @@
 import numpy as np
-from aequilibrae.paths.AoN import (
+from aequilibrae.paths.cython.AoN import (
     copy_one_dimension,
     sum_axis1,
     linear_combination,

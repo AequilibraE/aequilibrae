@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_logger
-from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 
 @dataclasses.dataclass

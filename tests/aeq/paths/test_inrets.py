@@ -1,7 +1,7 @@
 from multiprocessing import cpu_count
 
 import numpy as np
-from aequilibrae.paths.AoN import inrets, delta_inrets
+from aequilibrae.paths.cython.AoN import inrets, delta_inrets
 
 
 def test_inrets_function():

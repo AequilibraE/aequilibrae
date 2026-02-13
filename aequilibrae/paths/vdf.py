@@ -1,4 +1,4 @@
-from aequilibrae.paths.AoN import (
+from aequilibrae.paths.cython.AoN import (
     bpr,
     delta_bpr,
     bpr2,

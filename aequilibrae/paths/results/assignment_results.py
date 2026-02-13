@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
+from aequilibrae.paths.cython.AoN import sum_axis1, assign_link_loads
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters

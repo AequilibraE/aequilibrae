@@ -41,6 +41,7 @@ dependencies = [
   "tqdm",
 ]
 
+license = "LicenseRef-AequilibraE"
 license-files = ["LICENSE.TXT"]
 
 [project.optional-dependencies]

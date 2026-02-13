@@ -6,7 +6,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 import yaml
-from aequilibrae.distribution.ipf_core import ipf_core
+from aequilibrae.distribution.cython.ipf_core import ipf_core
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix

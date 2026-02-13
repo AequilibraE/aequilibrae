@@ -2,7 +2,7 @@ import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
 import numpy as np
-from aequilibrae.paths.AoN import one_to_all, assign_link_loads
+from aequilibrae.paths.cython.AoN import one_to_all, assign_link_loads
 
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread

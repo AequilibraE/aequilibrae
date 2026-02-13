@@ -1,6 +1,6 @@
 from scipy import sparse
 import numpy as np
-from aequilibrae.paths.public_transport import HyperpathGenerating
+from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 
 class OptimalStrategies:
