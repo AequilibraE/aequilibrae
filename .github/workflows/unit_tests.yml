@@ -138,7 +138,8 @@ jobs:
         if (-not $vsdev) {
           throw "VsDevCmd.bat not found"
         }
-        cmd /c "\"$($vsdev.FullName)\" -arch=x64 >nul && set" | ForEach-Object {
+        $cmd = '"' + $vsdev.FullName + '" -arch=x64 >nul && set'
+        cmd /c $cmd | ForEach-Object {
           if ($_ -match "^(INCLUDE|LIB|LIBPATH|PATH|VCToolsInstallDir|VCToolsRedistDir)=(.*)$") {
             "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
