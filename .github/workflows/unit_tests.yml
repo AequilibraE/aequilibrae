@@ -149,7 +149,8 @@ jobs:
           $resolved_dirs += Get-Item -Path $pattern -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
         }
         $resolved_dirs = $resolved_dirs | Select-Object -Unique
-        if (-not ($resolved_dirs | ForEach-Object { Test-Path (Join-Path $_ "clang_rt.asan_dynamic-x86_64.dll") } | Where-Object { $_ } | Select-Object -First 1)) {
+        $has_asan_dll = $resolved_dirs | ForEach-Object { Test-Path (Join-Path $_ "clang_rt.asan_dynamic-x86_64.dll") } | Where-Object { $_ } | Select-Object -First 1
+        if (-not $has_asan_dll) {
           throw "ASAN runtime DLL not found. Verify VS2022 C++ tooling is available on the runner."
         }
         "PATH=$($resolved_dirs -join ';');$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
