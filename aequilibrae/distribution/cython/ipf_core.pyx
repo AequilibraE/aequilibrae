@@ -82,15 +82,15 @@ def ipf_core(
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef object _fratar(cython.floating[:, :] flows,
-                    double[:] prod_tot,
+                double[:] prod_tot,
                 const double[:] prod_tgt,
-                    double[:] prod_factor,
-                    double[::1] attr_tot,
+                double[:] prod_factor,
+                double[::1] attr_tot,
                 const double[:] attr_tgt,
-                    double[:] attr_factor,
-                    int max_iter,
-                    double toler,
-                    int cpus):
+                double[:] attr_factor,
+                int max_iter,
+                double toler,
+                int cpus):
 
     cdef double err = 1.0
     cdef int iter = 0
@@ -132,8 +132,8 @@ cdef object _fratar(cython.floating[:, :] flows,
 @cython.boundscheck(False)
 cpdef void _total_attra(cython.floating[:, :] flows,
                     const double[:] prod_tgt,
-                        double[::1] attr_tot,
-                        int cpus) noexcept:
+                    double[::1] attr_tot,
+                    int cpus) noexcept:
     cdef long i, j, jk
     cdef double *local_buf
     cdef long I = flows.shape[0]
@@ -169,8 +169,8 @@ cpdef void _total_attra(cython.floating[:, :] flows,
 @cython.boundscheck(False)
 cpdef void _total_prods(cython.floating[:, :] flows,
                     const double[:] prod_tgt,
-                        double[:] prod_tot,
-                        int cpus) noexcept nogil:
+                    double[:] prod_tot,
+                    int cpus) noexcept nogil:
 
     cdef long long i, j
     cdef long long I = flows.shape[0]
@@ -191,9 +191,9 @@ cpdef void _total_prods(cython.floating[:, :] flows,
 @cython.boundscheck(False)
 @cython.cdivision(True)
 cpdef double _factors(const double[:] target,
-                      double[:] total,
-                      double[:] factor,
-                      int cpus) noexcept:
+                  double[:] total,
+                  double[:] factor,
+                  int cpus) noexcept:
 
     cdef long long i, I = target.shape[0]
     cdef double err = 1.0
