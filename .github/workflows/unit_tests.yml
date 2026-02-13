@@ -138,20 +138,21 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        $candidate_globs = @(
-          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC\*\bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll",
-          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\bin\clang_rt.asan_dynamic-x86_64.dll",
-          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\lib\clang\*\lib\windows\clang_rt.asan_dynamic-x86_64.dll"
+        $candidate_dirs = @(
+          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC\*\bin\Hostx64\x64",
+          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\bin",
+          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\lib\clang\*\lib\windows",
+          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Redist\MSVC\*\x64\Microsoft.VC143.OpenMP"
         )
-        $asan_dll = $null
-        foreach ($glob in $candidate_globs) {
-          $asan_dll = Get-ChildItem -Path $glob -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($asan_dll) { break }
+        $resolved_dirs = @()
+        foreach ($pattern in $candidate_dirs) {
+          $resolved_dirs += Get-Item -Path $pattern -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
         }
-        if (-not $asan_dll) {
+        $resolved_dirs = $resolved_dirs | Select-Object -Unique
+        if (-not ($resolved_dirs | ForEach-Object { Test-Path (Join-Path $_ "clang_rt.asan_dynamic-x86_64.dll") } | Where-Object { $_ } | Select-Object -First 1)) {
           throw "ASAN runtime DLL not found. Verify VS2022 C++ tooling is available on the runner."
         }
-        "PATH=$($asan_dll.DirectoryName);$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        "PATH=$($resolved_dirs -join ';');$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
