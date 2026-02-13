@@ -82,3 +82,45 @@ jobs:
       run: |
         uv pip uninstall pytest-xdist
         DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib uv run pytest tests/ --durations=50 --random-order --verbose
+
+  testing_asan:
+    needs: linting
+    runs-on: ${{ matrix.os }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}-asan
+      cancel-in-progress: true
+    strategy:
+      matrix:
+        python-version: ['3.12']
+        os: [windows-latest, ubuntu-latest]
+    env:
+      AEQ_ASAN: "1"
+      PYTHONMALLOC: "malloc"
+      ASAN_OPTIONS: "detect_leaks=0"
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set Python environment
+      uses: astral-sh/setup-uv@v7
+      with:
+          python-version: ${{ matrix.python-version }}
+
+    - name: Download spatialite on Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt update
+        sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
+        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+
+    - name: Download spatialite on Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        uv run tests/setup_windows_spatialite.py
+
+    - name: Install Python and create virtual environment
+      run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear
+
+    - name: Install dependencies
+      run: uv pip install -e ".[dev]"
+
+    - name: Runs test with ASAN
+      run: uv run pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose

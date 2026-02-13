@@ -22,8 +22,9 @@ if os.getenv("AEQ_DEBUG"):
     compile_args.extend(["-O0", "-g"])
 
 if os.getenv("AEQ_ASAN"):
-    compile_args.append(f"{prefix}sanitize=address")
-    link_args.append(f"{prefix}sanitize=address")
+    asan_flag = "/fsanitize=address" if is_win else f"{prefix}sanitize=address"
+    compile_args.append(asan_flag)
+    link_args.append(asan_flag)
 
     if not is_win:
         compile_args.append(f"{prefix}sanitize=undefined")
