@@ -99,7 +99,6 @@ jobs:
     env:
       AEQ_ASAN: "1"
       PYTHONMALLOC: "malloc"
-      ASAN_OPTIONS: "detect_leaks=0"
     steps:
     - uses: actions/checkout@v6
     - name: Set Python environment
