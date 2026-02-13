@@ -78,10 +78,7 @@ jobs:
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
-      run: uv pip install -e ".[dev]"
-      env:
-        CXX: /opt/homebrew/opt/llvm/bin/clang++
-        CC: /opt/homebrew/opt/llvm/bin/clang
+      run: CXX=$(brew --prefix llvm)/bin/clang++ CC=$(brew --prefix llvm)/bin/clang uv pip install -e ".[dev]"
 
     - name: Runs test (Windows & Linux)
       if: matrix.os != 'macos-latest'
@@ -91,7 +88,7 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         uv pip uninstall pytest-xdist
-        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib uv run pytest tests/ --durations=50 --random-order --verbose
+        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(brew --prefix)/lib uv run pytest tests/ --durations=50 --random-order --verbose
 
   testing_asan:
     needs: linting
@@ -145,13 +142,11 @@ jobs:
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
-      run: uv pip install -e ".[dev]"
+      run: CXX=$(brew --prefix llvm)/bin/clang++ CC=$(brew --prefix llvm)/bin/clang uv pip install -e ".[dev]"
       env:
         AEQ_UBSAN: "1"
-        CXX: /opt/homebrew/opt/llvm/bin/clang++
-        CC: /opt/homebrew/opt/llvm/bin/clang
 
-    - name: Runs test with ASAN/UBSAN (Windows)
+    - name: Runs test with ASAN (Windows)
       if: matrix.os == 'windows-latest'
       run: uv run pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
@@ -163,11 +158,11 @@ jobs:
         LSAN_OPTIONS: "suppressions=${{ github.workspace }}/.github/asan.supp:exitcode=1"
         UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
 
-    - name: Runs test with ASAN/UBSAN (macOS)
+    - name: Runs test with ASAN/UBSAN (macOS, serial)
       if: matrix.os == 'macos-latest'
       run: |
         uv pip uninstall pytest-xdist
-        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib uv run pytest tests/ --durations=50 --random-order --verbose
+        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(brew --prefix)/lib uv run pytest tests/ --durations=50 --random-order --verbose
       env:
         ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1:abort_on_error=1"
         LSAN_OPTIONS: "suppressions=${{ github.workspace }}/.github/asan.supp:exitcode=1"
