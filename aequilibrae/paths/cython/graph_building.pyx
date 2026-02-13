@@ -430,6 +430,8 @@ def create_compressed_link_network_mapping(graph):
         int64_t[::] data
         int32_t[:] node_mapping
         const int64_t[:, :] non_duplicated
+        const long long[:] compact_a_nodes
+        const long long[:] compact_b_nodes
         signed char direction
 
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
