@@ -439,8 +439,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph_fs
     cdef double [:] g_view = graph.compact_cost
-    cdef long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
-    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
+    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
     cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
 
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
