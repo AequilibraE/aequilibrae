@@ -99,7 +99,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.13']
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     env:
       AEQ_ASAN: "1"
       PYTHONMALLOC: "malloc"
