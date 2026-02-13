@@ -103,7 +103,6 @@ aequilibrae = "aequilibrae"
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
-lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
 exclude = [
     ".idea",
     "__pycache__",
