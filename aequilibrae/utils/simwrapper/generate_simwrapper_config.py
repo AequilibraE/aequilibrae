@@ -105,7 +105,7 @@ class SimwrapperConfigGenerator:
             return results_tables, False
 
         return results_tables[:max_tables], True
-    
+
     def _results_truncation_notice(self, shown, total):
         return TextPanel(
             title="Please Note",
@@ -131,7 +131,7 @@ class SimwrapperConfigGenerator:
             },
         ]
 
-        panel = TilePanel("Network Size", dataset, "monochrome")
+        panel = TilePanel("Network Size", dataset, height = 1, colors="monochrome")
 
         return [panel]
 
@@ -153,12 +153,8 @@ class SimwrapperConfigGenerator:
             [
                 {"label": "Regular Links", "color": "#4c72b0", "shape": "line"},
                 {"label": "Centroid Connectors", "color": "#9c72b0", "shape": "line"},
-                {"label": "Centroid Node", "color": "#FF6600", "shape": "line"},
-                {
-                    "label": "Regular Node",
-                    "color": "#cacaca",
-                    "shape": "line",
-                },
+                {"label": "Centroid Node", "color": "#FF6600", "shape": "circle"},
+                {"label": "Regular Node", "color": "#cacaca", "shape": "circle"},
             ]
         )
 
@@ -185,20 +181,20 @@ class SimwrapperConfigGenerator:
                 "sqlFilter": "link_type = 3",
                 "style": {
                     "lineColor": "#9c72b0",
-                    "lineWidth": 3,
+                    "lineWidth": 20,
                 },
             },
         )
 
         # add centroid nodes layer
-        centroid_node_style = {"fillColor": "#FF6600", "pointRadius": 120}
+        centroid_node_style = {"fillColor": "#FF6600", "pointRadius": 300}
         panel.add_layer(
             "nodes_centroids",
             {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=1", "style": centroid_node_style},
         )
 
         # add regular nodes layer
-        regular_node_style = {"fillColor": "#cacaca", "pointRadius": 35}
+        regular_node_style = {"fillColor": "#cacaca", "pointRadius": 100}
         panel.add_layer(
             "nodes_regular",
             {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=0", "style": regular_node_style},
@@ -214,9 +210,12 @@ class SimwrapperConfigGenerator:
 
         # if there are no links types map nothing
         if not link_types:
-            return []
+            links = self.project.network.links.data
+            link_types = links["link_type"].unique()
 
-        link_type_names = self.project.network.link_types
+        else:
+            link_type_names = self.project.network.link_types
+            link_types = [link_type_names.get(x).link_type for x in link_types]
 
         colours = self._categorical_palette(len(link_types))
         colour_map = dict(zip(link_types, colours, strict=True))
@@ -227,8 +226,7 @@ class SimwrapperConfigGenerator:
         # build and set legend
         legend = [{"subtitle": "Link Types"}]
         for i, lt in enumerate(link_types):
-            x = link_type_names.get(lt)
-            legend.append({"label": f"{x.link_type}",
+            legend.append({"label": f"{lt}",
                            "color": f"{colours[i]}",
                            "shape": "line"})
  
@@ -244,7 +242,7 @@ class SimwrapperConfigGenerator:
                 "style": {
                     "lineColor": {
                         "column": "link_type",
-                        "palette": colour_map,
+                        "colors": colour_map,
                     },
                     "lineWidth": 10,
                 },
@@ -551,7 +549,7 @@ class SimwrapperConfigGenerator:
                 title=f"{table} flow",
                 results_table=table,
                 colour_metric = "VOC_max",
-                width_metric = "POC_tot"
+                width_metric = "PCE_tot"
             )
             row.append(panel)
 
@@ -567,7 +565,7 @@ class SimwrapperConfigGenerator:
             "introRow": self._intro_row(),
             "statsRow": self._stats_rows(),
             "entireNetworkRow": self._entire_network_row(),
-            "linkTypeAndCapasityRow": self._links_info_row() + self._capacity_map_row(),
+            "linkTypeAndCapacityRow": self._links_info_row() + self._capacity_map_row(),
         }
 
         res_df = self.project.results.list()

@@ -61,10 +61,10 @@ class TilePanel(SimwrapperPanel):
         panel = TilePanel("Summary Statistics", "data/summary.csv", height=3)
     """
 
-    def __init__(self, title, dataset, height=None, width=None, palette=None):
+    def __init__(self, title, dataset, height=None, width=None, colors=None):
         super().__init__("tile", title, height=height, width=width)
         self.dataset = dataset
-        self.palette = palette
+        self.colors = colors
 
     def to_dict(self):
         """Returns dictionary representation of the panel"""
@@ -72,8 +72,8 @@ class TilePanel(SimwrapperPanel):
 
         panel["dataset"] = self.dataset
 
-        if self.palette:
-            panel["palette"] = self.palette
+        if self.colors:
+            panel["colors"] = self.colors
 
         return panel
 
@@ -144,7 +144,8 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.zoom = zoom
         self.projection = projection
 
-        self.set_defaults()
+        # self.set_defaults()
+        self.defaults = None
 
         self.extra_databases = None
         self.layers = {}
@@ -247,8 +248,8 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         super().set_extra_databases({"results": self.results_database})
         super().set_legend(self.build_legend())
 
-        self.set_colour_styling([0, 10])
-        self.set_width_styling([0, 10])
+        self.set_colour_styling([0, 2])
+        self.set_width_styling([0, 2])
 
         self.add_layer()
 
