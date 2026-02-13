@@ -41,8 +41,7 @@ dependencies = [
   "tqdm",
 ]
 
-[project.license]
-file = "LICENSE.TXT"
+license-files = ["LICENSE.TXT"]
 
 [project.optional-dependencies]
 
