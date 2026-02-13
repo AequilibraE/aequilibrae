@@ -149,27 +149,6 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: uv pip install -e ".[dev]"
 
-    - name: Add ASAN runtime to PATH (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        $candidate_dirs = @(
-          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC\*\bin\Hostx64\x64",
-          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\bin",
-          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\LLVM\x64\lib\clang\*\lib\windows",
-          "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Redist\MSVC\*\x64\Microsoft.VC143.OpenMP"
-        )
-        $resolved_dirs = @()
-        foreach ($pattern in $candidate_dirs) {
-          $resolved_dirs += Get-Item -Path $pattern -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-        }
-        $resolved_dirs = $resolved_dirs | Select-Object -Unique
-        $has_asan_dll = $resolved_dirs | ForEach-Object { Test-Path (Join-Path $_ "clang_rt.asan_dynamic-x86_64.dll") } | Where-Object { $_ } | Select-Object -First 1
-        if (-not $has_asan_dll) {
-          throw "ASAN runtime DLL not found. Verify VS2022 C++ tooling is available on the runner."
-        }
-        "PATH=$($resolved_dirs -join ';');$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: uv pip install -e ".[dev]"
