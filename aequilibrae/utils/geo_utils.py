@@ -34,10 +34,4 @@ def metre_crs_for_gdf(gdf):
     zone = int((lon + 180) / 6) + 1
     south = lat < 0
 
-    return CRS.from_dict({
-        "proj": "utm",
-        "zone": zone,
-        "south": south,
-        "datum": "WGS84",
-        "units": "m"
-    })
+    return CRS.from_dict({"proj": "utm", "zone": zone, "south": south, "datum": "WGS84", "units": "m"})

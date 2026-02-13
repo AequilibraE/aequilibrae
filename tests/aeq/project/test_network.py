@@ -5,7 +5,6 @@ import pytest
 from shapely.geometry import box, Polygon
 
 
-
 def test_create_from_osm(empty_project):
     if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
         pytest.skip("Skipped check to not load OSM servers")

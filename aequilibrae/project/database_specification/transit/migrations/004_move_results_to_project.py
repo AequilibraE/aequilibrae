@@ -6,7 +6,6 @@ from aequilibrae.context import get_active_project
 from aequilibrae.project.data import Results
 
 
-
 def migrate(
     *,
     project_conn: sqlite3.Connection,

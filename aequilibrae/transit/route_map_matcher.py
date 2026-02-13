@@ -18,8 +18,13 @@ DEAD_END_RUN = 40
 
 
 class RouteMapMatcher(WorkerThread):
-    def __init__(self, link_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame,
-                 distance_to_project=50):
+    def __init__(
+        self,
+        link_gdf: gpd.GeoDataFrame,
+        nodes_gdf: gpd.GeoDataFrame,
+        stops_gdf: gpd.GeoDataFrame,
+        distance_to_project=50,
+    ):
         super().__init__(None)
 
         utm_zone = metre_crs_for_gdf(link_gdf)
@@ -56,8 +61,9 @@ class RouteMapMatcher(WorkerThread):
 
         self.__build_graph_from_scratch()
 
-    def map_match_route(self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None,
-                        pattern_id: Optional[str] = None):
+    def map_match_route(
+        self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None, pattern_id: Optional[str] = None
+    ):
         # `pattern_id` is accepted for API compatibility and reserved for future use (e.g., logging/filtering).
         _ = pattern_id
 
@@ -90,8 +96,14 @@ class RouteMapMatcher(WorkerThread):
         connectors = gpd.GeoDataFrame(df, geometry=connector_geo).set_crs(self.links.crs)
 
         min_speed = max(min(self.links.speed_ab.min(), self.links.speed_ba.min()), 1.0)
-        connectors = connectors.assign(direction=0, link_id=0, is_connector=1, speed_ab=min_speed, speed_ba=min_speed,
-                                       distance=max(1.2 * (connectors.geometry.length ** 1.3)))
+        connectors = connectors.assign(
+            direction=0,
+            link_id=0,
+            is_connector=1,
+            speed_ab=min_speed,
+            speed_ba=min_speed,
+            distance=max(1.2 * (connectors.geometry.length**1.3)),
+        )
 
         net_data = pd.concat([broken_links, connectors], ignore_index=True)
         net_data["link_id"] = np.arange(1, net_data.shape[0] + 1)
@@ -255,8 +267,10 @@ class RouteMapMatcher(WorkerThread):
 
         # Remove consecutive links with same original_id and direction
         # (these are internal graph subdivisions of the same physical link)
-        df = df[(df.original_id.shift(-1, fill_value=-1) != df.original_id) | (
-                df.direction.shift(-1, fill_value=-1) != df.direction)]
+        df = df[
+            (df.original_id.shift(-1, fill_value=-1) != df.original_id)
+            | (df.direction.shift(-1, fill_value=-1) != df.direction)
+        ]
 
         # Filter out isolated short segments (likely noise or dead-end detours)
         # Keep a link if it differs from both neighbors OR if it's long enough
@@ -276,7 +290,7 @@ class RouteMapMatcher(WorkerThread):
             has_issues = False
             for i in range(0, df.shape[0] - 2):
                 # Check if three consecutive rows are all the same link
-                if df.loc[i: i + 2, "original_id"].unique().shape[0] == 1:
+                if df.loc[i : i + 2, "original_id"].unique().shape[0] == 1:
                     df.drop(index=[i, i + 1], inplace=True)
                     df.index = pd.RangeIndex(df.shape[0])
                     has_issues = True
@@ -320,8 +334,11 @@ class RouteMapMatcher(WorkerThread):
         """
         if df.empty:
             return LineString()
-        df_ = self.links[["link_id", "geometry"]].merge(df.assign(sequence=np.arange(df.shape[0])), on="link_id",
-                                                        how="inner").sort_values("sequence")
+        df_ = (
+            self.links[["link_id", "geometry"]]
+            .merge(df.assign(sequence=np.arange(df.shape[0])), on="link_id", how="inner")
+            .sort_values("sequence")
+        )
         df_.reset_index(drop=True, inplace=True)
         # dir < 0 means BA direction (reverse), dir >= 0 means AB direction (forward)
         shapes = [rec.geometry.reverse() if rec["dir"] < 0 else rec.geometry for _, rec in df_.iterrows()]

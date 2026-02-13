@@ -295,12 +295,12 @@ class GraphBase(ABC):  # noqa: B024
         return all_nodes, num_nodes, nodes_to_indices, fs, df
 
     def compute_path(
-            self,
-            origin: int,
-            destination: int,
-            early_exit: bool = False,
-            a_star: bool = False,
-            heuristic: Union[str, None] = None,
+        self,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
     ):
         """
         Returns the results from path computation result holder.

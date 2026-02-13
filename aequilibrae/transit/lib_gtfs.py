@@ -24,8 +24,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None,
-                 pces=None):  # noqa: B006
+    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None):
         """Instantiates a transit class for the network
 
         :Arguments:

@@ -9,8 +9,9 @@ from shapely import Point
 from shapely.ops import substring
 
 
-def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, tolerance: float = 50) -> List[
-    gpd.GeoDataFrame]:
+def split_links_at_stops(
+    stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, tolerance: float = 50
+) -> List[gpd.GeoDataFrame]:
     """
     Breaks links at the closest points for the nodes (transit stops) nearby, within a certain tolerance.
     New nodes are created at split points with IDs continuing from the maximum of the existing `a_node` and `b_node` values.
@@ -33,8 +34,9 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
 
     # --- Step 0: Make sure we are operating in metres  ---
     for df in [stops, links]:
-        assert df.crs.axis_info[0].unit_name.lower() in ["metre", "meter"], \
+        assert df.crs.axis_info[0].unit_name.lower() in ["metre", "meter"], (
             "Both GeoDataFrames must be in a CRS with metre/meter units."
+        )
 
     # --- Step 1: Matching Points to Lines (Same as before) ---
     # Buffer and intersection
@@ -43,8 +45,11 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
     buffered_points = buffered_points.set_geometry(buffered_points.geometry.buffer(tolerance))
 
     matches_within = gpd.sjoin(buffered_points, links, how="inner", predicate="intersects")
-    matches_within = matches_within.set_geometry("orig_geometry").drop(columns=["geometry"]).rename(
-        columns={"orig_geometry": "geometry"})
+    matches_within = (
+        matches_within.set_geometry("orig_geometry")
+        .drop(columns=["geometry"])
+        .rename(columns={"orig_geometry": "geometry"})
+    )
 
     # Handle orphans
     matched_indices = matches_within.index.unique()
@@ -61,10 +66,7 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
     # Merge line info
     # We need geometry and node IDs
     df_result = df_result.merge(
-        links[["geometry", "a_node", "b_node"]],
-        left_on="index_right",
-        right_index=True,
-        suffixes=("", "_line")
+        links[["geometry", "a_node", "b_node"]], left_on="index_right", right_index=True, suffixes=("", "_line")
     )
 
     # Calculate distance along line (linear reference)
@@ -83,8 +85,7 @@ def split_links_at_stops(stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, toler
     # 1 metre is effectively "right there"
     epsilon = 1
     valid_splits = df_result[
-        (df_result["dist_along"] > epsilon) &
-        (df_result["dist_along"] < (df_result["line_length"] - epsilon))
+        (df_result["dist_along"] > epsilon) & (df_result["dist_along"] < (df_result["line_length"] - epsilon))
     ].copy()
 
     if valid_splits.empty:

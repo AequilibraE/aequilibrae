@@ -66,12 +66,12 @@ class PathResults:
         self._heuristic = "equirectangular"
 
     def compute_path(
-            self,
-            origin: int,
-            destination: int,
-            early_exit: bool = False,
-            a_star: bool = False,
-            heuristic: Union[str, None] = None,
+        self,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
     ) -> None:
         """Computes the path between two nodes in the network.
 

@@ -1,4 +1,3 @@
-
 import pytest
 
 from aequilibrae.project import Project

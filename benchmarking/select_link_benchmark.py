@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from aequilibrae import Project, TrafficAssignment, TrafficClass  # noqa: E402
+from aequilibrae import Project, TrafficAssignment, TrafficClass
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
