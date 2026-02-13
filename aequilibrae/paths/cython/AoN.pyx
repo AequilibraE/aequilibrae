@@ -220,10 +220,10 @@ def path_computation(origin, destination, graph, results):
     # In order to release the GIL for this procedure, we create all the
     # memory views we will need
     cdef double [:] g_view = graph.cost
-    cdef long long [:] original_b_nodes_view = graph.graph.b_node.to_numpy(copy=False)
+    cdef const long long [:] original_b_nodes_view = graph.graph.b_node.to_numpy(copy=False)
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    cdef long long [:] ids_graph_view = graph.graph.id.to_numpy(copy=False)
+    cdef const long long [:] ids_graph_view = graph.graph.id.to_numpy(copy=False)
     block_flows_through_centroids = graph.block_centroid_flows
 
     cdef long long [:] predecessors_view = results.predecessors
@@ -235,8 +235,8 @@ def path_computation(origin, destination, graph, results):
     cdef long long [:] b_nodes_view = new_b_nodes
 
     cdef bint a_star_bint = results.a_star
-    cdef double [:] lat_view
-    cdef double [:] lon_view
+    cdef const double [:] lat_view
+    cdef const double [:] lon_view
     cdef long long [:] nodes_to_indices_view
     cdef Heuristic heuristic
     if results.a_star:
