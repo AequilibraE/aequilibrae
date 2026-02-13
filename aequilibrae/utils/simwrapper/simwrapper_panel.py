@@ -39,6 +39,17 @@ class SimwrapperPanel:
 
         return panel
 
+    def _add_if_set(self, panel: dict, **kwargs):
+        """Add key/value pairs to `panel` only when the value is truthy.
+
+        Keeps callers concise and preserves original behaviour that
+        omitted empty/falsey values (empty dict/list/None/0/"").
+        """
+        for k, v in kwargs.items():
+            if v:
+                panel[k] = v
+        return panel
+
 
 class ConvergencePanel(SimwrapperPanel):
     def __init__(self, title, config, height=None, width=None):
@@ -46,11 +57,9 @@ class ConvergencePanel(SimwrapperPanel):
         self.config = config
 
     def to_dict(self):
-        """Returns dictionary representation of the panel"""
+        """Returns dictionary representation of the panel."""
         panel = super().to_dict()
-
-        panel["config"] = self.config
-
+        self._add_if_set(panel, config=self.config)
         return panel
 
 
@@ -62,7 +71,7 @@ class TilePanel(SimwrapperPanel):
         **title** (:obj:`str`): title
         **dataset** (:obj:`str`): path to csv dataset used by tile
         **height** (:obj:`int`, *Optional*): panel height
-        **width** (:obj:`int`, *Optional*): p[anel width
+        **width** (:obj:`int`, *Optional*): panel width
 
     :Example:
         panel = TilePanel("Summary Statistics", "data/summary.csv", height=3)
@@ -74,14 +83,10 @@ class TilePanel(SimwrapperPanel):
         self.colors = colors
 
     def to_dict(self):
-        """Returns dictionary representation of the panel"""
+        """Returns dictionary representation of the panel."""
         panel = super().to_dict()
-
         panel["dataset"] = self.dataset
-
-        if self.colors:
-            panel["colors"] = self.colors
-
+        self._add_if_set(panel, colors=self.colors)
         return panel
 
 
@@ -106,14 +111,12 @@ class TextPanel(SimwrapperPanel):
         self.is_file = is_file
 
     def to_dict(self):
-        """Returns dictionary representation of the panel"""
+        """Returns dictionary representation of the panel."""
         panel = super().to_dict()
-
         if self.is_file:
-            panel["file"] = self.data
+            self._add_if_set(panel, file=self.data)
         else:
-            panel["content"] = self.data
-
+            self._add_if_set(panel, content=self.data)
         return panel
 
 
@@ -151,7 +154,6 @@ class AequilibraEMapPanel(SimwrapperPanel):
         self.zoom = zoom
         self.projection = projection
 
-        # self.set_defaults()
         self.defaults = None
 
         self.extra_databases = None
@@ -163,12 +165,11 @@ class AequilibraEMapPanel(SimwrapperPanel):
         if defaults_dict:
             available_keys = {"fillColor", "lineColor", "lineWidth", "pointRadius"}
             assert not available_keys ^ defaults_dict.keys(), (
-                f"Defaults dictionary can only contain the following keys: " + ", ".join(available_keys)
+                "Defaults dictionary can only contain the following keys: " + ", ".join(available_keys)
             )
 
             self.defaults = defaults_dict
         else:
-            # fallback to some default values if none provided
             self.defaults = {
                 "fillColor": "#00ffef",
                 "lineColor": "#ffff00",
@@ -194,26 +195,16 @@ class AequilibraEMapPanel(SimwrapperPanel):
 
         panel["database"] = self.database
 
-        if self.center:
-            panel["center"] = self.center
-
-        if self.zoom:
-            panel["zoom"] = self.zoom
-
-        if self.projection:
-            panel["projection"] = self.projection
-
-        if self.defaults:
-            panel["defaults"] = self.defaults
-
-        if self.legend:
-            panel["legend"] = self.legend
-
-        if self.extra_databases:
-            panel["extraDatabases"] = self.extra_databases
-
-        if self.layers:
-            panel["layers"] = self.layers
+        self._add_if_set(
+            panel,
+            center=self.center,
+            zoom=self.zoom,
+            projection=self.projection,
+            defaults=self.defaults,
+            legend=self.legend,
+            extraDatabases=self.extra_databases,
+            layers=self.layers,
+        )
 
         return panel
 
@@ -371,9 +362,3 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
                 "style": self.colour_style | self.width_style,
             },
         )
-
-    def to_dict(self):
-        """Returns dictionary representation of the panel"""
-        panel = super().to_dict()
-
-        return panel

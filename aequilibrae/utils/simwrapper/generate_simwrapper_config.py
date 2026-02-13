@@ -26,7 +26,7 @@ class SimwrapperConfigGenerator:
         """Initialise the config generator and create output directories.
 
         :Arguments:
-            **output_dir** (:obj:`Project`, *Optional*): Aequilibrae Project being transferred
+            **project** (:obj:`Project`): AequilibraE Project object
             **output_dir** (:obj:`str`, *Optional*): Root directory for SimWrapper outputs
         """
         self.project = project
@@ -80,7 +80,7 @@ class SimwrapperConfigGenerator:
         return config
 
     def _intro_row(self):
-        """resturns project details text panel"""
+        """Returns project details text panel."""
 
         return [TextPanel(title="title", data="intro")]
 
@@ -105,7 +105,7 @@ class SimwrapperConfigGenerator:
         return base[:n]
 
     def _truncate_results_tables(self, results_tables, max_tables=3):
-        """Returns truncated results list and note noting truncation occurred"""
+        """Return a truncated results list and a flag indicating whether truncation occurred."""
 
         if len(results_tables) <= max_tables:
             return results_tables, False
@@ -202,7 +202,7 @@ class SimwrapperConfigGenerator:
             {"table": "nodes", "geometry": "point", "sqlFilter": "is_centroid=0", "style": regular_node_style},
         )
 
-        # retun panel inside a list
+        # return panel inside a list
         return [panel]
 
     def _links_info_row(self):
@@ -310,7 +310,7 @@ class SimwrapperConfigGenerator:
             **legend** (:obj:`list`): legend def for the map
             **data_range** (:obj:`list`): value range used for colour scale
             **palette** (:obj:`str`, *Optional*): colour palette to use
-            **width_by_link_type** (:obj:`bool`, *Optional*): vary line width by link type????????? weird
+            **width_by_link_type** (:obj:`bool`, *Optional*): whether to vary line width by link type (optional)
         """
 
         panel = AequilibraEMapPanel(
@@ -336,7 +336,7 @@ class SimwrapperConfigGenerator:
             }
         }
 
-        # link type by line width?? made optional bc weird, but example yaml does this
+        # link type by line width: optional (kept for compatibility with example YAML)
         if width_by_link_type:
             style["lineWidth"] = {
                 "column": "link_type",
@@ -350,7 +350,7 @@ class SimwrapperConfigGenerator:
         if width_by_metric:
             style["lineWidth"] = {
                 "column": width_by_metric,
-                "dataRange": [0, 500],  # change depending on project/ guess better
+                "dataRange": [0, 500],  # project-dependent default; adjust to your data's scale
                 "widthRange": [10, 250],
             }
 
@@ -410,7 +410,7 @@ class SimwrapperConfigGenerator:
         if not json_string:
             return [], []
 
-        # if stored as excaped string unescape
+        # If the JSON is stored with escaped characters (double-encoded), unescape it first
         if json_string.startswith('{\\"'):
             json_string = json_string.encode().decode("unicode_escape")
 
@@ -435,19 +435,19 @@ class SimwrapperConfigGenerator:
             rgap,
         )
 
-    def _export_convergence_csv(self, results_dfataframe):
+    def _export_convergence_csv(self, results_dataframe):
         """
-        export assignment convergence data for all result tables into a single CSV.
+        Export assignment convergence data for all results tables into a single CSV.
 
-        outputs: iteration, rgap, series
+        Outputs: iteration, rgap, series
         """
         rows = []
 
-        for _, row in results_dfataframe.iterrows():
+        for _, row in results_dataframe.iterrows():
             table_name = row["table_name"]
             procedure_report = row.get("procedure_report")
 
-            # extract cinveregnce arrays
+            # extract convergence arrays
             iteration, rgap = self._parse_convergence_json(procedure_report)
 
             if not iteration or not rgap:
@@ -482,7 +482,7 @@ class SimwrapperConfigGenerator:
         return output_path
 
     def _write_convergence_vega_spec(self, csv_path):
-        """writes vegalite spec for assignment convergence, returns path to this"""
+        """Write a Vega-Lite spec for assignment convergence and return the filename."""
 
         # where to save it
         path = self.output_dir / "simwrapper_data" / "assignment_convergence.vega.json"
@@ -516,7 +516,7 @@ class SimwrapperConfigGenerator:
         return path.name
 
     def _assignment_convergence_plot(self, results_dataframe):
-        """returns vegalite convergence plot panel"""
+        """Return a Vega-Lite convergence plot panel."""
 
         #  export convergence csv
         csv_path = self._export_convergence_csv(results_dataframe)
@@ -557,7 +557,7 @@ class SimwrapperConfigGenerator:
     def _build_dashboard_config(self):
         """Builds and returns full dashboard configuration for simwrapper"""
 
-        config = self._dashboard_skeleton()  # based config
+        config = self._dashboard_skeleton()  # base config
 
         # dashboard rows
         rows = {

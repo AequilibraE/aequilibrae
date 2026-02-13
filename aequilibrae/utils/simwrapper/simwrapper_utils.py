@@ -39,7 +39,7 @@ def pretty_round(value, direction="up"):
 def get_links_bounds_box(project):
     """
     Compute box around all coordinates in links table of project.
-    Queries spatial database to find max and min x and y coords across all link geomerties
+    Queries spatial database to find max and min x and y coords across all link geometries
     to return overall network links' reach.
 
     Returns bounding box values (xmin, ymin, xmax, ymax)
@@ -72,7 +72,7 @@ def get_project_center(project):
         return [
             0,
             0,
-        ]  # if cant find coordinates bc of missing link vals, will make this better though but works for now
+        ]  # If coordinates cannot be determined (missing link values), return a fallback [0, 0].
 
     xmin, ymin, xmax, ymax = row
 
@@ -92,7 +92,7 @@ def get_project_zoom(project):
     row = get_links_bounds_box(project)
 
     if row is None or any(value is None for value in row):
-        return 10  # if cant find coordinates bc of missing link vals, will make this better though but works for now
+        return 10  # If bounding box can't be determined, return a default zoom level.
 
     xmin, ymin, xmax, ymax = row
 
@@ -102,7 +102,7 @@ def get_project_zoom(project):
     max_span = max(x_span, y_span)  # use larger of two so we see everything
 
     if max_span <= 0:
-        return 10  # if invalid values, clearly not a negative distance we want
+        return 10  # If max_span is non-positive, return the default zoom level.
 
     # calculate ~ zoom:
     # at zoom of 0 the world is ~360degrees wide
