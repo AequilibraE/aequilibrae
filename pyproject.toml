@@ -148,6 +148,14 @@ target-version = "py310"
 [tool.ruff.lint.mccabe]
 max-complexity = 20
 
+[tool.coverage.report]
+fail_under = 75
+show_missing = True
+
+
+[tool.coverage.html]
+directory = "coverage_html_report"
+
 [tool.cibuildwheel]
 build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*"]
 
