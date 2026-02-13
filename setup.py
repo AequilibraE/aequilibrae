@@ -26,6 +26,10 @@ if os.getenv("AEQ_ASAN"):
     compile_args.append(asan_flag)
     link_args.append(asan_flag)
 
+    if is_win:
+        compile_args = [arg for arg in compile_args if arg != "/openmp"]
+        link_args = [arg for arg in link_args if arg != "/openmp"]
+
 if os.getenv("AEQ_UBSAN") and not is_win:
     compile_args.append(f"{prefix}sanitize=undefined")
     link_args.append(f"{prefix}sanitize=undefined")
