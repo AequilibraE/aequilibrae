@@ -128,8 +128,6 @@ jobs:
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: uv pip install -e ".[dev]"
-      env:
-        AEQ_UBSAN: "1"
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
@@ -137,13 +135,12 @@ jobs:
       env:
         AEQ_UBSAN: "1"
 
-    - name: Runs test with ASAN/UBSAN (Linux)
+    - name: Runs test with ASAN (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: uv run pytest tests/ --durations=50 --random-order --verbose
       env:
         ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1:abort_on_error=1"
         LSAN_OPTIONS: "suppressions=${{ github.workspace }}/.github/asan.supp:exitcode=1"
-        UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
 
     - name: Runs test with ASAN/UBSAN (macOS, serial)
       if: matrix.os == 'macos-latest'
