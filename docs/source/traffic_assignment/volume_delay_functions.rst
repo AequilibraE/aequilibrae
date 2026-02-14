@@ -268,7 +268,7 @@ Where :math:`z = \frac{v}{c} - 1`
 
 **Default Parameters:**
   * :math:`\alpha = 0.25`
-  * :math:`\tau = 0.8` (note: the typical factor of 8 is absorbed into :math:`\tau`)
+  * :math:`\tau = 0.8` (this is :math:`8 \times 0.1`, see note below)
 
 **Origin and Background:**
 
@@ -276,11 +276,19 @@ Developed by Rahmi Akcelik, this function was specifically designed for signaliz
 and urban arterials. It incorporates queue theory and reflects the delay characteristics of 
 traffic signals.
 
-**Note on τ Parameter:**
+**Important Note on τ Parameter:**
 
-In AequilibraE, the Akcelik VDF parameter :math:`\tau` has the typical factor of 8 absorbed into it. 
-Users should supply :math:`8 \times \tau` rather than :math:`\tau` alone. This means if you want to 
-use a :math:`\tau` value of 0.1, you should set the parameter to 0.8.
+In standard Akcelik formulations, the function includes a factor of 8 in the formula. However, 
+in AequilibraE's implementation, this factor of 8 has been absorbed into the :math:`\tau` parameter 
+for computational efficiency. 
+
+**What this means for users:**
+
+* If academic literature references a :math:`\tau` value (e.g., 0.1), you must multiply it by 8 
+  before setting it in AequilibraE
+* Example: To use :math:`\tau = 0.1`, set ``tau = 0.8`` in AequilibraE
+* Example: To use :math:`\tau = 0.15`, set ``tau = 1.2`` in AequilibraE
+* The default value of 0.8 corresponds to a standard :math:`\tau = 0.1`
 
 **Characteristics:**
 
@@ -475,7 +483,8 @@ References and Further Reading
 
 * Bureau of Public Roads (1964). *Traffic Assignment Manual*. U.S. Department of Commerce.
 * Hampton Roads Transportation Planning Organization (2020). *Regional Travel Demand Model V2 Methodology Report*. 
-  Available: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
+  Available: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf 
+  (accessed February 2026)
 
 **Conical Function:**
 

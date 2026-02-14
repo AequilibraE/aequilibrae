@@ -118,8 +118,7 @@ for name, func, formula, description in vdfs:
     ax1.text(1.05, ax1.get_ylim()[1] * 0.95, 'Capacity', fontsize=9, color='red', rotation=90)
     
     # Right plot: Derivative (marginal cost)
-    dx = 0.001
-    derivative = np.gradient(func(voc_range), dx)
+    derivative = np.gradient(func(voc_range), voc_range)
     ax2.plot(voc_range, derivative, linewidth=2.5, color='#ff7f0e')
     ax2.axvline(x=1.0, color='red', linestyle=':', linewidth=1.5, alpha=0.7)
     ax2.fill_between(voc_range, 0, derivative, alpha=0.1, color='#ff7f0e')
