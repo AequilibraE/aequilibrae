@@ -93,7 +93,7 @@ procedure.
 
     >>> assig.set_classes([tc_car, tc_truck])
 
-* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``, or ``INRETS``
+* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``, ``INRETS``, or ``AKCELIK``
 
 .. doctest::
 
@@ -194,37 +194,25 @@ See the the example :ref:`example_assign_sparse` for a more practical explanatio
 Volume-delay function
 ~~~~~~~~~~~~~~~~~~~~~
 
-For now, the VDF functions available in AequilibraE are
+AequilibraE supports five Volume Delay Functions (VDFs): BPR, BPR2, Conical, INRETS, and Akcelik.
+Each VDF has distinct characteristics that make it suitable for different modeling scenarios.
 
-* BPR [1]_
+For detailed information on VDF formulations, parameter guidance, and usage recommendations, 
+see the dedicated :ref:`volume_delay_functions` page, which includes:
 
-.. math:: CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)
+* Mathematical formulas and technical descriptions
+* Default parameter values and calibration guidance
+* Behavioral charts showing V/C ratios from 0 to 3
+* Origin and background for each function
+* Recommendations for choosing the right VDF
 
-* BPR2
+**Quick reference:**
 
-Before capacity (is the same as BPR)
-
-.. math:: CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)
-
-After capacity
-
-.. math:: CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^{2*\beta})
-
-* Spiess' conical [2]_
-
-.. math:: CongestedTime_{i} = FreeFlowTime_{i} * (2 + \sqrt[2][\alpha^2*(1- \frac{Volume_{i}}{Capacity_{i}})^2 + \beta^2] - \alpha *(1-\frac{Volume_{i}}{Capacity_{i}})-\beta)
-
-* French INRETS (alpha < 1)
-
-Before capacity
-
-.. math:: CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- (\alpha *\frac{Volume_{i}}{Capacity_{i}})}{1.1-\frac{Volume_{i}}{Capacity_{i}}}
-
-After capacity
-
-.. math:: CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- \alpha}{0.1} * (\frac{Volume_{i}}{Capacity_{i}})^2
-
-More functions will be added as needed/requested/possible.
+* **BPR**: Standard highway assignment (α=0.15, β=4.0)
+* **BPR2**: Enhanced over-capacity penalty (α=0.15, β=4.0)
+* **Conical**: Smooth theoretical function (α=0.15, β=4.0)
+* **INRETS**: Urban arterials (α=1.0)
+* **Akcelik**: Signalized intersections (α=0.25, τ=0.8)
 
 Setting Preloads
 ----------------
