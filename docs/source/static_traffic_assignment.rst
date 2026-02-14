@@ -17,6 +17,7 @@ of some of these procedures and some light discussion on its motivation.
    :maxdepth: 1
 
    traffic_assignment/assignment_procedures
+   traffic_assignment/volume_delay_functions
    traffic_assignment/traffic_assignment_insights
    traffic_assignment/traffic_assignment_validation
    _auto_examples/traffic_assignment/index
