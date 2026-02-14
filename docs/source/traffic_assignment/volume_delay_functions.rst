@@ -8,8 +8,7 @@ travel time and traffic volume. They are essential components of traffic assignm
 how congestion affects travel times as more vehicles use a link.
 
 AequilibraE implements five different VDF formulations, each with distinct characteristics that make 
-them suitable for different modeling scenarios. The choice of VDF can significantly impact assignment 
-results, particularly in congested networks.
+them suitable for different modeling traditions.
 
 Available VDF Functions
 -----------------------
@@ -103,7 +102,6 @@ standard choice for highway assignment models worldwide.
 
 * May underestimate congestion effects at very high V/C ratios
 * Less suitable for signalized urban arterials
-* Does not explicitly model intersection delay
 
 BPR2 (Modified BPR)
 ~~~~~~~~~~~~~~~~~~~
@@ -302,8 +300,6 @@ for computational efficiency.
 
 * Urban networks with signalized intersections
 * Arterial roads with frequent signals
-* When intersection delay is a significant component
-* Networks where queue formation is important
 * Australian and some Asian modeling contexts (where it's more common)
 
 **Limitations:**
