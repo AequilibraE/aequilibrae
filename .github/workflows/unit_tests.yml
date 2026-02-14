@@ -139,7 +139,7 @@ jobs:
 
     - name: Runs test with ASAN/UBSAN (Linux)
       if: matrix.os == 'ubuntu-latest'
-      run: uv run pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+      run: uv run pytest tests/ --durations=50 --random-order --verbose
       env:
         ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1:abort_on_error=1"
         LSAN_OPTIONS: "suppressions=${{ github.workspace }}/.github/asan.supp:exitcode=1"
