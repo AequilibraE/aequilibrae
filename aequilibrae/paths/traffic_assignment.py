@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from numpy import nan_to_num
 
-from aequilibrae import Parameters
+from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation

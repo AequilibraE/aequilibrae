@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import Project
 from aequilibrae.distribution import Ipf
 
 

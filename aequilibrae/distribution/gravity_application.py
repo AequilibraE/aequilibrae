@@ -7,7 +7,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 
-from aequilibrae import Parameters
+from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel

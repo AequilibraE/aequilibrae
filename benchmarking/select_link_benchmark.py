@@ -45,7 +45,7 @@ def aequilibrae_init(proj_path: str, cost: str):
 def arkansas(path: str):
     from aequilibrae import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
-    from aequilibrae import logger
+    from aequilibrae.log import logger
 
     proj = Project()
     proj.open(path)

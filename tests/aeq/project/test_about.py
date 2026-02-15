@@ -4,7 +4,7 @@ import string
 
 import pytest
 
-from aequilibrae import Project
+from aequilibrae.project.project import Project
 from aequilibrae.utils.db_utils import read_and_close
 
 
