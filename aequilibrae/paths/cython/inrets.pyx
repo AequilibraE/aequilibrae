@@ -2,7 +2,7 @@ from libc.math cimport pow
 from cython.parallel import prange
 
 
-def inrets(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
+def inrets(congested_times, link_flows, capacity, fftime, alpha, cores):
     cdef int c = cores
 
     cdef double [:] congested_view = congested_times
@@ -10,12 +10,11 @@ def inrets(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
     cdef double [:] capacity_view = capacity
     cdef double [:] fftime_view = fftime
     cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
 
-    inrets_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
+    inrets_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, c)
 
 
-def delta_inrets(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
+def delta_inrets(dbpr, link_flows, capacity, fftime, alpha, cores):
     cdef int c = cores
 
     cdef double [:] dbpr_view = dbpr
@@ -23,9 +22,8 @@ def delta_inrets(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
     cdef double [:] capacity_view = capacity
     cdef double [:] fftime_view = fftime
     cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
 
-    dinrets_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
+    dinrets_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, c)
 
 
 @cython.wraparound(False)
@@ -37,7 +35,6 @@ cpdef void inrets_cython(
     double [:] capacity,
     double [:] fftime,
     double[:] alpha,
-    double [:] beta,
     int cores
 ) noexcept:
     cdef long long i
@@ -66,7 +63,6 @@ cpdef void dinrets_cython(
     double [:] capacity,
     double [:] fftime,
     double[:] alpha,
-    double [:] beta,
     int cores
 ) noexcept:
     cdef long long i

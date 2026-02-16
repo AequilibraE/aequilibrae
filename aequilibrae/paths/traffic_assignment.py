@@ -415,14 +415,16 @@ class TrafficAssignment(AssignmentBase):
         self._config["VDF parameters"] = par
         pars = []
 
-        if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
-            parameter_mins = {"alpha": 0.0, "beta": 1.0}
+        if self.vdf.function in ["BPR", "BPR2", "CONICAL"]:
+            parameter_bounds = {"alpha": (0.0, float("inf")), "beta": (1.0, float("inf"))}
+        elif self.vdf.function == "INRETS":
+            parameter_bounds = {"alpha": (0.0, 1.0)}
         elif self.vdf.function == "AKCELIK":
-            parameter_mins = {"alpha": 0.0, "tau": 0.0}
+            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf"))}
         else:
             raise ValueError(f"unknown vdf function {self.vdf.function}")
 
-        for p1, minimum in parameter_mins.items():
+        for p1, (minimum, maximum) in parameter_bounds.items():
             if p1 not in par:
                 raise ValueError(f"{p1} should exist in the set of parameters provided")
             p = par[p1]
@@ -439,6 +441,8 @@ class TrafficAssignment(AssignmentBase):
                 raise ValueError(f"At least one {p1} is NaN")
             elif array.min() < minimum:
                 raise ValueError(f"At least one {p1} is less than {minimum}")
+            elif array.max() > maximum:
+                raise ValueError(f"At least one {p1} is greater than {maximum}")
 
         self.__dict__["vdf_parameters"] = pars
         self._config["VDF function"] = self.vdf.function.lower()

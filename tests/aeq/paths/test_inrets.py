@@ -8,7 +8,6 @@ def test_inrets_function():
     cores = cpu_count()
 
     alpha = np.zeros(11)
-    beta = np.zeros(11)
     fftime = np.ones(11)
     capacity = np.ones(11)
     congested_times = np.zeros(11)
@@ -17,7 +16,7 @@ def test_inrets_function():
     alpha.fill(0.95)
     link_flows = np.arange(11).astype(float) * 0.2
 
-    inrets(congested_times, link_flows, capacity, fftime, alpha, beta, cores)
+    inrets(congested_times, link_flows, capacity, fftime, alpha, cores)
 
     should_be = np.array(
         [
@@ -44,8 +43,8 @@ def test_inrets_function():
         link_flows.fill(1 * 0.1001 * i)
 
         link_flows += np.arange(11) * dx
-        inrets(congested_times, link_flows, capacity, fftime, alpha, beta, cores)
-        delta_inrets(delta, link_flows, capacity, fftime, alpha, beta, cores)
+        inrets(congested_times, link_flows, capacity, fftime, alpha, cores)
+        delta_inrets(delta, link_flows, capacity, fftime, alpha, cores)
 
         # The derivative needs to be monotonically increasing.
         assert min(delta[1:] - delta[:-1]) > 0, "Delta is not increasing as it should"
