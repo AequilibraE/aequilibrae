@@ -283,8 +283,8 @@ class AssignmentResults(AssignmentResultsBase):
             assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
-                flow_ab = res[f"{name}_{n}_ab"].to_numpy(copy=False)
-                flow_ba = res[f"{name}_{n}_ba"].to_numpy(copy=False)
+                flow_ab = res[f"{name}_{n}_ab"].to_numpy(copy=True)
+                flow_ba = res[f"{name}_{n}_ba"].to_numpy(copy=True)
                 flow_ab[m.network_ab_idx] = link_flows[m.graph_ab_idx, i]
                 flow_ba[m.network_ba_idx] = link_flows[m.graph_ba_idx, i]
                 res[f"{name}_{n}_ab"] = flow_ab
