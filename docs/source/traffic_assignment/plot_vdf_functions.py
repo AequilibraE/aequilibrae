@@ -60,7 +60,7 @@ ax.plot(link_flows, function_apply(akcelik, link_flows, 0.35, 8.0), label='Akcel
 ax.plot(link_flows, function_apply(bpr, link_flows, 0.15, 4.0), label='BPR (α=0.15, β=4.0)', linewidth=2)
 ax.plot(link_flows, function_apply(bpr2, link_flows, 0.15, 4.0), label='BPR2 (α=0.15, β=4.0)', linewidth=2)
 ax.plot(link_flows, function_apply(conical, link_flows, 1.2, 3.0), label='Conical (α=1.2, β=3.0)', linewidth=2)
-ax.plot(link_flows, function_apply(inrets, link_flows, 0.9, 2.0), label='INRETS (α=0.9, β=2.0)', linewidth=2)
+ax.plot(link_flows, function_apply(inrets, link_flows, 0.9, 999.0), label='INRETS (α=0.9)', linewidth=2)  # beta not used
 
 # Add vertical line at capacity
 ax.axvline(x=1.0, color='red', linestyle=':', linewidth=1.5, alpha=0.7, label='Capacity (V/C=1)')
@@ -89,7 +89,7 @@ vdfs = [
     ('BPR', bpr, delta_bpr, 0.15, 4.0, 'Standard BPR function with α=0.15, β=4.0'),
     ('BPR2', bpr2, delta_bpr2, 0.15, 4.0, 'Modified BPR: β before capacity, 2β after'),
     ('Conical', conical, delta_conical, 1.2, 3.0, 'Spiess Conical with α=1.2, β=3.0'),
-    ('INRETS', inrets, delta_inrets, 0.9, 2.0, 'French INRETS with α=0.9, β=2.0'),
+    ('INRETS', inrets, delta_inrets, 0.9, 999, 'French INRETS with α=0.9'),
     ('Akcelik', akcelik, delta_akcelik, 0.35, 8.0, 'Akcelik function with α=0.35, τ=8.0')
 ]
 
@@ -138,7 +138,7 @@ voc_near = np.linspace(0.5, 1.5, 200)
 ax.plot(voc_near, function_apply(bpr, voc_near, 0.15, 4.0), label='BPR (α=0.15, β=4.0)', linewidth=2.5)
 ax.plot(voc_near, function_apply(bpr2, voc_near, 0.15, 4.0), label='BPR2 (α=0.15, β=4.0)', linewidth=2.5, linestyle='--')
 ax.plot(voc_near, function_apply(conical, voc_near, 1.2, 3.0), label='Conical (α=1.2, β=3.0)', linewidth=2.5)
-ax.plot(voc_near, function_apply(inrets, voc_near, 0.9, 2.0), label='INRETS (α=0.9, β=2.0)', linewidth=2.5)
+ax.plot(voc_near, function_apply(inrets, voc_near, 0.9, 999), label='INRETS (α=0.9)', linewidth=2.5)
 ax.plot(voc_near, function_apply(akcelik, voc_near, 0.35, 8.0), label='Akcelik (α=0.35, τ=8.0)', linewidth=2.5)
 
 ax.axvline(x=1.0, color='red', linestyle=':', linewidth=2, alpha=0.7, label='Capacity')
