@@ -24,7 +24,7 @@ AequilibraE currently supports the following VDF functions:
 VDF Comparison
 --------------
 
-The following chart compares the behavior of all available VDF functions with their typical parameter values:
+The following chart compares the behavior of all available VDF functions with their example values:
 
 .. image:: ../_images/vdf_comparison.png
    :align: center
@@ -255,7 +255,7 @@ Akcelik
 
 **Mathematical Formula:**
 
-.. math:: t = t_0 + \alpha\left(z + \sqrt{z^2 + \frac{\tau v}{c}}\right)
+.. math:: t = t_0 + \alpha\left(z + \sqrt{z^2 + \frac{\tau v}{c^2}}\right)
 
 Where :math:`z = \frac{v}{c} - 1`
 

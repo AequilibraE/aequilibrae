@@ -31,25 +31,31 @@ from_voc, to_voc = 0, 3
 link_flows = np.linspace(from_voc, to_voc, array_size)
 
 
-def function_apply(func, link_flows, par1, par2):
+def function_apply(func, link_flows, par1, par2: float | None = None):
     size = link_flows.shape[0]
     congested_times = np.zeros(size, dtype=np.float64)
     capacity = np.ones(size, dtype=np.float64)
     fftime = np.ones(size, dtype=np.float64)
     par1s = np.ones(size, dtype=np.float64) * par1
-    par2s = np.ones(size, dtype=np.float64) * par2
-    func(congested_times, link_flows, capacity, fftime, par1s, par2s, 1)
+    if par2 is not None:
+        par2s = np.ones(size, dtype=np.float64) * par2
+        func(congested_times, link_flows, capacity, fftime, par1s, par2s, 1)
+    else:
+        func(congested_times, link_flows, capacity, fftime, par1s, 1)
     return congested_times
 
 
-def derivative_apply(delta_func, link_flows, par1, par2):
+def derivative_apply(delta_func, link_flows, par1, par2: float | None = None):
     size = link_flows.shape[0]
     derivative = np.zeros(size, dtype=np.float64)
     capacity = np.ones(size, dtype=np.float64)
     fftime = np.ones(size, dtype=np.float64)
     par1s = np.ones(size, dtype=np.float64) * par1
-    par2s = np.ones(size, dtype=np.float64) * par2
-    delta_func(derivative, link_flows, capacity, fftime, par1s, par2s, 1)
+    if par2 is not None:
+        par2s = np.ones(size, dtype=np.float64) * par2
+        delta_func(derivative, link_flows, capacity, fftime, par1s, par2s, 1)
+    else:
+        delta_func(derivative, link_flows, capacity, fftime, par1s, 1)
     return derivative
 
 # Create the main comparison plot
@@ -60,10 +66,10 @@ ax.plot(link_flows, function_apply(akcelik, link_flows, 0.35, 8.0), label='Akcel
 ax.plot(link_flows, function_apply(bpr, link_flows, 0.15, 4.0), label='BPR (α=0.15, β=4.0)', linewidth=2)
 ax.plot(link_flows, function_apply(bpr2, link_flows, 0.15, 4.0), label='BPR2 (α=0.15, β=4.0)', linewidth=2)
 ax.plot(link_flows, function_apply(conical, link_flows, 1.2, 3.0), label='Conical (α=1.2, β=3.0)', linewidth=2)
-ax.plot(link_flows, function_apply(inrets, link_flows, 0.9, 999.0), label='INRETS (α=0.9)', linewidth=2)  # beta not used
+ax.plot(link_flows, function_apply(inrets, link_flows, 0.9), label='INRETS (α=0.9)', linewidth=2)  # beta not used
 
 # Add vertical line at capacity
-ax.axvline(x=1.0, color='red', linestyle=':', linewidth=1.5, alpha=0.7, label='Capacity (V/C=1)')
+ax.axvline(x=1.0, color='red', linestyle=':', linewidth=1.5, alpha=0.7, label='Capacity (V/C = 1)')
 
 # Formatting
 ax.set_xlabel('Volume / Capacity Ratio', fontsize=12, fontweight='bold')
@@ -89,7 +95,7 @@ vdfs = [
     ('BPR', bpr, delta_bpr, 0.15, 4.0, 'Standard BPR function with α=0.15, β=4.0'),
     ('BPR2', bpr2, delta_bpr2, 0.15, 4.0, 'Modified BPR: β before capacity, 2β after'),
     ('Conical', conical, delta_conical, 1.2, 3.0, 'Spiess Conical with α=1.2, β=3.0'),
-    ('INRETS', inrets, delta_inrets, 0.9, 999, 'French INRETS with α=0.9'),
+    ('INRETS', inrets, delta_inrets, 0.9, None, 'French INRETS with α=0.9'),
     ('Akcelik', akcelik, delta_akcelik, 0.35, 8.0, 'Akcelik function with α=0.35, τ=8.0')
 ]
 
@@ -135,13 +141,13 @@ for name, func, delta_func, par1, par2, description in vdfs:
 fig, ax = plt.subplots(figsize=(10, 6))
 
 voc_near = np.linspace(0.5, 1.5, 200)
+ax.plot(voc_near, function_apply(akcelik, voc_near, 0.35, 8.0), label='Akcelik (α=0.35, τ=8.0)', linewidth=2.5)
 ax.plot(voc_near, function_apply(bpr, voc_near, 0.15, 4.0), label='BPR (α=0.15, β=4.0)', linewidth=2.5)
 ax.plot(voc_near, function_apply(bpr2, voc_near, 0.15, 4.0), label='BPR2 (α=0.15, β=4.0)', linewidth=2.5, linestyle='--')
 ax.plot(voc_near, function_apply(conical, voc_near, 1.2, 3.0), label='Conical (α=1.2, β=3.0)', linewidth=2.5)
-ax.plot(voc_near, function_apply(inrets, voc_near, 0.9, 999), label='INRETS (α=0.9)', linewidth=2.5)
-ax.plot(voc_near, function_apply(akcelik, voc_near, 0.35, 8.0), label='Akcelik (α=0.35, τ=8.0)', linewidth=2.5)
+ax.plot(voc_near, function_apply(inrets, voc_near, 0.9), label='INRETS (α=0.9)', linewidth=2.5)
 
-ax.axvline(x=1.0, color='red', linestyle=':', linewidth=2, alpha=0.7, label='Capacity')
+ax.axvline(x=1.0, color='red', linestyle=':', linewidth=2, alpha=0.7, label='Capacity (V/C = 1)')
 ax.fill_betweenx([0, 10], 0.85, 1.15, alpha=0.1, color='yellow', label='Near-capacity region')
 
 ax.set_xlabel('Volume / Capacity Ratio', fontsize=12, fontweight='bold')
