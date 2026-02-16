@@ -472,7 +472,9 @@ class RouteChoice:
         """
 
         if self.demand.no_demand():
-            warnings.warn("No demand was provided. To perform link loading add a demand matrix or data frame", stacklevel=2)
+            warnings.warn(
+                "No demand was provided. To perform link loading add a demand matrix or data frame", stacklevel=2
+            )
             return pd.DataFrame([])
 
         ll = self.__rc.get_link_loading(cores=self.cores)
@@ -548,7 +550,8 @@ class RouteChoice:
                 if isinstance(link_ids, tuple) and len(link_ids) == 2 and link_ids[1] == 0:
                     warnings.warn(
                         f"Adding both directions of a link ({link_ids[0]}) to a single AND set is likely "
-                        f"unintentional. Replacing with {(link_ids[0], -1)} OR {(link_ids[0], 1)}", stacklevel=2
+                        f"unintentional. Replacing with {(link_ids[0], -1)} OR {(link_ids[0], 1)}",
+                        stacklevel=2,
                     )
                     normalised_link_set.append((link_ids[0], -1))
                     normalised_link_set.append((link_ids[0], 1))
@@ -579,7 +582,8 @@ class RouteChoice:
                         elif comp_id in and_set:
                             warnings.warn(
                                 "Two input links map to the same compressed link in the network"
-                                f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}", stacklevel=2
+                                f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}",
+                                stacklevel=2,
                             )
                         else:
                             and_set.add(comp_id)

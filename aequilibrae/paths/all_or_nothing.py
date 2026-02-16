@@ -1,3 +1,4 @@
+from typing import TYPE_CHECKING
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
@@ -8,15 +9,16 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .multi_threaded_aon import MultiThreadedAoN
 
-if False:
-    pass
+if TYPE_CHECKING:
+    from aequilibrae.paths.results import AssignmentResults
+    from aequilibrae.paths.graph import Graph
+    from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 
 class allOrNothing(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, class_name, matrix, graph, results):
-        # type: (str, AequilibraeMatrix, Graph, AssignmentResults)->None
+    def __init__(self, class_name: str, matrix: AequilibraeMatrix, graph: Graph, results: AssignmentResults):
         WorkerThread.__init__(self, None)
 
         self.class_name = class_name

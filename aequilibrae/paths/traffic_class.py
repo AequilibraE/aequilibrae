@@ -182,7 +182,8 @@ class TrafficClass(TransportClassBase):
                     if comp_id in link_ids:
                         warnings.warn(
                             "Two input links map to the same compressed link in the network"
-                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}", stacklevel=2
+                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}",
+                            stacklevel=2,
                         )
                     else:
                         link_ids.append(comp_id)

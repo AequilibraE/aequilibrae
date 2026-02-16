@@ -154,7 +154,8 @@ class TransitGraphBuilder:
             warnings.warn(
                 "the 'seed', 'geometry_noise', and 'noise_coef' arguments are depreciated and no longer in use. "
                 "Duplicate geometries are allowed within the public transport database.",
-                DeprecationWarning, stacklevel=2,
+                DeprecationWarning,
+                stacklevel=2,
             )
 
         # graph parameters
@@ -1219,7 +1220,8 @@ class TransitGraphBuilder:
         elif method == "connector project match":
             # Check validity of project and nodes database
             warnings.warn(
-                'In its current implementation, the "connector project match" method may take a while for large networks.', stacklevel=2
+                'In its current implementation, the "connector project match" method may take a while for large networks.',
+                stacklevel=2,
             )
 
             nodes = self.project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
@@ -1367,7 +1369,8 @@ class TransitGraphBuilder:
         if robust is not None:
             warnings.warn(
                 "the 'robust' argument is depreciated and no longer in use. Duplicate geometries are allowed within the public transport database.",
-                DeprecationWarning, stacklevel=2,
+                DeprecationWarning,
+                stacklevel=2,
             )
 
         with conn or self.project.transit_connection as conn:

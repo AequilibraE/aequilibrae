@@ -4,11 +4,20 @@ from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
 
+from typing import TYPE_CHECKING
+
 import numpy as np
-from aequilibrae.paths.cython.AoN import copy_two_dimensions, copy_three_dimensions
-from aequilibrae.paths.cython.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
-from aequilibrae.paths.cython.AoN import sum_a_times_b_minus_c, linear_combination_1d
-from aequilibrae.paths.cython.AoN import triple_linear_combination, triple_linear_combination_skims
+from aequilibrae.paths.cython.AoN import (
+    copy_two_dimensions,
+    copy_three_dimensions,
+    linear_combination,
+    linear_combination_skims,
+    aggregate_link_costs,
+    sum_a_times_b_minus_c,
+    linear_combination_1d,
+    triple_linear_combination,
+    triple_linear_combination_skims,
+)
 from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
@@ -16,6 +25,9 @@ from aequilibrae.paths.results import AssignmentResults
 
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+if TYPE_CHECKING:
+    from aequilibrae.paths.traffic_assignment import TrafficAssignment, TrafficClass
 
 
 class LinearApproximation(WorkerThread):
@@ -41,7 +53,7 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["beta1"] = []
             self.convergence_report["beta2"] = []
 
-        self.assig = assig_spec  # type: TrafficAssignment
+        self.assig: TrafficAssignment = assig_spec
 
         if None in [
             assig_spec.classes,
@@ -56,7 +68,7 @@ class LinearApproximation(WorkerThread):
                 f"when assigning. Check if you have all of these: {all_par}"
             )
 
-        self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
+        self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
         self.cap_field = assig_spec.capacity_field
@@ -102,9 +114,9 @@ class LinearApproximation(WorkerThread):
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
 
-        self.step_direction = {}  # type: Dict[AssignmentResults]
-        self.previous_step_direction = {}  # type: Dict[AssignmentResults]
-        self.temp_step_direction_for_copy = {}  # type: Dict[AssignmentResults]
+        self.step_direction: dict[str, AssignmentResults] = {}
+        self.previous_step_direction: dict[str, AssignmentResults] = {}
+        self.temp_step_direction_for_copy: dict[str, AssignmentResults] = {}
 
         self.aons = {}
 
@@ -310,9 +322,9 @@ class LinearApproximation(WorkerThread):
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
-                ppst = self.temp_step_direction_for_copy[c._id]  # type: AssignmentResults
-                prev_stp_dir = self.previous_step_direction[c._id]  # type: AssignmentResults
-                stp_dir = self.step_direction[c._id]  # type: AssignmentResults
+                ppst: AssignmentResults = self.temp_step_direction_for_copy[c._id]
+                prev_stp_dir: AssignmentResults = self.previous_step_direction[c._id]
+                stp_dir: AssignmentResults = self.step_direction[c._id]
 
                 copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
                 ppst.total_flows()
