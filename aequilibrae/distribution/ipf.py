@@ -137,7 +137,7 @@ class Ipf:
             self.error = "Vectors are not balanced"
         else:
             # guarantees that they are precisely balanced
-            self.__col_vector = col_data.to_numpy() * (sum_rows / sum_cols)
+            self.__col_vector = self.__col_vector  * (sum_rows / sum_cols)
 
     def __check_parameters(self):
         for i in self.__required_parameters:
