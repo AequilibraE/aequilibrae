@@ -21,8 +21,10 @@ class Results:
 
         Arguments:
             **project**: Project instance this Results object belongs to
-            **project_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the database to use for the results table.
-            **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the results database
+            **project_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
+                database to use for the results table.
+            **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
+                results database
         """
         self.project = project
         self.logger = project.logger

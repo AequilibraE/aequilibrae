@@ -177,7 +177,10 @@ class NetworkSimplifier(WorkerThread):
         df = df[cols]
         data = df.assign(srid=self.link_layer.crs.to_epsg()).to_records(index=False)
 
-        sql = f"INSERT INTO links({','.join(df.columns)}) VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
+        sql = (
+            f"INSERT INTO links({','.join(df.columns)}) "
+            f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
+        )
         with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             conn.executemany(sql, data)
             conn.executemany("DELETE FROM links WHERE link_id=?", [[x] for x in links_to_delete])

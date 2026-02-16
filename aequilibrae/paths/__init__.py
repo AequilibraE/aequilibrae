@@ -9,7 +9,7 @@ from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
-from aequilibrae.paths.results import *
+from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults, PathResults, SkimResults
 from aequilibrae.paths.route_choice import RouteChoice
 from aequilibrae.paths.sub_area import SubAreaAnalysis
 from aequilibrae.paths.traffic_assignment import TrafficAssignment, TransitAssignment
@@ -31,6 +31,10 @@ __all__ = [
     "MultiThreadedNetworkSkimming",
     "NetworkSkimming",
     "OptimalStrategies",
+    "AssignmentResults",
+    "TransitAssignmentResults",
+    "PathResults",
+    "SkimResults",
     "RouteChoice",
     "SubAreaAnalysis",
     "TrafficAssignment",

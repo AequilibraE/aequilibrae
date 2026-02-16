@@ -109,7 +109,8 @@ class Transit(WorkerThread):
         by 'period_id'.
 
         :Arguments:
-            **period_ids** (:obj:`int`): List of periods of to save. Defaults to 'project.network.periods.default_period.period_id'.
+            **period_ids** (:obj:`int`): List of periods of to save. Defaults to
+                'project.network.periods.default_period.period_id'.
             **force** (:obj:`bool`): Remove the existing graphs before saving the 'period_ids' graphs. Default 'False'.
 
         """

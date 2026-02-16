@@ -11,7 +11,8 @@ from aequilibrae import logger
 
 class AequilibraEConnection(sqlite3.Connection):
     """
-    This custom factory class intends to solve the issue of premature commits when trying to use manual transaction control.
+    This custom factory class intends to solve the issue of premature commits when trying to
+    use manual transaction control.
 
     After ``manual_transaction`` is called, context manager enters and exits are tracked via their depth, the
     ``sqlite3.Connection`` is placed into manual transaction control and a transaction is started. If another

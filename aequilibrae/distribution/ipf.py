@@ -25,7 +25,10 @@ class Ipf:
         >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
 
-        >>> vectors = pd.DataFrame({"productions":np.zeros(matrix.zones), "attractions":np.zeros(matrix.zones)}, index=matrix.index)
+        >>> vectors = pd.DataFrame(
+        ...     {"productions": np.zeros(matrix.zones), "attractions": np.zeros(matrix.zones)},
+        ...     index=matrix.index,
+        ... )
 
         >>> vectors["productions"] = matrix.rows()
         >>> vectors["attractions"] = matrix.columns()

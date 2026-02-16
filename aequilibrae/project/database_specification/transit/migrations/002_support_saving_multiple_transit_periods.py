@@ -74,7 +74,8 @@ def migrate(
             columns = recreate_columns(transit_conn, logger, table, f"__old_{table}")
 
             transit_conn.execute(
-                f"""INSERT INTO {table}({",".join(columns)},'period_id') SELECT {",".join(columns)},{period_id} FROM __old_{table}"""
+                f"INSERT INTO {table}({','.join(columns)},'period_id') "
+                f"SELECT {','.join(columns)},{period_id} FROM __old_{table}"
             )
             transit_conn.execute(f"SELECT DropTable(NULL, '__old_{table}')")
 

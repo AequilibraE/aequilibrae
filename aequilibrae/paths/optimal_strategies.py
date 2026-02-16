@@ -30,7 +30,8 @@ class OptimalStrategies:
                 )
             except ValueError as e:
                 raise ValueError(
-                    f"matrix core {cls.matrix_core} not found in matrix view. Ensure the matrix is prepared and the core exists"
+                    f"matrix core {cls.matrix_core} not found in matrix view. "
+                    f"Ensure the matrix is prepared and the core exists"
                 ) from e
 
             # Take the COO matrix and lookup the index values (taz_id)

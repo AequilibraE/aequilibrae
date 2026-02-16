@@ -554,7 +554,7 @@ class LinearApproximation(WorkerThread):
                         )
 
                     if c._selected_links:
-                        for name, idx in c._aon_results._selected_links.items():
+                        for name, _idx in c._aon_results._selected_links.items():
                             # Copy the temporary results into the final od matrix, referenced by link_set name
                             # The temp flows have an index associated with the link_set name
                             linear_combination_skims(
@@ -687,9 +687,10 @@ class LinearApproximation(WorkerThread):
             self.conjugate_failed = False
 
         except ValueError as e:
-            # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
-            # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
-            # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
+            # We can have iterations where the objective function is not *strictly* convex, but the
+            # scipy method cannot deal with this. Stepsize is then either given by 1 or 0, depending
+            # on where the objective function is smaller. However, using zero would mean the overall
+            # solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
             if self.algorithm == "bfw":

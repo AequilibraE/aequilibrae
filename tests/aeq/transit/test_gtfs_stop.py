@@ -59,8 +59,11 @@ def test_save_to_database(data, build_gtfs_project):
 
     sql = "Select agency_id, link, dir, description, street from stops where stop=?"
 
-    sql_tl = """Insert into route_links ("transit_link", "pattern_id", "seq", "from_stop", "to_stop", "distance", "geometry")
-                VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"""
+    sql_tl = (
+        "Insert into route_links "
+        '("transit_link", "pattern_id", "seq", "from_stop", "to_stop", "distance", "geometry") '
+        "VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"
+    )
 
     with database_connection("transit") as transit_conn:
         s.save_to_database(transit_conn, commit=True)

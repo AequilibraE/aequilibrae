@@ -84,7 +84,9 @@ class GMNSBuilder:
         if gmns_geom not in self.link_df.columns.to_list():
             if self.geom_df is None:
                 raise ValueError(
-                    "To create an aequilibrae links table, geometries information must be provided either in the GMNS link table or in a separate file ('geometry_path' attribute)."
+                    "To create an aequilibrae links table, geometries information must be "
+                    "provided either in the GMNS link table or in a separate file "
+                    "('geometry_path' attribute)."
                 )
             else:
                 self.link_df = self.link_df.merge(self.geom_df, on="geometry_id", how="left")
@@ -132,7 +134,8 @@ class GMNSBuilder:
         missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
         if missing_f != []:
             print(
-                f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+                f"Fields not imported from link table: {'; '.join(missing_f)}. "
+                f"If you want them to be imported, please modify the parameters.yml file."
             )
 
         # Adding new fields to AequilibraE nodes table / Preparing it to receive information from GMNS table.
@@ -157,7 +160,8 @@ class GMNSBuilder:
         missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
         if missing_f != []:
             print(
-                f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+                f"Fields not imported from node table: {'; '.join(missing_f)}. "
+                f"If you want them to be imported, please modify the parameters.yml file."
             )
 
         # Getting information from some optional GMNS fields
@@ -490,7 +494,8 @@ class GMNSBuilder:
                 new_link = LineString(link_points)
                 self.link_df.loc[idx, "geometry"] = new_link.wkt
                 logger.info(
-                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. It was not connected to its start node."
+                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. "
+                    f"It was not connected to its start node."
                 )
 
             if link_end_boundary != (to_point_x, to_point_y):
@@ -507,7 +512,8 @@ class GMNSBuilder:
                 new_link = LineString(link_points)
                 self.link_df.loc[idx, "geometry"] = new_link.wkt
                 logger.info(
-                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. It was not connected to its end node."
+                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. "
+                    f"It was not connected to its end node."
                 )
 
     def save_to_database(self, links_fields, nodes_fields):

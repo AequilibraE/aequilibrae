@@ -307,7 +307,8 @@ class AequilibraeMatrix(object):
             **compressed** (:obj:`bool`, *Optional*): Boolean for whether we should compress the output matrix.
             Not yet implemented
 
-            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only. Defaults to ``True``
+            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in
+                memory only. Defaults to ``True``
 
         """
 

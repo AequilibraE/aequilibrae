@@ -27,9 +27,11 @@ class DelaunayAnalysis:
         """Creates a delaunay network based on the existing model
 
         :Arguments:
-            **source** (:obj:`str`, *Optional*): Source of the centroids/zones. Either ``zones`` or ``network``. Default ``zones``
+            **source** (:obj:`str`, *Optional*): Source of the centroids/zones. Either ``zones``
+            or ``network``. Default ``zones``
 
-            **overwrite path** (:obj:`bool`, *Optional*): Whether to should overwrite an existing Delaunay Network. Default ``False``
+            **overwrite path** (:obj:`bool`, *Optional*): Whether to should overwrite an
+            existing Delaunay Network. Default ``False``
 
         """
 
@@ -76,7 +78,8 @@ class DelaunayAnalysis:
                             ON CONFLICT(link_id) DO UPDATE SET geometry=excluded.geometry"""
 
             zone_geo_sql = """INSERT INTO delaunay_network (link_id, geometry)
-                                select lnk.link_id, MakeLine(st_centroid(za.geometry), st_centroid(zb.geometry)) from delaunay_network lnk
+                                select lnk.link_id, MakeLine(st_centroid(za.geometry),
+                                st_centroid(zb.geometry)) from delaunay_network lnk
                                         inner join zones za on lnk.a_node=za.zone_id
                                         inner join zones zb on lnk.b_node=zb.zone_id
                             ON CONFLICT(link_id) DO UPDATE SET geometry=excluded.geometry;"""
