@@ -1,4 +1,3 @@
-from typing import TYPE_CHECKING
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
@@ -9,10 +8,9 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .multi_threaded_aon import MultiThreadedAoN
 
-if TYPE_CHECKING:
-    from aequilibrae.paths.results import AssignmentResults
-    from aequilibrae.paths.graph import Graph
-    from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.paths.graph import Graph
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 
 class allOrNothing(WorkerThread):
