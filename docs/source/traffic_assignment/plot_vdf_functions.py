@@ -1,7 +1,7 @@
 """
 Generate VDF comparison charts for documentation
 """
-from aequilibrae.paths.AoN import (
+from aequilibrae.paths.cython.AoN import (
     akcelik,
     bpr,
     bpr2,
