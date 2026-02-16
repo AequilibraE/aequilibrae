@@ -72,7 +72,7 @@ Where:
   * :math:`\alpha` = calibration parameter
   * :math:`\beta` = calibration parameter (power)
 
-**Default Parameters:**
+**Standard Parameters:**
   * :math:`\alpha = 0.15`
   * :math:`\beta = 4.0`
 
@@ -88,7 +88,7 @@ standard choice for highway assignment models worldwide.
 * Monotonically increasing (no discontinuities)
 * Convex function ensuring convergence in assignment algorithms
 * Well-suited for highway networks
-* Default parameters are based on extensive empirical studies
+* Standard parameters are based on extensive empirical studies
 
 **When to Use:**
 
@@ -120,7 +120,7 @@ After capacity (:math:`v > c`):
 
 .. math:: t = t_0 \left(1 + \alpha \left(\frac{v}{c}\right)^{2\beta}\right)
 
-**Default Parameters:**
+**Standard Parameters:**
   * :math:`\alpha = 0.15`
   * :math:`\beta = 4.0`
 
@@ -162,7 +162,7 @@ Conical (Spiess)
 
 .. math:: t = t_0 \left(2 + \sqrt{\alpha^2\left(1-\frac{v}{c}\right)^2 + \beta^2} - \alpha\left(1-\frac{v}{c}\right) - \beta\right)
 
-**Default Parameters:**
+**Standard Parameters:**
   * :math:`\alpha = 0.15`
   * :math:`\beta = 4.0`
 
@@ -212,7 +212,7 @@ After capacity (:math:`v > c`):
 
 .. math:: t = t_0 \frac{1.1 - \alpha}{0.1} \left(\frac{v}{c}\right)^2
 
-**Default Parameters:**
+**Standard Parameters:**
   * :math:`\alpha = 1.0` (must be :math:`< 1.1`)
 
 **Origin and Background:**
@@ -259,7 +259,7 @@ Akcelik
 
 Where :math:`z = \frac{v}{c} - 1`
 
-**Default Parameters:**
+**Standard Parameters:**
   * :math:`\alpha = 0.25`
   * :math:`\tau = 0.8` (this is :math:`8 \times 0.1`, see note below)
 
@@ -281,7 +281,7 @@ for computational efficiency.
   before setting it in AequilibraE
 * Example: To use :math:`\tau = 0.1`, set ``tau = 0.8`` in AequilibraE
 * Example: To use :math:`\tau = 0.15`, set ``tau = 1.2`` in AequilibraE
-* The default value of 0.8 corresponds to a standard :math:`\tau = 0.1`
+* A value of 0.8 corresponds to a standard :math:`\tau = 0.1`
 
 **Characteristics:**
 
@@ -312,7 +312,7 @@ General Recommendations
 
 **For BPR and BPR2:**
 
-* :math:`\alpha = 0.15` and :math:`\beta = 4.0` are widely accepted defaults for highways
+* :math:`\alpha = 0.15` and :math:`\beta = 4.0` are widely accepted for highways
 * Urban arterials may benefit from :math:`\alpha` values between 0.15 and 0.25
 * Higher :math:`\beta` values (5-8) create sharper congestion curves
 * Lower :math:`\beta` values (2-3) create more gradual curves
@@ -345,7 +345,7 @@ When calibrating VDF parameters:
 3. **Validate results**: Compare assigned volumes and speeds against counts
 4. **Test sensitivity**: Understand how parameter changes affect results
 5. **Check convergence**: Ensure your chosen parameters allow the algorithm to converge
-6. **Match local conditions**: Default parameters may not suit all geographic contexts
+6. **Match local conditions**: Standard parameters may not suit all geographic contexts
 
 Setting VDF Parameters in AequilibraE
 --------------------------------------
