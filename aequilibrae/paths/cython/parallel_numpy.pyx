@@ -296,7 +296,7 @@ def assign_link_loads(actual_links, compressed_links, crosswalk, cores):
 
     cdef double [:, :] actual_view = actual_links
     cdef double [:, :] compressed_view = compressed_links
-    cdef long long [:] crosswalk_view = crosswalk
+    cdef const long long [:] crosswalk_view = crosswalk
 
     assign_link_loads_cython(actual_view, compressed_view, crosswalk_view, c)
 
@@ -307,7 +307,7 @@ def assign_link_loads(actual_links, compressed_links, crosswalk, cores):
 cpdef void assign_link_loads_cython(
     cython.floating[:, :] actual,
     cython.floating[:, :] compressed,
-    long long[:] crosswalk,
+    const long long[:] crosswalk,
     int cores
 ) noexcept:
     cdef long long i, j, k
@@ -323,7 +323,7 @@ cpdef void assign_link_loads_cython(
 def aggregate_link_costs(actual_costs, compressed_costs, crosswalk):
     cdef double [:] actual_view = actual_costs
     cdef double [:] compressed_view = compressed_costs
-    cdef long long [:] crosswalk_view = crosswalk
+    cdef const long long [:] crosswalk_view = crosswalk
 
     aggregate_link_costs_cython(actual_view, compressed_view, crosswalk_view)
 
@@ -331,7 +331,7 @@ def aggregate_link_costs(actual_costs, compressed_costs, crosswalk):
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void aggregate_link_costs_cython(double[:] actual, double[:] compressed, long long[:] crosswalk) noexcept:
+cpdef void aggregate_link_costs_cython(double[:] actual, double[:] compressed, const long long[:] crosswalk) noexcept:
     cdef long long i, k
     cdef long long links = actual.shape[0]
     cdef long long c_l = compressed.shape[0]

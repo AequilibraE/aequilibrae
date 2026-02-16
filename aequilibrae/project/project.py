@@ -10,7 +10,7 @@ import warnings
 
 import pandas as pd
 
-from aequilibrae import global_logger
+from aequilibrae.log import global_logger
 from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.log import Log
 from aequilibrae.log import get_log_handler

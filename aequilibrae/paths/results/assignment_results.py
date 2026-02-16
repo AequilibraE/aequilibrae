@@ -136,12 +136,14 @@ class AssignmentResults(AssignmentResultsBase):
         self.links = graph.num_links
         self.num_skims = len(graph.skim_fields)
         self.skim_names = list(graph.skim_fields)
-        self.lids = graph.graph.link_id.values
-        self.direcs = graph.graph.direction.values
+        self.lids = graph.graph.link_id.to_numpy(copy=False)
+        self.direcs = graph.graph.direction.to_numpy(copy=False)
         self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
-        self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
-        self._graph_ids = graph.graph.__supernet_id__.values
-        self._graph_compressed_ids = graph.graph.__compressed_id__.values
+        supernet_ids = graph.graph.__supernet_id__.to_numpy(copy=False)
+        compressed_ids = graph.graph.__compressed_id__.to_numpy(copy=False)
+        self.crosswalk[supernet_ids] = compressed_ids
+        self._graph_ids = supernet_ids
+        self._graph_compressed_ids = compressed_ids
         self.__redim()
         self._graph_id = graph._id
 
@@ -281,8 +283,12 @@ class AssignmentResults(AssignmentResultsBase):
             assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
-                res[f"{name}_{n}_ab"].values[m.network_ab_idx] = link_flows[m.graph_ab_idx, i]
-                res[f"{name}_{n}_ba"].values[m.network_ba_idx] = link_flows[m.graph_ba_idx, i]
+                flow_ab = res[f"{name}_{n}_ab"].to_numpy(copy=True)
+                flow_ba = res[f"{name}_{n}_ba"].to_numpy(copy=True)
+                flow_ab[m.network_ab_idx] = link_flows[m.graph_ab_idx, i]
+                flow_ba[m.network_ba_idx] = link_flows[m.graph_ba_idx, i]
+                res[f"{name}_{n}_ab"] = flow_ab
+                res[f"{name}_{n}_ba"] = flow_ba
 
                 # Tot Flow
                 res[f"{name}_{n}_tot"] = np.nansum(res[[f"{name}_{n}_ab", f"{name}_{n}_ba"]].to_numpy(), axis=1)
@@ -315,7 +321,7 @@ class TransitAssignmentResults(AssignmentResultsBase):
         self.zones = graph.num_zones
         self.centroids = graph.centroids
         self.links = graph.num_links
-        self.lids = graph.graph.link_id.values
+        self.lids = graph.graph.link_id.to_numpy(copy=False)
 
     def reset(self) -> None:
         """

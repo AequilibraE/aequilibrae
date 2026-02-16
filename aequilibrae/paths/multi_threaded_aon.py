@@ -31,6 +31,7 @@ class MultiThreadedAoN:
     def prepare(self, graph, results):
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
+        compact_b_nodes = graph.compact_graph.b_node.to_numpy(copy=False)
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         if results._selected_links:
             self.has_flow_mask = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
@@ -58,7 +59,7 @@ class MultiThreadedAoN:
         self.reached_first = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         self.connectors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         self.temp_link_loads = np.zeros((results.cores, results.links + 1, results.classes["number"]), dtype=ftype)
-        self.temp_b_nodes = np.zeros((results.cores, graph.compact_graph.b_node.shape[0]), dtype=itype)
+        self.temp_b_nodes = np.zeros((results.cores, compact_b_nodes.shape[0]), dtype=itype)
 
         for i in range(results.cores):
-            self.temp_b_nodes[i, :] = graph.compact_graph.b_node.values[:]
+            self.temp_b_nodes[i, :] = compact_b_nodes[:]

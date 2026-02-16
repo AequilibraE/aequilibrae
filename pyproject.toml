@@ -31,7 +31,7 @@ dependencies = [
   "scipy>=1.4",
   "pyaml",
   "requests",
-  "pandas<3",
+  "pandas>=2.2",
   "shapely>=2.0",
   "pyproj",
   "rtree",

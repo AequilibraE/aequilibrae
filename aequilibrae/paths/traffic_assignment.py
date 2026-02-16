@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from numpy import nan_to_num
 
-from aequilibrae import Parameters
+from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
@@ -19,6 +19,32 @@ from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.utils.core_setter import set_cores
+
+
+def _assign_aggregation_fields(
+    aggregation,
+    field_ab,
+    field_ba,
+    graph_ab_values,
+    graph_ba_values,
+    network_ab_idx,
+    network_ba_idx,
+):
+    ab = aggregation[field_ab].to_numpy(copy=True)
+    ba = aggregation[field_ba].to_numpy(copy=True)
+    ab[network_ab_idx] = nan_to_num(graph_ab_values)
+    ba[network_ba_idx] = nan_to_num(graph_ba_values)
+    aggregation[field_ab] = ab
+    aggregation[field_ba] = ba
+
+
+def _safe_delay_factor(congested_time, free_flow_time):
+    return np.divide(
+        congested_time,
+        free_flow_time,
+        out=np.zeros_like(congested_time),
+        where=free_flow_time != 0,
+    )
 
 
 class AssignmentBase(ABC):
@@ -662,25 +688,63 @@ class TrafficAssignment(AssignmentBase):
 
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
-        graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
-        agg["Preload_AB"].values[m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
-        agg["Preload_BA"].values[m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        graph_ab_idx, graph_ba_idx = m.graph_ab_idx, m.graph_ba_idx
+
+        _assign_aggregation_fields(
+            agg,
+            "Preload_AB",
+            "Preload_BA",
+            preload[m.graph_ab_idx],
+            preload[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
-        agg["Congested_Time_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
-        agg["Congested_Time_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "Congested_Time_AB",
+            "Congested_Time_BA",
+            congested_time[m.graph_ab_idx],
+            congested_time[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        agg["Delay_factor_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
-        agg["Delay_factor_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
+        delay_factor_ab = _safe_delay_factor(congested_time[graph_ab_idx], free_flow_tt[graph_ab_idx])
+        delay_factor_ba = _safe_delay_factor(congested_time[graph_ba_idx], free_flow_tt[graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "Delay_factor_AB",
+            "Delay_factor_BA",
+            delay_factor_ab,
+            delay_factor_ba,
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
-        agg["VOC_AB"].values[m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
-        agg["VOC_BA"].values[m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "VOC_AB",
+            "VOC_BA",
+            voc[m.graph_ab_idx],
+            voc[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
-        agg["PCE_AB"].values[m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
-        agg["PCE_BA"].values[m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "PCE_AB",
+            "PCE_BA",
+            tot_flow[m.graph_ab_idx],
+            tot_flow[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)

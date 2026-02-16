@@ -5,7 +5,7 @@ from enum import IntEnum
 from typing import Optional
 import contextlib
 
-from aequilibrae import logger
+from aequilibrae.log import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.db_utils import AequilibraEConnection
 

@@ -180,11 +180,11 @@ class GTFSReader(WorkerThread):
                             times[1:] += df.add_time[:].astype(int)
 
                     assert min(times[1:] - times[:-1]) > 0
-                    stop_times.arrival_time.values[:] = times[:].astype(int)
-                    stop_times.departure_time.values[:] = times[:].astype(int)
-                    stop_times.source_time.values[:] = source_time[:].astype(int)
-                    trip.arrivals = stop_times.arrival_time.values
-                    trip.departures = stop_times.departure_time.values
+                    stop_times.loc[:, "arrival_time"] = times[:].astype(int)
+                    stop_times.loc[:, "departure_time"] = times[:].astype(int)
+                    stop_times.loc[:, "source_time"] = source_time[:].astype(int)
+                    trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
+                    trip.departures = stop_times.departure_time.to_numpy(copy=True)
 
         if total_fast:
             self.logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
@@ -376,11 +376,11 @@ class GTFSReader(WorkerThread):
         df = pd.DataFrame(stoptimes)
         for col in ["arrival_time", "departure_time"]:
             df2 = df[col].str.split(":", expand=True)
-            df2.fillna(0, inplace=True)
+            df2 = df2.fillna("0")
             df2.columns = ["h", "m", "s"]
-            df2.loc[df2.h.str.len() < 1, "h"] = 0
-            df2.loc[df2.m.str.len() < 1, "m"] = 0
-            df2.loc[df2.s.str.len() < 1, "s"] = 0
+            df2.loc[df2.h.str.len() < 1, "h"] = "0"
+            df2.loc[df2.m.str.len() < 1, "m"] = "0"
+            df2.loc[df2.s.str.len() < 1, "s"] = "0"
             df2 = df2.assign(sec=0)
             df2.loc[:, "sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
             stoptimes[col] = df2.sec.values

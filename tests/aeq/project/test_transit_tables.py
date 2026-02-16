@@ -1,6 +1,6 @@
 import pytest
 
-from aequilibrae.project import Project
+from aequilibrae.project.project import Project
 from aequilibrae.transit import Transit
 
 

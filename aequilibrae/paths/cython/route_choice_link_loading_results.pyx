@@ -176,14 +176,14 @@ cdef class LinkLoadingResults:
         # self.f64_sl_od_matrix and self.f32_sl_od_matrix are not allocated here. The objects are initialised to
         # empty vectors but elements are created in self.reduce_sl_link_loading
 
-    cdef object link_loading_to_objects(self, long long[:] compressed_id_view, int cores):
+    cdef object link_loading_to_objects(self, const long long[:] compressed_id_view, int cores):
         if self.link_loading_objects is None:
             self.link_loading_objects = dict(zip(*self.apply_generic_link_loading(
                 self.f64_link_loading, self.f32_link_loading, compressed_id_view, cores
             )))
         return self.link_loading_objects
 
-    cdef object sl_link_loading_to_objects(self, long long[:] compressed_id_view, int cores):
+    cdef object sl_link_loading_to_objects(self, const long long[:] compressed_id_view, int cores):
         if not self.sl_link_loading:
             return {}
 
@@ -314,7 +314,7 @@ cdef class LinkLoadingResults:
         LinkLoadingResults self,
         vector[unique_ptr[vector[double]]] &f64_link_loading,
         vector[unique_ptr[vector[float]]] &f32_link_loading,
-        long long[:] compressed_id_view,
+        const long long[:] compressed_id_view,
         int cores
     ):
         cdef:

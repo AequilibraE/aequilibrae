@@ -12,7 +12,7 @@ import shapely.wkt
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
 
-from aequilibrae import logger
+from aequilibrae.log import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.db_utils import commit_and_close
 

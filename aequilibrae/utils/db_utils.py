@@ -6,7 +6,7 @@ from sqlite3 import Connection, connect
 from typing import Union
 
 import pandas as pd
-from aequilibrae import logger
+from aequilibrae.log import logger
 
 
 class AequilibraEConnection(sqlite3.Connection):

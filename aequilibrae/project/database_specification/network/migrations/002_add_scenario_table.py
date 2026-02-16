@@ -1,9 +1,8 @@
+import pathlib
 import sqlite3
 from typing import Optional
-import pathlib
 
-from aequilibrae import logger
-
+from aequilibrae.log import logger
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 
 
