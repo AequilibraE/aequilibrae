@@ -172,11 +172,6 @@ Developed by Heinz Spiess in 1990, the Conical function was designed to overcome
 limitations of the BPR function while maintaining computational tractability. It ensures positive 
 derivatives everywhere and has desirable mathematical properties for convergence.
 
-**Reference:**
-
-Spiess, H. (1990). "Technical Note—Conical Volume-Delay Functions." *Transportation Science*, 24(2): 153-158. 
-https://doi.org/10.1287/trsc.24.2.153
-
 **Characteristics:**
 
 * Infinitely differentiable (smooth everywhere)
