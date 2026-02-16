@@ -2,7 +2,7 @@ from os.path import join
 import os
 
 from aequilibrae.transit import Transit
-from aequilibrae.project import Project
+from aequilibrae.project.project import Project
 
 import numpy as np
 import pandas as pd

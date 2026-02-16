@@ -4,7 +4,7 @@ from typing import Optional
 from aequilibrae.context import get_active_project
 from aequilibrae.log import logger
 from aequilibrae.project.data import Results
-from aequilibrae.project import Project
+from aequilibrae.project.project import Project
 
 
 def migrate(

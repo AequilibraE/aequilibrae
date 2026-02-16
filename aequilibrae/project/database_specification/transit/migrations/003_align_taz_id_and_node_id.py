@@ -6,7 +6,7 @@ import numpy as np
 
 from aequilibrae.context import get_active_project
 from aequilibrae.log import logger
-from aequilibrae.project import Project
+from aequilibrae.project.project import Project
 from aequilibrae.project.project_creation import add_triggers, remove_triggers
 from aequilibrae.transit import Transit
 

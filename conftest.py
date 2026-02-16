@@ -8,7 +8,7 @@ import pytest
 from shapely.geometry import Polygon
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project import Project
+from aequilibrae.project.project import Project
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
