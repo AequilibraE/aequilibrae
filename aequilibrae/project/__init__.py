@@ -10,3 +10,18 @@ from aequilibrae.project.network.period import Period
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
 from aequilibrae.project.scenario import Scenario
+
+__all__ = [
+    "Project",
+    "About",
+    "Network",
+    "FieldEditor",
+    "Zoning",
+    "Zone",
+    "Matrices",
+    "Log",
+    "Period",
+    "Periods",
+    "NetworkSimplifier",
+    "Scenario",
+]

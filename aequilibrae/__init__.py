@@ -24,6 +24,34 @@ from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResult
 
 from aequilibrae import paths
 
+__all__ = [
+    "global_logger",
+    "Parameters",
+    "Matrices",
+    "Log",
+    "matrix",
+    "transit",
+    "project",
+    "Ipf",
+    "GravityApplication",
+    "GravityCalibration",
+    "SyntheticGravityModel",
+    "AequilibraeMatrix",
+    "distribution",
+    "NetworkSkimming",
+    "TrafficClass",
+    "VDF",
+    "allOrNothing",
+    "TrafficAssignment",
+    "Graph",
+    "AssignmentPaths",
+    "Project",
+    "AssignmentResults",
+    "SkimResults",
+    "PathResults",
+    "paths",
+]
+
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
 version = "1.5.2"
 
