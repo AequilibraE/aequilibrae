@@ -478,14 +478,14 @@ References and Further Reading
 **BPR Function:**
 
 * Bureau of Public Roads (1964). *Traffic Assignment Manual*. U.S. Department of Commerce.
-* Hampton Roads Transportation Planning Organization (2020). *Regional Travel Demand Model V2 Methodology Report*. 
-  Available: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf 
-  (accessed February 2026)
 
 **Conical Function:**
 
 * Spiess, H. (1990). "Technical Note—Conical Volume-Delay Functions." *Transportation Science*, 24(2): 153-158. 
   https://doi.org/10.1287/trsc.24.2.153
+* Hampton Roads Transportation Planning Organization (2020). *Regional Travel Demand Model V2 Methodology Report*. 
+  Available: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf 
+  (accessed February 2026)
 
 **Akcelik Function:**
 
