@@ -4,6 +4,8 @@ import geopandas as gpd
 import pandas as pd
 import json
 import csv
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 from aequilibrae.utils.simwrapper.simwrapper_panel import (
     SimwrapperPanel,
@@ -27,10 +29,19 @@ class SimwrapperConfigGenerator:
 
         :Arguments:
             **project** (:obj:`Project`): AequilibraE Project object
-            **output_dir** (:obj:`str`, *Optional*): Root directory for SimWrapper outputs
+            **output_dir** (:obj:`str`, *Optional*): Root directory for SimWrapper outputs (created inside project)
         """
         self.project = project
-        self.output_dir = Path(output_dir)
+        od = Path(output_dir)
+        # keep simwrapper outputs inside the opened project folder; treat any provided
+        # name as a project-relative subdirectory unless the caller explicitly
+        # supplies a path below the project.
+        if not od.is_absolute():
+            od = Path(self.project.project_base_path) / od
+        else:
+            if not str(od).startswith(str(self.project.project_base_path)):
+                od = Path(self.project.project_base_path) / od.name
+        self.output_dir = od
         self.generated_files = {}
         self._create_directories()
         self.center = get_project_center(self.project)
@@ -54,19 +65,20 @@ class SimwrapperConfigGenerator:
         self.data_dir.mkdir(exist_ok=True)  # data
 
     def _find_project_title(self):
-        """Generate  project title from the project folder name, otherwise returns "AequilibraE Project" """
+        """Generate project title using the project's model name when available;
+        otherwise derive a readable title from the project folder name. Guaranteed
+        to return a non-empty string.
+        """
+        model_name = getattr(self.project.about, "model_name", None)
+        if model_name:
+            return model_name
 
-        try:
-            folder_name = self.project.project_base_path.name
-            title = folder_name.replace("_", " ").title()
-
-            if not title.strip():
-                raise ValueError
-
+        folder_name = Path(self.project.project_base_path).name
+        title = folder_name.replace("_", " ").title()
+        if title.strip():
             return title
 
-        except Exception:
-            return "AequilibraE Project"
+        return "AequilibraE Project"
 
     def _add_to_generated_files(self, key, path):
         """Add file to self.generated_files"""
@@ -85,28 +97,34 @@ class SimwrapperConfigGenerator:
         return [TextPanel(title="title", data="intro")]
 
     def _get_link_types(self):
-        """returns list of link types in network"""
-        return self.project.network.link_types.all_types()
+        """Return a list of link-type *names* present in the project's network (empty list if none)."""
+        try:
+            lts = self.project.network.link_types.all_types()
+            if lts:
+                return [lt.link_type for lt in lts.values()]
+        except AttributeError:
+            # safe fallback to links table below when link_types API is not available
+            pass
+        return []
 
     def _categorical_palette(self, n):
-        """Returns n visually distinct colors"""
-
-        base = [
-            "#4C78A8",
-            "#F58518",
-            "#E45756",
-            "#72B7B2",
-            "#54A24B",
-            "#EECA3B",
-            "#B279A2",
-            "#FF9DA6",
-            "#9D755D",
-        ]
-        return base[:n]
+        """Returns n visually distinct hex colour strings using matplotlib colormaps."""
+        if n <= 0:
+            return []
+        cmap = plt.get_cmap("tab20")
+        try:
+            if n <= getattr(cmap, "N", 20):
+                return [mcolors.to_hex(cmap(i)) for i in range(n)]
+        except (AttributeError, TypeError):
+            # fall back to requesting a resized colormap below
+            pass
+        cmap = plt.get_cmap("tab20", n)
+        return [mcolors.to_hex(cmap(i)) for i in range(n)]
 
     def _truncate_results_tables(self, results_tables, max_tables=3):
         """Return a truncated results list and a flag indicating whether truncation occurred."""
-
+        # TODO: get 3 most recent results
+        # TODO: optionally take user input on which tables to show
         if len(results_tables) <= max_tables:
             return results_tables, False
 
@@ -119,8 +137,6 @@ class SimwrapperConfigGenerator:
                 f"Showing {shown} of {total} result scenarios.\n\n"
                 "Additional scenarios were omitted to keep the dashboard readable."
             ),
-            height=2,
-            width=6,
         )
 
     def _stats_rows(self):
@@ -134,6 +150,13 @@ class SimwrapperConfigGenerator:
                 "key": "Node Count",
                 "value": {"database": "project_database.sqlite", "query": "SELECT printf('%,d', COUNT(*)) FROM nodes"},
             },
+            {
+                "key": "Zone Count",
+                "value": {
+                    "database": "project_database.sqlite",
+                    "query": "SELECT printf('%,d', COUNT(*)) FROM nodes WHERE is_centroid=1",
+                },
+            },
         ]
 
         panel = TilePanel("Network Size", dataset, height=1, colors="monochrome")
@@ -144,13 +167,14 @@ class SimwrapperConfigGenerator:
         """Builds yaml config for map of entire network"""
 
         # aequilibrae panel with center and zoom
+        # prefer project projection when available; fall back to None
+        proj = getattr(self.project.about, "projection", None)
         panel = AequilibraEMapPanel(
             "Entire Network",
             height=10,
-            width=6,
             center=self.center,
             zoom=self.zoom,
-            projection="EPSG:32719",
+            projection=proj,
         )
 
         # set legend
@@ -163,13 +187,24 @@ class SimwrapperConfigGenerator:
             ]
         )
 
+        # determine centroid-link identification; prefer explicit link_types, otherwise infer
+        centroid_names = [
+            name for name in (self._get_link_types() or []) if "centroid" in name.lower() or "connector" in name.lower()
+        ]
+        if centroid_names:
+            centroid_filter = " OR ".join([f"link_type = '{n}'" for n in centroid_names])
+            non_centroid_filter = " AND ".join([f"link_type != '{n}'" for n in centroid_names])
+        else:
+            centroid_filter = "a_node IN (SELECT node_id FROM nodes WHERE is_centroid=1) OR b_node IN (SELECT node_id FROM nodes WHERE is_centroid=1)"
+            non_centroid_filter = f"NOT ({centroid_filter})"
+
         # non-centroid connector links
         panel.add_layer(
             "links_regular",
             {
                 "table": "links",
                 "geometry": "line",
-                "sqlFilter": "link_type != 3",
+                "sqlFilter": non_centroid_filter,
                 "style": {"lineColor": "#4C78A8", "lineWidth": 2},
             },
         )
@@ -180,7 +215,7 @@ class SimwrapperConfigGenerator:
             {
                 "table": "links",
                 "geometry": "line",
-                "sqlFilter": "link_type = 3",
+                "sqlFilter": centroid_filter,
                 "style": {
                     "lineColor": "#9c72b0",
                     "lineWidth": 20,
@@ -208,27 +243,23 @@ class SimwrapperConfigGenerator:
     def _links_info_row(self):
         """Builds yaml config for panel to show attributes of selected link"""
 
-        link_types = self._get_link_types()
+        link_type_names = self._get_link_types()
 
-        # if there are no links types map nothing
-        if not link_types:
+        # fallback: read unique values directly from the links table
+        if not link_type_names:
             links = self.project.network.links.data
-            link_types = links["link_type"].unique()
+            link_type_names = sorted(links["link_type"].unique().tolist())
 
-        else:
-            link_type_names = self.project.network.link_types
-            link_types = [link_type_names.get(x).link_type for x in link_types]
-
-        colours = self._categorical_palette(len(link_types))
-        colour_map = dict(zip(link_types, colours, strict=True))
+        colours = self._categorical_palette(len(link_type_names))
+        colour_map = dict(zip(link_type_names, colours))
 
         # map panel
-        panel = AequilibraEMapPanel("Link Types", height=10, width=6, center=self.center, zoom=self.zoom)
+        panel = AequilibraEMapPanel("Link Types", height=10, width=1, center=self.center, zoom=self.zoom)
 
         # build and set legend
         legend = [{"subtitle": "Link Types"}]
-        for i, lt in enumerate(link_types):
-            legend.append({"label": f"{lt}", "color": f"{colours[i]}", "shape": "line"})
+        for i, lt_name in enumerate(link_type_names):
+            legend.append({"label": f"{lt_name}", "color": colours[i], "shape": "line"})
 
         panel.set_legend(legend)
 
@@ -252,11 +283,11 @@ class SimwrapperConfigGenerator:
 
     def _capacity_map_row(self):
         """Map showing links styled by capacity"""
-        panel = AequilibraEMapPanel(title="Link Capacity", height=10, width=6, center=self.center, zoom=self.zoom)
+        panel = AequilibraEMapPanel(title="Link Capacity", height=10, width=1, center=self.center, zoom=self.zoom)
 
         panel.set_legend(
             [
-                {"subtitle": "Link Capacity"},
+                {"subtitle": "Link Capacity"},  # TODO: colour map
                 {"label": "0 - 1,000", "color": "#2C115F", "size": 2, "shape": "line"},
                 {"label": "1,000 - 3,000", "color": "#721F81", "size": 4, "shape": "line"},
                 {"label": "3,000 - 6,000", "color": "#B73779", "size": 6, "shape": "line"},
@@ -269,7 +300,10 @@ class SimwrapperConfigGenerator:
             "lineColor": {
                 "column": "capacity_ab",
                 "palette": "SunsetDark",
-                "dataRange": [0, 1000],
+                "dataRange": [
+                    0,
+                    1000,
+                ],  # TODO: we have the capability to dynamically set this based on data, this method is probably superseeded by the results maps (using "capacity" as results)
             },
             "lineWidth": {
                 "column": "capacity_ab",
@@ -283,95 +317,12 @@ class SimwrapperConfigGenerator:
             {
                 "table": "links",
                 "geometry": "line",
-                # "sqlFilter": "link_type != 3",
+                # "sqlFilter": "link_type != 3", # TODO: idea here was to not show centroid connectors, since they have huge capacities. If link_types table is defined, we can use that, otherwise we'll have to guess for it. Better of (a) defaulting to show everything and (b) allowing user to specify what the centroid connector is
                 "style": capacity_styling,
             },
         )
 
         return [panel]
-
-    def _scenario_metric_map(
-        self,
-        title,
-        results_table,
-        metric_column,
-        legend,
-        data_range,
-        palette="Temps",
-        width_by_link_type=True,
-        width_by_metric=None,
-    ):
-        """makes scenario comparison map for a network's performance metric'
-
-        :Arguments:
-            **title** (:obj:`str`): panel title
-            **results_table** (:obj:`str`): results table to join to links
-            **metric_column** (:obj:`str`): metric to use for link colouring
-            **legend** (:obj:`list`): legend def for the map
-            **data_range** (:obj:`list`): value range used for colour scale
-            **palette** (:obj:`str`, *Optional*): colour palette to use
-            **width_by_link_type** (:obj:`bool`, *Optional*): whether to vary line width by link type (optional)
-        """
-
-        panel = AequilibraEMapPanel(
-            title=title,
-            height=10,
-            width=3,
-            center=self.center,
-            zoom=self.zoom,
-            projection="EPSG:32719",
-        )
-
-        # add extra db
-        panel.set_extra_databases({"results": "results_database.sqlite"})
-
-        panel.set_legend(legend)
-
-        # links layer styling
-        style = {
-            "lineColor": {
-                "column": metric_column,
-                "palette": palette,
-                "dataRange": data_range,
-            }
-        }
-
-        # link type by line width: optional (kept for compatibility with example YAML)
-        if width_by_link_type:
-            style["lineWidth"] = {
-                "column": "link_type",
-                "widths": {
-                    3: 20,
-                    2: 40,
-                    1: 20,
-                },
-            }
-
-        if width_by_metric:
-            style["lineWidth"] = {
-                "column": width_by_metric,
-                "dataRange": [0, 500],  # project-dependent default; adjust to your data's scale
-                "widthRange": [10, 250],
-            }
-
-        # add links layer
-        panel.add_layer(
-            "links",
-            {
-                "table": "links",
-                "geometry": "line",
-                "join": {
-                    "database": "results",
-                    "table": results_table,
-                    "leftKey": "link_id",
-                    "rightKey": "link_id",
-                    "type": "left",
-                },
-                "style": style,
-            },
-        )
-
-        return panel
 
     def _delay_factor_row(self, results_tables):
         """Builds delay factor comparison panels"""
@@ -530,9 +481,8 @@ class SimwrapperConfigGenerator:
         # panel wrapper
         panel = ConvergencePanel(
             title="Assignment Convergence",
-            config="simwrapper/simwrapper_data/" + vega_spec,
+            config=f"{self.output_dir.name}/simwrapper_data/{vega_spec}",
             height=6,
-            width=6,
         )
 
         return [panel]

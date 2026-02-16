@@ -211,12 +211,48 @@ class AequilibraEMapPanel(SimwrapperPanel):
 
 class AequilibraEResultsMapPanel(AequilibraEMapPanel):
     """
-    Panel for rendering interactive AequilibraE network maps with results layers.
+    Panel for rendering interactive AequilibraE network maps with optional results styling.
+
+    Behavior
+    - When `results_table` is provided the panel LEFT JOINs the map `links` layer with that
+      table from an extra `results` database and reads metric values from the joined table.
+    - When `results_table` is omitted the panel reads metrics directly from the project's
+      `links` table in `project_database.sqlite` (no separate results DB/table required).
+    - Data ranges used for styling are computed from the lower/upper percentiles (default
+      5th/95th) and pretty-rounded with `pretty_round`.
+    - If a metric or the corresponding table/column is missing the panel falls back to the
+      default data range `[0, 1]` (graceful fallback).
 
     :Arguments:
-        **title** (:obj:`str`): title
-        **project** (:obj:`Project`, *Optional*): AequilibraE project, used to compute data ranges from percentiles.
-            If not provided, data ranges default to [0, 1].
+        **title** (:obj:`str`): panel title shown in the dashboard
+        **project** (:obj:`Project`, *Optional*): open Project instance used to read metric values
+            and compute percentile ranges; if not provided ranges default to [0, 1]
+        **project_database** (:obj:`str`): main project database filename (default: ``project_database.sqlite``)
+        **results_database** (:obj:`str`): results database filename (default: ``results_database.sqlite``);
+            used only when ``results_table`` is provided
+        **colour_metric** (:obj:`str`, *Optional*): column name used to style line colour. Look-up order:
+            results table (if provided) → project `links` table
+        **width_metric** (:obj:`str`, *Optional*): column name used to style line width (same lookup rules)
+        **results_table** (:obj:`str`, *Optional*): name of the table in the results DB to join to `links`.
+            When omitted, metrics are read from the project `links` table instead.
+        **palette** (:obj:`str`): colour palette for `colour_metric` scaling (default: ``Temps``)
+        **height**, **width**, **center**, **zoom**, **projection**: visual/layout parameters (see
+            :class:`AequilibraEMapPanel`)
+
+    Notes
+        - The panel will register an `extraDatabases` entry named ``results`` only when
+          ``results_table`` is specified.
+        - Ranges are computed from percentiles (5th/95th) and rounded via
+          :func:`aequilibrae.utils.simwrapper.simwrapper_utils.pretty_round`.
+
+    Examples
+        - Read a metric from the project `links` table::
+
+            panel = AequilibraEResultsMapPanel("Capacity", project=proj, colour_metric="capacity_ab")
+
+        - Read a metric from an external results table and join it to `links`::
+
+            panel = AequilibraEResultsMapPanel("VOC", project=proj, results_table="assignment", colour_metric="VOC_max")
     """
 
     def __init__(
@@ -239,29 +275,53 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
             title, project_database, height=height, width=width, center=center, zoom=zoom, projection=projection
         )
 
+        # inputs
         self.results_database = results_database
         self.colour_metric = colour_metric
         self.width_metric = width_metric
         self.palette = palette
         self.results_table = results_table
 
-        super().set_extra_databases({"results": self.results_database})
+        # only register an extra `results` database when a results table is being used
+        if self.results_table:
+            self.set_extra_databases({"results": self.results_database})
 
+        # compute ranges (supports reading from results DB *or* from project `links` table)
         colour_range = self._compute_data_range(project, self.colour_metric)
         width_range = self._compute_data_range(project, self.width_metric)
 
-        super().set_legend(self.build_legend(colour_range, width_range))
+        self.set_legend(self.build_legend(colour_range, width_range))
 
         self.set_colour_styling(colour_range)
         self.set_width_styling(width_range)
 
-        self.add_layer()
+        # build the links layer; only add a `join` if results_table is provided
+        layer = {
+            "table": "links",
+            "geometry": "line",
+            "style": self.colour_style | self.width_style,
+        }
+
+        if self.results_table:
+            layer["join"] = {
+                "database": "results",
+                "table": self.results_table,
+                "leftKey": "link_id",
+                "rightKey": "link_id",
+                "type": "left",
+            }
+
+        self.add_layer("links", layer)
 
     def _compute_data_range(self, project, metric, lower_pct=5, upper_pct=95):
         """Compute a pretty-rounded data range from the 5th and 95th percentiles.
 
+        This supports reading the metric either from a results table (when
+        ``self.results_table`` is set) or directly from the project `links` table
+        (when no results table is provided).
+
         :Arguments:
-            **project**: AequilibraE project with results_connection
+            **project**: AequilibraE project with connections
             **metric** (:obj:`str`): column name to compute range for
             **lower_pct** (:obj:`int`): lower percentile (default 5)
             **upper_pct** (:obj:`int`): upper percentile (default 95)
@@ -269,14 +329,21 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         :Returns:
             **list**: [lower_bound, upper_bound] rounded to pretty numbers
         """
-        if not metric or not project or not self.results_table:
+        if not metric or not project:
             return [0, 1]
 
         try:
-            with project.results_connection as conn:
-                cursor = conn.execute(f"SELECT [{metric}] FROM [{self.results_table}] WHERE [{metric}] IS NOT NULL")
-                values = np.array([row[0] for row in cursor.fetchall()], dtype=float)
-        except (sqlite3.OperationalError, Exception):
+            if self.results_table:
+                # metric lives in a results DB/table
+                with project.results_connection as conn:
+                    cursor = conn.execute(f"SELECT [{metric}] FROM [{self.results_table}] WHERE [{metric}] IS NOT NULL")
+                    values = np.array([row[0] for row in cursor.fetchall()], dtype=float)
+            else:
+                # metric comes from the main project `links` table
+                with project.db_connection as conn:
+                    cursor = conn.execute(f"SELECT [{metric}] FROM links WHERE [{metric}] IS NOT NULL")
+                    values = np.array([row[0] for row in cursor.fetchall()], dtype=float)
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, ValueError, TypeError):
             return [0, 1]
 
         if len(values) == 0:
@@ -344,21 +411,3 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
             }
         else:
             self.width_style = {"lineWidth": 10}
-
-    def add_layer(self):
-
-        super().add_layer(
-            "links",
-            {
-                "table": "links",
-                "geometry": "line",
-                "join": {
-                    "database": "results",
-                    "table": self.results_table,
-                    "leftKey": "link_id",
-                    "rightKey": "link_id",
-                    "type": "left",
-                },
-                "style": self.colour_style | self.width_style,
-            },
-        )
