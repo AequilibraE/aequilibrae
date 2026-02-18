@@ -3,24 +3,31 @@ import os
 from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
-from typing import List, Dict
+
+from typing import TYPE_CHECKING
 
 import numpy as np
-from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
-from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
-from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
-from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
+from aequilibrae.paths.cython.AoN import (
+    copy_two_dimensions,
+    copy_three_dimensions,
+    linear_combination,
+    linear_combination_skims,
+    aggregate_link_costs,
+    sum_a_times_b_minus_c,
+    linear_combination_1d,
+    triple_linear_combination,
+    triple_linear_combination_skims,
+)
 from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.traffic_class import TrafficClass
-
-if False:
-    from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+if TYPE_CHECKING:
+    from aequilibrae.paths.traffic_assignment import TrafficAssignment, TrafficClass
 
 
 class LinearApproximation(WorkerThread):
@@ -46,7 +53,7 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["beta1"] = []
             self.convergence_report["beta2"] = []
 
-        self.assig = assig_spec  # type: TrafficAssignment
+        self.assig: TrafficAssignment = assig_spec
 
         if None in [
             assig_spec.classes,
@@ -61,7 +68,7 @@ class LinearApproximation(WorkerThread):
                 f"when assigning. Check if you have all of these: {all_par}"
             )
 
-        self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
+        self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
         self.cap_field = assig_spec.capacity_field
@@ -107,9 +114,9 @@ class LinearApproximation(WorkerThread):
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
 
-        self.step_direction = {}  # type: Dict[AssignmentResults]
-        self.previous_step_direction = {}  # type: Dict[AssignmentResults]
-        self.temp_step_direction_for_copy = {}  # type: Dict[AssignmentResults]
+        self.step_direction: dict[str, AssignmentResults] = {}
+        self.previous_step_direction: dict[str, AssignmentResults] = {}
+        self.temp_step_direction_for_copy: dict[str, AssignmentResults] = {}
 
         self.aons = {}
 
@@ -315,9 +322,9 @@ class LinearApproximation(WorkerThread):
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
-                ppst = self.temp_step_direction_for_copy[c._id]  # type: AssignmentResults
-                prev_stp_dir = self.previous_step_direction[c._id]  # type: AssignmentResults
-                stp_dir = self.step_direction[c._id]  # type: AssignmentResults
+                ppst: AssignmentResults = self.temp_step_direction_for_copy[c._id]
+                prev_stp_dir: AssignmentResults = self.previous_step_direction[c._id]
+                stp_dir: AssignmentResults = self.step_direction[c._id]
 
                 copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
                 ppst.total_flows()
@@ -519,7 +526,7 @@ class LinearApproximation(WorkerThread):
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
-                                c.results.select_link_loading[name],  # ouput matrix
+                                c.results.select_link_loading[name],  # output matrix
                                 np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
@@ -547,7 +554,7 @@ class LinearApproximation(WorkerThread):
                         )
 
                     if c._selected_links:
-                        for name, idx in c._aon_results._selected_links.items():
+                        for name, _idx in c._aon_results._selected_links.items():
                             # Copy the temporary results into the final od matrix, referenced by link_set name
                             # The temp flows have an index associated with the link_set name
                             linear_combination_skims(
@@ -680,9 +687,10 @@ class LinearApproximation(WorkerThread):
             self.conjugate_failed = False
 
         except ValueError as e:
-            # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
-            # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
-            # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
+            # We can have iterations where the objective function is not *strictly* convex, but the
+            # scipy method cannot deal with this. Stepsize is then either given by 1 or 0, depending
+            # on where the objective function is smaller. However, using zero would mean the overall
+            # solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
             if self.algorithm == "bfw":

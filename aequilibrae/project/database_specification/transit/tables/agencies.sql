@@ -6,11 +6,11 @@
 --@ 
 --@ **agency_id** identifies the agency for the specified route
 --@
---@ **agency** contains the fuill name of the transit agency
+--@ **agency** contains the full name of the transit agency
 --@
---@ **feed_date** idicates the date for which the GTFS feed is being imported
+--@ **feed_date** indicates the date for which the GTFS feed is being imported
 --@
---@ **service_date** indicates the date for the indicate route scheduling
+--@ **service_date** indicates the date for the indicated route scheduling
 --@
 --@ **description_field** provides useful description of a transit agency
 

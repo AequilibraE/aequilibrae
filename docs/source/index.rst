@@ -132,7 +132,7 @@ Python
       
       :doc:`other_applications`
 
-    Explore other applcations of AequilibraE!
+    Explore other applications of AequilibraE!
     +++
     :doc:`_auto_examples/other_applications/index`
 

@@ -58,7 +58,7 @@ cdef connectivity_single_threaded(origin, graph, aux_result, disconn_array, all_
         int zones = graph.num_zones
 
         long long [:] graph_fs_view = graph.compact_fs
-        long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
+        const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy() # No need to be editable
 
         # views from the aux-result object
         long long [:] predecessors_view = aux_result.predecessors[core_id, :]

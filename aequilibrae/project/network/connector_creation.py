@@ -1,5 +1,4 @@
 import logging
-import time
 from sqlite3 import Connection
 from typing import Optional, Union
 
@@ -9,7 +8,6 @@ import geopandas as gpd
 from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon
 
-from aequilibrae.utils.db_utils import commit_and_close
 
 INFINITE_CAPACITY = 99999
 
@@ -63,7 +61,10 @@ def connector_creation(
     # Check if link with a/b nodes exists to avoid unnecessary repetition
     centr_geo = centroid.geometry.values[0]
     links = network.links
-    query = """(a_node==@zone_id | b_node==@zone_id) & (a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"""
+    query = (
+        "(a_node==@zone_id | b_node==@zone_id) & "
+        "(a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"
+    )
     for _, rec in joined.iterrows():
         link_exist = proj_links.query(query)
         if link_exist.empty:
@@ -222,11 +223,13 @@ def bulk_connector_creation(
     connectors["link_id"] = np.arange(max_link_id + 1, max_link_id + 1 + len(connectors))
 
     existing_connectors_sql = "UPDATE links SET modes=? WHERE link_id=?"
-    new_connectors_sql = f"""
-    INSERT INTO links
-    (link_id, a_node, b_node, modes, direction, link_type, capacity_ab, capacity_ba, name, geometry)
-    VALUES(?,?,?,?,0,"centroid_connector",{INFINITE_CAPACITY},{INFINITE_CAPACITY},'centroid connector zone ' || ?2,GeomFromWKB(?, 4326))
-    """
+    new_connectors_sql = (
+        f"INSERT INTO links "
+        f"(link_id, a_node, b_node, modes, direction, link_type, capacity_ab, capacity_ba, "
+        f"name, geometry) "
+        f"VALUES(?,?,?,?,0,'centroid_connector',{INFINITE_CAPACITY},{INFINITE_CAPACITY}, "
+        f"'centroid connector zone ' || ?2,GeomFromWKB(?, 4326))"
+    )
     with conn:
         conn.executemany(existing_connectors_sql, existing_connectors[["modes", "link_id"]].to_records(index=False))
         conn.executemany(

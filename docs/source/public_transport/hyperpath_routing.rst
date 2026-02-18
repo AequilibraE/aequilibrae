@@ -113,7 +113,7 @@ The code below allows you to reproduce the same experiment that resulted in the 
     import numpy as np
     import pandas as pd
 
-    from aequilibrae.paths.public_transport import HyperpathGenerating
+    from aequilibrae.paths.cython.public_transport import HyperpathGenerating
     from numba import jit
 
     RANDOM_SEED = 124  # random seed

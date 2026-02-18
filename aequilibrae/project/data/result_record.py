@@ -1,5 +1,4 @@
 import pandas as pd
-import json
 import sqlite3
 from typing import Optional
 
@@ -14,8 +13,10 @@ class ResultRecord(SafeClass):
     Arguments:
         **data_set** (:obj:`dict`): Dictionary containing the result record data.
         **project**: (:obj:`Project`): Project object this result record belongs to.
-        **project_conn** (:obj:`Optional[sqlite3.Connection])`: Connection to the project database. If None, the project's connection will be used.
-        **results_conn** (:obj:`Optional[sqlite3.Connection]`): Connection to the results database. If None, the project's results connection will be used.
+        **project_conn** (:obj:`Optional[sqlite3.Connection]`): Connection to the project database.
+            If None, the project's connection will be used.
+        **results_conn** (:obj:`Optional[sqlite3.Connection]`): Connection to the results database.
+            If None, the project's results connection will be used.
     """
 
     def __init__(
@@ -53,8 +54,9 @@ class ResultRecord(SafeClass):
                     self.reference_table,
                 ]
                 conn.execute(
-                    "INSERT INTO results (table_name, procedure, procedure_id, procedure_report, timestamp, description, year, scenario, reference_table)"
-                    " VALUES(?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO results (table_name, procedure, procedure_id, "
+                    "procedure_report, timestamp, description, year, scenario, reference_table) "
+                    "VALUES(?,?,?,?,?,?,?,?,?)",
                     data,
                 )
 

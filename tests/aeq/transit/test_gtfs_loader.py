@@ -18,7 +18,7 @@ def test_load_data(build_gtfs_project, test_data_path):
 
     df = cap[cap.city == "Coquimbo"]
     df.loc[df.min_distance < 100, "speed"] = 10
-    dict_speeds = {x: df for x, df in df.groupby(["mode"])}  # noqa: C416
+    dict_speeds = dict(iter(df.groupby(["mode"])))
     with build_gtfs_project.project.transit_connection as conn:
         gtfs = GTFSReader(conn)
 

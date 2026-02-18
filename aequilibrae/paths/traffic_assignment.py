@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from numpy import nan_to_num
 
-from aequilibrae import Parameters
+from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
@@ -19,7 +19,32 @@ from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.utils.core_setter import set_cores
-from aequilibrae.utils.db_utils import commit_and_close
+
+
+def _assign_aggregation_fields(
+    aggregation,
+    field_ab,
+    field_ba,
+    graph_ab_values,
+    graph_ba_values,
+    network_ab_idx,
+    network_ba_idx,
+):
+    ab = aggregation[field_ab].to_numpy(copy=True)
+    ba = aggregation[field_ba].to_numpy(copy=True)
+    ab[network_ab_idx] = nan_to_num(graph_ab_values)
+    ba[network_ba_idx] = nan_to_num(graph_ba_values)
+    aggregation[field_ab] = ab
+    aggregation[field_ba] = ba
+
+
+def _safe_delay_factor(congested_time, free_flow_time):
+    return np.divide(
+        congested_time,
+        free_flow_time,
+        out=np.zeros_like(congested_time),
+        where=free_flow_time != 0,
+    )
 
 
 class AssignmentBase(ABC):
@@ -119,7 +144,7 @@ class AssignmentBase(ABC):
         self.classes.append(transport_class)
 
     def _check_field(self, field: str, allow_zeros=False) -> None:
-        """Throws expection if field is invalid."""
+        """Throws exception if field is invalid."""
         if not self.classes:
             raise ValueError("You need add at least one transport class first")
 
@@ -370,40 +395,54 @@ class TrafficAssignment(AssignmentBase):
         Parameter values can be scalars (same values for the entire network) or network field names
         (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
+        The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it.
+        Users should supply ``8 * tau`` to match other common usages. Additionally the standard
+        ``0.25`` factor can be overridden by supplying the 'alpha' parameter.
+
         :Arguments:
             **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
-
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
             raise RuntimeError(
                 "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
             )
+
+        # In literature 0.25 is not provided as a parameter. We allow it but default to 0.25 if it wasn't provided.
+        if self.vdf.function == "AKCELIK":
+            par["alpha"] = par.get("alpha", 0.25)
+
         self.__dict__["vdf_parameters"] = par
         self._config["VDF parameters"] = par
         pars = []
-        if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
-            for p1 in ["alpha", "beta"]:
-                if p1 not in par:
-                    raise ValueError(f"{p1} should exist in the set of parameters provided")
-                p = par[p1]
-                if isinstance(self.vdf_parameters[p1], str):
-                    c = self.classes[0]
-                    array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-                    array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
-                else:
-                    array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
-                    array.fill(self.vdf_parameters[p1])
-                pars.append(array)
 
-                if np.any(np.isnan(array)):
-                    raise ValueError(f"At least one {p1} is NaN")
+        if self.vdf.function in ["BPR", "BPR2", "CONICAL"]:
+            parameter_bounds = {"alpha": (0.0, float("inf")), "beta": (1.0, float("inf"))}
+        elif self.vdf.function == "INRETS":
+            parameter_bounds = {"alpha": (0.0, 1.0)}
+        elif self.vdf.function == "AKCELIK":
+            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf"))}
+        else:
+            raise ValueError(f"unknown vdf function {self.vdf.function}")
 
-                if p1 == "alpha":
-                    if array.min() < 0:
-                        raise ValueError(f"At least one {p1} is smaller than zero")
-                else:
-                    if array.min() < 1:
-                        raise ValueError(f"At least one {p1} is smaller than one. Results will make no sense")
+        for p1, (minimum, maximum) in parameter_bounds.items():
+            if p1 not in par:
+                raise ValueError(f"{p1} should exist in the set of parameters provided")
+            p = par[p1]
+            if isinstance(self.vdf_parameters[p1], str):
+                c = self.classes[0]
+                array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+                array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
+            else:
+                array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+                array.fill(self.vdf_parameters[p1])
+            pars.append(array)
+
+            if np.any(np.isnan(array)):
+                raise ValueError(f"At least one {p1} is NaN")
+            elif array.min() < minimum:
+                raise ValueError(f"At least one {p1} is less than {minimum}")
+            elif array.max() > maximum:
+                raise ValueError(f"At least one {p1} is greater than {maximum}")
 
         self.__dict__["vdf_parameters"] = pars
         self._config["VDF function"] = self.vdf.function.lower()
@@ -525,7 +564,7 @@ class TrafficAssignment(AssignmentBase):
         self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
         self.preloads[name] = self.preloads[name].fillna(0)
 
-        # Enable preload to be added before or after specifyig the algorithm
+        # Enable preload to be added before or after specifying the algorithm
         if self.assignment is not None:
             if self.assignment.preload is None:
                 self.assignment.preload = self.preloads[name].to_numpy()
@@ -653,25 +692,63 @@ class TrafficAssignment(AssignmentBase):
 
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
-        graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
-        agg["Preload_AB"].values[m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
-        agg["Preload_BA"].values[m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        graph_ab_idx, graph_ba_idx = m.graph_ab_idx, m.graph_ba_idx
+
+        _assign_aggregation_fields(
+            agg,
+            "Preload_AB",
+            "Preload_BA",
+            preload[m.graph_ab_idx],
+            preload[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
-        agg["Congested_Time_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
-        agg["Congested_Time_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "Congested_Time_AB",
+            "Congested_Time_BA",
+            congested_time[m.graph_ab_idx],
+            congested_time[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        agg["Delay_factor_AB"].values[m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
-        agg["Delay_factor_BA"].values[m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
+        delay_factor_ab = _safe_delay_factor(congested_time[graph_ab_idx], free_flow_tt[graph_ab_idx])
+        delay_factor_ba = _safe_delay_factor(congested_time[graph_ba_idx], free_flow_tt[graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "Delay_factor_AB",
+            "Delay_factor_BA",
+            delay_factor_ab,
+            delay_factor_ba,
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
-        agg["VOC_AB"].values[m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
-        agg["VOC_BA"].values[m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "VOC_AB",
+            "VOC_BA",
+            voc[m.graph_ab_idx],
+            voc[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
-        agg["PCE_AB"].values[m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
-        agg["PCE_BA"].values[m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
+        _assign_aggregation_fields(
+            agg,
+            "PCE_AB",
+            "PCE_BA",
+            tot_flow[m.graph_ab_idx],
+            tot_flow[m.graph_ba_idx],
+            m.network_ab_idx,
+            m.network_ba_idx,
+        )
         agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
@@ -728,14 +805,14 @@ class TrafficAssignment(AssignmentBase):
         :Arguments:
             **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
 
-            **which_ones** (:obj:`str`, *Optional*): {'final': Results of the final iteration, 'blended': Averaged results
-            for all iterations, 'all': Saves skims for both the final iteration and the blended ones}.
-            Default is 'final'
+            **which_ones** (:obj:`str`, *Optional*): 'final': Results of the final iteration,
+                'blended': Averaged results for all iterations, 'all': Saves skims for both the final iteration and the
+                blended ones. Default is 'final'
 
             **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
+                Defaults to the active project
         """
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:

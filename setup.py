@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import platform
 from os.path import join
 import os
@@ -36,16 +35,20 @@ extension_args = {
     "language": "c++",
 }
 
-ext_mod_aon = Extension("aequilibrae.paths.AoN", [join("aequilibrae", "paths", "cython", "AoN.pyx")], **extension_args)
+ext_mod_aon = Extension(
+    "aequilibrae.paths.cython.AoN",
+    [join("aequilibrae", "paths", "cython", "AoN.pyx")],
+    **extension_args,
+)
 
 ext_mod_ipf = Extension(
-    "aequilibrae.distribution.ipf_core",
+    "aequilibrae.distribution.cython.ipf_core",
     [join("aequilibrae", "distribution", "cython", "ipf_core.pyx")],
     **extension_args,
 )
 
 ext_mod_put = Extension(
-    "aequilibrae.paths.public_transport",
+    "aequilibrae.paths.cython.public_transport",
     [join("aequilibrae", "paths", "cython", "public_transport.pyx")],
     **extension_args,
 )
@@ -69,7 +72,7 @@ ext_mod_rc_set_results = Extension(
 )
 
 ext_mod_graph_building = Extension(
-    "aequilibrae.paths.graph_building",
+    "aequilibrae.paths.cython.graph_building",
     [join("aequilibrae", "paths", "cython", "graph_building.pyx")],
     **extension_args,
 )

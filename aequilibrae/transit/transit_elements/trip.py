@@ -1,6 +1,5 @@
 from sqlite3 import Connection
 
-from shapely.geometry import LineString
 
 from aequilibrae.transit.constants import Constants, TRIP_ID_MULTIPLIER
 from aequilibrae.log import logger

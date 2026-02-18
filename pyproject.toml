@@ -31,7 +31,8 @@ dependencies = [
   "scipy>=1.4",
   "pyaml",
   "requests",
-  "pandas<3",
+  "pandas>=2.2",
+  "shapely>=2.0",
   "pyproj",
   "rtree",
   "pyarrow",
@@ -40,8 +41,8 @@ dependencies = [
   "tqdm",
 ]
 
-[project.license]
-file = "LICENSE.TXT"
+license = "LicenseRef-AequilibraE"
+license-files = ["LICENSE.TXT"]
 
 [project.optional-dependencies]
 
@@ -106,8 +107,12 @@ aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
+<<<<<<< develop
 lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
 lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+=======
+lint.ignore = ["B017"]
+>>>>>>> develop
 exclude = [
     ".idea",
     "__pycache__",
@@ -149,6 +154,13 @@ target-version = "py310"
 
 [tool.ruff.lint.mccabe]
 max-complexity = 20
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+
+[tool.coverage.html]
+directory = "coverage_html_report"
 
 [tool.cibuildwheel]
 build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*"]

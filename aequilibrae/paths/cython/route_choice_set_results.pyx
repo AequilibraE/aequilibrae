@@ -6,6 +6,7 @@ from libcpp.memory cimport shared_ptr, make_shared
 from cython.operator cimport dereference as d
 from cython.operator cimport postincrement as inc
 
+import importlib.util
 import pandas as pd
 import numpy as np
 
@@ -96,15 +97,26 @@ cdef class RouteChoiceSetResults:
     def write(self, where):
         table = self.make_df_from_results()
 
-        engine = pd.io.parquet.get_engine('auto').__class__
-        if (engine.__module__, engine.__name__) == ("pandas.io.parquet", "PyArrowImpl"):
+        engine_name = pd.get_option("io.parquet.engine")
+        if engine_name == "auto":
+            if importlib.util.find_spec("pyarrow") is not None:
+                engine_name = "pyarrow"
+            elif importlib.util.find_spec("fastparquet") is not None:
+                engine_name = "fastparquet"
+            else:
+                raise RuntimeError(
+                    "No supported parquet engine (pyarrow or fastparquet) available. "
+                    "Please install one with: pip install pyarrow OR pip install fastparquet"
+                )
+
+        if engine_name == "pyarrow":
             kwargs = dict(
                 # can't provide partitioning_flavor and partition_cols through the Pandas API
                 use_threads=True,
                 existing_data_behavior="overwrite_or_ignore",
                 file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
             )
-        elif (engine.__module__, engine.__name__) == ("pandas.io.parquet", "FastParquetImpl"):
+        elif engine_name == "fastparquet":
             logger.info("FastParquet back-end doesn't support individual partition logging, writing table now...")
             kwargs = dict(
                 file_scheme="hive",

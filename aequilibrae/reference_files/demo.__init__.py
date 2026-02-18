@@ -1,14 +1,15 @@
 """
 AequilibraE run module.
 
-This module is dynamically imported when the `project.run` property is accessed. Objects named within `parameters.yml`
-under the `run` heading will have their arguments partially applied via `functools.partial` and will replace the objects
-within this module.
+This module is dynamically imported when the `project.run` property is accessed. Objects named
+within `parameters.yml` under the `run` heading will have their arguments partially applied via
+`functools.partial` and will replace the objects within this module.
 
-Not all objects within this module must be named `parameters.yml`. If an object is named within `parameters.yml`, then it
-must exist within this module otherwise a `RuntimeError` will be raised.
+Not all objects within this module must be named `parameters.yml`. If an object is named within
+`parameters.yml`, then it must exist within this module otherwise a `RuntimeError` will be raised.
 
-Functions should use the `get_active_project()` function to obtain a reference to the current project.
+Functions should use the `get_active_project()` function to obtain a reference to the current
+project.
 
 State within this module should be avoided as this file may be run multiple times.
 """

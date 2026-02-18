@@ -7,7 +7,7 @@ class Fare:
 
     * fare_id (:obj:`int`): ID of the fare as in the network model
     * fare (:obj:`str`): ID of the fare as in GTFS
-    * agency (:obj:`str`): Corresponding agency as inputed during import
+    * agency (:obj:`str`): Corresponding agency as inputted during import
     * agency_id (:obj:`int`): ID of the corresponding agency as in the network model
     * price (:obj:`int`): As in GTFS
     * currency (:obj:`str`): As in GTFS

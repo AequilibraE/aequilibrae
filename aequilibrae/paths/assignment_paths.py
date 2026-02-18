@@ -9,7 +9,7 @@ from aequilibrae.context import get_active_project
 # TODO: let's make it optional to keep path files in memory, although this can get out of control very quickly it should
 # be much quicker when working with a single origin
 
-# TODO: factor out AssignmentResultsTable into different file, also get rid of dirty eval bu changing creation
+# TODO: factor out AssignmentResultsTable into different file, also get rid of dirty eval by changing creation
 
 # FIXME: this is for zone_index and compressed link ids
 # for link ids, look up what we are doing in graph - we might want to keep the order of links for a single compressed

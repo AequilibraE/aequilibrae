@@ -1,7 +1,6 @@
 import os
 import pytest
 from random import random
-from tempfile import gettempdir
 
 from shapely.geometry import box
 

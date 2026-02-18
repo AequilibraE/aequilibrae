@@ -14,9 +14,9 @@ cdef void _remove_dead_ends(
     long long [:] graph_fs,
     long long [:] all_nodes,
     long long [:] nodes_to_indices,
-    long long [:] a_nodes,
-    long long [:] b_nodes,
-    signed char [:] directions,
+    const long long [:] a_nodes,
+    const long long [:] b_nodes,
+    const signed char [:] directions,
     long long [:] in_degree,
     long long [:] out_degree,
     uint8_t [:] burnt_links,
@@ -134,9 +134,9 @@ cdef long long _build_compressed_graph(
     long long[:] link_idx,
     long long[:] links_index,
     long long[:] link_edge,
-    long long[:] a_nodes,
-    long long[:] b_nodes,
-    signed char[:] directions,
+    const long long[:] a_nodes,
+    const long long[:] b_nodes,
+    const signed char[:] directions,
     long long link_id_max,
     long long[:] simplified_links,
     signed char[:] simplified_directions,
@@ -232,9 +232,14 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     # edges. Anything that uses graph.graph is operating on the **directed** graph. This graph has only directed edges,
     # they may be backwards but they are directed
 
-    directed_node_max = max(graph.graph.a_node.values.max(), graph.graph.b_node.values.max())
-    in_degree = np.bincount(graph.graph.b_node.values, minlength=directed_node_max + 1)
-    out_degree = np.bincount(graph.graph.a_node.values, minlength=directed_node_max + 1)
+    graph_a_nodes = graph.graph.a_node.to_numpy(copy=False)
+    graph_b_nodes = graph.graph.b_node.to_numpy(copy=False)
+    graph_directions = graph.graph.direction.to_numpy(copy=False)
+    graph_link_ids = graph.graph.link_id.to_numpy(copy=False)
+
+    directed_node_max = max(graph_a_nodes.max(), graph_b_nodes.max())
+    in_degree = np.bincount(graph_b_nodes, minlength=directed_node_max + 1)
+    out_degree = np.bincount(graph_a_nodes, minlength=directed_node_max + 1)
 
     centroid_idx = graph.nodes_to_indices[graph.centroids]
     in_degree[centroid_idx] = -1
@@ -248,15 +253,15 @@ def build_compressed_graph(graph, remove_dead_ends=True):
             graph.fs,
             graph.all_nodes,
             graph.nodes_to_indices,
-            graph.graph.a_node.values,
-            graph.graph.b_node.values,
-            graph.graph.direction.values,
+            graph_a_nodes,
+            graph_b_nodes,
+            graph_directions,
             in_degree,
             out_degree,
             burnt_links,
         )
         # Perhaps filter to unique link_ids? There'll be duplicates in here
-        graph.dead_end_links = graph.graph.link_id.values[burnt_links]
+        graph.dead_end_links = graph_link_ids[burnt_links]
 
         if graph.dead_end_links.shape[0]:
             df = df[~df.link_id.isin(graph.dead_end_links)]
@@ -264,12 +269,16 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.dead_end_links = np.array([], dtype=np.int64)
     # Build link index
     link_id_max = df.link_id.max()
+    link_ids = df.link_id.to_numpy(copy=False)
+    a_nodes = df.a_node.to_numpy(copy=False)
+    b_nodes = df.b_node.to_numpy(copy=False)
+    directions = df.direction.to_numpy(copy=False)
 
     link_idx = np.empty(link_id_max + 1, dtype=np.int64)
     link_idx[df.link_id] = np.arange(df.shape[0])
 
-    nodes = np.hstack([df.a_node.values, df.b_node.values])
-    links = np.hstack([df.link_id.values, df.link_id.values])
+    nodes = np.hstack([a_nodes, b_nodes])
+    links = np.hstack([link_ids, link_ids])
     # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
     counts = np.bincount(nodes)
 
@@ -295,8 +304,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     # resulting values are
     # 0: This node is not of degree one. We're not interested in this case.
     # 1: This node is of degree one AND, has either incoming or outgoing flow. We can remove these these.
-    link_edge = df.link_id.values[
-        degree_two[df.a_node.values] + degree_two[df.b_node.values] == 1
+    link_edge = link_ids[
+        degree_two[a_nodes] + degree_two[b_nodes] == 1
     ].astype(np.int64)
 
     simplified_links = np.full(link_id_max + 1, -1, dtype=np.int64)
@@ -310,9 +319,9 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         link_idx[:],
         links_index[:],
         link_edge[:],
-        df.a_node.values[:],
-        df.b_node.values[:],
-        df.direction.values[:],
+        a_nodes[:],
+        b_nodes[:],
+        directions[:],
         link_id_max,
         simplified_links[:],
         simplified_directions[:],
@@ -414,13 +423,15 @@ def create_compressed_link_network_mapping(graph):
 
     cdef:
         long long i, j, a_node, x, b_node, tmp, compressed_id, non_duplicated_idx
-        long long[:] b
-        long long[:] values
-        signed char[:] directions
+        const long long[:] b
+        const long long[:] values
+        const signed char[:] directions
         uint32_t[:] idx
         int64_t[::] data
         int32_t[:] node_mapping
-        int64_t[:, :] non_duplicated
+        const int64_t[:, :] non_duplicated
+        const long long[:] compact_a_nodes
+        const long long[:] compact_b_nodes
         signed char direction
 
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
@@ -437,17 +448,18 @@ def create_compressed_link_network_mapping(graph):
     data = np.zeros(len(filtered), dtype=np.int64)
     node_mapping = np.full(graph.num_nodes, -1, dtype=np.int32)
 
-    compact_a_nodes = graph.compact_graph["a_node"].to_numpy()
-    compact_b_nodes = graph.compact_graph["b_node"].to_numpy()
+    compact_a_nodes = graph.compact_graph["a_node"].to_numpy(copy=False)
+    compact_b_nodes = graph.compact_graph["b_node"].to_numpy(copy=False)
 
     non_duplicated_idx = 0
-    non_duplicated = filtered[~duplicated].sort_values(by="__compressed_id__").to_numpy()
+    non_duplicated = filtered[~duplicated].sort_values(by="__compressed_id__").to_numpy(copy=False)
 
     i = 0
     # This should be possible to parallelise, each thread gets a segment of the bincount below, they compute their
     # respective idx and data, then the end i value from the first segment is added to the idx of the segment after and
     # so on. Then the idx and data values are concatenated
-    for compressed_id, count in enumerate(np.bincount(filtered["__compressed_id__"].to_numpy())):
+    compressed_ids = filtered["__compressed_id__"].to_numpy(copy=True)
+    for compressed_id, count in enumerate(np.bincount(compressed_ids)):
         # We separate the easy un-compressible link path from the compressible link path
         # gb.get_group and those sorted searches are rather slow
         if count == 1:
@@ -460,10 +472,10 @@ def create_compressed_link_network_mapping(graph):
         else:
             df = gb.get_group(compressed_id)
             idx[compressed_id] = i
-            values = df.link_id.to_numpy()
-            directions = df.direction.to_numpy()
-            a = df.a_node.to_numpy()
-            b = df.b_node.to_numpy()
+            values = df.link_id.to_numpy(copy=False)
+            directions = df.direction.to_numpy(copy=False)
+            a = df.a_node.to_numpy(copy=False)
+            b = df.b_node.to_numpy(copy=False)
 
             # In order to ensure that the link IDs come out in the correct order we must walk the links
             # we do this assuming the `a` array is sorted.

@@ -64,7 +64,7 @@ INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, descri
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','line_id', 'ID of the Line this node belongs to');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','line_seg_idx', 'Index of the line segement this node belongs to');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','line_seg_idx', 'Index of the line segment this node belongs to');
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','modes', 'Modes connected to the node');
 --#

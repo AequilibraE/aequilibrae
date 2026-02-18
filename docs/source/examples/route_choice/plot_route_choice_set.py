@@ -91,7 +91,7 @@ choice_set = rc.get_results()
 # rc.save_path_files(path)
 
 # %%
-# From those path files we could also preform a full assignment or select link analysis by using the ``execute_from_path_files`` method.
+# From those path files we could also perform a full assignment or select link analysis by using the ``execute_from_path_files`` method.
 
 # rc.execute_from_path_files(path)
 

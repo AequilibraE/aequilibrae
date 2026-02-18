@@ -267,7 +267,7 @@ graph.set_blocked_centroid_flows(False)
 # construction of the compressed link to network link mapping that's required. This is a one
 # time operation per graph and is cached. We need to supply a Graph and an AequilibraeMatrix
 # or DataFrame via the ``add_demand`` method, if demand is not provided link loading cannot
-# be preformed.
+# be performed.
 rc = RouteChoice(graph)
 rc.add_demand(mat)
 

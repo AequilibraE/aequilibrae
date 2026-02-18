@@ -9,15 +9,15 @@
 --@ 
 --@ **agency_id** identifies a relevant agency for a fare.
 --@ 
---@ **price** especifies the fare price
+--@ **price** specifies the fare price
 --@ 
---@ **currency_code** especifies the currency used to pay the fare
+--@ **currency_code** specifies the currency used to pay the fare
 --@ 
 --@ **payment_method** indicates when the fare must be paid.
 --@ 
 --@ **transfer** indicates the number of transfers permitted on the fare
 --@ 
---@ **transfer_duration** indicates the lenght of time in seconds before a 
+--@ **transfer_duration** indicates the length of time in seconds before a
 --@ transfer expires.
 
 create TABLE IF NOT EXISTS fare_attributes (

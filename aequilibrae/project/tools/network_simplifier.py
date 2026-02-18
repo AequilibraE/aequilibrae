@@ -26,7 +26,7 @@ class NetworkSimplifier(WorkerThread):
         self.network = self.project.network
         self.link_layer = self.network.links.data
 
-        warnings.warn("This will alter your database in place. Make sure you have a backup.")
+        warnings.warn("This will alter your database in place. Make sure you have a backup.", stacklevel=2)
 
     def simplify(self, graph: Graph, max_speed_ratio: float = 1.1):
         """
@@ -96,7 +96,7 @@ class NetworkSimplifier(WorkerThread):
 
             new_geo = linemerge(geos)
             if not isinstance(new_geo, LineString):
-                warnings.warn(f"Failed to merge geometry for superlink around link {rec.link_id}")
+                warnings.warn(f"Failed to merge geometry for superlink around link {rec.link_id}", stacklevel=2)
                 continue
 
             break_into = ceil(new_geo.length)
@@ -177,7 +177,10 @@ class NetworkSimplifier(WorkerThread):
         df = df[cols]
         data = df.assign(srid=self.link_layer.crs.to_epsg()).to_records(index=False)
 
-        sql = f"INSERT INTO links({','.join(df.columns)}) VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
+        sql = (
+            f"INSERT INTO links({','.join(df.columns)}) "
+            f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
+        )
         with commit_and_close(self.project.path_to_file, spatial=True) as conn:
             conn.executemany(sql, data)
             conn.executemany("DELETE FROM links WHERE link_id=?", [[x] for x in links_to_delete])

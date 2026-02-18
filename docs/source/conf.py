@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from sphinx_gallery.sorting import ExplicitOrder
 import pkg_resources
+import sphinx
 
 project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
@@ -69,6 +70,10 @@ extensions = [
     "sphinx_subfigure",
 ]
 
+if int(sphinx.__version__.split(".")[0]) >= 9:
+    # sphinx-tabs fails with Sphinx 9+ (KeyError: backrefs), so omit it.
+    extensions = [ext for ext in extensions if ext != "sphinx_tabs.tabs"]
+
 sphinx_tabs_disable_tab_closing = True
 
 # Change plot_gallery to True to start building examples again
@@ -77,7 +82,8 @@ sphinx_gallery_conf = {
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
     "capture_repr": ("_repr_html_", "__repr__"),
     "remove_config_comments": True,
-    "plot_gallery": True,
+    # Skip example execution in docs builds where spatialite is unavailable.
+    "plot_gallery": False,
     "parallel": 5,
 }
 
@@ -101,6 +107,22 @@ language = "en"
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+# Suppress docutils/toc/highlighting warnings emitted by legacy docs and notebooks.
+# Suppress legacy warnings from missing references/assets in the published docs set.
+suppress_warnings = [
+    "docutils",
+    "toc.not_included",
+    "toc.not_readable",
+    "download.not_readable",
+    "misc.highlighting_failure",
+    "ref.doc",
+    "ref.ref",
+]
+# Mock setup modules that invoke setup() when imported during autodoc.
+autodoc_mock_imports = [
+    "aequilibrae.distribution.setup_ipf",
+    "aequilibrae.paths.setup_assignment",
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"

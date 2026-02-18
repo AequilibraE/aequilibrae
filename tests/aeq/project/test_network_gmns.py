@@ -39,7 +39,7 @@ def test_create_from_gmns(empty_project):
         nd_ct = conn.execute("""select count(*) from nodes""").fetchone()[0]
 
         if nd_ct != gmns_node_df.shape[0]:
-            warn("Number of nodes created is different than expected.")
+            warn("Number of nodes created is different than expected.", stacklevel=2)
             return
 
         rand_lk = random.choice([x[0] for x in conn.execute("""select link_id from links""").fetchall()])

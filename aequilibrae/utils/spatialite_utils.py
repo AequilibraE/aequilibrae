@@ -7,7 +7,6 @@ from os.path import basename, join
 from pathlib import Path
 from sqlite3 import Connection, register_adapter, OperationalError
 from tempfile import gettempdir
-from typing import Optional
 from zipfile import ZipFile
 
 import numpy as np
@@ -16,7 +15,7 @@ from aequilibrae.log import global_logger
 from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
-# Setup adapaters so that we can read/write numpy types directly to DB
+# Setup adapters so that we can read/write numpy types directly to DB
 register_adapter(np.int64, int)
 register_adapter(np.int32, int)
 register_adapter(np.float32, float)
@@ -119,7 +118,7 @@ def ensure_spatialite_binaries() -> None:
         shutil.copyfile(join(directory, "proj.db"), join(projdb_dir, "proj.db"))
     except Exception as e:
         msg = f"Could not put the proj.db file in the expected place. {e.args}"
-        warnings.warn(msg)
+        warnings.warn(msg, stacklevel=2)
         global_logger.warning(msg)
 
 

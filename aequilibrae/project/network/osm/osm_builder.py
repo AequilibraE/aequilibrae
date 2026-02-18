@@ -83,7 +83,7 @@ class OSMBuilder(WorkerThread):
 
             # The link is a straight line between two points
             # Or all midpoints are only part of a single link
-            node_indices = node_count.loc[link["nodes"], "counter"].to_numpy()
+            node_indices = node_count.loc[link["nodes"], "counter"].to_numpy(copy=True)
             if len(link["nodes"]) == 2 or node_indices[1:-1].max() == 1:
                 # The link has no intersections
                 geometries.append([idx, self._build_geometry(link.nodes)])

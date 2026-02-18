@@ -41,7 +41,7 @@ def check_rtree(project) -> bool:
         try:
             conn.execute("SELECT rtreecheck('idx_nodes_geometry');")
         except Exception as e:
-            warn(f"RTREE not available --> {e.args}")
+            warn(f"RTREE not available --> {e.args}", stacklevel=2)
             return False
         return True
 

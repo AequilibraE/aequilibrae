@@ -1,9 +1,10 @@
-import sqlite3
 import pathlib
+import sqlite3
 from typing import Optional
 
-from aequilibrae import Project, logger
 from aequilibrae.context import get_active_project
+from aequilibrae.log import logger
+from aequilibrae.project.project import Project
 from aequilibrae.project.project_creation import add_triggers, remove_triggers, recreate_columns
 
 
@@ -74,7 +75,8 @@ def migrate(
             columns = recreate_columns(transit_conn, logger, table, f"__old_{table}")
 
             transit_conn.execute(
-                f"""INSERT INTO {table}({",".join(columns)},'period_id') SELECT {",".join(columns)},{period_id} FROM __old_{table}"""
+                f"INSERT INTO {table}({','.join(columns)},'period_id') "
+                f"SELECT {','.join(columns)},{period_id} FROM __old_{table}"
             )
             transit_conn.execute(f"SELECT DropTable(NULL, '__old_{table}')")
 

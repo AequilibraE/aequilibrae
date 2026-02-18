@@ -307,7 +307,8 @@ class AequilibraeMatrix(object):
             **compressed** (:obj:`bool`, *Optional*): Boolean for whether we should compress the output matrix.
             Not yet implemented
 
-            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only. Defaults to ``True``
+            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in
+                memory only. Defaults to ``True``
 
         """
 
@@ -709,7 +710,7 @@ class AequilibraeMatrix(object):
     def __getattr__(self, mat_name: str):
         if mat_name in object.__dict__:
             if mat_name == "matrix" and self.__omx:
-                warnings.warn("You can't access OMX matrix cores like that")
+                warnings.warn("You can't access OMX matrix cores like that", stacklevel=2)
                 return
             return self.__dict__[mat_name]
 

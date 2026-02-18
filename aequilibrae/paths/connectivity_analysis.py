@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import sys
 
-from aequilibrae.paths.AoN import connectivity_multi_threaded
+from aequilibrae.paths.cython.AoN import connectivity_multi_threaded
 
 from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.aeq_signal import SIGNAL

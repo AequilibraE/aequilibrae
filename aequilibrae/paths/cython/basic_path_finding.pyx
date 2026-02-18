@@ -171,7 +171,7 @@ cdef void blocking_centroid_flows(int action,
                                   long long centroids,
                                   long long [:] fs,
                                   long long [:] temp_b_nodes,
-                                  long long [:] real_b_nodes) noexcept nogil:
+                                  const long long [:] real_b_nodes) noexcept nogil:
     cdef long long i
 
     if action == 1:  # We are unblocking
@@ -281,7 +281,7 @@ cpdef int path_finding(
     long long [:] csr_indices,
     long long [:] graph_fs,
     long long [:] pred,
-    long long [:] ids,
+    const long long [:] ids,
     long long [:] connectors,
     long long [:] reached_first
 ) noexcept nogil:
@@ -405,8 +405,8 @@ cdef inline double haversine_heuristic(double lat1, double lon1, double lat2, do
     Arguments:
         **lat1** (:obj:`double`): Latitude of destination
         **lon1** (:obj:`double`): Longitude of destination
-        **lat2** (:obj:`double`): Latitude of node to evalutate
-        **lon2** (:obj:`double`): Longitude of node to evalutate
+        **lat2** (:obj:`double`): Latitude of node to evaluate
+        **lon2** (:obj:`double`): Longitude of node to evaluate
         **data** (:obj:`void*`): This void pointer should hold a precomputed cos(lat1) as a double
 
     Returns the distance between (lat1, lon1) and (lat2, lon2).
@@ -461,10 +461,10 @@ cpdef void path_finding_a_star(long origin,
                                long long [:] csr_indices,
                                long long [:] graph_fs,
                                long long [:] nodes_to_indices,
-                               double [:] lats,
-                               double [:] lons,
+                               const double [:] lats,
+                               const double [:] lons,
                                long long [:] pred,
-                               long long [:] ids,
+                               const long long [:] ids,
                                long long [:] connectors,
                                Heuristic heuristic) noexcept nogil:
     """

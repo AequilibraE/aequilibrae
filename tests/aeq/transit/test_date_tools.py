@@ -92,7 +92,7 @@ class TestDateTools:
             day_of_week(100)
 
     def test_format_date(self):
-        for i in range(100):
+        for _i in range(100):
             year = randint(1000, 2020)
             month = randint(1, 12)
             day = randint(1, 28)

@@ -11,7 +11,7 @@ for example.
 
 Some basic usages of the AequilibraE path module consist on:
 
-#. **Path computation**: computes the path between two arbritrary nodes.
+#. **Path computation**: computes the path between two arbitrary nodes.
 
 #. **Network skimming**: can compute either the distance, the travel time, or your own cost matrix
    between a series of nodes.

@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix, GeneralisedCOODemand
 from aequilibrae.paths.route_choice import RouteChoice
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet

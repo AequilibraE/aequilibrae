@@ -5,7 +5,7 @@ from datetime import datetime
 from multiprocessing.dummy import Pool as ThreadPool
 from uuid import uuid4
 
-from aequilibrae.paths.AoN import skimming_single_origin
+from aequilibrae.paths.cython.AoN import skimming_single_origin
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming

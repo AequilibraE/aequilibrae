@@ -1,5 +1,5 @@
 Examples
 --------
 
-Other applcations
-~~~~~~~~~~~~~~~~~
+Other applications
+~~~~~~~~~~~~~~~~~~

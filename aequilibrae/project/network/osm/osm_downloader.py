@@ -135,8 +135,9 @@ class OSMDownloader(WorkerThread):
                 # pause for error_pause_duration seconds before re-trying request
                 if error_pause_duration is None:
                     error_pause_duration = self.sleeptime + 1
-                msg = "Server at {} returned status code {} and no JSON data. Re-trying request in {:.2f} seconds.".format(
-                    domain, response.status_code, error_pause_duration
+                msg = (
+                    "Server at {} returned status code {} and no JSON data. "
+                    "Re-trying request in {:.2f} seconds.".format(domain, response.status_code, error_pause_duration)
                 )
                 self.report.append(msg)
                 self.logger.info(msg)
