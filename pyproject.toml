@@ -81,6 +81,10 @@ build = ["setuptools", "cython", "wheel"]
 
 dev = ['aequilibrae[build, tests, docs]']
 
+# simwrapper CLI
+[project.scripts]
+aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
+
 [tool.setuptools.dynamic]
 version = { attr = "aequilibrae.version" }
 
@@ -101,9 +105,6 @@ aequilibrae = "aequilibrae"
         "database_specification/transit/triggers/*.*",
         "database_specification/transit/migrations/*.*",
     ]
-
-[tool.setuptools.entry-points."console_scripts"]
-aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
