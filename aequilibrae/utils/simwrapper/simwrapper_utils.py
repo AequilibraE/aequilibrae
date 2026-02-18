@@ -1,4 +1,7 @@
 import math
+import csv
+import json
+from pathlib import Path
 
 
 def pretty_round(value, direction="up"):
@@ -113,3 +116,79 @@ def get_project_zoom(project):
     zoom = max(min_zoom, min(max_zoom, zoom))
 
     return zoom
+
+
+# --- convergence parsing / export helpers (used by SimwrapperConfigGenerator) ---
+import csv
+import json
+from pathlib import Path
+
+
+def parse_convergence_json(json_string):
+    """Parse a (possibly double-encoded) procedure-report JSON string.
+
+    Returns (iteration_list, rgap_list). For invalid/missing input returns ([], []).
+    """
+    if not json_string:
+        return [], []
+
+    # If the JSON is stored with escaped characters (double-encoded), unescape it first
+    if isinstance(json_string, str) and json_string.startswith('{\\"'):
+        json_string = json_string.encode().decode("unicode_escape")
+
+    try:
+        data = json.loads(json_string)
+    except (TypeError, json.JSONDecodeError, ValueError):
+        return [], []
+
+    # double encoded json case
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except (json.JSONDecodeError, ValueError):
+            return [], []
+
+    if not isinstance(data, dict):
+        return [], []
+
+    convergence = data.get("convergence", {})
+    iteration = convergence.get("iteration", [])
+    rgap = convergence.get("rgap", [])
+
+    return iteration, rgap
+
+
+def export_convergence_csv(results_dataframe, data_dir):
+    """Write assignment convergence for all results tables into data_dir/assignment_convergence.csv.
+
+    Returns Path to written CSV, or None if there was no convergence data. Raises ValueError
+    when iteration/rgap lengths mismatch for a scenario.
+    """
+    rows = []
+
+    for _, row in results_dataframe.iterrows():
+        table_name = row["table_name"]
+        procedure_report = row.get("procedure_report")
+
+        iteration, rgap = parse_convergence_json(procedure_report)
+
+        if not iteration or not rgap:
+            continue
+
+        if len(iteration) != len(rgap):
+            raise ValueError(f"Iteration/RGAP length mismatch for {table_name}")
+
+        for it, rg in zip(iteration, rgap, strict=True):
+            rows.append({"iteration": it, "rgap": rg, "series": table_name})
+
+    if not rows:
+        return None
+
+    output_path = Path(data_dir) / "assignment_convergence.csv"
+
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["iteration", "rgap", "series"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    return output_path

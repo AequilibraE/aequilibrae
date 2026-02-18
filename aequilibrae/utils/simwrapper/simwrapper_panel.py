@@ -6,16 +6,13 @@ from aequilibrae.utils.simwrapper.simwrapper_utils import pretty_round
 
 
 class SimwrapperPanel:
-    """Base class for all simwrapper panels
+    """Base class for all SimWrapper panels.
 
-    :Arguments:
-        **type** (:obj:`str`): panel type
-        **title** (:obj:`str`): title to show in the dashboard
-        **height** (:obj:`int`, *Optional*): panel height
-        **width** (:obj:`int`, *Optional*): panel width
-
-    :Example:
-        panel = SimwrapperPanel("text", "My Panel", height=3, width=6)
+    Arguments:
+        **type** (:obj:`str`): Panel type
+        **title** (:obj:`str`): Title to show in the dashboard
+        **height** (:obj:`int`, optional): Panel height
+        **width** (:obj:`int`, optional): Panel width
     """
 
     def __init__(self, type, title, height=None, width=None):
@@ -25,7 +22,7 @@ class SimwrapperPanel:
         self.width = width
 
     def to_dict(self):
-        """Returns dictionary representation of the panel"""
+        """Returns dictionary representation of the panel."""
         panel = {
             "type": self.type,
             "title": self.title,
@@ -40,11 +37,7 @@ class SimwrapperPanel:
         return panel
 
     def _add_if_set(self, panel: dict, **kwargs):
-        """Add key/value pairs to `panel` only when the value is truthy.
-
-        Keeps callers concise and preserves original behaviour that
-        omitted empty/falsey values (empty dict/list/None/0/"").
-        """
+        """Adds key/value pairs to ``panel`` only when the value is truthy."""
         for k, v in kwargs.items():
             if v:
                 panel[k] = v
@@ -52,6 +45,8 @@ class SimwrapperPanel:
 
 
 class ConvergencePanel(SimwrapperPanel):
+    """Panel wrapper for Vega/Vega-Lite specifications."""
+
     def __init__(self, title, config, height=None, width=None):
         super().__init__("vega", title, height=height, width=width)
         self.config = config
@@ -64,17 +59,13 @@ class ConvergencePanel(SimwrapperPanel):
 
 
 class TilePanel(SimwrapperPanel):
-    """
-    Panel used to display tabular summary statistics.
+    """Panel used to display tabular summary statistics.
 
-    :Arguments:
-        **title** (:obj:`str`): title
-        **dataset** (:obj:`str`): path to csv dataset used by tile
-        **height** (:obj:`int`, *Optional*): panel height
-        **width** (:obj:`int`, *Optional*): panel width
-
-    :Example:
-        panel = TilePanel("Summary Statistics", "data/summary.csv", height=3)
+    Arguments:
+        **title** (:obj:`str`): Title
+        **dataset** (:obj:`str` or :obj:`list`): CSV path or inline dataset
+        **height** (:obj:`int`, optional): Panel height
+        **width** (:obj:`int`, optional): Panel width
     """
 
     def __init__(self, title, dataset, height=None, width=None, colors=None):
@@ -91,18 +82,14 @@ class TilePanel(SimwrapperPanel):
 
 
 class TextPanel(SimwrapperPanel):
-    """
-    Panel for displaying text content.
+    """Panel for displaying text content.
 
-    :Arguments:
-        **title** (:obj:`str`): title
-        **data** (:obj:`str`): text content or file path
-        **is_file** (:obj:`bool`, *Optional*): if data is a file reference
-        **height** (:obj:`int`, *Optional*): panel height
-        **width** (:obj:`int`, *Optional*): panel width
-
-    :Example:
-        panel = TextPanel("Overview", "text/overview.md", is_file=True)
+    Arguments:
+        **title** (:obj:`str`): Title
+        **data** (:obj:`str`): Text content or file path
+        **is_file** (:obj:`bool`, optional): Whether ``data`` is a file reference
+        **height** (:obj:`int`, optional): Panel height
+        **width** (:obj:`int`, optional): Panel width
     """
 
     def __init__(self, title, data, is_file=False, height=None, width=None):
@@ -121,20 +108,15 @@ class TextPanel(SimwrapperPanel):
 
 
 class AequilibraEMapPanel(SimwrapperPanel):
-    """
-    Panel for rendering interactive AequilibraE network maps.
+    """Panel for rendering interactive AequilibraE network maps.
 
-    :Arguments:
-        **title** (:obj:`str`): title
-        **database** (:obj:`str`, *Optional*): project database
-        **height** (:obj:`int`, *Optional*): panel height
-        **width** (:obj:`int`, *Optional*): panel width
-        **center** (:obj:`list`, *Optional*): map center coordinates
-        **zoom** (:obj:`int`, *Optional*): initial zoom level
-        **projection** (:obj:`str`, *Optional*): coordinate reference system
-
-    :Example:
-        panel = AequilibraEMapPanel(title, database, view, height, width, center, zoom, projection)
+    Arguments:
+        **title** (:obj:`str`): Title
+        **database** (:obj:`str`, optional): Project database
+        **height** (:obj:`int`, optional): Panel height
+        **width** (:obj:`int`, optional): Panel width
+        **center** (:obj:`list`, optional): Map center coordinates
+        **zoom** (:obj:`int`, optional): Initial zoom level
     """
 
     def __init__(
@@ -145,14 +127,12 @@ class AequilibraEMapPanel(SimwrapperPanel):
         width=None,
         center=None,
         zoom=None,
-        projection=None,
     ):
         super().__init__("aequilibrae", title, height=height, width=width)
 
         self.database = database
         self.center = center
         self.zoom = zoom
-        self.projection = projection
 
         self.defaults = None
 
@@ -164,8 +144,9 @@ class AequilibraEMapPanel(SimwrapperPanel):
         """Sets default visuals for map layers"""
         if defaults_dict:
             available_keys = {"fillColor", "lineColor", "lineWidth", "pointRadius"}
-            assert not available_keys ^ defaults_dict.keys(), (
-                "Defaults dictionary can only contain the following keys: " + ", ".join(available_keys)
+            # ensure provided keys are a subset of the allowed keys (previous code required an exact match)
+            assert set(defaults_dict.keys()).issubset(available_keys), (
+                "Defaults dictionary can only contain the following keys: " + ", ".join(sorted(available_keys))
             )
 
             self.defaults = defaults_dict
@@ -199,7 +180,6 @@ class AequilibraEMapPanel(SimwrapperPanel):
             panel,
             center=self.center,
             zoom=self.zoom,
-            projection=self.projection,
             defaults=self.defaults,
             legend=self.legend,
             extraDatabases=self.extra_databases,
@@ -236,8 +216,9 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         **results_table** (:obj:`str`, *Optional*): name of the table in the results DB to join to `links`.
             When omitted, metrics are read from the project `links` table instead.
         **palette** (:obj:`str`): colour palette for `colour_metric` scaling (default: ``Temps``)
-        **height**, **width**, **center**, **zoom**, **projection**: visual/layout parameters (see
+        **height**, **width**, **center**, **zoom**: visual/layout parameters (see
             :class:`AequilibraEMapPanel`)
+        **sql_filter** (:obj:`str`, *Optional*): SQL filter expression applied to the ``links`` layer
 
     Notes
         - The panel will register an `extraDatabases` entry named ``results`` only when
@@ -245,14 +226,9 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         - Ranges are computed from percentiles (5th/95th) and rounded via
           :func:`aequilibrae.utils.simwrapper.simwrapper_utils.pretty_round`.
 
-    Examples
-        - Read a metric from the project `links` table::
-
-            panel = AequilibraEResultsMapPanel("Capacity", project=proj, colour_metric="capacity_ab")
-
-        - Read a metric from an external results table and join it to `links`::
-
-            panel = AequilibraEResultsMapPanel("VOC", project=proj, results_table="assignment", colour_metric="VOC_max")
+    Examples:
+        - Read a metric from the project ``links`` table
+        - Read a metric from a results table and join it to ``links``
     """
 
     def __init__(
@@ -267,13 +243,11 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         width=None,
         center=None,
         zoom=None,
-        projection=None,
         palette="Temps",
         results_table=None,
+        sql_filter=None,
     ):
-        super().__init__(
-            title, project_database, height=height, width=width, center=center, zoom=zoom, projection=projection
-        )
+        super().__init__(title, project_database, height=height, width=width, center=center, zoom=zoom)
 
         # inputs
         self.results_database = results_database
@@ -281,6 +255,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         self.width_metric = width_metric
         self.palette = palette
         self.results_table = results_table
+        self.sql_filter = sql_filter
 
         # only register an extra `results` database when a results table is being used
         if self.results_table:
@@ -301,6 +276,9 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
             "geometry": "line",
             "style": self.colour_style | self.width_style,
         }
+
+        if self.sql_filter:
+            layer["sqlFilter"] = self.sql_filter
 
         if self.results_table:
             layer["join"] = {
@@ -388,7 +366,6 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         return legend
 
     def set_colour_styling(self, data_range):
-
         if self.colour_metric:
             self.colour_style = {
                 "lineColor": {

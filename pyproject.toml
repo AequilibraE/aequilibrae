@@ -101,9 +101,13 @@ aequilibrae = "aequilibrae"
         "database_specification/transit/migrations/*.*",
     ]
 
+[tool.setuptools.entry-points."console_scripts"]
+aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
+
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
 lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 exclude = [
     ".idea",
     "__pycache__",
@@ -141,7 +145,6 @@ exclude = [
     ".venv312",
 ]
 line-length = 120
-lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py310"
 
 [tool.ruff.lint.mccabe]
