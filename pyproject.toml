@@ -107,12 +107,7 @@ aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
-<<<<<<< develop
-lint.ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
-lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-=======
 lint.ignore = ["B017"]
->>>>>>> develop
 exclude = [
     ".idea",
     "__pycache__",
