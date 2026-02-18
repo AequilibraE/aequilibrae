@@ -118,12 +118,6 @@ def get_project_zoom(project):
     return zoom
 
 
-# --- convergence parsing / export helpers (used by SimwrapperConfigGenerator) ---
-import csv
-import json
-from pathlib import Path
-
-
 def parse_convergence_json(json_string):
     """Parse a (possibly double-encoded) procedure-report JSON string.
 

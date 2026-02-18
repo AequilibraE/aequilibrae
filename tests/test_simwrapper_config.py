@@ -1,8 +1,3 @@
-import json
-from pathlib import Path
-
-import pandas as pd
-from aequilibrae.utils.simwrapper.simwrapper_utils import parse_convergence_json, export_convergence_csv
 import pytest
 
 from aequilibrae.utils.simwrapper.generate_simwrapper_config import SimwrapperConfigGenerator

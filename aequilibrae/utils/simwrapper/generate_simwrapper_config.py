@@ -592,8 +592,12 @@ def main(argv=None):
     parser.add_argument("-p", "--project", default=".", help="Project path (folder containing project_database.sqlite)")
     parser.add_argument("-o", "--output-dir", default="simwrapper", help="Output directory (inside project)")
     parser.add_argument("--max-results-tables", type=int, default=None, help="Maximum number of results tables")
-    parser.add_argument("--results-tables", nargs="+", default=None, help="Explicit results table names (space-separated)")
-    parser.add_argument("--centroid-link-types", nargs="+", default=None, help="Centroid link type names (space-separated)")
+    parser.add_argument(
+        "--results-tables", nargs="+", default=None, help="Explicit results table names (space-separated)"
+    )
+    parser.add_argument(
+        "--centroid-link-types", nargs="+", default=None, help="Centroid link type names (space-separated)"
+    )
     parser.add_argument("-q", "--quiet", action="store_true", help="Suppress informational output")
     args = parser.parse_args(argv)
 
