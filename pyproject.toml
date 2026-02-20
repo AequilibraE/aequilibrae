@@ -59,7 +59,6 @@ docs = [
   "sphinx-design",
   "sphinx-git",
   "nbconvert",
-  "sphinx-tabs",
   "sphinx-subfigure"
 ]
 

@@ -66,15 +66,11 @@ extensions = [
     "sphinx_design",
     "sphinx_copybutton",
     "sphinx_git",
-    "sphinx_tabs.tabs",
+    "sphinx_design",
     "sphinx_subfigure",
 ]
 
-if int(sphinx.__version__.split(".")[0]) >= 9:
-    # sphinx-tabs fails with Sphinx 9+ (KeyError: backrefs), so omit it.
-    extensions = [ext for ext in extensions if ext != "sphinx_tabs.tabs"]
 
-sphinx_tabs_disable_tab_closing = True
 
 # Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
