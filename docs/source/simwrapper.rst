@@ -6,7 +6,7 @@ SimWrapper Extension
 
 `SimWrapper <https://simwrapper.app/>`_ is a browser-based, client-side tool for exploring transport simulation outputs. It accepts simple YAML configuration files describing dashboards of maps, tables and charts. Nothing is uploaded to the internet, everything is kept local. The application is `open-source <https://github.com/simwrapper/simwrapper>`_ and designed so that non-coding stakeholders can open a dashboard in their browser and interact with results.
 
-The SimWrapper extension generates portable dashboard configuration for visualising an AequilibraE project with the `simwrapper.app <https://simwrapper.app/>`_ or `explore.outerloop.io <https://explore.outerloop.io/>`_.
+The SimWrapper extension generates portable dashboard configuration for visualising an AequilibraE project with the `simwrapper.app <https://simwrapper.app/>`_ or `explore.outerloop.io <https://explore.outerloop.io/>`_. At the time of writing Outer Loop is hosting a preview version of SimWrapper while the required changes are being unstreamed.
 
 You can view an example dashboard at `explore.outerloop.io <https://explore.outerloop.io/>`_ by selecting "Chicago AequilibraE Example" from the Example Dashboards section.
 
