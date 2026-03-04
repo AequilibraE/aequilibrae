@@ -69,17 +69,17 @@ class SimwrapperConfigGenerator:
         self.centroid_link_types = centroid_link_types
 
         od = Path(output_dir)
-        project_root = Path(self.project.project_base_path).resolve()
+        self.project_root = Path(self.project.project_base_path).resolve()
         # Treat relative paths as project-relative subdirectories; accept absolute paths
         # only when they are located inside the project directory. Absolute paths
         # outside the project are rejected to guarantee all SimWrapper outputs remain
         # under the project directory.
         if not od.is_absolute():
-            od = (project_root / od).resolve()
+            od = (self.project_root / od).resolve()
         else:
             od = od.resolve()
-            if not od.is_relative_to(project_root):
-                raise ValueError(f"output_dir must be inside the project directory ({project_root}); got '{od}'")
+            if not od.is_relative_to(self.project_root):
+                raise ValueError(f"output_dir must be inside the project directory ({self.project_root}); got '{od}'")
         self.output_dir = od
         self.generated_files = {}
         self._create_directories()
@@ -92,8 +92,8 @@ class SimwrapperConfigGenerator:
         Structure:
         PROJECT-DIRECTORY/
             simwrapper_data/    # Data files referenced by configs
-                linkstats.csv   # CSV of link properties/metrics
-                other_stats.csv # Additional CSV outputs
+                assignment_convergence.vega.json   # Vegalite JSON for convergence plot
+                assignment_convergence.csv         # Additional CSV outputs
                 ...
             dashboard-*.yaml    # Dashboard configuration file(s)
         """
@@ -446,17 +446,6 @@ class SimwrapperConfigGenerator:
             for table in results_tables
         ]
 
-    def _export_convergence_csv(self, results_dataframe):
-        """Delegate convergence CSV creation to utils and register the generated file.
-
-        Keeps the public behaviour unchanged (returns Path or None; registers file).
-        """
-        output_path = export_convergence_csv(results_dataframe, self.data_dir)
-        if output_path is None:
-            return None
-        self._add_to_generated_files("assignment_convergence", output_path)
-        return output_path
-
     def _write_convergence_vega_spec(self, csv_path):
         """Write a Vega-Lite spec for assignment convergence.
 
@@ -472,7 +461,7 @@ class SimwrapperConfigGenerator:
         spec = {
             "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
             "data": {
-                "url": Path(csv_path).name,
+                "url": csv_path.relative_to(self.project_root).as_posix(),
                 "format": {"type": "csv"},
             },
             "mark": {"type": "line", "point": False},
@@ -501,18 +490,21 @@ class SimwrapperConfigGenerator:
         """Return a Vega-Lite convergence plot panel."""
 
         #  export convergence csv
-        csv_path = self._export_convergence_csv(results_dataframe)
+        csv_path = export_convergence_csv(results_dataframe, self.data_dir)
 
         # skip if no convergence data
         if csv_path is None:
             return None
 
+        self._add_to_generated_files("assignment_convergence", csv_path)
         vega_spec = self._write_convergence_vega_spec(csv_path)
 
         # panel wrapper
+        full_path = self.output_dir / self.data_dir / vega_spec
+        rel_path = full_path.relative_to(self.project_root)
         panel = ConvergencePanel(
             title="Assignment Convergence",
-            config=(Path("simwrapper_data") / vega_spec).as_posix(),
+            config=rel_path.as_posix(),
             height=6,
         )
 
