@@ -91,11 +91,12 @@ class SimwrapperConfigGenerator:
 
         Structure:
         PROJECT-DIRECTORY/
-            simwrapper_data/    # Data files referenced by configs
-                assignment_convergence.vega.json   # Vegalite JSON for convergence plot
-                assignment_convergence.csv         # Additional CSV outputs
-                ...
-            dashboard-*.yaml    # Dashboard configuration file(s)
+            dashboard-*.yaml                           # Dashboard configuration file(s)
+            simwrapper/
+                simwrapper_data/                       # Data files referenced by configs
+                    assignment_convergence.vega.json   # Vegalite JSON for convergence plot
+                    assignment_convergence.csv         # Additional CSV outputs
+                    ...
         """
         self.data_dir = self.output_dir / "simwrapper_data"  # make subcategories
 
@@ -500,7 +501,7 @@ class SimwrapperConfigGenerator:
         vega_spec = self._write_convergence_vega_spec(csv_path)
 
         # panel wrapper
-        full_path = self.output_dir / self.data_dir / vega_spec
+        full_path = self.data_dir / vega_spec
         rel_path = full_path.relative_to(self.project_root)
         panel = ConvergencePanel(
             title="Assignment Convergence",
