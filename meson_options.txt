@@ -1,0 +1,1 @@
+option('aeq_asan', type: 'boolean', value: false, description: 'Enable Address Sanitizer')
