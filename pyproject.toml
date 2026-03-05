@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools", "cython", "wheel"]
+build-backend = "mesonpy"
+requires = ["meson-python>=0.15.0", "ninja", "cython", "wheel"]
 
 [project]
 authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
@@ -19,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
 ]
-dynamic = ["version"]
+version = "1.6.0"
 description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
@@ -63,7 +64,6 @@ docs = [
 ]
 
 tests = [
-  "setuptools",
   "codecov",
   "pytest",
   "pytest-xdist",
@@ -76,34 +76,13 @@ tests = [
 ]
 
 # Build system requirement should match
-build = ["setuptools", "cython", "wheel"]
+build = ["meson-python>=0.15.0", "cython", "wheel"]
 
 dev = ['aequilibrae[build, tests, docs]']
 
 # simwrapper CLI
 [project.scripts]
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
-
-[tool.setuptools.dynamic]
-version = { attr = "aequilibrae.version" }
-
-[tool.setuptools.package-dir]
-aequilibrae = "aequilibrae"
-
-[tool.setuptools.package-data]
-    "aequilibrae.reference_files"= ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"]
-    "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
-    "aequilibrae.distribution"= ["cython/*.pyx"]
-    "aequilibrae.matrix"= ["*.pyx", "*.pxd"]
-    "aequilibrae"= ["./parameters.yml"]
-    "aequilibrae.project"= [
-        "database_specification/network/tables/*.*",
-        "database_specification/network/triggers/*.*",
-        "database_specification/network/migrations/*.*",
-        "database_specification/transit/tables/*.*",
-        "database_specification/transit/triggers/*.*",
-        "database_specification/transit/migrations/*.*",
-    ]
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
