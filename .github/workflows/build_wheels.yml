@@ -38,14 +38,20 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}
       cancel-in-progress: true
-    env:
-      CIBW_VIRTUALENV_URL: https://github.com/pypa/get-virtualenv/releases/download/20.30.0/virtualenv.pyz
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, ubuntu-24.04-arm] # macos-latest, macos-13
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Pre-download virtualenv (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $cacheDir = "$env:LOCALAPPDATA\pypa\cibuildwheel\Cache"
+          New-Item -ItemType Directory -Force -Path $cacheDir
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/pypa/get-virtualenv/20.30.0/public/virtualenv.pyz" -OutFile "$cacheDir\virtualenv-20.30.0.pyz"
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3
