@@ -39,7 +39,7 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}
       cancel-in-progress: true
     env:
-      CIBW_VIRTUALENV_URL: https://raw.githubusercontent.com/pypa/get-virtualenv/20.30.0/public/virtualenv.pyz
+      CIBW_VIRTUALENV_URL: https://github.com/pypa/get-virtualenv/releases/download/20.30.0/virtualenv.pyz
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, ubuntu-24.04-arm] # macos-latest, macos-13
