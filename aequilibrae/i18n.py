@@ -28,7 +28,7 @@ def _safe_ref(obj: object):
 
 def _set_docstring(obj: object, doc: Optional[str]) -> None:
     try:
-        setattr(obj, "__doc__", doc)
+        obj.__doc__ = doc
     except Exception:
         return
 

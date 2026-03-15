@@ -110,7 +110,11 @@ class MessageCollector(ast.NodeVisitor):
             elif isinstance(node.func, ast.Attribute):
                 if node.func.attr in LOG_METHODS:
                     self._add(first_arg, node.lineno)
-                elif isinstance(node.func.value, ast.Name) and node.func.value.id == "warnings" and node.func.attr == "warn":
+                elif (
+                    isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "warnings"
+                    and node.func.attr == "warn"
+                ):
                     self._add(first_arg, node.lineno)
         self.generic_visit(node)
 
@@ -166,7 +170,7 @@ def _translate_missing_entries(
             if len(short_batch) >= 20:
                 try:
                     results = translator.translate_batch(short_batch)
-                    for src, dst in zip(short_batch, results):
+                    for src, dst in zip(short_batch, results, strict=True):
                         cache[src] = dst
                 except Exception:
                     for src in short_batch:
@@ -180,7 +184,7 @@ def _translate_missing_entries(
     if short_batch:
         try:
             results = translator.translate_batch(short_batch)
-            for src, dst in zip(short_batch, results):
+            for src, dst in zip(short_batch, results, strict=True):
                 cache[src] = dst
         except Exception:
             for src in short_batch:
@@ -192,7 +196,9 @@ def _translate_missing_entries(
     return translated
 
 
-def build_catalog(locale: str, target_language: str, messages: dict[str, set[Location]], max_new: int | None = None) -> Catalog:
+def build_catalog(
+    locale: str, target_language: str, messages: dict[str, set[Location]], max_new: int | None = None
+) -> Catalog:
     po_path = LOCALE_ROOT / locale / "LC_MESSAGES" / f"{DOMAIN}.po"
     if po_path.exists():
         with po_path.open("rb") as fobj:
@@ -294,4 +300,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
