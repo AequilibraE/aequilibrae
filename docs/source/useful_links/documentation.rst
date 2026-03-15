@@ -186,6 +186,18 @@ these steps in your local machine.
     # and refer to this location).
     cp aequilibrae.zip docs/build/html/aequilibrae.zip
 
+Internationalization
+--------------------
+
+Documentation strings can be exported for translation using Sphinx gettext:
+
+.. code-block:: text
+
+    sphinx-build -b gettext docs/source docs/build/gettext
+
+The generated catalogs under ``docs/build/gettext`` can be uploaded to Transifex and synced
+back to ``docs/source/locale/<language>/LC_MESSAGES``.
+
 Uploading docs to S3
 --------------------
 

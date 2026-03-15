@@ -1,0 +1,22 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: aequilibrae\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Configures package translations from compiled gettext catalogs if available."
+msgstr "Configura las traducciones del paquete desde catálogos gettext compilados cuando están disponibles."
+
+msgid "Lists languages for which text catalogs are available in the source tree."
+msgstr "Enumera los idiomas para los que hay catálogos de texto disponibles en el árbol de código fuente."
+
+msgid ""
+"multiprocessing start method already set. On MacOS, AequilibraE requires the "
+"'fork' start method. AequilibraE may crash when using procedures that utilise "
+"multiprocessing or progress bars."
+msgstr ""
+"El método de inicio de multiprocessing ya está configurado. En MacOS, "
+"AequilibraE requiere el método de inicio 'fork'. AequilibraE puede fallar al "
+"usar procedimientos que utilicen multiprocessing o barras de progreso."

@@ -1,5 +1,6 @@
 import sys
 from multiprocessing import set_start_method, get_start_method
+from gettext import gettext as _
 
 from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
@@ -23,6 +24,7 @@ from aequilibrae.project.project import Project
 from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults
 
 from aequilibrae import paths
+from aequilibrae.i18n import set_language
 
 __all__ = [
     "global_logger",
@@ -55,12 +57,16 @@ __all__ = [
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
 version = "1.6.1"
 
+set_language()
+
 # On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
 if sys.platform == "darwin" and get_start_method(allow_none=True) != "fork":
     try:
         set_start_method("fork")
     except RuntimeError:
         logger.critical(
-            "multiprocessing start method already set. On MacOS, AequilibraE requires the 'fork' start method. "
-            "AequilibraE may crash when using procedures that utilise multiprocessing or progress bars."
+            _(
+                "multiprocessing start method already set. On MacOS, AequilibraE requires the 'fork' start method. "
+                "AequilibraE may crash when using procedures that utilise multiprocessing or progress bars."
+            )
         )
