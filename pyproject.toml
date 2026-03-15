@@ -63,7 +63,7 @@ docs = [
 ]
 
 i18n = [
-  "Babel>=2.18",
+  "babel>=2.18",
   "deep-translator>=1.11.4",
 ]
 
