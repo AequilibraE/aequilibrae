@@ -1,6 +1,5 @@
 import sys
 from multiprocessing import set_start_method, get_start_method
-from gettext import gettext as _
 
 from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
@@ -24,7 +23,7 @@ from aequilibrae.project.project import Project
 from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults
 
 from aequilibrae import paths
-from aequilibrae.i18n import set_language
+from aequilibrae.i18n import _, set_language
 
 __all__ = [
     "global_logger",
