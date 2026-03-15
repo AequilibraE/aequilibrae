@@ -45,16 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Pre-download virtualenv (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $cacheDir = "$env:LOCALAPPDATA\pypa\cibuildwheel\Cache"
-          New-Item -ItemType Directory -Force -Path $cacheDir
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/pypa/get-virtualenv/20.30.0/public/virtualenv.pyz" -OutFile "$cacheDir\virtualenv-20.30.0.pyz"
-
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.3
+        uses: pypa/cibuildwheel@v3.4.0
 
       - uses: actions/upload-artifact@v4
         with:
