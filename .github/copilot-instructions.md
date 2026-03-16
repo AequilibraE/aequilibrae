@@ -43,8 +43,7 @@ pip install -e ".[dev]"
 For production wheels, `cibuildwheel` is used in CI. On macOS, LLVM (clang) must be used for OpenMP support; GCC is used on Linux; MSVC on Windows.
 
 **Sanitizer builds** (developers only):
-- `AEQ_ASAN=1` enables AddressSanitizer
-- `AEQ_UBSAN=1` enables UndefinedBehaviorSanitizer (non-Windows only)
+- `AEQ_ASAN=1` enables AddressSanitizer (and also UndefinedBehaviorSanitizer on non-Windows platforms)
 
 ## Running Tests
 
@@ -85,7 +84,7 @@ Always run `ruff check` before committing Python changes.
 - **pandas 3+ compatibility**: Do not mutate `.values` arrays in-place; use `.to_numpy(copy=...)` and assign back.
 - **Logging**: Use `logger` from `aequilibrae.log`; avoid bare `print` in library code.
 - **Error handling**: Raise `ValueError` for user-input errors; use descriptive messages.
-- **Docstrings**: NumPy/Google style matching existing files in the module.
+- **Docstrings**: Sphinx/reST-style (e.g., ``:Arguments:``, ``:Returns:``, ``.. code-block::``), matching existing files in the module.
 
 ### Cython (`.pyx`, `.pxd`, `.pxi`)
 
