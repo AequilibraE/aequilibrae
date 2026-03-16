@@ -1,6 +1,7 @@
 thisdir = 'aequilibrae/project/database_specification/transit/triggers'
 
 pyfiles = [
+  'triggers_list.txt',
   'transit_triggers.sql',
 ]
 

@@ -12,6 +12,7 @@ pyfiles = [
   'periods.sql',
   'results.sql',
   'scenarios.sql',
+  'table_list.txt',
   'transit_graph_configs.sql',
   'zones.sql',
 ]

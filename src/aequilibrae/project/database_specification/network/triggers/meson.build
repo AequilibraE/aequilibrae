@@ -5,6 +5,7 @@ pyfiles = [
   'modes_table_triggers.sql',
   'network_triggers.sql',
   'periods_triggers.sql',
+  'triggers_list.txt',
   'scenarios_triggers.sql',
 ]
 

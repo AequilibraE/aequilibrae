@@ -17,6 +17,7 @@ pyfiles = [
   'routes.sql',
   'stop_connectors.sql',
   'stops.sql',
+  'table_list.txt',
   'trigger_settings.sql',
   'trips.sql',
   'trips_schedule.sql',
