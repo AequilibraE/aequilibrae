@@ -29,7 +29,7 @@ class CreateTablesSRC:
         self.conn = database_connection(db_type=self.__folder, project_path=self.proj_path)
         self.path = join(
             *Path(realpath(__file__)).parts[:-1],
-            f"../aequilibrae/project/database_specification/{self.__folder}/tables",
+            f"../src/aequilibrae/project/database_specification/{self.__folder}/tables",
         )
         self.doc_path = str(
             Path(realpath(__file__)).parent / "source" / "aequilibrae_project" / tgt_fldr
