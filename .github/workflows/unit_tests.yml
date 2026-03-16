@@ -69,23 +69,14 @@ jobs:
     - name: Install Python and create virtual environment
       run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear
 
-    - name: Install dependencies (Windows & Linux)
-      if: matrix.os != 'macos-latest'
-      run: uv pip install ".[dev]"
-
-    - name: Install dependencies (macOS)
-      if: matrix.os == 'macos-latest'
-      run: uv pip install ".[dev]"
-      env:
-        CXX: /opt/homebrew/opt/llvm/bin/clang++
-        CC: /opt/homebrew/opt/llvm/bin/clang
-
     - name: Runs test (Windows & Linux)
       if: matrix.os != 'macos-latest'
-      run: pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+      run: uv run --extra tests pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
     - name: Runs test (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        uv pip uninstall pytest-xdist
-        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib pytest tests/ --durations=50 --random-order --verbose
+        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib uv run --extra tests pytest tests/ --durations=50 --random-order --verbose
+      env:
+        CXX: /opt/homebrew/opt/llvm/bin/clang++
+        CC: /opt/homebrew/opt/llvm/bin/clang
