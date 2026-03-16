@@ -1,18 +1,18 @@
 import os
 import pathlib
 
-root_dir = "aequilibrae"
+root_dir = "src/aequilibrae"
 
 ext_modules = {
-    "aequilibrae/paths/cython/AoN.pyx": "AoN",
-    "aequilibrae/distribution/cython/ipf_core.pyx": "ipf_core",
-    "aequilibrae/paths/cython/public_transport.pyx": "public_transport",
-    "aequilibrae/paths/cython/route_choice_set.pyx": "route_choice_set",
-    "aequilibrae/paths/cython/route_choice_link_loading_results.pyx": "route_choice_link_loading_results",
-    "aequilibrae/paths/cython/route_choice_set_results.pyx": "route_choice_set_results",
-    "aequilibrae/paths/cython/graph_building.pyx": "graph_building",
-    "aequilibrae/matrix/sparse_matrix.pyx": "sparse_matrix",
-    "aequilibrae/matrix/coo_demand.pyx": "coo_demand",
+    "src/aequilibrae/paths/cython/AoN.pyx": "AoN",
+    "src/aequilibrae/distribution/cython/ipf_core.pyx": "ipf_core",
+    "src/aequilibrae/paths/cython/public_transport.pyx": "public_transport",
+    "src/aequilibrae/paths/cython/route_choice_set.pyx": "route_choice_set",
+    "src/aequilibrae/paths/cython/route_choice_link_loading_results.pyx": "route_choice_link_loading_results",
+    "src/aequilibrae/paths/cython/route_choice_set_results.pyx": "route_choice_set_results",
+    "src/aequilibrae/paths/cython/graph_building.pyx": "graph_building",
+    "src/aequilibrae/matrix/sparse_matrix.pyx": "sparse_matrix",
+    "src/aequilibrae/matrix/coo_demand.pyx": "coo_demand",
 }
 
 
@@ -58,7 +58,7 @@ def write_meson(path):
     if not subdirs and not py_files and not ext_files:
         return
 
-    thisdir = path.replace(os.sep, "/")
+    thisdir = path.replace(os.sep, "/").removeprefix("src/")
 
     content = []
     content.append(f"thisdir = '{thisdir}'\n")
