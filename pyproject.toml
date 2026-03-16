@@ -145,6 +145,9 @@ manylinux-aarch64-image = "manylinux_2_28"
 manylinux-pypy_x86_64-image = "manylinux_2_28"
 manylinux-pypy_aarch64-image = "manylinux_2_28"
 
+[tool.cibuildwheel.windows]
+config-settings = { "setup-args" = "--vsenv" }
+
 [tool.cibuildwheel.linux]
 archs = ["auto"]
 build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*"]
