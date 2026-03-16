@@ -11,9 +11,9 @@ openmp = dependency('openmp')
 deps = [openmp]
 
 add_project_arguments(
-    '-X', 'embedsignature=True',
-    '-X', 'emit_code_comments=True',
-    language : 'cython'
+  '-X', 'embedsignature=True',
+  '-X', 'emit_code_comments=True',
+  language : 'cython'
 )
 
 subdir('src/aequilibrae')

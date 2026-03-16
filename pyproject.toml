@@ -2,6 +2,9 @@
 build-backend = "mesonpy"
 requires = ["meson-python>=0.15.0", "ninja", "cython"]
 
+[tool.meson-python.args]
+setup = ['--vsenv']
+
 [project]
 authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
 classifiers = [
@@ -144,9 +147,6 @@ manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 manylinux-pypy_x86_64-image = "manylinux_2_28"
 manylinux-pypy_aarch64-image = "manylinux_2_28"
-
-[tool.cibuildwheel.windows]
-config-settings = { "setup-args" = "--vsenv" }
 
 [tool.cibuildwheel.linux]
 archs = ["auto"]
