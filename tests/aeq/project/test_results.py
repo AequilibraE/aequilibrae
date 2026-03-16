@@ -17,7 +17,7 @@ class MockProject:
 
 @pytest.fixture(scope="module")
 def results_sql_path(test_data_path):
-    return test_data_path.parent.parent / "aequilibrae/project/database_specification/network/tables/results.sql"
+    return test_data_path.parent.parent / "src/aequilibrae/project/database_specification/network/tables/results.sql"
 
 
 # Fixtures for ResultRecord tests
