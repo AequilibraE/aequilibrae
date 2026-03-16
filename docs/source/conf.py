@@ -71,14 +71,12 @@ extensions = [
 
 
 
-# Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
     "capture_repr": ("_repr_html_", "__repr__"),
     "remove_config_comments": True,
-    # Skip example execution in docs builds where spatialite is unavailable.
-    "plot_gallery": False,
+    "plot_gallery": True,
     "parallel": 5,
 }
 
