@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python>=0.15.0", "ninja", "cython", "wheel"]
+requires = ["meson-python>=0.15.0", "ninja", "cython"]
 
 [project]
 authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
@@ -75,10 +75,8 @@ tests = [
   "wheel",
 ]
 
-# Build system requirement should match
-build = ["meson-python>=0.15.0", "cython", "wheel"]
 
-dev = ['aequilibrae[build, tests, docs]']
+dev = ['aequilibrae[tests, docs]']
 
 # simwrapper CLI
 [project.scripts]
