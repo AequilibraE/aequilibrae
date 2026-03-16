@@ -1,13 +1,16 @@
-py.install_sources(
-    '__init__.py',
-    'demo.__init__.py',
-    subdir: 'aequilibrae.reference_files'
-)
+thisdir = 'aequilibrae/reference_files'
+
+pyfiles = [
+  '__init__.py',
+  'coquimbo.zip',
+  'demo.__init__.py',
+  'nauru.zip',
+  'sioux_falls.zip',
+  'spatialite.sqlite',
+]
 
 py.install_sources(
-    'coquimbo.zip',
-    'nauru.zip',
-    'sioux_falls.zip',
-    'spatialite.sqlite',
-    subdir: 'aequilibrae.reference_files'
+  pyfiles,
+  pure: false,
+  subdir: thisdir,
 )

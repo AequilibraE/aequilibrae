@@ -1,13 +1,15 @@
-py.install_sources(
-    'ipf_core.pyx',
-    subdir: 'aequilibrae.distribution.cython'
-)
+thisdir = 'aequilibrae/distribution/cython'
 
-py.extension_module(
-    'ipf_core',
-    'ipf_core.pyx',
-    cpp_args: cpp_args,
-    link_args: link_args,
+exts = [
+  'ipf_core',
+]
+
+foreach ext : exts
+  py.extension_module(
+    ext,
+    ext + '.pyx',
+    dependencies: deps,
     install: true,
-    subdir: 'aequilibrae.distribution.cython'
-)
+    subdir: thisdir,
+  )
+endforeach

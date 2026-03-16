@@ -1,27 +1,32 @@
-py.install_sources(
-    '__init__.py',
-    'connector_creation.py',
-    'gmns_builder.py',
-    'gmns_exporter.py',
-    'haversine.py',
-    'link.py',
-    'link_type.py',
-    'link_types.py',
-    'links.py',
-    'mode.py',
-    'modes.py',
-    'network.py',
-    'node.py',
-    'nodes.py',
-    'period.py',
-    'periods.py',
-    'safe_class.py',
-    subdir: 'aequilibrae.project.network'
-)
+thisdir = 'aequilibrae/project/network'
+
+pyfiles = [
+  '__init__.py',
+  'connector_creation.py',
+  'gmns_builder.py',
+  'gmns_exporter.py',
+  'haversine.py',
+  'link.py',
+  'link_type.py',
+  'link_types.py',
+  'links.py',
+  'mode.py',
+  'modes.py',
+  'network.py',
+  'network.yml',
+  'node.py',
+  'nodes.py',
+  'period.py',
+  'periods.py',
+  'safe_class.py',
+]
 
 py.install_sources(
-    'network.yml',
-    subdir: 'aequilibrae.project.network'
+  pyfiles,
+  pure: false,
+  subdir: thisdir,
 )
 
-subdir('osm')
+foreach pkg : pkgs
+  subdir(pkg)
+endforeach

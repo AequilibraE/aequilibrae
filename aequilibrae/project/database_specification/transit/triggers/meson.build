@@ -1,4 +1,11 @@
+thisdir = 'aequilibrae/project/database_specification/transit/triggers'
+
+pyfiles = [
+  'transit_triggers.sql',
+]
+
 py.install_sources(
-    'transit_triggers.sql',
-    subdir: 'aequilibrae.project.database_specification.transit.triggers'
+  pyfiles,
+  pure: false,
+  subdir: thisdir,
 )

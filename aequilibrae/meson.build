@@ -1,20 +1,29 @@
-py.install_sources(
-    '__init__.py',
-    'context.py',
-    'log.py',
-    'parameters.py',
-    subdir: 'aequilibrae'
-)
+thisdir = 'aequilibrae'
+
+pyfiles = [
+  '__init__.py',
+  'context.py',
+  'log.py',
+  'parameters.py',
+  'parameters.yml',
+]
+
+pkgs = [
+  'distribution',
+  'matrix',
+  'paths',
+  'project',
+  'reference_files',
+  'transit',
+  'utils',
+]
 
 py.install_sources(
-    'parameters.yml',
-    subdir: 'aequilibrae'
+  pyfiles,
+  pure: false,
+  subdir: thisdir,
 )
 
-subdir('distribution')
-subdir('matrix')
-subdir('paths')
-subdir('project')
-subdir('reference_files')
-subdir('transit')
-subdir('utils')
+foreach pkg : pkgs
+  subdir(pkg)
+endforeach

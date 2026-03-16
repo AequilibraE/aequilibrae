@@ -1,5 +1,12 @@
+thisdir = 'aequilibrae/utils/interface'
+
+pyfiles = [
+  '__init__.py',
+  'worker_thread.py',
+]
+
 py.install_sources(
-    '__init__.py',
-    'worker_thread.py',
-    subdir: 'aequilibrae.utils.interface'
+  pyfiles,
+  pure: false,
+  subdir: thisdir,
 )
