@@ -21,6 +21,10 @@ pyfiles = [
   'safe_class.py',
 ]
 
+pkgs = [
+  'osm',
+]
+
 py.install_sources(
   pyfiles,
   pure: false,

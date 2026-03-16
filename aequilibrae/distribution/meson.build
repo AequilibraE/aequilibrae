@@ -9,6 +9,10 @@ pyfiles = [
   'synthetic_gravity_model.py',
 ]
 
+pkgs = [
+  'cython',
+]
+
 py.install_sources(
   pyfiles,
   pure: false,
