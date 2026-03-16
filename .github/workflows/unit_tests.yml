@@ -71,13 +71,13 @@ jobs:
 
     - name: Runs test (Windows & Linux)
       if: matrix.os != 'macos-latest'
-      run: uv run --no-editable pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+      run: uv run --no-editable --extra dev pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
     - name: Runs test (macOS)
       if: matrix.os == 'macos-latest'
       run: |
         uv pip uninstall pytest-xdist
-        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib uv run --no-editable pytest tests/ --durations=50 --random-order --verbose
+        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib uv run --extra dev --no-editable pytest tests/ --durations=50 --random-order --verbose
       env:
         CXX: /opt/homebrew/opt/llvm/bin/clang++
         CC: /opt/homebrew/opt/llvm/bin/clang
