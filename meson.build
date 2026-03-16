@@ -16,4 +16,4 @@ add_project_arguments(
     language : 'cython'
 )
 
-subdir('aequilibrae')
+subdir('src/aequilibrae')
