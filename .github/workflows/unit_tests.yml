@@ -71,11 +71,11 @@ jobs:
 
     - name: Install dependencies (Windows & Linux)
       if: matrix.os != 'macos-latest'
-      run: uv pip install -e ".[dev]"
+      run: uv pip install ".[dev]"
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
-      run: uv pip install -e ".[dev]"
+      run: uv pip install ".[dev]"
       env:
         CXX: /opt/homebrew/opt/llvm/bin/clang++
         CC: /opt/homebrew/opt/llvm/bin/clang
