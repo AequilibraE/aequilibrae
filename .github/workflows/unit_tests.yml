@@ -5,6 +5,10 @@ on: [pull_request]
 env:
   AEQ_SHOW_PROGRESS: "0"
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   linting:
     runs-on: ubuntu-latest
@@ -40,6 +44,10 @@ jobs:
             python-version: '3.11'
           - os: macos-latest
             python-version: '3.12'
+        include:
+          - sanitisers: false
+          - python-version: '3.13'
+            sanitisers: true
 
       max-parallel: 20
     steps:
@@ -63,21 +71,33 @@ jobs:
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
-      run: |
-        uv run tests/setup_windows_spatialite.py
+      run: uv run tests/setup_windows_spatialite.py
 
     - name: Install Python and create virtual environment
-      run: uv venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear
+      run: uv venv --python ${{ matrix.python-version }} --python-preference only-managed --clear
 
-    - name: Runs test (Windows & Linux)
-      if: matrix.os != 'macos-latest'
-      run: uv run --no-editable --extra dev pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+    - name: Activate virtualenv
+      run: |
+        . .venv/bin/activate
+        echo PATH=$PATH >> $GITHUB_ENV
 
-    - name: Runs test (macOS)
+    - name: Setup environment variables (MacOS)
       if: matrix.os == 'macos-latest'
       run: |
-        uv pip uninstall pytest-xdist
-        DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/opt/homebrew/lib uv run --extra dev --no-editable pytest tests/ --durations=50 --random-order --verbose
-      env:
-        CXX: /opt/homebrew/opt/llvm/bin/clang++
-        CC: /opt/homebrew/opt/llvm/bin/clang
+        echo AEQ_SPATIALITE_DIR=/opt/homebrew/lib >> $GITHUB_ENV
+        echo CXX=/opt/homebrew/opt/llvm/bin/clang++ >> $GITHUB_ENV
+        echo CC=/opt/homebrew/opt/llvm/bin/clang >> $GITHUB_ENV
+
+    - name: Compile and test
+      if: matrix.sanitisers == false
+      run: |
+        uv pip install --verbose ".[dev]"
+        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+
+    - name: Compile and test (sanitisers)
+      if: matrix.sanitisers == true
+      run: |
+        uv pip install --verbose ".[dev]" -Csetup-args="-Dbuildtype=debug -Db_sanitize=address,undefined"
+        export LD_PRELOAD=libasan.so
+        export ASAN_OPTIONS=detect_leaks=1
+        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
