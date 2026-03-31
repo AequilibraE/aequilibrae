@@ -37,6 +37,7 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13']
         os: [windows-latest, ubuntu-latest, macos-latest]
+        sanitisers: [false]
         exclude:
           - os: macos-latest
             python-version: '3.10'
@@ -45,8 +46,8 @@ jobs:
           - os: macos-latest
             python-version: '3.12'
         include:
-          - sanitisers: false
-          - python-version: '3.13'
+          - so: ubuntu-latest
+            python-version: '3.13'
             sanitisers: true
 
       max-parallel: 20
@@ -98,6 +99,6 @@ jobs:
       if: matrix.sanitisers == true
       run: |
         uv pip install --verbose ".[dev]" -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
-        export LD_PRELOAD=libasan.so
+        export LD_PRELOAD=$(gcc -print-file-name=libasan.so)
         export ASAN_OPTIONS=detect_leaks=1
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
