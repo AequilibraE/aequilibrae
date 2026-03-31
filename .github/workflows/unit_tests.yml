@@ -84,7 +84,7 @@ jobs:
         echo PATH=$PATH >> $GITHUB_ENV
 
     - name: Activate virtualenv (windows)
-      If: matrix.os == 'windows-latest'
+      if: matrix.os == 'windows-latest'
       run: |
         . .venv/Scripts/activate
         echo PATH=$PATH >> $GITHUB_ENV
