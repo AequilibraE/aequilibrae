@@ -29,9 +29,9 @@ jobs:
 
   testing:
     needs: linting
-    runs-on: ${{ matrix.os}}
+    runs-on: ${{ matrix.os }}
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}-sanitisers=${{ matrix.sanitisers }}
       cancel-in-progress: true
     strategy:
       matrix:
@@ -46,7 +46,7 @@ jobs:
           - os: macos-latest
             python-version: '3.12'
         include:
-          - so: ubuntu-latest
+          - os: ubuntu-latest
             python-version: '3.13'
             sanitisers: true
 
