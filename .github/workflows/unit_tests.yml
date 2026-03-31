@@ -97,7 +97,7 @@ jobs:
     - name: Compile and test (sanitisers)
       if: matrix.sanitisers == true
       run: |
-        uv pip install --verbose ".[dev]" -Csetup-args="-Dbuildtype=debug -Db_sanitize=address,undefined"
+        uv pip install --verbose ".[dev]" -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         export LD_PRELOAD=libasan.so
         export ASAN_OPTIONS=detect_leaks=1
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
