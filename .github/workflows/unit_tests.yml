@@ -78,8 +78,15 @@ jobs:
       run: uv venv --python ${{ matrix.python-version }} --python-preference only-managed --clear
 
     - name: Activate virtualenv
+      if: matrix.os != 'windows-latest'
       run: |
         . .venv/bin/activate
+        echo PATH=$PATH >> $GITHUB_ENV
+
+    - name: Activate virtualenv (windows)
+      If: matrix.os == 'windows-latest'
+      run: |
+        . .venv/Scripts/activate
         echo PATH=$PATH >> $GITHUB_ENV
 
     - name: Setup environment variables (MacOS)
