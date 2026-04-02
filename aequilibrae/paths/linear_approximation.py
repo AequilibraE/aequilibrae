@@ -109,8 +109,8 @@ class LinearApproximation(WorkerThread):
             self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
 
         self.free_flow_tt = assig_spec.free_flow_tt
-        self.current_assigned_flow = np.array(assig_spec.total_flow, copy=True)
-        self.fw_total_flow = np.array(assig_spec.total_flow, copy=True)
+        self.current_assigned_flow = np.array(assig_spec.total_flow, dtype=np.float64, copy=True)
+        self.fw_total_flow = np.array(assig_spec.total_flow, dtype=np.float64, copy=True)
         if self.preload is not None:
             self.fw_total_flow += self.preload
         self.congested_time = assig_spec.congested_time
@@ -227,8 +227,8 @@ class LinearApproximation(WorkerThread):
         self.betas[2] = mu * self.betas[0]
 
     def _set_current_flow(self, assigned_flow):
-        self.current_assigned_flow = np.array(assigned_flow, copy=True)
-        self.fw_total_flow = np.array(self.current_assigned_flow, copy=True)
+        self.current_assigned_flow = np.array(assigned_flow, dtype=np.float64, copy=True)
+        self.fw_total_flow = np.array(self.current_assigned_flow, dtype=np.float64, copy=True)
         if self.preload is not None:
             self.fw_total_flow += self.preload
 
@@ -748,8 +748,11 @@ class LinearApproximation(WorkerThread):
         aon_cost = np.sum(self.congested_time * self.aon_total_flow)
         current_cost = np.sum(self.congested_time * self.current_assigned_flow)
         if current_cost == 0.0:
-            self.rgap = 0.0
-            return True
+            if aon_cost == 0.0:
+                self.rgap = 0.0
+                return True
+            self.rgap = np.inf
+            return False
         self.rgap = abs(current_cost - aon_cost) / current_cost
         if self.rgap_target >= self.rgap:
             return True
