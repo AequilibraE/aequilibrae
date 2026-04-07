@@ -278,7 +278,7 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
 
     .. grid-item::
 
-This documentation correspond to software version:
+This documentation corresponds to software version:
 
 .. git_commit_detail::
     :branch:
