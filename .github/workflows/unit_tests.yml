@@ -26,7 +26,7 @@ jobs:
 
   testing:
     needs: linting
-    name: Testing on ${{ matrix.os }}, Python ${{ matrix.python-version }}${{ martix.sanitisers && ', with sanitisers enable' || ' '  }}
+    name: Testing on ${{ matrix.os }}, Python ${{ matrix.python-version }}${{ matrix.sanitisers && ', with sanitisers enable' || ' '  }}
     runs-on: ${{ matrix.os }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}-sanitisers=${{ matrix.sanitisers }}
