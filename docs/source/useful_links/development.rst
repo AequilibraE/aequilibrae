@@ -152,7 +152,7 @@ The above steps can be done in a single command as well (for example with the de
 
 ::
 
-  uv pip install -e . --no-build-isolation -Cbuild-dir=build-dbg -Csetup-args="-Dbuildtype=debug -Db_sanitize=address,undefined" -Ceditable-verbose=true
+  uv pip install -e . --no-build-isolation -Cbuild-dir=build-dbg -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined" -Ceditable-verbose=true
 
 The build directory and other configuration can be omitted to use a standard release build under the name ``build``
 with:
