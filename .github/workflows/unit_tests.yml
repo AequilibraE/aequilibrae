@@ -5,10 +5,6 @@ on: [pull_request]
 env:
   AEQ_SHOW_PROGRESS: "0"
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
   linting:
     runs-on: ubuntu-latest
@@ -86,8 +82,8 @@ jobs:
     - name: Activate virtualenv (windows)
       if: matrix.os == 'windows-latest'
       run: |
-        . .venv/Scripts/activate
-        echo PATH=$PATH >> $GITHUB_ENV
+        .\.venv\Scripts\Activate.ps1
+        "$env:PATH" | Out-File -FilePath "$env:GITHUB_PATH" -Append
 
     - name: Setup environment variables (MacOS)
       if: matrix.os == 'macos-latest'
@@ -99,13 +95,14 @@ jobs:
     - name: Compile and test
       if: matrix.sanitisers == false
       run: |
-        uv pip install --verbose ".[dev]"
+        uv pip install ".[dev]"
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
     - name: Compile and test (sanitisers)
       if: matrix.sanitisers == true
       run: |
-        uv pip install --verbose ".[dev]" -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
+        uv pip install ".[dev]" -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         export LD_PRELOAD=$(gcc -print-file-name=libasan.so)
         export ASAN_OPTIONS=detect_leaks=1
+        export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
