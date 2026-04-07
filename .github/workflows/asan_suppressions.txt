@@ -1,6 +1,7 @@
 leak:site-packages/pyarrow
 leak:site-packages/numpy
 leak:site-packages/scipy
+leak:site-packages/pandas
 leak:site-packages/matplotlib
 leak:_PyObject_Malloc
 leak:_PyObject_Calloc

@@ -8,6 +8,7 @@ env:
 jobs:
   linting:
     runs-on: ubuntu-latest
+    name: Linting
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -25,6 +26,7 @@ jobs:
 
   testing:
     needs: linting
+    name: Testing on ${{ matrix.os }}, Python ${{ matrix.python-version }}${{ martix.sanitisers && ', with sanitisers enable' || ' '  }}
     runs-on: ${{ matrix.os }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.python-version }}-sanitisers=${{ matrix.sanitisers }}
@@ -99,10 +101,9 @@ jobs:
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
 
     - name: Compile and test (sanitisers)
-      if: matrix.sanitisers == true
+      if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
       run: |
         uv pip install ".[dev]" -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
-        export LD_PRELOAD=$(gcc -print-file-name=libasan.so)
         export ASAN_OPTIONS=detect_leaks=1
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
-        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+        LD_PRELOAD=$(gcc -print-file-name=libasan.so) pytest tests/
