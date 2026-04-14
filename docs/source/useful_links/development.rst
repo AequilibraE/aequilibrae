@@ -65,7 +65,7 @@ another Python version simply change the installed version.
 
 AequilibraE compilation requires access to a C++17 compatible compiler with OpenMP support.
 
-On MacOS please refer to <macos_compilation> for installation of LLVM as the pre-installed clang does not support OpenMP.
+On MacOS please refer to :ref:`macos_compilation` for installation of LLVM as the pre-installed clang does not support OpenMP.
 
 On Unix-like operating systems please refer to your package manager of choice for installation instructions.
 
