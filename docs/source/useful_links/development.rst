@@ -297,7 +297,7 @@ Next, build the documentation in html format with the following commands run fro
 
 ::
 
-  sphinx-apidoc -T -o docs/source/generated aequilibrae
+  sphinx-apidoc -T -o docs/source/generated src/aequilibrae
   cd docs
   make html
 
