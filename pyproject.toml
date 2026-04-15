@@ -23,7 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
 ]
-version = "2.0.0"
+dynamic = ["version", "license", "license-files"]
 description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
@@ -44,9 +44,6 @@ dependencies = [
   "geopandas",
   "tqdm",
 ]
-
-license = "LicenseRef-AequilibraE"
-license-files = ["LICENSE.TXT"]
 
 [project.optional-dependencies]
 

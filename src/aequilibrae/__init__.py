@@ -1,4 +1,5 @@
 import sys
+import importlib.metadata
 from multiprocessing import set_start_method, get_start_method
 
 from aequilibrae.log import logger, global_logger
@@ -52,8 +53,7 @@ __all__ = [
     "paths",
 ]
 
-# When updating the version, one must also update the docs/source/useful_links/version_history.rst file
-version = "2.0.0"
+version = importlib.metadata.version("aequilibrae")
 
 # On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
 if sys.platform == "darwin" and get_start_method(allow_none=True) != "fork":
