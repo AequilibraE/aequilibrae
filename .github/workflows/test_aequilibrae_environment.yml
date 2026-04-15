@@ -24,7 +24,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip uv
-        python -m uv pip install -e .[dev]
+        python -m uv pip install .[dev]
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
