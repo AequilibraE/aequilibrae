@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional
 import contextlib
+import typing
 
 from aequilibrae.log import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
@@ -11,10 +12,9 @@ from aequilibrae.utils.db_utils import AequilibraEConnection
 
 
 class MigrationStatus(IntEnum):
-    MISSING: int = 1
-    SKIPPED: int = 2
-    APPLIED: int = 3
-
+    MISSING = 1
+    SKIPPED = 2
+    APPLIED = 3
 
 @dataclass
 class Migration:
@@ -38,9 +38,12 @@ class Migration:
     id: int
     name: str
     file: pathlib.Path
-    type: str = None
+    type: str = ""
 
-    def __post_init__(self):
+    def __init__(self, id: int, name: str, file: pathlib.Path):
+        self.id = id
+        self.name = name
+        self.file = file
         if self.file.suffix == ".py":
             self.type = "py"
         elif self.file.suffix == ".sql":
@@ -156,10 +159,10 @@ class MigrationManager:
         as a list of ``pathlib.Path`` to migrations.
     """
 
-    network_migration_file = (
+    network_migration_file: pathlib.Path = (
         pathlib.Path(__file__).parent.parent / "database_specification" / "network" / "migrations" / "migrations.py"
     )
-    transit_migration_file = (
+    transit_migration_file: pathlib.Path = (
         pathlib.Path(__file__).parent.parent / "database_specification" / "transit" / "migrations" / "migrations.py"
     )
 
@@ -187,7 +190,7 @@ class MigrationManager:
         if len(self.migrations) != len(res):
             raise ValueError("duplicate migration IDs found. Ensure migration IDs are unique.")
 
-    def __ensure_inital_is_applied(self, conn):
+    def __ensure_inital_is_applied(self, conn: sqlite3.Connection):
         # Handle the initial migration separately, the 'migrations' table might not have been created. We implicitly
         # apply this migration all the time to ensure the table exists.
         with conn:
@@ -255,7 +258,7 @@ class MigrationManager:
 
         return res
 
-    def upgrade(self, main_conn: str, connections: dict[str, Optional[AequilibraEConnection]], skip: set[int] = None):
+    def upgrade(self, main_conn: str, connections: dict[str, AequilibraEConnection], skip: set[int] = set()):
         """
         Find and apply all applicable migrations.
 
@@ -271,8 +274,6 @@ class MigrationManager:
             `AequilibraEConnection` objects. These connections are used during the migration process.
 
         """
-        if skip is None:
-            skip = set()
         migrations = self.find_applicable(connections[main_conn])
 
         for migration in migrations:
