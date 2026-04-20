@@ -2,9 +2,7 @@ import pathlib
 import sqlite3
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional
 import contextlib
-import typing
 
 from aequilibrae.log import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
