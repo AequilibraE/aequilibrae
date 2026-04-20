@@ -9,6 +9,7 @@ from os.path import join
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
+import numpy_typing as npt
 import pandas as pd
 
 from aequilibrae.context import get_logger
@@ -621,7 +622,7 @@ class GraphBase(ABC):  # noqa: B024
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
 
-    def create_compressed_link_network_mapping(self):
+    def create_compressed_link_network_mapping(self) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_], npt.NDArray[np.generic]]:
         """
         Create three arrays providing a mapping of compressed ID to link ID.
 

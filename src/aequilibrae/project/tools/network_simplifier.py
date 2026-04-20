@@ -5,21 +5,23 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+import numpy.typing as npt
 from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge
 from shapely.ops import substring
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.graph import Graph
+from aequilibrae.project.project import Project
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
-class NetworkSimplifier(WorkerThread):
+class NetworkSimplifier(WorkerThread): # type: ignore
     signal = SIGNAL(object)
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, project: Project) -> None:
         super().__init__(None)
 
         self.project = project or get_active_project()
@@ -75,7 +77,7 @@ class NetworkSimplifier(WorkerThread):
                 continue
 
             link_sequence = [abs(x) for x in link_sequence]
-            self.link_sequence = [x for x in link_sequence if x not in centroid_connectors]
+            self.link_sequence = np.array([x for x in link_sequence if x not in centroid_connectors])
             self.candidates = self.link_layer.query("link_id in @link_sequence").set_index("link_id")
 
             if self.candidates.shape[0] <= 1:
@@ -140,7 +142,7 @@ class NetworkSimplifier(WorkerThread):
 
         self.project.logger.warning("Network has been rebuilt. You should run this tool's rebuild network method")
 
-    def __process_link_fields(self, candidates, link_sequence, max_speed_ratio):
+    def __process_link_fields(self, candidates: pd.DataFrame, link_sequence: npt.NDArray[np.int_], max_speed_ratio: float = 1.1):
         start_node = candidates.loc[link_sequence[0]]["a_node"]
         longest_link_id = candidates.sort_values("distance", ascending=False).index[0]
         speed_ab, speed_ba, geos, lanes_ab, lanes_ba = [], [], [], [], []
