@@ -19,11 +19,12 @@ class Period(SafeClass):
         >>> project.close()
     """
 
-    def __init__(self, dataset, project):
+    def __init__(self, dataset, period_id, project):
         """"""
         super().__init__(dataset, project)
         self.__fields = list(dataset.keys())
         self._table = "periods"
+        self.period_id: int = period_id
 
     def __repr__(self):
         return (
