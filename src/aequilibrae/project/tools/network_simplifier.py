@@ -12,7 +12,6 @@ from shapely.ops import substring
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.graph import Graph
-from aequilibrae.project.project import Project
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -21,7 +20,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 class NetworkSimplifier(WorkerThread): # type: ignore
     signal = SIGNAL(object)
 
-    def __init__(self, project: Project) -> None:
+    def __init__(self, project) -> None:
         super().__init__(None)
 
         self.project = project or get_active_project()
