@@ -142,7 +142,8 @@ class NetworkSimplifier(WorkerThread): # type: ignore
 
         self.project.logger.warning("Network has been rebuilt. You should run this tool's rebuild network method")
 
-    def __process_link_fields(self, candidates: pd.DataFrame, link_sequence: npt.NDArray[np.int_], max_speed_ratio: float = 1.1):
+    def __process_link_fields(self, candidates: pd.DataFrame, link_sequence: npt.NDArray[np.int_],
+                               max_speed_ratio: float = 1.1):
         start_node = candidates.loc[link_sequence[0]]["a_node"]
         longest_link_id = candidates.sort_values("distance", ascending=False).index[0]
         speed_ab, speed_ba, geos, lanes_ab, lanes_ba = [], [], [], [], []

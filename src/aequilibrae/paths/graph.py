@@ -9,7 +9,7 @@ from os.path import join
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-import numpy_typing as npt
+import numpy.typing as npt
 import pandas as pd
 
 from aequilibrae.context import get_logger
