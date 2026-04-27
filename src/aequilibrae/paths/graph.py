@@ -18,10 +18,10 @@ from aequilibrae.paths.cython.graph_building import build_compressed_graph, crea
 
 @dataclasses.dataclass
 class NetworkGraphIndices:
-    network_ab_idx: np.array
-    network_ba_idx: np.array
-    graph_ab_idx: np.array
-    graph_ba_idx: np.array
+    network_ab_idx: np.ndarray
+    network_ba_idx: np.ndarray
+    graph_ab_idx: np.ndarray
+    graph_ba_idx: np.ndarray
 
 
 def _get_graph_to_network_mapping(lids, direcs):

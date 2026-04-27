@@ -2,7 +2,7 @@ from typing import Union, List
 
 import numpy as np
 from aequilibrae.paths.cython.AoN import update_path_trace, path_computation, HEURISTIC_MAP
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import Graph, GraphBase
 
 
 class PathResults:
@@ -104,7 +104,7 @@ class PathResults:
         path_computation(origin, destination, self.graph, self)
         self.__skim_path()
 
-    def prepare(self, graph: Graph) -> None:
+    def prepare(self, graph: GraphBase) -> None:
         """
         Prepares the object with dimensions corresponding to the graph object
 
