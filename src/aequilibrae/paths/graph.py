@@ -672,7 +672,7 @@ class Graph(GraphBase):
 
 
 class TransitGraph(GraphBase):
-    def __init__(self, config: dict = {}, od_node_mapping: Optional[pd.DataFrame] = None, *args, **kwargs):
+    def __init__(self, config: Optional[dict] = None, od_node_mapping: Optional[pd.DataFrame] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._config = config
         self.od_node_mapping = od_node_mapping
