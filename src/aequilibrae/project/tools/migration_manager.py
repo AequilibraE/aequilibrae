@@ -276,6 +276,9 @@ class MigrationManager:
         """
         migrations = self.find_applicable(connections[main_conn])
 
+        if skip is None:
+            skip = set()
+
         for migration in migrations:
             # We use a contextlib.ExitStack to enter and exit an arbitrary number of manual transactions at once. We
             # want to start manual transactions for all the provided databases.
