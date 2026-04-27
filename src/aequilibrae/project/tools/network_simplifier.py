@@ -20,7 +20,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 class NetworkSimplifier(WorkerThread): # type: ignore
     signal = SIGNAL(object)
 
-    def __init__(self, project) -> None:
+    def __init__(self, project = None) -> None:
         super().__init__(None)
 
         self.project = project or get_active_project()
