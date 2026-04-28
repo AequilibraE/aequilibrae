@@ -1,11 +1,14 @@
+from __future__ import annotations
 import os
 import shutil
 import sqlite3
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 
 import pandas as pd
 
-from aequilibrae import Project
+if TYPE_CHECKING:
+    from aequilibrae import Project
+
 from aequilibrae.utils.python_signal import PythonSignal
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.log import logger

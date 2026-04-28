@@ -111,7 +111,8 @@ class Periods(BasicTable):
         data["period_start"] = start
         data["period_end"] = end
         data["period_description"] = description if description is not None else ""
-        period = Period(data, period_id, self.project)
+        data["period_id"] = period_id
+        period = Period(data, self.project)
         self.__items[period_id] = period
         return period
 
