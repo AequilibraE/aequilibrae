@@ -459,18 +459,17 @@ class GraphBase(ABC):  # noqa: B024
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
-        if self.centroids is not None:
-            if self.centroids.shape[0]:
-                self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
+        if self.centroids is not None and self.centroids.shape[0]:
+            self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
-                gpb = self.__graph_groupby
-                if any(x not in self.__graph_groupby for x in skim_fields):
-                    gpb = self.graph.groupby(["__compressed_id__"])
+            gpb = self.__graph_groupby
+            if any(x not in self.__graph_groupby for x in skim_fields):
+                gpb = self.graph.groupby(["__compressed_id__"])
 
-                df = gpb.sum(numeric_only=True)[skim_fields].reset_index()
+            df = gpb.sum(numeric_only=True)[skim_fields].reset_index()
 
-                for i, skm in enumerate(skim_fields):
-                    self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
+            for i, skm in enumerate(skim_fields):
+                self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
