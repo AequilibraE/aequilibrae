@@ -172,7 +172,6 @@ class GraphBase(ABC):  # noqa: B024
         self.__network_error_checking__()
 
         # Creates the centroids
-
         if centroids is not None:
             if not np.issubdtype(centroids.dtype, np.integer):
                 raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
