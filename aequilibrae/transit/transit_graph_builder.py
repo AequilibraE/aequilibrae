@@ -10,7 +10,6 @@ TransitGraphBuilder Assumptions:
 - headways are uniform for trips of the same pattern.
 
 """
-from tables.expression import a
 from pandas.core.frame import DataFrame
 
 import warnings
@@ -1181,35 +1180,37 @@ class TransitGraphBuilder:
         self._create_boarding_edges()
         self._create_alighting_edges()
         self._create_connector_edges()
-        if self.with_inner_stop_transfers:
-            self._create_inner_stop_transfer_edges()
-        if self.with_outer_stop_transfers:
-            self._create_outer_stop_transfer_edges()
-        if self.with_walking_edges:
-            self._create_walking_edges()
 
-        # stack the dataframes on top of each other
         assert self.__on_board_edges is not None
         assert self.__boarding_edges is not None
         assert self.__alighting_edges is not None
         assert self.__dwell_edges is not None
         assert self.__connector_edges is not None
-        assert self.__inner_stop_transfer_edges is not None
-        assert self.__outer_stop_transfer_edges is not None
-        assert self.__walking_edges is not None
-        self.edges = pd.concat(
-            [
+
+        edges: list[DataFrame] = [
                 self.__on_board_edges,
                 self.__boarding_edges,
                 self.__alighting_edges,
                 self.__dwell_edges,
-                self.__connector_edges,
-                self.__inner_stop_transfer_edges,
-                self.__outer_stop_transfer_edges,
-                self.__walking_edges,
-            ],
-            axis=0,
-        )
+                self.__connector_edges
+        ]
+
+        # add optional edges
+        if self.with_inner_stop_transfers:
+            self._create_inner_stop_transfer_edges()
+            assert self.__inner_stop_transfer_edges is not None
+            edges.append(self.__inner_stop_transfer_edges)
+        if self.with_outer_stop_transfers:
+            self._create_outer_stop_transfer_edges()
+            assert self.__outer_stop_transfer_edges is not None
+            edges.append(self.__outer_stop_transfer_edges)
+        if self.with_walking_edges:
+            self._create_walking_edges()
+            assert self.__walking_edges is not None
+            edges.append(self.__walking_edges)
+
+        # stack the dataframes on top of each other
+        self.edges = pd.concat(edges, axis=0)
 
         # reset index and copy it to column
         self.edges.reset_index(drop=True, inplace=True)
