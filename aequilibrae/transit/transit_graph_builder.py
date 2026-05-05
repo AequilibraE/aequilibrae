@@ -10,6 +10,8 @@ TransitGraphBuilder Assumptions:
 - headways are uniform for trips of the same pattern.
 
 """
+from tables.expression import a
+from pandas.core.frame import DataFrame
 
 import warnings
 
@@ -97,9 +99,9 @@ class TransitGraphBuilder:
         time_margin: int = 0,
         projected_crs: str = "EPSG:3857",
         num_threads: int = -1,
-        seed: int = None,
-        geometry_noise: bool = None,
-        noise_coef: float = None,
+        seed: int | None = None,
+        geometry_noise: bool | None = None,
+        noise_coef: float | None= None,
         with_inner_stop_transfers: bool = False,
         with_outer_stop_transfers: bool = False,
         with_walking_edges: bool = True,
@@ -122,26 +124,26 @@ class TransitGraphBuilder:
 
         # graph components
         # ----------------
-        self.vertices = None
-        self.edges = None
-        self.__line_segments = None
-        self.od_node_mapping = None
+        self.vertices: pd.DataFrame | None = None
+        self.edges: pd.DataFrame | None = None
+        self.__line_segments: pd.DataFrame | None = None
+        self.od_node_mapping: pd.DataFrame | None = None
 
         # vertices
-        self.__stop_vertices = None
-        self.__boarding_vertices = None
-        self.__alighting_vertices = None
-        self.__od_vertices = None
+        self.__stop_vertices: pd.DataFrame | None = None
+        self.__boarding_vertices: pd.DataFrame | None = None
+        self.__alighting_vertices: pd.DataFrame | None = None
+        self.__od_vertices: pd.DataFrame | None = None
 
         # edges
-        self.__on_board_edges = None
-        self.__dwell_edges = None
-        self.__alighting_edges = None
-        self.__boarding_edges = None
-        self.__connector_edges = None
-        self.__inner_stop_transfer_edges = pd.DataFrame()
-        self.__outer_stop_transfer_edges = pd.DataFrame()
-        self.__walking_edges = pd.DataFrame()
+        self.__on_board_edges: pd.DataFrame | None = None
+        self.__dwell_edges: pd.DataFrame | None = None
+        self.__alighting_edges: pd.DataFrame | None = None
+        self.__boarding_edges: pd.DataFrame | None = None
+        self.__connector_edges: pd.DataFrame | None = None
+        self.__inner_stop_transfer_edges: pd.DataFrame | None = None
+        self.__outer_stop_transfer_edges: pd.DataFrame | None = None
+        self.__walking_edges: pd.DataFrame | None = None
 
         self.global_crs = "EPSG:4326"
         self.__global_crs = pyproj.CRS(self.global_crs)
@@ -202,14 +204,14 @@ class TransitGraphBuilder:
             "max_connectors_per_zone",
         ]
 
-    def add_zones(self, zones, from_crs: str = None):
+    def add_zones(self, zones, from_crs: str | None = None):
         """Add zones as ODs.
 
         :Arguments:
             **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information.
             Columns must include `zone_id` and `geometry`.
 
-            **from_crs** (:obj:`str`): The CRS of the `geometry` column of `zones`. If not provided
+            **from_crs** (:obj:`str`, optional): The CRS of the `geometry` column of `zones`. If not provided
             it's assumed that the geometry is already in ``self.projected_crs``. If provided, the
             geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
         """
@@ -374,6 +376,7 @@ class TransitGraphBuilder:
         tt_full.rename(columns={"trav_time": "trav_time_full"}, inplace=True)
 
         # Compute the mean travel time from the different trips corresponding to
+        assert self.__line_segments is not None
         self.__line_segments = pd.merge(self.__line_segments, tt, on=["pattern_id", "seq"], how="left")
         self.__line_segments = pd.merge(self.__line_segments, tt_full, on=["pattern_id", "seq"], how="left")
         self.__line_segments.trav_time = self.__line_segments.trav_time.fillna(self.__line_segments.trav_time_full)
@@ -444,6 +447,7 @@ class TransitGraphBuilder:
         # compute the mean headway computed among the trips of a given pattern
         mh = mh[["pattern_id", "headway"]].groupby("pattern_id").mean().reset_index(drop=False)
 
+        assert self.__line_segments is not None
         self.__line_segments = pd.merge(self.__line_segments, mh, on=["pattern_id"], how="left")
 
     def _create_stop_vertices(self):
@@ -454,6 +458,7 @@ class TransitGraphBuilder:
             stop_vertices = pd.read_sql(sql=sql, con=conn)
 
         # filter stops that are used on the given time range
+        assert self.__line_segments is not None
         stops_ids = pd.concat((self.__line_segments.from_stop, self.__line_segments.to_stop), axis=0).unique()
         stop_vertices = stop_vertices.loc[stop_vertices.stop_id.isin(stops_ids)]
 
@@ -466,8 +471,10 @@ class TransitGraphBuilder:
 
     def _create_boarding_vertices(self):
         """Create boarding vertices."""
+        assert self.__line_segments is not None
         boarding_vertices = self.__line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
         boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
+        assert self.__stop_vertices is not None
         boarding_vertices = pd.merge(
             boarding_vertices, self.__stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
         )
@@ -480,6 +487,8 @@ class TransitGraphBuilder:
 
     def _create_alighting_vertices(self):
         """Create alighting vertices."""
+        assert self.__line_segments is not None
+        assert self.__stop_vertices is not None
         alighting_vertices = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
         alighting_vertices = pd.merge(
@@ -538,6 +547,7 @@ class TransitGraphBuilder:
     def create_od_node_mapping(self):
         """Build a dataframe mapping the centroid node ids with to transport assignment zone
         ids."""
+        assert self.vertices is not None
         if self.blocking_centroid_flows:
             origin_nodes = self.vertices.loc[
                 self.vertices.node_type == "origin",
@@ -581,7 +591,11 @@ class TransitGraphBuilder:
         self._create_od_vertices()
 
         # stack the dataframes on top of each other
-        self.vertices = pd.concat(
+        assert self.__od_vertices is not None
+        assert self.__stop_vertices is not None
+        assert self.__boarding_vertices is not None
+        assert self.__alighting_vertices is not None
+        self.vertices: DataFrame = pd.concat(
             [
                 self.__od_vertices,
                 self.__stop_vertices,
@@ -615,10 +629,12 @@ class TransitGraphBuilder:
 
     def _create_on_board_edges(self):
         """Create on board edges."""
+        assert self.__line_segments is not None
         on_board_edges = self.__line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
         on_board_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
         # get tail vertex index
+        assert self.vertices is not None
         on_board_edges = pd.merge(
             on_board_edges,
             self.vertices[self.vertices.node_type == "boarding"][["line_id", "line_seg_idx", "node_id"]],
@@ -645,10 +661,12 @@ class TransitGraphBuilder:
 
     def _create_boarding_edges(self):
         """Create boarding edges."""
+        assert self.__line_segments is not None
         boarding_edges = self.__line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
         boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
 
         # get tail vertex index (stop vertex)
+        assert self.vertices is not None
         boarding_edges = pd.merge(
             boarding_edges,
             self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id"]],
@@ -679,10 +697,12 @@ class TransitGraphBuilder:
 
     def _create_alighting_edges(self):
         """Create alighting edges."""
+        assert self.__line_segments is not None
         alighting_edges = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
 
         # get tail vertex index (alighting vertex)
+        assert self.vertices is not None
         alighting_edges = pd.merge(
             alighting_edges,
             self.vertices[self.vertices.node_type == "alighting"][["line_id", "line_seg_idx", "node_id"]],
@@ -713,6 +733,7 @@ class TransitGraphBuilder:
     def _create_dwell_edges(self):
         """Create dwell edges."""
         # we start by removing the first segment of each line
+        assert self.__line_segments is not None
         dwell_edges = self.__line_segments.loc[self.__line_segments.seq != 0][["line_id", "from_stop", "seq"]]
         dwell_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
@@ -721,6 +742,7 @@ class TransitGraphBuilder:
 
         # head vertex index (boarding vertex)
         # boarding vertices of line segments [1:segment_count+1]
+        assert self.vertices is not None
         dwell_edges = pd.merge(
             dwell_edges,
             self.vertices[self.vertices.node_type == "boarding"][["line_id", "stop_id", "node_id", "line_seg_idx"]],
@@ -784,6 +806,7 @@ class TransitGraphBuilder:
             node_type = "origin"
         else:
             node_type = "od"
+        assert self.vertices is not None
         od_vertices = self.vertices[self.vertices.node_type == node_type][["node_id", "taz_id", "geometry"]].copy(
             deep=True
         )
@@ -895,6 +918,7 @@ class TransitGraphBuilder:
         egress_connector_edges = access_connector_edges.copy(deep=True)
         egress_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"}, inplace=True)
 
+        assert self.od_node_mapping is not None
         if self.blocking_centroid_flows:
             # we need to switch the head node to a destination node instead of an origin node
             egress_connector_edges = pd.merge(
@@ -921,6 +945,7 @@ class TransitGraphBuilder:
 
     def _create_inner_stop_transfer_edges(self):
         """Create transfer edges between distinct lines of each stop."""
+        assert self.vertices is not None
         alighting = self.vertices[self.vertices.node_type == "alighting"][["stop_id", "line_id", "node_id"]].rename(
             columns={"line_id": "o_line_id", "node_id": "b_node"}
         )
@@ -935,6 +960,7 @@ class TransitGraphBuilder:
         ]
 
         # update the transfer edge frequency
+        assert self.__line_segments is not None
         inner_stop_transfer_edges = pd.merge(
             inner_stop_transfer_edges,
             self.__line_segments[["from_stop", "line_id", "freq"]],
@@ -979,6 +1005,7 @@ class TransitGraphBuilder:
         stops = stops[stops.parent_station.isin(station_list)]
 
         # load the aligthing vertices (tail of transfer edges)
+        assert self.vertices is not None
         alighting = self.vertices[self.vertices.node_type == "alighting"][
             ["stop_id", "line_id", "node_id", "geometry"]
         ].rename(columns={"line_id": "o_line_id", "geometry": "o_geometry", "node_id": "b_node"})
@@ -1010,6 +1037,7 @@ class TransitGraphBuilder:
         ]
 
         # update the transfer edge frequency
+        assert self.__line_segments is not None
         outer_stop_transfer_edges = pd.merge(
             outer_stop_transfer_edges,
             self.__line_segments[["from_stop", "line_id", "freq"]],
@@ -1078,6 +1106,7 @@ class TransitGraphBuilder:
         stops = stops[stops.parent_station.isin(station_list)]
 
         # tail vertex
+        assert self.vertices is not None
         o_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
             columns={"geometry": "o_geometry", "node_id": "b_node"}
         )
@@ -1160,6 +1189,14 @@ class TransitGraphBuilder:
             self._create_walking_edges()
 
         # stack the dataframes on top of each other
+        assert self.__on_board_edges is not None
+        assert self.__boarding_edges is not None
+        assert self.__alighting_edges is not None
+        assert self.__dwell_edges is not None
+        assert self.__connector_edges is not None
+        assert self.__inner_stop_transfer_edges is not None
+        assert self.__outer_stop_transfer_edges is not None
+        assert self.__walking_edges is not None
         self.edges = pd.concat(
             [
                 self.__on_board_edges,
@@ -1207,6 +1244,8 @@ class TransitGraphBuilder:
         if not all_present:
             raise ValueError("cannot build a transit graph without a GTFS import")
 
+        # FIXME: change these methods that create verticies and edges to standalone functions or static
+        #  methods, and then call them here, and change in-place methods to non-inplace that return the dataframes
         self._create_vertices()
         self._create_edges()
 
@@ -1232,6 +1271,8 @@ class TransitGraphBuilder:
         if method not in ["direct", "connector project match"]:
             raise ValueError("method must be either 'direct' or 'connector project match'")
 
+        assert self.edges is not None
+        assert self.vertices is not None
         self.edges["geometry"] = None
 
         if method == "direct":
@@ -1318,6 +1359,8 @@ class TransitGraphBuilder:
 
         # Loop over connect edges, query for the closest nodes in the project and create the relevant line string
         lines = []
+        assert self.edges is not None
+        assert self.vertices is not None
         for row in self.edges[connector_rows].itertuples():
             # row.a_node - 1 because the node_ids are the index + 1
             start = shapely.ops.transform(
@@ -1360,7 +1403,7 @@ class TransitGraphBuilder:
             lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
         return lines
 
-    def create_additional_db_fields(self, conn: sqlite3.Connection = None):
+    def create_additional_db_fields(self, conn: sqlite3.Connection | None = None):
         """
         Create the additional required entries in the tables.
 
@@ -1397,7 +1440,7 @@ class TransitGraphBuilder:
                 ],
             )
 
-    def save_vertices(self, robust=None, conn: sqlite3.Connection = None):
+    def save_vertices(self, robust=None, conn: sqlite3.Connection | None = None):
         """
         Write the vertices DataFrame to the public transport database.
 
@@ -1423,6 +1466,7 @@ class TransitGraphBuilder:
                     f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})"
                 )
 
+            assert self.vertices is not None
             df = self.vertices[SF_VERTEX_COLS]
             conn.executemany(
                 f"""\
@@ -1449,7 +1493,7 @@ class TransitGraphBuilder:
         with pt_conn as conn:
             conn.execute("DELETE FROM nodes where period_id=?", (period_id,))
 
-    def save_edges(self, recreate_line_geometry=False, conn: sqlite3.Connection = None):
+    def save_edges(self, recreate_line_geometry=False, conn: sqlite3.Connection | None = None):
         """
         Save the contents of self.edges to the public transport database.
 
@@ -1463,6 +1507,7 @@ class TransitGraphBuilder:
            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         # We need to generate the geometry for each edge, this may take a bit
+        assert self.edges is not None
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
@@ -1496,7 +1541,7 @@ class TransitGraphBuilder:
         with pt_conn as conn:
             conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
 
-    def save_config(self, conn: sqlite3.Connection = None):
+    def save_config(self, conn: sqlite3.Connection| None = None):
         with conn or self.project.db_connection as conn:
             sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
             conn.execute(sql, [self.period_id, json.dumps(self.config)])
@@ -1520,8 +1565,8 @@ class TransitGraphBuilder:
     def save(
         self,
         robust=True,
-        pt_conn: sqlite3.Connection = None,
-        project_conn: sqlite3.Connection = None,
+        pt_conn: sqlite3.Connection| None = None,
+        project_conn: sqlite3.Connection| None = None,
     ):
         """Save the current graph to the public transport database.
 
@@ -1562,6 +1607,9 @@ class TransitGraphBuilder:
         #         f"are missing."
         #     )
 
+        assert self.od_node_mapping is not None
+        assert self.vertices is not None
+        assert self.edges is not None
         g = TransitGraph(config=self.config, od_node_mapping=self.od_node_mapping)
         g.network = self.edges.copy(deep=True)
         g.cost = g.network.trav_time.values
@@ -1656,6 +1704,7 @@ class TransitGraphBuilder:
     ):
         """Convert a sparse demand matrix from ``zone_id``\'s to the corresponding
         ``node_id``\'s."""
+        assert self.od_node_mapping is not None
         if self.blocking_centroid_flows:
             od_matrix = pd.merge(
                 demand_matrix,
