@@ -1,5 +1,9 @@
 from .safe_class import SafeClass
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aequilibrae import Project
 
 class Period(SafeClass):
     """A Period object represents a single record in the *periods* table
@@ -18,6 +22,10 @@ class Period(SafeClass):
 
         >>> project.close()
     """
+    period_id: int
+    period_start: int
+    period_end: int
+    period_description: str
 
     def __init__(self, dataset, project):
         """"""
