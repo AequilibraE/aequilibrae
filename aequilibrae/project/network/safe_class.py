@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from pandas.core.algorithms import T
 import shapely.wkb
 
 if TYPE_CHECKING:

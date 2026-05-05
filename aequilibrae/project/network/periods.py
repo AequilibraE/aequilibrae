@@ -89,7 +89,7 @@ class Periods(BasicTable):
         for k in lst:
             del self.__items[k]
 
-    def new_period(self, period_id: int, start: int, end: int, description: str = None) -> Period:
+    def new_period(self, period_id: int, start: int, end: int, description: str | None = None) -> Period:
         """Creates a new period with a given ID
 
         :Arguments:
