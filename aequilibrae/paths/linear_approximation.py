@@ -1,28 +1,27 @@
 import logging
 import os
+import time
 from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
-
 from typing import TYPE_CHECKING
 
 import numpy as np
-from aequilibrae.paths.cython.AoN import (
-    copy_two_dimensions,
-    copy_three_dimensions,
-    linear_combination,
-    linear_combination_skims,
-    aggregate_link_costs,
-    sum_a_times_b_minus_c,
-    linear_combination_1d,
-    triple_linear_combination,
-    triple_linear_combination_skims,
-)
 from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.paths.cython.AoN import (
+    aggregate_link_costs,
+    copy_three_dimensions,
+    copy_two_dimensions,
+    linear_combination,
+    linear_combination_1d,
+    linear_combination_skims,
+    sum_a_times_b_minus_c,
+    triple_linear_combination,
+    triple_linear_combination_skims,
+)
 from aequilibrae.paths.results import AssignmentResults
-
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
@@ -47,7 +46,7 @@ class LinearApproximation(WorkerThread):
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
         self.iteration_issue = []
-        self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
+        self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "time": [], "warnings": []}
         if algorithm in ["cfw", "bfw"]:
             self.convergence_report["beta0"] = []
             self.convergence_report["beta1"] = []
@@ -253,7 +252,12 @@ class LinearApproximation(WorkerThread):
 
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
-        if self.iter == 2 or self.stepsize == 1.0 or self.do_fw_step or self.algorithm in ["msa", "frank-wolfe"]:
+        if (
+            self.iter == 2
+            or self.stepsize_has_been_reset
+            or self.do_fw_step
+            or self.algorithm in ["msa", "frank-wolfe"]
+        ):
             self.do_fw_step = False
             self.do_conjugate_step = True
             self.conjugate_stepsize = 0.0
@@ -613,6 +617,7 @@ class LinearApproximation(WorkerThread):
             converged = self.check_convergence() if self.iter > 1 else False
             self._update_congested_costs()
 
+            self.convergence_report["time"].append(time.perf_counter())
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
