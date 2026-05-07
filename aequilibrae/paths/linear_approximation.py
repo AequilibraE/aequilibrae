@@ -92,6 +92,13 @@ class LinearApproximation(WorkerThread):
         # BFW specific stuff
         self.betas = np.array([1.0, 0.0, 0.0])
 
+        # Optional BFW diagnostics. Activated by setting the env var AEQ_BFW_DEBUG=1.
+        # Captures per-iteration μ/ν/β values, the derivative of the line-search objective
+        # at α=0 and α=1, and the biconjugacy residual e^T H d / (e^T H e).
+        self._bfw_debug = bool(int(os.environ.get("AEQ_BFW_DEBUG", "0")))
+        self._bfw_debug_record = {}
+        self._bfw_debug_log = []
+
         # Instantiates the arrays that we will use over and over
         self.capacity = assig_spec.capacity
 
@@ -215,6 +222,28 @@ class LinearApproximation(WorkerThread):
         self.betas[0] = 1.0 / (1.0 + nu + mu)
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
+
+        if self._bfw_debug:
+            # Orthogonality residual e^T H d / e^T H e measures how badly the
+            # previous-iteration biconjugacy assumption is violated. With x_ ≡ (1-α)·e and
+            # z_ ≡ (1-α)·d the (1-α)^2 factor cancels in the ratio.
+            ed_cross = 0.0
+            for c_0 in self.traffic_classes:
+                for c_1 in self.traffic_classes:
+                    ed_cross += x_[c_0._id] * z_[c_1._id]
+            ed_cross_val = float(np.sum(ed_cross * self.vdf_der))
+            ee_val = float(np.sum(np.sum([x_[c._id] * x_[c._id] for c in self.traffic_classes], axis=0) * self.vdf_der))
+            biconj_residual = ed_cross_val / ee_val if ee_val != 0.0 else float("nan")
+            self._bfw_debug_record = {
+                "alpha_prev": self.stepsize,
+                "mu": float(mu),
+                "nu": float(nu),
+                "mu_numerator": float(mu_numerator),
+                "mu_denominator": float(mu_denominator),
+                "nu_nom": float(nu_nom),
+                "nu_denom": float(nu_denom),
+                "biconj_residual_ed_over_ee": biconj_residual,
+            }
 
     def __calculate_step_direction(self):
         """Calculates step direction depending on the method"""
@@ -630,6 +659,16 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
+
+        if self._bfw_debug and self._bfw_debug_log:
+            import json
+            dbg_path = os.environ.get(
+                "AEQ_BFW_DEBUG_FILE", os.path.join(gettempdir(), f"aeq_bfw_debug_{self.procedure_id}.json")
+            )
+            with open(dbg_path, "w", encoding="utf-8") as fh:
+                json.dump(self._bfw_debug_log, fh, indent=2)
+            self.logger.info(f"BFW diagnostic log written to {dbg_path}")
+
         self.signal.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
@@ -671,6 +710,21 @@ class LinearApproximation(WorkerThread):
 
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
+        if self._bfw_debug:
+            d0_dbg = float(derivative_of_objective(0.0))
+            d1_dbg = float(derivative_of_objective(1.0))
+            rec = {
+                "iter": self.iter,
+                "algorithm": self.algorithm,
+                "betas": self.betas.tolist() if self.algorithm in ("cfw", "bfw") else None,
+                "derivative_at_0": d0_dbg,
+                "derivative_at_1": d1_dbg,
+                "do_fw_step": self.do_fw_step,
+                "conjugate_failed": self.conjugate_failed,
+            }
+            rec.update(self._bfw_debug_record)
+            self._bfw_debug_record = {}
+
         try:
             min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
             self.stepsize = min_res.root
@@ -678,23 +732,46 @@ class LinearApproximation(WorkerThread):
                 self.logger.warning("Descent direction stepsize finder has not converged")
 
             self.conjugate_failed = False
+            if self._bfw_debug:
+                rec["outcome"] = "ok"
+                rec["stepsize"] = self.stepsize
+                self._bfw_debug_log.append(rec)
 
         except ValueError as e:
-            # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
-            # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
-            # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
-            # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
-            # seems to work well in practice.
-            if self.algorithm == "bfw":
-                self.betas.fill(-1)
+            # `root_scalar` raises ValueError when the derivative does not change sign in [0, 1].
+            # There are two genuinely distinct cases:
+            #   * derivative(0) < 0  ⇒  direction is descent at the current point. Since the
+            #     derivative is monotone non-decreasing along the (convex) line, descent
+            #     persists throughout [0, 1] and the optimum sits at α = 1 (or beyond).
+            #     This is a perfectly valid line-search outcome and only happens because we
+            #     bracket the search to the feasible interval. We must NOT treat it as a
+            #     "reset" — the resulting solution is fine and convergence may be checked.
+            #   * derivative(0) >= 0 ⇒  direction is *not* a descent direction. We then need
+            #     to reset to a Frank-Wolfe step (or, if FW itself failed, take a tiny MSA
+            #     step to avoid stalling).
+            d0_for_branch = derivative_of_objective(0.0)
+            d1_for_branch = derivative_of_objective(1.0)
+            if self._bfw_debug:
+                rec["outcome"] = "linesearch_failed"
+                rec["fail_d0"] = float(d0_for_branch)
+                rec["fail_d1"] = float(d1_for_branch)
+                rec["fail_d0_sign"] = "neg" if d0_for_branch < 0 else "nonneg"
 
-            if abs(derivative_of_objective(0.0)) < abs(derivative_of_objective(1.0)):
+            if d0_for_branch >= 0:
+                # Direction is not descent at α = 0. Mark BFW betas as invalid for reporting.
+                if self.algorithm == "bfw":
+                    self.betas.fill(-1)
+
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
                     # works well in practice, however for a large number of iterations this might be too much so
                     # use this heuristic instead.
                     self.logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
                     self.stepsize = tiny_step
+                    if self._bfw_debug:
+                        rec["resolution"] = "tiny_step"
+                        rec["stepsize"] = self.stepsize
+                        self._bfw_debug_log.append(rec)
                 else:
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
@@ -704,16 +781,26 @@ class LinearApproximation(WorkerThread):
                     msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
                     self.logger.warning(msg)
                     self.iteration_issue.append(msg)
+                    if self._bfw_debug:
+                        rec["resolution"] = "fw_reset_recursive"
+                        self._bfw_debug_log.append(rec)
 
                     # By doing it recursively, we avoid doing the same AoN again
                     self.__calculate_step_direction()
                     self.calculate_stepsize()
-
             else:
-                # Do we want to keep some of the old solution, or just throw away everything?
+                # derivative(0) < 0 (and derivative(1) must also be ≤ 0, otherwise the bracket
+                # search would have succeeded). The objective is still decreasing at α = 1, so
+                # the constrained optimum on [0, 1] is α = 1. Take the full step; do NOT mark
+                # this as a reset — convergence checking remains valid.
                 self.stepsize = 1.0
-                self.logger.warning("Reset line search")
-                self.stepsize_has_been_reset = True
+                self.logger.info(
+                    "Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]"
+                )
+                if self._bfw_debug:
+                    rec["resolution"] = "boundary_alpha_1"
+                    rec["stepsize"] = self.stepsize
+                    self._bfw_debug_log.append(rec)
 
         assert 0 <= self.stepsize <= 1.0
 
