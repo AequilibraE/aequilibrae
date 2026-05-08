@@ -1,11 +1,9 @@
 import multiprocessing as mp
 import sys
-import threading
 from datetime import datetime
-from multiprocessing.dummy import Pool as ThreadPool
 from uuid import uuid4
 
-from aequilibrae.paths.cython.AoN import skimming_single_origin
+from aequilibrae.paths.cython.AoN import skimming_parallel
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
@@ -66,24 +64,27 @@ class NetworkSkimming(WorkerThread):
         self.execute()
 
     def execute(self):
-        """Runs the skimming process as specified in the graph"""
+        """Runs the skimming process as specified in the graph.
+
+        Dispatches all origins to a single OpenMP-parallel Cython kernel
+        (``skimming_parallel``). This avoids the per-origin Python pool
+        dispatch overhead the previous ThreadPool-based path paid.
+        """
         self.signal.emit(["start", self.graph.num_zones, ""])
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
         self.aux_res.prepare(self.graph, self.results.cores, self.results.nodes, self.results.num_skims)
-        pool = ThreadPool(self.results.cores)
-        all_threads = {"count": 0}
-        for orig in list(self.graph.centroids):
-            i = int(self.graph.nodes_to_indices[orig])
-            if i >= self.graph.nodes_to_indices.shape[0]:
-                self.report.append(f"Centroid {orig} is beyond the domain of the graph")
-            elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
-                self.report.append(f"Centroid {orig} does not exist in the graph")
-            else:
-                pool.apply_async(self.__func_skim_thread, args=(orig, all_threads))
-        pool.close()
-        pool.join()
+
+        skipped = skimming_parallel(self.graph, self.results, self.aux_res, self.results.cores)
+        for _orig, msg in skipped:
+            self.report.append(msg)
+
+        # Mirror the single-update progress signal so QGIS / TUI listeners get
+        # a "completed" tick. The kernel itself runs nogil so we cannot emit
+        # per-origin updates without serialising on the GIL.
+        self.signal.emit(["update", self.graph.num_zones, f"{self.graph.num_zones}/{self.graph.num_zones}"])
+
         self.aux_res = None
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
@@ -128,16 +129,4 @@ class NetworkSkimming(WorkerThread):
         record.procedure = "Network skimming"
         record.save()
 
-    def __func_skim_thread(self, origin, all_threads):
-        if threading.get_ident() in all_threads:
-            th = all_threads[threading.get_ident()]
-        else:
-            all_threads[threading.get_ident()] = all_threads["count"]
-            th = all_threads["count"]
-            all_threads["count"] += 1
-        x = skimming_single_origin(origin, self.graph, self.results, self.aux_res, th)
-        self.cumulative += 1
-        if x != origin:
-            self.report.append(x)
 
-        self.signal.emit(["update", self.cumulative, f"{self.cumulative}/{self.graph.num_zones}"])

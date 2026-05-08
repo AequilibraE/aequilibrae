@@ -1,6 +1,7 @@
 # cython: language_level=3
 import os
 
+from cython.parallel cimport parallel, prange, threadid
 
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
@@ -497,3 +498,113 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
     return orig
+
+
+def skimming_parallel(graph, result, aux_result, long cores):
+    """OpenMP-parallel skimming over all valid centroids.
+
+    Runs one Dijkstra per origin inside a single ``with nogil, parallel``
+    block, eliminating the per-origin Python ThreadPool dispatch overhead
+    that ``NetworkSkimming.execute`` paid before. Each OpenMP thread uses
+    its own slice of the per-thread aux arrays (indexed by ``threadid()``)
+    and its own persistent priority queue (allocated by
+    ``MultiThreadedNetworkSkimming.prepare``).
+
+    Returns a list of (origin, message) tuples for any centroid that could
+    not be processed. Successful origins return an empty list.
+    """
+    if result._graph_id != graph._id:
+        raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
+
+    cdef:
+        long long compact_nodes = graph.compact_num_nodes + 1
+        long long zones = graph.num_zones
+        long long block_flows_through_centroids = graph.block_centroid_flows
+        long long skims = result.num_skims
+
+    # Pre-resolve centroids -> compact indices on the Python side. We also
+    # filter out any centroid that has no outgoing edges so the parallel
+    # kernel can be a tight loop with no branching for malformed inputs.
+    centroids = list(graph.centroids)
+    compact_nodes_to_indices = graph.compact_nodes_to_indices
+    compact_fs = graph.compact_fs
+    valid_origin_indices = []
+    skipped = []
+    for _orig in centroids:
+        _ci = int(compact_nodes_to_indices[_orig])
+        if _ci < 0 or _ci >= compact_nodes:
+            skipped.append((_orig, f"Centroid {_orig} is outside the compact graph"))
+            continue
+        if compact_fs[_ci] == compact_fs[_ci + 1]:
+            skipped.append((_orig, f"Centroid {_orig} has no outgoing edges"))
+            continue
+        valid_origin_indices.append(_ci)
+
+    cdef long long n_origins = len(valid_origin_indices)
+    if n_origins == 0:
+        return skipped
+
+    cdef long long [:] origin_idx_view = np.asarray(valid_origin_indices, dtype=np.int64)
+
+    # Graph views (shared, read-only across threads).
+    cdef long long [:] graph_fs_view = compact_fs
+    cdef double [:] g_view = graph.compact_cost
+    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
+    cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
+
+    # Output skim cube (origin_index, dest_zone, skim).
+    cdef double [:, :, :] final_skim_view = result.skims.matrix_view
+
+    # Per-thread aux state (sliced by threadid inside the parallel region).
+    cdef long long [:, :] predecessors_mat = aux_result.predecessors
+    cdef long long [:, :] reached_first_mat = aux_result.reached_first
+    cdef long long [:, :] connectors_mat = aux_result.connectors
+    cdef long long [:, :] b_nodes_mat = aux_result.temp_b_nodes
+    cdef double [:, :, :] skim_mat = aux_result.temporary_skims
+
+    # Empty destinations array (we never use early exit for skimming).
+    cdef unsigned char [:] destinations = np.zeros(0, dtype=np.uint8)
+
+    cdef:
+        long long i, oi, w
+        int tid
+
+    with nogil, parallel(num_threads=cores):
+        tid = threadid()
+
+        for i in prange(n_origins, schedule="guided"):
+            oi = origin_idx_view[i]
+
+            if block_flows_through_centroids:
+                blocking_centroid_flows(0, oi, zones, graph_fs_view,
+                                        b_nodes_mat[tid], original_b_nodes_view)
+
+            w = path_finding(oi,
+                             destinations,
+                             -1,
+                             g_view,
+                             b_nodes_mat[tid],
+                             graph_fs_view,
+                             predecessors_mat[tid],
+                             ids_graph_view,
+                             connectors_mat[tid],
+                             reached_first_mat[tid])
+
+            skim_multiple_fields(oi,
+                                 compact_nodes,
+                                 zones,
+                                 skims,
+                                 skim_mat[tid],
+                                 predecessors_mat[tid],
+                                 connectors_mat[tid],
+                                 graph_skim_view,
+                                 reached_first_mat[tid],
+                                 w,
+                                 final_skim_view[oi, :, :])
+
+            if block_flows_through_centroids:
+                blocking_centroid_flows(1, oi, zones, graph_fs_view,
+                                        b_nodes_mat[tid], original_b_nodes_view)
+
+    return skipped
