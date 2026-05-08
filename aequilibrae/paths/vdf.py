@@ -1,4 +1,6 @@
 from aequilibrae.paths.AoN import bpr, delta_bpr, bpr2, delta_bpr2, conical, delta_conical, inrets, delta_inrets
+from aequilibrae.paths.AoN import integral_bpr, integral_bpr2, integral_conical, integral_inrets
+)
 
 all_vdf_functions = ["bpr", "bpr2", "conical", "inrets"]
 
@@ -20,6 +22,7 @@ class VDF:
         self.__dict__["function"] = ""
         self.__dict__["apply_vdf"] = None
         self.__dict__["apply_derivative"] = None
+        self.__dict__["apply_integral"] = None
 
     def __setattr__(self, instance, value) -> None:
         if instance == "function":
@@ -28,15 +31,19 @@ class VDF:
             if value == "BPR":
                 self.__dict__["apply_vdf"] = bpr
                 self.__dict__["apply_derivative"] = delta_bpr
+                self.__dict__["apply_integral"] = integral_bpr
             elif value == "BPR2":
                 self.__dict__["apply_vdf"] = bpr2
                 self.__dict__["apply_derivative"] = delta_bpr2
+                self.__dict__["apply_integral"] = integral_bpr2
             elif value == "CONICAL":
                 self.__dict__["apply_vdf"] = conical
                 self.__dict__["apply_derivative"] = delta_conical
+                self.__dict__["apply_integral"] = integral_conical
             elif value == "INRETS":
                 self.__dict__["apply_vdf"] = inrets
                 self.__dict__["apply_derivative"] = delta_inrets
+                self.__dict__["apply_integral"] = integral_inrets
             else:
                 raise ValueError("VDF function not available")
         else:

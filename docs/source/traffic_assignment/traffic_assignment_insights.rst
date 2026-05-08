@@ -44,14 +44,93 @@ AequilibraE supports class-specific cost functions, where each class can include
 Convergence criteria
 --------------------
 
-Convergence in AequilibraE is measured solely in terms of relative gap, which is a somewhat old 
-recommendation [4]_, but it is still the most used measure in practice, and is detailed below.
+Convergence in AequilibraE is *driven* by the classical relative gap (``RelGap``) — a somewhat old
+recommendation [4]_, but still the most used measure in practice — but several additional
+convergence metrics are *reported* alongside it on every iteration. They are all written to the
+``convergence_report`` attribute of the assignment and printed to the iteration log; only
+``RelGap`` is compared against the stopping criterion. The additional metrics, equivalent by those
+available in commercial packages, give complementary views of how close the assignment is
+to user equilibrium and are particularly useful when comparing AequilibraE against other packages
+or when diagnosing slow convergence.
 
-.. math:: RelGap = \frac{\sum_{a}V_{a}^{*}*C_{a} - \sum_{a}V_{a}^{AoN}*C_{a}}{\sum_{a}V_{a}^{*}*C_{a}}
-
-The algorithm's two stop criteria currently used are the maximum number of iterations and the 
-target Relative Gap, as specified above. These two parameters are described in detail in the 
+The algorithm's two stop criteria currently used are the maximum number of iterations and the
+target ``RelGap``. These two parameters are described in detail in the
 :ref:`parameters_assignment` section, in the :ref:`parameters_file`.
+
+Notation used below: :math:`x_a` is the flow on link ``a`` at the current iteration,
+:math:`y_a` is the all-or-nothing (AON) flow on link ``a`` at the current congested cost,
+:math:`s_a` is the BFW combined step direction flow on link ``a``,
+:math:`c_a(x_a)` is the congested cost on link ``a`` at the current flow,
+:math:`D` is the total assigned demand (PCE-adjusted, summed across classes), and
+:math:`Z(x) = \sum_{a} \int_0^{x_a} c_a(s)\, ds` is the Beckmann objective.
+
+Relative gap (``rgap``) — used for stopping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. math:: \mathit{RelGap} = \frac{\left| \sum_{a} x_{a} \cdot c_{a}(x_{a}) - \sum_{a} y_{a} \cdot c_{a}(x_{a}) \right|}{\sum_{a} x_{a} \cdot c_{a}(x_{a})}
+
+This is the classical Wardrop-style measure of how close the current flow assignment is to the
+result of an all-or-nothing assignment on the current congested costs. **This is the only quantity
+compared against the user-supplied target gap**; the other metrics below are reported but never
+trigger termination.
+
+Direction-based gap (``rgap_direction``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. math:: \mathit{rgap\_direction} = \frac{\sum_{a} x_{a} \cdot c_{a}(x_{a}) - \sum_{a} s_{a} \cdot c_{a}(x_{a})}{\sum_{a} x_{a} \cdot c_{a}(x_{a})}
+
+A variant of the relative gap that uses the BFW combined step direction
+:math:`s_a = \beta_0\, y_a + \beta_1\, s^{k-1}_a + \beta_2\, s^{k-2}_a` instead of the pure AON
+flow in the numerator. Because :math:`s` is a convex combination that includes contributions from
+the current flow's history, this measure is systematically smaller than ``RelGap`` and is the
+quantity reported by some other packages under the same name "relative gap". It is provided for
+direct comparison.
+
+Normalized gap (``normalized_gap``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. math:: \mathit{NormGap} = \frac{\sum_{a} x_{a} \cdot c_{a}(x_{a}) - \sum_{a} y_{a} \cdot c_{a}(x_{a})}{D}
+
+The absolute gap divided by the total assigned demand. Equivalent to the difference between the
+average trip cost on the network and the average trip cost on the current shortest paths,
+expressed in cost units per assigned vehicle. Useful for cross-network comparison because it has
+the same units regardless of network size.
+
+Beckmann objective and lower bounds (``objective``, ``lower_bound``, ``best_lower_bound``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. math:: \mathit{Objective} = Z(x) = \sum_{a} \int_0^{x_a} c_a(s)\, ds
+
+The value of the Beckmann objective at the current iterate. Because :math:`x` is feasible, this is
+always an *upper bound* on the unknown user-equilibrium objective :math:`Z^{*}`. AequilibraE
+computes :math:`Z(x)` link-by-link in closed form for each of the supported VDFs (BPR, BPR2,
+Conical, INRETS).
+
+.. math:: \mathit{LowerBound} = Z(x) + \sum_{a} c_{a}(x_{a}) \cdot (y_{a} - x_{a})
+
+A *lower bound* on :math:`Z^{*}` derived from the convex linearisation of :math:`Z` at :math:`x`
+combined with the AON optimality of :math:`y`. The bound can be negative on the first iterations
+of a freshly-started run because the objective contribution can be much smaller than the inner
+product term until the assignment stabilises.
+
+.. math:: \mathit{BestLowerBound} = \max\left( \mathit{LowerBound}_{k},\ \mathit{BestLowerBound}_{k-1} \right)
+
+The running maximum of ``LowerBound`` across iterations. AequilibraE initialises this to
+:math:`-\infty` at the start of every assignment, so resumed runs (including more iterations on
+top of an already-converged assignment) discard the best lower bound from the previous run.
+``BestLowerBound`` is monotonically non-decreasing
+across iterations within a single assignment.
+
+Best relative gap (``best_rgap``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. math:: \mathit{BestRGap} = \frac{Z(x) - \mathit{BestLowerBound}}{\left| Z(x) \right|}
+
+A measure of how close the current flow's Beckmann objective is to the (unknown) user-equilibrium
+optimum :math:`Z^{*}`. A ``BestRGap`` of e.g. ``0.001`` means the current flow's Beckmann objective
+is within 0.1 % of :math:`Z^{*}`. Because ``BestLowerBound`` is initialised to :math:`-\infty`,
+``BestRGap`` is reported as ``inf`` on the very first iteration where it is computed, and on the
+first iteration of any resumed run.
 
 Available algorithms
 --------------------
@@ -127,6 +206,14 @@ purposes.
 * In some instances, Frank-Wolfe is extremely unstable during the first iterations on assignment, resulting on 
   numerical errors on our line search. We found that setting the step size to the corresponding MSA value 
   (1/current iteration) resulted in the problem quickly becoming stable and moving towards a state where the line search started working properly. This technique was generalized to the conjugate and biconjugate Frank-Wolfe algorithms.
+
+* All five gap measures listed under :ref:`convergence_criteria` are written into the
+  ``convergence_report`` attribute of the assignment object (a dict of lists, one entry per
+  iteration) and emitted to the iteration log line. Only ``RelGap`` is compared against the
+  user-supplied target gap; the others are reported for diagnostic and cross-package comparison
+  purposes. The Beckmann integral :math:`Z(x)` is computed in closed form per VDF in dedicated
+  Cython helpers (``integral_bpr``, ``integral_bpr2``, ``integral_conical``, ``integral_inrets``)
+  exposed through ``vdf.apply_integral``.
 
 Multi-threaded implementation
 -----------------------------

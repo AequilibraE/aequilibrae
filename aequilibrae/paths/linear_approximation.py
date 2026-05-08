@@ -43,7 +43,12 @@ class LinearApproximation(WorkerThread):
         self.convergence_report = {
             "iteration": [],
             "rgap": [],
-            "rgap_quetzal": [],
+            "rgap_direction": [],
+            "normalized_gap": [],
+            "objective": [],
+            "lower_bound": [],
+            "best_lower_bound": [],
+            "best_rgap": [],
             "alpha": [],
             "warnings": [],
         }
@@ -78,11 +83,15 @@ class LinearApproximation(WorkerThread):
 
         self.iter = 0
         self.rgap = np.inf
-        # Quetzal-style relative gap (BFW-direction based; ``msa_utils.py:get_relgap``).
-        # Reported in the convergence report and the iteration log next to the
-        # AequilibraE rgap, but does NOT drive the stopping criterion — that
-        # remains the AON-based ``self.rgap`` against ``self.rgap_target``.
-        self.rgap_quetzal = np.inf
+        self.rgap_direction = np.inf
+        # See ``check_convergence``. ``best_lower_bound`` is intentionally initialised to ``-inf`` so
+        # the first iteration's ``best_rgap`` will be ``inf`` until a valid
+        # lower bound is computed
+        self.objective = np.inf
+        self.lower_bound = -np.inf
+        self.best_lower_bound = -np.inf
+        self.normalized_gap = np.inf
+        self.best_rgap = np.inf
         self.stepsize = 1.0
         self.conjugate_stepsize = 0.0
         self.fw_class_flow = 0
@@ -129,6 +138,21 @@ class LinearApproximation(WorkerThread):
         self._trap_new_flow = np.zeros_like(self.congested_time)
         self._trap_new_cost = np.zeros_like(self.congested_time)
         self._trap_avg_cost = np.zeros_like(self.congested_time)
+
+        # Scratch buffer for the per-link Beckmann integral Z_l = ∫_0^{x_l} c_l ds.
+        # Written into by ``self.vdf.apply_integral`` once per iteration in
+        # ``check_convergence``, then summed to obtain ``self.objective``.
+        self._beckmann_integral_buffer = np.zeros_like(self.congested_time)
+
+        # Total assigned demand (PCE-adjusted, summed across classes), used
+        # as the denominator of the normalized gap. Cached once because the OD matrix 
+        # does not change across iterations.
+        self.total_demand = float(
+            sum(
+                np.sum(c.matrix.matrix_view) * c.pce
+                for c in self.traffic_classes
+            )
+        )
 
         self.step_direction = {}  # type: Dict[AssignmentResults]
         self.previous_step_direction = {}  # type: Dict[AssignmentResults]
@@ -493,7 +517,10 @@ class LinearApproximation(WorkerThread):
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
         self.logger.info(f"{self.algorithm} Assignment STATS")
-        self.logger.info("Iteration, RelativeGap (AON), RelativeGap (Quetzal/BFW direction), stepsize")
+        self.logger.info(
+            "Iteration,RelativeGap,DirectionGap,NormalizedGap,Objective,"
+            "BestLowerBound,BestRGap,StepSize"
+        )
 
         msg = "Equilibrium Assignment"
         for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
@@ -618,7 +645,12 @@ class LinearApproximation(WorkerThread):
 
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
-            self.convergence_report["rgap_quetzal"].append(self.rgap_quetzal)
+            self.convergence_report["rgap_direction"].append(self.rgap_direction)
+            self.convergence_report["normalized_gap"].append(self.normalized_gap)
+            self.convergence_report["objective"].append(self.objective)
+            self.convergence_report["lower_bound"].append(self.lower_bound)
+            self.convergence_report["best_lower_bound"].append(self.best_lower_bound)
+            self.convergence_report["best_rgap"].append(self.best_rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
 
@@ -627,7 +659,11 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
 
-            self.logger.info(f"{self.iter},{self.rgap},{self.rgap_quetzal},{self.stepsize}")
+            self.logger.info(
+                f"{self.iter},{self.rgap},{self.rgap_direction},"
+                f"{self.normalized_gap},{self.objective},"
+                f"{self.best_lower_bound},{self.best_rgap},{self.stepsize}"
+            )
             if converged:
                 self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
@@ -645,7 +681,7 @@ class LinearApproximation(WorkerThread):
 
             msg = (
                 f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} "
-                f"- RGap: {self.rgap:.6} - RGap_Quetzal: {self.rgap_quetzal:.6}"
+                f"- RGap: {self.rgap:.6} - rgap_direction: {self.rgap_direction:.6}"
             )
             self.signal.emit(["set_text", msg])
 
@@ -658,7 +694,10 @@ class LinearApproximation(WorkerThread):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(
             f"{self.algorithm} Assignment finished. {self.iter} iterations, "
-            f"final AON rgap = {self.rgap}, final Quetzal/BFW-direction rgap = {self.rgap_quetzal}"
+            f"final AON rgap = {self.rgap}, "
+            f"final BFW-direction rgap = {self.rgap_direction}, "
+            f"final normalized gap = {self.normalized_gap}, "
+            f"final best relative gap = {self.best_rgap}"
         )
 
         self.signal.emit(["finished"])
@@ -688,23 +727,17 @@ class LinearApproximation(WorkerThread):
         return class_specific_term
 
     def __objective_change_at_stepsize(self, stepsize: float) -> float:
-        """Trapezoidal approximation of the Beckmann objective change
+        """Trapezoidal approximation of the objective function change
         ``Z(x + α·d) − Z(x)`` for a given line-search step ``α = stepsize``.
 
-        Mirrors Quetzal's ``z_prime`` (msa_utils.py:76). On large congested
-        networks (e.g. Chicago, BPR β=4), this trapezoidal line search picks
-        smaller, more conservative α values than the analytic-derivative
-        line search and yields materially better BFW convergence — both
-        because the smaller step matches Quetzal's empirically-effective
-        trajectory and because the smaller α reduces the magnitude of the
-        ``μ·α/(1-α)`` bias term in the next iteration's BFW formula.
+        On large congested networks, this trapezoidal line search picks smaller,
+        more conservative α values than the analytic-derivative line search and yields materially better
+        BFW convergence because the smaller α reduces the magnitude of the ``μ·α/(1-α)`` bias term in
+        the next iteration's BFW formula.
 
-        All intermediate buffers are pre-allocated on the instance
-        (``self._trap_new_flow``, ``self._trap_new_cost``,
-        ``self._trap_avg_cost``) so that this helper does NOT clobber
-        ``self.congested_value`` (which the analytic-derivative line
-        search uses as scratch) and does NOT allocate fresh arrays on
-        every Brent probe.
+        All intermediate buffers are pre-allocated on the instance (``self._trap_new_flow``, ``self._trap_new_cost``,
+        ``self._trap_avg_cost``) so that this helper does NOT clobber ``self.congested_value`` (which the
+        analytic-derivative line search uses as scratch) and does NOT allocate fresh arrays on every Brent probe.
         """
         linear_combination_1d(
             self._trap_new_flow,
@@ -739,32 +772,29 @@ class LinearApproximation(WorkerThread):
             self.stepsize = 1.0 / self.iter
             return
 
-        # For BFW/CFW use a Quetzal-style trapezoidal Beckmann minimiser on
+        # For BFW/CFW use trapezoidal Beckmann minimiser on
         # [0, α_max] instead of root-finding the analytic derivative.
         #
         # Two cooperating mechanisms vs. the analytic root_scalar approach:
         #
         # (1) Trapezoidal objective. The analytic and trapezoidal lines
         #     agree when c(x) is approximately quadratic between x and
-        #     x + d, but diverge significantly when the BPR exponent is
-        #     large (β=4 on Chicago). With the trapezoidal form the early
-        #     α values match Quetzal's φ to ~3 decimals.
-        # (2) Quetzal-style cap α_max = 1/sqrt(iter). Prevents the line
-        #     search from ever returning α = 1.0 — the boundary case that
+        #     x + d, but diverge significantly when the BPR exponent is large (β=4)
+        # (2) The inspiration for a cap α_max = 1/sqrt(iter) comes from Quetzal Transport. 
+        #     It prevents the line search from ever returning α = 1.0 — the boundary case that
         #     would otherwise trigger a 3-iteration FW+CFW restart in
         #     ``__calculate_step_direction`` and poison the BFW history
         #     (s^{k-1} collapses onto the new x^k). The cap also keeps
         #     the ``μ·α/(1-α)`` bias term in the next BFW iteration
         #     bounded.
         #
-        # Combined Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
         if self.algorithm in ("bfw", "cfw"):
             alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5)
             res = minimize_scalar(
                 self.__objective_change_at_stepsize,
                 bounds=(0.0, alpha_max),
                 method="Bounded",
-                options={"xatol": 1e-4, "maxiter": 10},
+                options={"xatol": 1e-6, "maxiter": 50},
             )
             candidate = float(res.x)
             # Brent's bounded method does not evaluate the endpoints exactly.
@@ -862,21 +892,33 @@ class LinearApproximation(WorkerThread):
         assert 0 <= self.stepsize <= 1.0
 
     def check_convergence(self):
-        """Calculate relative gap and return ``True`` if it is smaller than desired precision.
+        """Calculate relative gaps and return ``True`` if the AequilibraE
+        relative gap is smaller than the desired precision.
 
-        Two relative gaps are computed and stored on the instance:
+        Five gap-related quantities are computed and stored on the instance:
 
         * ``self.rgap`` — the AequilibraE convention,
           ``|Σ flow·cost − Σ AON·cost| / Σ flow·cost``. **This is the only
           quantity used for the stopping criterion** (compared against
           ``self.rgap_target``).
-        * ``self.rgap_quetzal`` — Quetzal's convention
-          (``msa_utils.py:get_relgap``),
+        * ``self.rgap_direction`` — the gap in the BFW step direction,
           ``(Σ flow·cost − Σ direction·cost) / Σ flow·cost``, where
           ``direction`` is the BFW combined step direction
           (``self.step_direction_flow``). Reported alongside ``self.rgap``
           in the iteration log and the convergence report so the two
           measures can be compared. NOT used for stopping.
+        * ``self.normalized_gap`` — The absolute
+          gap ``Σ flow·cost − Σ AON·cost`` divided by the total assigned
+          demand. In units of cost per assigned vehicle.
+        * ``self.objective`` — Beckmann objective ``Z(x_k) = Σ_l ∫_0^{x_l}
+          c_l(s) ds``. Always an upper bound on the unknown UE optimum
+          ``Z*`` because ``x_k`` is feasible. Computed via
+          ``self.vdf.apply_integral``.
+        * ``self.lower_bound``, ``self.best_lower_bound``,
+          ``self.best_rgap`` — the convex linearisation lower bound
+          ``LB_k = Z(x_k) + c(x_k)·(y_k − x_k)``, the running maximum
+          across iterations, and the certified suboptimality
+          ``(Z(x_k) − BLB_k) / |Z(x_k)|``.
         """
         if self.stepsize_has_been_reset:
             return False
@@ -884,7 +926,8 @@ class LinearApproximation(WorkerThread):
         current_cost = np.sum(self.congested_time * self.fw_total_flow)
 
         aon_cost = np.sum(self.congested_time * self.aon_total_flow)
-        self.rgap = abs(current_cost - aon_cost) / current_cost
+        absolute_gap = current_cost - aon_cost
+        self.rgap = abs(absolute_gap) / current_cost
 
         # ``step_direction_flow`` is set by ``__calculate_step_direction``
         # which only runs when ``self.iter > 1`` (and not for the
@@ -892,7 +935,39 @@ class LinearApproximation(WorkerThread):
         # is called). Both conditions are already satisfied by the gate in
         # ``execute()``: ``converged = self.check_convergence() if self.iter > 1 else False``.
         direction_cost = np.sum(self.congested_time * self.step_direction_flow)
-        self.rgap_quetzal = (current_cost - direction_cost) / current_cost
+        self.rgap_direction = (current_cost - direction_cost) / current_cost
+
+        # Normalized gap: per-assigned-vehicle suboptimality, in cost units.
+        self.normalized_gap = absolute_gap / self.total_demand
+
+        # Beckmann objective Z(x_k). Computed by integrating the link cost
+        # function from 0 to the current flow on each link, then summing.
+        self.vdf.apply_integral(
+            self._beckmann_integral_buffer,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.cores,
+        )
+        self.objective = float(np.sum(self._beckmann_integral_buffer))
+
+        # New lower bound from convex linearisation:
+        #   LB_k = Z(x_k) + c(x_k)·(y_k − x_k) = objective − absolute_gap.
+        self.lower_bound = self.objective - absolute_gap
+
+        # Best lower bound: monotone non-decreasing across iterations.
+        # Initialised to ``-inf`` in ``__init__``;
+        if self.lower_bound > self.best_lower_bound:
+            self.best_lower_bound = self.lower_bound
+
+        # Best relative gap: certified suboptimality vs. the unknown
+        # equilibrium objective ``Z*``.
+        denom = abs(self.objective)
+        if denom > 0.0:
+            self.best_rgap = (self.objective - self.best_lower_bound) / denom
+        else:
+            self.best_rgap = np.inf
 
         if self.rgap_target >= self.rgap:
             return True
