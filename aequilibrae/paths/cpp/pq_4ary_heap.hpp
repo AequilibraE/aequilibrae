@@ -91,8 +91,14 @@ inline void min_heapify(PriorityQueue* pqueue, std::size_t node_idx) noexcept {
         std::size_t smallest = i;
         double min_key = pqueue->Elements[pqueue->A[smallest]].key;
 
+        // Mirror the original Cython tie-breaking: scan children from highest
+        // index to lowest. Two valid heaps that differ only in tie-break choice
+        // can produce different (but equal-cost) Dijkstra trees; reverse scan
+        // matches the historical reference outputs.
         const std::size_t first_child = kArity * i + 1;
-        for (std::size_t child = first_child; child < first_child + kArity && child < pqueue->size; ++child) {
+        const std::size_t end_child = first_child + kArity < pqueue->size ? first_child + kArity : pqueue->size;
+        for (std::size_t k = end_child; k > first_child; --k) {
+            const std::size_t child = k - 1;
             const double child_key = pqueue->Elements[pqueue->A[child]].key;
             if (child_key < min_key) {
                 smallest = child;
