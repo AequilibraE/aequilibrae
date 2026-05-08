@@ -42,8 +42,7 @@ dependencies = [
   "tqdm",
 ]
 
-license = "LicenseRef-AequilibraE"
-license-files = ["LICENSE.TXT"]
+license = { file = "LICENSE.TXT" }
 
 [project.optional-dependencies]
 
@@ -93,7 +92,7 @@ aequilibrae = "aequilibrae"
 
 [tool.setuptools.package-data]
     "aequilibrae.reference_files"= ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"]
-    "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
+    "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd", "cpp/*.hpp"]
     "aequilibrae.distribution"= ["cython/*.pyx"]
     "aequilibrae.matrix"= ["*.pyx", "*.pxd"]
     "aequilibrae"= ["./parameters.yml"]
