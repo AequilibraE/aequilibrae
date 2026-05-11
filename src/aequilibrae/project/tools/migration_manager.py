@@ -226,7 +226,7 @@ class MigrationManager:
             for migration in self.migrations.values():
                 migration.mark_as_seen(conn)
 
-    def find_applicable(self, conn: sqlite3.Connection):
+    def find_applicable(self, conn: sqlite3.Connection) -> list[tuple[int, MigrationStatus]]:
         """
         Find all applicable migrations.
 
