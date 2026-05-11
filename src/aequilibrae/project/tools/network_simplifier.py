@@ -1,7 +1,9 @@
 import warnings
 from copy import deepcopy
 from math import ceil
-from typing import List
+from typing import List, TYPE_CHECKING
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
 
 import numpy as np
 import pandas as pd
@@ -17,10 +19,10 @@ from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
-class NetworkSimplifier(WorkerThread): # type: ignore
+class NetworkSimplifier(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, project = None) -> None:
+    def __init__(self, project: Project) -> None:
         super().__init__(None)
 
         self.project = project or get_active_project()
