@@ -239,7 +239,7 @@ class MigrationManager:
             **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
 
         """
-        migrations = list(self.status(conn).items()) 
+        migrations = list(self.status(conn).items())
 
         for i in range(len(migrations)):
             k, v = migrations[i]
