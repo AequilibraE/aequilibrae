@@ -1,12 +1,8 @@
-import zipfile
 from itertools import product
-from os.path import join
-from tempfile import gettempdir
 
 import numpy as np
 import pytest
 
-from aequilibrae import Project
 from aequilibrae.paths import path_computation
 from aequilibrae.paths.results import PathResults
 

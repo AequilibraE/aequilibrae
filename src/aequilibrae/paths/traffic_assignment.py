@@ -46,6 +46,7 @@ def _safe_delay_factor(congested_time, free_flow_time):
         where=free_flow_time != 0,
     )
 
+
 logger = logging.getLogger(__name__)
 
 

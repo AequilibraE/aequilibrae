@@ -1,7 +1,4 @@
 import os
-from logging import FileHandler
-
-from aequilibrae.project.project import Project
 
 
 def test_contents(sioux_falls_test):

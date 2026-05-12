@@ -3,10 +3,10 @@ import logging
 import os
 import shutil
 import sqlite3
+import warnings
 from collections import namedtuple
 from contextlib import contextmanager
 from pathlib import Path
-import warnings
 
 import pandas as pd
 
@@ -21,12 +21,12 @@ from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
-from aequilibrae.reference_files import spatialite_database, demo_init_py
+from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close, safe_connect
+from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
-from aequilibrae.utils.logging_utils import default_log_file_config
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +257,7 @@ class Project:
         """
         logger.info("Starting database upgrades")
         if ignore_project or ignore_transit or ignore_results:
-            warnings.warn("Take care when ignoring a database during an upgrade.")
+            warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
 
         connections = {
             "project_conn": None,

@@ -1,14 +1,13 @@
 import csv
+import logging
 import math
 import re
 import string
 from collections import defaultdict
 from copy import deepcopy
-import logging
 
 import numpy as np
 import pandas as pd
-import shapely.wkb
 import shapely.wkt
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
@@ -86,7 +85,8 @@ class GMNSBuilder:
         if gmns_geom not in self.link_df.columns.to_list():
             if self.geom_df is None:
                 raise ValueError(
-                    "To create an aequilibrae links table, geometries information must be provided either in the GMNS link table or in a separate file ('geometry_path' attribute)."
+                    "To create an aequilibrae links table, geometries information must be provided either in the GMNS"
+                    " link table or in a separate file ('geometry_path' attribute)."
                 )
             else:
                 self.link_df = self.link_df.merge(self.geom_df, on="geometry_id", how="left")
@@ -133,8 +133,9 @@ class GMNSBuilder:
         all_fields = list(gmns_l_fields)
         missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
         if missing_f != []:
-            print(
-                f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+            logger.error(
+                f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please "
+                "modify the parameters.yml file."
             )
 
         # Adding new fields to AequilibraE nodes table / Preparing it to receive information from GMNS table.
@@ -158,8 +159,9 @@ class GMNSBuilder:
         all_fields = list(gmns_n_fields)
         missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
         if missing_f != []:
-            print(
-                f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+            logger.error(
+                f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please "
+                "modify the parameters.yml file."
             )
 
         # Getting information from some optinal GMNS fields
@@ -333,7 +335,7 @@ class GMNSBuilder:
         else:
             link_types_list = self.link_df[gmns_ltype].to_list()
 
-        ## Adding link_types to AequilibraE model
+        # Adding link_types to AequilibraE model
 
         link_types_list = [s.replace("-", "_") for s in link_types_list]
         type_saved = ""
@@ -492,7 +494,8 @@ class GMNSBuilder:
                 new_link = LineString(link_points)
                 self.link_df.loc[idx, "geometry"] = new_link.wkt
                 logger.info(
-                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. It was not connected to its start node."
+                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. "
+                    "It was not connected to its start node."
                 )
 
             if link_end_boundary != (to_point_x, to_point_y):
@@ -509,7 +512,8 @@ class GMNSBuilder:
                 new_link = LineString(link_points)
                 self.link_df.loc[idx, "geometry"] = new_link.wkt
                 logger.info(
-                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. It was not connected to its end node."
+                    f"Geometry for link_id = {row[gmns_lid]} has just been corrected. "
+                    "It was not connected to its end node."
                 )
 
     def save_to_database(self, links_fields, nodes_fields):

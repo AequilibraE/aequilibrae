@@ -411,11 +411,13 @@ cdef class RouteChoiceSet:
 
         if zero_cost_ods:
             warnings.warn(
-                f"found zero cost routes for OD pairs, the entire route set has been masked for: {zero_cost_ods}"
+                f"found zero cost routes for OD pairs, the entire route set has been masked for: {zero_cost_ods}",
+                stacklevel=2,
             )
         if unreachable_ods:
             warnings.warn(
-                f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}"
+                f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}",
+                stacklevel=2,
             )
 
     def assign_from_df(

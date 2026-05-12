@@ -1,4 +1,3 @@
-import logging
 import pytest
 
 from aequilibrae.project.database_connection import database_connection

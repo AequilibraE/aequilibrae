@@ -71,9 +71,8 @@ def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEF
     logger = logging.getLogger("aequilibrae")
 
     if any(
-            isinstance(handler, logging.StreamHandler)
-            and handler.stream == sys.stderr or handler.stream == sys.stdout
-            for handler in logger.handlers
+        isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr or handler.stream == sys.stdout
+        for handler in logger.handlers
     ):
         return
 
