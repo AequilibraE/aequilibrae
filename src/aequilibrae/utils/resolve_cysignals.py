@@ -9,4 +9,9 @@ from os.path import dirname, relpath
 
 import cysignals
 
-print(relpath(dirname(cysignals.__file__)))
+try:
+    path = relpath(dirname(cysignals.__file__))
+except ValueError:
+    path = dirname(cysignals.__file__)
+
+print(path)
