@@ -32,4 +32,4 @@ def replace_version(file_path, suffix):
 
 
 replace_in_file("pyproject.toml", "numpy", "<1.99")
-replace_version("./aequilibrae/__init__.py", ".dev")
+replace_version("./src/aequilibrae/__init__.py", ".dev")

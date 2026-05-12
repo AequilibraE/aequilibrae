@@ -11,11 +11,16 @@ is our current roadmap.
 Contributing to AequilibraE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This page presents some initial instructions on how to set up your system to start contributing to 
+This page presents some initial instructions on how to set up your system to start contributing to
 AequilibraE and lists the requirements for all pull requests to be merged into master.
 
 .. note::
-   The recommendations on this page are current as of October 2021.
+   The recommendations on this page are current as of April 2026.
+
+.. note::
+   In April 2026 the build back-end of AequilibraE was changed to ``meson-python`` to better support the growing amount
+   of C++ and Cython code. While this changed the initial setup for advanced development workflows, the simple edit,
+   ``pip install .``, repeat, workflow remains functional.
 
 Software Design and requirements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -23,7 +28,8 @@ Software Design and requirements
 The most important piece of AequilibraE's backend is, without a doubt, `NumPy <http://numpy.org>`__.
 
 Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
-accelerate computation. All compiled code is written in `Cython <https://cython.org/>`_.
+accelerate computation. Most compiled code is written in `Cython <https://cython.org/>`_ with particular core pieces
+implemented in C++17.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
 found in `this article <https://doi.org/10.1371/journal.pbio.1001745>`_.
@@ -33,44 +39,128 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.10, 3.11, 3.12, 3.13 & 3.14, but we recommend using Python 3.11 or 3.12 for
+AequilibraE is currently tested for Python 3.10, 3.11, 3.12 & 3.13, but we recommend using Python 3.12 or 3.13 for
 development.
 
-We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or 
+We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or
 `VSCode <https://code.visualstudio.com/>`_ which are awesome IDEs for Python.
 
 If you are using a different IDE, we would welcome if you could contribute with instructions to set that up.
 
-Non-Windows
-+++++++++++
+.. note::
+
+   The following makes heavy use of `UV <https://docs.astral.sh/uv/>`_, an "extremely fast Python package and project
+   manager, written in Rust." We utilise the ``uv`` pip-compatible interface rather than the ``uv`` project management
+   for simplicity. If you choose the use the ``uv`` project management interface you should be away of `uv does not work
+   with meson-python editable installs <https://github.com/astral-sh/uv/issues/10214>`_ and supply ``--no-editable`` to
+   ``uv run`` and ``uv sync``.
+
+Simple development installation
++++++++++++++++++++++++++++++++
+
+Make sure to clone the AequilibraE repository and run the following from within that cloned repository.
+
+The following instructions assume you are using `UV <https://docs.astral.sh/uv/>`_ and Python 3.12. If you'd like to use
+another Python version simply change the installed version.
+
+AequilibraE compilation requires access to a C++17 compatible compiler with OpenMP support.
+
+On MacOS please refer to :ref:`macos_compilation` for installation of LLVM as the pre-installed clang does not support OpenMP.
+
+On Unix-like operating systems please refer to your package manager of choice for installation instructions.
+
+On Windows we recommend the Visual Studio C and C++ desktop development components.
+
 ::
 
-  ./ci.sh setup_dev
+  uv python install 3.12  # Install the latest Python 3.12
+  uv venv --python 3.12   # Creates the ".venv" virtual enviroment using the version of Python we just installed
 
-Windows
+Then activate the virtual environment for this shell.
+
+For Unix-like operating systems:
+::
+  .venv/bin/activate
+
+For Windows:
+::
+
+  .venv\Scripts\activate  # Activate the virtual enviroment for this shell
+
+Then install AequilibraE.
+::
+
+  uv pip install .
+
+
+Visual Studio Code
+++++++++++++++++++
+
+Visual Studio Code should automatically detect the virtual environment if it is at the top of the workspace. If you need
+to create the virtual environment some where else other than at the root of the project you can add the directory
+containing the virtual environments to your workspace.
+
+PyCharm
 +++++++
 
-Make sure to clone the AequilibraE repository and run the following from within that cloned repo using an elevated command prompt.
-
-Python 3.12 (or whatever version you chose) needs to be installed, and the following instructions assume you are 
-using `Chocolatey <https://chocolatey.org/>`_ as a package manager.
-
-::
-
-  cinst python3 --version 3.12
-  cinst python
-
-  set PATH=C:\Python312;%PATH%
-  python -m pip install pipenv
-  virtualenv .venv #Only if you want to save the virtual environment in the same folder
-  python -m pipenv install --dev
-  python -m pipenv run pre-commit-install
-
-Setup Pycharm with the virtual environment you just created.
+Setup PyCharm with the virtual environment you just created.
 
 ::
 
   Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
+
+Advanced installation
++++++++++++++++++++++
+
+An advanced development installation is for users who want to develop AequilibraE with a faster edit-compile-run
+workflow, different build configurations, use AequilibraE under a C++ debugger, or with address sanitation enabled.
+
+The following assumes you have a working Python virtual environment with the repository cloned.
+
+We'll be creating an editable installation with no build-isolation to allow meson quickly recompile AequilibraE on
+import. Due to the lack of build-isolation we need to ensure the virtual environment contains all the build dependencies
+as well the runtime dependencies.
+
+::
+
+  uv pip install meson-python ninja cython
+
+Meson-python operates on a "build directory" rather than working in-tree as the previous build-system did
+(``setuptools``). It will create a directory that uses a specific configuration (release, debug, etc.), then that can be
+chosen when installing. The following creates a release configuration, ``build``, and debug build, ``build-dbg``, with
+optimisation disabled and the address sanitiser enabled.
+
+Meson can be invoked directly to create the build directory. This step is optional but allows the separation of the
+configuration and installation steps.
+
+::
+
+  meson setup build
+  meson setup build-dbg -Dbuildtype=debug -Db_sanitize=address,undefined
+
+Then the configuration to use can be selected when installing in the virtual environment.
+
+::
+
+  uv pip install --no-build-isolation --editable . -Cbuild-dir=build -Ceditable-verbose=true
+
+``--no-build-isolation`` is required when using ``--editable`` because the recompilation on import will use the current
+virtual environment as opposed to a temporary one typically used. ``editable-verbose=true`` enables the print out of the
+compilation upon import, this is required to see build error and warnings without a separate compilation step.
+
+The above steps can be done in a single command as well (for example with the debug build)
+
+::
+
+  uv pip install -e . --no-build-isolation -Cbuild-dir=build-dbg -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined" -Ceditable-verbose=true
+
+The build directory and other configuration can be omitted to use a standard release build under the name ``build``
+with:
+
+::
+
+  uv pip install -e . --no-build-isolation -Ceditable-verbose=true
+
 
 Development Guidelines
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -83,15 +173,15 @@ Style
 
 * Python code should follow (mostly) the `pycodestyle style guide <https://pycodestyle.pycqa.org/en/latest/>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/latest/peps/pep-0287/>`_
-* We are big fans of auto-code formatting. For that, we use `ruff <https://docs.astral.sh/ruff/>`_ and 
-  `Black <https://black.readthedocs.io/en/stable/>`_.
+* We are big fans of auto-code formatting. For that, we use `ruff <https://docs.astral.sh/ruff/>`_ and
+  `cython-lint <https://pypi.org/project/cython-lint/>`_.
 * Negating some of what we have said so far, we use maximum line length of 120 characters
 
 Imports
 ^^^^^^^
 
 * Imports should be one per line.
-* Imports should be grouped into standard library, third-party, and intra-library imports 
+* Imports should be grouped into standard library, third-party, and intra-library imports
   (``CTRL + SHIFT + o`` does it automatically on PyCharm).
 * Imports of NumPy and Pandas should follow the following convention:
 
@@ -133,7 +223,7 @@ In a more verbose way...
   * Documentation building test
 
 * If the tests pass, then a manual pull request can be approved to merge into develop.
-* The ``main`` and ``develop`` branches are protected and therefore can only be written to 
+* The ``main`` and ``develop`` branches are protected and therefore can only be written to
   after the code has been reviewed and approved.
 * No individual has the privileges to push to the ``main`` or ``develop`` branches.
 
@@ -173,37 +263,43 @@ Testing is done for Windows, MacOs and Ubuntu Linux on all supported Python vers
 to run these tests. These tests need to pass and additionally somebody has to
 manually review the code before merging it into master (or returning for corrections).
 
-In some cases, test targets need to be updated to match the new results produced by the code since these 
-are now the correct results.  In order to update the test targets, first determine which tests are 
-failing and then review the failing lines in the source files.  These are easy to identify since each 
-test ultimately comes down to one of Python's various types of ``assert`` statements.  Once you identify 
-which ``assert`` is failing, you can work your way back through the code that creates the test targets in 
-order to update it. After updating the test targets, re-run the tests to confirm the new code passes all 
+In some cases, test targets need to be updated to match the new results produced by the code since these
+are now the correct results.  In order to update the test targets, first determine which tests are
+failing and then review the failing lines in the source files.  These are easy to identify since each
+test ultimately comes down to one of Python's various types of ``assert`` statements.  Once you identify
+which ``assert`` is failing, you can work your way back through the code that creates the test targets in
+order to update it. After updating the test targets, re-run the tests to confirm the new code passes all
 the tests.
 
 Documentation
 ^^^^^^^^^^^^^
 
-All the AequilibraE documentation is (unfortunately) written in 
-`reStructuredText <http://docutils.sourceforge.net/rst.html>`_  and built with 
+All the AequilibraE documentation is (unfortunately) written in
+`reStructuredText <http://docutils.sourceforge.net/rst.html>`_  and built with
 `Sphinx <http://www.sphinx-doc.org/en/stable/>`_.
 Although reStructuredText is often unnecessarily convoluted to write, Sphinx is capable of converting it to standard-
 looking HTML pages, while also bringing the docstring documentation along for the ride.
 
 To build the documentation, first make sure the required packages are installed. If you have correctly setup the dev
-environment above, then nothing else is needed. However, if you have incorrectly only run::
+environment above, then nothing else is needed. However, if you have incorrectly only run
 
-    python -m pipenv install
+::
 
-Then you will have to run::
+  uv pip install .
 
-    python -m pipenv install --dev
+Then you will have to run
 
-Next, build the documentation in html format with the following commands run from the ``root`` folder::
+::
 
-    sphinx-apidoc -T -o docs/source/generated aequilibrae
-    cd docs
-    make html
+  uv pip install ".[dev]"
+
+Next, build the documentation in html format with the following commands run from the ``root`` folder
+
+::
+
+  sphinx-apidoc -T -o docs/source/generated src/aequilibrae
+  cd docs
+  make html
 
 More information on writing and contributing to AequilibraE's documentation are available
 :ref:`in this page <guide_to_docs>`.
@@ -211,11 +307,11 @@ More information on writing and contributing to AequilibraE's documentation are 
 Working with progress bars
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-From version 1.1.0, AequilibraE is capable of displaying progress bars in Jupyter Notebooks using 
+From version 1.1.0, AequilibraE is capable of displaying progress bars in Jupyter Notebooks using
 `TQDM <https://tqdm.github.io/>`_. For the companion QGIS plugin, `PyQt6 <https://doc.qt.io/qtforpython-6/index.html>`_
 is used to emit messages in progress bars.
- 
-AequilibraE provides a wrapper class `SIGNAL` that will use the appropriate underlying mechanism to display 
+
+AequilibraE provides a wrapper class `SIGNAL` that will use the appropriate underlying mechanism to display
 the progress bars.
 
 .. code-block:: python
@@ -226,7 +322,7 @@ the progress bars.
       signal = SIGNAL(object)
 
       def my_method(self):
-        signal.emit(['start', 10, 'running my method']) 
+        signal.emit(['start', 10, 'running my method'])
         for i in range(0, 10):
            signal.emit(['update', i, f"Current val: {i}"])
            sleep(0.4)

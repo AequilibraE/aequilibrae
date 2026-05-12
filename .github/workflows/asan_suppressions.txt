@@ -1,0 +1,14 @@
+leak:site-packages/pyarrow
+leak:site-packages/numpy
+leak:site-packages/scipy
+leak:site-packages/pandas
+leak:site-packages/matplotlib
+leak:_PyObject_Malloc
+leak:_PyObject_Calloc
+leak:PyUFunc_FromFuncAndDataAndSignatureAndIdentity
+leak:_PyBytes_Resize.localalias
+leak:resize_compact
+leak:PyThread_allocate_lock.localalias
+leak:_PyUnicodeWriter_Finish
+leak:_PyTuple_Resize
+leak:_PyBytes_Resize
