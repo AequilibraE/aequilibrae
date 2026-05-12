@@ -13,7 +13,7 @@ comparing algorithm results.
 
 Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
-All tests were performed with the AequilibraE version 1.1.0.
+All tests were performed with the AequilibraE version 1.7.0.
 
 As shown below, the results produced by AequilibraE are within expected, although
 some differences have been found, particularly for Winnipeg. We suspect that there are 
@@ -58,44 +58,6 @@ issues with the reference results and welcome further investigations.
                 :align: center
                 :width: 590
                 :alt: Chicago MSA 1000 iterations
-
-   .. tab-item:: Barcelona
-
-      .. tab-set::
-
-         .. tab-item:: Network stats
-
-            * Links: 2,522
-            * Nodes: 1,020
-            * Zones: 110
-
-         .. tab-item:: biconjugate Frank-Wolfe
-
-            .. image:: ../_images/assig_validation/Barcelona_bfw-1000_iter.png
-                :align: center
-                :width: 590
-                :alt: Barcelona Biconjugate Frank-Wolfe 1000 iterations
-
-         .. tab-item:: Conjugate Frank-Wolfe
-
-            .. image:: ../_images/assig_validation/Barcelona_cfw-1000_iter.png
-                :align: center
-                :width: 590
-                :alt: Barcelona Conjugate Frank-Wolfe 1000 iterations
-
-         .. tab-item:: Frank-Wolfe
-
-            .. image:: ../_images/assig_validation/Barcelona_fw-1000_iter.png
-                :align: center
-                :width: 590
-                :alt: Barcelona Frank-Wolfe 1000 iterations
-
-         .. tab-item:: MSA
-
-            .. image:: ../_images/assig_validation/Barcelona_msa-1000_iter.png
-                :align: center
-                :width: 590
-                :alt: Barcelona MSA 1000 iterations
 
    .. tab-item:: Winnipeg
 
@@ -228,13 +190,6 @@ as that instance has a comparable size to real-world models.
           :width: 590
           :alt: Algorithm convergence comparison
 
-   .. tab-item:: Barcelona
-
-      .. image:: ../_images/assig_validation/convergence_comparison_Barcelona.png
-          :align: center
-          :width: 590
-          :alt: Algorithm convergence comparison
-
    .. tab-item:: Winnipeg
 
       .. image:: ../_images/assig_validation/convergence_comparison_Winnipeg.png
@@ -272,15 +227,15 @@ applications.
 Computational performance
 -------------------------
 
-All tests were run on a workstation equipped AMD Threadripper 3970X with 32 cores
-(64 threads) @ 3.7 GHz (memory use is trivial for these instances).
+All tests were run on a desktop equipped with an Intel Core Ultra 285K (**14 cores used only**)
+running Windows 11 Pro.
 
 On this machine, AequilibraE performed 1,000 iterations of
-biconjugate Frank-Wolfe assignment on the Chicago Network in a little over 4 minutes,
-or a little less than 0.43s per iteration.
+biconjugate Frank-Wolfe assignment on the Chicago Network in around 267 seconds,
+or around 0.267s per iteration (other algorithms are as low as 0.230 seconds per iteration).
 
-Compared with AequilibraE previous versions, we can notice a reasonable decrease
-in processing time.
+This performance is substantially better than seen on previous versions and is on par with
+that of commercial software.
 
 .. note::
    The biggest opportunity for performance in AequilibraE right now it to apply
@@ -301,11 +256,12 @@ understand, and then we'll perform the assignment.
 .. _code-block-for-convergence-study:
 
 .. code-block:: python
-
     # Imports
+    import os
+    os.environ["AEQ_SHOW_PROGRESS"] = "FALSE"
+
     from pathlib import Path
     from time import perf_counter
-
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
@@ -387,8 +343,16 @@ understand, and then we'll perform the assignment.
         return g
 
     def known_results(folder: Path, model_stub: str) -> pd.DataFrame:
-        df = pd.read_csv(folder / f"{model_stub}_flow.tntp", sep='\t')
-        df.columns = ["a_node", "b_node", "TNTP Solution", "cost"]
+        df = pd.read_csv(folder / f"{model_stub}_flow.tntp", skiprows=8, sep='\t')
+
+        cols = ["a_node", "b_node", "TNTP Solution", "cost"]
+        if len(df.columns) == 5:
+            cols.append("trash")
+        df.columns = cols
+
+        if len(cols) == 5:
+            df = df.drop(columns=["trash"])
+
         return df
 
     # Let's run the assignment
@@ -396,6 +360,7 @@ understand, and then we'll perform the assignment.
         assigclass = TrafficClass("car", g, mat)
         if "toll" in g.network.columns:
             assigclass.set_fixed_cost("toll")
+            assigclass.set_vot(1.0)
 
         assig = TrafficAssignment()
         assig.set_classes([assigclass])
@@ -406,6 +371,7 @@ understand, and then we'll perform the assignment.
         assig.max_iter = 1000
         assig.rgap_target = 1e-10 # Nearly guarantees that convergence won't be reached
         assig.set_algorithm(algorithm)
+        assig.set_cores(14)
         assig.execute()
         return assig
 
@@ -448,6 +414,7 @@ understand, and then we'll perform the assignment.
         known_flows = known_results(folder, model_stub)
         # We run the traffic assignment
         conv = None
+        print(f"start assignment for {model_stub}")
         for algorithm in ["bfw", "cfw", "fw", "msa"]:
             t = -perf_counter()
             assig = assign(g, mat, algorithm)
@@ -477,11 +444,10 @@ understand, and then we'll perform the assignment.
         plt.legend(title='Columns')
         plt.savefig(folder / f"convergence_comparison_{model_name}.png", dpi=300)
 
-    models = {"chicago": [Path(r'D:\src\TransportationNetworks\chicago-regional'), "ChicagoRegional"],
-          "sioux_falls": [Path(r'D:\src\TransportationNetworks\SiouxFalls'), "SiouxFalls"],
-            "anaheim": [Path(r'D:\src\TransportationNetworks\Anaheim'), "Anaheim"],
-            "winnipeg": [Path(r'D:\src\TransportationNetworks\Winnipeg'), "Winnipeg"],
-            "barcelona": [Path(r'D:\src\TransportationNetworks\Barcelona'), "Barcelona"],
+    models = {"chicago": [Path(r'D:\OL\src\TransportationNetworks\chicago-regional'), "ChicagoRegional"],
+              "sioux_falls": [Path(r'D:\OL\src\TransportationNetworks\SiouxFalls'), "SiouxFalls"],
+              "anaheim": [Path(r'D:\OL\src\TransportationNetworks\Anaheim'), "Anaheim"],
+              "winnipeg": [Path(r'D:\OL\src\TransportationNetworks\Winnipeg'), "Winnipeg"],
           }
 
     convergence = {}
