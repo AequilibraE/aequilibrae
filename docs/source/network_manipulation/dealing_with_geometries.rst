@@ -36,7 +36,7 @@ usefulness of this implementation or its robustness in face of minimally careful
 use of the tool.
 
 .. note::
-  This documentation, as well as the SQL code it referes to, comes from the
+  This documentation, as well as the SQL code it refers to, comes from the
   seminal work done in `TranspoNet <http://github.com/AequilibraE/TranspoNet/>`_
   by `Pedro <https://au.linkedin.com/in/pedrocamargo>`_ and
   `Andrew <https://au.linkedin.com/in/andrew-o-brien-5a8bb486>`_.

@@ -5,9 +5,8 @@ import urllib
 import warnings
 from os.path import basename, join
 from pathlib import Path
-from sqlite3 import Connection, register_adapter
+from sqlite3 import Connection, OperationalError, register_adapter
 from tempfile import gettempdir
-from typing import Optional
 from zipfile import ZipFile
 
 import numpy as np
@@ -15,12 +14,13 @@ import numpy as np
 from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
-# Setup adapaters so that we can read/write numpy types directly to DB
+# Setup adapters so that we can read/write numpy types directly to DB
 register_adapter(np.int64, int)
 register_adapter(np.int32, int)
 register_adapter(np.float32, float)
 register_adapter(np.float64, float)
 register_adapter(object, str)
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,31 @@ def _connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False):
 
 def load_spatialite_extension(conn: Connection):
     conn.enable_load_extension(True)
-    conn.load_extension("mod_spatialite")
+    directory = os.environ.get("AEQ_SPATIALITE_DIR")
+
+    # Try loading from specific directory first
+    if directory:
+        try:
+            conn.load_extension(os.path.join(directory, "mod_spatialite"))
+            return
+        except OperationalError:
+            logger.error(
+                f"Environment variable 'AEQ_SPATIALITE_DIR' was provided ({directory}), "
+                "but mod_spatialite could not be loaded from this directory. Trying system path"
+            )
+
+    try:
+        conn.load_extension("mod_spatialite")
+    except OperationalError as e:
+        if is_windows():
+            ensure_spatialite_binaries()
+            try:
+                # Retry after potential download
+                directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
+                conn.load_extension(os.path.join(directory, "mod_spatialite"))
+                return
+            except OperationalError as e2:
+                raise e2 from e
 
 
 def is_spatialite(conn):
@@ -75,7 +99,12 @@ def ensure_spatialite_binaries() -> None:
 
     if not _dll_already_exists(directory):
         logger.info(f"mod_spatialite.dll not found in {directory} attempting to download")
-        _download_and_extract_spatialite(directory)
+        try:
+            _download_and_extract_spatialite(directory)
+            os.environ["AEQ_SPATIALITE_DIR"] = directory
+        except Exception as e:
+            logger.error(f"Failed to download Spatialite binaries: {e}")
+            raise e
 
     set_known_spatialite_folder(directory)
 
@@ -91,7 +120,7 @@ def ensure_spatialite_binaries() -> None:
         shutil.copyfile(join(directory, "proj.db"), join(projdb_dir, "proj.db"))
     except Exception as e:
         msg = f"Could not put the proj.db file in the expected place. {e.args}"
-        warnings.warn(msg)
+        warnings.warn(msg, stacklevel=2)
         logger.warning(msg)
 
 
@@ -109,7 +138,7 @@ def _download_and_extract_spatialite(directory: os.PathLike) -> None:
     os.remove(zip_file)
 
 
-def spatialize_db(conn):
+def spatialize_db(conn, logger=None):
     logger.info("Adding Spatialite infrastructure to the database")
     if not inside_qgis and not is_spatialite(conn):
         try:

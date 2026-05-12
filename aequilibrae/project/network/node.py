@@ -5,7 +5,6 @@ from typing import Optional
 from shapely.geometry import Polygon
 from .safe_class import SafeClass
 from .connector_creation import connector_creation
-from ...utils.spatialite_utils import load_spatialite_extension
 
 logger = logging.getLogger(__name__)
 

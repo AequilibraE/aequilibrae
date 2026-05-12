@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from sphinx_gallery.sorting import ExplicitOrder
 import pkg_resources
+import sphinx
 
 project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
@@ -65,13 +66,11 @@ extensions = [
     "sphinx_design",
     "sphinx_copybutton",
     "sphinx_git",
-    "sphinx_tabs.tabs",
     "sphinx_subfigure",
 ]
 
-sphinx_tabs_disable_tab_closing = True
 
-# Change plot_gallery to True to start building examples again
+
 sphinx_gallery_conf = {
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
@@ -101,6 +100,22 @@ language = "en"
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+# Suppress docutils/toc/highlighting warnings emitted by legacy docs and notebooks.
+# Suppress legacy warnings from missing references/assets in the published docs set.
+suppress_warnings = [
+    "docutils",
+    "toc.not_included",
+    "toc.not_readable",
+    "download.not_readable",
+    "misc.highlighting_failure",
+    "ref.doc",
+    "ref.ref",
+]
+# Mock setup modules that invoke setup() when imported during autodoc.
+autodoc_mock_imports = [
+    "aequilibrae.distribution.setup_ipf",
+    "aequilibrae.paths.setup_assignment",
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"

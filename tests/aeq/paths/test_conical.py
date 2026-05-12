@@ -1,5 +1,4 @@
-import pytest
-from aequilibrae.paths.AoN import conical, delta_conical
+from aequilibrae.paths.cython.AoN import conical, delta_conical
 from multiprocessing import cpu_count
 import numpy as np
 

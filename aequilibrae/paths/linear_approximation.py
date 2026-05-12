@@ -3,29 +3,37 @@ import os
 from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
-from typing import List, Dict
+from typing import TYPE_CHECKING
 
 import numpy as np
-from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
-from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
-from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
-from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
 from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.paths.cython.AoN import (
+    aggregate_link_costs,
+    copy_three_dimensions,
+    copy_two_dimensions,
+    linear_combination,
+    linear_combination_1d,
+    linear_combination_skims,
+    sum_a_times_b_minus_c,
+    triple_linear_combination,
+    triple_linear_combination_skims,
+)
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.traffic_class import TrafficClass
-
-if False:
-    from aequilibrae.paths.traffic_assignment import TrafficAssignment
-
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+if TYPE_CHECKING:
+    from aequilibrae.paths.traffic_assignment import TrafficAssignment, TrafficClass
+
 
 logger = logging.getLogger(__name__)
 
 
 class LinearApproximation(WorkerThread):
+    equilibration = SIGNAL(object)
+    assignment = SIGNAL(object)
     signal = SIGNAL(object)
 
     def __init__(self, assig_spec, algorithm, project=None) -> None:
@@ -45,7 +53,7 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["beta1"] = []
             self.convergence_report["beta2"] = []
 
-        self.assig = assig_spec  # type: TrafficAssignment
+        self.assig: TrafficAssignment = assig_spec
 
         if None in [
             assig_spec.classes,
@@ -60,7 +68,7 @@ class LinearApproximation(WorkerThread):
                 f"when assigning. Check if you have all of these: {all_par}"
             )
 
-        self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
+        self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
         self.cap_field = assig_spec.capacity_field
@@ -101,14 +109,17 @@ class LinearApproximation(WorkerThread):
             self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
 
         self.free_flow_tt = assig_spec.free_flow_tt
-        self.fw_total_flow = assig_spec.total_flow
+        self.current_assigned_flow = np.array(assig_spec.total_flow, dtype=np.float64, copy=True)
+        self.fw_total_flow = np.array(assig_spec.total_flow, dtype=np.float64, copy=True)
+        if self.preload is not None:
+            self.fw_total_flow += self.preload
         self.congested_time = assig_spec.congested_time
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
 
-        self.step_direction = {}  # type: Dict[AssignmentResults]
-        self.previous_step_direction = {}  # type: Dict[AssignmentResults]
-        self.temp_step_direction_for_copy = {}  # type: Dict[AssignmentResults]
+        self.step_direction: dict[str, AssignmentResults] = {}
+        self.previous_step_direction: dict[str, AssignmentResults] = {}
+        self.temp_step_direction_for_copy: dict[str, AssignmentResults] = {}
 
         self.aons = {}
 
@@ -215,6 +226,27 @@ class LinearApproximation(WorkerThread):
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
 
+    def _set_current_flow(self, assigned_flow):
+        self.current_assigned_flow = np.array(assigned_flow, dtype=np.float64, copy=True)
+        self.fw_total_flow = np.array(self.current_assigned_flow, dtype=np.float64, copy=True)
+        if self.preload is not None:
+            self.fw_total_flow += self.preload
+
+    def _update_congested_costs(self):
+        self.vdf.apply_vdf(
+            self.congested_time,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.cores,
+        )
+
+        for c in self.traffic_classes:
+            if self.time_field in c.graph.skim_fields:
+                k = c.graph.skim_fields.index(self.time_field)
+                aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
+
     def __calculate_step_direction(self):
         """Calculates step direction depending on the method"""
         sd_flows = []
@@ -314,9 +346,9 @@ class LinearApproximation(WorkerThread):
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
-                ppst = self.temp_step_direction_for_copy[c._id]  # type: AssignmentResults
-                prev_stp_dir = self.previous_step_direction[c._id]  # type: AssignmentResults
-                stp_dir = self.step_direction[c._id]  # type: AssignmentResults
+                ppst: AssignmentResults = self.temp_step_direction_for_copy[c._id]
+                prev_stp_dir: AssignmentResults = self.previous_step_direction[c._id]
+                stp_dir: AssignmentResults = self.step_direction[c._id]
 
                 copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
                 ppst.total_flows()
@@ -467,7 +499,9 @@ class LinearApproximation(WorkerThread):
             c.graph.set_graph(self.time_field)
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
-            self.aons[c._id].signal = self.signal
+
+        self._set_current_flow(np.zeros_like(self.capacity))
+        self._update_congested_costs()
 
         logger.info(f"{self.algorithm} Assignment STATS")
         logger.info("Iteration, RelativeGap, stepsize")
@@ -488,6 +522,8 @@ class LinearApproximation(WorkerThread):
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
+                self.signal.emit(["refresh"])
+                self.signal.emit(["reset"])
                 aon.signal = self.signal
 
                 aon.execute()
@@ -517,7 +553,7 @@ class LinearApproximation(WorkerThread):
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
-                                c.results.select_link_loading[name],  # ouput matrix
+                                c.results.select_link_loading[name],  # output matrix
                                 np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
@@ -545,7 +581,7 @@ class LinearApproximation(WorkerThread):
                         )
 
                     if c._selected_links:
-                        for name, idx in c._aon_results._selected_links.items():
+                        for name, _idx in c._aon_results._selected_links.items():
                             # Copy the temporary results into the final od matrix, referenced by link_set name
                             # The temp flows have an index associated with the link_set name
                             linear_combination_skims(
@@ -567,9 +603,7 @@ class LinearApproximation(WorkerThread):
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
 
-            self.fw_total_flow = np.sum(flows, axis=0)
-            if self.preload is not None:
-                self.fw_total_flow += self.preload
+            self._set_current_flow(np.sum(flows, axis=0))
 
             if self.algorithm == "all-or-nothing":
                 break
@@ -577,19 +611,7 @@ class LinearApproximation(WorkerThread):
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-            self.vdf.apply_vdf(
-                self.congested_time,
-                self.fw_total_flow,
-                self.capacity,
-                self.free_flow_tt,
-                *self.vdf_parameters,
-                self.cores,
-            )
-
-            for c in self.traffic_classes:
-                if self.time_field in c.graph.skim_fields:
-                    k = c.graph.skim_fields.index(self.time_field)
-                    aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
+            self._update_congested_costs()
 
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
@@ -618,7 +640,7 @@ class LinearApproximation(WorkerThread):
                     c.graph.skims[:, idx] = self.congested_time[:]
 
             msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
-            self.signal.emit(["update", self.iter, msg])
+            self.signal.emit(["set_text", msg])
 
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
@@ -634,11 +656,13 @@ class LinearApproximation(WorkerThread):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
         the corresponding contribution needs to be passed in"""
         x = np.zeros_like(self.fw_total_flow)
-        linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
-        # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
+        linear_combination_1d(x, self.step_direction_flow, self.current_assigned_flow, stepsize, self.cores)
+        if self.preload is not None:
+            x += self.preload
+        # x = preload + current_assigned_flow + stepsize * (self.step_direction_flow - self.current_assigned_flow)
         self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
         link_cost_term = sum_a_times_b_minus_c(
-            self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
+            self.congested_value, self.step_direction_flow, self.current_assigned_flow, self.cores
         )
         return link_cost_term + const_term
 
@@ -678,9 +702,10 @@ class LinearApproximation(WorkerThread):
             self.conjugate_failed = False
 
         except ValueError as e:
-            # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
-            # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
-            # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
+            # We can have iterations where the objective function is not *strictly* convex, but the
+            # scipy method cannot deal with this. Stepsize is then either given by 1 or 0, depending
+            # on where the objective function is smaller. However, using zero would mean the overall
+            # solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
             if self.algorithm == "bfw":
@@ -721,7 +746,13 @@ class LinearApproximation(WorkerThread):
             return False
 
         aon_cost = np.sum(self.congested_time * self.aon_total_flow)
-        current_cost = np.sum(self.congested_time * self.fw_total_flow)
+        current_cost = np.sum(self.congested_time * self.current_assigned_flow)
+        if current_cost == 0.0:
+            if aon_cost == 0.0:
+                self.rgap = 0.0
+                return True
+            self.rgap = np.inf
+            return False
         self.rgap = abs(current_cost - aon_cost) / current_cost
         if self.rgap_target >= self.rgap:
             return True

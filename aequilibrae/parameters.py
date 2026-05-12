@@ -30,7 +30,7 @@ class Parameters:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Parameters
+        >>> from aequilibrae.parameters import Parameters
 
         >>> project = Project()
         >>> project.new(project_path)

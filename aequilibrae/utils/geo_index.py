@@ -22,7 +22,7 @@ class GeoIndex:
 
     def build_from_layer(self, layer) -> dict:
         if inside_qgis:
-            warnings.warn("This method works inside QGIS only")
+            warnings.warn("This method works inside QGIS only", stacklevel=2)
         self.built = True
         self.idx = Index(layer.getFeatures())
         return {f.id(): loads(f.geometry().asWkb().data()) for f in layer.getFeatures()}
@@ -49,7 +49,7 @@ class GeoIndex:
         elif rtree_avail:
             self.idx.insert(feature_id, geometry.bounds)
         else:
-            warnings.warn("You need RTREE to build a spatial index")
+            warnings.warn("You need RTREE to build a spatial index", stacklevel=2)
 
     def nearest(self, geo: Union[Point, Polygon, LineString, MultiPoint, MultiPolygon], num_results) -> List[int]:
         """Finds nearest neighbor for a given geometry
@@ -69,7 +69,7 @@ class GeoIndex:
         elif rtree_avail:
             return self.idx.nearest(geo.bounds, num_results)
         else:
-            warnings.warn("You need RTREE to build a spatial index")
+            warnings.warn("You need RTREE to build a spatial index", stacklevel=2)
 
     def delete(self, feature_id, geometry: Union[Point, Polygon, LineString, MultiPoint, MultiPolygon]):
         if inside_qgis:
@@ -82,7 +82,7 @@ class GeoIndex:
         elif rtree_avail:
             self.idx.delete(feature_id, geometry.bounds)
         else:
-            warnings.warn("You need RTREE to build a spatial index")
+            warnings.warn("You need RTREE to build a spatial index", stacklevel=2)
 
     def reset(self):
         self.idx = Index()

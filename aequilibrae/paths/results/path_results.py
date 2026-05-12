@@ -1,8 +1,7 @@
 from typing import Union, List
 
 import numpy as np
-from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
-
+from aequilibrae.paths.cython.AoN import update_path_trace, path_computation, HEURISTIC_MAP
 from aequilibrae.paths.graph import Graph
 
 
@@ -103,10 +102,7 @@ class PathResults:
         if heuristic is not None:
             self.set_heuristic(heuristic)
         path_computation(origin, destination, self.graph, self)
-        if self.graph.skim_fields:
-            self.skims.fill(np.inf)
-            self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
-            self.skims[self.skims > self.__graph_sum] = np.inf
+        self.__skim_path()
 
     def prepare(self, graph: Graph) -> None:
         """
@@ -176,13 +172,15 @@ class PathResults:
         :Arguments:
             **destination** (:obj:`int`): ID of the node we are computing the path too
         """
-        if not isinstance(destination, int):
+        if not isinstance(destination, (int, np.integer)):
             raise TypeError("destination needs to be an integer")
 
         if destination >= self.graph.nodes_to_indices.shape[0]:
             raise ValueError("destination out of the range of node numbers in the graph")
 
         update_path_trace(self, destination, self.graph)
+
+        self.__skim_path()
 
     def set_heuristic(self, heuristic: str) -> None:
         """
@@ -197,5 +195,11 @@ class PathResults:
         self._heuristic = heuristic
 
     def get_heuristics(self) -> List[str]:
-        """Return the availiable heuristics."""
+        """Return the available heuristics."""
         return list(HEURISTIC_MAP.keys())
+
+    def __skim_path(self):
+        if self.graph.skim_fields:
+            self.skims.fill(np.inf)
+            self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
+            self.skims[self.skims > self.__graph_sum] = np.inf

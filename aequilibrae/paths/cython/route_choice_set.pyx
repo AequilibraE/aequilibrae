@@ -97,7 +97,7 @@ cdef class RouteChoiceSet:
         # self.heuristic = HEURISTIC_MAP[self.res._heuristic]
         self.cost_view = graph.compact_cost
         self.graph_fs_view = graph.compact_fs
-        self.b_nodes_view = graph.compact_graph.b_node.values
+        self.b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
         self.nodes_to_indices_view = graph.compact_nodes_to_indices
 
         # tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
@@ -105,10 +105,10 @@ cdef class RouteChoiceSet:
         # self.lon_view = tmp.lon.values
         self.a_star = False
 
-        self.ids_graph_view = graph.compact_graph.id.values
+        self.ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
 
         # We explicitly don't want the links that have been removed from the graph
-        self.graph_compressed_id_view = graph.graph.__compressed_id__.values
+        self.graph_compressed_id_view = graph.graph.__compressed_id__.to_numpy(copy=False)
         self.num_nodes = graph.compact_num_nodes
         self.num_links = graph.compact_num_links
         self.zones = graph.num_zones
@@ -431,7 +431,7 @@ cdef class RouteChoiceSet:
         cutoff_prob: float = 0.0,
     ):
         cdef:
-            long int c_cores = 1  # Single threaded only due to high python interop, this shoud be fast anyway
+            long int c_cores = 1  # Single threaded only due to high python interop, this should be fast anyway
             int thread_id = 0
 
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
@@ -688,7 +688,7 @@ cdef class RouteChoiceSet:
                     del banned
                     banned = d(banned_status.first)
 
-                # If the destination is reachable we must build the path and readd
+                # If the destination is reachable we must build the path and re-add
                 if thread_predecessors[dest_index] >= 0:
                     vec = new vector[long long]()
                     # Walk the predecessors tree to find our path, we build it up in a C++ vector because we can't know

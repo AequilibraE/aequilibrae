@@ -8,12 +8,10 @@ from typing import Dict
 
 import numpy as np
 import pandas as pd
-import pyproj
 from pyproj import Transformer
 from shapely.geometry import LineString
 
 from aequilibrae.transit.column_order import column_order
-from aequilibrae.transit.constants import AGENCY_MULTIPLIER
 from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
@@ -48,7 +46,6 @@ class GTFSReader(WorkerThread):
         self.fare_attributes = {}
         self.feed_dates = []
         self.data_arrays = {}
-        self.wgs84 = pyproj.Proj("epsg:4326")
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
 
@@ -182,11 +179,11 @@ class GTFSReader(WorkerThread):
                             times[1:] += df.add_time[:].astype(int)
 
                     assert min(times[1:] - times[:-1]) > 0
-                    stop_times.arrival_time.values[:] = times[:].astype(int)
-                    stop_times.departure_time.values[:] = times[:].astype(int)
-                    stop_times.source_time.values[:] = source_time[:].astype(int)
-                    trip.arrivals = stop_times.arrival_time.values
-                    trip.departures = stop_times.departure_time.values
+                    stop_times.loc[:, "arrival_time"] = times[:].astype(int)
+                    stop_times.loc[:, "departure_time"] = times[:].astype(int)
+                    stop_times.loc[:, "source_time"] = source_time[:].astype(int)
+                    trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
+                    trip.departures = stop_times.departure_time.to_numpy(copy=True)
 
         if total_fast:
             logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
@@ -378,11 +375,11 @@ class GTFSReader(WorkerThread):
         df = pd.DataFrame(stoptimes)
         for col in ["arrival_time", "departure_time"]:
             df2 = df[col].str.split(":", expand=True)
-            df2.fillna(0, inplace=True)
+            df2 = df2.fillna("0")
             df2.columns = ["h", "m", "s"]
-            df2.loc[df2.h.str.len() < 1, "h"] = 0
-            df2.loc[df2.m.str.len() < 1, "m"] = 0
-            df2.loc[df2.s.str.len() < 1, "s"] = 0
+            df2.loc[df2.h.str.len() < 1, "h"] = "0"
+            df2.loc[df2.m.str.len() < 1, "m"] = "0"
+            df2.loc[df2.s.str.len() < 1, "s"] = "0"
             df2 = df2.assign(sec=0)
             df2.loc[:, "sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
             stoptimes[col] = df2.sec.values
@@ -464,7 +461,7 @@ class GTFSReader(WorkerThread):
         for route_type, pce in self.__pces__.items():
             routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
-        for i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
+        for _i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
             r = Route(self.agency.agency_id)
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r

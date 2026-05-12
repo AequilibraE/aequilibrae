@@ -1,4 +1,3 @@
-from contextlib import closing
 from sqlite3 import Connection
 
 from aequilibrae.transit.constants import Constants

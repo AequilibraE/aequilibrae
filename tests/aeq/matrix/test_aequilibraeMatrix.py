@@ -9,7 +9,6 @@ import openmatrix as omx
 import pandas as pd
 import pytest
 
-from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix
 
 zones = 50

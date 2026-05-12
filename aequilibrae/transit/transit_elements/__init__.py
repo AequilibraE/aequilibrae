@@ -7,4 +7,6 @@ from .route import Route
 from .service import Service
 from .stop import Stop
 from .trip import Trip
-from .mode_correspondence import mode_correspondence
+from .mode_correspondence import mode_corresp
+
+__all__ = ["Agency", "Fare", "FareRule", "Link", "Pattern", "Route", "Service", "Stop", "Trip", "mode_corresp"]

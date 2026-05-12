@@ -1,11 +1,10 @@
-import math
-from typing import Dict, Optional
 import logging
+import math
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
-import shapely.wkt
 from shapely import union_all
 from shapely.geometry import Polygon, box
 
@@ -21,7 +20,7 @@ from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
-from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
+from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
@@ -42,7 +41,6 @@ class Network(WorkerThread):
 
     def __init__(self, project) -> None:
         WorkerThread.__init__(self, None)
-        from aequilibrae.paths import Graph
 
         self.graphs = {}  # type: Dict[Graph]
         self.project = project

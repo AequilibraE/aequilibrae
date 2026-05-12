@@ -1,8 +1,7 @@
 import os
 from logging import FileHandler
 
-import pytest
-from aequilibrae import Project
+from aequilibrae.project.project import Project
 
 
 def test_contents(sioux_falls_test):

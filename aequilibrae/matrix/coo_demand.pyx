@@ -95,14 +95,14 @@ cdef class GeneralisedCOODemand:
         self.f32.clear()
 
         cdef:
-            double[::1] f64_array
-            float[::1] f32_array
+            const double[::1] f64_array
+            const float[::1] f32_array
             vector[double] *f64_vec
             vector[float] *f32_vec
 
         for col in df:
             if df.dtypes[col] == "float64":
-                f64_array = df[col].to_numpy()
+                f64_array = df[col].to_numpy() # no need to be editable
 
                 # The unique pointer will take ownership of this allocation
                 f64_vec = new vector[double]()
@@ -111,7 +111,7 @@ cdef class GeneralisedCOODemand:
                 self.f64.emplace_back(f64_vec)
 
             elif df.dtypes[col] == "float32":
-                f32_array = df[col].to_numpy()
+                f32_array = df[col].to_numpy() # no need to be editable
 
                 # The unique pointer will take ownership of this allocation
                 f32_vec = new vector[float]()

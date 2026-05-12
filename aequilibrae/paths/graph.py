@@ -1,9 +1,10 @@
 import dataclasses
+import logging
 import pickle
 import uuid
 import warnings
-import logging
 from abc import ABC
+from copy import deepcopy
 from datetime import datetime
 from os.path import join
 from typing import List, Optional, Tuple, Union
@@ -11,7 +12,7 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class GraphBase(ABC):  # noqa: B024
     The compressed graph is used internally.
     """
 
-    def __init__(self):
+    def __init__(self, logger=None):
         self.__integer_type = np.int64
         self.__float_type = np.float64
 
@@ -139,6 +140,16 @@ class GraphBase(ABC):  # noqa: B024
             return self.__float_type
         else:
             raise ValueError("It must be either a int or a float")
+
+    def reverse(self):
+        g = deepcopy(self)
+        g.network = g.network.rename(columns={"a_node": "b_node", "b_node": "a_node"})
+        g.prepare_graph(self.centroids)
+        if self.cost_field:
+            g.set_graph(self.cost_field)
+        if self.skim_fields:
+            g.set_skimming(self.skim_fields)
+        return g
 
     def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
@@ -226,7 +237,8 @@ class GraphBase(ABC):  # noqa: B024
         not_pos = pd.DataFrame(not_pos, copy=True)[neg_names]
         not_pos.columns = names
 
-        # Swap the a and b nodes of these edges. Direction is used for mapping the graph.graph back to the network. It does not indicate the direction of the link.
+        # Swap the a and b nodes of these edges. Direction is used for mapping the graph.graph back
+        # to the network. It does not indicate the direction of the link.
         not_pos.loc[:, "direction"] = -1
         aux = np.array(not_pos.a_node.values, copy=True)
         not_pos.loc[:, "a_node"] = not_pos.loc[:, "b_node"]
@@ -249,7 +261,9 @@ class GraphBase(ABC):  # noqa: B024
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
         present_centroids = np.isin(centroids, nodes, assume_unique=True)
         if not present_centroids.all():
-            warnings.warn("Found centroids not present in the graph!\n" + str(centroids[~present_centroids]))
+            warnings.warn(
+                "Found centroids not present in the graph!\n" + str(centroids[~present_centroids]), stacklevel=2
+            )
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
         all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 

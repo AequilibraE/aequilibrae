@@ -1,6 +1,6 @@
 import pytest
 
-from aequilibrae.paths import TrafficClass, Graph
+from aequilibrae.paths import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
 
 

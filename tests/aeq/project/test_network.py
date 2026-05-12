@@ -4,8 +4,6 @@ from warnings import warn
 import pytest
 from shapely.geometry import box, Polygon
 
-from aequilibrae.project import Project
-
 
 def test_create_from_osm(empty_project):
     if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
@@ -18,7 +16,7 @@ def test_create_from_osm(empty_project):
         osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]
 
         if osmids == 0:
-            warn("COULD NOT RETRIEVE DATA FROM OSM")
+            warn("COULD NOT RETRIEVE DATA FROM OSM", stacklevel=2)
             return
 
         if osmids >= lks:
