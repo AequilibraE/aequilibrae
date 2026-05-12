@@ -1,4 +1,0 @@
-global-include *.pyx
-global-include *.pxd
-include README.md
-include LICENSE.TXT

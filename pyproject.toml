@@ -1,5 +1,9 @@
 [build-system]
-requires = ["setuptools", "cython", "wheel", "cysignals"]
+build-backend = "mesonpy"
+requires = ["meson-python>=0.15.0", "ninja", "cython", "cysignals"]
+
+[tool.meson-python.args]
+setup = ['--vsenv']
 
 [project]
 authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
@@ -20,7 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
 ]
-dynamic = ["version"]
+dynamic = ["version", "license", "license-files"]
 description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
@@ -43,9 +47,6 @@ dependencies = [
   "cysignals",
 ]
 
-license = "LicenseRef-AequilibraE"
-license-files = ["LICENSE.TXT"]
-
 [project.optional-dependencies]
 
 docs = [
@@ -65,7 +66,6 @@ docs = [
 ]
 
 tests = [
-  "setuptools",
   "codecov",
   "pytest",
   "pytest-xdist",
@@ -77,35 +77,11 @@ tests = [
   "wheel",
 ]
 
-# Build system requirement should match
-build = ["setuptools", "cython", "wheel", "cysignals"]
-
-dev = ['aequilibrae[build, tests, docs]']
+dev = ['aequilibrae[tests, docs]']
 
 # simwrapper CLI
 [project.scripts]
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
-
-[tool.setuptools.dynamic]
-version = { attr = "aequilibrae.version" }
-
-[tool.setuptools.package-dir]
-aequilibrae = "aequilibrae"
-
-[tool.setuptools.package-data]
-    "aequilibrae.reference_files"= ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"]
-    "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
-    "aequilibrae.distribution"= ["cython/*.pyx"]
-    "aequilibrae.matrix"= ["*.pyx", "*.pxd"]
-    "aequilibrae"= ["./parameters.yml"]
-    "aequilibrae.project"= [
-        "database_specification/network/tables/*.*",
-        "database_specification/network/triggers/*.*",
-        "database_specification/network/migrations/*.*",
-        "database_specification/transit/tables/*.*",
-        "database_specification/transit/triggers/*.*",
-        "database_specification/transit/migrations/*.*",
-    ]
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
@@ -182,3 +158,8 @@ repair-wheel-command = "delocate-wheel -vv --require-archs {delocate_archs} -w {
 
 [tool.cython-lint]
 max-line-length = 120
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
