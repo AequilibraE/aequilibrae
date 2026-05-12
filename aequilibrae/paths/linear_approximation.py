@@ -694,7 +694,9 @@ class LinearApproximation(WorkerThread):
             class_specific_term += class_link_costs
         return class_specific_term
 
-    def __objective_change_at_stepsize(self, stepsize: float) -> float:
+    def __objective_change_at_stepsize(
+        self, derivative_of_objective_stepsize_independent: np.ndarray, stepsize: float
+    ) -> float:
         """Trapezoidal approximation of the Beckmann objective change
         ``Z(x + α·d) − Z(x)`` for a given line-search step ``α = stepsize``.
 
@@ -733,7 +735,7 @@ class LinearApproximation(WorkerThread):
                 self.cores,
             )
         )
-        fixed_cost_term = stepsize * self.__derivative_of_objective_stepsize_independent()
+        fixed_cost_term = stepsize * derivative_of_objective_stepsize_independent
         return link_term + fixed_cost_term
 
     def calculate_stepsize(self):
@@ -764,8 +766,12 @@ class LinearApproximation(WorkerThread):
         # Combined Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
         if self.algorithm in ("bfw", "cfw"):
             alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5)
+            derivative_of_objective_stepsize_independent = self.__derivative_of_objective_stepsize_independent()
             res = minimize_scalar(
-                self.__objective_change_at_stepsize,
+                partial(
+                    self.__objective_change_at_stepsize,
+                    derivative_of_objective_stepsize_independent,
+                ),
                 bounds=(0.0, alpha_max),
                 method="Bounded",
                 options={"xatol": 1e-4, "maxiter": 10},
@@ -776,7 +782,7 @@ class LinearApproximation(WorkerThread):
             # boundary case (descent throughout the cap interval) still picks
             # α_max instead of a value just inside it.
             z_interior = float(res.fun)
-            z_at_max = self.__objective_change_at_stepsize(alpha_max)
+            z_at_max = self.__objective_change_at_stepsize(derivative_of_objective_stepsize_independent, alpha_max)
             if z_at_max < z_interior and z_at_max < 0.0:
                 self.stepsize = alpha_max
             elif z_interior < 0.0:
