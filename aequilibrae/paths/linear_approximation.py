@@ -242,6 +242,26 @@ class LinearApproximation(WorkerThread):
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
 
+    def _set_current_flow(self, assigned_flow):
+        self.fw_total_flow = np.array(assigned_flow, dtype=np.float64, copy=True)
+        if self.preload is not None:
+            self.fw_total_flow += self.preload
+
+    def _update_congested_costs(self):
+        self.vdf.apply_vdf(
+            self.congested_time,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.cores,
+        )
+
+        for c in self.traffic_classes:
+            if self.time_field in c.graph.skim_fields:
+                k = c.graph.skim_fields.index(self.time_field)
+                aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
+
     def __calculate_step_direction(self):
         """Calculates step direction depending on the method"""
         sd_flows = []
@@ -496,6 +516,9 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
+        self._set_current_flow(np.zeros_like(self.capacity))
+        self._update_congested_costs()
+
         self.logger.info(f"{self.algorithm} Assignment stats")
         self.logger.info("Iteration, RelativeGap (AoN), RelativeGap (Step direction), stepsize")
 
@@ -546,7 +569,7 @@ class LinearApproximation(WorkerThread):
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
-                                c.results.select_link_loading[name],  # ouput matrix
+                                c.results.select_link_loading[name],  # output matrix
                                 np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
@@ -596,9 +619,7 @@ class LinearApproximation(WorkerThread):
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
 
-            self.fw_total_flow = np.sum(flows, axis=0)
-            if self.preload is not None:
-                self.fw_total_flow += self.preload
+            self._set_current_flow(np.sum(flows, axis=0))
 
             if self.algorithm == "all-or-nothing":
                 break
@@ -606,19 +627,7 @@ class LinearApproximation(WorkerThread):
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-            self.vdf.apply_vdf(
-                self.congested_time,
-                self.fw_total_flow,
-                self.capacity,
-                self.free_flow_tt,
-                *self.vdf_parameters,
-                self.cores,
-            )
-
-            for c in self.traffic_classes:
-                if self.time_field in c.graph.skim_fields:
-                    k = c.graph.skim_fields.index(self.time_field)
-                    aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
+            self._update_congested_costs()
 
             self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
             self.convergence_report["iteration"].append(self.iter)
