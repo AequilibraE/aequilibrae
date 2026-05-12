@@ -882,9 +882,24 @@ class LinearApproximation(WorkerThread):
         if self.stepsize_has_been_reset:
             return False
 
-        current_cost = np.sum(self.congested_time * self.fw_total_flow)
+        aon_cost = 0.0
+        current_cost = 0.0
+        direction_cost = 0.0
+        for c in self.traffic_classes:
+            aon_class_flow = c._aon_results.total_link_loads
+            current_class_flow = c.results.total_link_loads
+            step_direction_flow = self.step_direction[c._id].total_link_loads
 
-        aon_cost = np.sum(self.congested_time * self.aon_total_flow)
+            aon_cost += np.sum((self.congested_time + c.fixed_cost) * aon_class_flow)
+            current_cost += np.sum((self.congested_time + c.fixed_cost) * current_class_flow)
+            direction_cost += np.sum((self.congested_time + c.fixed_cost) * step_direction_flow)
+
+        if current_cost == 0.0:
+            if aon_cost == 0.0:
+                self.rgap = 0.0
+                return True
+            self.rgap = np.inf
+            return False
         self.rgap = abs(current_cost - aon_cost) / current_cost
 
         # ``step_direction_flow`` is set by ``__calculate_step_direction``
@@ -892,7 +907,6 @@ class LinearApproximation(WorkerThread):
         # all-or-nothing algorithm, which short-circuits before this method
         # is called). Both conditions are already satisfied by the gate in
         # ``execute()``: ``converged = self.check_convergence() if self.iter > 1 else False``.
-        direction_cost = np.sum(self.congested_time * self.step_direction_flow)
         self.rgap_direction = (current_cost - direction_cost) / current_cost
 
         if self.rgap_target >= self.rgap:
