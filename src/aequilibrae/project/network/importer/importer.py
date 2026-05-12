@@ -21,7 +21,15 @@ _LINK_DEFAULTS = {
     "source_id": None,
 }
 _NODE_DEFAULTS = {"source_id": None}
-_SOURCE_META_KEYS = ("source", "backend", "source_url", "fetched_at", "release")
+
+# Provenance keys persisted for every import. ``release`` is OPTIONAL because not
+# every source is versioned (e.g. a raw OSM PBF or Overpass query has no release
+# tag), whereas Overture imports do. Splitting the two avoids rejecting valid
+# unversioned imports while still recording the release when a source provides
+# one. Keep these lists explicit so the contract is not silently mutated.
+REQUIRED_SOURCE_META_KEYS = ("source", "backend", "source_url", "fetched_at")
+OPTIONAL_SOURCE_META_KEYS = ("release",)
+_SOURCE_META_KEYS = REQUIRED_SOURCE_META_KEYS + OPTIONAL_SOURCE_META_KEYS
 
 
 def _default_modes():
@@ -40,6 +48,7 @@ class NetworkImporter:
         simplify="osmnx",
         consolidate_tolerance=10.0,
         cache_tag: str = "",
+        download_buildings: bool = False,
         **source_kwargs,
     ) -> None:
         from aequilibrae.project.network.importer.about_writer import AboutWriter
@@ -73,7 +82,7 @@ class NetworkImporter:
             if simplifier_obj.name == "neatnet":
                 from aequilibrae.project.network.importer.buildings import fetch_building_footprints
 
-                buildings_gdf = fetch_building_footprints(net, download_cache)
+                buildings_gdf = fetch_building_footprints(net, download_cache, enabled=download_buildings)
                 if buildings_gdf is not None:
                     simplify_kwargs["exclusion_mask"] = buildings_gdf
             net = simplifier_obj.simplify(net, **simplify_kwargs)
@@ -108,7 +117,7 @@ def _normalize_source_meta(net: StagedNetwork) -> None:
     if not isinstance(net.source_meta, dict):
         raise ImporterError("StagedNetwork.source_meta must be a dict")
 
-    missing = [key for key in _SOURCE_META_KEYS[:-1] if key not in net.source_meta]
+    missing = [key for key in REQUIRED_SOURCE_META_KEYS if key not in net.source_meta]
     if missing:
         raise ImporterError(f"StagedNetwork.source_meta missing required keys: {missing}")
 

@@ -11,7 +11,12 @@ from aequilibrae.project.network.importer.simplifiers.impl_osmnx import (
     _build_source_attr_map,
 )
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
-from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_node_modes
+from aequilibrae.project.network.importer.utils import (
+    NODE_ID_START,
+    aligned_along_geometry,
+    compute_lengths,
+    compute_node_modes,
+)
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
@@ -85,8 +90,7 @@ def _gdf_to_staged(
 
     _transfer_attributes(edges, original_links)
 
-    utm = edges.geometry.estimate_utm_crs()
-    edges["distance"] = edges.geometry.to_crs(utm).length.astype(float)
+    edges["distance"] = compute_lengths(edges.geometry).to_numpy()
 
     nodes = gpd.GeoDataFrame(
         {
@@ -142,12 +146,19 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
 
         fwd_candidates = []
         bwd_candidates = []
+        contributing_oidx: list[int] = []
+
+        nearest_oidx = int(tree.nearest(sg))
+        nearest_lt = str(orig_lt[nearest_oidx])
 
         for oidx in hits:
+            if not _link_type_compatible(nearest_lt, str(orig_lt[oidx])):
+                continue
             aligned = _is_forward_aligned(sg, orig_geoms[oidx])
             d = int(orig_dir[oidx])
             dist = float(sg.distance(orig_geoms[oidx]))
             base_id = orig_source_ids[oidx]
+            contributing_oidx.append(int(oidx))
 
             if d == 0:
                 if aligned:
@@ -176,8 +187,7 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
             directions[i] = 1
         elif has_bwd:
             directions[i] = -1
-        nearest_oidx = int(tree.nearest(sg))
-        link_types[i] = str(orig_lt[nearest_oidx])
+        link_types[i] = nearest_lt
         names[i] = orig_name[nearest_oidx]
 
         ordered_refs = _unique_source_refs(fwd_candidates + bwd_candidates)
@@ -186,9 +196,17 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
         primary_source_ids[i] = ordered_source_ids[0] if ordered_source_ids else orig_source_ids[nearest_oidx]
         provenance[i] = _build_provenance(ordered_source_ids, src_attrs)
 
+        # Only inherit modes from originals that actually contributed as
+        # aligned, link-type-compatible candidates. A naive union over every
+        # geometry within the buffer would let a nearby sidewalk or cycleway
+        # bleed walk/bike modes onto an unrelated highway.
         all_modes: set = set()
-        for oidx in hits:
+        for oidx in contributing_oidx:
             m = orig_modes[oidx]
+            if isinstance(m, str):
+                all_modes.update(m)
+        if not all_modes:
+            m = orig_modes[nearest_oidx]
             if isinstance(m, str):
                 all_modes.update(m)
         modes_arr[i] = "".join(sorted(all_modes)) or "c"
@@ -214,13 +232,58 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     simplified[_SOURCE_REFS_TMP_COL] = source_refs
 
 
+# Highway classes grouped by function. Modes are only inherited between
+# originals that fall in the same functional family as the simplified link's
+# nearest original, which stops e.g. footway/cycleway modes bleeding onto roads.
+_LINK_TYPE_FAMILIES = (
+    {"motorway", "motorway_link", "trunk", "trunk_link"},
+    {
+        "primary",
+        "primary_link",
+        "secondary",
+        "secondary_link",
+        "tertiary",
+        "tertiary_link",
+        "unclassified",
+        "residential",
+        "living_street",
+        "service",
+        "road",
+        "busway",
+        "bus_guideway",
+    },
+    {"footway", "pedestrian", "steps", "path", "corridor", "elevator", "escalator", "bridleway"},
+    {"cycleway"},
+)
+
+
+def _link_type_family(link_type: str):
+    lt = (link_type or "").lower()
+    for family in _LINK_TYPE_FAMILIES:
+        if lt in family:
+            return family
+    return None
+
+
+def _link_type_compatible(reference: str, candidate: str) -> bool:
+    """Whether ``candidate`` may donate attributes to a link classed ``reference``.
+
+    Same link type is always compatible. Otherwise both must belong to the same
+    functional family. Unknown/unclassified types fall back to permissive so we
+    never drop the only available candidate.
+    """
+    if reference == candidate:
+        return True
+    ref_family = _link_type_family(reference)
+    cand_family = _link_type_family(candidate)
+    if ref_family is None or cand_family is None:
+        return True
+    return ref_family is cand_family
+
+
 def _is_forward_aligned(geom_a, geom_b) -> bool:
     """Return whether ``geom_b`` flows roughly in the same direction as ``geom_a``."""
-    ca = geom_a.coords
-    cb = geom_b.coords
-    va = (ca[-1][0] - ca[0][0], ca[-1][1] - ca[0][1])
-    vb = (cb[-1][0] - cb[0][0], cb[-1][1] - cb[0][1])
-    return (va[0] * vb[0] + va[1] * vb[1]) >= 0
+    return aligned_along_geometry(geom_a, geom_b)
 
 
 def _nearest_oriented_value(candidates: list[tuple[str, float]], oriented_src_attrs: dict, field: str):

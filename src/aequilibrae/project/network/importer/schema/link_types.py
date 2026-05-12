@@ -17,6 +17,12 @@ class LinkTypeAllocator:
     def __post_init__(self):
         self._used_ids: set = set(self.existing.values())
 
+    @staticmethod
+    def count_free_slots(existing: dict) -> int:
+        """How many new single-character ids are still available given ``existing``."""
+        used = set(existing.values())
+        return sum(1 for c in _FALLBACK_ALPHABET if c not in used)
+
     def allocate(self, link_type: str) -> str:
         if link_type in self.existing:
             return self.existing[link_type]

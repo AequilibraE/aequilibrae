@@ -19,7 +19,7 @@ from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
     parse_direction,
 )
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
-from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_node_modes
+from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_lengths, compute_node_modes
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
@@ -290,8 +290,7 @@ def _prepare_edges(edges_gdf: gpd.GeoDataFrame, osm_to_node: dict) -> gpd.GeoDat
         logger.info(f"Dropped {dropped_unmapped} OSM edges with unmapped nodes and {dropped_geometry} without geometry")
     if len(edges) == 0:
         raise ImporterError("OSM acquisition produced zero usable edges after node mapping")
-    utm = edges.geometry.estimate_utm_crs().to_string()
-    edges["distance"] = edges.geometry.to_crs(utm).length.astype(float)
+    edges["distance"] = compute_lengths(edges.geometry).to_numpy()
     return edges
 
 

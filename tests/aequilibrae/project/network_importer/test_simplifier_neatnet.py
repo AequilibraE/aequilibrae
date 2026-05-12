@@ -6,6 +6,7 @@ from shapely.geometry import Point
 
 from aequilibrae.project.network.importer.simplifiers.impl_neatnet import (
     _DUAL_CARRIAGEWAY_WARNING,
+    _link_type_compatible,
     _transfer_attributes,
     run_neatnet_simplify,
 )
@@ -52,7 +53,55 @@ def test_transfer_attributes_collapses_opposing_carriageways_to_coarse_bidirecti
     assert row["source_id"] == "fwd"
     assert row["_source_refs"] == ["fwd::ab", "bwd::ba"]
     payload = json.loads(row["source_ids"])
-    assert set(payload) == {"fwd", "bwd"}
+    assert payload["schema_version"] == 1
+    assert set(payload["sources"]) == {"fwd", "bwd"}
+
+
+def test_link_type_compatibility_blocks_cross_family_transfer():
+    # Same type and same functional family are compatible.
+    assert _link_type_compatible("primary", "primary") is True
+    assert _link_type_compatible("primary", "residential") is True
+    # A footway/cycleway must not donate to a road.
+    assert _link_type_compatible("primary", "footway") is False
+    assert _link_type_compatible("primary", "cycleway") is False
+    # Unknown types stay permissive so we never drop the only candidate.
+    assert _link_type_compatible("primary", "some_custom_type") is True
+
+
+def test_transfer_attributes_does_not_bleed_sidewalk_modes_onto_highway():
+    # A highway link with a pedestrian sidewalk running parallel within the
+    # buffer must NOT inherit the walk mode from the sidewalk.
+    simplified = gpd.GeoDataFrame(
+        {"geometry": [LineString([(0.0, 0.0), (0.0, 0.002)])]},
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+    original = gpd.GeoDataFrame(
+        {
+            "direction": [1, 1],
+            "modes": ["c", "w"],
+            "link_type": ["primary", "footway"],
+            "name": ["Main St", "Sidewalk"],
+            "speed_ab": [60.0, None],
+            "speed_ba": [None, None],
+            "lanes_ab": [2, None],
+            "lanes_ba": [None, None],
+            "source_id": ["road", "walk"],
+            "geometry": [
+                LineString([(0.0, 0.0), (0.0, 0.002)]),
+                LineString([(0.00008, 0.0), (0.00008, 0.002)]),
+            ],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+
+    _transfer_attributes(simplified, original)
+
+    row = simplified.iloc[0]
+    assert "w" not in row["modes"]
+    assert row["modes"] == "c"
+    assert row["link_type"] == "primary"
 
 
 def test_run_neatnet_simplify_warns_about_dual_carriageway_collapse(monkeypatch):

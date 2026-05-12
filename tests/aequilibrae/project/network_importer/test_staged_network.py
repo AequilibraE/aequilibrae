@@ -89,4 +89,34 @@ def test_graph_round_trip_preserves_topology():
 
     back = StagedNetwork.from_graph(g)
     assert set(back.nodes["node_id"]) == {100000, 100001, 100002}
-    assert len(back.links) == 3
+    # The bidirectional link must be recombined into a single staged row, so
+    # the reconstructed network has exactly the 2 original links, not 3.
+    assert len(back.links) == 2
+    assert back.links["link_id"].is_unique
+    assert sorted(back.links["direction"]) == [0, 1]
+
+
+def test_graph_round_trip_is_idempotent():
+    net = _make_minimal_staged()
+    once = StagedNetwork.from_graph(net.to_graph())
+    twice = StagedNetwork.from_graph(once.to_graph())
+    assert len(once.links) == len(twice.links) == 2
+    assert sorted(once.links["direction"]) == sorted(twice.links["direction"])
+    assert twice.links["link_id"].is_unique
+
+
+def test_from_graph_requires_source_ref():
+    import networkx as nx
+
+    from shapely.geometry import LineString
+
+    from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
+
+    g = nx.MultiDiGraph()
+    g.graph["crs"] = "EPSG:4326"
+    g.add_node(100000, x=0.0, y=0.0)
+    g.add_node(100001, x=0.0, y=1.0)
+    g.add_edge(100000, 100001, key=1, geometry=LineString([(0, 0), (0, 1)]))
+
+    with pytest.raises(StagedNetworkValidationError, match="_source_ref"):
+        StagedNetwork.from_graph(g)

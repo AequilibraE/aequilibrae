@@ -10,15 +10,44 @@ from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
 
+# Maximum bounding-box span (degrees, max of width/height) for which an
+# automatic building download is allowed. Larger extents would pull millions of
+# polygons and can exhaust memory / hit rate limits, so we skip them.
+_MAX_BUILDINGS_BBOX_SPAN_DEGREES = 0.5
+
 
 def fetch_building_footprints(
     net: StagedNetwork,
     download_cache: DownloadCache,
+    *,
+    enabled: bool = False,
+    max_bbox_span_degrees: float = _MAX_BUILDINGS_BBOX_SPAN_DEGREES,
 ) -> Optional[gpd.GeoDataFrame]:
-    """Download buildings covering the current staged network extent."""
-    overturemaps = require("overturemaps", feature="building footprint download for neatnet")
+    """Optionally download buildings covering the current staged network extent.
+
+    Disabled by default: the building footprints are only used to refine the
+    neatnet exclusion mask, and downloading them over a large extent is a common
+    cause of out-of-memory / timeout failures. When enabled, the download is
+    still skipped (with a warning) for bounding boxes larger than
+    ``max_bbox_span_degrees``.
+    """
+    if not enabled:
+        logger.info("Building-footprint download is disabled; proceeding without an exclusion mask")
+        return None
 
     bbox = tuple(net.links.total_bounds)
+    span = max(float(bbox[2] - bbox[0]), float(bbox[3] - bbox[1]))
+    if span > max_bbox_span_degrees:
+        logger.warning(
+            "Skipping building-footprint download: bounding-box span %.3f deg exceeds the limit of %.3f deg. "
+            "Downloading buildings over an area this large risks running out of memory.",
+            span,
+            max_bbox_span_degrees,
+        )
+        return None
+
+    overturemaps = require("overturemaps", feature="building footprint download for neatnet")
+
     logger.info(f"Downloading building footprints from Overture Maps for bbox={bbox}")
 
     from aequilibrae.project.network.importer.sources.overture.impl import (

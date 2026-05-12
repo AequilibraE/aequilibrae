@@ -169,15 +169,26 @@ def parse_direction(tags: Mapping) -> int:
     return 0
 
 
-_SPEED_RE = re.compile(r"\s*([0-9.]+)\s*(km/h|kmh|kph|mph|knots)?\s*", re.IGNORECASE)
+# Anchored full-string match: a single numeric magnitude with an optional unit
+# and nothing else. This rejects compound/garbled values like "50; 40",
+# "50 (variable)" or "RO:urban" instead of silently parsing the leading number.
+_SPEED_RE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(km/h|kmh|kph|mph|knots)?\s*", re.IGNORECASE)
 
 
 def parse_speed(value) -> float | None:
-    """Parse an OSM maxspeed tag (e.g. ``"50"``, ``"30 mph"``) into km/h."""
+    """Parse an OSM maxspeed tag (e.g. ``"50"``, ``"30 mph"``) into km/h.
+
+    Returns ``None`` for values that are not a single clean magnitude (optionally
+    with a recognised unit), e.g. ``"50; 40"``, ``"50 (variable)"``, ``"walk"``,
+    ``"none"`` or ``"signals"``. Parsing only the leading number of such values
+    would corrupt downstream speed/capacity fields, so we refuse them.
+    """
     if value is None:
         return None
-    s = str(value)
-    m = _SPEED_RE.match(s)
+    s = str(value).strip()
+    if not s:
+        return None
+    m = _SPEED_RE.fullmatch(s)
     if not m:
         return None
     try:
@@ -229,7 +240,36 @@ def directional_lanes(tags: Mapping) -> tuple[int | None, int | None]:
         return (fwd if fwd is not None else total), None
     if direction == -1:
         return None, (bwd if bwd is not None else total)
-    # Bidirectional: use explicit forward/backward when available;
-    # otherwise propagate the total to both directions (the legacy "divide by 2"
-    # was a bug; OSM lanes is typically the total for the carriageway).
-    return (fwd if fwd is not None else total), (bwd if bwd is not None else total)
+
+    # Bidirectional. Prefer explicit directional tags. ``lanes`` in OSM is the
+    # total lane count for the whole carriageway (both directions combined), so
+    # for a two-way link we must split it across directions; assigning the total
+    # to both sides would double the modelled capacity.
+    if fwd is not None or bwd is not None:
+        # When at least one explicit side is present, derive the other from the
+        # total when possible, otherwise mirror the known side.
+        if fwd is not None and bwd is not None:
+            return fwd, bwd
+        if fwd is not None:
+            other = (total - fwd) if (total is not None and total - fwd >= 1) else fwd
+            return fwd, other
+        other = (total - bwd) if (total is not None and total - bwd >= 1) else bwd
+        return other, bwd
+
+    return _split_total_lanes(total)
+
+
+def _split_total_lanes(total: int | None) -> tuple[int | None, int | None]:
+    """Split a carriageway lane total across the two directions.
+
+    The remainder of an odd total is assigned to the AB direction. A total of
+    ``1`` (single shared lane) is reported as one lane in each direction rather
+    than zero, since a zero-lane direction would be treated as impassable.
+    """
+    if total is None:
+        return None, None
+    if total <= 1:
+        return total, total
+    ab = total // 2 + total % 2
+    ba = total // 2
+    return ab, ba

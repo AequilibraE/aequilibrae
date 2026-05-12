@@ -134,7 +134,8 @@ def test_graph_to_staged_preserves_merged_source_provenance():
     assert row["lanes_ab"] == 2
     assert row["lanes_ba"] == 1
     payload = json.loads(row["source_ids"])
-    assert set(payload) == {"fwd", "bwd"}
+    assert payload["schema_version"] == 1
+    assert set(payload["sources"]) == {"fwd", "bwd"}
 
 
 def test_graph_to_staged_reorients_reverse_one_way_as_forward_row_geometry():

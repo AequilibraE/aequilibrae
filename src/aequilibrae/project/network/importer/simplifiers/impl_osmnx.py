@@ -8,7 +8,7 @@ from shapely.geometry import LineString, MultiLineString, Point
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import is_missing, to_jsonable
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
-from aequilibrae.project.network.importer.utils import NODE_ID_START
+from aequilibrae.project.network.importer.utils import NODE_ID_START, aligned_along_geometry, compute_lengths
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
     need_dist = df["distance"].isna()
     if need_dist.any():
         gs = gpd.GeoSeries(df.loc[need_dist, "geometry"].values, crs="EPSG:4326")
-        df.loc[need_dist, "distance"] = gs.to_crs(gs.estimate_utm_crs()).length.values
+        df.loc[need_dist, "distance"] = compute_lengths(gs).to_numpy()
 
     edge_name = df["name"] if "name" in df.columns else pd.Series(dtype=object, index=df.index)
     df["name"] = [
@@ -241,10 +241,18 @@ def _base_source_ids(source_refs: list[str], oriented_src_attrs: dict) -> list[s
     return source_ids
 
 
+# Bump when the structure of the provenance payload changes so downstream
+# deserialisers can detect/adapt to the format.
+PROVENANCE_SCHEMA_VERSION = 1
+
+
 def _build_provenance(source_ids: list, src_attrs: dict):
     if not source_ids:
         return None
-    payload = {sid: src_attrs.get(sid, {}) for sid in source_ids}
+    payload = {
+        "schema_version": PROVENANCE_SCHEMA_VERSION,
+        "sources": {sid: src_attrs.get(sid, {}) for sid in source_ids},
+    }
     return json.dumps(payload, separators=(",", ":"), default=str)
 
 
@@ -305,8 +313,4 @@ def _first_non_missing(values, *, fallback=None, default=None):
 
 
 def _is_forward_aligned(geom_a, geom_b) -> bool:
-    coords_a = geom_a.coords
-    coords_b = geom_b.coords
-    vec_a = (coords_a[-1][0] - coords_a[0][0], coords_a[-1][1] - coords_a[0][1])
-    vec_b = (coords_b[-1][0] - coords_b[0][0], coords_b[-1][1] - coords_b[0][1])
-    return (vec_a[0] * vec_b[0] + vec_a[1] * vec_b[1]) >= 0
+    return aligned_along_geometry(geom_a, geom_b)
