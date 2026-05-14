@@ -2,200 +2,261 @@
 
 #include <cassert>
 #include <cstddef>
-#include <limits>
+#include <cstdint>
 
-namespace aequilibrae::paths::cpp {
+#include "pq_heap_base.hpp"
 
-enum ElementState {
-    SCANNED,
-    NOT_IN_HEAP,
-    IN_HEAP,
-};
+namespace aequilibrae::paths::cpp
+{
 
-struct Element {
-    double key;
-    ElementState state;
-    std::size_t node_idx;
-};
+    class FourAryHeap final : public PriorityQueueBase<FourAryHeap>
+    {
+    public:
+        FourAryHeap() noexcept = default;
 
-struct PriorityQueue {
-    std::size_t length;
-    std::size_t size;
-    std::size_t* A;
-    Element* Elements;
-    double* keys;
-};
-
-inline constexpr std::size_t kArity = 4;
-inline constexpr double kInfinity = std::numeric_limits<double>::infinity();
-
-inline void initialize_element(PriorityQueue* pqueue, std::size_t element_idx) noexcept {
-    assert(pqueue != nullptr);
-    assert(element_idx < pqueue->length);
-
-    pqueue->Elements[element_idx].key = kInfinity;
-    pqueue->Elements[element_idx].state = NOT_IN_HEAP;
-    pqueue->Elements[element_idx].node_idx = pqueue->length;
-}
-
-inline void exchange_nodes(PriorityQueue* pqueue, std::size_t node_i, std::size_t node_j) noexcept {
-    assert(pqueue != nullptr);
-    assert(node_i < pqueue->size);
-    assert(node_j < pqueue->size);
-
-    const std::size_t element_i = pqueue->A[node_i];
-    const std::size_t element_j = pqueue->A[node_j];
-
-    assert(element_i < pqueue->length);
-    assert(element_j < pqueue->length);
-
-    pqueue->A[node_i] = element_j;
-    pqueue->A[node_j] = element_i;
-    pqueue->Elements[element_j].node_idx = node_i;
-    pqueue->Elements[element_i].node_idx = node_j;
-}
-
-inline void decrease_key_from_node_index(PriorityQueue* pqueue, std::size_t node_idx, double key_new) noexcept {
-    assert(pqueue != nullptr);
-    assert(node_idx < pqueue->size);
-
-    std::size_t i = node_idx;
-    const std::size_t element_idx = pqueue->A[i];
-    assert(element_idx < pqueue->length);
-    assert(pqueue->Elements[element_idx].state == IN_HEAP);
-    assert(key_new <= pqueue->Elements[element_idx].key);
-
-    pqueue->Elements[element_idx].key = key_new;
-    while (i > 0) {
-        const std::size_t parent = (i - 1) / kArity;
-        const std::size_t parent_element = pqueue->A[parent];
-        assert(parent_element < pqueue->length);
-        if (pqueue->Elements[parent_element].key > key_new) {
-            exchange_nodes(pqueue, i, parent);
-            i = parent;
-        } else {
-            break;
+        ~FourAryHeap()
+        {
+            free_heap();
         }
-    }
-}
 
-inline void min_heapify(PriorityQueue* pqueue, std::size_t node_idx) noexcept {
-    assert(pqueue != nullptr);
-    if (pqueue->size == 0) {
-        return;
-    }
-    assert(node_idx < pqueue->size);
+    private:
+        friend class PriorityQueueBase<FourAryHeap>;
 
-    std::size_t i = node_idx;
-    while (true) {
-        std::size_t smallest = i;
-        double min_key = pqueue->Elements[pqueue->A[smallest]].key;
+        void init_heap_impl(std::size_t length) noexcept
+        {
+            alloc_heap(length);
+        }
 
-        // Mirror the original Cython tie-breaking: scan children from highest
-        // index to lowest. Two valid heaps that differ only in tie-break choice
-        // can produce different (but equal-cost) Dijkstra trees; reverse scan
-        // matches the historical reference outputs.
-        const std::size_t first_child = kArity * i + 1;
-        const std::size_t end_child = first_child + kArity < pqueue->size ? first_child + kArity : pqueue->size;
-        for (std::size_t k = end_child; k > first_child; --k) {
-            const std::size_t child = k - 1;
-            const double child_key = pqueue->Elements[pqueue->A[child]].key;
-            if (child_key < min_key) {
-                smallest = child;
-                min_key = child_key;
+        void alloc_heap_impl(std::size_t length) noexcept
+        {
+            free_heap();
+
+            length_ = length;
+            size_ = 0;
+            heap_ = length > 0 ? new std::size_t[length] : nullptr;
+            elements_ = length > 0 ? new Element[length] : nullptr;
+            current_epoch_ = 1;
+
+            for (std::size_t i = 0; i < length_; ++i)
+            {
+                heap_[i] = length_;
+                initialize_element(i);
             }
         }
 
-        if (smallest == i) {
-            return;
+        void reset_heap_impl() noexcept
+        {
+            assert(size_ == 0);
+
+            current_epoch_ += 1;
+            if (current_epoch_ == 0)
+            {
+                current_epoch_ = 1;
+            }
+
+            for (std::size_t i = 0; i < length_; ++i)
+            {
+                elements_[i].state = NOT_IN_HEAP;
+                elements_[i].epoch = 0;
+            }
         }
 
-        exchange_nodes(pqueue, i, smallest);
-        i = smallest;
-    }
-}
+        void free_heap_impl() noexcept
+        {
+            delete[] heap_;
+            delete[] elements_;
 
-inline void init_heap(PriorityQueue* pqueue, std::size_t length) noexcept {
-    assert(pqueue != nullptr);
+            heap_ = nullptr;
+            elements_ = nullptr;
+            length_ = 0;
+            size_ = 0;
+            current_epoch_ = 0;
+        }
 
-    pqueue->length = length;
-    pqueue->size = 0;
-    pqueue->A = length > 0 ? new std::size_t[length] : nullptr;
-    pqueue->Elements = length > 0 ? new Element[length] : nullptr;
-    pqueue->keys = nullptr;
+        void insert_impl(std::size_t element_idx, double key) noexcept
+        {
+            assert(element_idx < length_);
+            assert(size_ < length_);
+            assert(key < kInfinity);
 
-    for (std::size_t i = 0; i < length; ++i) {
-        pqueue->A[i] = length;
-        initialize_element(pqueue, i);
-    }
-}
+            const std::size_t node_idx = size_;
+            ++size_;
+            elements_[element_idx].state = IN_HEAP;
+            elements_[element_idx].epoch = current_epoch_;
+            elements_[element_idx].node_idx = node_idx;
+            heap_[node_idx] = element_idx;
+            decrease_key_from_node_index(node_idx, key);
+        }
 
-inline void free_heap(PriorityQueue* pqueue) noexcept {
-    assert(pqueue != nullptr);
+        void decrease_key_impl(std::size_t element_idx, double key_new) noexcept
+        {
+            assert(element_idx < length_);
+            assert(element_is_in_heap(element_idx));
 
-    delete[] pqueue->A;
-    delete[] pqueue->Elements;
-    pqueue->A = nullptr;
-    pqueue->Elements = nullptr;
-    pqueue->keys = nullptr;
-    pqueue->length = 0;
-    pqueue->size = 0;
-}
+            decrease_key_from_node_index(elements_[element_idx].node_idx, key_new);
+        }
 
-inline void insert(PriorityQueue* pqueue, std::size_t element_idx, double key) noexcept {
-    assert(pqueue != nullptr);
-    assert(element_idx < pqueue->length);
-    assert(pqueue->size < pqueue->length);
-    assert(pqueue->Elements[element_idx].state == NOT_IN_HEAP);
-    assert(key < kInfinity);
+        double peek_impl() const noexcept
+        {
+            assert(size_ > 0);
+            return elements_[heap_[0]].key;
+        }
 
-    const std::size_t node_idx = pqueue->size;
-    ++pqueue->size;
-    pqueue->Elements[element_idx].state = IN_HEAP;
-    pqueue->Elements[element_idx].node_idx = node_idx;
-    pqueue->A[node_idx] = element_idx;
-    decrease_key_from_node_index(pqueue, node_idx, key);
-}
+        bool is_empty_impl() const noexcept
+        {
+            return size_ == 0;
+        }
 
-inline void decrease_key(PriorityQueue* pqueue, std::size_t element_idx, double key_new) noexcept {
-    assert(pqueue != nullptr);
-    assert(element_idx < pqueue->length);
-    assert(pqueue->Elements[element_idx].state == IN_HEAP);
+        std::size_t extract_min_impl() noexcept
+        {
+            assert(size_ > 0);
 
-    decrease_key_from_node_index(pqueue, pqueue->Elements[element_idx].node_idx, key_new);
-}
+            const std::size_t element_idx = heap_[0];
+            const std::size_t node_idx = size_ - 1;
 
-inline double peek(PriorityQueue* pqueue) noexcept {
-    assert(pqueue != nullptr);
-    assert(pqueue->size > 0);
+            exchange_nodes(0, node_idx);
 
-    return pqueue->Elements[pqueue->A[0]].key;
-}
+            elements_[element_idx].state = SCANNED;
+            elements_[element_idx].node_idx = length_;
+            heap_[node_idx] = length_;
+            --size_;
 
-inline bool is_empty(PriorityQueue* pqueue) noexcept {
-    assert(pqueue != nullptr);
-    return pqueue->size == 0;
-}
+            if (size_ > 0)
+            {
+                min_heapify(0);
+            }
 
-inline std::size_t extract_min(PriorityQueue* pqueue) noexcept {
-    assert(pqueue != nullptr);
-    assert(pqueue->size > 0);
+            return element_idx;
+        }
 
-    const std::size_t element_idx = pqueue->A[0];
-    const std::size_t node_idx = pqueue->size - 1;
+        ElementState effective_state_impl(std::size_t element_idx) const noexcept
+        {
+            const Element &element = elements_[element_idx];
+            if (element.epoch != current_epoch_)
+            {
+                return NOT_IN_HEAP;
+            }
+            return element.state;
+        }
 
-    exchange_nodes(pqueue, 0, node_idx);
+        double element_key_impl(std::size_t element_idx) const noexcept
+        {
+            return elements_[element_idx].key;
+        }
 
-    pqueue->Elements[element_idx].state = SCANNED;
-    pqueue->Elements[element_idx].node_idx = pqueue->length;
-    pqueue->A[node_idx] = pqueue->length;
-    --pqueue->size;
+        struct Element
+        {
+            double key;
+            std::uint32_t epoch;
+            ElementState state;
+            std::size_t node_idx;
+        };
 
-    if (pqueue->size > 0) {
-        min_heapify(pqueue, 0);
-    }
+        static constexpr std::size_t kArity = 4;
 
-    return element_idx;
-}
+        std::size_t length_ = 0;
+        std::size_t size_ = 0;
+        std::size_t *heap_ = nullptr;
+        Element *elements_ = nullptr;
+        std::uint32_t current_epoch_ = 0;
 
-}  // namespace aequilibrae::paths::cpp
+        void initialize_element(std::size_t element_idx) noexcept
+        {
+            elements_[element_idx].key = kInfinity;
+            elements_[element_idx].epoch = 0;
+            elements_[element_idx].state = NOT_IN_HEAP;
+            elements_[element_idx].node_idx = length_;
+        }
+
+        bool element_is_in_heap(std::size_t element_idx) const noexcept
+        {
+            const Element &element = elements_[element_idx];
+            return element.epoch == current_epoch_ && element.state == IN_HEAP;
+        }
+
+        void exchange_nodes(std::size_t node_i, std::size_t node_j) noexcept
+        {
+            assert(node_i < size_);
+            assert(node_j < size_);
+
+            const std::size_t element_i = heap_[node_i];
+            const std::size_t element_j = heap_[node_j];
+
+            assert(element_i < length_);
+            assert(element_j < length_);
+
+            heap_[node_i] = element_j;
+            heap_[node_j] = element_i;
+            elements_[element_j].node_idx = node_i;
+            elements_[element_i].node_idx = node_j;
+        }
+
+        void decrease_key_from_node_index(std::size_t node_idx, double key_new) noexcept
+        {
+            assert(node_idx < size_);
+
+            std::size_t current = node_idx;
+            const std::size_t element_idx = heap_[current];
+            assert(element_idx < length_);
+            assert(elements_[element_idx].state == IN_HEAP);
+            assert(key_new <= elements_[element_idx].key);
+
+            elements_[element_idx].key = key_new;
+            while (current > 0)
+            {
+                const std::size_t parent = (current - 1) / kArity;
+                const std::size_t parent_element = heap_[parent];
+                assert(parent_element < length_);
+                if (elements_[parent_element].key > key_new)
+                {
+                    exchange_nodes(current, parent);
+                    current = parent;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        void min_heapify(std::size_t node_idx) noexcept
+        {
+            if (size_ == 0)
+            {
+                return;
+            }
+
+            assert(node_idx < size_);
+
+            std::size_t current = node_idx;
+            while (true)
+            {
+                std::size_t smallest = current;
+                double min_key = elements_[heap_[smallest]].key;
+
+                const std::size_t first_child = kArity * current + 1;
+                const std::size_t end_child = first_child + kArity < size_ ? first_child + kArity : size_;
+
+                for (std::size_t candidate = end_child; candidate > first_child; --candidate)
+                {
+                    const std::size_t child = candidate - 1;
+                    const double child_key = elements_[heap_[child]].key;
+                    if (child_key < min_key)
+                    {
+                        smallest = child;
+                        min_key = child_key;
+                    }
+                }
+
+                if (smallest == current)
+                {
+                    return;
+                }
+
+                exchange_nodes(current, smallest);
+                current = smallest;
+            }
+        }
+    };
+
+} // namespace aequilibrae::paths::cpp
