@@ -2,7 +2,7 @@
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.utils.cython.bridge cimport Bridge, log, f, DEBUG, msleep
+from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, msleep
 from aequilibrae.utils.cython.bar cimport Bar
 
 
@@ -304,7 +304,7 @@ cdef class RouteChoiceSet:
 
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
-                    log(bridge, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
+                    log(bridge.c, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
 
                     if origin_index == dest_index:
                         bar.inc()

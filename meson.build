@@ -9,8 +9,13 @@ project(
   license_files: ['LICENSE.TXT'],
 )
 
-py = import('python').find_installation(pure: false)
+add_project_arguments(
+  '-X', 'embedsignature=True',
+  '-X', 'emit_code_comments=True',
+  language : 'cython'
+)
 
+py = import('python').find_installation(pure: false)
 
 openmp = dependency('openmp')
 
@@ -22,12 +27,6 @@ deps = [openmp, cysignals]
 
 incdir = include_directories(
   'src/aequilibrae/utils/cpp/'
-)
-
-add_project_arguments(
-  '-X', 'embedsignature=True',
-  '-X', 'emit_code_comments=True',
-  language : 'cython'
 )
 
 subdir('src/aequilibrae')

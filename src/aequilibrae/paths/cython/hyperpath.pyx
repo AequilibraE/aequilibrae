@@ -13,7 +13,7 @@ from libc.stdint cimport int64_t, uint8_t, uint32_t, uint64_t
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
-from aequilibrae.utils.cython.bridge cimport Bridge, log, f
+from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f
 from aequilibrae.utils.cython.bar cimport Bar
 
 ctypedef double DATATYPE_t
