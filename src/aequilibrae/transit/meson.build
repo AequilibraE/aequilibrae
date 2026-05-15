@@ -8,7 +8,6 @@ pyfiles = [
   'gtfs_loader.py',
   'lib_gtfs.py',
   'route_map_matcher.py',
-  'route_system.py',
   'transit.py',
   'transit_graph_builder.py',
 ]
