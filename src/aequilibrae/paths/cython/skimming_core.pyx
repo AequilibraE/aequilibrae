@@ -22,7 +22,7 @@ def skimming_parallel(graph, result, long cores):
     result = SkimResults()
     result.prepare(graph)
     num_skims = len(graph.skim_fields)
-    num_nodes = results.nodes
+    num_nodes = result.nodes
 
     aux_result = MultiThreadedPaths()
     aux_result.prepare(graph, cores, num_nodes, num_skims)
