@@ -7,23 +7,24 @@ from aequilibrae.utils.get_table import get_table
 
 
 def read_stop_times(conn: sqlite3.Connection):
-    tpm = get_table("Transit_Pattern_Links", conn)
-    tts = get_table("Transit_Trips_Schedule", conn).reset_index()
-    tl = get_table("Transit_Links", conn).reset_index()
-    trps = pd.read_sql("select pattern_id, trip_id from Transit_Trips", conn)
-    tl.drop(columns=["pattern_id", "length", "geo", "type"], inplace=True)
+    tpm = get_table("pattern_mapping", conn)
+    tts = get_table("trips_schedule", conn).reset_index()
+    tl = get_table("route_links", conn).reset_index()
+    trps = pd.read_sql("SELECT pattern_id, trip_id FROM trips", conn)
+    tl.drop(columns=["pattern_id", "distance", "geometry"], inplace=True)
 
     trip_stops = tts.merge(trps, on="trip_id")
-    links = tpm.merge(tl, on="transit_link")
+    links = tpm.merge(tl, left_on="link", right_on="transit_link")
+    links.rename(columns={"seq_x": "seq"}, inplace=True)
 
-    first_nodes = links[["pattern_id", "from_node", "index"]].rename(columns={"from_node": "stop_id"})
-    last_nodes = links.sort_values("index", ascending=False).drop_duplicates(subset=["pattern_id"], keep="first")
-    last_nodes = last_nodes[["pattern_id", "to_node", "index"]].rename(columns={"to_node": "stop_id"})
-    last_nodes.loc[:, "index"] += 1
+    first_nodes = links[["pattern_id", "from_stop", "seq"]].rename(columns={"from_stop": "stop_id"})
+    last_nodes = links.sort_values("seq", ascending=False).drop_duplicates(subset=["pattern_id"], keep="first")
+    last_nodes = last_nodes[["pattern_id", "to_stop", "seq"]].rename(columns={"to_stop": "stop_id"})
+    last_nodes.loc[:, "seq"] += 1
 
-    links = pd.concat([first_nodes, last_nodes], ignore_index=True).set_index(["pattern_id", "index"])
-    stop_times = trip_stops.set_index(["pattern_id", "index"]).join(links).reset_index()
-    renames = {"index": "stop_sequence", "departure": "departure_time", "arrival": "arrival_time"}
+    links = pd.concat([first_nodes, last_nodes], ignore_index=True).set_index(["pattern_id", "seq"])
+    stop_times = trip_stops.set_index(["pattern_id", "seq"]).join(links).reset_index()
+    renames = {"seq": "stop_sequence", "departure": "departure_time", "arrival": "arrival_time"}
     stop_times.rename(columns=renames, inplace=True)
 
     # Conversion must be convoluted to support

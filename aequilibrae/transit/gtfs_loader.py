@@ -2,11 +2,12 @@ import hashlib
 import zipfile
 from copy import deepcopy
 from datetime import datetime
+from io import TextIOWrapper
 from os.path import splitext, basename
-from typing import Dict
+from typing import Any, Dict, cast
 
-import numpy as np
 import pandas as pd
+from pandas.errors import EmptyDataError
 from pyproj import Transformer
 from shapely.geometry import LineString
 
@@ -14,10 +15,43 @@ from aequilibrae.context import get_logger
 from aequilibrae.transit.column_order import column_order
 from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+
+def _clean_string_series(series: pd.Series) -> pd.Series:
+    return (
+        series.astype("string")
+        .str.encode("ascii", errors="ignore")
+        .str.decode("ascii")
+        .str.strip()
+    )
+
+
+def _coerce_gtfs_column(series: pd.Series, expected_type):
+    cleaned = _clean_string_series(series)
+
+    if expected_type is str:
+        return cleaned.fillna("")
+
+    numeric = cleaned.replace("", pd.NA)
+    if expected_type is int:
+        numeric = numeric.astype("string").str.split(".", n=1, regex=False).str[0]
+        return pd.to_numeric(numeric, errors="raise").astype("Int64")
+
+    if expected_type is float:
+        return pd.to_numeric(numeric, errors="raise").astype("Float64")
+
+    return cleaned
+
+
+def _time_series_to_seconds(series: pd.Series, field_name: str) -> pd.Series:
+    cleaned = _clean_string_series(series).replace("", pd.NA)
+    try:
+        return cleaned.map(to_seconds, na_action="ignore").astype("Int64")
+    except ValueError as err:
+        raise ValueError(f"Invalid GTFS time found in field {field_name}: {err}") from err
 
 
 class GTFSReader(WorkerThread):
@@ -34,8 +68,8 @@ class GTFSReader(WorkerThread):
         self.feed_date = ""
         self.agency = Agency(conn)
         self.services = {}
-        self.routes: Dict[int, Route] = {}
-        self.trips: Dict[int, Dict[Route]] = {}
+        self.routes: Dict[str, Route] = {}
+        self.trips: Dict[str, Dict[str, list[Trip]]] = {}
         self.stops: Dict[int, Stop] = {}
         self.stop_times = {}
         self.shapes = {}
@@ -47,6 +81,31 @@ class GTFSReader(WorkerThread):
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.logger = get_logger()
+
+    def __read_gtfs_table(self, file_name: str) -> pd.DataFrame:
+        schema = column_order[file_name]
+
+        try:
+            with self.zip_archive.open(file_name, "r") as raw_file:
+                csv_file = TextIOWrapper(raw_file, encoding="utf-8-sig", newline="")
+                data = pd.read_csv(cast(Any, csv_file), sep=",", dtype="string", keep_default_na=False)
+        except EmptyDataError:
+            data = pd.DataFrame(columns=list(schema.keys()))
+
+        data.columns = [col.lower().strip() for col in data.columns]
+        for column_name in schema:
+            if column_name not in data.columns:
+                data[column_name] = "" if schema[column_name] is str else pd.NA
+
+        data = data.loc[:, list(schema.keys())].copy()
+        if not data.empty:
+            cleaned = data.apply(_clean_string_series)
+            data = cleaned.loc[~cleaned.eq("").all(axis=1)].copy()
+
+        for column_name, expected_type in schema.items():
+            data[column_name] = _coerce_gtfs_column(data[column_name], expected_type)
+
+        return data.reset_index(drop=True)
 
     def set_feed_path(self, file_path):
         """Sets GTFS feed source to be used
@@ -124,65 +183,66 @@ class GTFSReader(WorkerThread):
                         )
 
                     if not stop_times.arrival_time.is_monotonic_increasing:
-                        stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = np.nan
-                        stop_times.arrival_time.fillna(method="ffill", inplace=True)
-                    diffs = np.diff(stop_times.arrival_time.values)
+                        stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = pd.NA
+                        stop_times.loc[:, "arrival_time"] = stop_times.arrival_time.ffill()
+                    diffs = stop_times.arrival_time.diff().iloc[1:].to_numpy(dtype=int)
 
                     stop_geos = [self.stops[x].geo for x in trip.stops]
-                    distances = np.array([x.distance(y) for x, y in zip(stop_geos[:-1], stop_geos[1:], strict=True)])
+                    distances = pd.Series([x.distance(y) for x, y in zip(stop_geos[:-1], stop_geos[1:], strict=True)])
 
-                    times = np.copy(stop_times.arrival_time.values)
-                    source_time = np.zeros_like(stop_times.arrival_time.values)
+                    times = stop_times.arrival_time.to_numpy(copy=True, dtype=int)
+                    source_time = pd.Series(0, index=stop_times.index, dtype="int64")
 
                     if times[-1] == times[-2]:
                         self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
                         self.logger.info("    Had conflicting stop times in its end")
                         times[-1] += 1
-                        source_time[-1] = 1
-                        diffs = np.diff(times)
+                        source_time.iloc[-1] = 1
+                        diffs = pd.Series(times).diff().iloc[1:].to_numpy(dtype=int)
 
-                    to_override = np.argwhere(diffs == 0)[:, 0] + 1
-                    if to_override.shape[0] > 0:
+                    to_override = stop_times.index[1:][pd.Series(diffs).eq(0)].tolist()
+                    if to_override:
                         self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
                         self.logger.info("     Had consecutive stops with the same timestamp")
                         for i in to_override:
-                            source_time[i] = 1
-                            times[i:] += 1
-                        diffs = np.diff(times)
+                            position = stop_times.index.get_loc(i)
+                            source_time.iloc[position] = 1
+                            times[position:] += 1
+                        diffs = pd.Series(times).diff().iloc[1:].to_numpy(dtype=int)
 
                     if max_speeds.shape[0] > 0:
-                        speeds = distances / diffs
+                        speeds = distances / pd.Series(diffs)
                         df = pd.DataFrame(
                             {
                                 "speed": speeds,
                                 "max_speed": max_speeds.speed.max(),
                                 "dist": distances,
                                 "elapsed_time": diffs,
-                                "add_time": np.zeros(diffs.shape[0], dtype=int),
-                                "source_time": source_time[1:],
+                                "add_time": pd.Series(0, index=distances.index, dtype="int64"),
+                                "source_time": source_time.iloc[1:].to_numpy(dtype=int),
                             }
                         )
 
                         for _, r in max_speeds.iterrows():
                             df.loc[(df.dist >= r.min_distance) & (df.dist < r.max_distance), "max_speed"] = r.speed
 
-                        to_fix = df[df.max_speed < df.speed].index.values
-                        if to_fix.shape[0] > 0:
-                            self.logger.debug(f"     Trip {trip.trip} had {to_fix.shape[0]} segments too fast")
-                            total_fast += to_fix.shape[0]
+                        to_fix = df.index[df.max_speed < df.speed].tolist()
+                        if to_fix:
+                            self.logger.debug(f"     Trip {trip.trip} had {len(to_fix)} segments too fast")
+                            total_fast += len(to_fix)
                             df.loc[to_fix[0] :, "source_time"] = 2
                             for i in to_fix:
                                 df.loc[i:, "add_time"] += (
                                     df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)
                                 ).astype(int)
 
-                            source_time[1:] = df.source_time[:]
-                            times[1:] += df.add_time[:].astype(int)
+                            source_time.iloc[1:] = df.source_time.to_numpy(dtype=int)
+                            times[1:] += df.add_time.to_numpy(dtype=int)
 
                     assert min(times[1:] - times[:-1]) > 0
                     stop_times.loc[:, "arrival_time"] = times[:].astype(int)
                     stop_times.loc[:, "departure_time"] = times[:].astype(int)
-                    stop_times.loc[:, "source_time"] = source_time[:].astype(int)
+                    stop_times.loc[:, "source_time"] = source_time.to_numpy(dtype=int)
                     trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
                     trip.departures = stop_times.departure_time.to_numpy(copy=True)
 
@@ -197,12 +257,18 @@ class GTFSReader(WorkerThread):
         if fareatttxt in self.zip_archive.namelist():
             self.logger.debug('  Loading "fare_attributes" table')
 
-            with self.zip_archive.open(fareatttxt, "r") as file:
-                fareatt = parse_csv(file, column_order[fareatttxt])
+            fareatt = self.__read_gtfs_table(fareatttxt)
             self.data_arrays[fareatttxt] = fareatt
 
-            for line in range(fareatt.shape[0]):
-                data = tuple(fareatt[line][list(column_order[fareatttxt].keys())])
+            for row in fareatt.to_dict(orient="records"):
+                data = (
+                    row["fare_id"],
+                    row["price"],
+                    row["currency_type"],
+                    row["payment_method"],
+                    row["transfers"],
+                    row["transfer_duration"],
+                )
                 headers = ["fare_id", "price", "currency", "payment_method", "transfer", "transfer_duration"]
                 f = Fare(self.agency.agency_id)
                 f.populate(data, headers)
@@ -217,12 +283,11 @@ class GTFSReader(WorkerThread):
 
         self.logger.debug('  Loading "fare_rules" table')
 
-        with self.zip_archive.open(farerltxt, "r") as file:
-            farerl = parse_csv(file, column_order[farerltxt])
+        farerl = self.__read_gtfs_table(farerltxt)
         self.data_arrays[farerltxt] = farerl
 
-        for line in range(farerl.shape[0]):
-            data = tuple(farerl[line][list(column_order[farerltxt].keys())])
+        for row in farerl.to_dict(orient="records"):
+            data = (row["fare_id"], row["route_id"], row["origin_id"], row["destination_id"], row["contains_id"])
             fr = FareRule()
             fr.populate(data, ["fare", "route", "origin", "destination", "contains"])
             fr.fare_id = self.fare_attributes[fr.fare].fare_id
@@ -240,19 +305,16 @@ class GTFSReader(WorkerThread):
         if shapestxt not in self.zip_archive.namelist():
             return
 
-        with self.zip_archive.open(shapestxt, "r") as file:
-            shapes = parse_csv(file, column_order[shapestxt])
-
-        all_shape_ids = np.unique(shapes["shape_id"]).tolist()
+        shapes = self.__read_gtfs_table(shapestxt)
+        all_shape_ids = shapes["shape_id"].drop_duplicates().tolist()
 
         self.data_arrays[shapestxt] = shapes
-        lats, lons = self.transformer.transform(shapes[:]["shape_pt_lat"], shapes[:]["shape_pt_lon"])
+        lats, lons = self.transformer.transform(shapes["shape_pt_lat"].tolist(), shapes["shape_pt_lon"].tolist())
         shapes["shape_pt_lat"] = lats
         shapes["shape_pt_lon"] = lons
 
         for shape_id in simple_progress(all_shape_ids, self.signal, "Loading shapes (Step: 4/12)"):
-            items = shapes[shapes["shape_id"] == shape_id]
-            items = items[np.argsort(items["shape_pt_sequence"])]
+            items = shapes.loc[shapes["shape_id"] == shape_id].sort_values("shape_pt_sequence")
             shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"], strict=True)))
             self.shapes[shape_id] = shape
 
@@ -263,61 +325,67 @@ class GTFSReader(WorkerThread):
 
         self.logger.debug('    Loading "trips" table')
         tripstxt = "trips.txt"
-        with self.zip_archive.open(tripstxt, "r") as file:
-            trips_array = parse_csv(file, column_order[tripstxt])
+        trips_array = self.__read_gtfs_table(tripstxt)
         self.data_arrays[tripstxt] = trips_array
 
-        if np.unique(trips_array["trip_id"]).shape[0] < trips_array.shape[0]:
+        if trips_array["trip_id"].duplicated().any():
             self.__fail("There are repeated trip IDs in trips.txt")
 
         stp_tm = self.data_arrays["stop_times.txt"]
-        diff = np.setdiff1d(trips_array["trip_id"], stp_tm["trip_id"], assume_unique=False)
-        if diff.shape[0] > 0:
-            diff = ",".join([str(x) for x in diff.tolist()])
+        diff = trips_array.loc[~trips_array["trip_id"].isin(stp_tm["trip_id"]), "trip_id"].drop_duplicates()
+        if not diff.empty:
+            diff = ",".join(diff.astype(str).tolist())
             msg = f"There are IDs in trips.txt without any stop on stop_times.txt -> {diff}"
             self.logger.error(msg)
             raise Exception(msg)
 
-        incal = np.unique(list(self.services.keys()))
-        diff = np.setdiff1d(trips_array["service_id"], incal, assume_unique=False)
-        if diff.shape[0] > 0:
-            diff = ",".join([str(x) for x in diff.tolist()])
+        incal = pd.Index(self.services.keys(), dtype="string")
+        diff = trips_array.loc[~trips_array["service_id"].isin(incal), "service_id"].drop_duplicates()
+        if not diff.empty:
+            diff = ",".join(diff.astype(str).tolist())
             self.__fail(f"There are service IDs in trips.txt that are absent in the calendar -> {diff}")
 
-        self.trips = {str(x): {} for x in np.unique(trips_array["route_id"])}
+        self.trips = {str(x): {} for x in trips_array["route_id"].drop_duplicates().tolist()}
 
-        for line in simple_progress(trips_array, self.signal, "Loading trips (Step: 5/12)"):
+        records = list(trips_array.itertuples(index=False, name=None))
+        for line in simple_progress(records, self.signal, "Loading trips (Step: 5/12)"):
             trip = Trip()
-            trip._populate(line, trips_array.dtype.names)
+            trip._populate(line, list(trips_array.columns))
             trip.route_id = self.routes[trip.route].route_id
             trip.shape = self.shapes.get(trip.shape_id, trip.shape)
+            replacement_ids = trip_replacements.get(trip.trip)
             all_trips = [trip]
-            if trip.trip_id in trip_replacements:
-                all_trips = [deepcopy(trip) for _ in range(len(trip_replacements[trip.trip_id]))]
+            if replacement_ids is not None:
+                all_trips = []
+                for replacement_id in replacement_ids:
+                    replacement_trip = deepcopy(trip)
+                    replacement_trip.trip = replacement_id
+                    all_trips.append(replacement_trip)
 
             for trip in all_trips:
-                stop_times = self.stop_times.get(trip.trip, [])
-                if len(stop_times) < 2:
+                stop_times = self.stop_times.get(trip.trip, pd.DataFrame())
+                if stop_times.shape[0] < 2:
                     self.logger.warning(f"Trip {trip.trip} had less than two stops, so we skipped it.")
                     continue
 
-                cleaner = stop_times.assign(seqkey=stop_times.stop.shift(-1) + "#####" + stop_times.stop)
+                cleaner = stop_times.assign(seqkey=stop_times.stop.shift(-1).fillna("") + "#####" + stop_times.stop)
                 cleaner.drop_duplicates(["seqkey"], inplace=True, keep="first")
                 stop_times = cleaner.drop(columns=["seqkey"])
                 stop_times.loc[:, "arrival_time"] = stop_times.arrival_time.astype(int)
                 stop_times.loc[:, "departure_time"] = stop_times.departure_time.astype(int)
                 self.stop_times[trip.trip] = stop_times
-                trip.stops = list(stop_times.stop_id.values)
+                trip.stops = stop_times.stop_id.tolist()
                 m = hashlib.md5()
                 m.update(trip.route.encode())
-                m.update("".join(stop_times.stop.values).encode())
+                m.update(stop_times.stop.astype(str).str.cat().encode())
 
                 trip.pattern_hash = m.hexdigest()
-                trip.arrivals = list(stop_times.arrival_time.values)
-                trip.departures = list(stop_times.departure_time.values)
-                trip.source_time = list(stop_times.source_time.values)
+                trip.arrivals = stop_times.arrival_time.tolist()
+                trip.departures = stop_times.departure_time.tolist()
+                trip.source_time = stop_times.source_time.tolist()
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
-                trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
+                trip_points = [self.stops[x].geo for x in trip.stops if self.stops[x].geo is not None]
+                trip._stop_based_shape = LineString(trip_points)
                 # trip.shape = self.shapes.get(trip.shape)
                 trip.pce = self.routes[trip.route].pce
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
@@ -334,11 +402,13 @@ class GTFSReader(WorkerThread):
         if freqtxt in self.zip_archive.namelist():
             self.logger.debug('    Loading "frequencies" table')
 
-            with self.zip_archive.open(freqtxt, "r") as file:
-                freqs = parse_csv(file, column_order[freqtxt])
+            freqs = self.__read_gtfs_table(freqtxt)
             self.data_arrays[freqtxt] = freqs
-            for line in range(freqs.shape[0]):
-                trip, start_time, end_time, headway = list(freqs[line][list(column_order[freqtxt].keys())])
+            for row in freqs.to_dict(orient="records"):
+                trip = row["trip_id"]
+                start_time = row["start_time"]
+                end_time = row["end_time"]
+                headway = row["headway_secs"]
                 if trip not in self.stop_times:
                     self.__fail(f"trip id {trip} in frequency table has no corresponding entry in trips")
 
@@ -356,7 +426,7 @@ class GTFSReader(WorkerThread):
                 for step in range(steps):
                     shift = step * headway
                     new_trip = template.copy()
-                    new_trip_str = f"{trip}-{new_trip.arrival_time.values[0]}".replace(":", "")
+                    new_trip_str = f"{trip}-{int(new_trip.arrival_time.iloc[0])}"
                     new_trip.loc[:, "arrival_time"] += shift
                     new_trip.loc[:, "departure_time"] += shift
                     self.stop_times[new_trip_str] = new_trip
@@ -369,29 +439,16 @@ class GTFSReader(WorkerThread):
         self.stop_times.clear()
         self.logger.debug('    Loading "stop times" table')
         stoptimestxt = "stop_times.txt"
-        with self.zip_archive.open(stoptimestxt, "r") as file:
-            stoptimes = parse_csv(file, column_order[stoptimestxt])
+        stoptimes = self.__read_gtfs_table(stoptimestxt)
         self.data_arrays[stoptimestxt] = stoptimes
 
-        df = pd.DataFrame(stoptimes)
         for col in ["arrival_time", "departure_time"]:
-            df2 = df[col].str.split(":", expand=True)
-            df2 = df2.fillna("0")
-            df2.columns = ["h", "m", "s"]
-            df2.loc[df2.h.str.len() < 1, "h"] = "0"
-            df2.loc[df2.m.str.len() < 1, "m"] = "0"
-            df2.loc[df2.s.str.len() < 1, "s"] = "0"
-            df2 = df2.assign(sec=0)
-            df2.loc[:, "sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
-            stoptimes[col] = df2.sec.values
+            stoptimes[col] = _time_series_to_seconds(stoptimes[col], col)
 
-        key = np.char.add(stoptimes["trip_id"].astype(str), np.array(["##"] * stoptimes.shape[0]))
-        key = np.char.add(key, stoptimes["stop_sequence"].astype(str))
-        if np.unique(key).shape[0] < stoptimes.shape[0]:
+        if stoptimes.duplicated(["trip_id", "stop_sequence"]).any():
             self.__fail("There are repeated stop_sequences for a single trip_id on stop_times.txt")
 
-        df = pd.DataFrame(stoptimes)
-
+        df = stoptimes.copy()
         df.loc[:, "arrival_time"] = df.loc[:, ["arrival_time", "departure_time"]].max(axis=1)
         df.loc[:, "departure_time"] = df.loc[:, "arrival_time"]
 
@@ -410,8 +467,9 @@ class GTFSReader(WorkerThread):
         df = df.assign(source_time=0)
 
         msg = "Loading stop times (Step: 3/12)"
-        for trip_id, data in simple_progress(df.groupby(df["trip_id"]), self.signal, msg):
-            data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
+        for trip_id, data in simple_progress(list(df.groupby("trip_id", sort=False)), self.signal, msg):
+            data = data.copy()
+            data.loc[:, "stop_sequence"] = range(data.shape[0])
             self.stop_times[trip_id] = data
 
     def __load_stops_table(self):
@@ -420,19 +478,19 @@ class GTFSReader(WorkerThread):
         self.logger.debug('    Loading "stops" table')
         self.stops = {}
         stopstxt = "stops.txt"
-        with self.zip_archive.open(stopstxt, "r") as file:
-            stops = parse_csv(file, column_order[stopstxt])
+        stops = self.__read_gtfs_table(stopstxt)
         self.data_arrays[stopstxt] = stops
 
-        if np.unique(stops["stop_id"]).shape[0] < stops.shape[0]:
+        if stops["stop_id"].duplicated().any():
             self.__fail("There are repeated stop IDs in stops.txt")
 
-        lats, lons = self.transformer.transform(stops[:]["stop_lat"], stops[:]["stop_lon"])
+        lats, lons = self.transformer.transform(stops["stop_lat"].tolist(), stops["stop_lon"].tolist())
         stops["stop_lat"] = lats
         stops["stop_lon"] = lons
 
-        for line in simple_progress(stops, self.signal, "Loading stops (Step: 2/12)"):
-            s = Stop(self.agency.agency_id, line, stops.dtype.names)
+        stop_records = list(stops.itertuples(index=False, name=None))
+        for line in simple_progress(stop_records, self.signal, "Loading stops (Step: 2/12)"):
+            s = Stop(self.agency.agency_id, line, list(stops.columns))
             s.agency = self.agency.agency
             s.srid = self.srid
             s.get_node_id()
@@ -444,27 +502,30 @@ class GTFSReader(WorkerThread):
         self.logger.debug('    Loading "routes" table')
         self.routes = {}
         routetxt = "routes.txt"
-        with self.zip_archive.open(routetxt, "r") as file:
-            routes = parse_csv(file, column_order[routetxt])
+        routes = self.__read_gtfs_table(routetxt)
         self.data_arrays[routetxt] = routes
 
-        if np.unique(routes["route_id"]).shape[0] < routes.shape[0]:
+        if routes["route_id"].duplicated().any():
             self.__fail("There are repeated route IDs in routes.txt")
 
         seated_cap, total_cap = self.__capacities__.get("other", [None, None])
-        routes = pd.DataFrame(routes)
         routes = routes.assign(seated_capacity=seated_cap, total_capacity=total_cap, srid=self.srid)
         for route_type, cap in self.__capacities__.items():
+            if route_type == "other":
+                continue
             routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
 
         default_pce = self.__pces__.get("other", 2.0)
         routes = routes.assign(pce=default_pce)
         for route_type, pce in self.__pces__.items():
+            if route_type == "other":
+                continue
             routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
-        for _i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
+        route_records = list(routes.itertuples(index=False, name=None))
+        for line in simple_progress(route_records, self.signal, "Loading routes (Step: 1/12)"):
             r = Route(self.agency.agency_id)
-            r.populate(line.values, routes.columns)
+            r.populate(line, list(routes.columns))
             self.routes[r.route] = r
 
     def __load_feed_calendar(self):
@@ -477,23 +538,22 @@ class GTFSReader(WorkerThread):
         caltxt = "calendar.txt"
         if caltxt in self.zip_archive.namelist():
             self.logger.debug('    Loading "calendar" table')
-            with self.zip_archive.open(caltxt, "r") as file:
-                calendar = parse_csv(file, column_order[caltxt])
+            calendar = self.__read_gtfs_table(caltxt)
 
             if calendar.shape[0] > 0:
-                calendar["start_date"] = [datetime.fromisoformat(format_date(i)) for i in calendar["start_date"]]
-                calendar["end_date"] = [datetime.fromisoformat(format_date(i)) for i in calendar["end_date"]]
+                calendar["start_date"] = calendar["start_date"].map(format_date).map(datetime.fromisoformat)
+                calendar["end_date"] = calendar["end_date"].map(format_date).map(datetime.fromisoformat)
                 self.data_arrays[caltxt] = calendar
-                if np.unique(calendar["service_id"]).shape[0] < calendar.shape[0]:
+                if calendar["service_id"].duplicated().any():
                     self.__fail("There are repeated service IDs in calendar.txt")
 
                 min_date = min(calendar["start_date"].tolist())
                 max_date = max(calendar["end_date"].tolist())
                 self.feed_dates = create_days_between(min_date, max_date)
 
-                for line in calendar:
+                for line in calendar.itertuples(index=False, name=None):
                     service = Service()
-                    service._populate(line, calendar.dtype.names, True)
+                    service._populate(line, list(calendar.columns), True)
                     self.services[service.service_id] = service
             else:
                 self.logger.warning('"calendar.txt" file is empty')
@@ -514,8 +574,7 @@ class GTFSReader(WorkerThread):
             return
 
         self.logger.debug('    Loading "calendar dates" table')
-        with self.zip_archive.open(caldatetxt, "r") as file:
-            caldates = parse_csv(file, column_order[caldatetxt])
+        caldates = self.__read_gtfs_table(caldatetxt)
 
         if caldates.shape[0] == 0:
             self.logger.warning('"calendar_dates.txt" file is empty')
@@ -527,12 +586,10 @@ class GTFSReader(WorkerThread):
             self.feed_dates = create_days_between(min_date, max_date)
 
         exception_inconsistencies = 0
-        svc_id_col = caldates.dtype.names.index("service_id")
-        xcpt_tp_col = caldates.dtype.names.index("exception_type")
-        for line in caldates:
-            sd = format_date(line["date"])
-            service_id = line[svc_id_col]
-            exception_type = line[xcpt_tp_col]
+        for row in caldates.to_dict(orient="records"):
+            sd = format_date(row["date"])
+            service_id = row["service_id"]
+            exception_type = row["exception_type"]
 
             if service_id not in self.services:
                 s = Service()

@@ -1,10 +1,13 @@
 import sqlite3
 
-# from aequilibrae.data import DataTableStorage
+import pandas as pd
+
 from aequilibrae.utils.get_table import get_table
-from aequilibrae.transit.transit_elements import Agency
 
 
 def read_agencies(conn: sqlite3.Connection):
-    data = get_table("transit_agencies", conn).reset_index()
-    return [Agency(conn).from_row(dt) for _, dt in data.iterrows() if dt.agency_id > 1]
+    data = get_table("agencies", conn).reset_index()
+    data = data.loc[data.agency_id > 1, ["agency_id", "agency"]].copy()
+    data.rename(columns={"agency": "agency_name"}, inplace=True)
+    data = data.assign(agency_url="https://vms.taps.anl.gov/tools/polaris/", agency_timezone=pd.NA)
+    return data[["agency_id", "agency_name", "agency_url", "agency_timezone"]]

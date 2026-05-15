@@ -199,7 +199,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """
         if self.srid is None:
             raise ValueError("We cannot load data without an SRID")
-        if service_date == self.day:
+        if service_date == self.day and self.select_routes:
             return
         if service_date not in self.gtfs_data.feed_dates:
             raise ValueError("The date chosen is not available in this GTFS feed")

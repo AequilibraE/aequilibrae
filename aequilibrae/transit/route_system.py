@@ -1,6 +1,7 @@
 import os
 import zipfile
 from os.path import join
+from typing import Any, cast
 
 import pandas as pd
 from pyproj import Transformer
@@ -16,16 +17,16 @@ class RouteSystem:
     def __init__(self, project):
         self.project = project
 
-        self.agencies = []
-        self.stops = []
-        self.routes = []
-        self.trips = []
-        self.patterns = []
+        self.agencies = pd.DataFrame([])
+        self.stops = pd.DataFrame([])
+        self.routes = pd.DataFrame([])
+        self.trips = pd.DataFrame([])
+        self.patterns = pd.DataFrame([])
         self.stop_times = pd.DataFrame([])
 
-        self.fare_attributes = []
-        self.fare_rules = []
-        self.zones = []
+        self.fare_attributes = pd.DataFrame([])
+        self.fare_rules = pd.DataFrame([])
+        self.zones = pd.DataFrame([])
 
         self.transformer = Transformer.from_crs(f"epsg:{get_srid()}", "epsg:4326", always_xy=True)
 
@@ -48,10 +49,12 @@ class RouteSystem:
         self.routes = read_routes(conn)
 
     def _read_patterns(self, conn):
-        self.patterns = self.patterns or read_patterns(conn, self.transformer)
+        if self.patterns.empty:
+            self.patterns = read_patterns(conn, self.transformer)
 
     def _read_trips(self, conn):
-        self.trips = self.trips or read_trips(conn)
+        if self.trips.empty:
+            self.trips = read_trips(conn)
 
     def _read_stop_times(self, conn):
         self.stop_times = read_stop_times(conn)
@@ -60,12 +63,12 @@ class RouteSystem:
         """ """
 
         with self.project.transit_connection as conn:
-            write_agencies(self.agencies, path_to_folder)
-            write_stops(self.stops, path_to_folder)
-            write_routes(self.routes, path_to_folder)
-            write_shapes(self.patterns, path_to_folder)
+            write_agencies(cast(Any, self.agencies), path_to_folder)
+            write_stops(cast(Any, self.stops), path_to_folder)
+            write_routes(cast(Any, self.routes), path_to_folder)
+            write_shapes(cast(Any, self.patterns), path_to_folder)
 
-            write_trips(self.trips, path_to_folder, conn)
+            write_trips(cast(Any, self.trips), path_to_folder, conn)
             write_stop_times(self.stop_times, path_to_folder)
             write_fares(path_to_folder, conn)
             self._zip_feed(path_to_folder)
