@@ -29,6 +29,8 @@ Installation
 
   The Windows App Store ships a version of Python that contains an sqlite dll that does not support the loading of extensions. This means that Spatialite will not be loaded, and therefore AequilibraE will not work properly.
 
+.. _macos_compilation:
+
 macOS
 ^^^^^
 

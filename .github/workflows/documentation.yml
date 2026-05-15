@@ -34,7 +34,7 @@ jobs:
         sudo apt install -y latexmk texlive-xetex fonts-freefont-otf xindy
         pip install uv
         python -m uv pip install wheel openmatrix pytest
-        python -m uv pip install -e .[dev]
+        python -m uv pip install .[dev]
 
     - name: Check history of versions
       run: |
@@ -44,12 +44,12 @@ jobs:
 
     - name: Test docstrings
       run: |
-        python -m pytest --doctest-modules aequilibrae/distribution --ignore=aequilibrae/distribution/setup_ipf.py
-        python -m pytest --doctest-modules aequilibrae/matrix
-        python -m pytest --doctest-modules aequilibrae/paths --ignore=aequilibrae/paths/setup_assignment.py
-        python -m pytest --doctest-modules aequilibrae/project --ignore=aequilibrae/project/database_specification
-        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py
-        python -m pytest --doctest-modules aequilibrae/transit
+        python -m pytest --doctest-modules --pyargs aequilibrae.distribution --ignore-glob='*setup_ipf.py'
+        python -m pytest --doctest-modules --pyargs aequilibrae.matrix
+        python -m pytest --doctest-modules --pyargs aequilibrae.paths --ignore-glob='*setup_assignment.py'
+        python -m pytest --doctest-modules --pyargs aequilibrae.project --ignore-glob='*database_specification*'
+        python -m pytest --doctest-modules --pyargs aequilibrae.log aequilibrae.parameters
+        python -m pytest --doctest-modules --pyargs aequilibrae.transit
         python -m pytest --doctest-glob=*.rst docs/source/aequilibrae_project/project_components
         python -m pytest --doctest-glob=*.rst docs/source/traffic_assignment
         python -m pytest --doctest-glob=*.rst docs/source/public_transport
