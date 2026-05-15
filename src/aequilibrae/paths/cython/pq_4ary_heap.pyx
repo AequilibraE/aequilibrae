@@ -3,7 +3,7 @@
 include "parameters.pxi"
 from libc.stddef cimport size_t
 
-cdef extern from "../cpp/pq_4ary_heap.hpp" namespace "aequilibrae::paths::cpp" nogil:
+cdef extern from "../cpp/pq_4ary_heap_old.hpp" namespace "aequilibrae::paths::cpp" nogil:
     cdef enum ElementState:
         SCANNED
         NOT_IN_HEAP
