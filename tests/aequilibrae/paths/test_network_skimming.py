@@ -1,9 +1,10 @@
+import multiprocessing as mp
 from os.path import join, isfile
 
 import numpy as np
 
 from aequilibrae.paths.cython.skimming_core import skimming_single_origin
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import SkimResults
 
@@ -22,8 +23,11 @@ def test_network_skimming(sioux_falls_example):
     # skimming results
     res = SkimResults()
     res.prepare(graph)
-    aux_res = MultiThreadedNetworkSkimming()
-    aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
+    aux_res = MultiThreadedPaths()
+    cores = mp.cpu_count()
+    aux_res.prepare_(graph, cores, res.nodes)
+    aux_res.temporary_skims = np.zeros((cores, res.nodes, len(graph.skim_fields)), dtype=np.float64)
+
     _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
     skm = NetworkSkimming(graph)
@@ -64,8 +68,10 @@ def test_network_skimming_no_project(sioux_falls_example):
     # skimming results
     res = SkimResults()
     res.prepare(graph)
-    aux_res = MultiThreadedNetworkSkimming()
-    aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
+    cores = mp.cpu_count()
+    aux_res = MultiThreadedPaths()
+    aux_res.prepare_(graph, cores, res.nodes, len(graph.skim_fields))
+    aux_res.temporary_skims = np.zeros((cores, res.nodes, len(graph.skim_fields)), dtype=np.float64)
     _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
     skm = NetworkSkimming(graph)

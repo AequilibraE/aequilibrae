@@ -1,9 +1,9 @@
+import multiprocessing as mp
 import random
 
 import numpy as np
-
 from aequilibrae.paths.cython.skimming_core import skimming_single_origin
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 from aequilibrae.paths.results import SkimResults
 
 
@@ -21,8 +21,9 @@ def test_skimming_single_origin(sioux_falls_example):
     # skimming results
     res = SkimResults()
     res.prepare(g)
-    aux_result = MultiThreadedNetworkSkimming()
-    aux_result.prepare(g, res.cores, res.nodes, res.num_skims)
+    aux_result = MultiThreadedPaths()
+    cores = mp.cpu_count()
+    aux_result.prepare_(g, cores, res.nodes)
 
     a = skimming_single_origin(origin, g, res, aux_result, 0)
     tot = np.sum(res.skims.distance[orig_idx, :])

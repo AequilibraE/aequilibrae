@@ -3,13 +3,10 @@ import sys
 from datetime import datetime
 from uuid import uuid4
 
-from aequilibrae.paths.cython.skimming_core import skimming_parallel
-
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
-from aequilibrae.paths.results.skim_results import SkimResults
-from aequilibrae.utils.core_setter import set_cores
+from aequilibrae.paths.cython.skimming_core import skimming_parallel
 from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 sys.dont_write_bytecode = True
@@ -53,8 +50,6 @@ class NetworkSkimming(WorkerThread):
         self.origins = origins
         self.graph = graph
         self.cores = mp.cpu_count()
-        self.results = SkimResults()
-        self.aux_res = MultiThreadedNetworkSkimming()
         self.report = []
         self.procedure_id = ""
         self.procedure_date = ""
@@ -71,12 +66,8 @@ class NetworkSkimming(WorkerThread):
         dispatch overhead the previous ThreadPool-based path paid.
         """
         self.signal.emit(["start", self.graph.num_zones, ""])
-        self.results.cores = self.cores
-        self.results.prepare(self.graph)
-        self.aux_res = MultiThreadedNetworkSkimming()
-        self.aux_res.prepare(self.graph, self.results.cores, self.results.nodes, self.results.num_skims)
 
-        skipped = skimming_parallel(self.graph, self.results, self.aux_res, self.results.cores)
+        skipped = skimming_parallel(self.graph, self.cores)
         for _orig, msg in skipped:
             self.report.append(msg)
 

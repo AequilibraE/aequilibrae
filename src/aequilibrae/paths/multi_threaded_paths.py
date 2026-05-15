@@ -11,6 +11,7 @@ class MultiThreadedPaths:
         self.connectors = np.array([], np.int64)
         #  holds the b_nodes in case of flows through centroid connectors are blocked
         self.temp_b_nodes = np.array([], np.int64)
+        self.temporary_skims = np.array([], np.int64)
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare_(self, graph, cores, nodes):

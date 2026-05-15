@@ -1,6 +1,6 @@
 # cython: language_level=3
 import os
-from aequilibrae.paths.cython.skimming_core cimport skim_multiple_fields, skim_single_path, _copy_skims
+from aequilibrae.paths.cython.skimming_core cimport skim_single_path, _copy_skims
 
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
@@ -402,99 +402,3 @@ def update_path_trace(results, destination, graph):
             results.path_nodes = None
             results.path_link_directions = None
             results.milepost = None
-
-
-def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
-    """
-    :param origin:
-    :param graph:
-    :param results:
-    :return:
-    """
-    cdef long long nodes, orig, origin_index, block_flows_through_centroids, skims, zones, b
-    # We transform the python variables in Cython variables
-    orig = origin
-    origin_index = graph.compact_nodes_to_indices[orig]
-
-    graph_fs = graph.compact_fs
-    if result._graph_id != graph._id:
-
-        raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
-
-    if orig not in graph.centroids:
-        raise ValueError("Centroid " + str(orig) + " is outside the range of zones in the graph")
-
-    if origin_index > graph.compact_num_nodes:
-        raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
-
-    if graph_fs[origin_index] == graph_fs[origin_index + 1]:
-        raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
-
-    nodes = graph.compact_num_nodes + 1
-    zones = graph.num_zones
-    block_flows_through_centroids = graph.block_centroid_flows
-    skims = result.num_skims
-
-    # In order to release the GIL for this procedure, we create all the
-    # memory views we will need
-
-    # views from the graph
-    cdef long long [:] graph_fs_view = graph_fs
-    cdef double [:] g_view = graph.compact_cost
-    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
-    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
-    cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
-
-    cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
-
-    # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
-    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
-    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
-    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
-
-    # Destination set
-    cdef unsigned char [:] destinations = np.array([], dtype=bool)
-
-    # Now we do all procedures with NO GIL
-    with nogil:
-        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
-            b = 0
-            blocking_centroid_flows(b,
-                                    origin_index,
-                                    zones,
-                                    graph_fs_view,
-                                    b_nodes_view,
-                                    original_b_nodes_view)
-        w = path_finding(origin_index,
-                         destinations,
-                         -1,  # destination index to disable early exit
-                         g_view,
-                         b_nodes_view,
-                         graph_fs_view,
-                         predecessors_view,
-                         ids_graph_view,
-                         conn_view,
-                         reached_first_view)
-
-        skim_multiple_fields(origin_index,
-                             nodes,
-                             zones,  # ???????????????
-                             skims,
-                             skim_matrix_view,
-                             predecessors_view,
-                             conn_view,
-                             graph_skim_view,
-                             reached_first_view,
-                             w,
-                             final_skim_matrices_view)
-        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
-            b = 1
-            blocking_centroid_flows(b,
-                                    origin_index,
-                                    zones,
-                                    graph_fs_view,
-                                    b_nodes_view,
-                                    original_b_nodes_view)
-    return orig

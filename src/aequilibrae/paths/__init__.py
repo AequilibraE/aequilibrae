@@ -6,7 +6,6 @@ from aequilibrae.paths.assignment_paths import AssignmentPaths
 from aequilibrae.paths.connectivity_analysis import ConnectivityAnalysis
 from aequilibrae.paths.graph import Graph, TransitGraph
 from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults, PathResults, SkimResults
@@ -27,7 +26,6 @@ __all__ = [
     "Graph",
     "TransitGraph",
     "MultiThreadedAoN",
-    "MultiThreadedNetworkSkimming",
     "NetworkSkimming",
     "OptimalStrategies",
     "AssignmentResults",
