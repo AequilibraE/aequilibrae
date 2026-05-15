@@ -7,8 +7,8 @@ from aequilibrae.utils.get_table import get_table
 
 
 def read_stop_times(conn: sqlite3.Connection):
-    tts = get_table("trips_schedule", conn).reset_index()
-    links = get_table("route_links", conn).reset_index()
+    tts = get_table("trips_schedule", conn)
+    links = get_table("route_links", conn)
     trps = pd.read_sql("SELECT pattern_id, trip_id FROM trips", conn)
     links.drop(columns=["distance", "geometry"], inplace=True)
 

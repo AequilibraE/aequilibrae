@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 
 
-def read_stops(conn: sqlite3.Connection, transformer):
+def read_stops(conn: sqlite3.Connection):
     sql = """
         SELECT stop_id,
                stop AS stop_code,
@@ -17,15 +17,8 @@ def read_stops(conn: sqlite3.Connection, transformer):
         FROM stops
     """
     data = pd.read_sql(sql, conn)
-    if transformer and not data.empty:
-        lons, lats = transformer.transform(data["x"].tolist(), data["y"].tolist())
-        data.loc[:, "stop_lon"] = lons[:]
-        data.loc[:, "stop_lat"] = lats[:]
-    else:
-        data.loc[:, "stop_lon"] = data["x"]
-        data.loc[:, "stop_lat"] = data["y"]
 
-    data = data.drop(columns=["x", "y"], errors="ignore")
+    data.rename(columns={"x": "stop_lon", "y": "stop_lat"}, inplace=True)
     for column in ["zone_id", "parent_station"]:
         if column not in data.columns:
             data[column] = pd.NA

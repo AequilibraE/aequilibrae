@@ -1,19 +1,20 @@
 import csv
-from os.path import join
+from pathlib import Path
 
 import pandas as pd
 from shapely.geometry import LineString, MultiLineString, Point
 
+
 def _shape_points(shape: LineString | MultiLineString):
-    if isinstance(shape, MultiLineString):
-        coords = []
-        for geom in shape.geoms:
-            coords.extend(list(geom.coords))
-        return [Point(pt) for pt in coords]
-    return [Point(pt) for pt in shape.coords]
+    if isinstance(shape, LineString):
+        return [Point(pt) for pt in shape.coords]
+    coords = []
+    for geom in shape.geoms:
+        coords.extend(list(geom.coords))
+    return [Point(pt) for pt in coords]
 
 
-def write_shapes(patterns: pd.DataFrame, folder_path: str):
+def write_shapes(patterns: pd.DataFrame, folder_path: Path):
     pattern_data = patterns.reindex(columns=["shape_id", "shape", "shape_length"]).copy()
     pattern_rows = pattern_data.to_dict(orient="records")
 
@@ -42,4 +43,4 @@ def write_shapes(patterns: pd.DataFrame, folder_path: str):
     output = pd.concat(data, ignore_index=True) if data else pd.DataFrame(
         columns=["shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence", "shape_dist_traveled"]
     )
-    output.to_csv(join(folder_path, "shapes.txt"), quoting=csv.QUOTE_NONNUMERIC, index=False)
+    output.to_csv(folder_path / "shapes.txt", quoting=csv.QUOTE_NONNUMERIC, index=False)

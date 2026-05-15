@@ -1,26 +1,21 @@
 import os
 import shutil
 import sqlite3
-import zipfile
-from os.path import join
+from os import PathLike
+from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
-from pyproj import Transformer
 
 from aequilibrae.log import logger
 from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
-from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.gtfs_writer import write_routes, write_agencies, write_fares
-from aequilibrae.transit.gtfs_writer import write_stops, write_trips, write_stop_times, write_shapes
+from aequilibrae.transit.gtfs_writer.gtfs_writer import export_gtfs
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
-from aequilibrae.transit.route_system_reader import read_agencies, read_patterns
-from aequilibrae.transit.route_system_reader import read_stop_times, read_stops, read_trips, read_routes
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
-from aequilibrae.utils.get_table import get_geo_table, get_table
+from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
@@ -95,55 +90,15 @@ class Transit(WorkerThread):
             with self.project.transit_connection as conn:
                 initialize_tables(self.logger, "transit", conn=conn)
 
-    def export_gtfs(self, path_to_folder: str) -> None:
+    def export_gtfs(self, path_to_folder: PathLike) -> None:
         """Exports the current transit database contents to a GTFS ZIP archive.
 
         :Arguments:
-            **path_to_folder** (:obj:`str`): Folder where the GTFS text files and resulting zip archive are written.
+            **path_to_folder** (:obj:`Path`): Folder where the GTFS text files and resulting zip archive are written.
         """
 
-        os.makedirs(path_to_folder, exist_ok=True)
-        transformer = Transformer.from_crs(f"epsg:{get_srid()}", "epsg:4326", always_xy=True)
-
         with self.project.transit_connection as conn:
-            agencies = read_agencies(conn)
-            stops = read_stops(conn, transformer)
-            routes = read_routes(conn)
-            patterns = read_patterns(conn, transformer)
-            trips = read_trips(conn)
-            stop_times = read_stop_times(conn)
-            service_dates = pd.read_sql("SELECT service_date FROM agencies WHERE agency_id > 1", conn)["service_date"]
-            fare_attributes = get_table("fare_attributes", conn)
-            fare_rules = get_table("fare_rules", conn)
-
-            write_agencies(agencies, path_to_folder)
-            write_stops(stops, path_to_folder)
-            write_routes(routes, path_to_folder)
-            write_shapes(patterns, path_to_folder)
-            write_trips(trips, path_to_folder, service_dates)
-            write_stop_times(stop_times, path_to_folder)
-            write_fares(fare_attributes, fare_rules, path_to_folder)
-
-        self._zip_gtfs_feed(path_to_folder)
-
-    @staticmethod
-    def _zip_gtfs_feed(path_to_folder: str) -> None:
-        filename = join(path_to_folder, "aequilibrae_gtfs.zip")
-        files = [
-            "agency",
-            "stops",
-            "routes",
-            "trips",
-            "stop_times",
-            "calendar",
-            "shapes",
-            "fare_attributes",
-            "fare_rules",
-        ]
-        with zipfile.ZipFile(filename, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
-            for file in files:
-                zip_file.write(join(path_to_folder, f"{file}.txt"), f"{file}.txt")
-                os.unlink(join(path_to_folder, f"{file}.txt"))
+            export_gtfs(conn, Path(path_to_folder))
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

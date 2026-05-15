@@ -6,6 +6,7 @@ from io import TextIOWrapper
 from os.path import splitext, basename
 from typing import Any, Dict, cast
 
+import numpy as np
 import pandas as pd
 from pandas.errors import EmptyDataError
 from pyproj import Transformer
@@ -218,7 +219,7 @@ class GTFSReader(WorkerThread):
                                 "max_speed": max_speeds.speed.max(),
                                 "dist": distances,
                                 "elapsed_time": diffs,
-                                "add_time": pd.Series(0, index=distances.index, dtype="int64"),
+                                "add_time": pd.Series(0, index=distances.index, dtype=np.int64),
                                 "source_time": source_time.iloc[1:].to_numpy(dtype=int),
                             }
                         )
@@ -230,11 +231,9 @@ class GTFSReader(WorkerThread):
                         if to_fix:
                             self.logger.debug(f"     Trip {trip.trip} had {len(to_fix)} segments too fast")
                             total_fast += len(to_fix)
-                            df.loc[to_fix[0] :, "source_time"] = 2
-                            for i in to_fix:
-                                df.loc[i:, "add_time"] += (
-                                    df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)
-                                ).astype(int)
+                            df.loc[to_fix:, "source_time"] = 2
+                            add_time = df.elapsed_time * (df.speed / df.max_speed -1).astype(int)
+                            df.loc[to_fix:, "add_time"] += add_time[to_fix]
 
                             source_time.iloc[1:] = df.source_time.to_numpy(dtype=int)
                             times[1:] += df.add_time.to_numpy(dtype=int)

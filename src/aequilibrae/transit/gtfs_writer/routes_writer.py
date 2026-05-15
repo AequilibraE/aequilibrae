@@ -1,9 +1,10 @@
 import csv
-from os.path import join
+from pathlib import Path
 
 import pandas as pd
 
-def write_routes(routes: pd.DataFrame, folder_path: str):
+
+def write_routes(routes: pd.DataFrame, folder_path: Path):
     headers = ["route_id", "agency_id", "route_short_name", "route_long_name", "route_desc", "route_type"]
-    df = routes.reindex(columns=headers).copy()
-    df.to_csv(join(folder_path, "routes.txt"), quoting=csv.QUOTE_NONNUMERIC, index=False)
+    df = routes.reindex(columns=headers)
+    df.to_csv(folder_path / "routes.txt", quoting=csv.QUOTE_NONNUMERIC, index=False)
