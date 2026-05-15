@@ -11,7 +11,7 @@ from aequilibrae.log import logger
 from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
-from aequilibrae.transit.gtfs_writer.gtfs_writer import export_gtfs
+from aequilibrae.transit.gtfs_writer.file_writer import export_gtfs
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
