@@ -2,19 +2,7 @@ import numpy as np
 
 
 class MultiThreadedPaths:
-    def __init__(self):
-        # The predecessors for each node in the graph
-        self.predecessors = np.array([], np.int64)
-        # Keeps the order in which the nodes were reached for the cascading network loading
-        self.reached_first = np.array([], np.int64)
-        # The previous link for each node in the tree
-        self.connectors = np.array([], np.int64)
-        #  holds the b_nodes in case of flows through centroid connectors are blocked
-        self.temp_b_nodes = np.array([], np.int64)
-        self.temporary_skims = np.array([], np.int64)
-
-    # In case we want to do by hand, we can prepare each method individually
-    def prepare_(self, graph, cores, nodes):
+    def __init__(self, graph, cores, nodes):
         itype = graph.default_types("int")
         compact_b_nodes = graph.compact_graph.b_node.to_numpy(copy=False)
         self.predecessors = np.zeros((cores, nodes), dtype=itype)

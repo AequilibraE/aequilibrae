@@ -21,7 +21,6 @@ include 'inrets.pyx'
 include 'akcelik.pyx'
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
-include 'connectivity.pyx'
 
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):

@@ -2,11 +2,9 @@ cimport cython
 from libc.math cimport INFINITY
 from cython.parallel cimport parallel, prange, threadid
 import numpy as np
-from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.paths.cython.basic_path_finding cimport blocking_centroid_flows, path_finding
-from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 
-def skimming_parallel(graph, result, long cores):
+def skimming_parallel(graph, result, aux_result, long cores):
     """OpenMP-parallel skimming over all valid centroids.
 
     Runs one Dijkstra per origin inside a single ``with nogil, parallel``
@@ -19,14 +17,6 @@ def skimming_parallel(graph, result, long cores):
     not be processed. Successful origins return an empty list.
     """
 
-    result = SkimResults()
-    result.prepare(graph)
-    num_skims = len(graph.skim_fields)
-    num_nodes = result.nodes
-
-    aux_result = MultiThreadedPaths()
-    aux_result.prepare(graph, cores, num_nodes, num_skims)
-    aux_result.temporary_skims = np.zeros((cores, num_nodes, num_skims), dtype=ftype)
 
     if result._graph_id != graph._id:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")

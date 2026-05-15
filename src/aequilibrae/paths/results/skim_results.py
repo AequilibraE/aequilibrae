@@ -1,3 +1,5 @@
+import multiprocessing as mp
+
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph
 
@@ -32,10 +34,12 @@ class SkimResults:
 
     def __init__(self):
         self.skims = AequilibraeMatrix()
+        self.cores = mp.cpu_count()
 
         self.links = -1
         self.nodes = -1
         self.zones = -1
+        self.num_skims = -1
         self._graph_id = None
         self.graph = Graph()
 
@@ -53,6 +57,7 @@ class SkimResults:
         self.nodes = graph.compact_num_nodes + 1
         self.zones = graph.num_zones
         self.links = graph.compact_num_links + 1
+        self.num_skims = len(graph.skim_fields)
 
         self.skims = AequilibraeMatrix()
         self.skims.create_empty(
@@ -60,6 +65,6 @@ class SkimResults:
         )
         self.skims.index[:] = graph.centroids[:]
         self.skims.computational_view(core_list=self.skims.names)
-        self.skims.matrix_view = self.skims.matrix_view.reshape(self.zones, self.zones, len(graph.skim_fields))
+        self.skims.matrix_view = self.skims.matrix_view.reshape(self.zones, self.zones, self.num_skims)
         self._graph_id = graph._id
         self.graph = graph

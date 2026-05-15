@@ -18,11 +18,6 @@ cpdef int path_finding(
     long long [:] reached_first
 ) noexcept nogil
 
-cpdef void dfs(long origin,
-               long long [:] csr_indices,
-               long long [:] graph_fs,
-               long long [:] pred) noexcept nogil
-
 ctypedef enum Heuristic:
     HAVERSINE
     EQUIRECTANGULAR
