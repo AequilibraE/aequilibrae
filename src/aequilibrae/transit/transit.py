@@ -3,7 +3,7 @@ import shutil
 import sqlite3
 import zipfile
 from os.path import join
-from typing import Any, Dict, List, cast
+from typing import Dict, List
 
 import pandas as pd
 from pyproj import Transformer
@@ -20,7 +20,7 @@ from aequilibrae.transit.route_system_reader import read_agencies, read_patterns
 from aequilibrae.transit.route_system_reader import read_stop_times, read_stops, read_trips, read_routes
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
-from aequilibrae.utils.get_table import get_geo_table
+from aequilibrae.utils.get_table import get_geo_table, get_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
@@ -112,14 +112,17 @@ class Transit(WorkerThread):
             patterns = read_patterns(conn, transformer)
             trips = read_trips(conn)
             stop_times = read_stop_times(conn)
+            service_dates = pd.read_sql("SELECT service_date FROM agencies WHERE agency_id > 1", conn)["service_date"]
+            fare_attributes = get_table("fare_attributes", conn)
+            fare_rules = get_table("fare_rules", conn)
 
-            write_agencies(cast(Any, agencies), path_to_folder)
-            write_stops(cast(Any, stops), path_to_folder)
-            write_routes(cast(Any, routes), path_to_folder)
-            write_shapes(cast(Any, patterns), path_to_folder)
-            write_trips(cast(Any, trips), path_to_folder, conn)
+            write_agencies(agencies, path_to_folder)
+            write_stops(stops, path_to_folder)
+            write_routes(routes, path_to_folder)
+            write_shapes(patterns, path_to_folder)
+            write_trips(trips, path_to_folder, service_dates)
             write_stop_times(stop_times, path_to_folder)
-            write_fares(path_to_folder, conn)
+            write_fares(fare_attributes, fare_rules, path_to_folder)
 
         self._zip_gtfs_feed(path_to_folder)
 

@@ -1,14 +1,10 @@
 import csv
 from os.path import join
-from typing import List, Union
 
 import pandas as pd
 from shapely.geometry import LineString, MultiLineString, Point
 
-from aequilibrae.transit.transit_elements import Pattern
-
-
-def _shape_points(shape: Union[LineString, MultiLineString]):
+def _shape_points(shape: LineString | MultiLineString):
     if isinstance(shape, MultiLineString):
         coords = []
         for geom in shape.geoms:
@@ -17,16 +13,9 @@ def _shape_points(shape: Union[LineString, MultiLineString]):
     return [Point(pt) for pt in shape.coords]
 
 
-def write_shapes(patterns: Union[List[Pattern], pd.DataFrame], folder_path: str):
-    if isinstance(patterns, pd.DataFrame):
-        pattern_data = patterns.reindex(columns=["shape_id", "shape", "shape_length"]).copy()
-        pattern_rows = pattern_data.to_dict(orient="records")
-    else:
-        pattern_rows = [
-            {"shape_id": pat.pattern_id, "shape": pat.shape, "shape_length": pat.shape_length}
-            for pat in patterns
-            if pat.shape is not None
-        ]
+def write_shapes(patterns: pd.DataFrame, folder_path: str):
+    pattern_data = patterns.reindex(columns=["shape_id", "shape", "shape_length"]).copy()
+    pattern_rows = pattern_data.to_dict(orient="records")
 
     data = []
     for pat in pattern_rows:
