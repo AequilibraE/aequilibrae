@@ -16,4 +16,5 @@ def read_routes(conn: sqlite3.Connection):
         inplace=True,
     )
     headers = ["route_id", "agency_id", "route_short_name", "route_long_name", "route_desc", "route_type"]
+    data = data.sort_values(["route_id", "agency_id"]).drop_duplicates(subset=["route_id"], keep="first")
     return data[headers].copy()

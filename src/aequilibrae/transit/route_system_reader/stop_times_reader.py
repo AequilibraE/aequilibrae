@@ -7,15 +7,12 @@ from aequilibrae.utils.get_table import get_table
 
 
 def read_stop_times(conn: sqlite3.Connection):
-    tpm = get_table("pattern_mapping", conn)
     tts = get_table("trips_schedule", conn).reset_index()
-    tl = get_table("route_links", conn).reset_index()
+    links = get_table("route_links", conn).reset_index()
     trps = pd.read_sql("SELECT pattern_id, trip_id FROM trips", conn)
-    tl.drop(columns=["pattern_id", "distance", "geometry"], inplace=True)
+    links.drop(columns=["distance", "geometry"], inplace=True)
 
     trip_stops = tts.merge(trps, on="trip_id")
-    links = tpm.merge(tl, left_on="link", right_on="transit_link")
-    links.rename(columns={"seq_x": "seq"}, inplace=True)
 
     first_nodes = links[["pattern_id", "from_stop", "seq"]].rename(columns={"from_stop": "stop_id"})
     last_nodes = links.sort_values("seq", ascending=False).drop_duplicates(subset=["pattern_id"], keep="first")

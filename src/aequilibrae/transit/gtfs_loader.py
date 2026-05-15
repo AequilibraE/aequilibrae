@@ -77,7 +77,7 @@ class GTFSReader(WorkerThread):
         self.fare_rules = []
         self.fare_attributes = {}
         self.feed_dates = []
-        self.data_arrays = {}
+        self.gtfs_tables = {}
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.logger = get_logger()
@@ -258,7 +258,7 @@ class GTFSReader(WorkerThread):
             self.logger.debug('  Loading "fare_attributes" table')
 
             fareatt = self.__read_gtfs_table(fareatttxt)
-            self.data_arrays[fareatttxt] = fareatt
+            self.gtfs_tables[fareatttxt] = fareatt
 
             for row in fareatt.to_dict(orient="records"):
                 data = (
@@ -284,7 +284,7 @@ class GTFSReader(WorkerThread):
         self.logger.debug('  Loading "fare_rules" table')
 
         farerl = self.__read_gtfs_table(farerltxt)
-        self.data_arrays[farerltxt] = farerl
+        self.gtfs_tables[farerltxt] = farerl
 
         for row in farerl.to_dict(orient="records"):
             data = (row["fare_id"], row["route_id"], row["origin_id"], row["destination_id"], row["contains_id"])
@@ -308,7 +308,7 @@ class GTFSReader(WorkerThread):
         shapes = self.__read_gtfs_table(shapestxt)
         all_shape_ids = shapes["shape_id"].drop_duplicates().tolist()
 
-        self.data_arrays[shapestxt] = shapes
+        self.gtfs_tables[shapestxt] = shapes
         lats, lons = self.transformer.transform(shapes["shape_pt_lat"].tolist(), shapes["shape_pt_lon"].tolist())
         shapes["shape_pt_lat"] = lats
         shapes["shape_pt_lon"] = lons
@@ -326,12 +326,12 @@ class GTFSReader(WorkerThread):
         self.logger.debug('    Loading "trips" table')
         tripstxt = "trips.txt"
         trips_array = self.__read_gtfs_table(tripstxt)
-        self.data_arrays[tripstxt] = trips_array
+        self.gtfs_tables[tripstxt] = trips_array
 
         if trips_array["trip_id"].duplicated().any():
             self.__fail("There are repeated trip IDs in trips.txt")
 
-        stp_tm = self.data_arrays["stop_times.txt"]
+        stp_tm = self.gtfs_tables["stop_times.txt"]
         diff = trips_array.loc[~trips_array["trip_id"].isin(stp_tm["trip_id"]), "trip_id"].drop_duplicates()
         if not diff.empty:
             diff = ",".join(diff.astype(str).tolist())
@@ -403,7 +403,7 @@ class GTFSReader(WorkerThread):
             self.logger.debug('    Loading "frequencies" table')
 
             freqs = self.__read_gtfs_table(freqtxt)
-            self.data_arrays[freqtxt] = freqs
+            self.gtfs_tables[freqtxt] = freqs
             for row in freqs.to_dict(orient="records"):
                 trip = row["trip_id"]
                 start_time = row["start_time"]
@@ -440,7 +440,7 @@ class GTFSReader(WorkerThread):
         self.logger.debug('    Loading "stop times" table')
         stoptimestxt = "stop_times.txt"
         stoptimes = self.__read_gtfs_table(stoptimestxt)
-        self.data_arrays[stoptimestxt] = stoptimes
+        self.gtfs_tables[stoptimestxt] = stoptimes
 
         for col in ["arrival_time", "departure_time"]:
             stoptimes[col] = _time_series_to_seconds(stoptimes[col], col)
@@ -479,7 +479,7 @@ class GTFSReader(WorkerThread):
         self.stops = {}
         stopstxt = "stops.txt"
         stops = self.__read_gtfs_table(stopstxt)
-        self.data_arrays[stopstxt] = stops
+        self.gtfs_tables[stopstxt] = stops
 
         if stops["stop_id"].duplicated().any():
             self.__fail("There are repeated stop IDs in stops.txt")
@@ -503,7 +503,7 @@ class GTFSReader(WorkerThread):
         self.routes = {}
         routetxt = "routes.txt"
         routes = self.__read_gtfs_table(routetxt)
-        self.data_arrays[routetxt] = routes
+        self.gtfs_tables[routetxt] = routes
 
         if routes["route_id"].duplicated().any():
             self.__fail("There are repeated route IDs in routes.txt")
@@ -543,7 +543,7 @@ class GTFSReader(WorkerThread):
             if calendar.shape[0] > 0:
                 calendar["start_date"] = calendar["start_date"].map(format_date).map(datetime.fromisoformat)
                 calendar["end_date"] = calendar["end_date"].map(format_date).map(datetime.fromisoformat)
-                self.data_arrays[caltxt] = calendar
+                self.gtfs_tables[caltxt] = calendar
                 if calendar["service_id"].duplicated().any():
                     self.__fail("There are repeated service IDs in calendar.txt")
 

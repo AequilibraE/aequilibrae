@@ -15,7 +15,6 @@ def read_stops(conn: sqlite3.Connection, transformer):
                ST_X(geometry) AS x,
                ST_Y(geometry) AS y
         FROM stops
-        WHERE agency_id > 1
     """
     data = pd.read_sql(sql, conn)
     if transformer and not data.empty:
