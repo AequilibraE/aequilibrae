@@ -5,6 +5,7 @@ import cython
 import numpy as np
 import pandas as pd
 
+from aequilibrae.paths.cython.basic_path_finding cimport blocking_centroid_flows, dfs
 from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 
 

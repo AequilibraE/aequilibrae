@@ -3,7 +3,7 @@ from libc.math cimport INFINITY
 from cython.parallel cimport parallel, prange, threadid
 import numpy as np
 from aequilibrae.paths.results.skim_results import SkimResults
-from aequilibrae.paths.cython.AoN cimport blocking_centroid_flows, path_finding
+from aequilibrae.paths.cython.basic_path_finding cimport blocking_centroid_flows, path_finding
 from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 
 def skimming_parallel(graph, result, long cores):

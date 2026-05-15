@@ -1,11 +1,19 @@
 # cython: language_level=3str
+import cython
 from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.cython.basic_path_finding cimport (
+    EQUIRECTANGULAR,
+    blocking_centroid_flows,
+    path_finding,
+    path_finding_a_star,
+)
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
+from libc.math cimport INFINITY
 from libc.string cimport memcpy
 from libcpp cimport nullptr
 from libcpp.algorithm cimport reverse, copy
@@ -76,10 +84,6 @@ Any further optimisations should focus on the path finding, from benchmarks it d
 routes aren't required small-ish things like the memcpy and banned link set copy aren't high priority.
 
 """
-
-# It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation
-# times
-include 'basic_path_finding.pyx'
 
 
 @cython.embedsignature(True)
@@ -514,10 +518,6 @@ cdef class RouteChoiceSet:
         self.get_sl_link_loading(cores=c_cores)
         self.get_sl_od_matrices()
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.initializedcheck(False)
     cdef void path_find(
         RouteChoiceSet self,
         long origin_index,

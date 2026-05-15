@@ -1,8 +1,19 @@
 # cython: language_level=3
+cimport cython
 import os
+import numpy as np
+from libc.string cimport memset
 from aequilibrae.paths.cython.skimming_core cimport skim_single_path, _copy_skims
+from aequilibrae.paths.cython.basic_path_finding cimport (
+    blocking_centroid_flows,
+    path_finding,
+    path_finding_a_star,
+)
+from aequilibrae.paths.cython.basic_path_finding import HEURISTIC_MAP
 
-include 'basic_path_finding.pyx'
+include 'parameters.pxi'
+
+
 include 'bpr.pyx'
 include 'bpr2.pyx'
 include 'conical.pyx'
@@ -196,7 +207,7 @@ def path_computation(origin, destination, graph, results):
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
     """
-    cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
+    cdef long long nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long skims, block_flows_through_centroids
     cdef bint early_exit_bint = results.early_exit
 
@@ -240,7 +251,7 @@ def path_computation(origin, destination, graph, results):
     cdef const double [:] lat_view
     cdef const double [:] lon_view
     cdef long long [:] nodes_to_indices_view
-    cdef Heuristic heuristic
+    cdef int heuristic
     if results.a_star:
         lat_view = graph.lonlat_index.lat.to_numpy(copy=False)
         lon_view = graph.lonlat_index.lon.to_numpy(copy=False)
@@ -402,3 +413,128 @@ def update_path_trace(results, destination, graph):
             results.path_nodes = None
             results.path_link_directions = None
             results.milepost = None
+
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)  # turn off bounds-checking for entire function
+cpdef void network_loading(
+    long classes,
+    double[:, :] demand,
+    long long [:] pred,
+    long long [:] conn,
+    double[:, :] link_loads
+) noexcept nogil:
+    cdef long long i, j, predecessor, connector, node
+    cdef long long zones = demand.shape[0]
+
+    # Traditional loading, without cascading
+    for i in range(zones):
+        node = i
+
+        predecessor = pred[node]
+        connector = conn[node]
+        while predecessor >= 0:
+            for j in range(classes):
+                link_loads[connector, j] += demand[i, j]
+
+            connector = conn[predecessor]
+            predecessor = pred[predecessor]
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cdef void sl_network_loading(
+    long long [:, :] selected_links,
+    double [:, :] demand,
+    long long [:] pred,
+    long long [:] conn,
+    double [:, :] link_loads,
+    double [:, :, :] sl_od_matrix,
+    double [:, :, :] sl_link_loading,
+    unsigned char [:] has_flow_mask,
+    long classes
+) noexcept nogil:
+    # VARIABLES:
+    #   selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
+    #   demand:         The input demand matrix for a given origin. The first index corresponds to destination,
+    #                   second is the class
+    #   pred:           The list of predecessor nodes, i.e. given a node, referencing that node's index in pred
+    #                   yields the previous node in the minimum spanning tree
+    #   conn:           The list of links which connect predecessor nodes. referencing it by the predecessor yields
+    #                   the link it used to connect the two nodes
+    # link_loads:       Stores the loading on each link. Equivalent to link_loads in network_loading
+    # temp_sl_od_matrix:     Stores the OD matrix for each set of selected links sliced for the given origin
+    # The indices are:  set of links, destination, class
+    # temp_sl_link_loading:  Stores the loading on the Selected links, and the paths which use the selected links
+    #                   The indices are: set of links, link_id, class)
+    # has_flow_mask:    An array which acts as a flag for which links were used in retracing a given OD path
+    # classes:          the number of subclasses of vehicles for the given TrafficClass
+    #
+    # Executes regular loading, while keeping track of SL links
+    cdef:
+        int i, j, k, l, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
+        long long predecessor, connection
+        bint found
+    for j in range(dests):
+        memset(&has_flow_mask[0], 0, xshape * sizeof(unsigned char))
+        connection = conn[j]
+        predecessor = pred[j]
+
+        # Walk the path and mark all used links in the has_flow_mask
+        while predecessor >= 0:
+            for k in range(classes):
+                link_loads[connection, k] += demand[j, k]
+            has_flow_mask[connection] = 1
+            connection = conn[predecessor]
+            predecessor = pred[predecessor]
+        # Now iterate through each SL set and see if any of their links were marked
+        for i in range(selected_links.shape[0]):
+            # We check to see if the given OD path marked any of our selected links
+            found = 0
+            l = 0
+            while l < selected_links.shape[1] and found == 0:
+                # Checks to see if the current set of selected links has finished
+                # NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
+                # There is either a serious bug, or the program has reached the end of a set of links in SL.
+                # This lets us early exit from the loop without needing to iterate through the rest of the array
+                # Which just has placeholder values
+                if selected_links[i][l] == -1:
+                    break
+                if has_flow_mask[selected_links[i][l]] != 0:
+                    found = 1
+                l += 1
+            if found == 0:
+                continue
+            for k in range(classes):
+                sl_od_matrix[i, j, k] = demand[j, k]
+            connection = conn[j]
+            predecessor = pred[j]
+            while predecessor >= 0:
+                for k in range(classes):
+                    sl_link_loading[i, connection, k] += demand[j, k]
+                connection = conn[predecessor]
+                predecessor = pred[predecessor]
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef void put_path_file_on_disk(unsigned int orig,
+                                 unsigned int [:] pred,
+                                 long long [:] predecessors,
+                                 unsigned int [:] conn,
+                                 long long [:] connectors,
+                                 long long [:] all_nodes,
+                                 unsigned int [:] origins_to_write,
+                                 unsigned int [:] nodes_to_write) noexcept nogil:
+    cdef long long i
+    cdef long long k = pred.shape[0]
+
+    for i in range(k):
+        origins_to_write[i] = orig
+        nodes_to_write[i] = all_nodes[i]
+        pred[i] = all_nodes[predecessors[i]]
+        conn[i] = connectors[i]
