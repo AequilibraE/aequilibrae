@@ -11,9 +11,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-cdef run_dijkstra_example(type_of_heap: str = "FourAryHeap"):
+def run_dijkstra_example(type_of_heap: str = "FourAryHeap"):
 
-    basic_config()
+    basic_config(level=logging.DEBUG)
     cdef:
         size_t origin = 0
         size_t max_size = 3
@@ -23,7 +23,7 @@ cdef run_dijkstra_example(type_of_heap: str = "FourAryHeap"):
         size_t predecessors[3]
         size_t found
         size_t i
-        Bridge b = Bridge(logger)
+        Bridge b
 
     # Tiny directed graph in CSR form:
     # 0 -> 1 (1.0), 0 -> 2 (4.0), 1 -> 2 (1.0)
@@ -43,7 +43,7 @@ cdef run_dijkstra_example(type_of_heap: str = "FourAryHeap"):
     for i in range(max_size):
         predecessors[i] = max_size
 
-    if True:
+    with Bridge(logger) as b:
         if type_of_heap == "FourAryHeap":
             found = dijkstra[FourAryHeap](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0], b.c)
         # elif type_of_heap == "PairingHeap":

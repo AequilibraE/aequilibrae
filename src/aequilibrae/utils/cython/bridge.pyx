@@ -63,7 +63,7 @@ cdef class Bridge:
         """
         Starts the background monitoring thread.
         """
-        self.__level = self.__logger.level
+        self.c.c_level = self.__logger.level
         self.task = threading.Thread(target=self.loop)
         self.task.start()
 
@@ -149,15 +149,15 @@ cdef class Bridge:
         cdef int level = 0
         cdef string msg
 
-        while not self.__log_queue.empty():
-            tmp = self.__log_queue.front()
+        while not self.c._log_queue.empty():
+            tmp = self.c._log_queue.front()
 
             level = tmp.first
             msg = move(tmp.second)
 
             self.__logger.log(level, msg.decode("UTF-8"))
 
-            self.__log_queue.pop_front()
+            self.c._log_queue.pop_front()
 
     def __enter__(self):
         self.start()

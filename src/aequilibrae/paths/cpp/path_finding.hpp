@@ -15,9 +15,11 @@ size_t dijkstra(const size_t origin, const size_t max_size, const double *costs,
   Queue queue{};
   size_t found{};
 
-  AEQ_LOG(b, AEQ_LOG_CRITICAL, aeq_format_string("origin = ", origin));
+  AEQ_LOG(b, AEQ_LOG_DEBUG,
+          aeq_format_string("Running Dijkstra's with origin = ", origin));
 
   queue.init_heap(max_size);
+  queue.insert(origin, 0.0);
 
   while (!queue.is_empty()) {
     const double tail_value = queue.peek();
@@ -32,7 +34,7 @@ size_t dijkstra(const size_t origin, const size_t max_size, const double *costs,
         const double head_value = tail_value + costs[idx];
         if (head_value == std::numeric_limits<double>::infinity()) {
           continue;
-        } else if (head_state != NOT_IN_HEAP) {
+        } else if (head_state == NOT_IN_HEAP) {
           queue.insert(head_vertex, head_value);
           predecessors[head_vertex] = tail_vertex;
         } else if (queue.element_key(head_vertex) > head_value) {
@@ -44,7 +46,6 @@ size_t dijkstra(const size_t origin, const size_t max_size, const double *costs,
   }
 
   queue.free_heap();
-
   return found;
 }
 
