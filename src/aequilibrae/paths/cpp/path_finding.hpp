@@ -3,11 +3,12 @@
 #include "pq_heap_base.hpp"
 #include <limits>
 #include <type_traits>
+#include <typeinfo>
 
 namespace aequilibrae::paths::cpp {
 
 template <class Queue>
-size_t dijkstra(const size_t origin, const size_t max_size, const double *costs,
+size_t dijkstra(size_t origin, const size_t max_size, const double *costs,
                 const size_t *csr, const size_t *fs, size_t *predecessors,
                 AeqLogClosure *b) noexcept {
   static_assert(std::is_base_of<PriorityQueueBase<Queue>, Queue>::value,
@@ -16,7 +17,8 @@ size_t dijkstra(const size_t origin, const size_t max_size, const double *costs,
   size_t found{};
 
   AEQ_LOG(b, AEQ_LOG_DEBUG,
-          aeq_format_string("Running Dijkstra's with origin = ", origin));
+          aeq_format_string("Running Dijkstra's with origin = ", origin,
+                            " with ", typeid(Queue).name()));
 
   queue.init_heap(max_size);
   queue.insert(origin, 0.0);

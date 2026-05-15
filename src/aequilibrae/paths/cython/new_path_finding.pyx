@@ -46,10 +46,10 @@ def run_dijkstra_example(type_of_heap: str = "FourAryHeap"):
     with Bridge(logger) as b:
         if type_of_heap == "FourAryHeap":
             found = dijkstra[FourAryHeap](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0], b.c)
-        # elif type_of_heap == "PairingHeap":
-        #     found = dijkstra[PairingHeap](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0])
-        # elif type_of_heap == "StdPriorityQueueAdapter":
-        #     found = dijkstra[StdPriorityQueueAdapter](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0])
+        elif type_of_heap == "PairingHeap":
+            found = dijkstra[PairingHeap](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0], b.c)
+        elif type_of_heap == "StdPriorityQueueAdapter":
+            found = dijkstra[StdPriorityQueueAdapter](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0], b.c)
         else:
             raise ValueError("Unknown heap type")
 
