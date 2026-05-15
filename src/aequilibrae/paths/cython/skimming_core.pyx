@@ -2,7 +2,7 @@ cimport cython
 from libc.math cimport INFINITY
 from cython.parallel cimport parallel, prange, threadid
 import numpy as np
-from aequilibrae import SkimResults
+from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.paths.cython.AoN cimport blocking_centroid_flows, path_finding
 from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 
@@ -27,7 +27,6 @@ def skimming_parallel(graph, result, long cores):
     aux_result = MultiThreadedPaths()
     aux_result.prepare(graph, cores, num_nodes, num_skims)
     aux_result.temporary_skims = np.zeros((cores, num_nodes, num_skims), dtype=ftype)
-
 
     if result._graph_id != graph._id:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -125,8 +124,7 @@ def skimming_parallel(graph, result, long cores):
 
     return skipped
 
-
-def  skimming_single_origin(origin, graph, result, aux_result, curr_thread):
+def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     """
     :param origin:
     :param graph:
@@ -140,7 +138,6 @@ def  skimming_single_origin(origin, graph, result, aux_result, curr_thread):
 
     graph_fs = graph.compact_fs
     if result._graph_id != graph._id:
-
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
     if orig not in graph.centroids:
@@ -221,7 +218,6 @@ def  skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                                     original_b_nodes_view)
     return orig
 
-
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn of bounds-checking for entire function
@@ -262,13 +258,12 @@ cpdef void skim_multiple_fields(long origin,
         for j in range(skims):
             final_skims[i, j] = node_skims[i, j]
 
-
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void _copy_skims(
-    double[:, :] skim_matrix,  # Skim matrix_procedures computed from one origin to all nodes
-    double[:, :] final_skim_matrix
+        double[:, :] skim_matrix,  # Skim matrix_procedures computed from one origin to all nodes
+        double[:, :] final_skim_matrix
 ) noexcept nogil:  # Skim matrix_procedures computed for one origin to all other centroids only
 
     cdef long i, j
@@ -277,20 +272,20 @@ cpdef void _copy_skims(
 
     for i in range(N):
         for j in range(skims):
-            final_skim_matrix[i, j]=skim_matrix[i, j]
+            final_skim_matrix[i, j] = skim_matrix[i, j]
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn of bounds-checking for entire function
 cpdef void skim_single_path(long origin,
-                           long nodes,
-                           long skims,
-                           double[:, :] node_skims,
-                           long long [:] pred,
-                           long long [:] conn,
-                           double[:, :] graph_costs,
-                           long long [:] reached_first,
-                           long found) noexcept nogil:
+                            long nodes,
+                            long skims,
+                            double[:, :] node_skims,
+                            long long [:] pred,
+                            long long [:] conn,
+                            double[:, :] graph_costs,
+                            long long [:] reached_first,
+                            long found) noexcept nogil:
     cdef long long i, node, predecessor, connector, j
 
     # sets all skims to infinity
