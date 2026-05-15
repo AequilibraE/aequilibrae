@@ -32,7 +32,7 @@ def _component_reachability(adjacency: csr_matrix):
 
     children = [set() for _ in range(num_components)]
     coo = adjacency.tocoo(copy=False)
-    for source, target in zip(labels[coo.row], labels[coo.col]):
+    for source, target in zip(labels[coo.row], labels[coo.col], strict=True):
         if source != target:
             children[source].add(target)
 
@@ -75,7 +75,7 @@ def _disconnected_pairs(graph, origins=None, signal=None) -> pd.DataFrame:
         allowed = reachable[labels[origin_index]]
         disconnected = [
             int(destination)
-            for destination_index, destination in zip(centroid_nodes, graph.centroids)
+            for destination_index, destination in zip(centroid_nodes, graph.centroids, strict=True)
             if destination != origin and labels[destination_index] not in allowed
         ]
         records.extend((int(origin), destination) for destination in disconnected)
