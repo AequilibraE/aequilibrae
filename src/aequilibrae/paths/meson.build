@@ -11,7 +11,6 @@ pyfiles = [
   'linear_approximation.py',
   'multi_threaded_aon.py',
   'multi_threaded_paths.py',
-  'multi_threaded_skimming.py',
   'network_skimming.py',
   'optimal_strategies.py',
   'public_transport.py',
