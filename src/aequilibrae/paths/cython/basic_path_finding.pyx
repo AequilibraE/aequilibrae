@@ -10,7 +10,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
-from libc.math cimport sin, cos, asin, sqrt, pi
+from libc.math cimport INFINITY, sin, cos, asin, sqrt, pi
 from libcpp.vector cimport vector
 
 include 'pq_4ary_heap.pyx'
