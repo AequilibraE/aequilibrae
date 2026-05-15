@@ -6,7 +6,7 @@ import pandas as pd
 
 def write_trips(trips: pd.DataFrame, folder_path: Path, service_dates: pd.Series):
     headers = ["route_id", "service_id", "trip_id", "trip_headsign", "direction_id", "shape_id"]
-    all_trips = trips.reindex(columns=headers, copy=True)
+    all_trips = trips.reindex(columns=headers).copy()
 
     all_trips.to_csv(folder_path / "trips.txt", quoting=csv.QUOTE_NONNUMERIC, index=False)
 
