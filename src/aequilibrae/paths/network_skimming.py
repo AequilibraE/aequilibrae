@@ -55,7 +55,7 @@ class NetworkSkimming(WorkerThread):
         self.graph = graph
         self.cores = mp.cpu_count()
         self.results = SkimResults()
-        self.aux_res = MultiThreadedPaths()
+        self.aux_res: MultiThreadedPaths
         self.report = []
         self.procedure_id = ""
         self.procedure_date = ""
@@ -75,8 +75,7 @@ class NetworkSkimming(WorkerThread):
 
         self.results.cores = self.cores
         self.results.prepare(self.graph)
-        self.aux_res = MultiThreadedPaths()
-        self.aux_res.prepare_(self.graph, self.results.cores, self.results.nodes)
+        self.aux_res = MultiThreadedPaths(self.graph, self.results.cores, self.results.nodes)
         self.aux_res.temporary_skims = np.zeros(
             (self.results.cores, self.results.nodes, self.results.num_skims),
             dtype=self.graph.default_types("float"),
