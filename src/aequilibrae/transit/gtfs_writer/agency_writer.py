@@ -13,7 +13,7 @@ def write_agencies(agencies: Union[List[Agency], pd.DataFrame], folder_path: str
     if isinstance(agencies, pd.DataFrame):
         df = agencies.reindex(columns=headers).copy()
     else:
-        data = [[ag.agency_id, ag.agency, "https://vms.taps.anl.gov/tools/polaris/", pd.NA] for ag in agencies]
+        data = [[ag.agency_id, ag.agency, "https://www.aequilibrae.com/", pd.NA] for ag in agencies]
         df = pd.DataFrame(data, columns=headers)
 
     df.to_csv(join(folder_path, "agency.txt"), quoting=csv.QUOTE_NONNUMERIC, index=False)
