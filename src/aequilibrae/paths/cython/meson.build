@@ -11,6 +11,7 @@ exts = [
   'route_choice_link_loading_results',
   'route_choice_set',
   'route_choice_set_results',
+  'skimming_core',
 ]
 
 py.install_sources(

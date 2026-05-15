@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 
-from aequilibrae.paths import skimming_single_origin
+from aequilibrae.paths.cython.skimming_core import skimming_single_origin
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results import SkimResults
 

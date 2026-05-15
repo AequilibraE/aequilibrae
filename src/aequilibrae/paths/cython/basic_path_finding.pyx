@@ -10,7 +10,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
-from libc.math cimport INFINITY, sin, cos, asin, sqrt, pi
+from libc.math cimport sin, cos, asin, sqrt, pi
 from libc.string cimport memset
 from libc.stdlib cimport malloc, free
 
@@ -42,23 +42,6 @@ cpdef void network_loading(
 
             connector = conn[predecessor]
             predecessor = pred[predecessor]
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cdef void _copy_skims(
-    double[:, :] skim_matrix,  # Skim matrix_procedures computed from one origin to all nodes
-    double[:, :] final_skim_matrix
-) noexcept nogil:  # Skim matrix_procedures computed for one origin to all other centroids only
-
-    cdef long i, j
-    cdef long N = final_skim_matrix.shape[0]
-    cdef long skims = final_skim_matrix.shape[1]
-
-    for i in range(N):
-        for j in range(skims):
-            final_skim_matrix[i, j]=skim_matrix[i, j]
 
 
 cdef int[:] return_an_int_view(input) noexcept nogil:
@@ -183,82 +166,6 @@ cdef void blocking_centroid_flows(int action,
 
         for i in range(fs[orig], fs[orig + 1]):
             temp_b_nodes[i] = real_b_nodes[i]
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)  # turn of bounds-checking for entire function
-cdef void skim_single_path(long origin,
-                           long nodes,
-                           long skims,
-                           double[:, :] node_skims,
-                           long long [:] pred,
-                           long long [:] conn,
-                           double[:, :] graph_costs,
-                           long long [:] reached_first,
-                           long found) noexcept nogil:
-    cdef long long i, node, predecessor, connector, j
-
-    # sets all skims to infinity
-    for i in range(nodes):
-        for j in range(skims):
-            node_skims[i, j] = INFINITY
-
-    # Zeroes the intrazonal cost
-    for j in range(skims):
-        node_skims[origin, j] = 0
-
-    # Cascade skimming
-    for i in range(1, found + 1):
-        node = reached_first[i]
-
-        # captures how we got to that node
-        predecessor = pred[node]
-        connector = conn[node]
-
-        for j in range(skims):
-            node_skims[node, j] = node_skims[predecessor, j] + graph_costs[connector, j]
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)  # turn of bounds-checking for entire function
-cpdef void skim_multiple_fields(long origin,
-                                long nodes,
-                                long zones,
-                                long skims,
-                                double[:, :] node_skims,
-                                long long [:] pred,
-                                long long [:] conn,
-                                double[:, :] graph_costs,
-                                long long [:] reached_first,
-                                long found,
-                                double [:, :] final_skims) noexcept nogil:
-    cdef long long i, node, predecessor, connector, j
-
-    # sets all skims to infinity
-    for i in range(nodes):
-        for j in range(skims):
-            node_skims[i, j] = INFINITY
-
-    # Zeroes the intrazonal cost
-    for j in range(skims):
-        node_skims[origin, j] = 0
-
-    # Cascade skimming
-    for i in range(1, found + 1):
-        node = reached_first[i]
-
-        # captures how we got to that node
-        predecessor = pred[node]
-        connector = conn[node]
-
-        for j in range(skims):
-            node_skims[node, j] = node_skims[predecessor, j] + graph_costs[connector, j]
-
-    for i in range(zones):
-        for j in range(skims):
-            final_skims[i, j] = node_skims[i, j]
 
 
 # ######################################################################################################################

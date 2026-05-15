@@ -1,4 +1,4 @@
-from aequilibrae.paths.cython.AoN import one_to_all, skimming_single_origin, path_computation, update_path_trace
+from aequilibrae.paths.cython.AoN import one_to_all, path_computation, update_path_trace
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
@@ -18,7 +18,6 @@ from aequilibrae.paths.vdf import VDF
 
 __all__ = [
     "one_to_all",
-    "skimming_single_origin",
     "path_computation",
     "update_path_trace",
     "HyperpathGenerating",
