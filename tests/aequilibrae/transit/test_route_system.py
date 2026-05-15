@@ -15,6 +15,9 @@ def test_transit_exports_gtfs_tables(build_gtfs_project, tmp_path):
     builder.save_to_disk()
 
     with transit.project.transit_connection as conn:
+        exported_trip_ids = {
+            row[0] for row in conn.execute("SELECT trip_id FROM trips ORDER BY trip_id").fetchall()
+        }
         pattern_count = conn.execute(
             "SELECT COUNT(DISTINCT pattern_id) FROM routes WHERE geometry IS NOT NULL"
         ).fetchone()[0]
@@ -60,6 +63,7 @@ def test_transit_exports_gtfs_tables(build_gtfs_project, tmp_path):
     assert routes["route_id"].is_unique
     assert routes["route_id"].nunique() == route_count
     assert trips["trip_id"].is_unique
+    assert set(trips["trip_id"]) == exported_trip_ids
     assert stop_times["stop_id"].notna().all()
     assert stop_times["trip_id"].isin(trips["trip_id"]).all()
     assert trips["route_id"].isin(routes["route_id"]).all()
