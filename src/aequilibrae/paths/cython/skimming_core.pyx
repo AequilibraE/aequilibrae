@@ -71,7 +71,7 @@ def skimming_parallel(graph, result, long cores):
     cdef long long [:, :] reached_first_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
     cdef long long [:, :] connectors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
     cdef double [:, :, :] skim_mat = np.zeros((cores, compact_nodes, skims), dtype=np.float64)
-    cdef unsigned char [:, :] destinations = np.zeros((cores, compact_nodes), dtype=np.uint8)
+    cdef unsigned char [:] destinations = np.ones(compact_nodes, dtype=np.uint8)
     cdef long long [:] centroids_idx = np.array(graph.nodes_to_indices[graph.centroids], dtype=np.int64)
     cdef long long[:, :] b_nodes_mat = np.tile(graph.compact_graph.b_node.to_numpy(copy=False), (cores, 1))
 
@@ -84,11 +84,9 @@ def skimming_parallel(graph, result, long cores):
             if block_flows_through_centroids:
                 blocking_centroid_flows(0, oi, zones, graph_fs_view,
                                         b_nodes_mat[tid], original_b_nodes_view)
-            for j in range(n_origins):
-                destinations[tid, centroids_idx[j]] = 1
 
             w = path_finding(oi,
-                             destinations[tid],
+                             destinations,
                              -1,
                              g_view,
                              b_nodes_mat[tid],
