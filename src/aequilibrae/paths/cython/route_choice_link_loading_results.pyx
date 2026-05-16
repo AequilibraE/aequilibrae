@@ -9,7 +9,7 @@ import itertools
 
 from collections.abc import Hashable
 
-include 'parallel_numpy.pyx'
+from aequilibrae.paths.cython.parallel_numpy cimport assign_link_loads_cython
 
 # See note in route_choice_set.pxd
 cdef class LinkLoadingResults:

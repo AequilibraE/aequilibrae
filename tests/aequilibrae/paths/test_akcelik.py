@@ -1,4 +1,4 @@
-from aequilibrae.paths.cython.AoN import akcelik, delta_akcelik
+from aequilibrae.paths.cython.vdf_core import akcelik, delta_akcelik
 from multiprocessing import cpu_count
 import numpy as np
 
