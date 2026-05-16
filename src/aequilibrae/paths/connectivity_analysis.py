@@ -115,7 +115,7 @@ class ConnectivityAnalysis:
         self.execute()
 
     def execute(self):
-        """Runs the skimming process as specified in the graph"""
+        """Runs the connectivity analysis for the graph and stores disconnected origin-destination pairs."""
 
         self.disconnected_pairs = _disconnected_pairs(self.graph, self.origins, self.connectivity)
         self.disconnected_pairs = self.disconnected_pairs.sort_values(["origin", "destination"])

@@ -10,8 +10,9 @@ def skimming_parallel(graph, result, aux_result, long cores):
     Runs one Dijkstra per origin inside a single ``with nogil, parallel``
     block, eliminating the per-origin Python ThreadPool dispatch overhead
     that ``NetworkSkimming.execute`` paid before. Each OpenMP thread uses
-    its own slice of the per-thread aux arrays (indexed by ``threadid()``)
-    and its own persistent priority queue.
+    its own slice of the per-thread aux arrays (indexed by ``threadid()``),
+    while ``path_finding`` is invoked once per origin within the parallel
+    loop.
 
     Returns a list of (origin, message) tuples for any centroid that could
     not be processed. Successful origins return an empty list.

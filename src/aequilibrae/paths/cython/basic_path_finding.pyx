@@ -11,6 +11,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 """
 cimport cython
 from libc.math cimport INFINITY, sin, cos, asin, sqrt, pi
+from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
 
 include 'pq_4ary_heap.pyx'
