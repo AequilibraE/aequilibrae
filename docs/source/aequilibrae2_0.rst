@@ -25,16 +25,26 @@ TODO: RUN THESE BENCHMARKS
 +-----------------+------------+------------+-----------+--------------------------+
 | R01C01_12345678 | Links      | Nodes      | centroids | AequilibraE 2.0 speed-up |
 +-----------------+------------+------------+-----------+--------------------------+
-| Australia wide  | 30,000,000 | 30,000,000 | 60,000    |                          |
-+-----------------+------------+------------+-----------+--------------------------+
 | Arkansas        |            |            |           |                          |
++-----------------+------------+------------+-----------+--------------------------+
+| Australia wide  | 30,000,000 | 30,000,000 | 60,000    |                          |
 +-----------------+------------+------------+-----------+--------------------------+
 | Chicago         |            |            |           |                          |
 +-----------------+------------+------------+-----------+--------------------------+
 | Coquimbo        |            |            |           |                          |
 +-----------------+------------+------------+-----------+--------------------------+
-|                 |            |            |           |                          |
+| Lyon            |            |            |           |                          |
 +-----------------+------------+------------+-----------+--------------------------+
+| Toulouse        |            |            |           |                          |
++-----------------+------------+------------+-----------+--------------------------+
+
+The following conditions apply to this benchmark:
+
+- The skimming procedure was run for a single mode and a single cost variable (i.e. "distance" for cars).
+- It does not include the time taken to build the graph or to save the result to disk.
+- The benchmarking was run on a desktop PC equipped with a intel i9 285K with 192GB of RAM, and
+using 8 threads for the parallelization (this CPU's *performance cores*).
+- The speed-up procedure considers the ratio between the median time for 10 runs.
 
 
 
@@ -42,6 +52,7 @@ API Changes
 --------------------
 
 XXX
+
 
 Changes in Behaviour
 --------------------
