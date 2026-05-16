@@ -70,12 +70,10 @@ def skimming_parallel(graph, result, long cores):
     cdef long long [:, :] predecessors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
     cdef long long [:, :] reached_first_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
     cdef long long [:, :] connectors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
-    cdef long long [:, :] b_nodes_mat = np.zeros((cores, graph.compact_graph.b_node.shape[0]), dtype=np.int64)
     cdef double [:, :, :] skim_mat = np.zeros((cores, compact_nodes, skims), dtype=np.float64)
     cdef unsigned char [:, :] destinations = np.zeros((cores, compact_nodes), dtype=np.uint8)
     cdef long long [:] centroids_idx = np.array(graph.nodes_to_indices[graph.centroids], dtype=np.int64)
-
-    cdef long long[:, :] b_nodes_mat = np.tile(graph.compact_graph.b_node.to_numpy(), (cores, 1))
+    cdef long long[:, :] b_nodes_mat = np.tile(graph.compact_graph.b_node.to_numpy(copy=False), (cores, 1))
 
     with nogil, parallel(num_threads=cores):
         tid = threadid()
