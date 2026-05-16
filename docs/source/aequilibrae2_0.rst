@@ -19,24 +19,23 @@ Network skimming
 ~~~~~~~~~~~~~~~~
 
 The parallelization of the network skimming procedure was re-implemented in Cython, bringing tangible performance
-improvements.  Limited benchmarks show performance improvements across various network sizes:
+improvements for small and medium networks, which cover a significant amount of the real-world networks
+in use by transportation planning agencies in 2026.
 
 TODO: RUN THESE BENCHMARKS
-+-----------------+------------+------------+-----------+--------------------------+
-| R01C01_12345678 | Links      | Nodes      | centroids | AequilibraE 2.0 speed-up |
-+-----------------+------------+------------+-----------+--------------------------+
-| Arkansas        |            |            |           |                          |
-+-----------------+------------+------------+-----------+--------------------------+
-| Australia wide  | 30,000,000 | 30,000,000 | 60,000    |                          |
-+-----------------+------------+------------+-----------+--------------------------+
-| Chicago         |            |            |           |                          |
-+-----------------+------------+------------+-----------+--------------------------+
-| Coquimbo        |            |            |           |                          |
-+-----------------+------------+------------+-----------+--------------------------+
-| Lyon            |            |            |           |                          |
-+-----------------+------------+------------+-----------+--------------------------+
-| Toulouse        |            |            |           |                          |
-+-----------------+------------+------------+-----------+--------------------------+
++-----------------+------------+-------------+------------+-----------+--------------------------+
+| R01C01_12345678 | Links      | Graph Links | Nodes      | centroids | AequilibraE 2.0 speed-up |
++-----------------+------------+-------------+------------+-----------+--------------------------+
+| Arkansas        |   300,146  |  591,489    |  243,059   |   6,445   |          0%              |
++-----------------+------------+-------------+------------+-----------+--------------------------+
+| Australia wide  | 4,113,479  |  7,760,714  | 30,000,000 | 60,000    |          0%              |
++-----------------+------------+-------------+------------+-----------+--------------------------+
+| Chicago         |   39,018   |   39,018    |  12,979    |  1,790    |         12%              |
++-----------------+------------+-------------+------------+-----------+--------------------------+
+| Coquimbo        |   19,983   |   34,546    |  15,724    |  133      |         31%              |
++-----------------+------------+-------------+------------+-----------+--------------------------+
+| Lyon            |  253,305   |  468,761    |  179,940   |  4,617    |          0%              |
++-----------------+------------+-------------+------------+-----------+--------------------------+
 
 The following conditions apply to this benchmark:
 
@@ -45,7 +44,6 @@ The following conditions apply to this benchmark:
 - The benchmarking was run on a desktop PC equipped with a intel i9 285K with 192GB of RAM, and
 using 8 threads for the parallelization (this CPU's *performance cores*).
 - The speed-up procedure considers the ratio between the median time for 10 runs.
-
 
 
 API Changes
