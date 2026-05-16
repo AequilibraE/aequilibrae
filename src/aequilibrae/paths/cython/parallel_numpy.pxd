@@ -57,12 +57,5 @@ cpdef void copy_two_dimensions_cython(double[:, :] target, double[:, :] source, 
 
 cpdef void copy_three_dimensions_cython(double[:, :, :] target, double[:, :, :] source, int cores) noexcept
 
-cpdef void assign_link_loads_cython(
-    cython.floating[:, :] actual,
-    cython.floating[:, :] compressed,
-    const long long[:] crosswalk,
-    int cores
-) noexcept
-
 cpdef void aggregate_link_costs_cython(double[:] actual, double[:] compressed, const long long[:] crosswalk) noexcept
 

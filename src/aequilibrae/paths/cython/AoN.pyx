@@ -529,3 +529,32 @@ cpdef void put_path_file_on_disk(unsigned int orig,
         nodes_to_write[i] = all_nodes[i]
         pred[i] = all_nodes[predecessors[i]]
         conn[i] = connectors[i]
+
+
+def assign_link_loads(actual_links, compressed_links, crosswalk, cores):
+    cdef int c = cores
+
+    cdef double [:, :] actual_view = actual_links
+    cdef double [:, :] compressed_view = compressed_links
+    cdef const long long [:] crosswalk_view = crosswalk
+
+    assign_link_loads_cython(actual_view, compressed_view, crosswalk_view, c)
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef void assign_link_loads_cython(
+    cython.floating[:, :] actual,
+    cython.floating[:, :] compressed,
+    const long long[:] crosswalk,
+    int cores
+) noexcept:
+    cdef long long i, j, k
+    cdef long long links = actual.shape[0]
+    cdef long long n = actual.shape[1]
+
+    for i in prange(links, nogil=True, num_threads=cores):
+        for j in range(n):
+            k = crosswalk[i]
+            actual[i, j] = compressed[k, j]
