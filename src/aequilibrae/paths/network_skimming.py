@@ -3,11 +3,9 @@ import sys
 from datetime import datetime
 from uuid import uuid4
 
-import numpy as np
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.cython.skimming_core import skimming_parallel
-from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.core_setter import set_cores
@@ -55,7 +53,6 @@ class NetworkSkimming(WorkerThread):
         self.graph = graph
         self.cores = mp.cpu_count()
         self.results = SkimResults()
-        self.aux_res: MultiThreadedPaths
         self.report = []
         self.procedure_id = ""
         self.procedure_date = ""
@@ -75,13 +72,8 @@ class NetworkSkimming(WorkerThread):
 
         self.results.cores = self.cores
         self.results.prepare(self.graph)
-        self.aux_res = MultiThreadedPaths(self.graph, self.results.cores, self.results.nodes)
-        self.aux_res.temporary_skims = np.zeros(
-            (self.results.cores, self.results.nodes, self.results.num_skims),
-            dtype=self.graph.default_types("float"),
-        )
 
-        skipped = skimming_parallel(self.graph, self.results, self.aux_res, self.results.cores)
+        skipped = skimming_parallel(self.graph, self.results, self.results.cores)
         for _orig, msg in skipped:
             self.report.append(msg)
 

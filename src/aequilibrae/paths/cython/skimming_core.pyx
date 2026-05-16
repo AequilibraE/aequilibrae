@@ -4,7 +4,8 @@ from cython.parallel cimport parallel, prange, threadid
 import numpy as np
 from aequilibrae.paths.cython.basic_path_finding cimport blocking_centroid_flows, path_finding
 
-def skimming_parallel(graph, result, aux_result, long cores):
+
+def skimming_parallel(graph, result, long cores):
     """OpenMP-parallel skimming over all valid centroids.
 
     Runs one Dijkstra per origin inside a single ``with nogil, parallel``
@@ -18,7 +19,6 @@ def skimming_parallel(graph, result, aux_result, long cores):
     not be processed. Successful origins return an empty list.
     """
 
-
     if result._graph_id != graph._id:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
@@ -27,6 +27,10 @@ def skimming_parallel(graph, result, aux_result, long cores):
         long long zones = graph.num_zones
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long skims = result.num_skims
+        Py_ssize_t i, j, n_b = graph.compact_graph.b_node.shape[0]
+        long long oi, w
+        int tid
+
 
     # Pre-resolve centroids -> compact indices on the Python side. We also
     # filter out any centroid that has no outgoing edges so the parallel
@@ -63,18 +67,15 @@ def skimming_parallel(graph, result, aux_result, long cores):
     cdef double [:, :, :] final_skim_view = result.skims.matrix_view
 
     # Per-thread aux state (sliced by threadid inside the parallel region).
-    cdef long long [:, :] predecessors_mat = aux_result.predecessors
-    cdef long long [:, :] reached_first_mat = aux_result.reached_first
-    cdef long long [:, :] connectors_mat = aux_result.connectors
-    cdef long long [:, :] b_nodes_mat = aux_result.temp_b_nodes
-    cdef double [:, :, :] skim_mat = aux_result.temporary_skims
+    cdef long long [:, :] predecessors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
+    cdef long long [:, :] reached_first_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
+    cdef long long [:, :] connectors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
+    cdef long long [:, :] b_nodes_mat = np.zeros((cores, graph.compact_graph.b_node.shape[0]), dtype=np.int64)
+    cdef double [:, :, :] skim_mat = np.zeros((cores, compact_nodes, skims), dtype=np.float64)
+    cdef unsigned char [:, :] destinations = np.zeros((cores, compact_nodes), dtype=np.uint8)
+    cdef long long [:] centroids_idx = np.array(graph.nodes_to_indices[graph.centroids], dtype=np.int64)
 
-    # Empty destinations array (we never use early exit for skimming).
-    cdef unsigned char [:] destinations = np.zeros(0, dtype=np.uint8)
-
-    cdef:
-        long long i, oi, w
-        int tid
+    cdef long long[:, :] b_nodes_mat = np.tile(graph.compact_graph.b_node.to_numpy(), (cores, 1))
 
     with nogil, parallel(num_threads=cores):
         tid = threadid()
@@ -85,9 +86,11 @@ def skimming_parallel(graph, result, aux_result, long cores):
             if block_flows_through_centroids:
                 blocking_centroid_flows(0, oi, zones, graph_fs_view,
                                         b_nodes_mat[tid], original_b_nodes_view)
+            for j in range(n_origins):
+                destinations[tid, centroids_idx[j]] = 1
 
             w = path_finding(oi,
-                             destinations,
+                             destinations[tid],
                              -1,
                              g_view,
                              b_nodes_mat[tid],
