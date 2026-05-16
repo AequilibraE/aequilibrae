@@ -1,5 +1,7 @@
 # cython: language_level=3
 cimport cython
+from cython.parallel cimport prange
+
 import os
 import numpy as np
 from libc.string cimport memset
