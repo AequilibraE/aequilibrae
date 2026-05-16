@@ -365,12 +365,13 @@ class GraphBase(ABC):  # noqa: B024
             self.set_blocked_centroid_flows(self.block_centroid_flows)
         self._id = uuid.uuid4().hex
 
-    def disconnected_nodes(self)->np.ndarray:
-        """Executes strong connectivity components analysis on the directed graph
+    def disconnected_nodes(self) -> np.ndarray:
+        """
+        Executes strongly connected components analysis on the directed graph
 
-            :Returns:
-                    **array** (:obj:`np.ndarray`): All nodes disconnected from the main portion of the network
-                """
+        :Returns:
+            **array** (:obj:`np.ndarray`): All nodes disconnected from the main portion of the network
+        """
         return disconnected_analysis(self)
 
 

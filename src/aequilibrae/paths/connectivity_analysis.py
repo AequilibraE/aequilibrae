@@ -8,6 +8,9 @@ sys.dont_write_bytecode = True
 
 
 def _analysis(anodes: np.ndarray, bnodes: np.ndarray) -> np.ndarray:
+    if anodes.size == 0 or bnodes.size == 0:
+        return np.array([], dtype=np.int64)
+
     n = np.max([np.max(anodes), np.max(bnodes)]) + 1
     csr = coo_matrix((np.ones(anodes.shape[0]), (anodes, bnodes)), shape=(n, n)).tocsr()
     n_components, labels = connected_components(csgraph=csr, directed=True, return_labels=True, connection="strong")
@@ -38,7 +41,7 @@ def blocking_through_centroids(graph) -> np.ndarray:
     )
 
     turns = turns[turns["in_link"] != turns["out_link"]]
-    turns = turns[turns["node"] < graph.centroids.shape[0]]
+    turns = turns[turns["node"] >= graph.centroids.shape[0]]
 
     anodes = turns.in_link.to_numpy()
     bnodes = turns.out_link.to_numpy()
