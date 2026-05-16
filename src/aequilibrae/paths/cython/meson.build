@@ -8,11 +8,14 @@ exts = [
   'AoN',
   'basic_path_finding',
   'graph_building',
+  'parallel_numpy',
+  'path_file_saving',
   'public_transport',
   'route_choice_link_loading_results',
   'route_choice_set',
   'route_choice_set_results',
   'skimming_core',
+  'vdf_core',
 ]
 
 py.install_sources(

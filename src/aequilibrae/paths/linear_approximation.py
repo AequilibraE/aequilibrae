@@ -10,7 +10,7 @@ import numpy as np
 from scipy.optimize import minimize_scalar, root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.AoN import (
+from aequilibrae.paths.cython.parallel_numpy import (
     aggregate_link_costs,
     copy_three_dimensions,
     copy_two_dimensions,

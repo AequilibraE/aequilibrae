@@ -10,17 +10,9 @@ from aequilibrae.paths.cython.basic_path_finding cimport (
     path_finding_a_star,
 )
 from aequilibrae.paths.cython.basic_path_finding import HEURISTIC_MAP
+from aequilibrae.paths.cython.path_file_saving import save_path_file
 
 include 'parameters.pxi'
-
-
-include 'bpr.pyx'
-include 'bpr2.pyx'
-include 'conical.pyx'
-include 'inrets.pyx'
-include 'akcelik.pyx'
-include 'parallel_numpy.pyx'
-include 'path_file_saving.pyx'
 
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):

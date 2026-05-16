@@ -36,18 +36,7 @@ def _component_reachability(adjacency: csr_matrix):
         if source != target:
             children[source].add(target)
 
-    reachable = []
-    for component in range(num_components):
-        seen = {component}
-        queue = deque([component])
-        while queue:
-            current = queue.popleft()
-            for nxt in children[current]:
-                if nxt not in seen:
-                    seen.add(nxt)
-                    queue.append(nxt)
-        reachable.append(seen)
-    return labels, reachable
+
 
 
 def _disconnected_pairs(graph, origins=None, signal=None) -> pd.DataFrame:
