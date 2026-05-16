@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_logger
+from aequilibrae.paths.connectivity_analysis import disconnected_analysis
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 
@@ -363,6 +364,15 @@ class GraphBase(ABC):  # noqa: B024
             self.prepare_graph(self.centroids)
             self.set_blocked_centroid_flows(self.block_centroid_flows)
         self._id = uuid.uuid4().hex
+
+    def disconnected_nodes(self)->np.ndarray:
+        """Executes strong connectivity components analysis on the directed graph
+
+            :Returns:
+                    **array** (:obj:`np.ndarray`): All nodes disconnected from the main portion of the network
+                """
+        return disconnected_analysis(self)
+
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = list(self.required_default_fields)

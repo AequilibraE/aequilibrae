@@ -3,7 +3,6 @@ from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.assignment_paths import AssignmentPaths
-from aequilibrae.paths.connectivity_analysis import ConnectivityAnalysis
 from aequilibrae.paths.graph import Graph, TransitGraph
 from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
 from aequilibrae.paths.network_skimming import NetworkSkimming
@@ -22,7 +21,6 @@ __all__ = [
     "HyperpathGenerating",
     "allOrNothing",
     "AssignmentPaths",
-    "ConnectivityAnalysis",
     "Graph",
     "TransitGraph",
     "MultiThreadedAoN",
