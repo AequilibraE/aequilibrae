@@ -29,9 +29,9 @@ def blocking_through_centroids(graph) -> np.ndarray:
     edges = graph.graph
 
     turns = (
-        edges[["id", "node_b"]].rename(columns={"id": "in_link", "node_b": "node"})
+        edges[["id", "b_node"]].rename(columns={"id": "in_link", "b_node": "node"})
         .merge(
-            edges[["id", "node_a"]].rename(columns={"id": "out_link", "node_a": "node"}),
+            edges[["id", "a_node"]].rename(columns={"id": "out_link", "a_node": "node"}),
             on="node",
             how="inner",
         )
