@@ -314,7 +314,7 @@ class Project:
         return self.project_parameters.parameters
 
     @property
-    def run(self) -> Run:
+    def run(self) -> "Run":
         """
         Load and return the AequilibraE run module with the default arguments from
         ``parameters.yml`` partially applied.
@@ -498,7 +498,8 @@ class Project:
             except FileNotFoundError:
                 pass
 
-            shutil.copy(parameters_path, scenario_path)
+            if parameters_path is not None:
+                shutil.copy(parameters_path, scenario_path)
 
             with commit_and_close(db, spatial=True) as conn:
                 conn.execute("DROP TABLE IF EXISTS scenarios")
