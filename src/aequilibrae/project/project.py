@@ -6,7 +6,7 @@ import os
 import shutil
 import sqlite3
 from pathlib import Path
-from typing import Any, NoReturn, TYPE_CHECKING
+from typing import Any, NoReturn
 import warnings
 
 import pandas as pd
@@ -24,12 +24,9 @@ from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database, demo_init_py
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import commit_and_close, safe_connect
+from aequilibrae.utils.db_utils import commit_and_close, safe_connect, AequilibraEConnection
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
-
-if TYPE_CHECKING:
-    from aequilibrae.utils.db_utils import AequilibraEConnection
 
 
 class Project:
