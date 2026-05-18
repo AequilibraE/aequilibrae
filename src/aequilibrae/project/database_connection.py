@@ -1,6 +1,6 @@
-import sqlite3
-from pathlib import Path
 from os import PathLike
+from pathlib import Path
+import sqlite3
 
 from aequilibrae.context import get_active_project
 from aequilibrae.utils.spatialite_utils import connect_spatialite
