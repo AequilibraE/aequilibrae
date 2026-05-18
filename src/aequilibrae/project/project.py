@@ -1,4 +1,3 @@
-from collections import namedtuple
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 import functools
@@ -7,7 +6,7 @@ import os
 import shutil
 import sqlite3
 from pathlib import Path
-from typing import Any, NamedTuple, NoReturn, TYPE_CHECKING
+from typing import Any, NoReturn, TYPE_CHECKING
 import warnings
 
 import pandas as pd
