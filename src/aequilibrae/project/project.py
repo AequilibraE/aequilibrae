@@ -70,7 +70,7 @@ class Project:
             not exist, it will fail.
         """
 
-        base_path = Path(project_path)
+        base_path: Path = Path(project_path)
         file_name = base_path / "project_database.sqlite"
 
         if not file_name.is_file() or not file_name.exists():
