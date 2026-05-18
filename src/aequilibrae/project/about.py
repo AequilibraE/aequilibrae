@@ -1,3 +1,9 @@
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
+    from pathlib import Path
+    import sqlite3
+
 import string
 import uuid
 from os.path import join, dirname, realpath
@@ -26,10 +32,10 @@ class About:
 
     """
 
-    def __init__(self, project):
+    def __init__(self, project: "Project") -> None:
         self.__characteristics = []
         self.__original = {}
-        self.__path_to_file = project.path_to_file
+        self.__path_to_file: "Path" = project.path_to_file
         self.logger = project.logger
 
         with project.db_connection as conn:
@@ -41,7 +47,7 @@ class About:
 
         with commit_and_close(self.__path_to_file, spatial=True) as conn:
             if not self.__has_about(conn):
-                qry_file = join(dirname(realpath(__file__)), "database_specification", "tables", "about.sql")
+                qry_file = Path(join(dirname(realpath(__file__)), "database_specification", "tables", "about.sql"))
                 run_queries_from_sql_file(conn, self.logger, qry_file)
 
             sql = "SELECT count(*) as num_records from about;"
@@ -104,11 +110,11 @@ class About:
                     conn.execute("UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
                     self.logger.info(f"Updated {k} on About_Table to {v}")
 
-    def __has_about(self, conn):
+    def __has_about(self, conn: "sqlite3.Connection") -> bool:
         sql = "SELECT name FROM sqlite_master WHERE type='table';"
         return any("about" in x[0] for x in conn.execute(sql).fetchall())
 
-    def __load(self, conn):
+    def __load(self, conn: "sqlite3.Connection"):
         self.__characteristics = []
         sql = "select infoname, infovalue from 'about'"
         for x in conn.execute(sql).fetchall():
