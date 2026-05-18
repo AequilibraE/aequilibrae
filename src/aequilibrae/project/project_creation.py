@@ -1,7 +1,8 @@
 import logging
-import re
 from pathlib import Path
+import re
 from sqlite3 import Connection
+
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
 
 
@@ -10,7 +11,7 @@ req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ["ogc_fid", "geometry"]
 
 
-def initialize_tables(logger, db_type: str, conn: Connection) -> None:
+def initialize_tables(logger: logging.Logger, db_type: str, conn: Connection) -> None:
     with conn as conn:
         create_base_tables(conn, logger, db_type)
         add_triggers(conn, logger, db_type)

@@ -258,7 +258,8 @@ class MigrationManager:
 
         return res
 
-    def upgrade(self, main_conn: str, connections: dict[str, AequilibraEConnection], skip: Optional[set[int]] = None):
+    def upgrade(self, main_conn: str, connections: dict[str, AequilibraEConnection | sqlite3.Connection],
+                 skip: Optional[set[int]] = None):
         """
         Find and apply all applicable migrations.
 

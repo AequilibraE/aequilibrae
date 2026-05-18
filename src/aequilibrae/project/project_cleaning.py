@@ -1,4 +1,8 @@
-def clean(project):
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
+
+def clean(project: "Project") -> None:
     # Since we cannot decide the order of trigger execution in SQLITE, we make sure to remove any
     # extraneous nodes at a few key moments (i.e. opening and closing the model)
     with project.db_connection as conn:

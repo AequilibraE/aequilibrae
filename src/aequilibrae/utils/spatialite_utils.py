@@ -31,7 +31,7 @@ def is_not_windows():
     return os.name != "nt"
 
 
-def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> Connection:
+def connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False) -> Connection:
     if inside_qgis:
         import qgis
 
@@ -42,7 +42,7 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
     return _connect_spatialite(path_to_file, missing_ok)
 
 
-def _connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False):
+def _connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False):
     conn = safe_connect(path_to_file, missing_ok)
     load_spatialite_extension(conn)
     return conn
@@ -81,7 +81,7 @@ def is_spatialite(conn):
     return has_table(conn, "geometry_columns")
 
 
-def set_known_spatialite_folder(spatialite_folder: os.PathLike):
+def set_known_spatialite_folder(spatialite_folder: os.PathLike | str):
     directory = str(spatialite_folder)
     if directory not in os.environ["PATH"]:
         os.environ["PATH"] = directory + os.pathsep + os.environ["PATH"]
@@ -122,11 +122,11 @@ def ensure_spatialite_binaries() -> None:
         global_logger.warning(msg)
 
 
-def _dll_already_exists(d: os.PathLike) -> bool:
+def _dll_already_exists(d: os.PathLike | str) -> bool:
     return os.path.exists(join(d, "mod_spatialite.dll"))
 
 
-def _download_and_extract_spatialite(directory: os.PathLike) -> None:
+def _download_and_extract_spatialite(directory: os.PathLike | str) -> None:
     url = "https://github.com/AequilibraE/aequilibrae/releases/download/v1.4.3/mod_spatialite-5.1.0-win-amd64.zip"
     zip_file = join(directory, basename(url))
 

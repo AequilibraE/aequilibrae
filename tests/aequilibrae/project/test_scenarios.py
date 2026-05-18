@@ -409,10 +409,10 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
 
     # For the root module we should have one matrix in the summary
     if scenario == "root":
-        assert "demand_omx" in scenario_example.run.matrix_summary()
+        assert "demand_omx" in scenario_example.run["matrix_summary"]()
     else:
         # For the others we shouldn't have any matrices, and the "run" dir shouldn't exist
-        assert len(scenario_example.run.matrix_summary()) == 0
+        assert len(scenario_example.run["matrix_summary"]()) == 0
         assert not (scenario_example.project_base_path / "run").exists()
 
 
