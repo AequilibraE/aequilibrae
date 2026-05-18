@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 import re
 import string
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, NoReturn, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from aequilibrae.project import Project
 
@@ -91,7 +91,7 @@ class FieldEditor:
         dt = self.__run_query_fetch_all(qry)
         self._table_fields = [x[1] for x in dt if x[1] != "ogc_fid"]
 
-    def remove(self, field_name: str) -> None:
+    def remove(self, field_name: str) -> NoReturn:
         raise NotImplementedError
 
     def save(self) -> None:
