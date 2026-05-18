@@ -1,5 +1,5 @@
 from collections import namedtuple
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 import functools
 import logging
@@ -314,7 +314,7 @@ class Project:
         return self.project_parameters.parameters
 
     @property
-    def run(self) -> "Run":
+    def run(self) -> dict[str, Callable]:
         """
         Load and return the AequilibraE run module with the default arguments from
         ``parameters.yml`` partially applied.
@@ -326,7 +326,7 @@ class Project:
             self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
         )
 
-        res = []
+        res: dict [str, Callable] = {}
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
@@ -336,10 +336,9 @@ class Project:
                 raise RuntimeError(f"found symbol '{name}' in the run module but it is not callable")
 
             func = functools.partial(attr, **(kwargs if kwargs is not None else {}))
-            res.append((name, func))
+            res[name] = func
 
-        Run = namedtuple("Run", [k for k, _ in res])
-        return Run._make([v for _, v in res])
+        return res
 
     def check_file_indices(self) -> NoReturn:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""
