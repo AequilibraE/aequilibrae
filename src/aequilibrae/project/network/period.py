@@ -1,4 +1,10 @@
+from __future__ import annotations
 from .safe_class import SafeClass
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aequilibrae import Project
 
 
 class Period(SafeClass):
@@ -19,7 +25,12 @@ class Period(SafeClass):
         >>> project.close()
     """
 
-    def __init__(self, dataset, project):
+    period_id: int
+    period_start: int
+    period_end: int
+    period_description: str
+
+    def __init__(self, dataset, project: Project):
         """"""
         super().__init__(dataset, project)
         self.__fields = list(dataset.keys())

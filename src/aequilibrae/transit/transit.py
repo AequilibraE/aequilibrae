@@ -1,12 +1,17 @@
+from __future__ import annotations
 import os
 import shutil
 import sqlite3
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 
 import pandas as pd
 
+if TYPE_CHECKING:
+    from aequilibrae import Project
+
+from aequilibrae.utils.python_signal import PythonSignal
+from aequilibrae.project.network.periods import Periods
 from aequilibrae.log import logger
-from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
@@ -17,8 +22,8 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 
 class Transit(WorkerThread):
-    transit = SIGNAL(object)
-    default_capacities = {
+    transit: PythonSignal = SIGNAL(object)
+    default_capacities: dict[int | str, list[int]] = {
         0: [150, 300],  # Tram, Streetcar, Light rail
         1: [280, 560],  # Subway/metro
         2: [700, 700],  # Rail
@@ -29,11 +34,11 @@ class Transit(WorkerThread):
         12: [50, 100],  # Monorail
         "other": [30, 60],
     }
-    default_pces = {0: 5.0, 1: 5.0, 3: 4.0, 5: 4.0, 11: 3.0, "other": 2.0}
-    graphs: Dict[str, TransitGraph] = {}
+    default_pces: dict[int | str, int | float] = {0: 5.0, 1: 5.0, 3: 4.0, 5: 4.0, 11: 3.0, "other": 2.0}
+    graphs: Dict[int, TransitGraphBuilder] = {}
     pt_con: sqlite3.Connection
 
-    def __init__(self, project):
+    def __init__(self, project: Project):
         """
         :Arguments:
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
@@ -41,17 +46,19 @@ class Transit(WorkerThread):
         """
         super().__init__(None)
 
-        self.project = project
+        self.project: Project = project
         self.logger = logger
-        self.periods = project.network.periods
+        self.periods: Periods = project.network.periods
 
         self.create_transit_database()
 
-    def get_table(self, table_name) -> pd.DataFrame:
+    def get_table(self, table_name: str) -> pd.DataFrame:
         with self.project.transit_connection as conn:
             return get_geo_table(table_name, conn)
 
-    def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
+    def new_gtfs_builder(
+        self, agency: str, file_path: str, day: str = "", description: str = ""
+    ) -> GTFSRouteSystemBuilder:
         """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
 
         :Arguments:
@@ -76,8 +83,8 @@ class Transit(WorkerThread):
             pces=self.default_pces,
         )
 
-        gtfs.signal = self.transit
-        gtfs.gtfs_data.signal = self.transit
+        gtfs.signal: PythonSignal = self.transit
+        gtfs.gtfs_data.signal: PythonSignal = self.transit
         return gtfs
 
     def create_transit_database(self):
@@ -96,14 +103,14 @@ class Transit(WorkerThread):
         A 'period_id' may be specified to select a time period. By default, a whole day is used. See
         'project.network.Periods' for more details.
         """
-        period_id = kwargs.pop("period_id", self.periods.default_period.period_id)
+        period_id: int = kwargs.pop("period_id", self.periods.default_period.period_id)
 
         graph = TransitGraphBuilder(self.project, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
         return graph
 
-    def save_graphs(self, period_ids: List[int] = None, force: bool = False):
+    def save_graphs(self, period_ids: List[int] | None = None, force: bool = False):
         """
         Save the previously build transit graphs to the 'public_transport.sqlite' database. Saving may be filtered
         by 'period_id'.
@@ -115,7 +122,7 @@ class Transit(WorkerThread):
 
         """
         if period_ids is None:
-            period_ids = self.graphs.keys()
+            period_ids: list[int] = list(self.graphs.keys())
 
         if force:
             self.remove_graphs(period_ids)
@@ -139,7 +146,7 @@ class Transit(WorkerThread):
             if unload:
                 del self.graphs[period_id]
 
-    def load(self, period_ids: List[int] = None):
+    def load(self, period_ids: List[int] | None = None):
         """
         Load the previously saved transit graphs from the 'public_transport.sqlite' database. Loading may be filtered
         by 'period_id'.
@@ -151,7 +158,7 @@ class Transit(WorkerThread):
         if period_ids is None:
             with self.project.db_connection as conn:
                 res = conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
-            period_ids = [x[0] for x in res]
+            period_ids: list[int] = [x[0] for x in res]
 
         for period_id in period_ids:
             self.graphs[period_id] = TransitGraphBuilder.from_db(self.project, period_id)
@@ -188,8 +195,8 @@ class Transit(WorkerThread):
         with self.project.transit_connection as conn:
             return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), conn)
 
-    def __build_pt_preload_sql(self, start, end, inclusion_cond):
-        probe_point_lookup = {
+    def __build_pt_preload_sql(self, start: int, end: int, inclusion_cond: str) -> str:
+        probe_point_lookup: dict[str, str] = {
             "start": "MIN(departure)",
             "end": "MAX(arrival)",
             "midpoint": "(MIN(departure) + MAX(arrival)) / 2",

@@ -1,8 +1,18 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import shapely.wkb
 
+if TYPE_CHECKING:
+    from aequilibrae import Project
+    from logging import Logger
 
 class SafeClass:
-    _srid = 4326
+    _srid: int = 4326
+    project: Project
+    _logger: Logger
+    __original__: dict
+    _table: str
+    __srid__: int
 
     def __init__(self, data_set: dict, project) -> None:
         self.__dict__["__original__"] = {}
