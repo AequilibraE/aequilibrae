@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .safe_class import SafeClass
 
 from typing import TYPE_CHECKING
