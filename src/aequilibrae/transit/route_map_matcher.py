@@ -35,8 +35,8 @@ class RouteMapMatcher(WorkerThread):
         stops_gdf: gpd.GeoDataFrame = (
             self.__rename_geo(stops_gdf).to_crs(utm_zone).rename(columns={"stop_id": "real_stop_id"})
         )
-        self.stops: gpd.GeoDataFrame = stops_gdf.assign(
-            stop_id=np.arange(stops_gdf.shape[0]) + nodes_gdf.node_id.max() + 1
+        self.stops: gpd.GeoDataFrame = gpd.GeoDataFrame(
+            stops_gdf.assign(stop_id=np.arange(stops_gdf.shape[0]) + nodes_gdf.node_id.max() + 1)
         )
         self.nodes: gpd.GeoDataFrame = self.__rename_geo(nodes_gdf).to_crs(utm_zone)
 
