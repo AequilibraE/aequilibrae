@@ -32,8 +32,12 @@ class RouteMapMatcher(WorkerThread):
         self.logger = get_logger()
 
         self.links: gpd.GeoDataFrame = self.__rename_geo(link_gdf).to_crs(utm_zone)
-        stops_gdf: gpd.GeoDataFrame = self.__rename_geo(stops_gdf).to_crs(utm_zone).rename(columns={"stop_id": "real_stop_id"})
-        self.stops: gpd.GeoDataFrame = stops_gdf.assign(stop_id=np.arange(stops_gdf.shape[0]) + nodes_gdf.node_id.max() + 1)
+        stops_gdf: gpd.GeoDataFrame = (
+            self.__rename_geo(stops_gdf).to_crs(utm_zone).rename(columns={"stop_id": "real_stop_id"})
+        )
+        self.stops: gpd.GeoDataFrame = stops_gdf.assign(
+            stop_id=np.arange(stops_gdf.shape[0]) + nodes_gdf.node_id.max() + 1
+        )
         self.nodes: gpd.GeoDataFrame = self.__rename_geo(nodes_gdf).to_crs(utm_zone)
 
         self.dist_thresh: int | float = distance_to_project
@@ -93,7 +97,9 @@ class RouteMapMatcher(WorkerThread):
         connector_geo = joined.reset_index(drop=True).geometry.shortest_line(geos.reset_index(drop=True).geometry)
 
         df = joined[["stop_id", "node_id"]].rename(columns={"stop_id": "a_node", "node_id": "b_node"})
-        connectors: gpd.GeoDataFrame = gpd.GeoDataFrame(df, geometry=connector_geo).set_crs(self.links.crs, inplace=False)
+        connectors: gpd.GeoDataFrame = gpd.GeoDataFrame(df, geometry=connector_geo).set_crs(
+            self.links.crs, inplace=False
+        )
 
         min_speed = max(min(self.links.speed_ab.min(), self.links.speed_ba.min()), 1.0)
         connectors: pd.DataFrame = connectors.assign(
