@@ -1,8 +1,11 @@
 from sqlite3 import IntegrityError
+import logging
 
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project.table_loader import TableLoader
+
+logger = logging.getLogger(__name__)
 
 
 class LinkTypes:
@@ -58,7 +61,6 @@ class LinkTypes:
     def __init__(self, net):
         self.__items = {}
         self.project = net.project
-        self.logger = net.project.logger
 
         tl = TableLoader()
         with self.project.db_connection as conn:
@@ -91,9 +93,9 @@ class LinkTypes:
             lt.delete()
             del self.__items[link_type_id]
         except IntegrityError as e:
-            self.logger.error(f"Failed to remove link_type {link_type_id}. {e.args}")
+            logger.error(f"Failed to remove link_type {link_type_id}. {e.args}")
             raise e
-        self.logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
+        logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
 
     def get(self, link_type_id: str) -> LinkType:
         """Get a link_type from the network by its *link_type_id*"""

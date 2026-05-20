@@ -1,6 +1,7 @@
 from sqlite3 import Connection
+import logging
 
-from aequilibrae.log import logger
+logger = logging.getLogger(__name__)
 
 
 class FareRule:

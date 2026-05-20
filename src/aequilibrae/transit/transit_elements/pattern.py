@@ -1,3 +1,4 @@
+import logging
 from sqlite3 import Connection
 from typing import List
 
@@ -9,11 +10,14 @@ from shapely.geometry import LineString
 from shapely.ops import transform
 
 from aequilibrae.transit.functions.get_srid import get_srid
+
 from .basic_element import BasicPTElement
 from .link import Link
 from .mode_correspondence import mode_corresp
 
 DEAD_END_RUN = 40
+
+logger = logging.getLogger(__name__)
 
 
 class Pattern(BasicPTElement):
@@ -41,7 +45,6 @@ class Pattern(BasicPTElement):
         self.total_capacity = None
         self.__srid = get_srid()
         self.__geolinks = gtfs_feed.geo_links
-        self.__logger = gtfs_feed.logger
 
         self.__feed = gtfs_feed
         # For map matching
@@ -138,7 +141,7 @@ class Pattern(BasicPTElement):
         if self.__map_matched:
             return
         self.__map_matched = True
-        self.__logger.debug(f"Map-matching pattern ID {self.pattern_id}")
+        logger.debug(f"Map-matching pattern ID {self.pattern_id}")
 
         if not self.__feed.map_matchers:
             self.__feed.builds_map_matchers()
@@ -158,12 +161,12 @@ class Pattern(BasicPTElement):
         df = map_matcher.map_match_route(stops, route_shape, self.pattern_id)
 
         if df.shape[0] == 0:
-            self.__logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
+            logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
             return
 
         self.shape = shapely.ops.transform(self.__feed.mm_transform_rev.transform, map_matcher.assemble_shape(df))
         self.__build_pattern_mapping(df)
-        self.__logger.debug(f"Map-matched pattern {self.pattern_id}")
+        logger.debug(f"Map-matched pattern {self.pattern_id}")
 
     def __build_pattern_mapping(self, df):
         # We find what is the position along routes that we have for each stop and make sure they are always growing

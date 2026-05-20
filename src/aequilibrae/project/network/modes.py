@@ -1,7 +1,10 @@
 from sqlite3 import IntegrityError
+import logging
 
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.mode import Mode
+
+logger = logging.getLogger(__name__)
 
 
 class Modes:
@@ -55,7 +58,6 @@ class Modes:
         self.__all_modes = []
         self.__items = {}
         self.project = net.project
-        self.logger = net.logger
         self.__update_list_of_modes()
 
     def add(self, mode: Mode) -> None:
@@ -67,7 +69,7 @@ class Modes:
                 raise ValueError("Mode already exists in the model")
 
             conn.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
-            self.logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
+            logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
             conn.commit()
             mode.save()
 
@@ -79,9 +81,9 @@ class Modes:
             try:
                 conn.execute(f'delete from modes where mode_id="{mode_id}"')
             except IntegrityError as e:
-                self.logger.error(f"Failed to remove mode {mode_id}. {e.args}")
+                logger.error(f"Failed to remove mode {mode_id}. {e.args}")
                 raise e
-            self.logger.warning(f"Mode {mode_id} was successfully removed from the database")
+            logger.warning(f"Mode {mode_id} was successfully removed from the database")
         self.__update_list_of_modes()
 
     @property

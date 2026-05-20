@@ -20,20 +20,21 @@ import pandas as pd
 import requests
 from shapely import Polygon
 
-from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .osm_params import default_headers, memory
 
 
+logger = logging.getLogger(__name__)
+
+
 class OSMDownloader(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
-        WorkerThread.__init__(self, None)
+    def __init__(self, polygons: List[Polygon], modes):
+        super().__init__(None)
 
-        self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []
@@ -111,7 +112,7 @@ class OSMDownloader(WorkerThread):
             time.sleep(self.sleeptime)
         start_time = time.time()
         self.report.append(f'Posting to {url} with timeout={timeout}, "{data}"')
-        self.logger.debug(f'Posting to {url} with timeout={timeout}, "{data}"')
+        logger.debug(f'Posting to {url} with timeout={timeout}, "{data}"')
         response = requests.post(url, data=data, timeout=timeout, headers=default_headers())
 
         # get the response size and the domain, log result
@@ -119,14 +120,14 @@ class OSMDownloader(WorkerThread):
         domain = re.findall(r"(?s)//(.*?)/", url)[0]
         msg = "Downloaded {:,.1f}KB from {} in {:,.2f} seconds".format(size_kb, domain, time.time() - start_time)
         self.report.append(msg)
-        self.logger.info(msg)
+        logger.info(msg)
 
         try:
             response_json = response.json()
             if "remark" in response_json:
                 msg = f'Server remark: "{response_json["remark"]}"'
                 self.report.append(msg)
-                self.logger.info(msg)
+                logger.info(msg)
         except Exception as err:
             # 429 is 'too many requests' and 504 is 'gateway timeout' from server
             # overload - handle these errors by recursively calling
@@ -140,7 +141,7 @@ class OSMDownloader(WorkerThread):
                     "Re-trying request in {:.2f} seconds.".format(domain, response.status_code, error_pause_duration)
                 )
                 self.report.append(msg)
-                self.logger.info(msg)
+                logger.info(msg)
                 time.sleep(error_pause_duration)
                 response_json = self.overpass_request(data=data, pause_duration=pause_duration, timeout=timeout)
 

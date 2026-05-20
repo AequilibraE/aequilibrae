@@ -1,12 +1,16 @@
-from scipy import sparse
+import logging
+
 import numpy as np
+from scipy import sparse
+
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+
+logger = logging.getLogger(__name__)
 
 
 class OptimalStrategies:
     def __init__(self, assig_spec):
         self.__assig_spec = assig_spec  # type: TransitAssignment
-        self.__logger = assig_spec.logger
 
     def execute(self):
         self.__classes = {}
@@ -70,7 +74,7 @@ class OptimalStrategies:
         for cls in self.__assig_spec.classes:
             hyperpath = self.__classes[cls._id]
 
-            self.__logger.info(f"Executing S&F assignment  for {cls._id}")
+            logger.info(f"Executing S&F assignment  for {cls._id}")
 
             hyperpath.assign(**self.__demand_cols[cls._id], threads=self.__assig_spec.cores)
             self.__results[cls._id].link_loads = hyperpath._edges["volume"].values

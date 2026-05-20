@@ -4,10 +4,12 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional
 import contextlib
+import logging
 
-from aequilibrae.log import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.db_utils import AequilibraEConnection
+
+logger = logging.getLogger(__name__)
 
 
 class MigrationStatus(IntEnum):

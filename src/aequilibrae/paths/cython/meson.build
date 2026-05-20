@@ -31,5 +31,6 @@ foreach ext : exts
     dependencies: deps,
     install: true,
     subdir: thisdir,
+    include_directories: incdir,
   )
 endforeach
