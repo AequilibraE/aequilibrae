@@ -10,7 +10,7 @@ import numpy as np
 from scipy.optimize import minimize_scalar, root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.AoN import (
+from aequilibrae.paths.cython.AoN import (
     aggregate_link_costs,
     copy_three_dimensions,
     copy_two_dimensions,
@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
+logger = logging.getLogger(__name__)
+
 
 class LinearApproximation(WorkerThread):
     equilibration = SIGNAL(object)
@@ -39,7 +41,6 @@ class LinearApproximation(WorkerThread):
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
         self.signal.emit(["set_text", "Linear Approximation"])
-        self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
         self.project_path = project.project_base_path if project else gettempdir()
 
@@ -519,8 +520,8 @@ class LinearApproximation(WorkerThread):
         self._set_current_flow(np.zeros_like(self.capacity))
         self._update_congested_costs()
 
-        self.logger.info(f"{self.algorithm} Assignment stats")
-        self.logger.info("Iteration, RelativeGap (AoN), RelativeGap (Step direction), stepsize")
+        logger.info(f"{self.algorithm} Assignment stats")
+        logger.info("Iteration, RelativeGap (AoN), stepsize")
 
         msg = "Equilibrium Assignment"
         for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
@@ -640,7 +641,7 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
 
-            self.logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
+            logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
                 self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
@@ -665,8 +666,8 @@ class LinearApproximation(WorkerThread):
             c.congested_time = self.congested_time
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
-            self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
-        self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations, final AoN rgap = {self.rgap}")
+            logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
+        logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations, final AoN rgap = {self.rgap}")
 
         self.signal.emit(["finished"])
 
@@ -797,7 +798,7 @@ class LinearApproximation(WorkerThread):
                 self.do_fw_step = True
                 self.conjugate_failed = True
                 msg = "BFW/CFW direction yielded no improvement; falling back to FW."
-                self.logger.warning(msg)
+                logger.warning(msg)
                 self.iteration_issue.append(msg)
                 assert 0 <= self.stepsize <= alpha_max + 1e-12
                 return
@@ -817,7 +818,7 @@ class LinearApproximation(WorkerThread):
             min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
             self.stepsize = min_res.root
             if not min_res.converged:
-                self.logger.warning("Descent direction stepsize finder has not converged")
+                logger.warning("Descent direction stepsize finder has not converged")
 
             self.conjugate_failed = False
 
@@ -844,7 +845,7 @@ class LinearApproximation(WorkerThread):
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
                     # works well in practice, however for a large number of iterations this might be too much so
                     # use this heuristic instead.
-                    self.logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
                     self.stepsize = tiny_step
                 else:
                     self.stepsize = 0.0
@@ -853,7 +854,7 @@ class LinearApproximation(WorkerThread):
                     self.conjugate_failed = True
 
                     msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
-                    self.logger.warning(msg)
+                    logger.warning(msg)
                     self.iteration_issue.append(msg)
 
                     # By doing it recursively, we avoid doing the same AoN again
@@ -865,7 +866,7 @@ class LinearApproximation(WorkerThread):
                 # the constrained optimum on [0, 1] is α = 1. Take the full step; do NOT mark
                 # this as a reset - convergence checking remains valid.
                 self.stepsize = 1.0
-                self.logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
+                logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
 
         assert 0 <= self.stepsize <= 1.0
 
@@ -879,10 +880,6 @@ class LinearApproximation(WorkerThread):
           quantity used for the stopping criterion** (compared against
           ``self.rgap_target``).
           ``(Σ flow·cost − Σ direction·cost) / Σ flow·cost``, where
-          ``direction`` is the BFW combined step direction
-          (``self.step_direction_flow``). Reported alongside ``self.rgap``
-          in the iteration log and the convergence report so the two
-          measures can be compared. NOT used for stopping.
         """
         if self.stepsize_has_been_reset:
             return False

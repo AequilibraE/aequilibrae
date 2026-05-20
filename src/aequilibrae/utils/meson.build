@@ -12,13 +12,16 @@ pyfiles = [
   'geo_utils.py',
   'get_table.py',
   'list_tables_in_db.py',
+  'logging_utils.py',
   'model_run_utils.py',
   'python_signal.py',
   'qgis_utils.py',
+  'resolve_cysignals.py',
   'spatialite_utils.py',
 ]
 
 pkgs = [
+  'cython',
   'interface',
   'simwrapper',
 ]

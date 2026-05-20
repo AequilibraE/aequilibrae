@@ -2,6 +2,7 @@
 
 import multiprocessing
 import socket
+import logging
 from pathlib import Path
 import json
 
@@ -12,9 +13,13 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.utils.db_utils import commit_and_close
 
+from aequilibrae.utils.cython.bridge cimport Bridge
+
 include 'hyperpath.pyx'
 
 from typing import Union
+
+logger = logging.getLogger(__name__)
 
 
 class HyperpathGenerating:
@@ -308,33 +313,35 @@ class HyperpathGenerating:
 
         self.skim_matrix = np.zeros((n_centroids, n_centroids, n_skim_cols))
 
-        compute_SF_in_parallel(
-            self._indptr[:],
-            self._edge_idx[:],
-            self._trav_time[:],
-            self._freq[:],
-            self._tail[:],
-            self._head[:],
-            self.destination_column[:],
-            destinations[:],
-            rest_of_destinations[:],
-            self.origin_column[:],
-            self.demand_column[:],
-            volume,
-            self.vertex_count,
-            volume.shape[0],
-            (multiprocessing.cpu_count() if threads < 1 else threads),
-            self._skim_cols[:],
-            self.u_i_vec,
-            self.skim_matrix,
-            self._o_vert_ids[:],
-            self._o_indices[:],
-            self._od_index_to_taz_index[:],
-            self._nodes_to_indices[:],
-            self._skimming,
-            self._is_travel_time,
-            len(self._skim_cols_names)
-        )
+        with Bridge(logger) as bridge:
+            compute_SF_in_parallel(
+                self._indptr[:],
+                self._edge_idx[:],
+                self._trav_time[:],
+                self._freq[:],
+                self._tail[:],
+                self._head[:],
+                self.destination_column[:],
+                destinations[:],
+                rest_of_destinations[:],
+                self.origin_column[:],
+                self.demand_column[:],
+                volume,
+                self.vertex_count,
+                volume.shape[0],
+                (multiprocessing.cpu_count() if threads < 1 else threads),
+                self._skim_cols[:],
+                self.u_i_vec,
+                self.skim_matrix,
+                self._o_vert_ids[:],
+                self._o_indices[:],
+                self._od_index_to_taz_index[:],
+                self._nodes_to_indices[:],
+                self._skimming,
+                self._is_travel_time,
+                len(self._skim_cols_names),
+                bridge,
+            )
 
         self._edges["volume"] = volume
 

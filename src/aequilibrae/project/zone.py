@@ -1,4 +1,5 @@
 import random
+import logging
 from sqlite3 import Connection
 from typing import Optional
 
@@ -6,6 +7,8 @@ from shapely.geometry import Point, MultiPolygon
 
 from .network.connector_creation import connector_creation
 from .network.safe_class import SafeClass
+
+logger = logging.getLogger(__name__)
 
 
 class Zone(SafeClass):
@@ -65,7 +68,7 @@ class Zone(SafeClass):
 
         with self.project.db_connection_spatial as conn:
             if conn.execute("select count(*) from nodes where node_id=?", [self.zone_id]).fetchone()[0] > 0:
-                self.project.logger.warning("Centroid already exists. Failed to create it")
+                logger.warning("Centroid already exists. Failed to create it")
                 return
 
             sql = "INSERT into nodes (node_id, is_centroid, geometry) VALUES(?,1,GeomFromWKB(?, ?));"
@@ -144,8 +147,6 @@ class Zone(SafeClass):
             row_count += conn.execute(sql, data).rowcount
 
             if row_count:
-                self.project.logger.warning(
-                    f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}"
-                )
+                logger.warning(f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}")
             else:
                 self.project.warning("No centroid connectors for this mode")

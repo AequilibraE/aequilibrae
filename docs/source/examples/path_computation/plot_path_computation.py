@@ -19,6 +19,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.logging_utils import basic_config
 
 # %%
 # We create the example project inside our temp folder
@@ -27,16 +28,10 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-import logging
-import sys
 
-# %%
-# We the project opens, we can tell the logger to direct all messages to the terminal as well
-logger = project.logger
-stdout_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
-stdout_handler.setFormatter(formatter)
-logger.addHandler(stdout_handler)
+# We'll also apply a basic logging configuration.
+
+basic_config()
 
 # %%
 # Path Computation

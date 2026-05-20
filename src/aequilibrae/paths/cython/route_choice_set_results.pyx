@@ -11,8 +11,9 @@ import pandas as pd
 import numpy as np
 
 import cython
+import logging
 
-from aequilibrae.log import logger
+logger = logging.getLogger(__name__)
 
 
 @cython.embedsignature(True)
@@ -144,7 +145,13 @@ cdef class RouteChoiceSetResults:
 
     @classmethod
     def read_dataset(cls, where):
-        df = pd.read_parquet(where, partitioning="hive")
+        engine = pd.io.parquet.get_engine('auto').__class__
+        if (engine.__module__, engine.__name__) == ("pandas.io.parquet", "PyArrowImpl"):
+            kwargs = {"partitioning": "hive"}
+        elif (engine.__module__, engine.__name__) == ("pandas.io.parquet", "FastParquetImpl"):
+            kwargs = {"file_scheme": "hive"}
+
+        df = pd.read_parquet(where, **kwargs)
         df["origin id"] = df["origin id"].astype(df["destination id"].dtype)
 
         # FastParquet is stupid and encodes Parquet list objects as json strings!!!

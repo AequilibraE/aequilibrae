@@ -13,6 +13,9 @@ from libc.stdint cimport int64_t, uint8_t, uint32_t, uint64_t
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
+from aequilibrae.utils.cython.bridge cimport Bridge, log, f
+from aequilibrae.utils.cython.bar cimport Bar
+
 ctypedef double DATATYPE_t
 DATATYPE_PY = np.float64
 
@@ -207,7 +210,8 @@ cdef void compute_SF_in_parallel(
     bint skimming,
     bint is_travel_time,
     size_t n_skim_cols,
-) noexcept nogil:
+    Bridge bridge,
+):
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     cdef:
         uint32_t *thread_demand_origins
@@ -237,8 +241,15 @@ cdef void compute_SF_in_parallel(
         int i  # openmp on windows requires iterator variable have signed type
         size_t k, j
         int64_t destination_vertex
+        int64_t total = (
+            destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
+            if skimming else
+            destination_vertex_indices_view.shape[0]
+        )
 
-    with parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
+    cdef Bar bar = bridge.new_bar("{}/{} destinations processed" + (" (skimming)" if skimming else ""), total=total)
+
+    with nogil, parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
         thread_demand_origins = <uint32_t  *> malloc(sizeof(uint32_t)  * d_vert_ids_view.shape[0])
         thread_demand_values  = <double *> malloc(sizeof(double) * d_vert_ids_view.shape[0])
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
@@ -256,11 +267,10 @@ cdef void compute_SF_in_parallel(
 
         thread_skim_j_vec = <double *> calloc(edge_count, sizeof(double) * n_skim_cols)
 
-        for i in prange(
-                destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
-                if skimming else
-                destination_vertex_indices_view.shape[0]
-        ):
+        for i in prange(total):
+            if bridge.should_stop():
+                break
+
             if i < destination_vertex_indices_view.shape[0]:
                 destination_vertex = destination_vertex_indices_view[i]
             else:
@@ -269,6 +279,7 @@ cdef void compute_SF_in_parallel(
                 destination_vertex = rest_of_destinations_view[i - destination_vertex_indices_view.shape[0]]
 
             if nodes_to_indices[destination_vertex] == -1:
+                bar.inc()
                 continue  # Completely disconnected nodes have an index of -1
 
             if i < destination_vertex_indices_view.shape[0]:
@@ -322,6 +333,7 @@ cdef void compute_SF_in_parallel(
                 skimming,
                 is_travel_time
             )
+            bar.inc()
 
         free(thread_demand_origins)
         free(thread_demand_values)
