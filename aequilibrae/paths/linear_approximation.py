@@ -97,11 +97,10 @@ class LinearApproximation(WorkerThread):
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
         self.conjugate_direction_max = 0.99999
 
-        # if FW stepsize is zero, we set it to the corresponding MSA stepsize and then need to not make
-        # the step direction conjugate to the previous direction.
-        self.do_fw_step = False
-        self.conjugate_failed = False
-        self.do_conjugate_step = False
+        # Direction state for the current iteration and the next one. BFW needs an FW step followed by
+        # a CFW step before it can safely resume bi-conjugate directions.
+        self.current_direction = "fw"
+        self.next_direction = None
 
         # BFW specific stuff
         self.betas = np.array([1.0, 0.0, 0.0])
@@ -265,12 +264,15 @@ class LinearApproximation(WorkerThread):
     def __calculate_step_direction(self):
         """Calculates step direction depending on the method"""
         sd_flows = []
+        direction = self.next_direction
+        self.next_direction = None
 
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
-        if self.iter == 2 or self.do_fw_step or self.algorithm in ["msa", "frank-wolfe"]:
-            self.do_fw_step = False
-            self.do_conjugate_step = True
+        if self.iter == 2 or direction == "fw" or self.algorithm in ["msa", "frank-wolfe"]:
+            self.current_direction = "fw"
+            if self.algorithm == "bfw":
+                self.next_direction = "cfw"
             self.conjugate_stepsize = 0.0
             for c in self.traffic_classes:
                 aon_res = c._aon_results
@@ -296,8 +298,8 @@ class LinearApproximation(WorkerThread):
                         )
 
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
-        elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
-            self.do_conjugate_step = False
+        elif (self.iter == 3) or (direction == "cfw") or (self.algorithm == "cfw"):
+            self.current_direction = "cfw"
             self.calculate_conjugate_stepsize()
             for c in self.traffic_classes:
                 sdr = self.step_direction[c._id]
@@ -358,6 +360,7 @@ class LinearApproximation(WorkerThread):
                 sd_flows.append(sdr.total_link_loads)
         # biconjugate
         else:
+            self.current_direction = "bfw"
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
@@ -443,6 +446,16 @@ class LinearApproximation(WorkerThread):
                     copy_three_dimensions(prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view, self.cores)
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
+
+    def __retry_with_fw_direction(self, msg: str):
+        if self.algorithm == "bfw":
+            self.betas.fill(-1)
+
+        self.logger.debug(msg)
+        self.iteration_issue.append(msg)
+        self.next_direction = "fw"
+        self.__calculate_step_direction()
+        self.calculate_stepsize()
 
     def __maybe_create_path_file_directories(self):
         path_base_dir = os.path.join(self.project_path, "path_files", self.procedure_id)
@@ -738,12 +751,21 @@ class LinearApproximation(WorkerThread):
         fixed_cost_term = stepsize * derivative_of_objective_stepsize_independent
         return link_term + fixed_cost_term
 
+    def __clip_stepsize(self, stepsize: float, upper_bound: float = 1.0) -> float:
+        if not np.isfinite(stepsize):
+            raise ValueError(f"Non-finite stepsize {stepsize} encountered")
+
+        clipped = min(max(float(stepsize), 0.0), upper_bound)
+        if clipped != stepsize:
+            msg = f"Stepsize {stepsize} outside [0, {upper_bound}]; clipping to {clipped}."
+            self.logger.debug(msg)
+            self.iteration_issue.append(msg)
+        return clipped
+
     def calculate_stepsize(self):
         """Calculate optimal stepsize in descent direction"""
-        self.stepsize_has_been_reset = False
-
         if self.algorithm == "msa":
-            self.stepsize = 1.0 / self.iter
+            self.stepsize = self.__clip_stepsize(1.0 / self.iter)
             return
 
         # For BFW/CFW use trapezoidal Beckmann minimiser on
@@ -776,33 +798,60 @@ class LinearApproximation(WorkerThread):
                 method="Bounded",
                 options={"xatol": 1e-4, "maxiter": 10},
             )
-            candidate = float(res.x)
+
+            def use_tiny_step(message: str):
+                tiny_step = 1e-2 / self.iter
+                if message:
+                    self.iteration_issue.append(message)
+                    log_message = f"# Alert: {message} Adding {tiny_step} as step size to make it non-zero."
+                else:
+                    log_message = f"# Alert: Adding {tiny_step} as step size to make it non-zero."
+                self.logger.debug(log_message)
+                self.stepsize = self.__clip_stepsize(tiny_step, alpha_max)
+
+            try:
+                candidate = self.__clip_stepsize(res.x, alpha_max)
+            except ValueError as e:
+                msg = f"BFW/CFW line search returned an invalid stepsize. {e.args}"
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
             # Brent's bounded method does not evaluate the endpoints exactly.
             # Compare the interior optimum against α_max explicitly so a true
             # boundary case (descent throughout the cap interval) still picks
             # α_max instead of a value just inside it.
             z_interior = float(res.fun)
+            if not np.isfinite(z_interior):
+                msg = f"BFW/CFW line search returned a non-finite objective value ({z_interior}); falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
             z_at_max = self.__objective_change_at_stepsize(derivative_of_objective_stepsize_independent, alpha_max)
+            if not np.isfinite(z_at_max):
+                msg = f"BFW/CFW line search returned a non-finite boundary objective ({z_at_max}); falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
             if z_at_max < z_interior and z_at_max < 0.0:
-                self.stepsize = alpha_max
+                self.stepsize = self.__clip_stepsize(alpha_max, alpha_max)
             elif z_interior < 0.0:
                 self.stepsize = candidate
             else:
-                # Trapezoidal line search found no improvement on (0, α_max].
-                # Mirror the analytic-branch fallback: do an FW reset on the
-                # next iteration. Without this reset, α=0 means the flow
-                # never updates and the next BFW iter has the same bad
-                # direction.
-                self.stepsize = 0.0
-                self.do_fw_step = True
-                self.conjugate_failed = True
                 msg = "BFW/CFW direction yielded no improvement; falling back to FW."
-                self.logger.warning(msg)
-                self.iteration_issue.append(msg)
-                assert 0 <= self.stepsize <= alpha_max + 1e-12
+                if self.current_direction == "fw":
+                    use_tiny_step("")
+                else:
+                    self.__retry_with_fw_direction(msg)
                 return
-            self.conjugate_failed = False
-            self.do_fw_step = False
             assert 0 <= self.stepsize <= alpha_max + 1e-12
             return
 
@@ -815,11 +864,9 @@ class LinearApproximation(WorkerThread):
 
         try:
             min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
-            self.stepsize = min_res.root
+            self.stepsize = self.__clip_stepsize(min_res.root)
             if not min_res.converged:
-                self.logger.warning("Descent direction stepsize finder has not converged")
-
-            self.conjugate_failed = False
+                self.logger.debug("Descent direction stepsize finder has not converged")
 
         except ValueError as e:
             # `root_scalar` raises ValueError when the derivative does not change sign in [0, 1].
@@ -836,35 +883,21 @@ class LinearApproximation(WorkerThread):
             d0_for_branch = derivative_of_objective(0.0)
 
             if d0_for_branch >= 0:
-                # Direction is not descent at α = 0. Mark BFW betas as invalid for reporting.
-                if self.algorithm == "bfw":
-                    self.betas.fill(-1)
-
-                if self.algorithm == "frank-wolfe" or self.conjugate_failed:
+                if self.current_direction == "fw" or self.algorithm == "frank-wolfe":
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
                     # works well in practice, however for a large number of iterations this might be too much so
                     # use this heuristic instead.
-                    self.logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
-                    self.stepsize = tiny_step
+                    self.logger.debug(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    self.stepsize = self.__clip_stepsize(tiny_step)
                 else:
-                    self.stepsize = 0.0
-                    # need to reset conjugate / bi-conjugate direction search
-                    self.do_fw_step = True
-                    self.conjugate_failed = True
-
                     msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
-                    self.logger.warning(msg)
-                    self.iteration_issue.append(msg)
-
-                    # By doing it recursively, we avoid doing the same AoN again
-                    self.__calculate_step_direction()
-                    self.calculate_stepsize()
+                    self.__retry_with_fw_direction(msg)
             else:
                 # derivative(0) < 0 (and derivative(1) must also be ≤ 0, otherwise the bracket
                 # search would have succeeded). The objective is still decreasing at α = 1, so
                 # the constrained optimum on [0, 1] is α = 1. Take the full step; do NOT mark
                 # this as a reset - convergence checking remains valid.
-                self.stepsize = 1.0
+                self.stepsize = self.__clip_stepsize(1.0)
                 self.logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
 
         assert 0 <= self.stepsize <= 1.0
@@ -884,8 +917,6 @@ class LinearApproximation(WorkerThread):
           in the iteration log and the convergence report so the two
           measures can be compared. NOT used for stopping.
         """
-        if self.stepsize_has_been_reset:
-            return False
 
         aon_cost = 0.0
         current_cost = 0.0

@@ -16,7 +16,7 @@ Instances can be downloaded `here <https://github.com/bstabler/TransportationNet
 All tests were performed with the AequilibraE version 1.7.0.
 
 As shown below, the results produced by AequilibraE are within expected, although
-some differences have been found, particularly for Winnipeg. We suspect that there are 
+some differences have been found, particularly for Anaheim. We suspect that there are
 issues with the reference results and welcome further investigations.
 
 .. tab-set::
