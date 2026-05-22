@@ -533,7 +533,7 @@ class LinearApproximation(WorkerThread):
         self._update_congested_costs()
 
         self.logger.info(f"{self.algorithm} Assignment stats")
-        self.logger.info("Iteration, RelativeGap (AoN), RelativeGap (Step direction), stepsize")
+        self.logger.info("Iteration, RelativeGap (AoN), stepsize")
 
         msg = "Equilibrium Assignment"
         for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
@@ -768,7 +768,7 @@ class LinearApproximation(WorkerThread):
             self.stepsize = self.__clip_stepsize(1.0 / self.iter)
             return
 
-        # For BFW/CFW use trapezoidal Beckmann minimiser on
+        # For BFW use trapezoidal Beckmann minimiser on
         # [0, α_max] instead of root-finding the analytic derivative.
         #
         # Two cooperating mechanisms vs. the analytic root_scalar approach:
@@ -777,17 +777,18 @@ class LinearApproximation(WorkerThread):
         #     agree when c(x) is approximately quadratic between x and
         #     x + d, but diverge significantly when the BPR exponent is
         #     large (β=4 on Chicago).
-        # (2) The inspiration for a cap α_max = 1/sqrt(iter) comes from Quetzal. Prevents the line
-        #     search from ever returning α = 1.0 - the boundary case that
-        #     would otherwise trigger a 3-iteration FW+CFW restart in
-        #     ``__calculate_step_direction`` and poison the BFW history
-        #     (s^{k-1} collapses onto the new x^k). The cap also keeps
-        #     the ``μ·α/(1-α)`` bias term in the next BFW iteration
-        #     bounded.
+        # (2) For BFW only: a cap α_max = 1/sqrt(iter) prevents the line search from
+        #     returning α = 1.0, which would collapse the BFW history (s^{k-1} onto x^k)
+        #     and cause the μ·α/(1-α) bias term in calculate_biconjugate_direction to blow up.
+        #     CFW has neither concern and uses α_max = 1.0 (uncapped).
         #
-        # Combined Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
+        # BFW Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
         if self.algorithm in ("bfw", "cfw"):
-            alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5)
+            # The 1/sqrt(iter) cap is only needed for BFW: it bounds the mu*alpha/(1-alpha) bias
+            # term in calculate_biconjugate_direction and prevents alpha=1.0 from collapsing the
+            # BFW history. CFW has no such term and no restart state sensitive to large steps, so
+            # capping CFW at 1/sqrt(iter) degrades it to MSA-like convergence without any benefit.
+            alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5) if self.algorithm == "bfw" else 1.0
             derivative_of_objective_stepsize_independent = self.__derivative_of_objective_stepsize_independent()
             res = minimize_scalar(
                 partial(
@@ -913,10 +914,9 @@ class LinearApproximation(WorkerThread):
           ``self.rgap_target``).
           ``(Σ flow·cost − Σ direction·cost) / Σ flow·cost``, where
           ``direction`` is the BFW combined step direction
-          (``self.step_direction_flow``). Reported alongside ``self.rgap``
-          in the iteration log and the convergence report so the two
-          measures can be compared. NOT used for stopping.
         """
+        if self.stepsize == 1.0:
+            return False
 
         aon_cost = 0.0
         current_cost = 0.0
