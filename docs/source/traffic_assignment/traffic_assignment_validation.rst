@@ -294,25 +294,87 @@ understand, and then we'll perform the assignment.
 .. _code-block-for-convergence-study:
 
 .. code-block:: python
-    # Imports
-    import os
-    os.environ["AEQ_SHOW_PROGRESS"] = "FALSE"
-
     from pathlib import Path
     from time import perf_counter
+
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
     import seaborn as sns
-    from sklearn.linear_model import LinearRegression
-    from sklearn.metrics import r2_score
+    from scipy.stats import linregress
+    from quetzal.model import stepmodel
 
     from aequilibrae.matrix import AequilibraeMatrix
-    from aequilibrae.paths import Graph
-    from aequilibrae.paths import TrafficAssignment
+    from aequilibrae.paths import Graph, TrafficAssignment
     from aequilibrae.paths.traffic_class import TrafficClass
 
-    # Helper functions
+
+    BASE = Path("/home/jake/OuterLoop/aequilbrae-nix/TransportationNetworks")
+
+    # Model list used for validation runs.
+    # Sioux Falls is included and handled by a dedicated Quetzal builder branch
+    # because FIRST_THRU_NODE=1 means zones are embedded in the road graph.
+    MODELS = {
+        "chicago": (BASE / "chicago-regional", "ChicagoRegional"),
+        "anaheim": (BASE / "Anaheim", "Anaheim"),
+        "winnipeg": (BASE / "Winnipeg", "Winnipeg"),
+        "sioux_falls": (BASE / "SiouxFalls", "SiouxFalls"),
+        "barcelona": (BASE / "Barcelona", "Barcelona"),
+    }
+
+    # Methods to test: msa, fw, cfw, bfw
+    # Note: Quetzal does not support cfw, so it will be skipped for Quetzal runs.
+    METHODS = ["msa", "fw", "cfw", "bfw"]
+    MAX_ITER = 1000
+    RGAP_TARGET = 1e-10
+    NUM_CORES = 14
+
+    VDF = {"bpr": "time * (1 + alpha * (flow / capacity) ** beta)"}
+    SEGMENTS = ["car"]
+
+
+    def parse_tntp_header(folder: Path, model_stub: str) -> dict:
+        """Returns the integer values from a TNTP metadata header."""
+        result = {}
+        with open(folder / f"{model_stub}_net.tntp") as fh:
+            for line in fh:
+                line = line.strip()
+                if line.startswith("<") and ">" in line:
+                    key, _, val = line[1:].partition(">")
+                    try:
+                        result[key.strip()] = int(val.strip())
+                    except ValueError:
+                        pass
+                elif line.startswith("~"):
+                    break
+        return result
+
+
+    def known_results(folder: Path, model_stub: str) -> pd.DataFrame:
+        path = folder / f"{model_stub}_flow.tntp"
+        with open(path) as fh:
+            first_line = fh.readline().strip()
+        skiprows = 8 if first_line.startswith("<") else 0
+        df = pd.read_csv(path, skiprows=skiprows, sep=r"\s+", engine="python")
+        # Drop any trailing semicolon column
+        df = df.loc[:, ~df.columns.str.strip().isin([";", ""])]
+        df.columns = [c.strip() for c in df.columns]
+        # Normalise column names to a_node / b_node / TNTP Solution / cost
+        col_map = {}
+        for c in df.columns:
+            cl = c.lower()
+            if cl in ("tail", "from"):
+                col_map[c] = "a_node"
+            elif cl in ("head", "to"):
+                col_map[c] = "b_node"
+            elif cl in ("volume",):
+                col_map[c] = "TNTP Solution"
+            elif cl in ("cost",):
+                col_map[c] = "cost"
+        df = df.rename(columns=col_map)
+        return df[["a_node", "b_node", "TNTP Solution"]].dropna()
+
+
     def build_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
         omx_name = folder / f"{model_stub}_trips.omx"
         if omx_name.exists():
@@ -322,17 +384,15 @@ understand, and then we'll perform the assignment.
             return mat
 
         matfile = str(folder / f"{model_stub}_trips.tntp")
-        # Creating the matrix
-        f = open(matfile, 'r')
-        all_rows = f.read()
-        blocks = all_rows.split('Origin')[1:]
+        with open(matfile, "r") as fh:
+            all_rows = fh.read()
+        blocks = all_rows.split("Origin")[1:]
         matrix = {}
         for k in range(len(blocks)):
-            orig = blocks[k].split('\n')
+            orig = blocks[k].split("\n")
             dests = orig[1:]
             orig = int(orig[0])
-
-            d = [eval('{' + a.replace(';', ',').replace(' ', '') + '}') for a in dests]
+            d = [eval("{" + a.replace(";", ",").replace(" ", "") + "}") for a in dests]
             destinations = {}
             for i in d:
                 destinations = {**destinations, **i}
@@ -344,153 +404,755 @@ understand, and then we'll perform the assignment.
             for j in range(zones):
                 mat_data[i, j] = matrix[i + 1].get(j + 1, 0)
 
-        # Let's save our matrix in AequilibraE Matrix format
         mat = AequilibraeMatrix()
-        mat.create_empty(zones=zones, matrix_names=['matrix'], memory_only=True)
-        mat.matrix['matrix'][:, :] = mat_data[:, :]
+        mat.create_empty(zones=zones, matrix_names=["matrix"], memory_only=True)
+        mat.matrix["matrix"][:, :] = mat_data[:, :]
         mat.index[:] = index[:]
         mat.computational_view(["matrix"])
         mat.export(str(omx_name))
         return mat
 
-    # Now let's parse the network
-    def build_graph(folder: Path, model_stub: str, centroids: np.array) -> Graph:
-        net = pd.read_csv(folder / f"{model_stub}_net.tntp", skiprows=7, sep='\t')
-        cols = ['init_node', 'term_node', 'free_flow_time', 'capacity', "b", "power"]
-        if 'toll' in net.columns:
-            cols.append('toll')
-        network = net[cols]
-        network.columns = ['a_node', 'b_node', 'free_flow_time', 'capacity', "b", "power", "toll"]
+
+    def build_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Graph:
+        header = parse_tntp_header(folder, model_stub)
+        first_thru_node = header.get("FIRST THRU NODE", 2)
+
+        net = pd.read_csv(folder / f"{model_stub}_net.tntp", skiprows=7, sep="\t")
+        cols = [
+            "init_node",
+            "term_node",
+            "free_flow_time",
+            "capacity",
+            "b",
+            "power",
+            "length",
+        ]
+        if "toll" in net.columns:
+            cols.append("toll")
+        network = net[cols].copy()
+        new_cols = [
+            "a_node",
+            "b_node",
+            "free_flow_time",
+            "capacity",
+            "b",
+            "power",
+            "length",
+        ]
+        if "toll" in net.columns:
+            new_cols.append("toll")
+        network.columns = new_cols
         network = network.assign(direction=1)
         network["link_id"] = network.index + 1
-        network.free_flow_time = network.free_flow_time.astype(np.float64)
+        network["free_flow_time"] = network["free_flow_time"].astype(np.float64)
 
-        # If you want to create an AequilibraE matrix for computation, then it follows
         g = Graph()
-        g.cost = net['free_flow_time'].values
-        g.capacity = net['capacity'].values
-        g.free_flow_time = net['free_flow_time'].values
+        g.cost = net["free_flow_time"].values
+        g.capacity = net["capacity"].values
+        g.free_flow_time = net["free_flow_time"].values
 
         g.network = network
-        g.network.loc[(g.network.power < 1), "power"] = 1
-        g.network.loc[(g.network.free_flow_time == 0), "free_flow_time"] = 0.01
+        g.network.loc[g.network["power"] < 1, "power"] = 1
+        g.network.loc[g.network["free_flow_time"] == 0, "free_flow_time"] = 0.01
         g.prepare_graph(centroids)
         g.set_graph("free_flow_time")
         g.set_skimming(["free_flow_time"])
-        g.set_blocked_centroid_flows(False)
+        g.set_blocked_centroid_flows(first_thru_node > 1)
         return g
 
-    def known_results(folder: Path, model_stub: str) -> pd.DataFrame:
-        df = pd.read_csv(folder / f"{model_stub}_flow.tntp", skiprows=8, sep='\t')
 
-        cols = ["a_node", "b_node", "TNTP Solution", "cost"]
-        if len(df.columns) == 5:
-            cols.append("trash")
-        df.columns = cols
+    def _base_quetzal_links(network: pd.DataFrame) -> pd.DataFrame:
+        """Build the common Quetzal link table from AequilibraE network links."""
+        q = network[
+            [
+                "link_id",
+                "a_node",
+                "b_node",
+                "free_flow_time",
+                "capacity",
+                "b",
+                "power",
+                "length",
+            ]
+        ].copy()
+        q = q.rename(
+            columns={
+                "a_node": "a",
+                "b_node": "b",
+                "free_flow_time": "time",
+                "b": "alpha",
+                "power": "beta",
+            }
+        )
+        q["segments"] = [{"car"} for _ in range(len(q))]
+        q["vdf"] = "bpr"
+        q = q.set_index("link_id")
+        q.index.name = "index"
+        return q
 
-        if len(cols) == 5:
-            df = df.drop(columns=["trash"])
 
-        return df
+    def _build_quetzal_model_separated_zones(
+        network: pd.DataFrame,
+        mat: AequilibraeMatrix,
+    ) -> stepmodel.StepModel:
+        """
+        Standard TNTP case: zone nodes are separate from road nodes.
+        Build zone_to_road from centroid-touching links.
+        """
+        sm = stepmodel.StepModel()
+        centroids = mat.index
 
-    # Let's run the assignment
-    def assign(g: Graph, mat: AequilibraeMatrix, algorithm: str):
-        assigclass = TrafficClass("car", g, mat)
+        q = _base_quetzal_links(network)
+
+        # Centroid connectors: any link touching a centroid node.
+        connector_mask = q["a"].isin(centroids) | q["b"].isin(centroids)
+
+        sm.road_links = q[~connector_mask].drop(columns=["segments"]).copy()
+        sm.road_links["segments"] = [{"car"} for _ in range(len(sm.road_links))]
+
+        zone_to_road = q[connector_mask].copy()
+        zone_to_road["direction"] = "egress"
+        zone_to_road.loc[zone_to_road["a"].isin(centroids), "direction"] = "access"
+        sm.zone_to_road = zone_to_road
+
+        centroid_set = set(centroids.tolist())
+        all_nodes = set(q["a"].tolist()) | set(q["b"].tolist())
+        road_node_ids = sorted(all_nodes - centroid_set)
+        sm.road_nodes = pd.DataFrame(index=road_node_ids)
+        sm.road_nodes.index.name = "node_id"
+
+        sm.zones = pd.DataFrame(index=centroids)
+        sm.zones.index.name = "index"
+        _set_quetzal_volumes(sm, mat, centroids)
+        return sm
+
+
+    def build_quetzal_model(
+        network: pd.DataFrame,
+        first_thru_node: int,
+        mat: AequilibraeMatrix,
+    ) -> stepmodel.StepModel:
+        """
+        Build a Quetzal StepModel from a TNTP network DataFrame.
+
+        Branches:
+        - first_thru_node > 1: standard separated zone/road coding
+        - first_thru_node <= 1: embedded-zone coding (Sioux Falls style)
+        """
+        if first_thru_node <= 1:
+            return _build_quetzal_model_embedded_zones(network, mat)
+        return _build_quetzal_model_separated_zones(network, mat)
+
+
+    def _base_quetzal_links(network: pd.DataFrame) -> pd.DataFrame:
+        """Build the common Quetzal link table from AequilibraE network links."""
+        q = network[
+            [
+                "link_id",
+                "a_node",
+                "b_node",
+                "free_flow_time",
+                "capacity",
+                "b",
+                "power",
+                "length",
+            ]
+        ].copy()
+        q = q.rename(
+            columns={
+                "a_node": "a",
+                "b_node": "b",
+                "free_flow_time": "time",
+                "b": "alpha",
+                "power": "beta",
+            }
+        )
+        q["segments"] = [{"car"} for _ in range(len(q))]
+        q["vdf"] = "bpr"
+        q = q.set_index("link_id")
+        q.index.name = "index"
+        return q
+
+
+    def _set_quetzal_volumes(
+        sm: stepmodel.StepModel, mat: AequilibraeMatrix, zone_ids: np.ndarray
+    ) -> None:
+        """Assign OD volumes to the StepModel using provided zone IDs."""
+        n = len(zone_ids)
+        sm.volumes = pd.DataFrame(
+            {
+                "origin": np.repeat(zone_ids, n),
+                "destination": np.tile(zone_ids, n),
+                "car": mat.matrix_view.flatten(),
+            }
+        )
+        sm.volumes = sm.volumes[sm.volumes["car"] != 0.0].reset_index(drop=True)
+
+
+    def _build_quetzal_model_separated_zones(
+        network: pd.DataFrame,
+        mat: AequilibraeMatrix,
+    ) -> stepmodel.StepModel:
+        """
+        Standard TNTP case: zone nodes are separate from road nodes.
+        Build zone_to_road from centroid-touching links.
+        """
+        sm = stepmodel.StepModel()
+        centroids = mat.index
+
+        q = _base_quetzal_links(network)
+
+        # Centroid connectors: any link touching a centroid node.
+        connector_mask = q["a"].isin(centroids) | q["b"].isin(centroids)
+
+        sm.road_links = q[~connector_mask].drop(columns=["segments"]).copy()
+        sm.road_links["segments"] = [{"car"} for _ in range(len(sm.road_links))]
+
+        zone_to_road = q[connector_mask].copy()
+        zone_to_road["direction"] = "egress"
+        zone_to_road.loc[zone_to_road["a"].isin(centroids), "direction"] = "access"
+        sm.zone_to_road = zone_to_road
+
+        centroid_set = set(centroids.tolist())
+        all_nodes = set(q["a"].tolist()) | set(q["b"].tolist())
+        road_node_ids = sorted(all_nodes - centroid_set)
+        sm.road_nodes = pd.DataFrame(index=road_node_ids)
+        sm.road_nodes.index.name = "node_id"
+
+        sm.zones = pd.DataFrame(index=centroids)
+        sm.zones.index.name = "index"
+        _set_quetzal_volumes(sm, mat, centroids)
+        return sm
+
+
+    def _build_quetzal_model_embedded_zones(
+        network: pd.DataFrame,
+        mat: AequilibraeMatrix,
+    ) -> stepmodel.StepModel:
+        """
+        Sioux Falls style case (FIRST_THRU_NODE=1): zones are embedded in the road graph.
+
+        We keep all original links as road_links and create synthetic zone nodes with
+        zero-time connectors to/from their corresponding road node so Quetzal still has
+        a clean zone/road separation.
+        """
+        sm = stepmodel.StepModel()
+        centroids = mat.index.astype(int)
+
+        q = _base_quetzal_links(network)
+        sm.road_links = q.copy()
+
+        all_nodes = sorted(set(q["a"].tolist()) | set(q["b"].tolist()))
+        sm.road_nodes = pd.DataFrame(index=all_nodes)
+        sm.road_nodes.index.name = "node_id"
+
+        # Create synthetic zone IDs to avoid colliding with road node IDs.
+        max_node = int(max(all_nodes)) if all_nodes else int(np.max(centroids))
+        zone_ids = (centroids + max_node).astype(int)
+        zone_map = dict(zip(centroids.tolist(), zone_ids.tolist()))
+
+        sm.zones = pd.DataFrame(index=zone_ids)
+        sm.zones.index.name = "index"
+
+        # Build access/egress connectors (zone <-> corresponding road node).
+        connectors = []
+        for c in centroids:
+            z = zone_map[int(c)]
+            connectors.append(
+                {
+                    "a": z,
+                    "b": int(c),
+                    "time": 0.0,
+                    "capacity": 1e12,
+                    "alpha": 0.15,
+                    "beta": 4.0,
+                    "length": 0.0,
+                    "vdf": "bpr",
+                    "segments": {"car"},
+                    "direction": "access",
+                }
+            )
+            connectors.append(
+                {
+                    "a": int(c),
+                    "b": z,
+                    "time": 0.0,
+                    "capacity": 1e12,
+                    "alpha": 0.15,
+                    "beta": 4.0,
+                    "length": 0.0,
+                    "vdf": "bpr",
+                    "segments": {"car"},
+                    "direction": "egress",
+                }
+            )
+
+        sm.zone_to_road = pd.DataFrame(connectors)
+        sm.zone_to_road.index.name = "index"
+
+        _set_quetzal_volumes(sm, mat, zone_ids)
+        return sm
+
+
+    def assign_aeq(g: Graph, mat: AequilibraeMatrix, method: str) -> TrafficAssignment:
+        assig_class = TrafficClass("car", g, mat)
         if "toll" in g.network.columns:
-            assigclass.set_fixed_cost("toll")
-            assigclass.set_vot(1.0)
+            assig_class.set_fixed_cost("toll")
+            assig_class.set_vot(1.0)
 
         assig = TrafficAssignment()
-        assig.set_classes([assigclass])
+        assig.set_classes([assig_class])
         assig.set_vdf("BPR")
         assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
         assig.set_capacity_field("capacity")
         assig.set_time_field("free_flow_time")
-        assig.max_iter = 1000
-        assig.rgap_target = 1e-10 # Nearly guarantees that convergence won't be reached
-        assig.set_algorithm(algorithm)
-        assig.set_cores(14)
+        assig.max_iter = MAX_ITER
+        assig.rgap_target = RGAP_TARGET
+        assig.set_algorithm(method)
+        assig.set_cores(NUM_CORES)
         assig.execute()
         return assig
 
-    # We compare the results
-    def validate(assig: TrafficAssignment, known_flows: pd.DataFrame, algorithm: str, folder: Path, model_name):
-        modeled = g.network[["link_id", "a_node", "b_node"]].merge(assig.results().matrix_ab.reset_index(),
-                                                                   on="link_id").rename(
-            columns={"matrix_ab": "AequilibraE Solution"})
-        merged = known_flows.merge(modeled, on=["a_node", "b_node"])
 
-        # Scatter plot
-        plt.figure(figsize=(10, 6))
-        sns.scatterplot(data=merged, x="TNTP Solution", y="AequilibraE Solution", s=30)
+    def assign_quetzal(sm: stepmodel.StepModel, method: str) -> stepmodel.StepModel:
+        # Quetzal's tolerance is a percentage; scale accordingly
+        sm.step_road_pathfinder(
+            method=method,
+            maxiters=MAX_ITER,
+            tolerance=RGAP_TARGET * 100.0,
+            segments=SEGMENTS,
+            vdf=VDF,
+            turn_penalties=None,
+            num_cores=NUM_CORES,
+            return_car_los=False,
+            log=True,
+        )
+        return sm
 
-        # Linear regression
-        X = merged["TNTP Solution"].values.reshape(-1, 1)
-        y = merged["AequilibraE Solution"].values
-        reg = LinearRegression(fit_intercept=False).fit(X, y)
-        y_pred = reg.predict(X)
-        r_squared = r2_score(y, y_pred)
 
-        # Plot regression line
-        plt.plot(merged["TNTP Solution"], y_pred, color='red', label='Linear regression')
+    def plot_convergence(
+        sm: stepmodel.StepModel | None,
+        aeq_report: pd.DataFrame,
+        name: str,
+        method: str,
+        tolerance: float,
+        plot_time: bool = True,
+        save_path: Path | None = None,
+    ):
+        """
+        Convergence plot showing Quetzal and AequilibraE relative gaps.
 
-        # Customize the plot
-        plt.title(f'Comparison of Known and AequilibraE Solutions - Algorithm: {algorithm}', fontsize=16)
-        plt.xlabel('Known Solution', fontsize=14)
-        plt.ylabel('AequilibraE Solution (1,000 iterations)', fontsize=14)
+        Quetzal stores relgap as a percentage; divide by 100 to match AequilibraE's scale.
+        rgap_direction was removed from AequilibraE; only the AoN rgap is plotted.
+        """
+        sns.set_theme(style="whitegrid", context="paper")
+        palette = sns.color_palette()
 
-        # Display the equation and R-squared on the plot
-        equation_text = f'y = {reg.coef_[0]:.2f}x\nR-squared = {r_squared:.5f}'
-        plt.text(x=merged["TNTP Solution"].max() * 0.5, y=merged["AequilibraE Solution"].max() * 0.85, s=equation_text,
-                 fontsize=12)
+        aeq_len = len(aeq_report)
+        qtl_len = len(sm.relgap) if sm is not None else 0
+        n_iters = max(qtl_len, aeq_len)
+        markevery = max(1, n_iters // 20)
 
-        plt.legend()
-        plt.savefig(folder / f"{model_name}_{algorithm}-1000_iter.png", dpi=300)
-        plt.close()
+        fig, ax = plt.subplots(figsize=(8, 6), dpi=150)
 
-    def assign_and_validate(g: Graph, mat: AequilibraeMatrix, folder: Path, model_stub: str):
-        known_flows = known_results(folder, model_stub)
-        # We run the traffic assignment
-        conv = None
-        print(f"start assignment for {model_stub}")
-        for algorithm in ["bfw", "cfw", "fw", "msa"]:
-            t = -perf_counter()
-            assig = assign(g, mat, algorithm)
-            t += perf_counter()
-            print(f"{model_stub},{algorithm},{t:0.4f}")
+        if plot_time:
+            x_label = "Time (s)"
+            x_aeq = aeq_report["time"]
+        else:
+            x_label = "Iterations"
+            x_aeq = aeq_report.index
 
-            res = assig.report()[["iteration", "rgap"]].rename(columns={"rgap": algorithm})
-            validate(assig, known_flows, algorithm, folder, model_stub)
+        if sm is not None:
+            x_sm = sm.times if plot_time else range(len(sm.relgap))
+            sns.lineplot(
+                x=x_sm,
+                y=[v / 100.0 for v in sm.relgap],
+                label="Quetzal (relative gap)",
+                ax=ax,
+                marker="X",
+                markevery=markevery,
+                markersize=6,
+                color=palette[0],
+                linewidth=2,
+            )
 
-            conv = res if conv is None else conv.merge(res, on="iteration")
-        df = conv.replace(np.inf, 1).set_index("iteration")
-        convergence_chart(df, data_folder, model_stub)
-        df.to_csv(folder / f"{model_stub}_convergence.csv")
+        sns.lineplot(
+            x=x_aeq,
+            y=aeq_report["rgap"],
+            label="AequilibraE (AoN relative gap)",
+            ax=ax,
+            marker="^",
+            markevery=markevery,
+            markersize=7,
+            color=palette[1],
+            linewidth=2,
+            linestyle=":",
+            dash_capstyle="round",
+        )
 
-    def convergence_chart(df: pd.DataFrame, folder: Path, model_name):
-        import matplotlib.pyplot as plt
+        ax.set_xlim(left=0)
+        ax.set_yscale("log")
+        ax.grid(True, which="minor", axis="y", linewidth=0.7, alpha=0.3)
+        ax.set_xlabel(x_label, labelpad=10)
+        ax.set_ylabel("Relative Gap", labelpad=10)
+        ax.set_title(
+            f"Convergence - {name}\n{method.upper()}, Target rgap: {tolerance}",
+            pad=14,
+            fontweight="bold",
+            fontsize=14,
+        )
+        ax.text(
+            0.02,
+            0.03,
+            f"Markers every {markevery} iterations",
+            transform=ax.transAxes,
+            fontsize=9,
+            bbox={
+                "boxstyle": "round,pad=0.25",
+                "facecolor": "white",
+                "alpha": 0.9,
+                "edgecolor": "0.9",
+            },
+        )
+        ax.legend(frameon=True, framealpha=0.9, edgecolor="0.8")
+        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+        sns.despine(left=False, bottom=False)
+        plt.tight_layout()
+        plt.draw()
 
-        plt.cla()
-        df = df.loc[15:, :]
-        for column in df.columns:
-            plt.plot(df.index, df[column], label=column)
-        # Customize the plot
-        plt.title('Convergence Comparison')
-        plt.xlabel('Iterations')
-        plt.ylabel('RGap')
-        plt.yscale("log")
-        plt.legend(title='Columns')
-        plt.savefig(folder / f"convergence_comparison_{model_name}.png", dpi=300)
+        if save_path:
+            plt.savefig(save_path, dpi=plt.gcf().dpi)
+        plt.show()
 
-    models = {"chicago": [Path(r'D:\OL\src\TransportationNetworks\chicago-regional'), "ChicagoRegional"],
-              "sioux_falls": [Path(r'D:\OL\src\TransportationNetworks\SiouxFalls'), "SiouxFalls"],
-              "anaheim": [Path(r'D:\OL\src\TransportationNetworks\Anaheim'), "Anaheim"],
-              "winnipeg": [Path(r'D:\OL\src\TransportationNetworks\Winnipeg'), "Winnipeg"],
-          }
 
-    convergence = {}
-    for model_name, (data_folder, model_stub) in models.items():
-        print(model_name)
-        mat = build_matrix(data_folder, model_stub)
-        g = build_graph(data_folder, model_stub, mat.index)
-        assign_and_validate(g, mat, data_folder, model_stub)
+    def plot_aeq_method_convergence_times(
+        aeq_method_reports: dict[str, pd.DataFrame],
+        model_name: str,
+        rgap_target: float,
+        save_path: Path | None = None,
+    ):
+        """
+        AequilibraE-only convergence plot over time for all tested methods.
+        Styled to match the per-method convergence plots.
+        """
+        sns.set_theme(style="whitegrid", context="paper")
+        palette = sns.color_palette()
+
+        method_order = [m.upper() for m in METHODS if m.upper() in aeq_method_reports]
+        if not method_order:
+            method_order = list(aeq_method_reports.keys())
+
+        max_len = max(len(df) for df in aeq_method_reports.values() if not df.empty)
+        markevery = max(1, max_len // 20)
+
+        fig, ax = plt.subplots(figsize=(8, 6), dpi=150)
+
+        for i, method in enumerate(method_order):
+            report = aeq_method_reports[method]
+            sns.lineplot(
+                x=report["time"],
+                y=report["rgap"],
+                label=method,
+                ax=ax,
+                marker="^",
+                markevery=markevery,
+                markersize=6,
+                color=palette[i % len(palette)],
+                linewidth=2,
+                linestyle=":",
+                dash_capstyle="round",
+            )
+
+        ax.set_xlim(left=0)
+        ax.set_yscale("log")
+        ax.grid(True, which="minor", axis="y", linewidth=0.7, alpha=0.3)
+        ax.set_xlabel("Time (s)", labelpad=10)
+        ax.set_ylabel("Relative Gap", labelpad=10)
+        ax.set_title(
+            f"Convergence - {model_name}\nAequilibraE Methods, Target rgap: {rgap_target}",
+            pad=14,
+            fontweight="bold",
+            fontsize=14,
+        )
+        ax.text(
+            0.02,
+            0.03,
+            f"Markers every {markevery} iterations",
+            transform=ax.transAxes,
+            fontsize=9,
+            bbox={
+                "boxstyle": "round,pad=0.25",
+                "facecolor": "white",
+                "alpha": 0.9,
+                "edgecolor": "0.9",
+            },
+        )
+        ax.legend(frameon=True, framealpha=0.9, edgecolor="0.8")
+        sns.despine(left=False, bottom=False)
+        plt.tight_layout()
+        plt.draw()
+
+        if save_path:
+            plt.savefig(save_path, dpi=plt.gcf().dpi, bbox_inches="tight")
+
+        plt.show()
+
+
+    def plot_flow_dashboard(
+        aeq_with_nodes: pd.DataFrame,
+        qtl_with_nodes: pd.DataFrame | None,
+        qtl_road_flows: pd.Series | None,
+        aeq_road_flows: pd.Series | None,
+        model_name: str,
+        method: str,
+        rgap_target: float,
+        save_path: Path | None = None,
+    ):
+        """
+        Combined flow comparison dashboard:
+        - Main panel: AequilibraE vs TNTP (largest, left)
+        - Side panels: Quetzal vs TNTP (top-right) and AequilibraE vs Quetzal (bottom-right)
+          (side panels omitted when Quetzal data is not available)
+        """
+        sns.set_theme(style="whitegrid", context="paper")
+
+        has_quetzal = qtl_with_nodes is not None
+
+        fig = plt.figure(figsize=(16, 8), dpi=150)
+        gs = fig.add_gridspec(2, 2, width_ratios=[1.45, 1.0], wspace=0.10, hspace=0.35)
+        ax_main = fig.add_subplot(gs[:, 0])
+        ax_rt = fig.add_subplot(gs[0, 1])
+        ax_rb = fig.add_subplot(gs[1, 1])
+
+        def add_scatter(ax, x_flows, y_flows, x_label, y_label, title, marker_size):
+            ax.scatter(x_flows, y_flows, alpha=0.5, s=marker_size, label="Link flows")
+
+            x_max = float(np.max(x_flows)) if len(x_flows) else 1.0
+            y_max = float(np.max(y_flows)) if len(y_flows) else 1.0
+            limit = max(x_max, y_max, 1.0)
+
+            reg = linregress(x_flows, y_flows)
+            x_line = np.array([0.0, limit])
+            y_line = reg.intercept + reg.slope * x_line
+            ax.plot(
+                x_line,
+                y_line,
+                linestyle="--",
+                linewidth=1.8,
+                color="red",
+                label=f"Regression  R²={reg.rvalue**2:.4f}\ny = {reg.slope:.4f}x + {reg.intercept:.4f}",
+            )
+            ax.plot(
+                [0.0, limit],
+                [0.0, limit],
+                linestyle="-",
+                color="grey",
+                alpha=0.5,
+                label="1:1",
+            )
+
+            ax.set_xlim(0.0, limit)
+            ax.set_ylim(0.0, limit)
+            ax.set_aspect("equal", adjustable="box")
+            ax.set_anchor("W")
+            ax.set_xlabel(x_label)
+            ax.set_ylabel(y_label)
+            ax.set_title(title, fontweight="bold", fontsize=11)
+            ax.legend(
+                frameon=True, framealpha=0.9, edgecolor="0.8", loc="upper left", fontsize=8
+            )
+            sns.despine(ax=ax, left=False, bottom=False)
+
+        add_scatter(
+            ax_main,
+            aeq_with_nodes["TNTP Solution"],
+            aeq_with_nodes["PCE_AB"],
+            "TNTP Reference Flow",
+            "AequilibraE Flow",
+            "AequilibraE vs TNTP",
+            marker_size=16,
+        )
+
+        add_scatter(
+            ax_rt,
+            qtl_with_nodes["TNTP Solution"]
+            if qtl_with_nodes is not None
+            else pd.Series(dtype=float),
+            qtl_with_nodes["flow"]
+            if qtl_with_nodes is not None
+            else pd.Series(dtype=float),
+            "TNTP Reference Flow",
+            "Quetzal Flow",
+            "Quetzal vs TNTP",
+            marker_size=10,
+        )
+
+        aligned_aeq = (
+            aeq_road_flows.loc[qtl_road_flows.index]
+            if qtl_road_flows is not None
+            else pd.Series(dtype=float)
+        )
+        add_scatter(
+            ax_rb,
+            qtl_road_flows if qtl_road_flows is not None else pd.Series(dtype=float),
+            aligned_aeq if aligned_aeq is not None else pd.Series(dtype=float),
+            "Quetzal Flow",
+            "AequilibraE Flow",
+            "AequilibraE vs Quetzal",
+            marker_size=10,
+        )
+
+        fig.suptitle(
+            f"Flow Validation Dashboard - {model_name}\n{method.upper()}, rgap < {rgap_target}",
+            fontsize=14,
+            fontweight="bold",
+            y=0.98,
+        )
+
+        if not has_quetzal:
+            for ax in [ax_rt, ax_rb]:
+                ax.text(
+                    0.5,
+                    0.5,
+                    "Quetzal data not available",
+                    transform=ax.transAxes,
+                    fontsize=12,
+                    ha="center",
+                    va="center",
+                    color="grey",
+                )
+                ax.legend().set_visible(False)
+
+        plt.tight_layout()
+        plt.draw()
+
+        if save_path:
+            plt.savefig(save_path, dpi=plt.gcf().dpi, bbox_inches="tight")
+
+        plt.show()
+
+
+    def run():
+        for model_name, (data_folder, model_stub) in MODELS.items():
+            print(f"\n{'=' * 60}")
+            print(f"{'=' * 60}")
+            print(f"MODEL: {model_name.upper()}")
+            print(f"{'=' * 60}")
+
+            header = parse_tntp_header(data_folder, model_stub)
+            first_thru_node = header["FIRST THRU NODE"]
+            print(
+                f"\nFIRST_THRU_NODE={first_thru_node}, N_ZONES={header['NUMBER OF ZONES']}"
+            )
+
+            if first_thru_node <= 1:
+                quetzal_mode = "embedded zones (synthetic zone connectors)"
+            else:
+                quetzal_mode = "separated zones (native centroid connectors)"
+            print(f"Quetzal build mode: {quetzal_mode}")
+
+            mat = build_matrix(data_folder, model_stub)
+            g = build_graph(data_folder, model_stub, mat.index)
+
+            aeq_method_reports = {}
+
+            for method in METHODS:
+                print(f"\n{'-' * 60}")
+                print(f"METHOD: {method.upper()}")
+                print(f"{'-' * 60}")
+
+                # --- AequilibraE ---
+                print(f"  Running AequilibraE ({method})...")
+                t0 = perf_counter()
+                assig = assign_aeq(g, mat, method)
+                t_aeq = perf_counter() - t0
+                print(
+                    f"  AequilibraE done in {t_aeq:.1f}s, final rgap={assig.report()['rgap'].iloc[-1]:.2e}"
+                )
+
+                # --- Quetzal (skip cfw) ---
+                if method.lower() == "cfw":
+                    print(
+                        f"  Skipping Quetzal ({method}) - method not supported by Quetzal"
+                    )
+                    t_qtl = None
+                    sm = None
+                else:
+                    print("  Building Quetzal model...")
+                    sm = build_quetzal_model(g.network, first_thru_node, mat)
+                    print(f"  Running Quetzal ({method})...")
+                    t0 = perf_counter()
+                    assign_quetzal(sm, method)
+                    t_qtl = perf_counter() - t0
+                    print(
+                        f"  Quetzal done in {t_qtl:.1f}s, final rgap={sm.relgap[-1] / 100.0:.2e}"
+                    )
+
+                aeq_report = assig.report()
+                aeq_results = (
+                    assig.results()
+                )  # indexed by link_id; use PCE_AB (all links are direction=1)
+
+                aeq_method_reports[method] = aeq_report
+
+                # --- Convergence plot ---
+                plot_convergence(
+                    sm,
+                    aeq_report,
+                    model_name.title(),
+                    method,
+                    RGAP_TARGET,
+                    plot_time=True,
+                    save_path=data_folder / f"{model_stub}_convergence_{method}.png",
+                )
+
+                # --- TNTP reference flows (always needed for dashboard) ---
+                tntp = known_results(data_folder, model_stub)
+                link_lookup = g.network[["link_id", "a_node", "b_node"]].set_index(
+                    "link_id"
+                )
+                aeq_with_nodes = (
+                    aeq_results[["PCE_AB"]]
+                    .join(link_lookup)
+                    .merge(tntp, on=["a_node", "b_node"], how="inner")
+                )
+
+                if sm is not None:
+                    road_link_ids = sm.road_links.index
+                    aeq_road_flows = aeq_results.loc[road_link_ids, "PCE_AB"]
+                    qtl_road_flows = sm.road_links["flow"]
+                    qtl_with_nodes = (
+                        sm.road_links[["flow"]]
+                        .join(link_lookup)
+                        .merge(tntp, on=["a_node", "b_node"], how="inner")
+                    )
+                else:
+                    qtl_with_nodes = None
+                    qtl_road_flows = None
+                    aeq_road_flows = None
+
+                # --- Combined scatter dashboard ---
+                plot_flow_dashboard(
+                    aeq_with_nodes,
+                    qtl_with_nodes,
+                    qtl_road_flows,
+                    aeq_road_flows,
+                    model_name.title(),
+                    method,
+                    RGAP_TARGET,
+                    save_path=data_folder / f"{model_stub}_flow_dashboard_{method}.png",
+                )
+
+                if sm is not None:
+                    diff = qtl_road_flows - aeq_road_flows.loc[road_link_ids]
+                    print(
+                        f"\n  Road-link flow difference (Quetzal - AequilibraE):\n{diff.describe().to_string()}\n"
+                    )
+
+            # --- AequilibraE-only method convergence comparison ---
+            plot_aeq_method_convergence_times(
+                aeq_method_reports,
+                model_name.title(),
+                RGAP_TARGET,
+                save_path=data_folder / f"{model_stub}_aeq_method_convergence_time.png",
+            )
