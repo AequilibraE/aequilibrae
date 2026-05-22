@@ -33,28 +33,28 @@ issues with the reference results and welcome further investigations.
 
          .. tab-item:: biconjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/ChicagoRegional_bfw-1000_iter.png
+            .. image:: ../_images/assig_validation/ChicagoRegional_flow_dashboard_bfw.png
                 :align: center
                 :width: 590
                 :alt: Chicago Biconjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Conjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/ChicagoRegional_cfw-1000_iter.png
+            .. image:: ../_images/assig_validation/ChicagoRegional_flow_dashboard_cfw.png
                 :align: center
                 :width: 590
                 :alt: Chicago Conjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/ChicagoRegional_fw-1000_iter.png
+            .. image:: ../_images/assig_validation/ChicagoRegional_flow_dashboard_fw.png
                 :align: center
                 :width: 590
                 :alt: Chicago Frank-Wolfe 1000 iterations
 
          .. tab-item:: MSA
 
-            .. image:: ../_images/assig_validation/ChicagoRegional_msa-1000_iter.png
+            .. image:: ../_images/assig_validation/ChicagoRegional_flow_dashboard_msa.png
                 :align: center
                 :width: 590
                 :alt: Chicago MSA 1000 iterations
@@ -71,28 +71,28 @@ issues with the reference results and welcome further investigations.
 
          .. tab-item:: biconjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Winnipeg_bfw-1000_iter.png
+            .. image:: ../_images/assig_validation/Winnipeg_flow_dashboard_bfw.png
                 :align: center
                 :width: 590
                 :alt: Winnipeg Biconjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Conjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Winnipeg_cfw-1000_iter.png
+            .. image:: ../_images/assig_validation/Winnipeg_flow_dashboard_cfw.png
                 :align: center
                 :width: 590
                 :alt: Winnipeg Conjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Winnipeg_fw-1000_iter.png
+            .. image:: ../_images/assig_validation/Winnipeg_flow_dashboard_fw.png
                 :align: center
                 :width: 590
                 :alt: Winnipeg Frank-Wolfe 1000 iterations
 
          .. tab-item:: MSA
 
-            .. image:: ../_images/assig_validation/Winnipeg_msa-1000_iter.png
+            .. image:: ../_images/assig_validation/Winnipeg_flow_dashboard_msa.png
                 :align: center
                 :width: 590
                 :alt: Winnipeg MSA 1000 iterations
@@ -109,28 +109,28 @@ issues with the reference results and welcome further investigations.
 
          .. tab-item:: biconjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Anaheim_bfw-1000_iter.png
+            .. image:: ../_images/assig_validation/Anaheim_flow_dashboard_bfw.png
                 :align: center
                 :width: 590
                 :alt: Anaheim Biconjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Conjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Anaheim_cfw-1000_iter.png
+            .. image:: ../_images/assig_validation/Anaheim_flow_dashboard_cfw.png
                 :align: center
                 :width: 590
                 :alt: Anaheim Conjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Anaheim_fw-1000_iter.png
+            .. image:: ../_images/assig_validation/Anaheim_flow_dashboard_fw.png
                 :align: center
                 :width: 590
                 :alt: Anaheim Frank-Wolfe 1000 iterations
 
          .. tab-item:: MSA
 
-            .. image:: ../_images/assig_validation/Anaheim_msa-1000_iter.png
+            .. image:: ../_images/assig_validation/Anaheim_flow_dashboard_msa.png
                 :align: center
                 :width: 590
                 :alt: Anaheim MSA 1000 iterations
@@ -147,28 +147,28 @@ issues with the reference results and welcome further investigations.
 
          .. tab-item:: biconjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/SiouxFalls_bfw-1000_iter.png
+            .. image:: ../_images/assig_validation/SiouxFalls_flow_dashboard_bfw.png
                 :align: center
                 :width: 590
                 :alt: Sioux Falls Biconjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Conjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/SiouxFalls_cfw-1000_iter.png
+            .. image:: ../_images/assig_validation/SiouxFalls_flow_dashboard_cfw.png
                 :align: center
                 :width: 590
                 :alt: Sioux Falls Conjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/SiouxFalls_fw-1000_iter.png
+            .. image:: ../_images/assig_validation/SiouxFalls_flow_dashboard_fw.png
                 :align: center
                 :width: 590
                 :alt: Sioux Falls Frank-Wolfe 1000 iterations
 
          .. tab-item:: MSA
 
-            .. image:: ../_images/assig_validation/SiouxFalls_msa-1000_iter.png
+            .. image:: ../_images/assig_validation/SiouxFalls_flow_dashboard_msa.png
                 :align: center
                 :width: 590
                 :alt: Sioux Falls MSA 1000 iterations
@@ -185,28 +185,28 @@ as that instance has a comparable size to real-world models.
 .. tab-set:: 
    .. tab-item:: Chicago
 
-      .. image:: ../_images/assig_validation/convergence_comparison_ChicagoRegional.png
+      .. image:: ../_images/assig_validation/ChicagoRegional_aeq_method_convergence_time.png
           :align: center
           :width: 590
           :alt: Algorithm convergence comparison
 
    .. tab-item:: Winnipeg
 
-      .. image:: ../_images/assig_validation/convergence_comparison_Winnipeg.png
+      .. image:: ../_images/assig_validation/Winnipeg_aeq_method_convergence_time.png
           :align: center
           :width: 590
           :alt: Algorithm convergence comparison
 
    .. tab-item:: Anaheim
 
-      .. image:: ../_images/assig_validation/convergence_comparison_Anaheim.png
+      .. image:: ../_images/assig_validation/Anaheim_aeq_method_convergence_time.png
           :align: center
           :width: 590
           :alt: Algorithm convergence comparison
 
    .. tab-item:: Sioux-Falls
 
-      .. image:: ../_images/assig_validation/convergence_comparison_SiouxFalls.png
+      .. image:: ../_images/assig_validation/SiouxFalls_aeq_method_convergence_time.png
           :align: center
           :width: 590
           :alt: Algorithm convergence comparison
