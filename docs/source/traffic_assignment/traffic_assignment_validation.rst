@@ -59,6 +59,44 @@ issues with the reference results and welcome further investigations.
                 :width: 590
                 :alt: Chicago MSA 1000 iterations
 
+   .. tab-item:: Barcelona
+
+      .. tab-set::
+
+         .. tab-item:: Network stats
+
+            * Links: 2,522
+            * Nodes: 1,020
+            * Zones: 110
+
+         .. tab-item:: biconjugate Frank-Wolfe
+
+            .. image:: ../_images/assig_validation/Barcelona_convergence_bfw.png
+                :align: center
+                :width: 590
+                :alt: Barcelona Biconjugate Frank-Wolfe 1000 iterations
+
+         .. tab-item:: Conjugate Frank-Wolfe
+
+            .. image:: ../_images/assig_validation/Barcelona_convergence_cfw.png
+                :align: center
+                :width: 590
+                :alt: Barcelona Conjugate Frank-Wolfe 1000 iterations
+
+         .. tab-item:: Frank-Wolfe
+
+            .. image:: ../_images/assig_validation/Barcelona_convergence_fw.png
+                :align: center
+                :width: 590
+                :alt: Barcelona Frank-Wolfe 1000 iterations
+
+         .. tab-item:: MSA
+
+            .. image:: ../_images/assig_validation/Barcelona_convergence_msa.png
+                :align: center
+                :width: 590
+                :alt: Barcelona MSA 1000 iterations
+
    .. tab-item:: Winnipeg
 
       .. tab-set::
@@ -177,12 +215,12 @@ Convergence Study
 -----------------
 
 Besides validating the final results from the algorithms, we have also compared
-how well they converge for the largest instance we have tested (Chicago Regional), 
+how well they converge for the largest instance we have tested (Chicago Regional),
 as that instance has a comparable size to real-world models.
 
 .. _algorithm_convergence_comparison:
 
-.. tab-set:: 
+.. tab-set::
    .. tab-item:: Chicago
 
       .. image:: ../_images/assig_validation/ChicagoRegional_aeq_method_convergence_time.png
@@ -213,7 +251,7 @@ as that instance has a comparable size to real-world models.
 
 Not surprisingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25 in the case of
-Chicago, and is capable of reaching 1.0e-04 just after 800 iterations, while 
+Chicago, and is capable of reaching 1.0e-04 just after 800 iterations, while
 MSA is still at 3.5e-4 even after 1,000 iterations for that same case.
 
 The actual show, however, is left for the biconjugate Frank-Wolfe
@@ -247,7 +285,7 @@ Want to run your own convergence study?
 
 If you want to run the convergence study in your machine, with Chicago Regional instance
 or any other instance presented here, check out the code block below! Please make sure
-you have already imported `TNTP files <https://github.com/bstabler/TransportationNetworks>`_ 
+you have already imported `TNTP files <https://github.com/bstabler/TransportationNetworks>`_
 into your machine.
 
 In the first part of the code, we'll parse TNTP instances to a format AequilibraE can
