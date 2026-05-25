@@ -265,12 +265,12 @@ applications.
 Computational performance
 -------------------------
 
-All tests were run on a desktop equipped with an Intel Core Ultra 285K (**14 cores used only**)
+All tests were run on a desktop equipped with an Ryzen 9 6900HX (**14 cores used only**)
 running Windows 11 Pro.
 
 On this machine, AequilibraE performed 1,000 iterations of
-biconjugate Frank-Wolfe assignment on the Chicago Network in around 267 seconds,
-or around 0.267s per iteration (other algorithms are as low as 0.230 seconds per iteration).
+biconjugate Frank-Wolfe assignment on the Chicago Network in around 442 seconds,
+or around 0.4422s per iteration (other algorithms are as low as 0.42 seconds per iteration).
 
 This performance is substantially better than seen on previous versions and is on par with
 that of commercial software.
