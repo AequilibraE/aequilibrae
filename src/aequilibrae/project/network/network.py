@@ -1,14 +1,14 @@
 import math
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
-import shapely.wkt
 from shapely import union_all
 from shapely.geometry import Polygon, box
 
 from aequilibrae.context import get_logger
+from aequilibrae.paths.graph import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
@@ -41,7 +41,7 @@ class Network(WorkerThread):
     def __init__(self, project) -> None:
         WorkerThread.__init__(self, None)
 
-        self.graphs = {}  # type: Dict[Graph]
+        self.graphs: Dict[Graph] = {}
         self.project = project
         self.logger = project.logger
         self.modes = Modes(self)
