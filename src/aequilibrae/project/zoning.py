@@ -1,7 +1,7 @@
 import warnings
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, Dict
+from typing import Dict, Union, TYPE_CHECKING
 
 import geopandas as gpd
 import pandas as pd
@@ -17,6 +17,9 @@ from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.geo_index import GeoIndex
+
+if TYPE_CHECKING:
+    from aequilibrae.project.network import Network
 
 
 class Zoning(BasicTable):
@@ -41,10 +44,10 @@ class Zoning(BasicTable):
         >>> project.close()
     """
 
-    def __init__(self, network):
+    def __init__(self, network: "Network"):
         super().__init__(network.project)
         self.__items: Dict[int, Zone] = {}
-        self.network = network
+        self.network: "Network" = network
         self.__table_type__ = "zones"
         self.__fields = []
         self.__geo_index = GeoIndex()

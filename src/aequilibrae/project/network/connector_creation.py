@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from scipy.spatial import KDTree
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString, MultiPolygon
 
 
 INFINITE_CAPACITY = 99999
@@ -23,7 +23,7 @@ def connector_creation(
     link_types="",
     connectors=1,
     conn: Optional[Connection] = None,
-    delimiting_area: Polygon = None,
+    delimiting_area: Optional[MultiPolygon] = None,
 ):
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
