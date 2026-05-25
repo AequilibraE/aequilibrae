@@ -48,7 +48,7 @@ def resolve_recusive_dict(base_dict):
 
 class GMNSBuilder:
     def __init__(
-        self, net, link_path: str, node_path: str, uses_path: str = None, geom_path: str = None, srid: int = 4326
+        self, net, link_path: str, node_path: str, uses_path: str = "", geom_path: str = "", srid: int = 4326
     ) -> None:
         self.p = Parameters()
         self.links = net.links
@@ -59,8 +59,8 @@ class GMNSBuilder:
 
         self.link_df = pd.read_csv(link_path).fillna("")
         self.node_df = pd.read_csv(node_path).fillna("")
-        self.uses_df = pd.read_csv(uses_path) if uses_path is not None else uses_path
-        self.geom_df = pd.read_csv(geom_path) if geom_path is not None else geom_path
+        self.uses_df = pd.read_csv(uses_path) if uses_path not in [""] else None
+        self.geom_df = pd.read_csv(geom_path) if geom_path not in [""] else None
         self.srid = srid
 
         self.l_equiv = self.p.parameters["network"]["gmns"]["link"]["equivalency"]

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 import functools
 import logging
@@ -6,7 +6,7 @@ import os
 import shutil
 import sqlite3
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import NoReturn
 import warnings
 
 import pandas as pd
@@ -137,25 +137,25 @@ class Project:
 
     @property
     @contextmanager
-    def db_connection(self) -> Generator[sqlite3.Connection | AequilibraEConnection, Any, None]:
+    def db_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._project_database_path, spatial=False) as conn:
             yield conn
 
     @property
     @contextmanager
-    def db_connection_spatial(self) -> Generator[sqlite3.Connection | AequilibraEConnection, Any, None]:
+    def db_connection_spatial(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
     @property
     @contextmanager
-    def results_connection(self) -> Generator[sqlite3.Connection | AequilibraEConnection, Any, None]:
+    def results_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._results_database_path, spatial=False, missing_ok=True) as conn:
             yield conn
 
     @property
     @contextmanager
-    def transit_connection(self) -> Generator[sqlite3.Connection | AequilibraEConnection, Any, None]:
+    def transit_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._transit_database_path, spatial=True, missing_ok=True) as conn:
             yield conn
 
