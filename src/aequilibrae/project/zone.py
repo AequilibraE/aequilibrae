@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class Zone(SafeClass):
     """Single zone object that can be queried and manipulated in memory"""
 
-    def __init__(self, dataset: dict, zoning: "Zoning"):
+    def __init__(self, dataset: dict, zoning: "Zoning") -> None:
         self.geometry = MultiPolygon()
         self.zone_id: int = -1
         super().__init__(dataset, zoning.project)
@@ -25,14 +25,14 @@ class Zone(SafeClass):
         self.__network_links: "Links" = zoning.network.links
         self.__network_nodes: "Nodes" = zoning.network.nodes
 
-    def delete(self):
+    def delete(self) -> None:
         """Removes the zone from the database"""
         with self.project.db_connection as conn:
             conn.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
         self.__zoning._remove_zone(self.zone_id)
         del self
 
-    def save(self):
+    def save(self) -> None:
         """Saves/Updates the zone data to the database"""
 
         if self.zone_id != self.__original__["zone_id"]:
