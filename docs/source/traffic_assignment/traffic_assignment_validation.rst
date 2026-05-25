@@ -298,6 +298,7 @@ understand, and then we'll perform the assignment.
     from time import perf_counter
 
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
     import numpy as np
     import pandas as pd
     import seaborn as sns
@@ -309,7 +310,7 @@ understand, and then we'll perform the assignment.
     from aequilibrae.paths.traffic_class import TrafficClass
 
 
-    BASE = Path("/home/jake/OuterLoop/aequilbrae-nix/TransportationNetworks")
+    BASE = Path(r"C:\Users\jake\src\aequilibrae\TransportationNetworks")
 
     # Model list used for validation runs.
     # Sioux Falls is included and handled by a dedicated Quetzal builder branch
@@ -544,36 +545,6 @@ understand, and then we'll perform the assignment.
         return _build_quetzal_model_separated_zones(network, mat)
 
 
-    def _base_quetzal_links(network: pd.DataFrame) -> pd.DataFrame:
-        """Build the common Quetzal link table from AequilibraE network links."""
-        q = network[
-            [
-                "link_id",
-                "a_node",
-                "b_node",
-                "free_flow_time",
-                "capacity",
-                "b",
-                "power",
-                "length",
-            ]
-        ].copy()
-        q = q.rename(
-            columns={
-                "a_node": "a",
-                "b_node": "b",
-                "free_flow_time": "time",
-                "b": "alpha",
-                "power": "beta",
-            }
-        )
-        q["segments"] = [{"car"} for _ in range(len(q))]
-        q["vdf"] = "bpr"
-        q = q.set_index("link_id")
-        q.index.name = "index"
-        return q
-
-
     def _set_quetzal_volumes(
         sm: stepmodel.StepModel, mat: AequilibraeMatrix, zone_ids: np.ndarray
     ) -> None:
@@ -587,42 +558,6 @@ understand, and then we'll perform the assignment.
             }
         )
         sm.volumes = sm.volumes[sm.volumes["car"] != 0.0].reset_index(drop=True)
-
-
-    def _build_quetzal_model_separated_zones(
-        network: pd.DataFrame,
-        mat: AequilibraeMatrix,
-    ) -> stepmodel.StepModel:
-        """
-        Standard TNTP case: zone nodes are separate from road nodes.
-        Build zone_to_road from centroid-touching links.
-        """
-        sm = stepmodel.StepModel()
-        centroids = mat.index
-
-        q = _base_quetzal_links(network)
-
-        # Centroid connectors: any link touching a centroid node.
-        connector_mask = q["a"].isin(centroids) | q["b"].isin(centroids)
-
-        sm.road_links = q[~connector_mask].drop(columns=["segments"]).copy()
-        sm.road_links["segments"] = [{"car"} for _ in range(len(sm.road_links))]
-
-        zone_to_road = q[connector_mask].copy()
-        zone_to_road["direction"] = "egress"
-        zone_to_road.loc[zone_to_road["a"].isin(centroids), "direction"] = "access"
-        sm.zone_to_road = zone_to_road
-
-        centroid_set = set(centroids.tolist())
-        all_nodes = set(q["a"].tolist()) | set(q["b"].tolist())
-        road_node_ids = sorted(all_nodes - centroid_set)
-        sm.road_nodes = pd.DataFrame(index=road_node_ids)
-        sm.road_nodes.index.name = "node_id"
-
-        sm.zones = pd.DataFrame(index=centroids)
-        sm.zones.index.name = "index"
-        _set_quetzal_volumes(sm, mat, centroids)
-        return sm
 
 
     def _build_quetzal_model_embedded_zones(
@@ -731,7 +666,7 @@ understand, and then we'll perform the assignment.
 
 
     def plot_convergence(
-        sm: stepmodel.StepModel | None,
+        qtl_convergence: pd.DataFrame | None,
         aeq_report: pd.DataFrame,
         name: str,
         method: str,
@@ -742,6 +677,7 @@ understand, and then we'll perform the assignment.
         """
         Convergence plot showing Quetzal and AequilibraE relative gaps.
 
+        qtl_convergence is a DataFrame with columns 'relgap' (as percentage) and 'time'.
         Quetzal stores relgap as a percentage; divide by 100 to match AequilibraE's scale.
         rgap_direction was removed from AequilibraE; only the AoN rgap is plotted.
         """
@@ -749,7 +685,7 @@ understand, and then we'll perform the assignment.
         palette = sns.color_palette()
 
         aeq_len = len(aeq_report)
-        qtl_len = len(sm.relgap) if sm is not None else 0
+        qtl_len = len(qtl_convergence) if qtl_convergence is not None else 0
         n_iters = max(qtl_len, aeq_len)
         markevery = max(1, n_iters // 20)
 
@@ -762,11 +698,11 @@ understand, and then we'll perform the assignment.
             x_label = "Iterations"
             x_aeq = aeq_report.index
 
-        if sm is not None:
-            x_sm = sm.times if plot_time else range(len(sm.relgap))
+        if qtl_convergence is not None:
+            x_sm = qtl_convergence["time"] if plot_time else range(len(qtl_convergence))
             sns.lineplot(
                 x=x_sm,
-                y=[v / 100.0 for v in sm.relgap],
+                y=qtl_convergence["relgap"] / 100.0,
                 label="Quetzal (relative gap)",
                 ax=ax,
                 marker="X",
@@ -859,8 +795,8 @@ understand, and then we'll perform the assignment.
                 markersize=6,
                 color=palette[i % len(palette)],
                 linewidth=2,
-                linestyle=":",
-                dash_capstyle="round",
+                linestyle="-",
+                # dash_capstyle="round",
             )
 
         ax.set_xlim(left=0)
@@ -924,12 +860,17 @@ understand, and then we'll perform the assignment.
         ax_rt = fig.add_subplot(gs[0, 1])
         ax_rb = fig.add_subplot(gs[1, 1])
 
-        def add_scatter(ax, x_flows, y_flows, x_label, y_label, title, marker_size):
+        def add_scatter(ax, x_flows, y_flows, x_label, y_label, title, marker_size, show_grid_lines):
             ax.scatter(x_flows, y_flows, alpha=0.5, s=marker_size, label="Link flows")
 
-            x_max = float(np.max(x_flows)) if len(x_flows) else 1.0
-            y_max = float(np.max(y_flows)) if len(y_flows) else 1.0
+            x_max = float(np.max(x_flows)) * 1.02 if len(x_flows) else 1.0
+            y_max = float(np.max(y_flows)) * 1.02 if len(y_flows) else 1.0
             limit = max(x_max, y_max, 1.0)
+
+            # power = np.floor(np.log10(limit))
+
+            # print(0, limit, power, np.ceil(limit / 10 ** power) * 10 ** power, n_ticks)
+            # major_ticks = np.linspace(0, np.ceil(limit / 10 ** power) * 10 ** power, n_ticks)
 
             reg = linregress(x_flows, y_flows)
             x_line = np.array([0.0, limit])
@@ -942,18 +883,22 @@ understand, and then we'll perform the assignment.
                 color="red",
                 label=f"Regression  R²={reg.rvalue**2:.4f}\ny = {reg.slope:.4f}x + {reg.intercept:.4f}",
             )
-            ax.plot(
-                [0.0, limit],
-                [0.0, limit],
-                linestyle="-",
-                color="grey",
-                alpha=0.5,
-                label="1:1",
-            )
+            if len(x_flows) > 0 and len(y_flows) > 0:
+                ax.plot(
+                    [0.0, limit],
+                    [0.0, limit],
+                    linestyle="-",
+                    color="grey",
+                    alpha=0.5,
+                    label="1:1",
+                )
 
             ax.set_xlim(0.0, limit)
             ax.set_ylim(0.0, limit)
             ax.set_aspect("equal", adjustable="box")
+            steps = [4, 6, 8]
+            ax.xaxis.set_major_locator(MaxNLocator(steps=steps))
+            ax.yaxis.set_major_locator(MaxNLocator(steps=steps))
             ax.set_anchor("W")
             ax.set_xlabel(x_label)
             ax.set_ylabel(y_label)
@@ -961,7 +906,9 @@ understand, and then we'll perform the assignment.
             ax.legend(
                 frameon=True, framealpha=0.9, edgecolor="0.8", loc="upper left", fontsize=8
             )
-            sns.despine(ax=ax, left=False, bottom=False)
+            for spine in ax.spines.values():
+                spine.set_linewidth(1.5)
+                spine.set_color("black")
 
         add_scatter(
             ax_main,
@@ -971,39 +918,42 @@ understand, and then we'll perform the assignment.
             "AequilibraE Flow",
             "AequilibraE vs TNTP",
             marker_size=16,
+            show_grid_lines=True
         )
 
         add_scatter(
             ax_rt,
             qtl_with_nodes["TNTP Solution"]
             if qtl_with_nodes is not None
-            else pd.Series(dtype=float),
+            else pd.Series(dtype=int),
             qtl_with_nodes["flow"]
             if qtl_with_nodes is not None
-            else pd.Series(dtype=float),
+            else pd.Series(dtype=int),
             "TNTP Reference Flow",
             "Quetzal Flow",
             "Quetzal vs TNTP",
             marker_size=10,
+            show_grid_lines=False
         )
 
         aligned_aeq = (
             aeq_road_flows.loc[qtl_road_flows.index]
             if qtl_road_flows is not None
-            else pd.Series(dtype=float)
+            else pd.Series(dtype=int)
         )
         add_scatter(
             ax_rb,
-            qtl_road_flows if qtl_road_flows is not None else pd.Series(dtype=float),
-            aligned_aeq if aligned_aeq is not None else pd.Series(dtype=float),
+            qtl_road_flows if qtl_road_flows is not None else pd.Series(dtype=int),
+            aligned_aeq if aligned_aeq is not None else pd.Series(dtype=int),
             "Quetzal Flow",
             "AequilibraE Flow",
             "AequilibraE vs Quetzal",
             marker_size=10,
+            show_grid_lines=False
         )
 
         fig.suptitle(
-            f"Flow Validation Dashboard - {model_name}\n{method.upper()}, rgap < {rgap_target}",
+            f"Flow Validation Dashboard - {model_name}\n{method.upper()}",
             fontsize=14,
             fontweight="bold",
             y=0.98,
@@ -1022,9 +972,11 @@ understand, and then we'll perform the assignment.
                     color="grey",
                 )
                 ax.legend().set_visible(False)
+                ax.set_xticks([])
+                ax.set_yticks([])
 
-        plt.tight_layout()
-        plt.draw()
+        # plt.tight_layout()
+        # plt.draw()
 
         if save_path:
             plt.savefig(save_path, dpi=plt.gcf().dpi, bbox_inches="tight")
@@ -1032,10 +984,10 @@ understand, and then we'll perform the assignment.
         plt.show()
 
 
-    def run():
+    def run_assignments() -> None:
+        """Part 1: Run AequilibraE and Quetzal assignments and save all results to disk."""
         for model_name, (data_folder, model_stub) in MODELS.items():
             print(f"\n{'=' * 60}")
-            print(f"{'=' * 60}")
             print(f"MODEL: {model_name.upper()}")
             print(f"{'=' * 60}")
 
@@ -1053,8 +1005,8 @@ understand, and then we'll perform the assignment.
 
             mat = build_matrix(data_folder, model_stub)
             g = build_graph(data_folder, model_stub, mat.index)
-
-            aeq_method_reports = {}
+            tntp = known_results(data_folder, model_stub)
+            link_lookup = g.network[["link_id", "a_node", "b_node"]].set_index("link_id")
 
             for method in METHODS:
                 print(f"\n{'-' * 60}")
@@ -1066,8 +1018,17 @@ understand, and then we'll perform the assignment.
                 t0 = perf_counter()
                 assig = assign_aeq(g, mat, method)
                 t_aeq = perf_counter() - t0
+                aeq_report = assig.report()
+                aeq_results = assig.results()  # indexed by link_id; PCE_AB for direction=1
                 print(
-                    f"  AequilibraE done in {t_aeq:.1f}s, final rgap={assig.report()['rgap'].iloc[-1]:.2e}"
+                    f"  AequilibraE done in {t_aeq:.1f}s, "
+                    f"final rgap={aeq_report['rgap'].iloc[-1]:.2e}"
+                )
+
+                aeq_with_nodes = (
+                    aeq_results[["PCE_AB"]]
+                    .join(link_lookup)
+                    .merge(tntp, on=["a_node", "b_node"], how="inner")
                 )
 
                 # --- Quetzal (skip cfw) ---
@@ -1075,8 +1036,10 @@ understand, and then we'll perform the assignment.
                     print(
                         f"  Skipping Quetzal ({method}) - method not supported by Quetzal"
                     )
-                    t_qtl = None
-                    sm = None
+                    qtl_convergence = None
+                    qtl_with_nodes = None
+                    qtl_road_flows = None
+                    aeq_road_flows = None
                 else:
                     print("  Building Quetzal model...")
                     sm = build_quetzal_model(g.network, first_thru_node, mat)
@@ -1085,39 +1048,11 @@ understand, and then we'll perform the assignment.
                     assign_quetzal(sm, method)
                     t_qtl = perf_counter() - t0
                     print(
-                        f"  Quetzal done in {t_qtl:.1f}s, final rgap={sm.relgap[-1] / 100.0:.2e}"
+                        f"  Quetzal done in {t_qtl:.1f}s, "
+                        f"final rgap={sm.relgap[-1] / 100.0:.2e}"
                     )
 
-                aeq_report = assig.report()
-                aeq_results = (
-                    assig.results()
-                )  # indexed by link_id; use PCE_AB (all links are direction=1)
-
-                aeq_method_reports[method] = aeq_report
-
-                # --- Convergence plot ---
-                plot_convergence(
-                    sm,
-                    aeq_report,
-                    model_name.title(),
-                    method,
-                    RGAP_TARGET,
-                    plot_time=True,
-                    save_path=data_folder / f"{model_stub}_convergence_{method}.png",
-                )
-
-                # --- TNTP reference flows (always needed for dashboard) ---
-                tntp = known_results(data_folder, model_stub)
-                link_lookup = g.network[["link_id", "a_node", "b_node"]].set_index(
-                    "link_id"
-                )
-                aeq_with_nodes = (
-                    aeq_results[["PCE_AB"]]
-                    .join(link_lookup)
-                    .merge(tntp, on=["a_node", "b_node"], how="inner")
-                )
-
-                if sm is not None:
+                    qtl_convergence = pd.DataFrame({"relgap": sm.relgap, "time": sm.times})
                     road_link_ids = sm.road_links.index
                     aeq_road_flows = aeq_results.loc[road_link_ids, "PCE_AB"]
                     qtl_road_flows = sm.road_links["flow"]
@@ -1126,12 +1061,88 @@ understand, and then we'll perform the assignment.
                         .join(link_lookup)
                         .merge(tntp, on=["a_node", "b_node"], how="inner")
                     )
+
+                    diff = qtl_road_flows - aeq_road_flows
+                    print(
+                        f"\n  Road-link flow difference (Quetzal - AequilibraE):"
+                        f"\n{diff.describe().to_string()}\n"
+                    )
+
+                # --- Save results ---
+                prefix = data_folder / model_stub
+                aeq_report.to_parquet(f"{prefix}_aeq_report_{method}.parquet")
+                aeq_with_nodes.to_parquet(f"{prefix}_aeq_with_nodes_{method}.parquet")
+                if qtl_convergence is not None:
+                    qtl_convergence.to_parquet(
+                        f"{prefix}_qtl_convergence_{method}.parquet"
+                    )
+                if qtl_with_nodes is not None:
+                    qtl_with_nodes.to_parquet(
+                        f"{prefix}_qtl_with_nodes_{method}.parquet"
+                    )
+                if qtl_road_flows is not None:
+                    qtl_road_flows.to_frame("flow").to_parquet(
+                        f"{prefix}_qtl_road_flows_{method}.parquet"
+                    )
+                if aeq_road_flows is not None:
+                    aeq_road_flows.to_frame("PCE_AB").to_parquet(
+                        f"{prefix}_aeq_road_flows_{method}.parquet"
+                    )
+                print(f"  Saved results for {model_name}/{method}.")
+
+
+    def plot_results() -> None:
+        """Part 2: Load saved results from disk and generate all plots."""
+        for model_name, (data_folder, model_stub) in MODELS.items():
+            print(f"\n{'=' * 60}")
+            print(f"MODEL: {model_name.upper()}")
+            print(f"{'=' * 60}")
+
+            prefix = data_folder / model_stub
+            aeq_method_reports: dict[str, pd.DataFrame] = {}
+
+            for method in METHODS:
+                aeq_report_path = Path(f"{prefix}_aeq_report_{method}.parquet")
+                if not aeq_report_path.exists():
+                    print(f"  Skipping {method.upper()} - no saved results found.")
+                    continue
+
+                aeq_report = pd.read_parquet(aeq_report_path)
+                aeq_with_nodes = pd.read_parquet(
+                    f"{prefix}_aeq_with_nodes_{method}.parquet"
+                )
+                aeq_method_reports[method.upper()] = aeq_report
+
+                qtl_path = Path(f"{prefix}_qtl_convergence_{method}.parquet")
+                if qtl_path.exists():
+                    qtl_convergence = pd.read_parquet(qtl_path)
+                    qtl_with_nodes = pd.read_parquet(
+                        f"{prefix}_qtl_with_nodes_{method}.parquet"
+                    )
+                    qtl_road_flows = pd.read_parquet(
+                        f"{prefix}_qtl_road_flows_{method}.parquet"
+                    )["flow"]
+                    aeq_road_flows = pd.read_parquet(
+                        f"{prefix}_aeq_road_flows_{method}.parquet"
+                    )["PCE_AB"]
                 else:
+                    qtl_convergence = None
                     qtl_with_nodes = None
                     qtl_road_flows = None
                     aeq_road_flows = None
 
-                # --- Combined scatter dashboard ---
+                # --- Convergence plot ---
+                plot_convergence(
+                    qtl_convergence,
+                    aeq_report,
+                    model_name.title(),
+                    method,
+                    RGAP_TARGET,
+                    plot_time=True,
+                    save_path=data_folder / f"{model_stub}_convergence_{method}.png",
+                )
+
+                # --- Flow dashboard ---
                 plot_flow_dashboard(
                     aeq_with_nodes,
                     qtl_with_nodes,
@@ -1143,16 +1154,12 @@ understand, and then we'll perform the assignment.
                     save_path=data_folder / f"{model_stub}_flow_dashboard_{method}.png",
                 )
 
-                if sm is not None:
-                    diff = qtl_road_flows - aeq_road_flows.loc[road_link_ids]
-                    print(
-                        f"\n  Road-link flow difference (Quetzal - AequilibraE):\n{diff.describe().to_string()}\n"
-                    )
-
             # --- AequilibraE-only method convergence comparison ---
-            plot_aeq_method_convergence_times(
-                aeq_method_reports,
-                model_name.title(),
-                RGAP_TARGET,
-                save_path=data_folder / f"{model_stub}_aeq_method_convergence_time.png",
-            )
+            if aeq_method_reports:
+                plot_aeq_method_convergence_times(
+                    aeq_method_reports,
+                    model_name.title(),
+                    RGAP_TARGET,
+                    save_path=data_folder
+                    / f"{model_stub}_aeq_method_convergence_time.png",
+                )
