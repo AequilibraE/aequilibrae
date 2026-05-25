@@ -3,7 +3,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Union, TYPE_CHECKING
 
-import geopandas as gpd
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
