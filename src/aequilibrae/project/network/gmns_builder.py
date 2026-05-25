@@ -4,10 +4,10 @@ import re
 import string
 from collections import defaultdict
 from copy import deepcopy
+from typing import Any
 
 import numpy as np
 import pandas as pd
-import shapely.wkb
 import shapely.wkt
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
@@ -66,7 +66,7 @@ class GMNSBuilder:
         self.l_equiv = self.p.parameters["network"]["gmns"]["link"]["equivalency"]
         self.n_equiv = self.p.parameters["network"]["gmns"]["node"]["equivalency"]
 
-    def doWork(self):
+    def doWork(self) -> None:
         p = self.p
         gmns_n_fields = p.parameters["network"]["gmns"]["node"]["fields"]
         gmns_l_fields = p.parameters["network"]["gmns"]["link"]["fields"]
@@ -220,7 +220,7 @@ class GMNSBuilder:
 
         self.save_to_database(links_fields, nodes_fields)
 
-    def maybe_transform_srid(self, srid):
+    def maybe_transform_srid(self, srid: int) -> None:
         if srid == 4326:
             return
 
@@ -243,7 +243,7 @@ class GMNSBuilder:
 
             self.link_df.loc[idx, "geometry"] = LineString(new_points).wkt
 
-    def get_aeq_direction(self):
+    def get_aeq_direction(self) -> list:
         gmns_dir = self.l_equiv["direction"]
         gmns_cap = self.l_equiv["capacity"]
         gmns_lanes = self.l_equiv["lanes"]
@@ -287,7 +287,8 @@ class GMNSBuilder:
 
         return direction
 
-    def get_ab_lists(self, direction):
+    def get_ab_lists(self, direction) -> tuple[list[str], list[str], list[str], list[str], list[str], list[str],
+                                               list[str], list[str], ]:
         gmns_speed = self.l_equiv["speed"]
         gmns_cap = self.l_equiv["capacity"]
         gmns_lanes = self.l_equiv["lanes"]
@@ -322,7 +323,7 @@ class GMNSBuilder:
 
         return speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba
 
-    def save_types_to_aeq(self):
+    def save_types_to_aeq(self) -> list[str]:
         gmns_ltype = self.l_equiv["link_type"]
 
         # Setting link_type = 'unclassified' if there is no information about it in the GMNS links table
@@ -353,7 +354,7 @@ class GMNSBuilder:
 
         return link_types_list
 
-    def save_modes_to_aeq(self):
+    def save_modes_to_aeq(self) -> list[str]:
         gmns_modes = self.l_equiv["modes"]
 
         if gmns_modes in self.link_df.columns.to_list():
@@ -455,7 +456,7 @@ class GMNSBuilder:
 
         return modes_gathered
 
-    def correct_geometries(self):
+    def correct_geometries(self) -> None:
         p = self.p
         gmns_lid = self.l_equiv["link_id"]
         gmns_a_node = self.l_equiv["a_node"]
@@ -516,7 +517,7 @@ class GMNSBuilder:
                     f"It was not connected to its end node."
                 )
 
-    def save_to_database(self, links_fields, nodes_fields):
+    def save_to_database(self, links_fields: dict[str, Any], nodes_fields: dict[str, Any]) -> None:
         aeq_nodes_df = pd.DataFrame(nodes_fields)
         aeq_links_df = pd.DataFrame(links_fields)
 
