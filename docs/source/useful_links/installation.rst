@@ -34,11 +34,11 @@ macOS
 
 AequilibraE does not provide pre-built wheel files for macOS. When installing from PyPi, the source distribution will be used and the library will be compiled locally. AequilibraE can also be built from source. For both methods you will need to:
 
-0. Install `homebrew <https://brew.sh/>`_, a package manager for macOS, if you do not have it already.
-1. Install LLVM or another C/C++ compiler with OpenMP support: ``brew install llvm``
-2. Install libspatialite: ``brew install libspatialite`` as per `this answer on Stack Overflow <https://stackoverflow.com/a/48370444/1480643>`_
-3. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
-4. Update the AEQ_SPATIALITE_DIR environment variable to include the homebrew path when loading libspatialite: ``export AEQ_SPATIALITE_DIR="/opt/homebrew/lib"``
+#. Install `homebrew <https://brew.sh/>`_, a package manager for macOS, if you do not have it already.
+#. Install LLVM or another C/C++ compiler with OpenMP support: ``brew install llvm``
+#. Install libspatialite: ``brew install libspatialite`` as per `this answer on Stack Overflow <https://stackoverflow.com/a/48370444/1480643>`_
+#. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
+#. Set the ``AEQ_SPATIALITE_DIR`` environment variable to the directory containing ``mod_spatialite``: ``export AEQ_SPATIALITE_DIR="$(brew --prefix)/lib"``
 
 Alternatively, run all steps at once:
 
