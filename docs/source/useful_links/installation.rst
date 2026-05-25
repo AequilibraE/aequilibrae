@@ -40,6 +40,16 @@ AequilibraE does not provide pre-built wheel files for macOS. When installing fr
 3. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
 4. Update the AEQ_SPATIALITE_DIR environment variable to include the homebrew path when loading libspatialite: ``export AEQ_SPATIALITE_DIR="/opt/homebrew/lib"``
 
+Alternatively, run all steps at once:
+
+::
+
+  brew install llvm
+  brew install libspatialite
+  export CXX=/opt/homebrew/opt/llvm/bin/clang++
+  export CC=/opt/homebrew/opt/llvm/bin/clang
+  export AEQ_SPATIALITE_DIR="/opt/homebrew/lib"
+
 AequilibraE may also require raising the "open files" limit, this can be achieved with ``ulimit -n 10240``. This should be placed in ``.zshrc`` or similar user shell configuration file.
 
 .. _dependencies:
