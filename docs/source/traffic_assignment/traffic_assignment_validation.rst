@@ -71,28 +71,28 @@ issues with the reference results and welcome further investigations.
 
          .. tab-item:: biconjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Barcelona_convergence_bfw.png
+            .. image:: ../_images/assig_validation/Barcelona_flow_dashboard_bfw.png
                 :align: center
                 :width: 590
                 :alt: Barcelona Biconjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Conjugate Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Barcelona_convergence_cfw.png
+            .. image:: ../_images/assig_validation/Barcelona_flow_dashboard_cfw.png
                 :align: center
                 :width: 590
                 :alt: Barcelona Conjugate Frank-Wolfe 1000 iterations
 
          .. tab-item:: Frank-Wolfe
 
-            .. image:: ../_images/assig_validation/Barcelona_convergence_fw.png
+            .. image:: ../_images/assig_validation/Barcelona_flow_dashboard_fw.png
                 :align: center
                 :width: 590
                 :alt: Barcelona Frank-Wolfe 1000 iterations
 
          .. tab-item:: MSA
 
-            .. image:: ../_images/assig_validation/Barcelona_convergence_msa.png
+            .. image:: ../_images/assig_validation/Barcelona_flow_dashboard_msa.png
                 :align: center
                 :width: 590
                 :alt: Barcelona MSA 1000 iterations
