@@ -1,5 +1,5 @@
 import math
-from typing import Dict, Optional
+from typing import Dict, Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -26,6 +26,9 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
+
 
 class Network(WorkerThread):
     """
@@ -38,7 +41,7 @@ class Network(WorkerThread):
     link_types: LinkTypes = None
     signal = SIGNAL(object)
 
-    def __init__(self, project) -> None:
+    def __init__(self, project: "Project") -> None:
         WorkerThread.__init__(self, None)
 
         self.graphs: Dict[Graph] = {}

@@ -96,7 +96,7 @@ def bulk_connector_creation(
     limit_to_zone: bool = True,
     distance_upper_bound: float = float("inf"),
     projected_crs: Union[str, int, None] = None,
-):
+) -> None:
     """
     Creates or updates centroid connectors between zone centroids and network nodes.
 
