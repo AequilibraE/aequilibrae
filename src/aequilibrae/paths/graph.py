@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import pickle
 import uuid
@@ -6,7 +8,7 @@ from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from os.path import join
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
@@ -14,6 +16,9 @@ import pandas as pd
 
 from aequilibrae.context import get_logger
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+
+if TYPE_CHECKING:
+    from aequilibrae.paths import PathResults
 
 
 @dataclasses.dataclass
@@ -304,7 +309,7 @@ class GraphBase(ABC):  # noqa: B024
         early_exit: bool = False,
         a_star: bool = False,
         heuristic: Union[str, None] = None,
-    ):
+    ) -> PathResults:
         """
         Returns the results from path computation result holder.
 

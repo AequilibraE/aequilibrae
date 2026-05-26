@@ -39,31 +39,31 @@ class PathResults:
     """
 
     def __init__(self) -> None:
-        self.predecessors = None
-        self.connectors = None
-        self.skims = None
-        self._skimming_array = None
-        self.path = None
-        self.path_nodes = None
-        self.path_link_directions = None
-        self.milepost = None
-        self.reached_first = None
-        self.origin = None
-        self.destination = None
-        self.graph: Graph = None
-        self.early_exit = False
-        self.a_star = False
-        self.links = -1
-        self.nodes = -1
-        self.zones = -1
-        self.num_skims = -1
+        self.predecessors: np.ndarray | None = None
+        self.connectors: np.ndarray | None = None
+        self.skims: np.ndarray | None = None
+        self._skimming_array: np.ndarray | None = None
+        self.path: np.ndarray[tuple[int], np.dtype[np.int_]] | None = None
+        self.path_nodes: np.ndarray | None = None
+        self.path_link_directions: np.ndarray | None = None
+        self.milepost: np.ndarray | None = None
+        self.reached_first: np.ndarray | None = None
+        self.origin: int | None = None
+        self.destination: int | None = None
+        self.graph: Graph | None = None
+        self.early_exit: bool = False
+        self.a_star: bool = False
+        self.links: int = -1
+        self.nodes: int = -1
+        self.zones: int = -1
+        self.num_skims: int = -1
         self.__integer_type = None
         self.__float_type = None
-        self._graph_id = None
-        self.__graph_sum = None
-        self._early_exit = self.early_exit
-        self._a_star = self.a_star
-        self._heuristic = "equirectangular"
+        self._graph_id: str | None = None
+        self.__graph_sum: float | None = None
+        self._early_exit: bool = self.early_exit
+        self._a_star: bool = self.a_star
+        self._heuristic: str = "equirectangular"
 
     def compute_path(
         self,

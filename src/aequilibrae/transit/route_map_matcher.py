@@ -1,3 +1,4 @@
+from aequilibrae.paths.results.path_results import PathResults
 import logging
 from typing import Optional, Union
 
@@ -23,7 +24,7 @@ class RouteMapMatcher(WorkerThread):
         link_gdf: gpd.GeoDataFrame,
         nodes_gdf: gpd.GeoDataFrame,
         stops_gdf: gpd.GeoDataFrame,
-        distance_to_project: int | float = 50,
+        distance_to_project: float = 50,
     ):
         super().__init__(None)
 
@@ -136,7 +137,9 @@ class RouteMapMatcher(WorkerThread):
 
         self.reverse_graph = self.graph.reverse()
 
-    def _build_full_path_on_broken_links(self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None):
+    def _build_full_path_on_broken_links(
+        self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None
+    ) -> tuple[list[int], list[int]]:
         # It assumes that both the graph, stops AND route shape are in the same CRS
 
         if route_stops.shape[0] <= 1:
@@ -161,7 +164,9 @@ class RouteMapMatcher(WorkerThread):
 
         current_stop = int(route_stops.stop_id.iat[0])
 
-        res = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]), early_exit=True)
+        res: PathResults = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]), early_exit=True)
+        assert res.path is not None
+        assert res.path_link_directions is not None
 
         if route_stops.shape[0] == 2:
             if res.milepost is None:
@@ -239,7 +244,7 @@ class RouteMapMatcher(WorkerThread):
 
         return path_directions, path_links
 
-    def _build_path_df(self, path_directions, path_links) -> pd.DataFrame:
+    def _build_path_df(self, path_directions: list[int], path_links: list[int]) -> pd.DataFrame:
         """Builds a cleaned DataFrame of link IDs and directions from raw path data.
 
         Performs post-processing to:
@@ -330,7 +335,7 @@ class RouteMapMatcher(WorkerThread):
         # Find all links that intersect this buffer
         return gdf.sjoin(geolinks, how="inner", predicate="contains").link_id.tolist()
 
-    def assemble_shape(self, df: pd.DataFrame, enforce_single_parts=True) -> Union[LineString, MultiLineString]:
+    def assemble_shape(self, df: pd.DataFrame, enforce_single_parts: bool = True) -> Union[LineString, MultiLineString]:
         """Assembles a LineString shape from the matched path links.
 
         Args:
@@ -367,7 +372,7 @@ class RouteMapMatcher(WorkerThread):
         return LineString(coords)
 
     @staticmethod
-    def __rename_geo(gdf):
+    def __rename_geo(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         if gdf.active_geometry_name != "geometry":
-            return gdf.rename_geometry("geometry")
+            return gdf.rename_geometry("geometry", inplace=False)
         return gdf
