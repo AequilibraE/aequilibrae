@@ -21,6 +21,7 @@ from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
+from aequilibrae.project.network.visum_geojson_importer import VisumGeoJSONImporter, VisumGeoJSONReport
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -250,6 +251,59 @@ class Network(WorkerThread):
         gmns_builder.doWork()
 
         self.logger.info("Network built successfully")
+
+    def create_from_visum_geojson(
+        self,
+        path_or_layers,
+        *,
+        mode_mapping: dict[str, str] = None,
+        link_type_mapping: dict[object, str] = None,
+        source_crs: str | int = None,
+        accept_default_crs: bool = False,
+        allow_non_empty: bool = False,
+        geometry_tolerance: float = 1e-6,
+    ) -> VisumGeoJSONReport:
+        """
+        Creates an AequilibraE private-traffic network from VISUM GeoJSON layers.
+
+        :Arguments:
+            **path_or_layers** (:obj:`str`, :obj:`Path`, or :obj:`dict`): Folder with conventional VISUM GeoJSON
+            layer names, or an explicit mapping from layer names to files.
+
+            **mode_mapping** (:obj:`dict`, *Optional*): Mapping from VISUM transport systems to single-character
+            AequilibraE mode IDs. Defaults to ``{"CAR": "c", "HGV": "h"}``.
+
+            **link_type_mapping** (:obj:`dict`, *Optional*): Mapping from VISUM link class/type values to
+            AequilibraE link type names.
+
+            **source_crs** (:obj:`str` or :obj:`int`, *Optional*): CRS to assign to layers that do not declare one.
+
+            **accept_default_crs** (:obj:`bool`, *Optional*): Accept ``EPSG:4326`` for layers without CRS metadata.
+
+            **allow_non_empty** (:obj:`bool`, *Optional*): Allow importing into a project that already has links.
+
+            **geometry_tolerance** (:obj:`float`, *Optional*): Maximum coordinate-unit distance allowed between VISUM
+            topology references and line endpoints.
+
+        :Returns:
+            :class:`aequilibrae.project.network.visum_geojson_importer.VisumGeoJSONReport`: Import diagnostics,
+            mapping choices, field inventory, imported row counts, and source-record references.
+        """
+
+        importer = VisumGeoJSONImporter(
+            self,
+            path_or_layers,
+            mode_mapping=mode_mapping,
+            link_type_mapping=link_type_mapping,
+            source_crs=source_crs,
+            accept_default_crs=accept_default_crs,
+            allow_non_empty=allow_non_empty,
+            geometry_tolerance=geometry_tolerance,
+        )
+        report = importer.doWork()
+
+        self.logger.info("VISUM GeoJSON network imported successfully")
+        return report
 
     def export_to_gmns(self, path: str):
         """

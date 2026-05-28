@@ -102,6 +102,50 @@ specification.
     * :ref:`import_from_gmns`
         Usage example
 
+.. _importing_from_visum_geojson_file:
+
+Importing from VISUM GeoJSON
+----------------------------
+
+VISUM GeoJSON private-traffic exports can be imported with
+``Project.network.create_from_visum_geojson()``. The importer reads GeoJSON
+layers through GeoPandas, validates VISUM source topology from identifiers such
+as ``FROMNODENO``, ``TONODENO``, ``ZONENO``, and ``NODENO``, and creates
+AequilibraE nodes, links, zones, centroids, and centroid connectors.
+
+Folder-based import recognizes conventional files named ``node.geojson``,
+``link.geojson``, ``zone_centroid.geojson``, ``connector.geojson``, optional
+``zone_polygon.geojson``, and optional ``countlocation.geojson``. Custom file
+names can be supplied with an explicit layer-to-path mapping.
+
+By default, VISUM ``CAR`` maps to AequilibraE mode ``c`` and ``HGV`` maps to
+mode ``h``. Users can override this mapping, for example to merge ``HGV`` into
+``c``. Link classes use deterministic link-type creation, and users can provide
+their own link-type mapping when model classes need specific AequilibraE names.
+
+VISUM length, speed, time, and capacity-like fields are parsed into assignment
+fields where possible. AequilibraE trigger-derived ``distance`` remains based on
+stored geometry, while source VISUM lengths are preserved separately in
+``visum_length_ab`` and ``visum_length_ba`` when present. Missing CRS metadata
+must be resolved by supplying ``source_crs`` or explicitly accepting the default
+``EPSG:4326`` assumption.
+
+Count locations are imported only as supported link-count associations in the
+returned report. They are not used to adjust OD matrices, calibrate demand, or
+run ODME. Public transport layers, OD matrix files, turn counts, detector/lane
+counts, screenlines, speeds, routes, and travel-time observations are recognized
+as deferred workflows for later import pipelines.
+
+Interactive UI wiring for VISUM import belongs in the adjacent frontend or
+plugin repository. This Python package exposes the import API and documentation.
+
+.. seealso::
+
+    * :func:`aequilibrae.project.network.network.Network.create_from_visum_geojson`
+        Function documentation
+    * :ref:`import_from_visum_geojson`
+        Usage example
+
 .. _aequilibrae_to_gmns:
 
 Exporting AequilibraE model to GMNS format
