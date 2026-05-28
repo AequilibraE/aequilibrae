@@ -57,6 +57,8 @@ When working inside an OpenSpec change:
 - Keep `tasks.md` as an executable checklist and update it as tasks complete.
 - Write specs as durable requirements using `SHALL` language and concrete scenarios.
 - Do not treat a spec delta as implementation detail; it describes intended behavior.
+- When user feedback changes scope, behavior, requirements, data model decisions, API shape, or deferred-work boundaries during an active OpenSpec change, update the affected OpenSpec artifacts before coding. Usually this means `design.md`, `tasks.md`, and any relevant spec delta.
+- When a user resolves an open question in conversation, remove or move that question from the open-question list and reflect the decision in the appropriate decision, spec, or task text. Leave only genuinely unresolved or deferred questions visible.
 - After implementation, verify tests and docs, then archive or prepare the change according to the OpenSpec workflow.
 
 If OpenSpec commands are available, prefer the native OpenSpec commands. If they are not available, maintain the same folder and document structure manually.
