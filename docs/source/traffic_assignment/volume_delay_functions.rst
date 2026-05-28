@@ -263,6 +263,13 @@ Where :math:`z = \frac{v}{c} - 1`
   * :math:`\alpha = 0.25`
   * :math:`\tau = 0.8` (this is :math:`8 \times 0.1`, see note below)
 
+.. note::
+    Different than other VDF functions, Akcelik depends on link length and consistency between its parameters
+    and the units for speed and link length. As it is common for models to use distance in meters, speed in
+    kilometers per hour and to assign time periods longer than one hour, the :math:`\tau` parameter should be
+    calibrated accordingly.
+
+
 **Origin and Background:**
 
 Developed by Rahmi Akcelik, this function was specifically designed for signalized intersections 
@@ -334,6 +341,8 @@ General Recommendations
 * :math:`\alpha = 0.25` is typical for signalized intersections
 * :math:`\tau` should reflect local traffic signal characteristics
 * Remember to use :math:`8 \times \tau` in AequilibraE
+
+
 
 Calibration Considerations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -451,7 +460,7 @@ Using Different VDFs
     
     # Urban network with signals - Akcelik
     assig.set_vdf('AKCELIK')
-    assig.set_vdf_parameters({"alpha": 0.25, "tau": 0.8})
+    assig.set_vdf_parameters({"alpha": 0.25, "tau": 0.8, "distance": "distance"})
     
     # Network with strong capacity constraints - BPR2
     assig.set_vdf('BPR2')

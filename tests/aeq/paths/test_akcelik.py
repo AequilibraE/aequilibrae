@@ -39,14 +39,15 @@ def test_akcelik_function():
 
     np.testing.assert_allclose(should_be, congested_times, err_msg="Akcelik is wrong")
 
+    length = np.ones(link_flows.shape[0])
     # Let's check the derivative for sections of the curve
     dx = 0.00000001
     for i in range(1, 11):
         link_flows.fill(1 * 0.2 * i)
         link_flows += np.arange(11) * dx
 
-        akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, cores)
-        delta_akcelik(delta, link_flows, capacity, fftime, alpha, tau, cores)
+        akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores)
+        delta_akcelik(delta, link_flows, capacity, fftime, alpha, tau, length, cores)
 
         # We check if the analytical solution matches the numerical differentiation
         dydx = (congested_times[1] - congested_times[0]) / dx
