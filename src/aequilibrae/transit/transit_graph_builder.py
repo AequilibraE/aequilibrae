@@ -10,6 +10,11 @@ TransitGraphBuilder Assumptions:
 - headways are uniform for trips of the same pattern.
 
 """
+
+from __future__ import annotations
+
+from aequilibrae.paths import PathResults
+
 from pandas.core.frame import DataFrame
 
 import warnings
@@ -26,7 +31,6 @@ from pandas.api.types import is_integer_dtype
 from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import KDTree, minkowski_distance
 
-from aequilibrae.paths import PathResults
 from aequilibrae.paths import TransitGraph
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
@@ -100,7 +104,7 @@ class TransitGraphBuilder:
         num_threads: int = -1,
         seed: int | None = None,
         geometry_noise: bool | None = None,
-        noise_coef: float | None= None,
+        noise_coef: float | None = None,
         with_inner_stop_transfers: bool = False,
         with_outer_stop_transfers: bool = False,
         with_walking_edges: bool = True,
@@ -1188,11 +1192,11 @@ class TransitGraphBuilder:
         assert self.__connector_edges is not None
 
         edges: list[DataFrame] = [
-                self.__on_board_edges,
-                self.__boarding_edges,
-                self.__alighting_edges,
-                self.__dwell_edges,
-                self.__connector_edges
+            self.__on_board_edges,
+            self.__boarding_edges,
+            self.__alighting_edges,
+            self.__dwell_edges,
+            self.__connector_edges,
         ]
 
         # add optional edges
@@ -1355,8 +1359,6 @@ class TransitGraphBuilder:
         # Prepare shortest path computation
         graph = project.network.graphs[graph_key]
         graph.set_graph("distance")
-        res = PathResults()
-        res.prepare(graph)
 
         # Loop over connect edges, query for the closest nodes in the project and create the relevant line string
         lines = []
@@ -1382,7 +1384,7 @@ class TransitGraphBuilder:
             if ids[0] == ids[1]:
                 line = shapely.LineString((start, nodes.iloc[ids[0]].geometry, end))
             else:
-                res.compute_path(*nodes.iloc[ids].index.values)
+                res = PathResults(graph, *nodes.iloc[ids].index.values)
 
                 if res.path_nodes is not None:
                     line = shapely.ops.linemerge(
@@ -1542,7 +1544,7 @@ class TransitGraphBuilder:
         with pt_conn as conn:
             conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
 
-    def save_config(self, conn: sqlite3.Connection| None = None):
+    def save_config(self, conn: sqlite3.Connection | None = None):
         with conn or self.project.db_connection as conn:
             sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
             conn.execute(sql, [self.period_id, json.dumps(self.config)])
@@ -1566,8 +1568,8 @@ class TransitGraphBuilder:
     def save(
         self,
         robust=True,
-        pt_conn: sqlite3.Connection| None = None,
-        project_conn: sqlite3.Connection| None = None,
+        pt_conn: sqlite3.Connection | None = None,
+        project_conn: sqlite3.Connection | None = None,
     ):
         """Save the current graph to the public transport database.
 

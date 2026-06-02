@@ -38,7 +38,15 @@ class PathResults:
         >>> project.close()
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        graph: GraphBase,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
+    ) -> None:
         self.predecessors: np.ndarray | None = None
         self.connectors: np.ndarray | None = None
         self.skims: np.ndarray | None = None
@@ -64,6 +72,10 @@ class PathResults:
         self._early_exit: bool = self.early_exit
         self._a_star: bool = self.a_star
         self._heuristic: str = "equirectangular"
+
+        self.prepare(graph)
+
+        self.compute_path(origin, destination, early_exit=early_exit, a_star=a_star, heuristic=heuristic)
 
     def compute_path(
         self,

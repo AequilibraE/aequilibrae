@@ -328,9 +328,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         from aequilibrae.paths import PathResults
 
-        res = PathResults()
-        res.prepare(self)
-        res.compute_path(origin, destination, early_exit, a_star, heuristic)
+        res = PathResults(self, origin, destination, early_exit, a_star, heuristic)
 
         return res
 
