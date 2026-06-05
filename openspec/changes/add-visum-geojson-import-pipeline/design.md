@@ -45,6 +45,41 @@ VISUM link layers include `FROMNODENO` and `TONODENO`, and connectors include `Z
 
 Alternative considered: spatially match endpoints to nearby nodes. This can hide model errors and would require tolerance decisions that vary by CRS and simulator export settings.
 
+### Preserve coincident VISUM nodes by offsetting, not merging
+
+Real VISUM models can contain multiple node records at the same physical coordinates when the records represent distinct
+modal or topological layers. For example, one coincident node can serve bus/train/tram links while another serves only
+rail-like links. AequilibraE's network triggers reject inserting two nodes at the same coordinates and AequilibraE does
+not currently model turn restrictions that would make an automatic merge safe in all cases.
+
+The importer will therefore preserve separate VISUM node IDs by default and apply a tiny deterministic coordinate offset
+to all but one node in each duplicate coordinate group. The original VISUM longitude/latitude and optional projected
+`XCOORD`/`YCOORD` values are preserved on the imported node, and diagnostics identify the duplicate group and offset.
+Imported link and connector geometries are rewritten at their endpoints to match the adjusted node geometry so the
+AequilibraE spatial triggers keep the intended source topology. Strict callers can request an error policy instead.
+
+Alternative considered: automatically merge coincident nodes. This was rejected as the default because it can create
+artificial connectivity across modal layers, especially while turn restrictions are outside the importer scope.
+
+### Preserve centroid node IDs when source node and zone IDs collide
+
+AequilibraE zoning and connector helpers commonly assume a zone centroid's `node_id` matches the corresponding
+`zone_id`. Real VISUM exports may still contain a regular node whose `NO` equals a zone centroid `NO`. In that case, the
+importer will keep the zone/centroid ID unchanged and remap the regular source node to a deterministic free AequilibraE
+node ID. Links and connectors are inserted through the source-to-imported node mapping, and `nodes.visum_node_no`
+preserves the original VISUM number.
+
+Alternative considered: remap centroid node IDs. This was rejected because it would break more existing AequilibraE
+assumptions around zone-centroid identity than remapping regular imported nodes.
+
+### Offset zone centroids when their coordinates collide
+
+VISUM zone centroids can share coordinates with regular network nodes. Because AequilibraE stores centroids in the same
+`nodes` table and rejects duplicate node geometries, the importer will offset the centroid node geometry when needed
+while keeping the zone ID as the centroid node ID. Connector geometries are rewritten to start from the adjusted centroid
+coordinate. Original VISUM centroid coordinates remain preserved on the centroid node for traceability and future
+geolocation/audit uses.
+
 ### Private-traffic first
 
 The first version will focus on private-traffic network import and assignment-ready fields. VISUM public transport concepts overlap only partially with AequilibraE's current GTFS/transit import model, so public transport should be studied and specified separately.

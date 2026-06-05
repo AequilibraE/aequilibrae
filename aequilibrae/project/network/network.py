@@ -257,11 +257,14 @@ class Network(WorkerThread):
         path_or_layers,
         *,
         mode_mapping: dict[str, str] = None,
+        ignored_transport_systems: set[str] | list[str] | tuple[str, ...] = None,
         link_type_mapping: dict[object, str] = None,
         source_crs: str | int = None,
         accept_default_crs: bool = False,
         allow_non_empty: bool = False,
         geometry_tolerance: float = 1e-6,
+        duplicate_node_policy: str = "offset",
+        duplicate_node_offset_meters: float = 0.25,
     ) -> VisumGeoJSONReport:
         """
         Creates an AequilibraE private-traffic network from VISUM GeoJSON layers.
@@ -272,6 +275,9 @@ class Network(WorkerThread):
 
             **mode_mapping** (:obj:`dict`, *Optional*): Mapping from VISUM transport systems to single-character
             AequilibraE mode IDs. Defaults to ``{"CAR": "c", "HGV": "h"}``.
+
+            **ignored_transport_systems** (:obj:`set`, :obj:`list`, or :obj:`tuple`, *Optional*): VISUM transport
+            systems to ignore explicitly. Any transport system outside ``mode_mapping`` must be mapped or ignored.
 
             **link_type_mapping** (:obj:`dict`, *Optional*): Mapping from VISUM link class/type values to
             AequilibraE link type names.
@@ -285,6 +291,13 @@ class Network(WorkerThread):
             **geometry_tolerance** (:obj:`float`, *Optional*): Maximum coordinate-unit distance allowed between VISUM
             topology references and line endpoints.
 
+            **duplicate_node_policy** (:obj:`str`, *Optional*): Policy for VISUM nodes with identical coordinates.
+            ``"offset"`` preserves source topology with a tiny deterministic coordinate offset. ``"error"`` rejects
+            coincident source nodes before database writes.
+
+            **duplicate_node_offset_meters** (:obj:`float`, *Optional*): Approximate offset distance used when
+            ``duplicate_node_policy="offset"``.
+
         :Returns:
             :class:`aequilibrae.project.network.visum_geojson_importer.VisumGeoJSONReport`: Import diagnostics,
             mapping choices, field inventory, imported row counts, and source-record references.
@@ -294,11 +307,14 @@ class Network(WorkerThread):
             self,
             path_or_layers,
             mode_mapping=mode_mapping,
+            ignored_transport_systems=ignored_transport_systems,
             link_type_mapping=link_type_mapping,
             source_crs=source_crs,
             accept_default_crs=accept_default_crs,
             allow_non_empty=allow_non_empty,
             geometry_tolerance=geometry_tolerance,
+            duplicate_node_policy=duplicate_node_policy,
+            duplicate_node_offset_meters=duplicate_node_offset_meters,
         )
         report = importer.doWork()
 

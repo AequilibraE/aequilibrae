@@ -1,3 +1,4 @@
+import math
 import re
 import string
 from dataclasses import dataclass, field
@@ -7,7 +8,7 @@ from typing import Mapping
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from shapely.geometry import MultiPolygon
+from shapely.geometry import LineString, MultiPolygon, Point
 
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.utils.db_utils import commit_and_close
@@ -43,6 +44,18 @@ DEFERRED_COUNT_FIELDS = {
     "CARS_PROJ",
     "HVG_PROJ",
     "MOTOR_PROJ",
+}
+_DIGIT_WORDS = {
+    "0": "zero",
+    "1": "one",
+    "2": "two",
+    "3": "three",
+    "4": "four",
+    "5": "five",
+    "6": "six",
+    "7": "seven",
+    "8": "eight",
+    "9": "nine",
 }
 
 
@@ -196,6 +209,8 @@ def inventory_visum_layers(layers: Mapping[str, gpd.GeoDataFrame]) -> dict[str, 
                 role = "geometry"
             elif column.startswith("R_"):
                 role = "directional"
+            elif layer == "connector" and column == "NO":
+                role = "optional"
             elif column in {"NO", "FROMNODENO", "TONODENO", "ZONENO", "NODENO"}:
                 role = "required"
             elif column in COUNT_CANDIDATE_FIELDS:
@@ -266,31 +281,53 @@ class VisumGeoJSONImporter:
         path_or_layers: str | Path | Mapping[str, str | Path],
         *,
         mode_mapping: Mapping[str, str] | None = None,
+        ignored_transport_systems: set[str] | list[str] | tuple[str, ...] | None = None,
         link_type_mapping: Mapping[object, str] | None = None,
         source_crs: str | int | None = None,
         accept_default_crs: bool = False,
         allow_non_empty: bool = False,
         geometry_tolerance: float = 1e-6,
+        duplicate_node_policy: str = "offset",
+        duplicate_node_offset_meters: float = 0.25,
     ) -> None:
+        if duplicate_node_policy not in {"offset", "error"}:
+            raise ValueError("duplicate_node_policy must be 'offset' or 'error'")
+        if duplicate_node_policy == "offset" and duplicate_node_offset_meters <= 0:
+            raise ValueError("duplicate_node_offset_meters must be positive when duplicate_node_policy='offset'")
         self.net = net
         self.path_or_layers = path_or_layers
         self.mode_mapping = {str(k).upper(): v for k, v in (mode_mapping or DEFAULT_MODE_MAPPING).items()}
+        self.ignored_transport_systems = {str(token).upper() for token in (ignored_transport_systems or set())}
         self.link_type_mapping = dict(link_type_mapping or {})
         self.source_crs = source_crs
         self.accept_default_crs = accept_default_crs
         self.allow_non_empty = allow_non_empty
         self.geometry_tolerance = geometry_tolerance
+        self.duplicate_node_policy = duplicate_node_policy
+        self.duplicate_node_offset_meters = duplicate_node_offset_meters
         self.report = VisumGeoJSONReport(mode_mapping=dict(self.mode_mapping))
         self.layers: dict[str, gpd.GeoDataFrame] = {}
+        self.node_ids: dict[object, int] = {}
+        self.node_points: dict[object, Point] = {}
+        self.node_metadata: dict[object, dict[str, object]] = {}
+        self.zone_points: dict[object, Point] = {}
+        self.zone_metadata: dict[object, dict[str, object]] = {}
         self.source_to_link_id: dict[object, int] = {}
+        self.connector_source_keys: dict[object, str] = {}
+        self.connector_source_nos: dict[object, int | None] = {}
+        self.skipped_records: dict[str, set[object]] = {"link": set(), "connector": set()}
 
     def doWork(self) -> VisumGeoJSONReport:
         self._discover_and_read()
         self._validate_required_columns()
+        self._prepare_connector_source_keys()
         self._validate_mode_values()
         self._validate_assignment_values()
         self._validate_assignment_readiness()
         self._validate_topology()
+        self._prepare_node_geometries()
+        self._prepare_node_ids()
+        self._prepare_zone_geometries()
         self.report.raise_for_errors()
 
         if self.net.count_links() > 0 and not self.allow_non_empty:
@@ -341,7 +378,7 @@ class VisumGeoJSONImporter:
             "node": {"NO"},
             "link": {"NO", "FROMNODENO", "TONODENO", "TSYSSET"},
             "zone_centroid": {"NO"},
-            "connector": {"NO", "ZONENO", "NODENO", "TSYSSET"},
+            "connector": {"ZONENO", "NODENO", "TSYSSET"},
         }
         for layer, fields in required.items():
             if layer not in self.layers:
@@ -356,13 +393,45 @@ class VisumGeoJSONImporter:
                     field=field_name,
                 )
 
+    def _prepare_connector_source_keys(self) -> None:
+        if "connector" not in self.layers:
+            return
+
+        base_counts = {}
+        for row_index, row in self.layers["connector"].iterrows():
+            source_no = _optional_int(row.get("NO"))
+            ab_modes = self._mapped_modes(row.get("TSYSSET"), "connector", source_no)
+            ba_modes = self._mapped_modes(row.get("R_TSYSSET"), "connector", source_no)
+            direction_code = _connector_direction_code(_direction(ab_modes, ba_modes))
+            base_key = (
+                f"connector:{_connector_key_part(row.get('ZONENO'))}:"
+                f"{_connector_key_part(row.get('NODENO'))}:{direction_code}"
+            )
+            base_counts[base_key] = base_counts.get(base_key, 0) + 1
+            suffix = "" if base_counts[base_key] == 1 else f":{base_counts[base_key]}"
+            self.connector_source_keys[row_index] = f"{base_key}{suffix}"
+            self.connector_source_nos[row_index] = source_no
+
+    def _source_id(self, layer: str, row_index, row):
+        if layer == "connector":
+            return self._connector_source_key(row_index)
+        return row.get("NO")
+
+    def _connector_source_key(self, row_index) -> str:
+        return self.connector_source_keys.get(row_index, f"connector:{row_index}")
+
+    def _connector_source_no(self, row_index) -> int | None:
+        return self.connector_source_nos.get(row_index)
+
     def _validate_topology(self) -> None:
         if not REQUIRED_LAYERS.issubset(self.layers):
             return
 
         nodes = self.layers["node"].set_index("NO")
         zones = self.layers["zone_centroid"].set_index("NO")
-        for _, row in self.layers["link"].iterrows():
+        for row_index, row in self.layers["link"].iterrows():
+            if self._skip_record("link", row_index):
+                continue
             source_id = row["NO"]
             if row["FROMNODENO"] not in nodes.index or row["TONODENO"] not in nodes.index:
                 self.report.add(
@@ -376,8 +445,10 @@ class VisumGeoJSONImporter:
             self._validate_line_endpoint(row.geometry, nodes.loc[row["FROMNODENO"]].geometry, True, "link", source_id)
             self._validate_line_endpoint(row.geometry, nodes.loc[row["TONODENO"]].geometry, False, "link", source_id)
 
-        for _, row in self.layers["connector"].iterrows():
-            source_id = row["NO"]
+        for row_index, row in self.layers["connector"].iterrows():
+            if self._skip_record("connector", row_index):
+                continue
+            source_id = self._connector_source_key(row_index)
             if row["ZONENO"] not in zones.index:
                 self.report.add(
                     "error",
@@ -400,40 +471,100 @@ class VisumGeoJSONImporter:
             self._validate_line_endpoint(row.geometry, nodes.loc[row["NODENO"]].geometry, False, "connector", source_id)
 
     def _validate_mode_values(self) -> None:
+        unmapped = {}
+        ignored = {}
         for layer in ("link", "connector"):
             if layer not in self.layers:
                 continue
-            for _, row in self.layers[layer].iterrows():
-                source_id = row.get("NO")
+            for row_index, row in self.layers[layer].iterrows():
+                source_id = self._source_id(layer, row_index, row)
                 ab_tokens = _split_tsysset(row.get("TSYSSET"))
                 ba_tokens = _split_tsysset(row.get("R_TSYSSET"))
-                if not ab_tokens and not ba_tokens:
+                tokens = ab_tokens + ba_tokens
+                mapped_tokens = [token for token in tokens if token.upper() in self.mode_mapping]
+                ignored_tokens = [token for token in tokens if token.upper() in self.ignored_transport_systems]
+                unmapped_tokens = [
+                    token
+                    for token in tokens
+                    if token.upper() not in self.mode_mapping and token.upper() not in self.ignored_transport_systems
+                ]
+
+                if not tokens:
+                    self.skipped_records[layer].add(row_index)
                     self.report.add(
-                        "error",
-                        "no-private-modes",
-                        "Record has no private transport systems in either direction",
+                        "warning",
+                        "empty-transport-systems",
+                        "Record has no declared transport systems and will not be imported",
                         layer=layer,
                         field="TSYSSET",
                         source_id=source_id,
                     )
-                for token in ab_tokens + ba_tokens:
-                    if token.upper() not in self.mode_mapping:
-                        self.report.add(
-                            "error",
-                            "unmapped-transport-system",
-                            f"Transport system '{token}' is not mapped",
-                            layer=layer,
-                            field="TSYSSET",
-                            source_id=source_id,
-                        )
+                    continue
+
+                for token in set(unmapped_tokens):
+                    self._add_transport_system_summary(unmapped, layer, token, source_id)
+                for token in set(ignored_tokens):
+                    self._add_transport_system_summary(ignored, layer, token, source_id)
+
+                if mapped_tokens:
+                    continue
+                if unmapped_tokens:
+                    continue
+
+                self.skipped_records[layer].add(row_index)
+                self.report.add(
+                    "warning",
+                    "ignored-record",
+                    "Record has only explicitly ignored transport systems and will not be imported",
+                    layer=layer,
+                    field="TSYSSET",
+                    source_id=source_id,
+                )
+
+        for (layer, token), summary in sorted(unmapped.items()):
+            source_text = ", ".join(str(source_id) for source_id in summary["sources"])
+            self.report.add(
+                "error",
+                "unmapped-transport-system",
+                (
+                    f"Transport system '{token}' appears in {summary['count']} {layer} records and requires an "
+                    f"explicit mode_mapping or ignored_transport_systems decision. Sample source IDs: {source_text}"
+                ),
+                layer=layer,
+                field="TSYSSET",
+            )
+
+        for (layer, token), summary in sorted(ignored.items()):
+            self.report.add(
+                "info",
+                "ignored-transport-system",
+                f"Transport system '{token}' is explicitly ignored in {summary['count']} {layer} records",
+                layer=layer,
+                field="TSYSSET",
+            )
+
+    def _add_transport_system_summary(self, summary: dict, layer: str, token: str, source_id) -> None:
+        key = (layer, token.upper())
+        if key not in summary:
+            summary[key] = {"count": 0, "sources": []}
+        summary[key]["count"] += 1
+        if len(summary[key]["sources"]) < 5:
+            summary[key]["sources"].append(source_id)
+
+    def _skip_record(self, layer: str, row_index) -> bool:
+        return row_index in self.skipped_records.get(layer, set())
 
     def _validate_assignment_values(self) -> None:
         for layer in ("link", "connector"):
             if layer not in self.layers:
                 continue
-            for _, row in self.layers[layer].iterrows():
-                source_id = row.get("NO")
+            for row_index, row in self.layers[layer].iterrows():
+                if self._skip_record(layer, row_index):
+                    continue
+                source_id = self._source_id(layer, row_index, row)
                 for prefix in ("", "R_"):
+                    if not self._mapped_modes(row.get(f"{prefix}TSYSSET"), layer, source_id):
+                        continue
                     for field_name, parser in (
                         (f"{prefix}LENGTH", parse_visum_length),
                         (f"{prefix}V0PRT", parse_visum_speed),
@@ -458,10 +589,12 @@ class VisumGeoJSONImporter:
         for layer in ("link", "connector"):
             if layer not in self.layers:
                 continue
-            for _, row in self.layers[layer].iterrows():
-                source_id = row.get("NO")
+            for row_index, row in self.layers[layer].iterrows():
+                if self._skip_record(layer, row_index):
+                    continue
+                source_id = self._source_id(layer, row_index, row)
                 for prefix, direction_value in (("", row.get("TSYSSET")), ("R_", row.get("R_TSYSSET"))):
-                    if not _split_tsysset(direction_value):
+                    if not self._mapped_modes(direction_value, layer, source_id):
                         continue
                     try:
                         length, speed, capacity, time = self._assignment_values(row, prefix, layer, source_id)
@@ -508,6 +641,12 @@ class VisumGeoJSONImporter:
             {
                 "visum_node_no": ("VISUM source node identifier", "INTEGER"),
                 "visum_zone_no": ("VISUM source zone identifier for centroid nodes", "INTEGER"),
+                "visum_original_lon": ("VISUM source node longitude before importer coordinate disambiguation", "REAL"),
+                "visum_original_lat": ("VISUM source node latitude before importer coordinate disambiguation", "REAL"),
+                "visum_xcoord": ("VISUM source projected X coordinate when provided", "REAL"),
+                "visum_ycoord": ("VISUM source projected Y coordinate when provided", "REAL"),
+                "visum_duplicate_coord_group": ("VISUM duplicate coordinate group identifier", "TEXT"),
+                "visum_coord_offset_m": ("Approximate coordinate offset applied during VISUM import in meters", "REAL"),
             },
         )
         self._add_fields(
@@ -515,6 +654,7 @@ class VisumGeoJSONImporter:
             {
                 "visum_link_no": ("VISUM source link identifier", "INTEGER"),
                 "visum_connector_no": ("VISUM source connector identifier", "INTEGER"),
+                "visum_connector_key": ("Deterministic VISUM connector source key", "TEXT"),
                 "visum_length_ab": ("VISUM source AB length in meters", "NUMERIC"),
                 "visum_length_ba": ("VISUM source BA length in meters", "NUMERIC"),
             },
@@ -553,7 +693,9 @@ class VisumGeoJSONImporter:
                 continue
             if layer == "connector":
                 continue
-            for _, row in self.layers[layer].iterrows():
+            for row_index, row in self.layers[layer].iterrows():
+                if self._skip_record(layer, row_index):
+                    continue
                 source_values.append(_link_type_source_value(row))
         mapping = dict(self.link_type_mapping)
         used_ids = set(self.net.link_types.all_types())
@@ -593,12 +735,31 @@ class VisumGeoJSONImporter:
     def _insert_nodes(self, conn) -> dict[object, int]:
         mapping = {}
         query = """
-            INSERT INTO nodes(node_id, is_centroid, visum_node_no, geometry)
-            VALUES(?, 0, ?, MakePoint(?, ?, 4326))
+            INSERT INTO nodes(
+                node_id, is_centroid, visum_node_no, visum_original_lon, visum_original_lat, visum_xcoord,
+                visum_ycoord, visum_duplicate_coord_group, visum_coord_offset_m, geometry
+            )
+            VALUES(?, 0, ?, ?, ?, ?, ?, ?, ?, MakePoint(?, ?, 4326))
         """
         for _, row in self.layers["node"].iterrows():
-            node_id = int(row["NO"])
-            conn.execute(query, (node_id, node_id, row.geometry.x, row.geometry.y))
+            node_id = self._node_id(row["NO"])
+            point = self._node_point(row["NO"])
+            metadata = self.node_metadata.get(row["NO"], {})
+            conn.execute(
+                query,
+                (
+                    node_id,
+                    int(row["NO"]),
+                    metadata.get("original_lon", row.geometry.x),
+                    metadata.get("original_lat", row.geometry.y),
+                    metadata.get("xcoord"),
+                    metadata.get("ycoord"),
+                    metadata.get("duplicate_group"),
+                    metadata.get("offset_m", 0.0),
+                    point.x,
+                    point.y,
+                ),
+            )
             mapping[row["NO"]] = node_id
         self.report.source_references["nodes"] = mapping
         return mapping
@@ -622,12 +783,28 @@ class VisumGeoJSONImporter:
                 """,
                 (zone_id, name, zone_id, geometry.wkt),
             )
+            point = self._zone_point(row["NO"])
+            metadata = self.zone_metadata.get(row["NO"], {})
             conn.execute(
                 """
-                INSERT INTO nodes(node_id, is_centroid, visum_zone_no, geometry)
-                VALUES(?, 1, ?, MakePoint(?, ?, 4326))
+                INSERT INTO nodes(
+                    node_id, is_centroid, visum_zone_no, visum_original_lon, visum_original_lat, visum_xcoord,
+                    visum_ycoord, visum_duplicate_coord_group, visum_coord_offset_m, geometry
+                )
+                VALUES(?, 1, ?, ?, ?, ?, ?, ?, ?, MakePoint(?, ?, 4326))
                 """,
-                (zone_id, zone_id, row.geometry.x, row.geometry.y),
+                (
+                    zone_id,
+                    zone_id,
+                    metadata.get("original_lon", row.geometry.x),
+                    metadata.get("original_lat", row.geometry.y),
+                    metadata.get("xcoord"),
+                    metadata.get("ycoord"),
+                    metadata.get("duplicate_group"),
+                    metadata.get("offset_m", 0.0),
+                    point.x,
+                    point.y,
+                ),
             )
             zones[row["NO"]] = zone_id
         self.report.source_references["zones"] = zones
@@ -642,7 +819,9 @@ class VisumGeoJSONImporter:
             )
             VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GeomFromText(?, 4326))
         """
-        for _, row in self.layers["link"].iterrows():
+        for row_index, row in self.layers["link"].iterrows():
+            if self._skip_record("link", row_index):
+                continue
             source_id = int(row["NO"])
             ab_modes = self._mapped_modes(row.get("TSYSSET"), "link", source_id)
             ba_modes = self._mapped_modes(row.get("R_TSYSSET"), "link", source_id)
@@ -658,8 +837,8 @@ class VisumGeoJSONImporter:
                 query,
                 (
                     source_id,
-                    int(row["FROMNODENO"]),
-                    int(row["TONODENO"]),
+                    self._node_id(row["FROMNODENO"]),
+                    self._node_id(row["TONODENO"]),
                     direction,
                     "".join(sorted(ab_modes | ba_modes)),
                     link_type,
@@ -672,7 +851,7 @@ class VisumGeoJSONImporter:
                     source_id,
                     length_ab,
                     length_ba,
-                    row.geometry.wkt,
+                    self._link_geometry(row).wkt,
                 ),
             )
             mapping[row["NO"]] = source_id
@@ -686,13 +865,19 @@ class VisumGeoJSONImporter:
         query = """
             INSERT INTO links(
                 link_id, a_node, b_node, direction, modes, link_type, speed_ab, speed_ba, capacity_ab, capacity_ba,
-                travel_time_ab, travel_time_ba, visum_connector_no, visum_length_ab, visum_length_ba, geometry
+                travel_time_ab, travel_time_ba, visum_connector_no, visum_connector_key, visum_length_ab,
+                visum_length_ba, geometry
             )
-            VALUES(?, ?, ?, ?, ?, 'centroid_connector', ?, ?, ?, ?, ?, ?, ?, ?, ?, GeomFromText(?, 4326))
+            VALUES(?, ?, ?, ?, ?, 'centroid_connector', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GeomFromText(?, 4326))
         """
-        for idx, (_, row) in enumerate(self.layers["connector"].iterrows(), start=1):
+        idx = 0
+        for row_index, row in self.layers["connector"].iterrows():
+            if self._skip_record("connector", row_index):
+                continue
+            idx += 1
             link_id = max_link + idx
-            source_id = int(row["NO"])
+            source_id = self._connector_source_key(row_index)
+            source_no = self._connector_source_no(row_index)
             ab_modes = self._mapped_modes(row.get("TSYSSET"), "connector", source_id)
             ba_modes = self._mapped_modes(row.get("R_TSYSSET"), "connector", source_id)
             direction = _direction(ab_modes, ba_modes)
@@ -707,7 +892,7 @@ class VisumGeoJSONImporter:
                 (
                     link_id,
                     int(row["ZONENO"]),
-                    int(row["NODENO"]),
+                    self._node_id(row["NODENO"]),
                     direction,
                     "".join(sorted(ab_modes | ba_modes)),
                     speed_ab,
@@ -716,15 +901,192 @@ class VisumGeoJSONImporter:
                     capacity_ba,
                     time_ab,
                     time_ba,
+                    source_no,
                     source_id,
                     length_ab,
                     length_ba,
-                    row.geometry.wkt,
+                    self._connector_geometry(row).wkt,
                 ),
             )
-            mapping[row["NO"]] = link_id
+            mapping[source_id] = link_id
         self.report.source_references["connectors"] = mapping
         return mapping
+
+    def _prepare_node_geometries(self) -> None:
+        if "node" not in self.layers:
+            return
+
+        groups: dict[tuple[float, float], list[tuple[object, object, Point]]] = {}
+        for row_index, row in self.layers["node"].iterrows():
+            point = row.geometry
+            if point is None or point.is_empty:
+                continue
+            source_id = row["NO"]
+            self.node_points[source_id] = point
+            self.node_metadata[source_id] = {
+                "original_lon": point.x,
+                "original_lat": point.y,
+                "xcoord": _optional_float(row.get("XCOORD")),
+                "ycoord": _optional_float(row.get("YCOORD")),
+                "duplicate_group": None,
+                "offset_m": 0.0,
+            }
+            groups.setdefault((point.x, point.y), []).append((row_index, source_id, point))
+
+        duplicate_group_number = 0
+        for records in groups.values():
+            if len(records) < 2:
+                continue
+            duplicate_group_number += 1
+            source_ids = [record[1] for record in records]
+            if self.duplicate_node_policy == "error":
+                self.report.add(
+                    "error",
+                    "coincident-node-coordinate",
+                    "VISUM nodes share identical coordinates; use duplicate_node_policy='offset' to preserve topology",
+                    layer="node",
+                    source_id=", ".join(str(source_id) for source_id in source_ids),
+                )
+                continue
+
+            group_id = f"node-coordinate-{duplicate_group_number}"
+            for position, (_, source_id, point) in enumerate(records):
+                offset_m = 0.0
+                adjusted_point = point
+                if position > 0:
+                    offset_m = self.duplicate_node_offset_meters
+                    adjusted_point = _offset_point(point, position - 1, len(records) - 1, offset_m)
+                self.node_points[source_id] = adjusted_point
+                self.node_metadata[source_id]["duplicate_group"] = group_id
+                self.node_metadata[source_id]["offset_m"] = offset_m
+
+            self.report.add(
+                "warning",
+                "coincident-node-offset",
+                (
+                    f"{len(records)} VISUM nodes share coordinates; importer applied deterministic offsets to "
+                    "preserve source topology. Source node IDs: "
+                    f"{', '.join(str(source_id) for source_id in source_ids)}"
+                ),
+                layer="node",
+                source_id=", ".join(str(source_id) for source_id in source_ids),
+            )
+
+        self.report.source_references["node_coordinate_offsets"] = {
+            _jsonish(source_id): {
+                "original_lon": metadata["original_lon"],
+                "original_lat": metadata["original_lat"],
+                "offset_m": metadata["offset_m"],
+                "duplicate_group": metadata["duplicate_group"],
+            }
+            for source_id, metadata in self.node_metadata.items()
+            if metadata.get("duplicate_group") is not None
+        }
+
+    def _node_point(self, source_id) -> Point:
+        return self.node_points[source_id]
+
+    def _prepare_node_ids(self) -> None:
+        if "node" not in self.layers:
+            return
+
+        zone_ids = {int(row["NO"]) for _, row in self.layers.get("zone_centroid", pd.DataFrame()).iterrows()}
+        source_node_ids = [int(row["NO"]) for _, row in self.layers["node"].iterrows()]
+        used_ids = set(zone_ids)
+        next_node_id = max(used_ids | set(source_node_ids), default=0) + 1
+
+        for _, row in self.layers["node"].iterrows():
+            source_id = row["NO"]
+            preferred_id = int(source_id)
+            if preferred_id not in used_ids:
+                node_id = preferred_id
+            else:
+                while next_node_id in used_ids:
+                    next_node_id += 1
+                node_id = next_node_id
+                next_node_id += 1
+                self.report.add(
+                    "warning",
+                    "node-id-remapped",
+                    (
+                        f"VISUM node {source_id} uses an ID reserved for a zone centroid; "
+                        f"imported as AequilibraE node {node_id}"
+                    ),
+                    layer="node",
+                    field="NO",
+                    source_id=source_id,
+                )
+            self.node_ids[source_id] = node_id
+            used_ids.add(node_id)
+
+    def _node_id(self, source_id) -> int:
+        return self.node_ids[source_id]
+
+    def _prepare_zone_geometries(self) -> None:
+        if "zone_centroid" not in self.layers:
+            return
+
+        occupied = {(point.x, point.y) for point in self.node_points.values()}
+        offset_number = 0
+        for _, row in self.layers["zone_centroid"].iterrows():
+            source_id = row["NO"]
+            point = row.geometry
+            self.zone_metadata[source_id] = {
+                "original_lon": point.x,
+                "original_lat": point.y,
+                "xcoord": _optional_float(row.get("XCOORD")),
+                "ycoord": _optional_float(row.get("YCOORD")),
+                "duplicate_group": None,
+                "offset_m": 0.0,
+            }
+
+            adjusted_point = point
+            if (adjusted_point.x, adjusted_point.y) in occupied:
+                offset_number += 1
+                group_id = f"zone-coordinate-{offset_number}"
+                offset_step = 0
+                while (adjusted_point.x, adjusted_point.y) in occupied:
+                    adjusted_point = _offset_point(point, offset_step, 8, self.duplicate_node_offset_meters)
+                    offset_step += 1
+                self.zone_metadata[source_id]["duplicate_group"] = group_id
+                self.zone_metadata[source_id]["offset_m"] = self.duplicate_node_offset_meters
+                self.report.add(
+                    "warning",
+                    "coincident-centroid-offset",
+                    (
+                        f"VISUM zone centroid {source_id} shares coordinates with another imported node; "
+                        "importer applied a deterministic offset"
+                    ),
+                    layer="zone_centroid",
+                    source_id=source_id,
+                )
+
+            self.zone_points[source_id] = adjusted_point
+            occupied.add((adjusted_point.x, adjusted_point.y))
+
+        self.report.source_references["zone_coordinate_offsets"] = {
+            _jsonish(source_id): {
+                "original_lon": metadata["original_lon"],
+                "original_lat": metadata["original_lat"],
+                "offset_m": metadata["offset_m"],
+                "duplicate_group": metadata["duplicate_group"],
+            }
+            for source_id, metadata in self.zone_metadata.items()
+            if metadata.get("duplicate_group") is not None
+        }
+
+    def _zone_point(self, source_id) -> Point:
+        return self.zone_points[source_id]
+
+    def _link_geometry(self, row) -> LineString:
+        return _line_with_endpoints(
+            row.geometry,
+            self._node_point(row["FROMNODENO"]),
+            self._node_point(row["TONODENO"]),
+        )
+
+    def _connector_geometry(self, row) -> LineString:
+        return _line_with_endpoints(row.geometry, self._zone_point(row["ZONENO"]), self._node_point(row["NODENO"]))
 
     def _mapped_modes(self, value, layer: str, source_id) -> set[str]:
         modes = set()
@@ -834,6 +1196,55 @@ def _direction(ab_modes: set[str], ba_modes: set[str]) -> int:
     return 1
 
 
+def _connector_direction_code(direction: int) -> str:
+    return {0: "B", 1: "O", -1: "D"}[direction]
+
+
+def _connector_key_part(value) -> str:
+    if value is None or pd.isna(value):
+        return "unknown"
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _optional_int(value) -> int | None:
+    if value is None or pd.isna(value) or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value) -> float | None:
+    if value is None or pd.isna(value) or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _offset_point(point: Point, offset_index: int, offset_count: int, offset_meters: float) -> Point:
+    angle = 2.0 * math.pi * offset_index / max(offset_count, 1)
+    latitude_radians = math.radians(point.y)
+    meters_per_degree_latitude = 111_320.0
+    meters_per_degree_longitude = max(math.cos(latitude_radians) * meters_per_degree_latitude, 1e-9)
+    dx = math.cos(angle) * offset_meters / meters_per_degree_longitude
+    dy = math.sin(angle) * offset_meters / meters_per_degree_latitude
+    return Point(point.x + dx, point.y + dy)
+
+
+def _line_with_endpoints(geometry, start_point: Point, end_point: Point) -> LineString:
+    coords = [(coord[0], coord[1]) for coord in geometry.coords]
+    coords[0] = (start_point.x, start_point.y)
+    coords[-1] = (end_point.x, end_point.y)
+    return LineString(coords)
+
+
 def _link_type_source_value(row) -> object:
     for field_name in ("LC", "TYPENO"):
         if field_name in row and not pd.isna(row[field_name]) and row[field_name] != "":
@@ -850,7 +1261,10 @@ def _first_unused_link_type_id(source: str, used: set[str]) -> str | None:
 
 
 def _clean_name(value) -> str:
-    text = re.sub(r"[^a-zA-Z_]+", "_", str(value).strip().lower()).strip("_")
+    text = str(value).strip().lower()
+    text = re.sub(r"\d", lambda match: f"_{_DIGIT_WORDS[match.group(0)]}", text)
+    text = re.sub(r"[^a-zA-Z_]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
     if not text or text[0] not in string.ascii_letters:
         text = f"visum_{text}" if text else "visum_default"
     return text

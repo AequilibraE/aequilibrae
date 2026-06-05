@@ -16,3 +16,7 @@ The system SHALL support creating and exporting network data through supported e
 - **WHEN** VISUM GeoJSON private-traffic import is requested
 - **THEN** the system SHALL populate network links, nodes, zones, centroids, and connectors according to configured VISUM mappings
 - **AND** preserve source identifiers and imported count locations for traceability and validation
+- **AND** preserve separate VISUM nodes that share coordinates unless strict duplicate-node handling is requested
+- **AND** preserve original VISUM coordinates when imported node geometries are offset to satisfy AequilibraE node uniqueness rules
+- **AND** preserve source-to-imported node ID mappings when VISUM regular node numbers collide with centroid node IDs
+- **AND** preserve zone centroids with adjusted coordinates when VISUM centroid coordinates collide with another imported node

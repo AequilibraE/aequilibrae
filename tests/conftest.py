@@ -22,6 +22,44 @@ DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
 
 
+def pytest_addoption(parser):
+    group = parser.getgroup("aequilibrae")
+    group.addoption(
+        "--visum-geojson-folder",
+        action="store",
+        default=None,
+        help="Folder with external VISUM GeoJSON files for opt-in importer smoke tests.",
+    )
+    group.addoption(
+        "--visum-expected-nodes",
+        action="store",
+        type=int,
+        default=None,
+        help="Expected imported node count for --visum-geojson-folder.",
+    )
+    group.addoption(
+        "--visum-expected-zones",
+        action="store",
+        type=int,
+        default=None,
+        help="Expected imported zone count for --visum-geojson-folder.",
+    )
+    group.addoption(
+        "--visum-expected-links",
+        action="store",
+        type=int,
+        default=None,
+        help="Expected imported link count for --visum-geojson-folder.",
+    )
+    group.addoption(
+        "--visum-expected-connectors",
+        action="store",
+        type=int,
+        default=None,
+        help="Expected imported connector count for --visum-geojson-folder.",
+    )
+
+
 @pytest.fixture(scope="session")
 def cache_path(tmp_path_factory):
     return tmp_path_factory.mktemp("cache", numbered=True)

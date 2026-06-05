@@ -106,3 +106,49 @@
 - [x] 10.4 Run relevant documentation doctests or example checks.
 - [x] 10.5 Run `ruff check aequilibrae/` on touched package code.
 - [x] 10.6 Run `openspec.cmd status --change add-visum-geojson-import-pipeline` and resolve any incomplete artifacts.
+
+## 11. Post-Review Real VISUM Connector Compatibility
+
+- [x] 11.1 Document that connector `NO` is optional and deterministic connector keys are generated from zone, node, and usable direction.
+- [x] 11.2 Implement connector import for layers without a numeric `NO`, preserving optional `visum_connector_no` and durable `visum_connector_key`.
+- [x] 11.3 Add regression tests for connector layers without `NO` and for duplicate deterministic connector keys.
+- [x] 11.4 Run focused VISUM importer tests and linting for touched files.
+
+## 12. Explicit Transport-System Mapping Decisions
+
+- [x] 12.1 Document that transport systems outside the default mapping require explicit mapping or explicit ignore decisions.
+- [x] 12.2 Add an `ignored_transport_systems` API option and report unmapped/ignored transport systems with structured diagnostics.
+- [x] 12.3 Skip records whose transport systems are all explicitly ignored and keep imported counts consistent.
+- [x] 12.4 Add regression tests for extra transport systems, explicit ignores, and user mappings such as `BUS -> t`.
+- [x] 12.5 Run focused VISUM importer tests and linting for touched files.
+
+## 13. Numeric Link-Type Naming Compatibility
+
+- [x] 13.1 Document that numeric VISUM `TYPENO` fallback values produce distinct AequilibraE link-type names.
+- [x] 13.2 Preserve digits in generated link-type names while keeping valid names for values that begin with digits.
+- [x] 13.3 Add regression tests for numeric `TYPENO` values such as `2` and `92`.
+- [x] 13.4 Run focused VISUM importer tests and linting for touched files.
+
+## 14. Coincident VISUM Node Compatibility
+
+- [x] 14.1 Document that coincident VISUM nodes can encode separate modal/topological layers and must not be merged by default.
+- [x] 14.2 Add a `duplicate_node_policy` API option with deterministic offset behavior and strict error behavior.
+- [x] 14.3 Preserve original VISUM node coordinates and offset diagnostics when disambiguating coincident nodes.
+- [x] 14.4 Update link and connector geometries to use adjusted endpoint coordinates for offset nodes.
+- [x] 14.5 Add regression tests for duplicate-node offset import and strict duplicate-node rejection.
+
+## 15. Source Node And Zone ID Collision Compatibility
+
+- [x] 15.1 Document that VISUM regular node numbers may collide with VISUM zone numbers.
+- [x] 15.2 Preserve zone IDs as centroid node IDs and remap only conflicting regular network nodes to free AequilibraE node IDs.
+- [x] 15.3 Preserve `visum_node_no` and source-reference mappings for remapped regular nodes.
+- [x] 15.4 Update link and connector endpoint imports to use the source-to-AequilibraE node ID mapping.
+- [x] 15.5 Add regression tests for a VISUM regular node whose `NO` collides with a zone centroid `NO`.
+
+## 16. Coincident Zone Centroid Compatibility
+
+- [x] 16.1 Document that VISUM zone centroids may share coordinates with regular network nodes.
+- [x] 16.2 Offset coincident zone centroid node geometries while preserving original VISUM centroid coordinates.
+- [x] 16.3 Update connector geometries to start from adjusted centroid coordinates.
+- [x] 16.4 Add regression tests for coincident zone centroid offset behavior.
+- [x] 16.5 Normalize adjusted VISUM link and connector endpoint geometries to AequilibraE XY line geometry.

@@ -66,3 +66,74 @@ adjustment are recognized as deferred and are not imported or executed by this p
 - `python docs/source/examples/network_manipulation/plot_create_from_visum_geojson.py` passed.
 - No SQL schema, migration, table-list, trigger-list, or durable count/source-mapping table artifacts were added, so the
   migration/schema verification task is not applicable for this implementation slice.
+
+## Post-Review Connector Compatibility
+
+Real VISUM GeoJSON connector exports may omit a numeric connector `NO` property and instead expose topology through
+`ZONENO`, `NODENO`, `DIRECTION`, and `R_DIRECTION`, with a vendor-specific feature ID. The importer now treats connector
+`NO` as optional, keeps `visum_connector_no` only when numeric source values are present, and stores a deterministic
+`visum_connector_key` derived from zone, node, and usable mapped direction. Duplicate generated keys receive stable
+numeric suffixes.
+
+Post-review verification:
+
+- `python -m pytest tests/aeq/project/test_network_visum_geojson.py -q --basetemp C:/tmp/aequilibrae/.pytest-tmp-visum`
+  passed with 15 tests and 1 skipped opt-in external-data test.
+- `ruff check aequilibrae/project/network/visum_geojson_importer.py tests/aeq/project/test_network_visum_geojson.py tests/conftest.py`
+  passed.
+- `python -m compileall aequilibrae/project/network/visum_geojson_importer.py tests/aeq/project/test_network_visum_geojson.py`
+  passed.
+- The opt-in external-data smoke test for `C:\Users\Pablo Barceló\Downloads` progressed past connector source-ID
+  handling and now fails on unmapped transport systems such as `BUS`, `TRAIN`, and `TRAM`, which is a separate
+  mode-filtering/mapping decision.
+
+## Post-Review Transport-System Mapping Policy
+
+VISUM transport systems outside the default `CAR -> c` and `HGV -> h` mapping now require an explicit caller decision:
+they must be included in `mode_mapping` or listed in `ignored_transport_systems`. Explicitly ignored transport systems
+are reported with diagnostics. Records whose declared transport systems are all ignored, or whose transport systems are
+empty in both directions, are skipped and reported rather than imported with an empty AequilibraE `modes` value.
+
+Post-review verification:
+
+- `python -m pytest tests/aeq/project/test_network_visum_geojson.py -q --basetemp C:/tmp/aequilibrae/.pytest-tmp-visum`
+  passed with 20 tests and 1 skipped opt-in external-data test.
+- `ruff check aequilibrae/project/network/visum_geojson_importer.py aequilibrae/project/network/network.py tests/aeq/project/test_network_visum_geojson.py tests/conftest.py`
+  passed.
+- A real-folder import using `ignored_transport_systems={'BUS', 'TRAIN', 'TRAM', 'BIKE', 'WALK', 'PUTW'}` progressed
+  past transport-system validation and then failed on a separate link-type uniqueness collision in the real VISUM link
+  classes.
+
+## Post-Review Numeric Link-Type Naming
+
+Real VISUM exports can include numeric `TYPENO` fallback values when `LC` is missing. AequilibraE link-type names only
+allow letters and underscores, so numeric source values are now encoded as words in generated names. For example,
+`TYPENO=2` becomes `visum_two` and `TYPENO=92` becomes `visum_nine_two`, avoiding collisions while satisfying the
+existing link-type API contract.
+
+Post-review verification:
+
+- `python -m pytest tests/aeq/project/test_network_visum_geojson.py -q --basetemp C:/tmp/aequilibrae/.pytest-tmp-visum`
+  passed with 21 tests and 1 skipped opt-in external-data test.
+- `ruff check aequilibrae/project/network/visum_geojson_importer.py aequilibrae/project/network/network.py tests/aeq/project/test_network_visum_geojson.py tests/conftest.py`
+  passed.
+- A real-folder import using `ignored_transport_systems={'BUS', 'TRAIN', 'TRAM', 'BIKE', 'WALK', 'PUTW'}` progressed
+  past link-type creation and now fails on a separate node integrity trigger: duplicate/on-top node geometries in the
+  source `node.geojson`.
+
+## Post-Review Coincident Node Compatibility
+
+The Karlsruhe VISUM export includes coincident nodes that encode separate modal/topological layers rather than duplicate
+data. AequilibraE rejects exact duplicate node coordinates, and merging these source nodes could create artificial
+connectivity while turn restrictions remain outside scope. The importer now preserves distinct source node IDs by
+default with `duplicate_node_policy="offset"`, stores original VISUM coordinates, rewrites imported link/connector
+endpoints to the adjusted coordinates, and reports duplicate coordinate groups. Callers can use
+`duplicate_node_policy="error"` to retain strict rejection behavior.
+
+The same Karlsruhe smoke check then exposed regular node IDs that collide with zone centroid IDs. The importer now keeps
+zone IDs as centroid node IDs, remaps only the conflicting regular node IDs, preserves `visum_node_no`, reports
+`node-id-remapped`, and inserts links/connectors through the source-to-imported node mapping.
+
+The following Karlsruhe smoke check then exposed zone centroid coordinates that collide with regular network node
+coordinates. The importer now offsets such centroid node geometries, preserves original VISUM centroid coordinates, and
+rewrites connector starts to the adjusted centroid coordinates.

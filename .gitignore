@@ -98,6 +98,8 @@ build/
 .coverage
 .coverage.*
 coverage.xml
+.pytest_cache/
+.pytest-tmp*/
 
 #### End snippet
 .DS_Store

@@ -120,7 +120,11 @@ names can be supplied with an explicit layer-to-path mapping.
 
 By default, VISUM ``CAR`` maps to AequilibraE mode ``c`` and ``HGV`` maps to
 mode ``h``. Users can override this mapping, for example to merge ``HGV`` into
-``c``. Link classes use deterministic link-type creation, and users can provide
+``c``. Any additional VISUM transport system must be explicitly mapped or
+explicitly ignored with ``ignored_transport_systems`` before the importer writes
+to the project database. This allows users to decide whether systems such as
+``BUS`` should become assignable road-vehicle modes or remain outside the import
+scope. Link classes use deterministic link-type creation, and users can provide
 their own link-type mapping when model classes need specific AequilibraE names.
 
 VISUM length, speed, time, and capacity-like fields are parsed into assignment
@@ -129,6 +133,27 @@ stored geometry, while source VISUM lengths are preserved separately in
 ``visum_length_ab`` and ``visum_length_ba`` when present. Missing CRS metadata
 must be resolved by supplying ``source_crs`` or explicitly accepting the default
 ``EPSG:4326`` assumption.
+
+Connector imports do not require a numeric VISUM connector ``NO`` field.
+AequilibraE stores numeric ``visum_connector_no`` values when present and always
+stores a deterministic ``visum_connector_key`` derived from the connector zone,
+node, and usable direction.
+
+Some VISUM models use multiple node records at the same physical coordinate to
+represent separate modal or topological layers. By default, the importer preserves
+these nodes separately with ``duplicate_node_policy="offset"``. It applies a tiny
+deterministic coordinate offset to satisfy AequilibraE's node uniqueness rules,
+adjusts imported link and connector endpoints consistently, and stores original
+VISUM coordinates in ``visum_original_lon``, ``visum_original_lat``,
+``visum_xcoord``, and ``visum_ycoord`` when available. Use
+``duplicate_node_policy="error"`` to reject coincident source nodes before import.
+If a VISUM regular node number collides with a VISUM zone number, the importer
+keeps the zone number as the centroid node ID and imports the regular node with a
+deterministic free node ID. The original value remains in ``visum_node_no`` and
+the returned report records the source-to-imported node mapping.
+If a VISUM zone centroid shares coordinates with an imported node, the importer
+keeps the zone number as the centroid node ID, applies a tiny deterministic
+centroid coordinate offset, and adjusts connector starts consistently.
 
 Count locations are imported only as supported link-count associations in the
 returned report. They are not used to adjust OD matrices, calibrate demand, or

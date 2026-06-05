@@ -58,9 +58,11 @@ changing importer defaults.
 
 | Field | Type | Nulls | Example values | Role |
 | --- | --- | --- | --- | --- |
-| `NO` | integer | 0 | `9001` | Required source connector ID |
+| `NO` | integer | optional | `9001` | Optional source connector ID |
 | `ZONENO` | integer | 0 | `1001` | Required zone centroid reference |
 | `NODENO` | integer | 0 | `1` | Required network node reference |
+| `DIRECTION` | text | optional | `O` | Forward connector direction marker |
+| `R_DIRECTION` | text | optional | `D` | Reverse connector direction marker |
 | `TSYSSET` | text/list | directional | `CAR,HGV` | Connector private modes |
 | `R_TSYSSET` | text/list | optional | `CAR,HGV`, empty | Reverse connector modes |
 | `LENGTH` | unit string/number | optional | `120m` | Source connector length |

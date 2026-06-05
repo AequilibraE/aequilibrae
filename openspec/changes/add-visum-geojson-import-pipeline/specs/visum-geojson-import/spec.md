@@ -26,10 +26,39 @@ The system SHALL validate VISUM topology using explicit source identifiers rathe
 - **THEN** the system SHALL require both referenced nodes to exist in the node layer
 - **AND** verify that the link geometry endpoints are compatible with the referenced node geometries according to the configured validation tolerance
 
+#### Scenario: Preserving coincident node topology
+- **WHEN** multiple VISUM node records share identical coordinates
+- **THEN** the system SHALL NOT merge the source nodes by default
+- **AND** SHALL preserve separate source node identifiers so modal or topological separation in VISUM is retained
+- **AND** SHALL support a deterministic offset policy that stores adjusted AequilibraE node coordinates while preserving original VISUM coordinates for traceability
+- **AND** SHALL adjust imported link and connector endpoint geometries consistently with the adjusted node coordinates
+- **AND** SHALL report the duplicate coordinate group and applied offset diagnostics
+
+#### Scenario: Strictly rejecting coincident nodes
+- **WHEN** a VISUM GeoJSON import is requested with strict duplicate-node handling
+- **THEN** the system SHALL reject coincident VISUM node coordinates before writing network records to the project database
+
+#### Scenario: Handling source node and zone ID collisions
+- **WHEN** a VISUM regular node `NO` collides with a VISUM zone centroid `NO`
+- **THEN** the system SHALL preserve the zone ID as the AequilibraE centroid node ID
+- **AND** SHALL import the regular source node with a deterministic free AequilibraE node ID
+- **AND** SHALL preserve the original VISUM node number in source metadata and source-reference mappings
+- **AND** SHALL import links and connectors using the mapped AequilibraE regular node ID
+
+#### Scenario: Preserving zone centroids that coincide with network nodes
+- **WHEN** a VISUM zone centroid shares coordinates with another imported node
+- **THEN** the system SHALL preserve the zone ID as the AequilibraE centroid node ID
+- **AND** SHALL apply a deterministic coordinate offset to the centroid node geometry
+- **AND** SHALL preserve original VISUM centroid coordinates for traceability
+- **AND** SHALL adjust imported connector start geometries consistently with the adjusted centroid coordinate
+- **AND** SHALL report the applied centroid offset diagnostic
+
 #### Scenario: Validating connector references
 - **WHEN** a VISUM connector references `ZONENO` and `NODENO`
 - **THEN** the system SHALL require the referenced zone centroid and network node to exist
 - **AND** import the connector as a centroid connector associated with the referenced zone and node
+- **AND** SHALL NOT require a numeric connector `NO` field when the connector can be identified from its zone, node, and directional availability
+- **AND** SHALL preserve a deterministic connector source key for traceability
 
 #### Scenario: Rejecting inferred snapping
 - **WHEN** link or connector references cannot be resolved by source identifiers
@@ -43,6 +72,9 @@ The system SHALL use deterministic default mappings and allow user-provided over
 - **WHEN** VISUM transport-system values are mapped to AequilibraE modes
 - **THEN** the system SHALL map only configured transport systems into single-character AequilibraE mode identifiers
 - **AND** report any unmapped transport-system values encountered in imported private-traffic layers
+- **AND** require any transport system outside the default mapping to be explicitly mapped or explicitly ignored before import writes to the project database
+- **AND** skip records whose transport systems are all explicitly ignored, with diagnostics that identify the skipped scope
+- **AND** skip records with no declared transport systems in either direction, with diagnostics that identify the skipped scope
 
 #### Scenario: Mapping heavy goods vehicles
 - **WHEN** VISUM private-traffic transport systems include `HGV`

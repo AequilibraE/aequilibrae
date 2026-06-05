@@ -13,6 +13,18 @@ Accepted inputs:
 The importer requires an empty network by default. Importing into a non-empty project is allowed only when the caller
 passes an explicit override; this protects users from accidentally blending two network sources.
 
+Coincident VISUM node coordinates are handled with `duplicate_node_policy`. The default policy, `offset`, preserves
+separate source nodes by applying a tiny deterministic coordinate offset and preserving the original VISUM coordinates.
+The strict policy, `error`, rejects coincident source nodes before project database writes.
+
+VISUM regular node `NO` values are used as AequilibraE node IDs when possible. If a regular node `NO` collides with a
+zone centroid `NO`, the importer keeps the zone ID as the centroid node ID and remaps the regular node to a deterministic
+free AequilibraE node ID. The returned `source_references["nodes"]` mapping records the source-to-imported ID relation.
+
+VISUM zone centroid coordinates are also disambiguated when they collide with already imported node coordinates. The
+zone ID remains the centroid node ID, connector geometries are adjusted to start at the imported centroid coordinate, and
+the original VISUM centroid coordinates are preserved on the centroid node.
+
 ## Diagnostics
 
 The importer returns a report object with:
@@ -44,10 +56,18 @@ Transport systems:
 Users may override `HGV -> c` to merge heavy goods vehicles into car mode. Every mapped mode ID must be a single
 character and must be created or already valid before links or connectors are inserted.
 
+Any VISUM transport system outside the configured mapping must be explicitly mapped or explicitly listed in
+`ignored_transport_systems`. The importer SHALL fail before database writes when extra transport systems are neither
+mapped nor ignored. Records whose available transport systems are all explicitly ignored SHALL be skipped and reported.
+Records with no declared transport systems in either direction SHALL also be skipped and reported because they cannot
+produce an AequilibraE mode string. This keeps simple `CAR`/`HGV` networks automatic while forcing richer VISUM exports
+to receive a deliberate modeling decision.
+
 Link types:
 
 - default class/type values map deterministically to AequilibraE link-type records;
 - `LC` is preferred over `TYPENO` for default classification;
+- numeric `TYPENO` fallback values generate distinct valid names such as `visum_two` and `visum_nine_two`;
 - values that exceed configured IDs receive deterministic fallback IDs from unused ASCII letters;
 - if no unused ID exists, import fails with an error diagnostic.
 
@@ -66,11 +86,28 @@ Source identifiers are preserved in importer-added core-table columns:
 
 - `nodes.visum_node_no`
 - `nodes.visum_zone_no`
+- `nodes.visum_original_lon`
+- `nodes.visum_original_lat`
+- `nodes.visum_xcoord`, when the source node layer provides projected `XCOORD`
+- `nodes.visum_ycoord`, when the source node layer provides projected `YCOORD`
+- `nodes.visum_duplicate_coord_group`, when a source node belongs to a duplicate coordinate group
+- `nodes.visum_coord_offset_m`, the approximate offset applied during import
 - `links.visum_link_no`
-- `links.visum_connector_no`
+- `links.visum_connector_no`, when the source connector layer provides a numeric `NO`
+- `links.visum_connector_key`, generated deterministically from connector zone, node, and usable direction
 - `links.visum_length_ab`
 - `links.visum_length_ba`
 - `zones.visum_zone_no`
+
+The AequilibraE `nodes.node_id` value may differ from `nodes.visum_node_no` when the source node number collides with a
+zone centroid node ID.
+
+Centroid nodes can also use `visum_original_lon`, `visum_original_lat`, `visum_xcoord`, `visum_ycoord`,
+`visum_duplicate_coord_group`, and `visum_coord_offset_m` when a VISUM zone centroid coordinate is offset.
+
+Connector keys use `connector:{ZONENO}:{NODENO}:{direction}`, where `direction` is `B`, `O`, or `D` according to mapped
+mode availability in the forward and reverse connector fields. If multiple connector records produce the same key, the
+importer appends a stable numeric suffix such as `:2`.
 
 Supported count-location associations are reported in diagnostics and source-reference maps in v1. No new durable
 count-location or generic source-mapping table is required for this change, so no SQL schema or migration artifact is
