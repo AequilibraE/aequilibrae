@@ -269,7 +269,7 @@ Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in the unit
 
 **Standard Parameters:**
   * :math:`\alpha = 0.25 \cdot \mathrm{T}_f`
-  * :math:`\tau = 0.1 \cdot \frac{8}{\mathrm{T}_f}` (this is :math:`8 \times 0.1 \div \mathrm{T}_f`, see note below)
+  * :math:`\tau = 0.1 \cdot 8 / \mathrm{T}_f` (see note below)
 
 .. note::
     Different than other VDF functions, Akcelik depends on link length and consistency between its parameters
@@ -286,15 +286,15 @@ traffic signals.
 
 **Important Note on τ Parameter:**
 
-In standard Akcelik formulations, the function includes a factor of :math:`\frac{8}{\mathrm{T}_f}` in the formula. However,
+In standard Akcelik formulations, the function includes a factor of :math:`8 / \mathrm{T}_f` in the formula. However,
 in AequilibraE's implementation, this factor of 8 has been absorbed into the :math:`\tau` parameter.
 
 **What this means for users:**
 
 * If academic literature references a :math:`\tau` value (e.g., 0.1), you must multiply it by 8
   before setting it in AequilibraE, then adjust by the duration of the analysis period.
-* Example: To use :math:`\tau = 0.1`, set ``tau = \frac{0.8}{\mathrm{T}_f}`` in AequilibraE
-* Example: To use :math:`\tau = 0.15`, set ``tau = \frac{1.2}{\mathrm{T}_f}`` in AequilibraE
+* Example: To use :math:`\tau = 0.1`, set ``tau = 0.8 / T_f}`` in AequilibraE
+* Example: To use :math:`\tau = 0.15`, set ``tau = 1.2 / T_f`` in AequilibraE
 * A value of 0.8 corresponds to a standard :math:`\tau = 0.1`
 
 **Characteristics:**
