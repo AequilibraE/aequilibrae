@@ -274,7 +274,7 @@ Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in the unit
 .. note::
     Different than other VDF functions, Akcelik depends on link length and consistency between its parameters
     and the units for speed and link length. As it is common for models to use distance in meters, speed in
-    kilometers per hour and to assign time periods longer than one hour, the :math:`\tau` parameter should be
+    kilometers per hour and to assign time periods longer than one hour, the :math:`\alpha` and :math:`\tau` parameters should be
     calibrated accordingly.
 
 
