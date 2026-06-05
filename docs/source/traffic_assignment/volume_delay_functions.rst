@@ -255,7 +255,7 @@ Akcelik
 
 **Mathematical Formula in the Literature:**
 
-.. math:: t = t_0 + 0.25 \mathrm{T}_f \left(z + \sqrt{z^2 + \frac{8 \tau v}{c^2 \cdot \mathrm{T}_f}}\right)
+.. math:: t = t_0 + 0.25 \cdot \mathrm{T}_f \left(z + \sqrt{z^2 + \frac{8 \tau v}{ \mathrm{T}_f c^2}}\right)
 
 Where :math:`z = \frac{v}{c} - 1`, :math:`\mathrm{T}_f` is the duration of the analysis period, and :math:`t` and :math:`t_0` are in the units time per distance (inverse of speed), not time. Importantly, the time unit component of :math:`\mathrm{T}_f`, :math:`t`, and :math:`t_0` must match.
 
@@ -263,9 +263,9 @@ The units in this formulation do not match the units of other VDF functions impl
 
 **Mathematical Formula in the AequilibraE:**
 
-.. math:: t = t_0 + length \alpha\left(z + \sqrt{z^2 + \frac{\tau v}{c^2}}\right)
+.. math:: t = t_0 + \mathrm{length} \cdot \alpha\left(z + \sqrt{z^2 + \frac{\tau v}{c^2}}\right)
 
-Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in the units. This formulation introduces a new parameter :math:`\alpha`, and absorbs the :math:`\frac{8}{\mathrm{T}_f}` factor into :math:`\tau`.
+Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in the units. This formulation introduces a new parameter :math:`\alpha`, and absorbs the :math:`8 / \mathrm{T}_f` factor into :math:`\tau`.
 
 **Standard Parameters:**
   * :math:`\alpha = 0.25 \cdot \mathrm{T}_f`
