@@ -265,7 +265,7 @@ The units in this formulation do not match the units of other VDF functions impl
 
 .. math:: t = t_0 + \mathrm{length} \cdot \alpha\left(z + \sqrt{z^2 + \frac{\tau v}{c^2}}\right)
 
-Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in the units. This formulation introduces a new parameter :math:`\alpha`, and absorbs the :math:`8 / \mathrm{T}_f` factor into :math:`\tau`.
+Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in time units. This formulation introduces a new parameter :math:`\alpha`, and absorbs the :math:`8 / \mathrm{T}_f` factor into :math:`\tau`.
 
 **Standard Parameters:**
   * :math:`\alpha = 0.25 \cdot \mathrm{T}_f`
