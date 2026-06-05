@@ -269,7 +269,7 @@ Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in the unit
 
 **Standard Parameters:**
   * :math:`\alpha = 0.25 \cdot \mathrm{T}_f`
-  * :math:`\tau = 0.1 \cdot \frac{8}{\mathrm{T}_f}` (this is :math:`8 \times 0.1 \divisionsymbol \mathrm{T}_f`, see note below)
+  * :math:`\tau = 0.1 \cdot \frac{8}{\mathrm{T}_f}` (this is :math:`8 \times 0.1 \div \mathrm{T}_f`, see note below)
 
 .. note::
     Different than other VDF functions, Akcelik depends on link length and consistency between its parameters
