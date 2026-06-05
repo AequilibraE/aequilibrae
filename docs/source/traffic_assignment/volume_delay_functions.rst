@@ -259,7 +259,7 @@ Akcelik
 
 Where :math:`z = \frac{v}{c} - 1`, :math:`\mathrm{T}_f` is the duration of the analysis period, and :math:`t` and :math:`t_0` are in the units time per distance (inverse of speed), not time. Importantly, the time unit component of :math:`\mathrm{T}_f`, :math:`t`, and :math:`t_0` must match.
 
-The units in this formulation do not match the units of other VDF functions implemented in AequilibraE. To provide a consistent API and usages, we implement and equivalent formulation as below.
+The units in this formulation do not match the units of other VDF functions implemented in AequilibraE. To provide a consistent API and usage semantics, we implement the equivalent formulation below.
 
 **Mathematical Formula in the AequilibraE:**
 
