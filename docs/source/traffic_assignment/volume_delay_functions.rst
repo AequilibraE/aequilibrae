@@ -255,7 +255,7 @@ Akcelik
 
 **Mathematical Formula in the Literature:**
 
-.. math:: t = t_0 + 0.25 \cdot \mathrm{T}_f \left(z + \sqrt{z^2 + \frac{8 \tau v}{ \mathrm{T}_f c^2}}\right)
+.. math:: t = t_0 + 0.25 \cdot \mathrm{T}_f \left(z + \sqrt{z^2 + \frac{8 \tau v}{ \mathrm{T}_f \cdot c^2}}\right)
 
 Where :math:`z = \frac{v}{c} - 1`, :math:`\mathrm{T}_f` is the duration of the analysis period, and :math:`t` and :math:`t_0` are in the units time per distance (inverse of speed), not time. Importantly, the time unit component of :math:`\mathrm{T}_f`, :math:`t`, and :math:`t_0` must match.
 
@@ -293,9 +293,9 @@ in AequilibraE's implementation, this factor of 8 has been absorbed into the :ma
 
 * If academic literature references a :math:`\tau` value (e.g., 0.1), you must multiply it by 8
   before setting it in AequilibraE, then adjust by the duration of the analysis period.
-* Example: To use :math:`\tau = 0.1`, set ``tau = 0.8 / T_f}`` in AequilibraE
-* Example: To use :math:`\tau = 0.15`, set ``tau = 1.2 / T_f`` in AequilibraE
-* A value of 0.8 corresponds to a standard :math:`\tau = 0.1`
+* Example: To use :math:`\tau = 0.1`, set ``tau = 0.8 / T_f`` in AequilibraE.
+* Example: To use :math:`\tau = 0.15`, set ``tau = 1.2 / T_f`` in AequilibraE.
+* A value of 0.8 corresponds to a standard :math:`\tau = 0.1` for the unit time period.
 
 **Characteristics:**
 
