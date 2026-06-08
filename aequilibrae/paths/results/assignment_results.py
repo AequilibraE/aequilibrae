@@ -136,11 +136,12 @@ class AssignmentResults(AssignmentResultsBase):
         self.links = graph.num_links
         self.num_skims = len(graph.skim_fields)
         self.skim_names = list(graph.skim_fields)
-        self.lids = graph.graph.link_id.to_numpy(copy=False)
-        self.direcs = graph.graph.direction.to_numpy(copy=False)
+        # copy=True ensures writable numpy buffers regardless of the pandas backend.
+        self.lids = graph.graph.link_id.to_numpy(copy=True)
+        self.direcs = graph.graph.direction.to_numpy(copy=True)
         self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
-        supernet_ids = graph.graph.__supernet_id__.to_numpy(copy=False)
-        compressed_ids = graph.graph.__compressed_id__.to_numpy(copy=False)
+        supernet_ids = graph.graph.__supernet_id__.to_numpy(copy=True)
+        compressed_ids = graph.graph.__compressed_id__.to_numpy(copy=True)
         self.crosswalk[supernet_ids] = compressed_ids
         self._graph_ids = supernet_ids
         self._graph_compressed_ids = compressed_ids
@@ -321,7 +322,7 @@ class TransitAssignmentResults(AssignmentResultsBase):
         self.zones = graph.num_zones
         self.centroids = graph.centroids
         self.links = graph.num_links
-        self.lids = graph.graph.link_id.to_numpy(copy=False)
+        self.lids = graph.graph.link_id.to_numpy(copy=True)
 
     def reset(self) -> None:
         """

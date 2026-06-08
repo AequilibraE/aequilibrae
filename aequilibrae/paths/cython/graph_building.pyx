@@ -11,9 +11,9 @@ from libc.stdint cimport int32_t, int64_t, uint8_t, uint32_t
 @cython.boundscheck(False)
 @cython.initializedcheck(False)
 cdef void _remove_dead_ends(
-    long long [:] graph_fs,
-    long long [:] all_nodes,
-    long long [:] nodes_to_indices,
+    const long long [:] graph_fs,
+    const long long [:] all_nodes,
+    const long long [:] nodes_to_indices,
     const long long [:] a_nodes,
     const long long [:] b_nodes,
     const signed char [:] directions,
@@ -131,17 +131,17 @@ cdef void _remove_dead_ends(
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef long long _build_compressed_graph(
-    long long[:] link_idx,
-    long long[:] links_index,
-    long long[:] link_edge,
+    const long long[:] link_idx,
+    const long long[:] links_index,
+    const long long[:] link_edge,
     const long long[:] a_nodes,
     const long long[:] b_nodes,
     const signed char[:] directions,
     long long link_id_max,
     long long[:] simplified_links,
     signed char[:] simplified_directions,
-    long long[:] counts,
-    long long[:] all_links,
+    const long long[:] counts,
+    const long long[:] all_links,
     long long[:] compressed_dir,
     long long[:] compressed_a_node,
     long long[:] compressed_b_node
@@ -232,10 +232,13 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     # edges. Anything that uses graph.graph is operating on the **directed** graph. This graph has only directed edges,
     # they may be backwards but they are directed
 
-    graph_a_nodes = graph.graph.a_node.to_numpy(copy=False)
-    graph_b_nodes = graph.graph.b_node.to_numpy(copy=False)
-    graph_directions = graph.graph.direction.to_numpy(copy=False)
-    graph_link_ids = graph.graph.link_id.to_numpy(copy=False)
+    # Use copy=True to materialise fresh, writable, numpy-backed arrays. This sidesteps
+    # read-only buffers (Copy-on-Write, PyArrow-backed columns) that would otherwise be
+    # rejected by Cython memoryview conversion with "buffer source array is read-only".
+    graph_a_nodes = graph.graph.a_node.to_numpy(copy=True)
+    graph_b_nodes = graph.graph.b_node.to_numpy(copy=True)
+    graph_directions = graph.graph.direction.to_numpy(copy=True)
+    graph_link_ids = graph.graph.link_id.to_numpy(copy=True)
 
     directed_node_max = max(graph_a_nodes.max(), graph_b_nodes.max())
     in_degree = np.bincount(graph_b_nodes, minlength=directed_node_max + 1)
@@ -269,10 +272,10 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.dead_end_links = np.array([], dtype=np.int64)
     # Build link index
     link_id_max = df.link_id.max()
-    link_ids = df.link_id.to_numpy(copy=False)
-    a_nodes = df.a_node.to_numpy(copy=False)
-    b_nodes = df.b_node.to_numpy(copy=False)
-    directions = df.direction.to_numpy(copy=False)
+    link_ids = df.link_id.to_numpy(copy=True)
+    a_nodes = df.a_node.to_numpy(copy=True)
+    b_nodes = df.b_node.to_numpy(copy=True)
+    directions = df.direction.to_numpy(copy=True)
 
     link_idx = np.empty(link_id_max + 1, dtype=np.int64)
     link_idx[df.link_id] = np.arange(df.shape[0])
@@ -448,11 +451,11 @@ def create_compressed_link_network_mapping(graph):
     data = np.zeros(len(filtered), dtype=np.int64)
     node_mapping = np.full(graph.num_nodes, -1, dtype=np.int32)
 
-    compact_a_nodes = graph.compact_graph["a_node"].to_numpy(copy=False)
-    compact_b_nodes = graph.compact_graph["b_node"].to_numpy(copy=False)
+    compact_a_nodes = graph.compact_graph["a_node"].to_numpy(copy=True)
+    compact_b_nodes = graph.compact_graph["b_node"].to_numpy(copy=True)
 
     non_duplicated_idx = 0
-    non_duplicated = filtered[~duplicated].sort_values(by="__compressed_id__").to_numpy(copy=False)
+    non_duplicated = filtered[~duplicated].sort_values(by="__compressed_id__").to_numpy(copy=True)
 
     i = 0
     # This should be possible to parallelise, each thread gets a segment of the bincount below, they compute their
@@ -472,10 +475,10 @@ def create_compressed_link_network_mapping(graph):
         else:
             df = gb.get_group(compressed_id)
             idx[compressed_id] = i
-            values = df.link_id.to_numpy(copy=False)
-            directions = df.direction.to_numpy(copy=False)
-            a = df.a_node.to_numpy(copy=False)
-            b = df.b_node.to_numpy(copy=False)
+            values = df.link_id.to_numpy(copy=True)
+            directions = df.direction.to_numpy(copy=True)
+            a = df.a_node.to_numpy(copy=True)
+            b = df.b_node.to_numpy(copy=True)
 
             # In order to ensure that the link IDs come out in the correct order we must walk the links
             # we do this assuming the `a` array is sorted.
