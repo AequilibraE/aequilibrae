@@ -77,6 +77,11 @@ Assignment fields:
 - capacity is stored as vehicles per hour in `capacity_ab` and `capacity_ba`;
 - free-flow time is stored in minutes in `travel_time_ab` and `travel_time_ba`;
 - if explicit VISUM time is missing, free-flow time is derived from parsed source length and speed;
+- if connector time and speed are missing but connector length is available, connector free-flow time is derived from
+  length using a deterministic 30 km/h fallback connector speed;
+- if connector length is missing or non-positive, fallback connector time derivation uses geodesic geometry length;
+- if connector capacity is missing, connector capacity is set to a deterministic high value of 99,999;
+- connector fallback assignment values are reported with diagnostics;
 - geometry-derived AequilibraE `distance` remains trigger-owned;
 - parsed VISUM source length is preserved in `visum_length_ab` and `visum_length_ba` when present.
 
@@ -101,6 +106,11 @@ Source identifiers are preserved in importer-added core-table columns:
 
 The AequilibraE `nodes.node_id` value may differ from `nodes.visum_node_no` when the source node number collides with a
 zone centroid node ID.
+
+The AequilibraE `links.link_id` value is a compact internal identifier assigned during import. It SHALL NOT reuse VISUM
+link or connector identifiers when those source identifiers are sparse or high-valued. VISUM source link numbers are
+preserved in `links.visum_link_no`, connector source values are preserved in `links.visum_connector_no` or
+`links.visum_connector_key`, and `report.source_references` maps source identifiers to imported compact link IDs.
 
 Centroid nodes can also use `visum_original_lon`, `visum_original_lat`, `visum_xcoord`, `visum_ycoord`,
 `visum_duplicate_coord_group`, and `visum_coord_offset_m` when a VISUM zone centroid coordinate is offset.

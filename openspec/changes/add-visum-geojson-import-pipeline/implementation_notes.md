@@ -137,3 +137,49 @@ zone IDs as centroid node IDs, remaps only the conflicting regular node IDs, pre
 The following Karlsruhe smoke check then exposed zone centroid coordinates that collide with regular network node
 coordinates. The importer now offsets such centroid node geometries, preserves original VISUM centroid coordinates, and
 rewrites connector starts to the adjusted centroid coordinates.
+
+## Compact Imported Link IDs
+
+VISUM source link numbers in the Karlsruhe export are sparse and high-valued, with source IDs above two billion. The
+graph compression path allocates by maximum `link_id`, so the importer now assigns compact AequilibraE `links.link_id`
+values and preserves source IDs in `links.visum_link_no`, `links.visum_connector_no`, `links.visum_connector_key`, and
+`report.source_references`.
+
+The Karlsruhe project was regenerated from the local Downloads VISUM folder with explicit mappings
+`CAR -> c`, `HGV -> h`, `BIKE -> b`, `WALK -> w`, and `BUS`/`PUTW`/`TRAIN`/`TRAM -> t`, then
+`Visum_3_modes.omx` was imported as `visum_3_modes`.
+
+Verification:
+
+- `python -m pytest tests/aeq/project/test_network_visum_geojson.py -q --basetemp C:/tmp/aequilibrae/.pytest-tmp-visum`
+  passed with 26 tests and one opt-in external test skipped.
+- `python -m pytest tests/aeq/project/test_matrices.py -q` passed with 13 tests.
+- `ruff check aequilibrae/project/network/visum_geojson_importer.py tests/aeq/project/test_network_visum_geojson.py aequilibrae/project/data/matrices.py tests/aeq/project/test_matrices.py` passed.
+- Regenerated Karlsruhe `links.link_id` values are compact from 1 through 13,723 while `visum_link_no` still preserves
+  source IDs up to 2,030,064,882.
+- `Visum_3_modes.omx` contains cores `Car`, `HVG`, and `PUT`; its `NO` mapping matches all 726 zones and centroid nodes.
+
+## Connector Assignment Defaults
+
+The Karlsruhe GeoJSON and Shapefile connector exports omit connector travel-time fields. A VISUM SQLite export inspected
+later showed richer connector columns such as `T0_TSYS(CAR)`, so a future SQLite importer should prefer those source
+values when available. For GeoJSON, the importer now defaults connector assignment values only when a connector has
+usable imported modes but lacks positive assignment fields: connector travel time is derived from connector length using
+a deterministic 30 km/h fallback speed, missing/zero length can be derived from connector geometry, and capacity defaults
+to 99,999. Each default emits structured diagnostics.
+
+The graph builder also now prevents links excluded from a requested mode from poisoning that mode's compressed graph with
+missing numeric fields while those excluded rows are being converted to self-loops.
+
+Post-default verification:
+
+- `python -m pytest tests/aeq/project/test_network_visum_geojson.py::test_connector_assignment_fields_default_when_not_exported tests/aeq/project/test_network_visum_geojson.py::test_mode_excluded_missing_fields_do_not_poison_car_graph -q --basetemp C:/tmp/aequilibrae/.pytest-tmp-visum-new` passed.
+- `ruff check aequilibrae/project/network/visum_geojson_importer.py aequilibrae/project/network/network.py tests/aeq/project/test_network_visum_geojson.py` passed.
+- Regenerated Karlsruhe from `C:\Users\Pablo Barceló\Downloads\Karlsruhe`, imported 8,432 nodes, 726 zones, 10,902 links,
+  2,821 connectors, and imported `Visum_3_modes.omx` as `visum_3_modes`.
+- The regenerated car graph has 8,367 compressed nodes, 726 zones, 25,041 directed graph rows, zero NaN `travel_time`
+  values, zero NaN `capacity` values, minimum travel time 0.0013561301794359395, and minimum capacity 1.0.
+- A 5-iteration MSA traffic assignment using the `Car` matrix core completed and returned 13,723 result rows with
+  `Car_tot` sum 35,805,710.82760005.
+- The car graph still warns that 28 centroids (`2000115` through `2000142`) are not present in the compressed graph.
+  Assignment completes, but those zones should be reviewed against VISUM connectivity if exact demand coverage is needed.

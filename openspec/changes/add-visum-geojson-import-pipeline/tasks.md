@@ -152,3 +152,19 @@
 - [x] 16.3 Update connector geometries to start from adjusted centroid coordinates.
 - [x] 16.4 Add regression tests for coincident zone centroid offset behavior.
 - [x] 16.5 Normalize adjusted VISUM link and connector endpoint geometries to AequilibraE XY line geometry.
+
+## 17. Compact Imported Link IDs
+
+- [x] 17.1 Document that imported AequilibraE link IDs are compact internal IDs while VISUM source IDs are preserved separately.
+- [x] 17.2 Update VISUM link and connector import to allocate compact `links.link_id` values.
+- [x] 17.3 Update source-reference and count-location mappings to point from VISUM source IDs to compact imported link IDs.
+- [x] 17.4 Add regression tests for high sparse VISUM link numbers and compact imported link IDs.
+- [x] 17.5 Regenerate the Karlsruhe example project from Downloads GeoJSON files and import `Visum_3_modes.omx`.
+- [x] 17.6 Run focused VISUM importer, matrix import, and assignment smoke checks.
+
+## 18. Connector Assignment Defaults
+
+- [x] 18.1 Document fallback connector travel-time and capacity behavior when VISUM GeoJSON lacks connector assignment fields.
+- [x] 18.2 Implement deterministic connector fallback speed and high capacity defaults in the VISUM importer.
+- [x] 18.3 Add regression tests for connector fallback assignment values and diagnostics.
+- [x] 18.4 Regenerate the Karlsruhe example project and rerun assignment-readiness checks.

@@ -415,7 +415,18 @@ class Network(WorkerThread):
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
             # the compressed graph representation is created)
             net = pd.DataFrame(data, copy=True)
-            net.loc[~net.modes.str.contains(m), "b_node"] = net.loc[~net.modes.str.contains(m), "a_node"]
+            excluded = ~net.modes.str.contains(m, na=False)
+            numeric_fields = [
+                field
+                for field in net.select_dtypes(np.number).columns
+                if field not in {"link_id", "a_node", "b_node", "direction", "ogc_fid"}
+                and not field.endswith("_id")
+                and not field.endswith("_no")
+            ]
+            for field in numeric_fields:
+                invalid = net[field].isna() | (net[field] <= 0)
+                net.loc[excluded & invalid, field] = 1.0
+            net.loc[excluded, "b_node"] = net.loc[excluded, "a_node"]
 
             g = Graph()
             g.mode = m

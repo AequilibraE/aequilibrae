@@ -6,6 +6,8 @@ from shapely.geometry import LineString, Point, Polygon
 
 from aequilibrae import AequilibraeMatrix, TrafficAssignment, TrafficClass
 from aequilibrae.project.network.visum_geojson_importer import (
+    CONNECTOR_FALLBACK_CAPACITY,
+    CONNECTOR_FALLBACK_SPEED_KMH,
     discover_visum_geojson_layers,
     inventory_visum_layers,
     parse_visum_capacity,
@@ -198,7 +200,7 @@ def test_create_from_visum_geojson_imports_network(empty_project, visum_geojson_
     assert report.source_references["count_locations"] == [
         {
             "source_id": 5001,
-            "link_id": 100,
+            "link_id": 1,
             "counts": {"DTVW": 1300, "HVG_ORIG": 120, "MOTOR_ORIG": 1070, "CAR_ORIG": 950},
         }
     ]
@@ -206,12 +208,16 @@ def test_create_from_visum_geojson_imports_network(empty_project, visum_geojson_
 
     with empty_project.db_connection as conn:
         assert conn.execute("select count(*) from nodes").fetchone()[0] == 4
-        assert conn.execute("select count(*) from links").fetchone()[0] == 3
+        assert conn.execute("select count(*) from links").fetchone()[0] == 4
         assert conn.execute("select count(*) from zones").fetchone()[0] == 2
         assert conn.execute("select count(*) from modes where mode_id='h'").fetchone()[0] == 1
-        assert conn.execute("select visum_length_ab from links where link_id=100").fetchone()[0] == 1000
-        assert conn.execute("select a_node, b_node from links where link_id=100").fetchone() == (1, 2)
-        assert conn.execute("select distance > 0 from links where link_id=100").fetchone()[0] == 1
+        assert conn.execute("select link_id from links order by link_id").fetchall() == [(1,), (2,), (3,), (4,)]
+        assert conn.execute("select visum_link_no from links where link_id=1").fetchone()[0] == 100
+        assert conn.execute("select direction, modes from links where link_id=1").fetchone() == (1, "ch")
+        assert conn.execute("select direction, modes from links where link_id=2").fetchone() == (-1, "c")
+        assert conn.execute("select visum_length_ab from links where visum_link_no=100").fetchone()[0] == 1000
+        assert conn.execute("select a_node, b_node from links where visum_link_no=100").fetchone() == (1, 2)
+        assert conn.execute("select distance > 0 from links where visum_link_no=100").fetchone()[0] == 1
         assert conn.execute("select modes is not null from nodes where node_id=1").fetchone()[0] == 1
         assert conn.execute("select link_types is not null from nodes where node_id=1").fetchone()[0] == 1
         assert conn.execute("select a_node, b_node from links where visum_connector_no=9001").fetchone() == (1001, 1)
@@ -285,7 +291,7 @@ def test_coincident_nodes_are_offset_to_preserve_topology(empty_project, visum_g
                    AND Abs(ST_Y(StartPoint(links.geometry)) - ST_Y(nodes.geometry)) < 1e-12
             FROM links
             JOIN nodes ON links.a_node = nodes.node_id
-            WHERE links.link_id = 101
+            WHERE links.visum_link_no = 101
             """
         ).fetchone()[0]
 
@@ -296,6 +302,22 @@ def test_coincident_nodes_are_offset_to_preserve_topology(empty_project, visum_g
     assert rows[1][1] != rows[1][3] or rows[1][2] != rows[1][4]
     assert rows[1][6] == 0.25
     assert link_endpoint_matches_node == 1
+
+
+def test_sparse_visum_link_numbers_import_as_compact_link_ids(empty_project, visum_geojson_folder):
+    links = gpd.read_file(visum_geojson_folder / "link.geojson")
+    links.loc[links.index[0], "NO"] = 2_000_001_598
+    links.to_file(visum_geojson_folder / "link.geojson", driver="GeoJSON")
+
+    report = empty_project.network.create_from_visum_geojson(visum_geojson_folder)
+
+    assert report.source_references["links"][2_000_001_598] == 1
+    assert report.source_references["count_locations"] == []
+    assert any(diag.code == "unresolved-count-link" for diag in report.diagnostics)
+
+    with empty_project.db_connection as conn:
+        assert conn.execute("select min(link_id), max(link_id), count(*) from links").fetchone() == (1, 4, 4)
+        assert conn.execute("select visum_link_no from links where link_id=1").fetchone()[0] == 2_000_001_598
 
 
 def test_coincident_node_error_policy_rejects_before_import(empty_project, visum_geojson_folder):
@@ -338,7 +360,10 @@ def test_source_node_id_collision_with_zone_id_is_remapped(empty_project, visum_
         source_node_no = conn.execute(
             "select visum_node_no from nodes where node_id=?", (remapped_node_id,)
         ).fetchone()[0]
-        assert conn.execute("select a_node, b_node from links where link_id=101").fetchone() == (remapped_node_id, 1)
+        assert conn.execute("select a_node, b_node from links where visum_link_no=101").fetchone() == (
+            remapped_node_id,
+            1,
+        )
 
     assert source_node_no == 1001
 
@@ -390,13 +415,13 @@ def test_connector_without_no_gets_deterministic_source_key(empty_project, visum
     report = empty_project.network.create_from_visum_geojson(visum_geojson_folder)
 
     assert report.source_references["connectors"] == {
-        "connector:1001:1:B": 101,
-        "connector:1002:2:B": 102,
+        "connector:1001:1:B": 3,
+        "connector:1002:2:B": 4,
     }
     with empty_project.db_connection as conn:
-        assert conn.execute("select visum_connector_no from links where link_id=101").fetchone()[0] is None
+        assert conn.execute("select visum_connector_no from links where link_id=3").fetchone()[0] is None
         assert (
-            conn.execute("select visum_connector_key from links where link_id=101").fetchone()[0]
+            conn.execute("select visum_connector_key from links where link_id=3").fetchone()[0]
             == "connector:1001:1:B"
         )
 
@@ -410,9 +435,9 @@ def test_duplicate_connector_source_keys_get_stable_suffix(empty_project, visum_
     report = empty_project.network.create_from_visum_geojson(visum_geojson_folder)
 
     assert report.source_references["connectors"] == {
-        "connector:1001:1:B": 101,
-        "connector:1002:2:B": 102,
-        "connector:1001:1:B:2": 103,
+        "connector:1001:1:B": 3,
+        "connector:1002:2:B": 4,
+        "connector:1001:1:B:2": 5,
     }
     with empty_project.db_connection as conn:
         keys = conn.execute("select visum_connector_key from links where link_type='centroid_connector'").fetchall()
@@ -483,7 +508,7 @@ def test_link_type_override(empty_project, visum_geojson_folder):
     empty_project.network.create_from_visum_geojson(visum_geojson_folder, link_type_mapping={"ARTERIAL": "arterial"})
 
     with empty_project.db_connection as conn:
-        assert conn.execute("select link_type from links where link_id=100").fetchone()[0] == "arterial"
+        assert conn.execute("select link_type from links where visum_link_no=100").fetchone()[0] == "arterial"
 
 
 def test_numeric_typeno_link_types_get_distinct_generated_names(empty_project, visum_geojson_folder):
@@ -502,8 +527,8 @@ def test_numeric_typeno_link_types_get_distinct_generated_names(empty_project, v
 
     assert report.link_type_mapping == {"2": "visum_two", "92": "visum_nine_two"}
     with empty_project.db_connection as conn:
-        assert conn.execute("select link_type from links where link_id=100").fetchone()[0] == "visum_two"
-        assert conn.execute("select link_type from links where link_id=101").fetchone()[0] == "visum_nine_two"
+        assert conn.execute("select link_type from links where visum_link_no=100").fetchone()[0] == "visum_two"
+        assert conn.execute("select link_type from links where visum_link_no=101").fetchone()[0] == "visum_nine_two"
 
 
 def test_mode_override_merges_hgv_into_car(empty_project, visum_geojson_folder):
@@ -512,7 +537,7 @@ def test_mode_override_merges_hgv_into_car(empty_project, visum_geojson_folder):
     )
 
     with empty_project.db_connection as conn:
-        modes = conn.execute("select modes from links where link_id=100").fetchone()[0]
+        modes = conn.execute("select modes from links where visum_link_no=100").fetchone()[0]
         h_count = conn.execute("select count(*) from modes where mode_id='h'").fetchone()[0]
 
     assert modes == "c"
@@ -543,7 +568,7 @@ def test_ignored_transport_system_is_reported_and_not_imported(empty_project, vi
 
     assert any(diag.code == "ignored-transport-system" and "BUS" in diag.message for diag in report.diagnostics)
     with empty_project.db_connection as conn:
-        assert conn.execute("select modes from links where link_id=100").fetchone()[0] == "ch"
+        assert conn.execute("select modes from links where visum_link_no=100").fetchone()[0] == "ch"
 
 
 def test_records_with_only_ignored_transport_systems_are_skipped(empty_project, visum_geojson_folder):
@@ -592,8 +617,37 @@ def test_user_can_map_bus_as_assignable_mode(empty_project, visum_geojson_folder
 
     assert report.mode_mapping == {"CAR": "c", "HGV": "h", "BUS": "t"}
     with empty_project.db_connection as conn:
-        assert conn.execute("select modes from links where link_id=100").fetchone()[0] == "cht"
+        assert conn.execute("select modes from links where visum_link_no=100").fetchone()[0] == "cht"
         assert conn.execute("select count(*) from modes where mode_id='t'").fetchone()[0] == 1
+
+
+def test_mode_excluded_missing_fields_do_not_poison_car_graph(empty_project, visum_geojson_folder):
+    links = gpd.read_file(visum_geojson_folder / "link.geojson")
+    transit_only = links.iloc[0].copy()
+    transit_only["NO"] = 200
+    transit_only["TSYSSET"] = "BUS"
+    transit_only["R_TSYSSET"] = "BUS"
+    for field in ("V0PRT", "R_V0PRT", "CAPPRT", "R_CAPPRT", "T0PRT", "R_T0PRT"):
+        if field in transit_only.index:
+            transit_only[field] = None
+    links = gpd.GeoDataFrame([links.iloc[0], transit_only], geometry="geometry", crs="EPSG:4326")
+    links.to_file(visum_geojson_folder / "link.geojson", driver="GeoJSON")
+
+    empty_project.network.create_from_visum_geojson(
+        visum_geojson_folder, mode_mapping={"CAR": "c", "HGV": "h", "BUS": "t"}
+    )
+    with empty_project.db_connection as conn:
+        transit_link_id = conn.execute("select link_id from links where visum_link_no=200").fetchone()[0]
+    empty_project.network.build_graphs(
+        fields=["distance", "travel_time_ab", "travel_time_ba", "capacity_ab", "capacity_ba"], modes=["c"]
+    )
+
+    graph = empty_project.network.graphs["c"].graph
+    transit_self_loop = graph[graph.link_id == transit_link_id]
+
+    assert transit_self_loop.a_node.eq(transit_self_loop.b_node).all()
+    assert not graph.travel_time.isna().any()
+    assert not graph.capacity.isna().any()
 
 
 def test_topology_validation_rejects_missing_node(tmp_path, visum_geojson_folder, empty_project):
@@ -656,3 +710,31 @@ def test_non_positive_assignment_fields_are_diagnostic_warnings(visum_geojson_fo
     assert any(diag.code == "non-assignment-ready" and diag.field == "CAPPRT" for diag in report.diagnostics)
     assert any(diag.code == "non-assignment-ready" and diag.field == "R_T0PRT" for diag in report.diagnostics)
     assert any(diag.code == "non-assignment-ready" and diag.field == "R_CAPPRT" for diag in report.diagnostics)
+
+
+def test_connector_assignment_fields_default_when_not_exported(visum_geojson_folder, empty_project):
+    connectors = gpd.read_file(visum_geojson_folder / "connector.geojson")
+    connectors = connectors.drop(columns=["V0PRT", "R_V0PRT", "CAPPRT", "R_CAPPRT"])
+    connectors.loc[connectors.index[0], ["LENGTH", "R_LENGTH"]] = "0km"
+    connectors.to_file(visum_geojson_folder / "connector.geojson", driver="GeoJSON")
+
+    report = empty_project.network.create_from_visum_geojson(visum_geojson_folder)
+
+    expected_time = (100.0 / 1000.0) / CONNECTOR_FALLBACK_SPEED_KMH * 60.0
+
+    assert any(diag.code == "connector-length-defaulted" for diag in report.diagnostics)
+    assert any(diag.code == "connector-speed-defaulted" for diag in report.diagnostics)
+    assert any(diag.code == "connector-capacity-defaulted" for diag in report.diagnostics)
+
+    with empty_project.db_connection as conn:
+        row = conn.execute(
+            """
+            SELECT travel_time_ab, travel_time_ba, capacity_ab, capacity_ba
+            FROM links
+            WHERE visum_connector_no=9001
+            """
+        ).fetchone()
+
+    assert row[0] > expected_time
+    assert row[1] > expected_time
+    assert row[2:] == (CONNECTOR_FALLBACK_CAPACITY, CONNECTOR_FALLBACK_CAPACITY)

@@ -9,6 +9,11 @@ The system SHALL import VISUM GeoJSON private-traffic network layers into an Aeq
 - **AND** create or update AequilibraE nodes, links, zones, centroids, and centroid connectors according to the configured mapping
 - **AND** preserve VISUM source identifiers needed to trace imported records to the source layers
 
+#### Scenario: Compacting imported link identifiers
+- **WHEN** VISUM link or connector source identifiers are sparse, high-valued, or non-contiguous
+- **THEN** the system SHALL assign compact AequilibraE `links.link_id` values for imported links and connectors
+- **AND** preserve VISUM source link and connector identifiers in source metadata fields and source-reference mappings
+
 #### Scenario: Importing optional zone polygons
 - **WHEN** a VISUM GeoJSON import includes zone polygon layers
 - **THEN** the system SHALL import supported zone polygon data as zone geometry
@@ -104,6 +109,17 @@ The system SHALL derive private-traffic assignment fields from VISUM source valu
 - **WHEN** a private-traffic link lacks required positive numeric time or capacity values for assignment
 - **THEN** the system SHALL report the affected source records and fields
 - **AND** indicate whether graph building can proceed without traffic assignment readiness
+
+#### Scenario: Defaulting connector assignment fields
+- **WHEN** an imported VISUM connector has usable private-traffic modes and length but lacks exported assignment time, speed, or capacity fields
+- **THEN** the system SHALL derive connector travel time from connector length using a deterministic fallback connector speed
+- **AND** assign a deterministic high fallback connector capacity
+- **AND** report that connector assignment defaults were applied
+
+#### Scenario: Defaulting connector length from geometry
+- **WHEN** an imported VISUM connector lacks a positive exported connector length needed for assignment fallback
+- **THEN** the system SHALL derive fallback connector travel time from the connector geometry length
+- **AND** report that connector length was defaulted from geometry
 
 ### Requirement: VISUM CRS handling is explicit
 The system SHALL handle VISUM GeoJSON coordinate reference systems explicitly.

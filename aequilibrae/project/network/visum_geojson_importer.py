@@ -8,6 +8,7 @@ from typing import Mapping
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pyproj import Geod
 from shapely.geometry import LineString, MultiPolygon, Point
 
 from aequilibrae.project.field_editor import FieldEditor
@@ -36,6 +37,9 @@ CONVENTIONAL_NAMES = {
     "countlocation": ("countlocation.geojson", "count_location.geojson", "count-locations.geojson"),
 }
 DEFAULT_MODE_MAPPING = {"CAR": "c", "HGV": "h"}
+CONNECTOR_FALLBACK_SPEED_KMH = 30.0
+CONNECTOR_FALLBACK_CAPACITY = 99999.0
+GEOD = Geod(ellps="WGS84")
 COUNT_CANDIDATE_FIELDS = {"CAR_ORIG", "HVG_ORIG", "MOTOR_ORIG", "DTVW"}
 DEFERRED_COUNT_FIELDS = {
     "CARS_LEFT",
@@ -697,6 +701,7 @@ class VisumGeoJSONImporter:
                 if self._skip_record(layer, row_index):
                     continue
                 source_values.append(_link_type_source_value(row))
+                source_values.append(_link_type_source_value(row, "R_"))
         mapping = dict(self.link_type_mapping)
         used_ids = set(self.net.link_types.all_types())
         existing_by_name = {
@@ -812,6 +817,7 @@ class VisumGeoJSONImporter:
 
     def _insert_links(self, conn, link_type_by_value: Mapping[object, str]) -> dict[object, int]:
         mapping = {}
+        next_link_id = self._next_link_id(conn)
         query = """
             INSERT INTO links(
                 link_id, a_node, b_node, direction, modes, link_type, speed_ab, speed_ba, capacity_ab, capacity_ba,
@@ -825,43 +831,87 @@ class VisumGeoJSONImporter:
             source_id = int(row["NO"])
             ab_modes = self._mapped_modes(row.get("TSYSSET"), "link", source_id)
             ba_modes = self._mapped_modes(row.get("R_TSYSSET"), "link", source_id)
-            direction = _direction(ab_modes, ba_modes)
             length_ab, speed_ab, capacity_ab, time_ab = self._assignment_values(row, "", "link", source_id)
             length_ba, speed_ba, capacity_ba, time_ba = self._assignment_values(row, "R_", "link", source_id)
-            if direction == 1:
-                speed_ba = capacity_ba = time_ba = None
-            elif direction == -1:
-                speed_ab = capacity_ab = time_ab = None
-            link_type = link_type_by_value[_link_type_source_value(row)]
-            conn.execute(
-                query,
-                (
-                    source_id,
-                    self._node_id(row["FROMNODENO"]),
-                    self._node_id(row["TONODENO"]),
-                    direction,
-                    "".join(sorted(ab_modes | ba_modes)),
-                    link_type,
-                    speed_ab,
-                    speed_ba,
-                    capacity_ab,
-                    capacity_ba,
-                    time_ab,
-                    time_ba,
-                    source_id,
-                    length_ab,
-                    length_ba,
-                    self._link_geometry(row).wkt,
-                ),
-            )
-            mapping[row["NO"]] = source_id
-            self.source_to_link_id[row["NO"]] = source_id
+            if ab_modes and ba_modes and ab_modes != ba_modes:
+                records = [
+                    (1, ab_modes, speed_ab, None, capacity_ab, None, time_ab, None, length_ab, None, ""),
+                    (-1, ba_modes, None, speed_ba, None, capacity_ba, None, time_ba, None, length_ba, "R_"),
+                ]
+                self.report.add(
+                    "info",
+                    "directional-mode-split",
+                    "Link has different mode sets by direction and was imported as directional one-way records",
+                    layer="link",
+                    field="TSYSSET",
+                    source_id=source_id,
+                )
+            else:
+                direction = _direction(ab_modes, ba_modes)
+                if direction == 1:
+                    speed_ba = capacity_ba = time_ba = None
+                elif direction == -1:
+                    speed_ab = capacity_ab = time_ab = None
+                records = [
+                    (
+                        direction,
+                        ab_modes | ba_modes,
+                        speed_ab,
+                        speed_ba,
+                        capacity_ab,
+                        capacity_ba,
+                        time_ab,
+                        time_ba,
+                        length_ab,
+                        length_ba,
+                        "",
+                    )
+                ]
+            for (
+                direction,
+                modes,
+                rec_speed_ab,
+                rec_speed_ba,
+                rec_capacity_ab,
+                rec_capacity_ba,
+                rec_time_ab,
+                rec_time_ba,
+                rec_length_ab,
+                rec_length_ba,
+                type_prefix,
+            ) in records:
+                link_id = next_link_id
+                next_link_id += 1
+                link_type = link_type_by_value[_link_type_source_value(row, type_prefix)]
+                conn.execute(
+                    query,
+                    (
+                        link_id,
+                        self._node_id(row["FROMNODENO"]),
+                        self._node_id(row["TONODENO"]),
+                        direction,
+                        "".join(sorted(modes)),
+                        link_type,
+                        rec_speed_ab,
+                        rec_speed_ba,
+                        rec_capacity_ab,
+                        rec_capacity_ba,
+                        rec_time_ab,
+                        rec_time_ba,
+                        source_id,
+                        rec_length_ab,
+                        rec_length_ba,
+                        self._link_geometry(row).wkt,
+                    ),
+                )
+                mapping.setdefault(row["NO"], link_id)
+                self.source_to_link_id.setdefault(row["NO"], link_id)
         self.report.source_references["links"] = mapping
         return mapping
 
     def _insert_connectors(self, conn) -> dict[object, int]:
         mapping = {}
-        max_link = max(self.source_to_link_id.values(), default=0)
+        next_link_id = self._next_link_id(conn)
         query = """
             INSERT INTO links(
                 link_id, a_node, b_node, direction, modes, link_type, speed_ab, speed_ba, capacity_ab, capacity_ba,
@@ -870,47 +920,89 @@ class VisumGeoJSONImporter:
             )
             VALUES(?, ?, ?, ?, ?, 'centroid_connector', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GeomFromText(?, 4326))
         """
-        idx = 0
         for row_index, row in self.layers["connector"].iterrows():
             if self._skip_record("connector", row_index):
                 continue
-            idx += 1
-            link_id = max_link + idx
             source_id = self._connector_source_key(row_index)
             source_no = self._connector_source_no(row_index)
             ab_modes = self._mapped_modes(row.get("TSYSSET"), "connector", source_id)
             ba_modes = self._mapped_modes(row.get("R_TSYSSET"), "connector", source_id)
-            direction = _direction(ab_modes, ba_modes)
             length_ab, speed_ab, capacity_ab, time_ab = self._assignment_values(row, "", "connector", source_id)
             length_ba, speed_ba, capacity_ba, time_ba = self._assignment_values(row, "R_", "connector", source_id)
-            if direction == 1:
-                speed_ba = capacity_ba = time_ba = None
-            elif direction == -1:
-                speed_ab = capacity_ab = time_ab = None
-            conn.execute(
-                query,
-                (
-                    link_id,
-                    int(row["ZONENO"]),
-                    self._node_id(row["NODENO"]),
-                    direction,
-                    "".join(sorted(ab_modes | ba_modes)),
-                    speed_ab,
-                    speed_ba,
-                    capacity_ab,
-                    capacity_ba,
-                    time_ab,
-                    time_ba,
-                    source_no,
-                    source_id,
-                    length_ab,
-                    length_ba,
-                    self._connector_geometry(row).wkt,
-                ),
-            )
-            mapping[source_id] = link_id
+            if ab_modes and ba_modes and ab_modes != ba_modes:
+                records = [
+                    (1, ab_modes, speed_ab, None, capacity_ab, None, time_ab, None, length_ab, None),
+                    (-1, ba_modes, None, speed_ba, None, capacity_ba, None, time_ba, None, length_ba),
+                ]
+                self.report.add(
+                    "info",
+                    "directional-mode-split",
+                    "Connector has different mode sets by direction and was imported as directional one-way records",
+                    layer="connector",
+                    field="TSYSSET",
+                    source_id=source_id,
+                )
+            else:
+                direction = _direction(ab_modes, ba_modes)
+                if direction == 1:
+                    speed_ba = capacity_ba = time_ba = None
+                elif direction == -1:
+                    speed_ab = capacity_ab = time_ab = None
+                records = [
+                    (
+                        direction,
+                        ab_modes | ba_modes,
+                        speed_ab,
+                        speed_ba,
+                        capacity_ab,
+                        capacity_ba,
+                        time_ab,
+                        time_ba,
+                        length_ab,
+                        length_ba,
+                    )
+                ]
+            for (
+                direction,
+                modes,
+                rec_speed_ab,
+                rec_speed_ba,
+                rec_capacity_ab,
+                rec_capacity_ba,
+                rec_time_ab,
+                rec_time_ba,
+                rec_length_ab,
+                rec_length_ba,
+            ) in records:
+                link_id = next_link_id
+                next_link_id += 1
+                conn.execute(
+                    query,
+                    (
+                        link_id,
+                        int(row["ZONENO"]),
+                        self._node_id(row["NODENO"]),
+                        direction,
+                        "".join(sorted(modes)),
+                        rec_speed_ab,
+                        rec_speed_ba,
+                        rec_capacity_ab,
+                        rec_capacity_ba,
+                        rec_time_ab,
+                        rec_time_ba,
+                        source_no,
+                        source_id,
+                        rec_length_ab,
+                        rec_length_ba,
+                        self._connector_geometry(row).wkt,
+                    ),
+                )
+                mapping.setdefault(source_id, link_id)
         self.report.source_references["connectors"] = mapping
         return mapping
+
+    def _next_link_id(self, conn) -> int:
+        return int(conn.execute("SELECT COALESCE(MAX(link_id), 0) + 1 FROM links").fetchone()[0])
 
     def _prepare_node_geometries(self) -> None:
         if "node" not in self.layers:
@@ -1103,6 +1195,43 @@ class VisumGeoJSONImporter:
         speed = parse_visum_speed(row.get(f"{prefix}V0PRT"))
         capacity = parse_visum_capacity(row.get(f"{prefix}CAPPRT"))
         time = parse_visum_time(row.get(f"{prefix}T0PRT"))
+        if layer == "connector":
+            if length is None or length <= 0:
+                geometry_length = _geodesic_length(row.geometry)
+                if geometry_length is not None and geometry_length > 0:
+                    length = geometry_length
+                    self.report.add(
+                        "warning",
+                        "connector-length-defaulted",
+                        "Connector length defaulted from geometry length",
+                        layer=layer,
+                        field=f"{prefix}LENGTH",
+                        source_id=source_id,
+                    )
+            if time is not None and time <= 0:
+                time = None
+            if speed is not None and speed <= 0:
+                speed = None
+            if time is None and speed is None and length is not None and length > 0:
+                speed = CONNECTOR_FALLBACK_SPEED_KMH
+                self.report.add(
+                    "warning",
+                    "connector-speed-defaulted",
+                    f"Connector speed defaulted to {CONNECTOR_FALLBACK_SPEED_KMH:g} km/h",
+                    layer=layer,
+                    field=f"{prefix}V0PRT",
+                    source_id=source_id,
+                )
+            if capacity is None or capacity <= 0:
+                capacity = CONNECTOR_FALLBACK_CAPACITY
+                self.report.add(
+                    "warning",
+                    "connector-capacity-defaulted",
+                    f"Connector capacity defaulted to {CONNECTOR_FALLBACK_CAPACITY:g}",
+                    layer=layer,
+                    field=f"{prefix}CAPPRT",
+                    source_id=source_id,
+                )
         if time is None and length is not None and speed is not None and speed > 0:
             time = (length / 1000.0) / speed * 60.0
         for field_name, parsed in ((f"{prefix}V0PRT", speed), (f"{prefix}CAPPRT", capacity), (f"{prefix}T0PRT", time)):
@@ -1245,8 +1374,21 @@ def _line_with_endpoints(geometry, start_point: Point, end_point: Point) -> Line
     return LineString(coords)
 
 
-def _link_type_source_value(row) -> object:
-    for field_name in ("LC", "TYPENO"):
+def _geodesic_length(geometry) -> float | None:
+    if geometry is None or geometry.is_empty or geometry.geom_type != "LineString":
+        return None
+    coords = list(geometry.coords)
+    if len(coords) < 2:
+        return None
+    length = 0.0
+    for start, end in zip(coords[:-1], coords[1:], strict=True):
+        _, _, distance = GEOD.inv(start[0], start[1], end[0], end[1])
+        length += distance
+    return length
+
+
+def _link_type_source_value(row, prefix: str = "") -> object:
+    for field_name in (f"{prefix}LC", f"{prefix}TYPENO"):
         if field_name in row and not pd.isna(row[field_name]) and row[field_name] != "":
             return row[field_name]
     return "default"
