@@ -171,6 +171,60 @@ plugin repository. This Python package exposes the import API and documentation.
     * :ref:`import_from_visum_geojson`
         Usage example
 
+.. _importing_from_visum_sqlite_file:
+
+Importing from VISUM SQLite
+---------------------------
+
+VISUM SQLite private-traffic exports can be imported with
+``Project.network.create_from_visum_sqlite()``. The importer reads relational
+VISUM tables, reconstructs geometry, and then uses the same network-writing
+rules as the VISUM GeoJSON importer.
+
+The required source tables are ``NETWORK``, ``NODE``, ``ZONE``, ``TSYS``,
+``MODE``, ``LINKTYPE``, ``LINK``, ``CONNECTOR``, and ``COUNTLOCATION``.
+``LINKPOLY`` is used when present to preserve shaped link geometry; otherwise
+links are built as straight lines between source endpoints. Zone polygons are
+reconstructed when the export contains compatible ``SURFACEITEM``,
+``FACEITEM``, ``EDGE``, ``EDGEITEM``, and ``POINT`` tables. Connectors use
+straight VISUM centroid-to-node geometry.
+
+The importer reads ``NETWORK.PROJECTIONDEFINITION`` for the source CRS and
+stores project geometry in the usual AequilibraE CRS. If the SQLite export does
+not contain parseable CRS metadata, provide ``source_crs`` or explicitly accept
+the default CRS assumption.
+
+VISUM SQLite stores links and connectors as directed source rows. AequilibraE
+link rows use one modal set per row, so source links with different AB and BA
+transport-system sets are imported as two one-way rows. This preserves modal
+connectivity and avoids allowing, for example, private vehicles to use a public
+transport-only reverse direction.
+
+SQLite connector assignment fields use source ``T0_TSYS(...)`` values for the
+mapped transport systems. When VISUM stores an explicit zero connector time, the
+importer writes a positive epsilon cost and reports a diagnostic. This keeps
+instant centroid transfers usable in VISUM while avoiding zero-cost edges in
+AequilibraE graph construction.
+
+Use ``visum_sqlite_source_connectivity()`` to extract directed source arcs by
+mapped AequilibraE mode. This is useful when validating that a SQLite import, or
+an equivalent GeoJSON import, preserved the source modal graph. The helper
+compares connectivity only; impedance differences from GeoJSON fallback values
+or SQLite epsilon connector costs should be checked separately.
+
+Public-transport service tables, turn restrictions, detector data, and other
+recognized VISUM tables are reported as deferred scope. They are not imported by
+this private-traffic network endpoint.
+
+.. seealso::
+
+    * :func:`aequilibrae.project.network.network.Network.create_from_visum_sqlite`
+        Function documentation
+    * :func:`aequilibrae.project.network.visum_sqlite_importer.visum_sqlite_source_connectivity`
+        Source graph validation helper
+    * :ref:`import_from_visum_sqlite`
+        Usage example
+
 .. _aequilibrae_to_gmns:
 
 Exporting AequilibraE model to GMNS format

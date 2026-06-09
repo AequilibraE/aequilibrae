@@ -22,6 +22,7 @@ from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.network.visum_geojson_importer import VisumGeoJSONImporter, VisumGeoJSONReport
+from aequilibrae.project.network.visum_sqlite_importer import VisumSQLiteImporter, VisumSQLiteReport
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -319,6 +320,81 @@ class Network(WorkerThread):
         report = importer.doWork()
 
         self.logger.info("VISUM GeoJSON network imported successfully")
+        return report
+
+    def create_from_visum_sqlite(
+        self,
+        path,
+        *,
+        mode_mapping: dict[str, str] = None,
+        ignored_transport_systems: set[str] | list[str] | tuple[str, ...] = None,
+        link_type_mapping: dict[object, str] = None,
+        source_crs: str | int = None,
+        accept_default_crs: bool = False,
+        allow_non_empty: bool = False,
+        geometry_tolerance: float = 1e-6,
+        duplicate_node_policy: str = "offset",
+        duplicate_node_offset_meters: float = 0.25,
+        connector_epsilon_minutes: float = 1e-6,
+    ) -> VisumSQLiteReport:
+        """
+        Creates an AequilibraE private-traffic network from a VISUM SQLite export.
+
+        :Arguments:
+            **path** (:obj:`str` or :obj:`Path`): VISUM SQLite export file.
+
+            **mode_mapping** (:obj:`dict`, *Optional*): Mapping from VISUM transport systems to single-character
+            AequilibraE mode IDs. Defaults to ``{"CAR": "c", "HGV": "h"}``.
+
+            **ignored_transport_systems** (:obj:`set`, :obj:`list`, or :obj:`tuple`, *Optional*): VISUM transport
+            systems to ignore explicitly. Any transport system outside ``mode_mapping`` must be mapped or ignored.
+
+            **link_type_mapping** (:obj:`dict`, *Optional*): Mapping from VISUM link class/type values to
+            AequilibraE link type names.
+
+            **source_crs** (:obj:`str` or :obj:`int`, *Optional*): CRS to use instead of
+            ``NETWORK.PROJECTIONDEFINITION``.
+
+            **accept_default_crs** (:obj:`bool`, *Optional*): Accept the importer's default CRS when the SQLite export
+            does not provide a parseable CRS.
+
+            **allow_non_empty** (:obj:`bool`, *Optional*): Allow importing into a project that already has links.
+
+            **geometry_tolerance** (:obj:`float`, *Optional*): Maximum coordinate-unit distance allowed between VISUM
+            topology references and reconstructed line endpoints.
+
+            **duplicate_node_policy** (:obj:`str`, *Optional*): Policy for VISUM nodes with identical coordinates.
+            ``"offset"`` preserves source topology with a tiny deterministic coordinate offset. ``"error"`` rejects
+            coincident source nodes before database writes.
+
+            **duplicate_node_offset_meters** (:obj:`float`, *Optional*): Approximate offset distance used when
+            ``duplicate_node_policy="offset"``.
+
+            **connector_epsilon_minutes** (:obj:`float`, *Optional*): Positive travel-time cost used when a VISUM
+            SQLite connector explicitly stores zero private-traffic travel time.
+
+        :Returns:
+            :class:`aequilibrae.project.network.visum_sqlite_importer.VisumSQLiteReport`: Import diagnostics,
+            mapping choices, field inventory, imported row counts, and source-record references.
+        """
+
+        importer = VisumSQLiteImporter(
+            self,
+            path,
+            mode_mapping=mode_mapping,
+            ignored_transport_systems=ignored_transport_systems,
+            link_type_mapping=link_type_mapping,
+            source_crs=source_crs,
+            accept_default_crs=accept_default_crs,
+            allow_non_empty=allow_non_empty,
+            geometry_tolerance=geometry_tolerance,
+            duplicate_node_policy=duplicate_node_policy,
+            duplicate_node_offset_meters=duplicate_node_offset_meters,
+            connector_epsilon_minutes=connector_epsilon_minutes,
+        )
+        report = importer.doWork()
+
+        self.logger.info("VISUM SQLite network imported successfully")
         return report
 
     def export_to_gmns(self, path: str):
