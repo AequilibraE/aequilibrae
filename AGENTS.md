@@ -6,9 +6,24 @@ Guidance for Codex, GitHub Copilot, and other coding agents working in this repo
 
 - `AGENTS.md` is the operational contract for AI agents: how to work in this repo.
 - `openspec/project.md` is the detailed brownfield project context and should be treated as the most complete architecture snapshot.
+- `openspec/config.yaml` shapes OpenSpec artifact generation with concise repo-wide context and rules.
+- `openspec/specs/*/spec.md` files are the durable capability behavior source of truth after changes are archived.
+- `openspec/changes/*` contains in-flight proposals, designs, tasks, spec deltas, and change-specific investigation notes.
 - `README.md` is the public package overview and quick orientation for users/contributors.
 
 When these documents disagree, check the source files, tests, CI, and SQL schema before editing.
+
+## Context Routing
+
+Keep `AGENTS.md` small. Use it to find the right context, not to carry every project fact.
+
+- For architecture and brownfield orientation, read `openspec/project.md`.
+- For current capability behavior, read the relevant file under `openspec/specs/`.
+- For active sprint decisions, open questions, mapping contracts, reviewer notes, or implementation notes, read the relevant `openspec/changes/<change>/` folder.
+- For user workflows and examples, read `docs/source/` and the corresponding gallery example.
+- For generated or platform-specific agent behavior, use `.codex/skills/`, `.github/prompts/`, `.github/skills/`, and `.github/copilot-instructions.md`.
+
+When new durable knowledge emerges, place it in the narrowest durable home: capability specs for behavior, `openspec/project.md` for architecture context, Sphinx docs for user-facing workflows, and change-local design notes for decisions that are not yet archived.
 
 ## Project Snapshot
 
@@ -45,8 +60,9 @@ Before substantive code changes:
 1. Read this file.
 2. Read `openspec/project.md`.
 3. Search `openspec/specs/` for capabilities related to the request.
-4. If the request changes behavior, public APIs, data model, algorithms, CLI behavior, or documentation promises, create or update an OpenSpec change before implementation.
-5. Keep the implementation aligned with the approved proposal, design notes, tasks, and spec deltas.
+4. Apply the artifact rules in `openspec/config.yaml` when creating or updating OpenSpec proposals, designs, specs, and tasks.
+5. If the request changes behavior, public APIs, data model, algorithms, CLI behavior, or documentation promises, create or update an OpenSpec change before implementation.
+6. Keep the implementation aligned with the approved proposal, design notes, tasks, and spec deltas.
 
 Small mechanical fixes may proceed without a new OpenSpec change when they do not alter intended behavior. Examples: typos, formatting, narrow lint fixes, obvious test maintenance, or comments. Still mention that no spec change was needed.
 
@@ -139,6 +155,7 @@ The wheel workflow currently builds wheels on Ubuntu, Windows, and Ubuntu ARM. T
 - Schema changes require migration logic and tests.
 - Maintain SpatiaLite compatibility.
 - Preserve data integrity guarantees enforced by triggers unless an approved spec change says otherwise.
+- For importer-specific provenance fields, source-ID mappings, or dynamically added columns, check the relevant importer code, OpenSpec change/spec, and docs in addition to static SQL schema files.
 - Remember that project data spans `project_database.sqlite`, `public_transport.sqlite`, `results_database.sqlite`, and matrix files under `matrices/`.
 
 ## Security And Robustness Notes
@@ -154,6 +171,7 @@ The wheel workflow currently builds wheels on Ubuntu, Windows, and Ubuntu ARM. T
 - Add focused tests for changed behavior.
 - Use existing pytest fixtures and sample data helpers from `conftest.py` and `tests/conftest.py`.
 - Integration tests may use bundled datasets such as `nauru.zip` and `sioux_falls.zip`.
+- For importer work, check for focused fixture tests and any opt-in smoke-test flags before assuming the full validation surface.
 - Keep coverage above the configured threshold in `pyproject.toml`.
 - If full tests are too expensive, run the narrowest meaningful subset and say what remains unverified.
 

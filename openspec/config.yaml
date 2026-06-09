@@ -1,20 +1,32 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  AequilibraE is a brownfield Python 3.10+ transportation modeling library.
+  Core public contracts include Project, Network, Graph, TrafficAssignment,
+  AequilibraeMatrix, SQLite/SpatiaLite project schemas, migrations, Cython
+  kernels, Sphinx documentation, and bundled test datasets.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Use AGENTS.md for operational routing, openspec/project.md for architecture
+  orientation, openspec/specs/*/spec.md for durable capability behavior, and
+  openspec/changes/* for in-flight decisions and implementation notes.
+
+rules:
+  proposal:
+    - Keep proposals scoped to user-visible or maintainer-visible intent.
+    - State non-goals for deferred behavior, especially imports, algorithms, schemas, and public APIs.
+
+  design:
+    - Call out compatibility, migration, numerical, performance, and SpatiaLite risks when relevant.
+    - For database changes, identify schema files, migrations, triggers, and transaction behavior.
+    - For network import changes, describe source provenance, identifier mapping, topology validation, and deferred source features.
+
+  specs:
+    - Write durable requirements using SHALL language and concrete scenarios.
+    - Capture intended behavior, not implementation steps.
+    - Avoid contradicting Sphinx docs, SQL schema, triggers, tests, or existing public API behavior.
+    - Mark deferred behavior explicitly rather than leaving it implicit.
+
+  tasks:
+    - Include focused tests for changed behavior.
+    - Include docs or doctest updates when public APIs, workflows, parameters, schemas, or examples change.
+    - Include relevant validation commands and OpenSpec status or archive-readiness checks.
