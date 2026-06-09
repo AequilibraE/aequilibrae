@@ -1,5 +1,7 @@
 import os
 from os.path import isfile, join
+from pathlib import Path
+from shutil import copy2
 
 import pandas as pd
 
@@ -10,6 +12,8 @@ from aequilibrae.project.table_loader import TableLoader
 
 class Matrices:
     """Gateway into the matrices available/recorded in the model"""
+
+    _supported_extensions = {".aem", ".omx"}
 
     def __init__(self, project):
         self.project = project
@@ -142,6 +146,72 @@ class Matrices:
         """Deletes a Matrix Record from the model and attempts to remove from disk"""
         mr = self.get_record(matrix_name)
         mr.delete()
+
+    def import_file(self, path: str | Path, name: str = None, file_name: str = None) -> MatrixRecord:
+        """Imports an existing matrix file into the project matrix registry.
+
+        The source matrix is copied into the project's ``matrices`` folder and registered in the project database.
+        Supported formats are OMX (``.omx``) and native AequilibraE matrices (``.aem``).
+
+        :Arguments:
+            **path** (:obj:`str` | :obj:`Path`): Path to the existing matrix file to import.
+
+            **name** (:obj:`str`, *Optional*): Matrix record name. Defaults to the destination file stem.
+
+            **file_name** (:obj:`str`, *Optional*): Destination file name inside the project ``matrices`` folder.
+            Defaults to the source file name.
+
+        :Returns:
+            **matrix_record** (:obj:`MatrixRecord`): Registered project matrix record.
+        """
+        source = Path(path).expanduser()
+        if not source.is_file():
+            raise FileNotFoundError(f"Matrix file does not exist: {source}")
+
+        if source.suffix.lower() not in self._supported_extensions:
+            raise ValueError("Matrix needs to be either OMX or native AequilibraE")
+
+        destination_file = str(file_name) if file_name is not None else source.name
+        destination_name = Path(destination_file)
+        if destination_name.name != destination_file:
+            raise ValueError("file_name must be a file name, not a path")
+        if destination_name.suffix.lower() not in self._supported_extensions:
+            raise ValueError("Matrix needs to be either OMX or native AequilibraE")
+
+        record_name = name or destination_name.stem.lower().replace(".", "_").replace(" ", "_")
+        if self.check_exists(record_name):
+            raise ValueError(f"There is already a matrix of name ({record_name}). It must be unique.")
+
+        for mat in self.__items.values():
+            if Path(mat.file_name).name.lower() == destination_name.name.lower():
+                raise ValueError(f"There is already a matrix record for file name ({destination_name.name}).")
+
+        matrix = AequilibraeMatrix()
+        try:
+            matrix.load(source)
+        finally:
+            if matrix.cores > 0:
+                matrix.close()
+
+        matrix_folder = Path(self.fldr)
+        matrix_folder.mkdir(parents=True, exist_ok=True)
+        destination = matrix_folder / destination_name.name
+        same_path = source.resolve() == destination.resolve()
+
+        if destination.exists() and not same_path:
+            raise FileExistsError(f"{destination_name.name} already exists. Choose a different name or matrix format")
+
+        copied = False
+        if not same_path:
+            copy2(source, destination)
+            copied = True
+
+        try:
+            return self.new_record(record_name, destination.name)
+        except Exception:
+            if copied and destination.exists():
+                destination.unlink()
+            raise
 
     def new_record(self, name: str, file_name: str, matrix=None) -> MatrixRecord:
         """Creates a new record for a matrix in disk, but does not save it

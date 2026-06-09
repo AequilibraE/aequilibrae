@@ -348,8 +348,11 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     # One can also check all the project matrices as a Pandas' DataFrame
     >>> matrices.list() # doctest: +SKIP
 
-    # We can add a naw matrix
+    # We can add a new matrix
     >>> matrices.new_record() # doctest: +SKIP
+
+    # Or import an existing OMX/AEM file into the project's matrices folder
+    >>> matrices.import_file("/tmp/my_demand.omx", name="my_demand") # doctest: +SKIP
     
     # To delete a matrix from the 'matrices' table, we can delete the record directly
     >>> matrices.delete_record("demand_mc")

@@ -1,10 +1,14 @@
 import string
 from math import floor
 from os.path import join
+from pathlib import Path
 from random import choice, randint
 from shutil import copyfile
 
+import numpy as np
 import pytest
+
+from aequilibrae.matrix import AequilibraeMatrix
 
 
 def randomword(length):
@@ -97,6 +101,65 @@ def test_delete(sioux_falls_example):
     assert cnt == 0, "Deleting matrix record failed"
     with pytest.raises(Exception):
         matrices.get_record("demand_omx")
+
+
+def test_import_file_omx(empty_project, omx_example):
+    matrices = empty_project.matrices
+
+    record = matrices.import_file(omx_example, name="imported_demand", file_name="imported_demand.omx")
+
+    assert record.name == "imported_demand"
+    assert record.file_name == "imported_demand.omx"
+    assert record.cores == 4
+    assert Path(matrices.fldr, "imported_demand.omx").is_file()
+
+    mat = matrices.get_matrix("imported_demand")
+    mat.computational_view(["m1"])
+    assert floor(mat.matrix_view.sum()) == 46
+    mat.close()
+
+
+def test_import_file_aem(empty_project, tmp_path):
+    source = tmp_path / "external_demand.aem"
+    source_matrix = AequilibraeMatrix()
+    source_matrix.create_empty(file_name=source, zones=2, matrix_names=["demand"], memory_only=False)
+    source_matrix.index[:] = np.array([10, 20])
+    source_matrix.matrix["demand"][:, :] = np.array([[1.0, 2.0], [3.0, 4.0]])
+    source_matrix.close()
+
+    matrices = empty_project.matrices
+    record = matrices.import_file(source, name="external_demand")
+
+    assert record.name == "external_demand"
+    assert record.file_name == "external_demand.aem"
+    assert record.cores == 1
+
+    mat = matrices.get_matrix("external_demand")
+    mat.computational_view(["demand"])
+    assert mat.matrix_view.sum() == 10.0
+    mat.close()
+
+
+def test_import_file_rejects_duplicates(empty_project, omx_example):
+    matrices = empty_project.matrices
+    matrices.import_file(omx_example, name="imported_demand", file_name="imported_demand.omx")
+
+    with pytest.raises(ValueError, match="already a matrix"):
+        matrices.import_file(omx_example, name="imported_demand", file_name="other_demand.omx")
+
+    with pytest.raises(ValueError, match="already a matrix record"):
+        matrices.import_file(omx_example, name="other_demand", file_name="imported_demand.omx")
+
+
+def test_import_file_rejects_unsupported_file(empty_project, tmp_path):
+    matrices = empty_project.matrices
+    unsupported = tmp_path / "demand.txt"
+    unsupported.write_text("not a matrix")
+
+    with pytest.raises(ValueError, match="Matrix needs to be either OMX or native AequilibraE"):
+        matrices.import_file(unsupported)
+
+    assert not Path(matrices.fldr, unsupported.name).exists()
 
 
 def test_list(sioux_falls_example):
