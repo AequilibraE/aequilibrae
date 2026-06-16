@@ -109,7 +109,7 @@ size_t dijkstra(size_t origin, const size_t max_size, const double *costs,
   }
 
   queue.free_heap();
-  return found;
+  return found - 1;
 }
 
 template <class Queue>

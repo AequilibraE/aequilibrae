@@ -239,12 +239,12 @@ def example():
             r = run_dijkstra_example(heap, destination=dest)
             label = f'dest={dest}' if dest else 'no dest'
             print(f'  {heap} ({label}): found={r["found"]}, path={r["path"]}, preds={r["predecessors"]}')
-            assert r['found'] > 0
-            assert r['predecessors'][0] == 2**64 - 1
+            assert r['found'] == 2  # 3 nodes total, found-1 = 2
+            assert r['predecessors'][0] == 2**64 - 1  # SENTINEL
             if dest == 2:
                 assert r['path'] == [0, 1, 2]
             else:
-                assert r['predecessors'][2] == 1  # optimal route without early exit
+                assert r['predecessors'][2] == 1
 
     print()
     print('=== A* examples ===')
@@ -253,7 +253,7 @@ def example():
             r = run_a_star_example(heap, heur)
             print(f'  {heap} + {heur}: path={r["path"]}')
             assert r['path'][0] == 0 and r['path'][-1] == 3
-            assert r['predecessors'][3] == 1  # optimal 0->1->3
+            assert r['predecessors'][3] == 1
 
     print()
     print('All assertions passed!')
