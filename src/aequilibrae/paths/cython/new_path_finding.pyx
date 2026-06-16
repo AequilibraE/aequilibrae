@@ -1,7 +1,7 @@
 from libc.stddef cimport size_t
 
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, StdPriorityQueueAdapter
-from aequilibrae.paths.cython.path_finding cimport dijkstra
+from aequilibrae.paths.cython.path_finding cimport dijkstra as cpp_dijkstra, a_star as cpp_a_star
 from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, msleep
 
 from aequilibrae.utils.logging_utils import basic_config
@@ -21,6 +21,10 @@ def run_dijkstra_example(type_of_heap: str = "FourAryHeap"):
         size_t csr[3]
         size_t fs[4]
         size_t predecessors[3]
+        size_t ids[3]
+        size_t connectors[3]
+        size_t reached_first[3]
+        unsigned char destinations[3]
         size_t found
         size_t i
         Bridge b
@@ -40,16 +44,29 @@ def run_dijkstra_example(type_of_heap: str = "FourAryHeap"):
     fs[2] = 3
     fs[3] = 3
 
+    # Link IDs (just sequential for demo)
+    ids[0] = 0
+    ids[1] = 1
+    ids[2] = 2
+
+    # No destinations / early exit disabled
     for i in range(max_size):
+        destinations[i] = 0
         predecessors[i] = max_size
 
     with Bridge(logger) as b:
         if type_of_heap == "FourAryHeap":
-            found = dijkstra[FourAryHeap](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0], b.c)
+            found = cpp_dijkstra[FourAryHeap](origin, max_size, &costs[0], &csr[0], &fs[0],
+                                              &predecessors[0], &ids[0], &connectors[0],
+                                              &reached_first[0], &destinations[0], -1, b.c)
         elif type_of_heap == "PairingHeap":
-            found = dijkstra[PairingHeap](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0], b.c)
+            found = cpp_dijkstra[PairingHeap](origin, max_size, &costs[0], &csr[0], &fs[0],
+                                              &predecessors[0], &ids[0], &connectors[0],
+                                              &reached_first[0], &destinations[0], -1, b.c)
         elif type_of_heap == "StdPriorityQueueAdapter":
-            found = dijkstra[StdPriorityQueueAdapter](origin, max_size, &costs[0], &csr[0], &fs[0], &predecessors[0], b.c)
+            found = cpp_dijkstra[StdPriorityQueueAdapter](origin, max_size, &costs[0], &csr[0], &fs[0],
+                                                          &predecessors[0], &ids[0], &connectors[0],
+                                                          &reached_first[0], &destinations[0], -1, b.c)
         else:
             raise ValueError("Unknown heap type")
 
