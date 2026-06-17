@@ -25,7 +25,7 @@ public:
 
 #define AEQ_LOG(closure, level, msg_exp)                                       \
   do {                                                                         \
-    if ((level) >= (closure)->c_level) {                                       \
+    if ((closure) && (level) >= (closure)->c_level) {                          \
       (closure)->_log((level), (msg_exp));                                     \
     }                                                                          \
   } while (0)
