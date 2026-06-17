@@ -22,6 +22,7 @@ pyfiles = [
 ]
 
 pkgs = [
+  'importer',
   'osm',
 ]
 

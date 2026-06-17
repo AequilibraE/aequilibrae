@@ -14,6 +14,7 @@ pyfiles = [
   'list_tables_in_db.py',
   'logging_utils.py',
   'model_run_utils.py',
+  'optional_dependency.py',
   'python_signal.py',
   'qgis_utils.py',
   'resolve_cysignals.py',

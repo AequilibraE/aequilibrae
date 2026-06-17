@@ -1,31 +1,27 @@
-import os
-from warnings import warn
-
 import pytest
-from shapely.geometry import box, Polygon
+from shapely.geometry import Polygon
 
 
-def test_create_from_osm(empty_project):
-    if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
-        pytest.skip("Skipped check to not load OSM servers")
+def test_create_from_osm_was_removed(empty_project):
+    """``create_from_osm`` was removed; calling it raises with a migration hint."""
+    with pytest.raises(AttributeError, match="import_from_osm"):
+        empty_project.network.create_from_osm(place_name="Nauru")
 
-    empty_project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
 
+def test_import_from_osm_via_pbf(empty_project):
+    pyrosm = pytest.importorskip("pyrosm")
+    from pyrosm import get_data
+
+    empty_project.network.import_from_osm(
+        pbf_path=get_data("test_pbf"),
+        modes=("car",),
+        simplify=False,
+    )
     with empty_project.db_connection as conn:
-        lks = conn.execute("""select count(*) from links""").fetchone()[0]
-        osmids = conn.execute("""select count(distinct osm_id) from links""").fetchone()[0]
-
-        if osmids == 0:
-            warn("COULD NOT RETRIEVE DATA FROM OSM", stacklevel=2)
-            return
-
-        if osmids >= lks:
-            pytest.fail("OSM links not broken down properly")
-
-        nds = conn.execute("""select count(*) from nodes""").fetchone()[0]
-
-        if lks > nds:
-            pytest.fail("We imported more links than nodes. Something wrong here")
+        n_links = conn.execute("SELECT count(*) FROM links").fetchone()[0]
+        n_nodes = conn.execute("SELECT count(*) FROM nodes").fetchone()[0]
+    assert n_links > 10
+    assert n_nodes > 10
 
 
 def test_count_centroids(sioux_falls_test):

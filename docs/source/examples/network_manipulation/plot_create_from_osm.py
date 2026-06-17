@@ -4,61 +4,67 @@
 Create project from OpenStreetMap
 =================================
 
-In this example, we show how to create an empty project and populate it with a network from 
-OpenStreetMap.
+In this example we show how to create an empty project and populate it with a
+network from OpenStreetMap. The new pluggable network-acquisition framework
+(``Network.import_from_osm``) replaces the old ``create_from_osm`` API.
 
-This time we will use GeoPandas to visualize the network.
+We use GeoPandas to visualise the result.
+
+Install the optional dependencies first::
+
+    pip install aequilibrae[create]
 """
 # %%
 # .. admonition:: References
-# 
-#   * :ref:`importing_from_osm` 
+#
+#   * :ref:`importing_from_osm`
 
 # %%
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.network.Network.create_from_osm`
+#     * :func:`aequilibrae.project.network.network.Network.import_from_osm`
 
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
 from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
 
 from aequilibrae import Project
 # sphinx_gallery_thumbnail_path = '../source/_images/nauru.png'
 
 # %%
 
-# We create an empty project on an arbitrary folder
+# Create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
 project = Project()
 project.new(fldr)
 
 # %%
-# Now we can download the network from any place in the world (as long as you have memory for 
-# all the download and data wrangling that will be done).
+# Import a network for the small nation of Nauru. The raw Overpass response is
+# saved to ``<project>/downloaded data/osm-overpass/`` so the import can be
+# inspected or replayed offline later.
+project.network.import_from_osm(place_name="Nauru")
 
 # %%
-# We can create from a bounding box or a named place.
-# For the sake of this example, we will choose the small nation of Nauru.
-project.network.create_from_osm(place_name="Nauru")
+# We can also import from a polygon (which must be in EPSG:4326) or from a
+# bounding box, or from a local .osm.pbf file:
+#
+# .. code-block:: python
+#
+#     from shapely.geometry import box
+#     project.network.import_from_osm(
+#         model_area=box(-112.185, 36.59, -112.179, 36.60)
+#     )
+#     # or
+#     project.network.import_from_osm(pbf_path="path/to/extract.osm.pbf")
 
 # %%
-# We can also choose to create a model from a polygon (which must be in ``EPSG:4326``)
-# or from a Polygon defined by a bounding box, for example.
-
-# project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
-
-# %%
-# We grab all the links data as a geopandas GeoDataFrame so we can process it easier
+# Grab all the links as a GeoDataFrame and plot.
 links = project.network.links.data
-
-# %%
-# Let's plot our network!
 links.explore(color="blue", style_kwds={"weight": 2}, tooltip="link_type")
 
 # %%

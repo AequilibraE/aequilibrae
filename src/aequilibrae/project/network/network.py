@@ -1,24 +1,18 @@
 import logging
-import math
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
-from shapely.geometry import Polygon, box
+from shapely.geometry import Polygon
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
-from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
-from aequilibrae.project.network.osm.osm_builder import OSMBuilder
-from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
-from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -112,114 +106,186 @@ class Network(WorkerThread):
             all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
-    def create_from_osm(
-        self,
-        model_area: Optional[Polygon] = None,
-        place_name: Optional[str] = None,
-        modes=("car", "transit", "bicycle", "walk"),
-        clean=True,
-    ) -> None:
-        """
-        Downloads the network from OpenStreetMap (OSM)
+    def create_from_osm(self, *args, **kwargs) -> None:
+        """Removed in favour of :meth:`import_from_osm`.
 
-        :Arguments:
-            **area** (:obj:`Polygon`, *Optional*): Polygon for which the network will be downloaded. If not provided,
-            a place name would be required
-
-            **place_name** (:obj:`str`, *Optional*): If not downloading with East-West-North-South boundingbox, this is
-            required
-
-            **modes** (:obj:`tuple`, *Optional*): List of all modes to be downloaded. Defaults to the modes in the
-            parameter file
-
-            **clean** (:obj:`bool`, *Optional*): Keeps only the links that intersects the model area polygon.
-            Defaults to ``True``. Does not apply to networks downloaded with a place name
+        The legacy ``create_from_osm`` writer was deprecated and removed as
+        part of the pluggable network-acquisition framework. The replacement is:
 
         .. code-block:: python
 
-            >>> project = Project()
-            >>> project.new(project_path)
+            project.network.import_from_osm(
+                place_name="...",            # or model_area=..., or pbf_path=...
+                modes=("car", "transit", "bicycle", "walk"),
+                simplify="osmnx",
+            )
 
-            # Now we can import the network for any place we want
-            >>> project.network.create_from_osm(place_name="my_beautiful_hometown") # doctest: +SKIP
-
-            >>> project.close()
+        See the migration guide for the full list of behavioural changes.
         """
+        raise AttributeError(
+            "Network.create_from_osm was removed. Use Network.import_from_osm("
+            "place_name=..., model_area=..., or pbf_path=...). "
+            "See docs/source/modeling_with_aequilibrae/network/importing.rst."
+        )
 
-        if self.count_links() > 0:
-            raise FileExistsError("You can only import an OSM network into a brand new model file")
+    # ------------------------------------------------------------------
+    # New pluggable network-acquisition framework
+    # See .kilo/plans/replace-osm-importer.md
+    # ------------------------------------------------------------------
 
-        with self.project.db_connection as conn:
-            conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
-            conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
+    def import_network(
+        self,
+        source,
+        *,
+        modes=("car", "transit", "bicycle", "walk"),
+        simplify="osmnx",
+        consolidate_tolerance: Optional[float] = 10.0,
+        cache_tag: str = "",
+        **source_kwargs,
+    ) -> None:
+        """Generic network-import entry point.
 
-        if isinstance(modes, (tuple, list)):
-            modes = list(modes)
-        elif isinstance(modes, str):
-            modes = [modes]
+        :Arguments:
+            **source**: A ``Source`` instance, or one of the registered names:
+            ``"osm-overpass"``, ``"osm-pbf"``, ``"overture-cloud"``,
+            ``"geodataframe"``, ``"file"``, ``"gmns"``.
+
+            **modes**: Sequence of AequilibraE mode names to retain.
+
+            **simplify**: ``"osmnx"`` (default), ``"neatnet"``, or ``False``.
+
+            **consolidate_tolerance**: Tolerance (m, auto-UTM) for OSMnx
+            ``consolidate_intersections``. Ignored when ``simplify=False`` or
+            ``simplify="neatnet"``.
+
+            **cache_tag**: Short label used in the per-import subfolder of
+            ``<project>/downloaded data/``.
+
+            Additional ``**source_kwargs`` are forwarded to the source
+            constructor when ``source`` is a registered string name.
+        """
+        from aequilibrae.project.network.importer.importer import NetworkImporter
+
+        NetworkImporter(self.project).run(
+            source,
+            modes=modes,
+            simplify=simplify,
+            consolidate_tolerance=consolidate_tolerance,
+            cache_tag=cache_tag,
+            **source_kwargs,
+        )
+
+    def import_from_osm(
+        self,
+        *,
+        model_area: Optional[Polygon] = None,
+        place_name: Optional[str] = None,
+        pbf_path=None,
+        modes=("car", "transit", "bicycle", "walk"),
+        custom_filter: Optional[str] = None,
+        simplify="osmnx",
+        consolidate_tolerance: Optional[float] = 10.0,
+    ) -> None:
+        """Import a network from OpenStreetMap.
+
+        Exactly one of ``model_area``, ``place_name``, ``pbf_path`` must be
+        provided. XML / .osm / .osm.bz2 is not supported — convert with
+        ``osmium cat in.osm -o out.osm.pbf`` first.
+        """
+        provided = sum(x is not None for x in (model_area, place_name, pbf_path))
+        if provided != 1:
+            raise ValueError(
+                "import_from_osm requires exactly one of: model_area, place_name, pbf_path"
+            )
+        if pbf_path is not None:
+            self.import_network(
+                "osm-pbf",
+                modes=modes,
+                simplify=simplify,
+                consolidate_tolerance=consolidate_tolerance,
+                cache_tag=str(pbf_path),
+                pbf_path=pbf_path,
+                custom_filter=custom_filter,
+            )
         else:
-            raise ValueError("'modes' needs to be string or list/tuple of string")
+            self.import_network(
+                "osm-overpass",
+                modes=modes,
+                simplify=simplify,
+                consolidate_tolerance=consolidate_tolerance,
+                cache_tag=place_name or "bbox",
+                model_area=model_area,
+                place_name=place_name,
+                custom_filter=custom_filter,
+            )
 
-        if place_name is None:
-            if (
-                model_area.bounds[0] < -180
-                or model_area.bounds[2] > 180
-                or model_area.bounds[1] < -90
-                or model_area.bounds[3] > 90
-            ):
-                raise ValueError("Coordinates out of bounds. Polygon must be in WGS84")
-            west, south, east, north = model_area.bounds
-        else:
-            clean = False
-            bbox, report = placegetter(place_name)
-            if bbox is None:
-                msg = f'We could not find a reference for place name "{place_name}"'
-                logger.warning(msg)
-                return
-            for i in report:
-                if "PLACE FOUND" in i:
-                    logger.info(i)
-            model_area = box(*bbox)
-            west, south, east, north = bbox
+    def import_from_overture(
+        self,
+        *,
+        model_area: Polygon,
+        release: Optional[str] = None,
+        modes=("car", "transit", "bicycle", "walk"),
+        simplify="osmnx",
+        consolidate_tolerance: Optional[float] = 10.0,
+    ) -> None:
+        """Import a network from Overture Maps (cloud backend; rule arrays always preserved)."""
+        if model_area is None:
+            raise ValueError("import_from_overture requires a `model_area` Polygon")
+        bounds = model_area.bounds
+        tag = f"bbox_{bounds[0]:.4f}_{bounds[1]:.4f}_{bounds[2]:.4f}_{bounds[3]:.4f}"
+        self.import_network(
+            "overture-cloud",
+            modes=modes,
+            simplify=simplify,
+            consolidate_tolerance=consolidate_tolerance,
+            cache_tag=tag,
+            model_area=model_area,
+            release=release,
+        )
 
-        # Need to compute the size of the bounding box to not exceed it too much
-        height = haversine((east + west) / 2, south, (east + west) / 2, north)
-        width = haversine(east, (north + south) / 2, west, (north + south) / 2)
-        area = height * width
+    def import_from_geodataframes(
+        self,
+        *,
+        nodes,
+        links,
+        crs=None,
+        column_mapping: Optional[dict] = None,
+        simplify=False,
+    ) -> None:
+        """Import a network from user-supplied ``(nodes, links)`` GeoDataFrames."""
+        self.import_network(
+            "geodataframe",
+            modes=("car", "transit", "bicycle", "walk"),
+            simplify=simplify,
+            cache_tag="user-geodataframes",
+            nodes=nodes,
+            links=links,
+            crs=crs,
+            column_mapping=column_mapping,
+        )
 
-        par = Parameters().parameters["osm"]
-        max_query_area_size = par["max_query_area_size"]
-
-        if area < max_query_area_size:
-            polygons = [model_area]
-        else:
-            polygons = []
-            parts = math.ceil(area / max_query_area_size)
-            horizontal = math.ceil(math.sqrt(parts))
-            vertical = math.ceil(parts / horizontal)
-            dx = (east - west) / horizontal
-            dy = (north - south) / vertical
-            for i in range(horizontal):
-                xmin = max(-180, west + i * dx)
-                xmax = min(180, west + (i + 1) * dx)
-                for j in range(vertical):
-                    ymin = max(-90, south + j * dy)
-                    ymax = min(90, south + (j + 1) * dy)
-                    subarea = box(xmin, ymin, xmax, ymax)
-                    if subarea.intersects(model_area):
-                        polygons.append(subarea)
-        logger.info("Downloading data")
-        dwnloader = OSMDownloader(polygons, modes)
-        dwnloader.signal = self.signal
-        dwnloader.doWork()
-
-        logger.info("Building Network")
-        self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
-
-        self.builder.signal = self.signal
-        self.builder.doWork()
-
-        logger.info("Network built successfully")
+    def import_from_file(
+        self,
+        *,
+        links_path,
+        nodes_path,
+        layer_links: Optional[str] = None,
+        layer_nodes: Optional[str] = None,
+        column_mapping: Optional[dict] = None,
+        simplify=False,
+    ) -> None:
+        """Import a network from disk via geopandas (GeoPackage, GeoJSON, Shapefile, FlatGeobuf)."""
+        self.import_network(
+            "file",
+            modes=("car", "transit", "bicycle", "walk"),
+            simplify=simplify,
+            cache_tag=str(links_path),
+            links_path=links_path,
+            nodes_path=nodes_path,
+            layer_links=layer_links,
+            layer_nodes=layer_nodes,
+            column_mapping=column_mapping,
+        )
 
     def create_from_gmns(
         self,

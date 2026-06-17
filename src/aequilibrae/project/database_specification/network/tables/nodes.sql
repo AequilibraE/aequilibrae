@@ -43,5 +43,5 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','link_types', 'Link types connected to the node');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','other_attributes', 'Other attributes of the node. Preferably in json format');
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','other_attributes', 'Other attributes of the node. Preferably in json format');
 
