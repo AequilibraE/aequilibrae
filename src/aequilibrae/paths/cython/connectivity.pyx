@@ -51,7 +51,7 @@ cdef connectivity_single_threaded(origin, graph, aux_result, disconn_array, all_
         all_threads["count"] += 1
 
     cdef:
-        ITYPE_t i, b, k
+        size_t i, b, k
         long orig = origin
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long [:] origin_index = graph.compact_nodes_to_indices
