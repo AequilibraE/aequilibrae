@@ -71,11 +71,11 @@ def test_compute_paths(p_results):
     for early_exit, a_star in product([True, False], repeat=2):
         r.early_exit = early_exit
         r.a_star = a_star
-        path_computation(5, 2, g, r)
-        assert list(r.path) == [12, 14]
-        assert list(r.path_link_directions) == [1, 1]
-        assert list(r.path_nodes) == [5, 6, 2]
-        assert list(r.milepost) == [0, 4, 9]
+        path, path_nodes, path_link_directions, milepost = path_computation(5, 2, r)
+        assert list(path) == [12, 14]
+        assert list(path_link_directions) == [1, 1]
+        assert list(path_nodes) == [5, 6, 2]
+        assert list(milepost) == [0, 4, 9]
 
 
 def test_compute_with_skimming(p_results):
