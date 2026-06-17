@@ -195,7 +195,7 @@ def path_computation(origin, destination, graph, results):
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
     """
-    cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
+    cdef int64_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long skims, block_flows_through_centroids
     cdef bint early_exit_bint = results.early_exit
 
