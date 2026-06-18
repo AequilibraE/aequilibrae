@@ -38,20 +38,16 @@ def test_simplify_osmnx_runs_and_reduces(empty_project):
     assert n_nodes > 0
     # Validate dict-of-dicts provenance on at least one link
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        for (oa,) in conn.execute(
-            "SELECT other_attributes FROM links WHERE other_attributes IS NOT NULL"
-        ):
+        for (oa,) in conn.execute("SELECT other_attributes FROM links WHERE other_attributes IS NOT NULL"):
             payload = json.loads(oa)
             if "source_id_list" in payload:
                 inner = payload["source_id_list"]
                 if isinstance(inner, str):
                     inner = json.loads(inner)
-                assert isinstance(inner, dict), \
-                    f"source_id_list must be a dict-of-dicts, got {type(inner).__name__}"
+                assert isinstance(inner, dict), f"source_id_list must be a dict-of-dicts, got {type(inner).__name__}"
                 for k, v in inner.items():
                     assert isinstance(k, str)
-                    assert isinstance(v, dict), \
-                        f"source_id_list[{k}] must be a dict, got {type(v).__name__}"
+                    assert isinstance(v, dict), f"source_id_list[{k}] must be a dict, got {type(v).__name__}"
                 return
     pytest.skip("No merged links produced — fixture too small for simplification to merge anything")
 

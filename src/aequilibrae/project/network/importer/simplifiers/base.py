@@ -11,8 +11,7 @@ class Simplifier(Protocol):
     name: ClassVar[str]
     required_extras: ClassVar[tuple]
 
-    def simplify(self, net: StagedNetwork, **kwargs) -> StagedNetwork:
-        ...
+    def simplify(self, net: StagedNetwork, **kwargs) -> StagedNetwork: ...
 
 
 SIMPLIFIERS: dict = {}
@@ -36,8 +35,6 @@ def resolve_simplifier(simplifier, **kwargs):
     if isinstance(simplifier, str):
         if simplifier not in SIMPLIFIERS:
             available = sorted(SIMPLIFIERS.keys())
-            raise SourceResolutionError(
-                f"Unknown simplifier name: {simplifier!r}. Available simplifiers: {available}"
-            )
+            raise SourceResolutionError(f"Unknown simplifier name: {simplifier!r}. Available simplifiers: {available}")
         return SIMPLIFIERS[simplifier](**kwargs)
     return simplifier

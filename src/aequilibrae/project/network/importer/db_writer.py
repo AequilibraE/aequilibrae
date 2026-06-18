@@ -67,10 +67,7 @@ class SpatialiteWriter:
     # ---------- link_types ----------
 
     def _ensure_link_types(self, conn, link_types: Iterable[str]) -> None:
-        existing = {
-            row[0]: row[1]
-            for row in conn.execute("SELECT link_type, link_type_id FROM link_types").fetchall()
-        }
+        existing = {row[0]: row[1] for row in conn.execute("SELECT link_type, link_type_id FROM link_types").fetchall()}
         allocator = LinkTypeAllocator(existing=existing)
         new_rows = []
         for lt in link_types:
@@ -98,10 +95,7 @@ class SpatialiteWriter:
 
         col_names = [c for c in direct.columns if c != "geometry"]
         placeholders = ",".join(["?"] * len(col_names))
-        sql = (
-            f"INSERT INTO nodes ({', '.join(col_names)}, geometry) "
-            f"VALUES ({placeholders}, MakePoint(?, ?, 4326))"
-        )
+        sql = f"INSERT INTO nodes ({', '.join(col_names)}, geometry) VALUES ({placeholders}, MakePoint(?, ?, 4326))"
         xs = direct.geometry.x.to_numpy()
         ys = direct.geometry.y.to_numpy()
         records = _to_records(direct, col_names)
@@ -115,10 +109,7 @@ class SpatialiteWriter:
 
         col_names = [c for c in direct.columns if c != "geometry"]
         placeholders = ",".join(["?"] * len(col_names))
-        sql = (
-            f"INSERT INTO links ({', '.join(col_names)}, geometry) "
-            f"VALUES ({placeholders}, GeomFromWKB(?, 4326))"
-        )
+        sql = f"INSERT INTO links ({', '.join(col_names)}, geometry) VALUES ({placeholders}, GeomFromWKB(?, 4326))"
         wkbs = direct.geometry.to_wkb()
         records = _to_records(direct, col_names)
         conn.executemany(sql, [r + (wkb,) for r, wkb in zip(records, wkbs)])

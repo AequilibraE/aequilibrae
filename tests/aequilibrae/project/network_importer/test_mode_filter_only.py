@@ -32,9 +32,7 @@ _BANNED_FILTER_KWARGS = (
 def test_no_link_type_filter_kwarg(method_name, kwarg):
     method = getattr(Network, method_name)
     sig = inspect.signature(method)
-    assert kwarg not in sig.parameters, (
-        f"{method_name}() must not accept '{kwarg}' (plan §1.3 rule 2)"
-    )
+    assert kwarg not in sig.parameters, f"{method_name}() must not accept '{kwarg}' (plan §1.3 rule 2)"
 
 
 def test_modes_kwarg_exists():
@@ -61,12 +59,7 @@ def test_osm_import_preserves_all_link_types_for_active_modes(empty_project):
     )
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        link_types = {
-            r[0]
-            for r in conn.execute("SELECT DISTINCT link_type FROM links").fetchall()
-        }
+        link_types = {r[0] for r in conn.execute("SELECT DISTINCT link_type FROM links").fetchall()}
     # Walking-only must include at least one of the typically pedestrian highway tags
     pedestrian = {"footway", "pedestrian", "path", "steps", "cycleway"}
-    assert link_types & pedestrian, (
-        f"Expected pedestrian link_types to survive a walk-only import; got {link_types}"
-    )
+    assert link_types & pedestrian, f"Expected pedestrian link_types to survive a walk-only import; got {link_types}"

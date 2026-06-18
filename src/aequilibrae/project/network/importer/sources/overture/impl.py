@@ -41,15 +41,17 @@ def acquire_cloud(
 
     download_cache.write_parquet("segments.parquet", segments_table)
     download_cache.write_parquet("connectors.parquet", connectors_table)
-    download_cache.write_manifest({
-        "source": "overture-cloud",
-        "backend": "overturemaps",
-        "release": release,
-        "bbox": list(bbox),
-        "modes": list(modes),
-        "segments_rows": segments_table.num_rows,
-        "connectors_rows": connectors_table.num_rows,
-    })
+    download_cache.write_manifest(
+        {
+            "source": "overture-cloud",
+            "backend": "overturemaps",
+            "release": release,
+            "bbox": list(bbox),
+            "modes": list(modes),
+            "segments_rows": segments_table.num_rows,
+            "connectors_rows": connectors_table.num_rows,
+        }
+    )
 
     segments_gdf = _table_to_gdf(segments_table)
     connectors_gdf = _table_to_gdf(connectors_table)
@@ -73,8 +75,7 @@ def _fetch_table(overturemaps, theme_type: str, bbox, *, release):
     rbr = overturemaps.record_batch_reader(theme_type, bbox=bbox)
     if rbr is None:
         raise ImporterError(
-            f"overturemaps returned no record batch reader for type={theme_type!r}; "
-            f"check connectivity and bbox={bbox}"
+            f"overturemaps returned no record batch reader for type={theme_type!r}; check connectivity and bbox={bbox}"
         )
     return rbr.read_all()
 
@@ -85,9 +86,7 @@ def _table_to_gdf(table) -> gpd.GeoDataFrame:
 
     df = table.to_pandas(use_threads=True)
     if "geometry" in df.columns:
-        df["geometry"] = df["geometry"].apply(
-            lambda v: from_wkb(v) if v is not None else None
-        )
+        df["geometry"] = df["geometry"].apply(lambda v: from_wkb(v) if v is not None else None)
     return gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
 
 

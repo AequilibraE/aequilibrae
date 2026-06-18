@@ -19,8 +19,7 @@ class Source(Protocol):
         *,
         modes: tuple,
         download_cache: DownloadCache,
-    ) -> StagedNetwork:
-        ...
+    ) -> StagedNetwork: ...
 
 
 SOURCES: dict = {}
@@ -37,8 +36,6 @@ def resolve_source(source, **kwargs) -> Source:
     if isinstance(source, str):
         if source not in SOURCES:
             available = sorted(SOURCES.keys())
-            raise SourceResolutionError(
-                f"Unknown source name: {source!r}. Available sources: {available}"
-            )
+            raise SourceResolutionError(f"Unknown source name: {source!r}. Available sources: {available}")
         return SOURCES[source](**kwargs)
     return source

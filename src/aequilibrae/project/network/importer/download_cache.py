@@ -75,10 +75,7 @@ class DownloadCache:
         self._timestamp = _utc_timestamp()
         self._tag = _slugify(tag)
         self._folder = (
-            self._project_base_path
-            / _BASE_FOLDER_NAME
-            / self._source_name
-            / f"{self._timestamp}__{self._tag}"
+            self._project_base_path / _BASE_FOLDER_NAME / self._source_name / f"{self._timestamp}__{self._tag}"
         )
         self._created = False
         self._sha256s: dict = {}

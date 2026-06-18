@@ -20,6 +20,4 @@ class OSMPbfSource:
     def acquire(self, *, modes, download_cache: DownloadCache) -> StagedNetwork:
         from aequilibrae.project.network.importer.sources.osm.impl import acquire_pbf
 
-        return acquire_pbf(
-            pbf_path=self.pbf_path, modes=modes, download_cache=download_cache, **self.kwargs
-        )
+        return acquire_pbf(pbf_path=self.pbf_path, modes=modes, download_cache=download_cache, **self.kwargs)

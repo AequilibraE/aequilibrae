@@ -25,6 +25,7 @@ JSON_COL = "other_attributes"
 # Shared, single-copy JSON helpers
 # ---------------------------------------------------------------------------
 
+
 def is_missing(value) -> bool:
     """True if the value is None or NaN (Python float NaN only).
 
@@ -106,18 +107,12 @@ def split_attributes(
     known = [
         c
         for c in cols
-        if c in table_cols_set
-        and c not in PROTECTED_COLS
-        and c != JSON_COL
-        and not str(c).startswith("_")
+        if c in table_cols_set and c not in PROTECTED_COLS and c != JSON_COL and not str(c).startswith("_")
     ]
     extras = [
         c
         for c in cols
-        if c not in table_cols_set
-        and c not in PROTECTED_COLS
-        and c != JSON_COL
-        and not str(c).startswith("_")
+        if c not in table_cols_set and c not in PROTECTED_COLS and c != JSON_COL and not str(c).startswith("_")
     ]
 
     if "geometry" in cols:

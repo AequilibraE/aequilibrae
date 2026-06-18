@@ -17,8 +17,8 @@ from typing import Callable, Mapping
 class ModeRule:
     """Predicate-based rule for assigning a single AequilibraE mode."""
 
-    mode_name: str          # e.g. "car"
-    mode_code: str          # one-letter mode_id, e.g. "c"
+    mode_name: str  # e.g. "car"
+    mode_code: str  # one-letter mode_id, e.g. "c"
     predicate: Callable[[Mapping], bool]
 
     def applies(self, tags: Mapping) -> bool:

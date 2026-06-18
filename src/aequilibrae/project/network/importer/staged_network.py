@@ -68,29 +68,21 @@ class StagedNetwork:
         """Assert the schema invariants of this staged network."""
         missing_nodes = [c for c in _REQUIRED_NODE_COLS if c not in self.nodes.columns]
         if missing_nodes:
-            raise StagedNetworkValidationError(
-                f"nodes GeoDataFrame missing required columns: {missing_nodes}"
-            )
+            raise StagedNetworkValidationError(f"nodes GeoDataFrame missing required columns: {missing_nodes}")
         missing_links = [c for c in _REQUIRED_LINK_COLS if c not in self.links.columns]
         if missing_links:
-            raise StagedNetworkValidationError(
-                f"links GeoDataFrame missing required columns: {missing_links}"
-            )
+            raise StagedNetworkValidationError(f"links GeoDataFrame missing required columns: {missing_links}")
 
         if self.nodes.crs is None or str(self.nodes.crs).upper() not in (
             "EPSG:4326",
             str(self.crs_geo).upper(),
         ):
-            raise StagedNetworkValidationError(
-                f"nodes CRS must be EPSG:4326, got {self.nodes.crs}"
-            )
+            raise StagedNetworkValidationError(f"nodes CRS must be EPSG:4326, got {self.nodes.crs}")
         if self.links.crs is None or str(self.links.crs).upper() not in (
             "EPSG:4326",
             str(self.crs_geo).upper(),
         ):
-            raise StagedNetworkValidationError(
-                f"links CRS must be EPSG:4326, got {self.links.crs}"
-            )
+            raise StagedNetworkValidationError(f"links CRS must be EPSG:4326, got {self.links.crs}")
 
         if not np.issubdtype(self.nodes["node_id"].dtype, np.integer):
             raise StagedNetworkValidationError(
@@ -99,21 +91,15 @@ class StagedNetwork:
         if self.nodes["node_id"].duplicated().any():
             raise StagedNetworkValidationError("nodes.node_id contains duplicates")
         if (self.nodes["node_id"] < _DEFAULT_NODE_START).any():
-            raise StagedNetworkValidationError(
-                f"nodes.node_id values must be >= {_DEFAULT_NODE_START}"
-            )
+            raise StagedNetworkValidationError(f"nodes.node_id values must be >= {_DEFAULT_NODE_START}")
 
         node_ids = set(self.nodes["node_id"].tolist())
         a_missing = ~self.links["a_node"].isin(node_ids)
         b_missing = ~self.links["b_node"].isin(node_ids)
         if a_missing.any():
-            raise StagedNetworkValidationError(
-                f"{int(a_missing.sum())} links.a_node values are not in nodes.node_id"
-            )
+            raise StagedNetworkValidationError(f"{int(a_missing.sum())} links.a_node values are not in nodes.node_id")
         if b_missing.any():
-            raise StagedNetworkValidationError(
-                f"{int(b_missing.sum())} links.b_node values are not in nodes.node_id"
-            )
+            raise StagedNetworkValidationError(f"{int(b_missing.sum())} links.b_node values are not in nodes.node_id")
 
         if (self.links["distance"] <= 0).any():
             raise StagedNetworkValidationError("links.distance must be > 0 (metres)")
@@ -122,9 +108,7 @@ class StagedNetwork:
             raise StagedNetworkValidationError("links.direction values must be in {-1, 0, 1}")
 
         if (self.links["modes"].fillna("").str.len() == 0).any():
-            raise StagedNetworkValidationError(
-                "links.modes must be a non-empty string for every row"
-            )
+            raise StagedNetworkValidationError("links.modes must be a non-empty string for every row")
 
     def to_graph(self) -> "nx.MultiDiGraph":
         """Build a networkx MultiDiGraph copy of the staged network.
@@ -187,6 +171,4 @@ class StagedNetwork:
         crs = g.graph.get("crs", "EPSG:4326")
         nodes_gdf = gpd.GeoDataFrame(node_records, geometry="geometry", crs=crs)
         links_gdf = gpd.GeoDataFrame(link_records, geometry="geometry", crs=crs)
-        return cls(
-            nodes=nodes_gdf, links=links_gdf, crs_geo=str(crs), source_meta=source_meta or {}
-        )
+        return cls(nodes=nodes_gdf, links=links_gdf, crs_geo=str(crs), source_meta=source_meta or {})

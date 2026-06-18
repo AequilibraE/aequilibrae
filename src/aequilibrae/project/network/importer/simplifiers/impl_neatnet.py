@@ -1,8 +1,5 @@
-"""neatnet-based simplifier implementation (opt-in)."""
-
-import logging
-
 import geopandas as gpd
+import logging
 import numpy as np
 import shapely
 from shapely.geometry import Point

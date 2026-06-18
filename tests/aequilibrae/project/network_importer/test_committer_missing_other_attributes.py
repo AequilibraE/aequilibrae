@@ -40,6 +40,4 @@ def test_missing_other_attributes_raises(empty_project):
     )
 
     with pytest.raises(ImporterError, match="other_attributes"):
-        empty_project.network.import_from_geodataframes(
-            nodes=nodes, links=links, simplify=False
-        )
+        empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)

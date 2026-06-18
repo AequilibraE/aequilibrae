@@ -30,7 +30,7 @@ def _basic_inputs():
             "name": ["Street A", "Street B", "Avenue X"],
             "surface": ["asphalt", "gravel", "asphalt"],
             "bridge": ["yes", None, None],
-            "_source_id": ["1", "2", "3"],   # IR scratch — should be stripped
+            "_source_id": ["1", "2", "3"],  # IR scratch — should be stripped
             "geometry": [
                 LineString([(0, 0), (0, 1)]),
                 LineString([(0, 1), (1, 1)]),
@@ -56,9 +56,7 @@ def test_unknown_columns_land_in_other_attributes(empty_project):
     empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        for link_id, oa in conn.execute(
-            "SELECT link_id, other_attributes FROM links ORDER BY link_id"
-        ):
+        for link_id, oa in conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id"):
             payload = json.loads(oa) if oa else {}
             assert "surface" in payload, f"link {link_id} missing 'surface'"
             # NaN/None should be dropped from the JSON object
@@ -122,9 +120,7 @@ def test_existing_other_attributes_is_merged_not_overwritten(empty_project):
     empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        rows = list(
-            conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id")
-        )
+        rows = list(conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id"))
         first = json.loads(rows[0][1])
         # Pre-existing key survived
         assert first["pre_existing"] == "yes"

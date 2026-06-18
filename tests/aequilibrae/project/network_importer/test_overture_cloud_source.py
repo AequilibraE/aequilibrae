@@ -55,15 +55,17 @@ def _make_segments_table():
         [{"max_speed": {"value": 50, "unit": "km/h"}, "between": None, "when": None}],
     ]
     access_restrictions = [None, None]
-    return pa.table({
-        "id": ids,
-        "geometry": geoms,
-        "subtype": subtypes,
-        "class": classes,
-        "connectors": connectors,
-        "speed_limits": speed_limits,
-        "access_restrictions": access_restrictions,
-    })
+    return pa.table(
+        {
+            "id": ids,
+            "geometry": geoms,
+            "subtype": subtypes,
+            "class": classes,
+            "connectors": connectors,
+            "speed_limits": speed_limits,
+            "access_restrictions": access_restrictions,
+        }
+    )
 
 
 class _FakeReader:
@@ -132,9 +134,7 @@ def test_overture_speed_limit_parsed(empty_project, monkeypatch):
         simplify=False,
     )
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        rows = list(conn.execute(
-            "SELECT speed_ab, speed_ba, link_type FROM links WHERE link_type='primary'"
-        ))
+        rows = list(conn.execute("SELECT speed_ab, speed_ba, link_type FROM links WHERE link_type='primary'"))
     assert rows
     for sab, sba, _lt in rows:
         # 50 km/h on a bidirectional link → both sides 50
@@ -149,14 +149,10 @@ def test_overture_rule_arrays_land_in_other_attributes(empty_project, monkeypatc
         simplify=False,
     )
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        for (oa,) in conn.execute(
-            "SELECT other_attributes FROM links WHERE link_type='primary'"
-        ):
+        for (oa,) in conn.execute("SELECT other_attributes FROM links WHERE link_type='primary'"):
             payload = json.loads(oa)
             # speed_limits array preserved verbatim (per plan §1.3 rule 7)
-            assert "speed_limits" in payload, (
-                f"speed_limits must be preserved; got keys {list(payload.keys())}"
-            )
+            assert "speed_limits" in payload, f"speed_limits must be preserved; got keys {list(payload.keys())}"
 
 
 def test_overture_about_provenance(empty_project, monkeypatch):
@@ -169,9 +165,7 @@ def test_overture_about_provenance(empty_project, monkeypatch):
     with sqlite3.connect(empty_project.path_to_file) as conn:
         about = {
             r[0]: r[1]
-            for r in conn.execute(
-                "SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'"
-            )
+            for r in conn.execute("SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'")
         }
     assert about["network_source"] == "overture"
     assert about["network_source_backend"] == "cloud"

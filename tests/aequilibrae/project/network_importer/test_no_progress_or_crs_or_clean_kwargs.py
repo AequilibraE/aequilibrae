@@ -28,9 +28,7 @@ _BANNED_KWARGS_EVERYWHERE = ("progress", "projected_crs", "clean", "commit")
 def test_no_banned_kwargs(method_name, banned):
     method = getattr(Network, method_name)
     sig = inspect.signature(method)
-    assert banned not in sig.parameters, (
-        f"{method_name}() must not accept '{banned}' (plan §1.3 rules 4 & 5)"
-    )
+    assert banned not in sig.parameters, f"{method_name}() must not accept '{banned}' (plan §1.3 rules 4 & 5)"
 
 
 def test_import_from_osm_rejects_xml_path():

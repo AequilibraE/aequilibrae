@@ -45,6 +45,7 @@ def test_write_parquet_round_trips(tmp_path):
     assert path.suffix == ".parquet"
 
     import pyarrow.parquet as pq
+
     back = pq.read_table(path)
     assert back.num_rows == 3
 

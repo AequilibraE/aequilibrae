@@ -39,13 +39,24 @@ def _explicit_allowed(tags: Mapping, key: str) -> bool:
 
 # --- Mode predicates ---
 
+
 def _allow_car(tags: Mapping) -> bool:
     highway = str(tags.get("highway", "")).lower()
     if not highway:
         return False
     # Hard exclusions for pedestrian/cycle-only ways unless explicitly allowed
-    pedestrian_only = {"footway", "pedestrian", "steps", "path", "cycleway", "bridleway",
-                       "corridor", "elevator", "escalator", "via_ferrata"}
+    pedestrian_only = {
+        "footway",
+        "pedestrian",
+        "steps",
+        "path",
+        "cycleway",
+        "bridleway",
+        "corridor",
+        "elevator",
+        "escalator",
+        "via_ferrata",
+    }
     if highway in pedestrian_only:
         return _explicit_allowed(tags, "motor_vehicle") or _explicit_allowed(tags, "vehicle")
     # Generic access denials
@@ -56,8 +67,7 @@ def _allow_car(tags: Mapping) -> bool:
     if _denied(tags, "vehicle") and not _explicit_allowed(tags, "motor_vehicle"):
         return False
     # service=parking_aisle/driveway/private gets dropped
-    if highway == "service" and _has(tags, "service",
-                                     "parking_aisle", "driveway", "private", "emergency_access"):
+    if highway == "service" and _has(tags, "service", "parking_aisle", "driveway", "private", "emergency_access"):
         return False
     return True
 
@@ -102,9 +112,21 @@ def _allow_transit(tags: Mapping) -> bool:
         return True
     # Most road types are bus-capable; mimic the legacy parameters.yml transit set.
     bus_capable = {
-        "motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link",
-        "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified",
-        "residential", "living_street", "service", "road",
+        "motorway",
+        "motorway_link",
+        "trunk",
+        "trunk_link",
+        "primary",
+        "primary_link",
+        "secondary",
+        "secondary_link",
+        "tertiary",
+        "tertiary_link",
+        "unclassified",
+        "residential",
+        "living_street",
+        "service",
+        "road",
     }
     if highway not in bus_capable:
         return False
@@ -112,8 +134,7 @@ def _allow_transit(tags: Mapping) -> bool:
         return False
     if _has(tags, "psv", "no") and not _explicit_allowed(tags, "bus"):
         return False
-    if highway == "service" and _has(tags, "service",
-                                     "parking_aisle", "driveway", "private", "emergency_access"):
+    if highway == "service" and _has(tags, "service", "parking_aisle", "driveway", "private", "emergency_access"):
         return False
     return True
 
@@ -144,6 +165,7 @@ def normalise_tag_key(key: str) -> str:
 
 
 # --- Direction / lanes / speed parsers ---
+
 
 def parse_direction(tags: Mapping) -> int:
     """OSM oneway / junction=roundabout → AequilibraE direction (-1/0/1)."""

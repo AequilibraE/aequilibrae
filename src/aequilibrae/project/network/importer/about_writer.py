@@ -60,9 +60,7 @@ class AboutWriter:
             "network_source_consolidate_tolerance": (
                 "" if consolidate_tolerance is None else f"{consolidate_tolerance}"
             ),
-            "network_source_download_cache": (
-                "" if download_cache_relpath is None else download_cache_relpath
-            ),
+            "network_source_download_cache": ("" if download_cache_relpath is None else download_cache_relpath),
             "network_source_aequilibrae_version": str(_aequilibrae_version),
         }
 

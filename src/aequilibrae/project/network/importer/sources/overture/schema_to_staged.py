@@ -30,19 +30,46 @@ logger = logging.getLogger(__name__)
 _NODE_START = 10000
 _NON_ROAD_SUBTYPES = {"rail", "water"}
 
-_MOTORISED_CLASSES = frozenset({
-    "motorway", "trunk", "primary", "secondary", "tertiary",
-    "residential", "living_street", "unclassified", "service",
-    "motorway_link", "trunk_link", "primary_link", "secondary_link",
-    "tertiary_link", "road",
-})
-_MIXED_TRAFFIC_CLASSES = frozenset({
-    "residential", "living_street", "unclassified", "tertiary", "secondary", "primary",
-})
+_MOTORISED_CLASSES = frozenset(
+    {
+        "motorway",
+        "trunk",
+        "primary",
+        "secondary",
+        "tertiary",
+        "residential",
+        "living_street",
+        "unclassified",
+        "service",
+        "motorway_link",
+        "trunk_link",
+        "primary_link",
+        "secondary_link",
+        "tertiary_link",
+        "road",
+    }
+)
+_MIXED_TRAFFIC_CLASSES = frozenset(
+    {
+        "residential",
+        "living_street",
+        "unclassified",
+        "tertiary",
+        "secondary",
+        "primary",
+    }
+)
 _HIGHWAY_LIKE_CLASSES = frozenset({"trunk", "motorway", "trunk_link", "motorway_link"})
-_PEDESTRIAN_CLASSES = frozenset({
-    "footway", "pedestrian", "path", "sidewalk", "steps", "crosswalk",
-})
+_PEDESTRIAN_CLASSES = frozenset(
+    {
+        "footway",
+        "pedestrian",
+        "path",
+        "sidewalk",
+        "steps",
+        "crosswalk",
+    }
+)
 _BICYCLE_FRIENDLY_PED_CLASSES = frozenset({"path", "crosswalk"})
 _BICYCLE_CLASSES = frozenset({"cycleway", "bicycle_path"})
 
@@ -61,10 +88,7 @@ def build_staged_from_overture(
 
     requested_codes = {MODE_CODE[m] for m in modes if m in MODE_CODE}
     if not requested_codes:
-        raise ImporterError(
-            f"None of the requested modes {modes!r} match the configured modes "
-            f"{sorted(MODE_CODE)}"
-        )
+        raise ImporterError(f"None of the requested modes {modes!r} match the configured modes {sorted(MODE_CODE)}")
 
     # ---- Connector → AeQ node_id map
     if str(connectors.crs).upper() != "EPSG:4326":
@@ -137,22 +161,24 @@ def _segment_to_links(seg: dict, geom, gers_to_node: dict, requested_codes: set)
         sub = substring(geom, at_a, at_b, normalized=True)
         if sub.is_empty:
             continue
-        out.append({
-            "a_node": gers_to_node[cid_a],
-            "b_node": gers_to_node[cid_b],
-            "direction": direction,
-            "modes": filtered_modes,
-            "link_type": link_type,
-            "name": seg.get("primary_name") or seg.get("names.primary"),
-            "speed_ab": speed_ab,
-            "speed_ba": speed_ba,
-            "lanes_ab": None,
-            "lanes_ba": None,
-            "geometry": sub,
-            "_source_id": sid,
-            "gers_id": sid,
-            **free_attrs,
-        })
+        out.append(
+            {
+                "a_node": gers_to_node[cid_a],
+                "b_node": gers_to_node[cid_b],
+                "direction": direction,
+                "modes": filtered_modes,
+                "link_type": link_type,
+                "name": seg.get("primary_name") or seg.get("names.primary"),
+                "speed_ab": speed_ab,
+                "speed_ba": speed_ba,
+                "lanes_ab": None,
+                "lanes_ba": None,
+                "geometry": sub,
+                "_source_id": sid,
+                "gers_id": sid,
+                **free_attrs,
+            }
+        )
     return out
 
 
@@ -255,12 +281,23 @@ def _speeds_for_segment(seg: dict, direction: int) -> tuple:
 
 
 _PASS_THROUGH_KEYS = (
-    "subtype", "class", "subclass", "road_flags", "road_surface",
-    "level_rules", "routes", "destinations", "width_rules",
-    "names", "primary_name",
+    "subtype",
+    "class",
+    "subclass",
+    "road_flags",
+    "road_surface",
+    "level_rules",
+    "routes",
+    "destinations",
+    "width_rules",
+    "names",
+    "primary_name",
 )
 _RULE_ARRAY_KEYS = (
-    "access_restrictions", "prohibited_transitions", "subclass_rules", "speed_limits",
+    "access_restrictions",
+    "prohibited_transitions",
+    "subclass_rules",
+    "speed_limits",
 )
 
 
@@ -272,11 +309,7 @@ def _free_attrs(seg: dict) -> dict:
         if value is None:
             continue
         value = value.tolist() if isinstance(value, np.ndarray) else value
-        out[key] = (
-            value
-            if isinstance(value, (str, int, float, bool))
-            else json.dumps(to_jsonable(value), default=str)
-        )
+        out[key] = value if isinstance(value, (str, int, float, bool)) else json.dumps(to_jsonable(value), default=str)
     for key in _RULE_ARRAY_KEYS:
         value = seg.get(key)
         if value is None:
@@ -296,9 +329,5 @@ def _compute_node_modes(node_ids: np.ndarray, links: gpd.GeoDataFrame) -> list:
         ignore_index=True,
     )
     incident["modes"] = incident["modes"].map(set)
-    per_node = (
-        incident.groupby("node")["modes"]
-        .agg(lambda s: "".join(sorted(set().union(*s))))
-        .to_dict()
-    )
+    per_node = incident.groupby("node")["modes"].agg(lambda s: "".join(sorted(set().union(*s)))).to_dict()
     return [per_node.get(int(nid), "") or "c" for nid in node_ids]

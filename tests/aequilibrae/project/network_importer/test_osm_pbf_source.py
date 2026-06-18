@@ -69,10 +69,7 @@ def test_pbf_link_types_are_preserved_uncapped(empty_project):
     )
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        link_types = {
-            r[0]
-            for r in conn.execute("SELECT DISTINCT link_type FROM links").fetchall()
-        }
+        link_types = {r[0] for r in conn.execute("SELECT DISTINCT link_type FROM links").fetchall()}
     # We expect multiple distinct link types (residential, primary, secondary, etc.)
     assert len(link_types) >= 3, f"only got link_types: {link_types}"
 
@@ -87,9 +84,7 @@ def test_pbf_unknown_tags_land_in_other_attributes(empty_project):
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
         # find a link with non-null other_attributes
-        for (oa,) in conn.execute(
-            "SELECT other_attributes FROM links WHERE other_attributes IS NOT NULL LIMIT 50"
-        ):
+        for (oa,) in conn.execute("SELECT other_attributes FROM links WHERE other_attributes IS NOT NULL LIMIT 50"):
             payload = json.loads(oa)
             if payload:
                 # at least one OSM tag we know exists in pyrosm's fixture
@@ -107,9 +102,7 @@ def test_pbf_about_provenance(empty_project):
     with sqlite3.connect(empty_project.path_to_file) as conn:
         about = {
             r[0]: r[1]
-            for r in conn.execute(
-                "SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'"
-            )
+            for r in conn.execute("SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'")
         }
     assert about["network_source"] == "osm"
     assert about["network_source_backend"] == "pyrosm"
@@ -123,8 +116,7 @@ def test_no_alter_table_during_osm_import(empty_project):
         before = {
             r[0]: r[1]
             for r in conn.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type='table' "
-                "AND name IN ('links','nodes')"
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('links','nodes')"
             )
         }
     empty_project.network.import_from_osm(
@@ -136,8 +128,7 @@ def test_no_alter_table_during_osm_import(empty_project):
         after = {
             r[0]: r[1]
             for r in conn.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type='table' "
-                "AND name IN ('links','nodes')"
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('links','nodes')"
             )
         }
     assert before == after

@@ -35,9 +35,7 @@ def _about(path):
     with sqlite3.connect(path) as conn:
         return {
             r[0]: r[1]
-            for r in conn.execute(
-                "SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'"
-            )
+            for r in conn.execute("SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'")
         }
 
 
@@ -65,6 +63,7 @@ def test_about_keys_updated_in_place_on_reimport(empty_project):
         conn.execute("DELETE FROM link_types WHERE link_type NOT IN ('centroid_connector','default')")
 
     import time
+
     time.sleep(0.05)
     _import(empty_project)
     second_ts = _about(empty_project.path_to_file)["network_source_fetched_at"]
