@@ -4,7 +4,6 @@ from typing import Sequence
 
 import geopandas as gpd
 import numpy as np
-import pandas as pd
 from shapely.ops import substring
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
@@ -77,19 +76,19 @@ def build_staged_from_overture(
 
     connectors = connectors.to_crs("EPSG:4326").dropna(subset=["geometry"]).reset_index(drop=True)
     connectors["node_id"] = np.arange(_NODE_START, _NODE_START + len(connectors), dtype=np.int64)
-    connectors["_source_id"] = connectors["id"].astype(str)
-    gers_to_node = dict(zip(connectors["_source_id"], connectors["node_id"]))
+    connectors["source_id"] = connectors["id"].astype(str)
+    gers_to_node = dict(zip(connectors["source_id"], connectors["node_id"], strict=True))
 
     segments = segments.to_crs("EPSG:4326")
     link_rows = []
-    dropped = {"empty_geometry": 0, "connectors": 0, "modes": 0, "geometry_split": 0}
-    for seg, geom in zip(segments.drop(columns=["geometry"]).to_dict(orient="records"), segments.geometry):
-        rows, reason = _segment_to_links(seg, geom, gers_to_node, requested_codes)
-        if reason:
-            dropped[reason] += 1
+    filtered_by_mode = 0
+    for seg, geom in zip(segments.drop(columns=["geometry"]).to_dict(orient="records"), segments.geometry, strict=True):
+        rows = _segment_to_links(seg, geom, gers_to_node, requested_codes)
+        if not rows:
+            filtered_by_mode += 1
         link_rows.extend(rows)
 
-    logger.info(f"Dropped Overture segments: {dropped}")
+    logger.info(f"Mode filter removed {filtered_by_mode} Overture segments")
     if not link_rows:
         raise ImporterError(f"After mode filtering ({modes!r}) no Overture links remain")
 
@@ -108,8 +107,7 @@ def build_staged_from_overture(
             "node_id": nodes_gdf["node_id"].astype(np.int64),
             "geometry": nodes_gdf["geometry"],
             "modes": compute_node_modes(nodes_gdf["node_id"].to_numpy(), links_gdf, fallback="c"),
-            "_source_id": nodes_gdf["_source_id"],
-            "gers_id": nodes_gdf["_source_id"],
+            "source_id": nodes_gdf["source_id"],
         },
         geometry="geometry",
         crs="EPSG:4326",
@@ -118,20 +116,25 @@ def build_staged_from_overture(
     return StagedNetwork(nodes=nodes_out, links=links_gdf, source_meta=source_meta)
 
 
-def _segment_to_links(seg: dict, geom, gers_to_node: dict, requested_codes: set) -> tuple[list, str | None]:
+def _segment_to_links(seg: dict, geom, gers_to_node: dict, requested_codes: set) -> list:
     if geom is None or geom.is_empty:
-        return [], "empty_geometry"
+        raise ImporterError(f"Overture segment {seg.get('id')!r} has empty geometry")
 
     pairs = _parse_connectors_field(seg.get("connectors"))
-    if len(pairs) < 2 or any(cid not in gers_to_node for cid, _ in pairs):
-        return [], "connectors"
+    if len(pairs) < 2:
+        raise ImporterError(f"Overture segment {seg.get('id')!r} has fewer than two connectors")
+    missing = [cid for cid, _ in pairs if cid not in gers_to_node]
+    if missing:
+        raise ImporterError(f"Overture segment {seg.get('id')!r} references missing connectors: {missing}")
 
     filtered_modes = filter_by_modes(_modes_for_segment(seg), requested_codes)
     if not filtered_modes:
-        return [], "modes"
+        return []
 
     rows = _split_segment_rows(seg, geom, pairs, gers_to_node, filtered_modes)
-    return rows, None if rows else "geometry_split"
+    if not rows:
+        raise ImporterError(f"Overture segment {seg.get('id')!r} produced no valid geometry splits")
+    return rows
 
 
 def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filtered_modes: str) -> list:
@@ -161,8 +164,7 @@ def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filter
                 "lanes_ab": None,
                 "lanes_ba": None,
                 "geometry": sub,
-                "_source_id": sid,
-                "gers_id": sid,
+                "source_id": sid,
                 **free_attrs,
             }
         )

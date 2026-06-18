@@ -10,8 +10,8 @@ from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
 
-_PROVENANCE_OUT_COL = "source_id_list"
-_PROVENANCE_PRIMARY = "source_id"
+_PROVENANCE_OUT_COL = "source_ids"
+_SOURCE_ID_COL = "source_id"
 _NODE_START = 100000
 
 
@@ -48,7 +48,9 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
 
     link_rows = []
     for link_id, (u, v, data) in enumerate(graph.edges(data=True), start=1):
-        geom = data.get("geometry") or LineString([(graph.nodes[u]["x"], graph.nodes[u]["y"]), (graph.nodes[v]["x"], graph.nodes[v]["y"])])
+        geom = data.get("geometry") or LineString(
+            [(graph.nodes[u]["x"], graph.nodes[u]["y"]), (graph.nodes[v]["x"], graph.nodes[v]["y"])]
+        )
         if isinstance(geom, MultiLineString):
             geom = max(geom.geoms, key=lambda p: p.length)
 
@@ -70,7 +72,7 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
                 "speed_ba": primary_attrs.get("speed_ba"),
                 "lanes_ab": primary_attrs.get("lanes_ab"),
                 "lanes_ba": primary_attrs.get("lanes_ba"),
-                _PROVENANCE_PRIMARY: primary,
+                _SOURCE_ID_COL: primary,
                 _PROVENANCE_OUT_COL: _build_provenance(source_ids, src_attrs),
             }
         )
@@ -101,7 +103,7 @@ def _coerce_modes(value) -> str:
 
 
 def _build_source_attr_map(links_gdf: gpd.GeoDataFrame) -> dict:
-    if "_source_id" not in links_gdf.columns:
+    if _SOURCE_ID_COL not in links_gdf.columns:
         return {}
     skip = {
         "a_node",
@@ -110,9 +112,7 @@ def _build_source_attr_map(links_gdf: gpd.GeoDataFrame) -> dict:
         "geometry",
         "direction",
         "distance",
-        "_source_id",
         _PROVENANCE_OUT_COL,
-        _PROVENANCE_PRIMARY,
     }
     out = {}
     for rec in links_gdf.to_dict(orient="records"):
@@ -121,12 +121,12 @@ def _build_source_attr_map(links_gdf: gpd.GeoDataFrame) -> dict:
             if is_missing(val) or col in skip or str(col).startswith("_"):
                 continue
             attrs[str(col)] = to_jsonable(val)
-        out[str(rec["_source_id"])] = attrs
+        out[str(rec[_SOURCE_ID_COL])] = attrs
     return out
 
 
 def _source_ids_for_edge(data: dict) -> list:
-    raw = data.get("_source_id") or data.get("merged_edges") or data.get("osmid")
+    raw = data.get(_SOURCE_ID_COL)
     if raw is None:
         return []
     if isinstance(raw, (list, tuple, set)):

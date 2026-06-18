@@ -121,27 +121,7 @@ class Network(WorkerThread):
         cache_tag: str = "",
         **source_kwargs,
     ) -> None:
-        """Generic network-import entry point.
-
-        :Arguments:
-            **source**: A ``Source`` instance, or one of the registered names:
-            ``"osm-overpass"``, ``"osm-pbf"``, ``"overture-cloud"``,
-            ``"geodataframe"``, ``"file"``, ``"gmns"``.
-
-            **modes**: Sequence of AequilibraE mode names to retain.
-
-            **simplify**: ``"osmnx"`` (default), ``"neatnet"``, or ``False``.
-
-            **consolidate_tolerance**: Tolerance (m, auto-UTM) for OSMnx
-            ``consolidate_intersections``. Ignored when ``simplify=False`` or
-            ``simplify="neatnet"``.
-
-            **cache_tag**: Short label used in the per-import subfolder of
-            ``<project>/downloaded data/``.
-
-            Additional ``**source_kwargs`` are forwarded to the source
-            constructor when ``source`` is a registered string name.
-        """
+        """Import from ``osm-overpass``, ``osm-pbf``, or ``overture-cloud``."""
         from aequilibrae.project.network.importer.importer import NetworkImporter
 
         NetworkImporter(self.project).run(
@@ -218,50 +198,6 @@ class Network(WorkerThread):
             cache_tag=tag,
             model_area=model_area,
             release=release,
-        )
-
-    def import_from_geodataframes(
-        self,
-        *,
-        nodes,
-        links,
-        crs=None,
-        column_mapping: Optional[dict] = None,
-        simplify=False,
-    ) -> None:
-        """Import a network from user-supplied ``(nodes, links)`` GeoDataFrames."""
-        self.import_network(
-            "geodataframe",
-            modes=("car", "transit", "bicycle", "walk"),
-            simplify=simplify,
-            cache_tag="user-geodataframes",
-            nodes=nodes,
-            links=links,
-            crs=crs,
-            column_mapping=column_mapping,
-        )
-
-    def import_from_file(
-        self,
-        *,
-        links_path,
-        nodes_path,
-        layer_links: Optional[str] = None,
-        layer_nodes: Optional[str] = None,
-        column_mapping: Optional[dict] = None,
-        simplify=False,
-    ) -> None:
-        """Import a network from disk via geopandas (GeoPackage, GeoJSON, Shapefile, FlatGeobuf)."""
-        self.import_network(
-            "file",
-            modes=("car", "transit", "bicycle", "walk"),
-            simplify=simplify,
-            cache_tag=str(links_path),
-            links_path=links_path,
-            nodes_path=nodes_path,
-            layer_links=layer_links,
-            layer_nodes=layer_nodes,
-            column_mapping=column_mapping,
         )
 
     def create_from_gmns(

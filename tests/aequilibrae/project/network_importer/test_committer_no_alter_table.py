@@ -1,12 +1,10 @@
-"""Strict invariant: the importer never issues ``ALTER TABLE`` on links/nodes.
-
-We snoop ``sqlite_master.sql`` before and after the import and assert byte-equality.
-"""
-
 import sqlite3
 
 import geopandas as gpd
 from shapely.geometry import LineString, Point
+
+from aequilibrae.project.network.importer.db_writer import SpatialiteWriter
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 def _snapshot(path):
@@ -49,7 +47,7 @@ def test_no_alter_table_links_or_nodes(empty_project):
         crs="EPSG:4326",
     )
 
-    empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
+    SpatialiteWriter(empty_project).write(StagedNetwork(nodes=nodes, links=links))
 
     after = _snapshot(empty_project.path_to_file)
-    assert before == after, "Importer modified links/nodes schema (it must not)"
+    assert before == after

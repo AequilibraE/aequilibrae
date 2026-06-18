@@ -1,5 +1,3 @@
-"""``Simplifier`` protocol + string-name registry."""
-
 from typing import ClassVar, Protocol, runtime_checkable
 
 from aequilibrae.project.network.importer.exceptions import SourceResolutionError
@@ -9,32 +7,28 @@ from aequilibrae.project.network.importer.staged_network import StagedNetwork
 @runtime_checkable
 class Simplifier(Protocol):
     name: ClassVar[str]
-    required_extras: ClassVar[tuple]
 
     def simplify(self, net: StagedNetwork, **kwargs) -> StagedNetwork: ...
 
 
-SIMPLIFIERS: dict = {}
+def _simplifiers() -> dict:
+    from aequilibrae.project.network.importer.simplifiers.osmnx_simplifier import OSMnxSimplifier
+
+    return {OSMnxSimplifier.name: OSMnxSimplifier}
 
 
-def register_simplifier(cls: type) -> type:
-    SIMPLIFIERS[cls.name] = cls
-    return cls
+SIMPLIFIERS = _simplifiers()
 
 
 def resolve_simplifier(simplifier, **kwargs):
-    """Resolve a Simplifier from an instance, string name, or boolean.
-
-    ``True`` resolves to the default (``"osmnx"``); ``False`` returns ``None``
-    meaning "skip simplification".
-    """
-    if simplifier is False:
+    if simplifier is False or simplifier is None:
         return None
     if simplifier is True:
         simplifier = "osmnx"
     if isinstance(simplifier, str):
-        if simplifier not in SIMPLIFIERS:
-            available = sorted(SIMPLIFIERS.keys())
+        simplifiers = _simplifiers()
+        if simplifier not in simplifiers:
+            available = sorted(simplifiers.keys())
             raise SourceResolutionError(f"Unknown simplifier name: {simplifier!r}. Available simplifiers: {available}")
-        return SIMPLIFIERS[simplifier](**kwargs)
+        return simplifiers[simplifier](**kwargs)
     return simplifier

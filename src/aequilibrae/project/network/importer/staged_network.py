@@ -36,7 +36,8 @@ class StagedNetwork:
             raise StagedNetworkValidationError(f"links CRS must be EPSG:4326, got {self.links.crs}")
 
         if not np.issubdtype(self.nodes["node_id"].dtype, np.integer):
-            raise StagedNetworkValidationError(f"nodes.node_id must be integer dtype, got {self.nodes['node_id'].dtype}")
+            dtype = self.nodes["node_id"].dtype
+            raise StagedNetworkValidationError(f"nodes.node_id must be integer dtype, got {dtype}")
         if self.nodes["node_id"].duplicated().any():
             raise StagedNetworkValidationError("nodes.node_id contains duplicates")
         if (self.nodes["node_id"] < _DEFAULT_NODE_START).any():
@@ -66,13 +67,14 @@ class StagedNetwork:
         node_cols = [c for c in self.nodes.columns if c != "geometry"]
         xs = self.nodes.geometry.x.to_numpy()
         ys = self.nodes.geometry.y.to_numpy()
-        for rec, x, y in zip(self.nodes[node_cols].to_dict(orient="records"), xs, ys):
+        for rec, x, y in zip(self.nodes[node_cols].to_dict(orient="records"), xs, ys, strict=True):
             nid = int(rec["node_id"])
             graph.add_node(nid, x=x, y=y, **rec)
 
         for rec, geom in zip(
             self.links.drop(columns=["geometry"]).to_dict(orient="records"),
             self.links.geometry,
+            strict=True,
         ):
             a, b = int(rec["a_node"]), int(rec["b_node"])
             link_id = int(rec["link_id"])

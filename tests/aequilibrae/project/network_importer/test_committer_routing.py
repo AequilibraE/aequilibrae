@@ -1,10 +1,11 @@
-"""Tests for the schema-aware committer (``SpatialiteWriter._split_attributes``)."""
-
 import json
 import sqlite3
 
 import geopandas as gpd
 from shapely.geometry import LineString, Point
+
+from aequilibrae.project.network.importer.db_writer import SpatialiteWriter
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 def _basic_inputs():
@@ -30,7 +31,7 @@ def _basic_inputs():
             "name": ["Street A", "Street B", "Avenue X"],
             "surface": ["asphalt", "gravel", "asphalt"],
             "bridge": ["yes", None, None],
-            "_source_id": ["1", "2", "3"],  # IR scratch — should be stripped
+            "source_id": ["1", "2", "3"],
             "geometry": [
                 LineString([(0, 0), (0, 1)]),
                 LineString([(0, 1), (1, 1)]),
@@ -42,9 +43,15 @@ def _basic_inputs():
     return nodes, links
 
 
+def _write(empty_project, nodes, links):
+    net = StagedNetwork(nodes=nodes, links=links)
+    net.validate()
+    SpatialiteWriter(empty_project).write(net)
+
+
 def test_known_columns_land_in_real_columns(empty_project):
     nodes, links = _basic_inputs()
-    empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
+    _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
         names = {r[0] for r in conn.execute("SELECT name FROM links")}
@@ -53,13 +60,13 @@ def test_known_columns_land_in_real_columns(empty_project):
 
 def test_unknown_columns_land_in_other_attributes(empty_project):
     nodes, links = _basic_inputs()
-    empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
+    _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        for link_id, oa in conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id"):
-            payload = json.loads(oa) if oa else {}
-            assert "surface" in payload, f"link {link_id} missing 'surface'"
-            # NaN/None should be dropped from the JSON object
+        for link_id, other_attributes in conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id"):
+            payload = json.loads(other_attributes) if other_attributes else {}
+            assert "surface" in payload
+            assert "source_id" in payload
             if link_id == 1:
                 assert payload.get("bridge") == "yes"
             else:
@@ -68,61 +75,51 @@ def test_unknown_columns_land_in_other_attributes(empty_project):
 
 def test_nodes_unknown_columns_land_in_other_attributes(empty_project):
     nodes, links = _basic_inputs()
-    empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
+    _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        for node_id, oa in conn.execute("SELECT node_id, other_attributes FROM nodes"):
-            payload = json.loads(oa) if oa else {}
-            assert "name" in payload, f"node {node_id} missing 'name'"
-            assert "custom_node_attr" in payload, f"node {node_id} missing 'custom_node_attr'"
+        for _node_id, other_attributes in conn.execute("SELECT node_id, other_attributes FROM nodes"):
+            payload = json.loads(other_attributes) if other_attributes else {}
+            assert "name" in payload
+            assert "custom_node_attr" in payload
 
 
 def test_underscore_prefixed_columns_are_stripped(empty_project):
     nodes, links = _basic_inputs()
-    empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
+    links = links.assign(_scratch=["1", "2", "3"])
+    _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        # _source_id must not appear as a real column (we never ALTER) and must not
-        # appear in other_attributes either.
         cols = [r[1] for r in conn.execute("PRAGMA table_info(links)")]
-        assert "_source_id" not in cols
-        for (oa,) in conn.execute("SELECT other_attributes FROM links"):
-            if oa:
-                assert "_source_id" not in json.loads(oa)
+        assert "_scratch" not in cols
+        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links"):
+            if other_attributes:
+                assert "_scratch" not in json.loads(other_attributes)
 
 
 def test_user_can_promote_attribute_by_adding_column(empty_project):
-    """If the user adds a column manually before importing, it must be used."""
     with empty_project.db_connection as conn:
         conn.execute("ALTER TABLE links ADD COLUMN surface TEXT")
 
     nodes, links = _basic_inputs()
-    empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
+    _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
         surfaces = {r[0] for r in conn.execute("SELECT surface FROM links")}
         assert surfaces == {"asphalt", "gravel"}
-        # And surface must NOT appear in other_attributes any more
-        for (oa,) in conn.execute("SELECT other_attributes FROM links"):
-            payload = json.loads(oa) if oa else {}
+        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links"):
+            payload = json.loads(other_attributes) if other_attributes else {}
             assert "surface" not in payload
 
 
 def test_existing_other_attributes_is_merged_not_overwritten(empty_project):
     nodes, links = _basic_inputs()
-    # Pre-supply a partial other_attributes column
     links = links.copy()
-    links["other_attributes"] = [
-        json.dumps({"pre_existing": "yes", "surface": "OVERRIDE_ME"}),
-        None,
-        None,
-    ]
-    empty_project.network.import_from_geodataframes(nodes=nodes, links=links, simplify=False)
+    links["other_attributes"] = [json.dumps({"pre_existing": "yes", "surface": "OVERRIDE_ME"}), None, None]
+    _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
         rows = list(conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id"))
         first = json.loads(rows[0][1])
-        # Pre-existing key survived
         assert first["pre_existing"] == "yes"
-        # The extras (surface, bridge) overrode the pre-existing duplicate
         assert first["surface"] == "asphalt"

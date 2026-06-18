@@ -5,7 +5,6 @@ import json
 
 import geopandas as gpd
 import pyarrow as pa
-import pytest
 from shapely.geometry import Point
 
 from aequilibrae.project.network.importer import DownloadCache

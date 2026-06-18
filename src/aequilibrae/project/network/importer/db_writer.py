@@ -75,7 +75,7 @@ class SpatialiteWriter:
         xs = direct.geometry.x.to_numpy()
         ys = direct.geometry.y.to_numpy()
         records = _to_records(direct, col_names)
-        conn.executemany(sql, [r + (float(x), float(y)) for r, x, y in zip(records, xs, ys)])
+        conn.executemany(sql, [r + (float(x), float(y)) for r, x, y in zip(records, xs, ys, strict=True)])
 
     def _insert_links(self, conn, links_gdf: gpd.GeoDataFrame, table_cols: list) -> None:
         direct, extra_json = split_attributes(links_gdf, table_cols)
@@ -86,7 +86,7 @@ class SpatialiteWriter:
         sql = f"INSERT INTO links ({', '.join(col_names)}, geometry) VALUES ({placeholders}, GeomFromWKB(?, 4326))"
         wkbs = direct.geometry.to_wkb()
         records = _to_records(direct, col_names)
-        conn.executemany(sql, [r + (wkb,) for r, wkb in zip(records, wkbs)])
+        conn.executemany(sql, [r + (wkb,) for r, wkb in zip(records, wkbs, strict=True)])
 
 
 def _to_records(direct: gpd.GeoDataFrame, col_names: list) -> list:

@@ -40,7 +40,7 @@ _RESERVED_LINK_COLS = {
     "link_type",
     "name",
     "geometry",
-    "_source_id",
+    "source_id",
 }
 _NON_TAG_COLS = {"u", "v", "key", "a_node", "b_node", "geometry", "distance", "osmid", "osm_id"}
 
@@ -63,7 +63,7 @@ def acquire_overpass(
         f"overpass:place={place_name}" if place_name is not None else f"overpass:bbox={list(model_area.bounds)}"
     )
 
-    fetch_kwargs = dict(network_type="all", simplify=False, retain_all=True, custom_filter=custom_filter)
+    fetch_kwargs = {"network_type": "all", "simplify": False, "retain_all": True, "custom_filter": custom_filter}
     try:
         if model_area is not None:
             graph = ox.graph_from_polygon(model_area, **fetch_kwargs)
@@ -269,7 +269,7 @@ def _prepare_nodes(nodes_gdf: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]
     nodes_gdf["osm_id"] = nodes_gdf["osm_id"].astype("int64")
     nodes_gdf = nodes_gdf.drop_duplicates(subset=["osm_id"]).reset_index(drop=True)
     nodes_gdf["node_id"] = np.arange(_NODE_START, _NODE_START + len(nodes_gdf), dtype=np.int64)
-    return nodes_gdf, dict(zip(nodes_gdf["osm_id"], nodes_gdf["node_id"]))
+    return nodes_gdf, dict(zip(nodes_gdf["osm_id"], nodes_gdf["node_id"], strict=True))
 
 
 def _prepare_edges(edges_gdf: gpd.GeoDataFrame, osm_to_node: dict) -> gpd.GeoDataFrame:
@@ -347,13 +347,13 @@ def _filter_edges(edges: gpd.GeoDataFrame, modes: Sequence[str], clip_to) -> gpd
 def _finalize_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     edges["link_id"] = np.arange(1, len(edges) + 1, dtype=np.int64)
     if "osmid" in edges.columns:
-        edges["_source_id"] = edges["osmid"].map(lambda v: str(v[0]) if isinstance(v, list) and v else str(v))
+        edges["source_id"] = edges["osmid"].map(lambda v: str(v[0]) if isinstance(v, list) and v else str(v))
     elif "osm_id" in edges.columns:
-        edges["_source_id"] = edges["osm_id"].astype(str)
+        edges["source_id"] = edges["osm_id"].astype(str)
     elif "id" in edges.columns:
-        edges["_source_id"] = edges["id"].astype(str)
+        edges["source_id"] = edges["id"].astype(str)
     else:
-        edges["_source_id"] = edges["link_id"].astype(str)
+        edges["source_id"] = edges["link_id"].astype(str)
 
     edges = edges.drop(columns=[c for c in ("u", "v", "key", "osmid") if c in edges.columns])
     rename_map = {
@@ -369,7 +369,7 @@ def _staged_nodes(nodes_gdf: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) -> gpd.G
             "node_id": nodes_gdf["node_id"].astype(np.int64),
             "geometry": nodes_gdf["geometry"],
             "modes": compute_node_modes(nodes_gdf["node_id"].to_numpy(), edges, fallback="c"),
-            "_source_id": nodes_gdf["osm_id"].astype(str),
+            "source_id": nodes_gdf["osm_id"].astype(str),
         },
         geometry="geometry",
         crs="EPSG:4326",

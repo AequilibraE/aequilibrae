@@ -54,7 +54,6 @@ create = [
   "networkx>=3.0",
   "scikit-learn",
   "pyrosm>=0.6.2",
-  "neatnet>=0.2",
   "overturemaps>=1.0",
 ]
 # Back-compat alias for one release; deprecated in the next minor.

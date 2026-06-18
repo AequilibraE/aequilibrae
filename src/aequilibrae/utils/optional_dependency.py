@@ -1,8 +1,7 @@
 """Utilities for handling optional third-party dependencies.
 
-The new network importer (``aequilibrae.project.network.importer``) is built on
-top of several optional packages (``osmnx``, ``pyrosm``, ``neatnet``,
-``overturemaps``). They are grouped under the ``aequilibrae[create]`` extra.
+The network importer depends on optional packages grouped under the
+``aequilibrae[create]`` extra.
 
 This module centralises the ``ImportError`` handling so users get a single,
 actionable message when an optional package is missing rather than a stack

@@ -3,9 +3,7 @@ thisdir = 'aequilibrae/project/network/importer/simplifiers'
 pyfiles = [
   '__init__.py',
   'base.py',
-  'impl_neatnet.py',
   'impl_osmnx.py',
-  'neatnet_simplifier.py',
   'osmnx_simplifier.py',
 ]
 

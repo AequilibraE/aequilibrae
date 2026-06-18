@@ -29,12 +29,6 @@ import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import geopandas as gpd
-    import pyarrow as pa
-
 logger = logging.getLogger(__name__)
 
 

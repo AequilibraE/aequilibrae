@@ -1,5 +1,3 @@
-"""``Source`` protocol + string-name registry."""
-
 from typing import ClassVar, Protocol, runtime_checkable
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
@@ -9,33 +7,31 @@ from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 @runtime_checkable
 class Source(Protocol):
-    """Anything that can produce a ``StagedNetwork``."""
-
     name: ClassVar[str]
-    required_extras: ClassVar[tuple]
 
-    def acquire(
-        self,
-        *,
-        modes: tuple,
-        download_cache: DownloadCache,
-    ) -> StagedNetwork: ...
+    def acquire(self, *, modes: tuple, download_cache: DownloadCache) -> StagedNetwork: ...
 
 
-SOURCES: dict = {}
+def _sources() -> dict:
+    from aequilibrae.project.network.importer.sources.osm.overpass import OSMOverpassSource
+    from aequilibrae.project.network.importer.sources.osm.pbf import OSMPbfSource
+    from aequilibrae.project.network.importer.sources.overture.cloud import OvertureCloudSource
+
+    return {
+        OSMOverpassSource.name: OSMOverpassSource,
+        OSMPbfSource.name: OSMPbfSource,
+        OvertureCloudSource.name: OvertureCloudSource,
+    }
 
 
-def register_source(cls: type) -> type:
-    """Class decorator that registers a Source subclass under its ``name``."""
-    SOURCES[cls.name] = cls
-    return cls
+SOURCES = _sources()
 
 
 def resolve_source(source, **kwargs) -> Source:
-    """Resolve a Source instance from either an instance or its registered name."""
     if isinstance(source, str):
-        if source not in SOURCES:
-            available = sorted(SOURCES.keys())
+        sources = _sources()
+        if source not in sources:
+            available = sorted(sources.keys())
             raise SourceResolutionError(f"Unknown source name: {source!r}. Available sources: {available}")
-        return SOURCES[source](**kwargs)
+        return sources[source](**kwargs)
     return source

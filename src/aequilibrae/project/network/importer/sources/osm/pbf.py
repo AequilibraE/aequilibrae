@@ -4,14 +4,11 @@ from pathlib import Path
 from typing import ClassVar
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
-from aequilibrae.project.network.importer.sources.base import register_source
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
-@register_source
 class OSMPbfSource:
     name: ClassVar[str] = "osm-pbf"
-    required_extras: ClassVar[tuple] = ("pyrosm",)
 
     def __init__(self, *, pbf_path):
         self.pbf_path = Path(pbf_path)

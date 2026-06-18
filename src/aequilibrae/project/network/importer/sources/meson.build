@@ -6,7 +6,6 @@ pyfiles = [
 ]
 
 pkgs = [
-  'generic',
   'osm',
   'overture',
 ]

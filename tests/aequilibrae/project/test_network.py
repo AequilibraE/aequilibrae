@@ -9,7 +9,7 @@ def test_create_from_osm_was_removed(empty_project):
 
 
 def test_import_from_osm_via_pbf(empty_project):
-    pyrosm = pytest.importorskip("pyrosm")
+    pytest.importorskip("pyrosm")
     from pyrosm import get_data
 
     empty_project.network.import_from_osm(

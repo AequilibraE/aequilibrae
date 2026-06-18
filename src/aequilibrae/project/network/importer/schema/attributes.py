@@ -1,13 +1,4 @@
-"""Schema-aware routing of free-form staged-network columns into ``other_attributes``.
-
-Implements the column-routing rules used by ``SpatialiteWriter``. The function
-decides per column whether it lands in a same-named existing table column or
-is JSON-encoded into ``other_attributes``.
-
-This module also hosts the project-wide ``is_missing`` and ``to_jsonable``
-helpers; they are imported by the OSMnx simplifier and the Overture source
-to avoid drift.
-"""
+"""Route staged-network attributes into table columns or ``other_attributes``."""
 
 import json
 import math
@@ -19,11 +10,6 @@ import pandas as pd
 
 PROTECTED_COLS = {"ogc_fid", "geometry"}
 JSON_COL = "other_attributes"
-
-
-# ---------------------------------------------------------------------------
-# Shared, single-copy JSON helpers
-# ---------------------------------------------------------------------------
 
 
 def is_missing(value) -> bool:

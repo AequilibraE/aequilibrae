@@ -3,14 +3,11 @@
 from typing import ClassVar
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
-from aequilibrae.project.network.importer.sources.base import register_source
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
-@register_source
 class OSMOverpassSource:
     name: ClassVar[str] = "osm-overpass"
-    required_extras: ClassVar[tuple] = ("osmnx",)
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
