@@ -5,10 +5,9 @@ Create project from OpenStreetMap
 =================================
 
 In this example we show how to create an empty project and populate it with a
-network from OpenStreetMap. The new pluggable network-acquisition framework
-(``Network.import_from_osm``) replaces the old ``create_from_osm`` API.
+network from OpenStreetMap using ``Network.import_from_osm``.
 
-We use GeoPandas to visualise the result.
+We use GeoPandas to visualize the result.
 
 Install the optional dependencies first::
 
@@ -44,9 +43,8 @@ project = Project()
 project.new(fldr)
 
 # %%
-# Import a network for the small nation of Nauru. The raw Overpass response is
-# saved to ``<project>/downloaded data/osm-overpass/`` so the import can be
-# inspected or replayed offline later.
+# Import a network for the small nation of Nauru. The raw Overpass response is saved to
+# ``<project>/downloaded data/osm-overpass/`` so the import can be inspected or replayed offline later.
 project.network.import_from_osm(place_name="Nauru")
 
 # %%

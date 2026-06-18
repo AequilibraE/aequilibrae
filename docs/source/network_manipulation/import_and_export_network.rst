@@ -1,50 +1,181 @@
 Importing and exporting the network
 ===================================
 
-Currently AequilibraE can import links and nodes from a network from OpenStreetMaps, 
-GMNS, and from link layers. AequilibraE can also export the existing network
-into GMNS format. There is some valuable information on these topics in the following
-sections.
+AequilibraE can populate a project network from OpenStreetMap, Overture Maps,
+GMNS files, and link layers. It can also export an existing project network to
+GMNS. This page documents the public import APIs and the behavior of the new
+OSM/Overture import pipeline.
+
+.. _network_importer_optional_dependencies:
+
+Optional dependencies
+---------------------
+
+The OSM and Overture importers use optional packages. Install them with the
+``create`` extra before using these importers::
+
+    pip install aequilibrae[create]
+
+The relevant optional packages are:
+
+* ``osmnx`` for OSM Overpass downloads and OSMnx simplification;
+* ``pyrosm`` for local ``.osm.pbf`` imports;
+* ``overturemaps`` for Overture Maps cloud downloads;
+* ``neatnet`` for neatnet simplification.
 
 .. _importing_from_osm:
 
 Importing from OpenStreetMap
 ----------------------------
 
-You can check more specifications on OSM download on the :ref:`parameters_file`.
+Use :func:`aequilibrae.project.network.network.Network.import_from_osm` to create
+an AequilibraE network from OpenStreetMap. Exactly one source selector must be
+provided:
+
+* ``place_name`` for an OSM place lookup through Overpass;
+* ``model_area`` for an EPSG:4326 polygon downloaded through Overpass;
+* ``pbf_path`` for a local ``.osm.pbf`` extract read with ``pyrosm``.
+
+Examples::
+
+    project.network.import_from_osm(place_name="Nauru")
+
+    from shapely.geometry import box
+
+    project.network.import_from_osm(
+        model_area=box(-112.185, 36.59, -112.179, 36.60),
+        modes=("car", "walk"),
+        simplify=False,
+    )
+
+    project.network.import_from_osm(
+        pbf_path="/path/to/extract.osm.pbf",
+        modes=("car", "transit", "bicycle", "walk"),
+        simplify="osmnx",
+    )
+
+``.osm``, ``.osm.bz2`` and XML inputs are not supported directly. Convert them
+to ``.osm.pbf`` first, for example with ``osmium``::
+
+    osmium cat input.osm -o output.osm.pbf
+
+The importer preserves the OSM ``highway`` value as ``link_type``. It does not
+apply a link-type allow-list; filtering is controlled by the ``modes`` argument.
+OSM tags that do not map to real project table columns are stored as JSON in
+``other_attributes``.
+
+Overpass imports write the downloaded payload and a manifest under
+``<project>/downloaded data/osm-overpass/``. Local PBF imports do not create a
+download cache because the source file is already local.
+
+.. _importing_from_overture:
+
+Importing from Overture Maps
+----------------------------
+
+Use :func:`aequilibrae.project.network.network.Network.import_from_overture` to
+import the Overture Maps transportation network for an EPSG:4326 polygon::
+
+    from shapely.geometry import box
+
+    project.network.import_from_overture(
+        model_area=box(-112.185, 36.59, -112.179, 36.60),
+        modes=("car", "walk"),
+        simplify="osmnx",
+    )
+
+The importer always uses the latest Overture Maps release advertised by the
+Overture STAC catalog. The release used for the import is written to the project
+``about`` table and to the download-cache manifest.
+
+The Overture importer reads the cloud ``segment`` and ``connector`` themes,
+splits segments at intermediate connectors, and derives AequilibraE link
+attributes from the Overture schema:
+
+* ``class`` becomes ``link_type``;
+* connector order defines ``a_node`` and ``b_node``;
+* access restrictions determine ``direction`` where possible;
+* global speed-limit rules populate ``speed_ab`` and ``speed_ba``;
+* additional Overture properties and rule arrays are stored in
+  ``other_attributes``.
+
+The raw Overture tables and a manifest are written under
+``<project>/downloaded data/overture-cloud/``.
+
+.. _network_import_modes:
+
+Mode filtering
+--------------
+
+All network import methods accept ``modes`` as a sequence of AequilibraE mode
+names. Supported names are:
+
+* ``"car"``;
+* ``"transit"``;
+* ``"bicycle"``;
+* ``"walk"``.
+
+Only links with at least one requested mode are kept. The stored ``modes`` field
+contains AequilibraE mode codes, not the full mode names.
+
+.. _network_import_simplification:
+
+Network simplification
+----------------------
+
+OSM and Overture imports can simplify the staged network before it is written to
+the project database. The ``simplify`` argument accepts:
+
+* ``"osmnx"``: simplify with OSMnx. This is the default;
+* ``"neatnet"``: simplify with neatnet;
+* ``False``: skip simplification.
+
+For OSMnx simplification, ``consolidate_tolerance`` controls intersection
+consolidation in metres after automatic projection to a local UTM CRS. Set it to
+``None`` to run OSMnx topological simplification without intersection
+consolidation::
+
+    project.network.import_from_osm(
+        pbf_path="/path/to/extract.osm.pbf",
+        simplify="osmnx",
+        consolidate_tolerance=None,
+    )
+
+    project.network.import_from_overture(
+        model_area=model_area,
+        simplify=False,
+    )
+
+Simplified links retain source provenance in ``other_attributes``. For OSMnx,
+merged-link provenance is stored under ``source_ids``.
+
+.. _network_importer_public_api:
+
+Public API summary
+------------------
+
+The main entry points are:
+
+* :func:`aequilibrae.project.network.network.Network.import_from_osm`;
+* :func:`aequilibrae.project.network.network.Network.import_from_overture`;
+* :func:`aequilibrae.project.network.network.Network.import_network` for explicit
+  source names: ``"osm-overpass"``, ``"osm-pbf"`` and ``"overture-cloud"``.
+
+``Network.create_from_osm`` was removed. Use ``Network.import_from_osm`` instead.
 
 .. note::
 
-   All links that cannot be imported due to errors in the SQL insert
-   statements are written to the log file with error message AND the SQL
-   statement itself, and therefore errors in import can be analyzed for
-   re-downloading or fixed by re-running the failed SQL statements after
-   manual fixing.
-
-Python limitations
-~~~~~~~~~~~~~~~~~~
-
-As it happens in other cases, Python's usual implementation of SQLite is
-incomplete, and does not include R-Tree, a key extension used by SpatiaLite for
-GIS operations.
-
-If you want to learn a little more about this topic, you can access this
-`blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
-or check out the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
-
-This limitation issue is solved when installing SpatiaLite, as shown
-in :ref:`the dependencies page <installing_spatialite>`.
-
-Please also note that AequilibraE's network consistency triggers **will NOT work** 
-before spatial indices have been created and/or if the editing is being done on a
-platform that does not support both R-Tree and SpatiaLite.
+   The OSM/Overture importer writes source-specific attributes to the existing
+   ``other_attributes`` column on ``links`` and ``nodes``. New projects contain
+   these columns. Existing projects created with older schemas must be upgraded
+   or recreated before using the importer.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.network.Network.create_from_osm`
-        Function documentation
     * :ref:`plot_from_osm`
-        Usage example
+        OSM import example
+    * :ref:`parameters_file`
+        Project parameter file
 
 Importing from link layer
 -------------------------
@@ -74,7 +205,7 @@ It is possible to import the following files from a GMNS source:
 * use_group table;
 * geometry table.
 
-You can find the specification for all these tables in the GMNS documentation, 
+You can find the specification for all these tables in the GMNS documentation,
 `here <https://github.com/zephyr-data-specs/GMNS/tree/develop/docs/spec>`_.
 
 By default, the method ``create_from_gmns()`` read all required and optional fields
