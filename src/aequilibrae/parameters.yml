@@ -106,11 +106,6 @@ network:
     - is_centroid:
         description: is_centroid
         type: integer
-  # NOTE: the legacy `network.osm.*` (all_link_types + per-mode link-type
-  # allow-lists + mode_filter blocks) was removed. The new importer
-  # (Network.import_from_osm) drives mode assignment from access semantics
-  # only (plan §1.3 rules 1-2). Link types are now uncapped and never filtered
-  # at import time.
   gmns:
     critical_dist: 2
     node:

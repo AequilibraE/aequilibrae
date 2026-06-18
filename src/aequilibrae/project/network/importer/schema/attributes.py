@@ -1,23 +1,16 @@
 """Route staged-network attributes into table columns or ``other_attributes``."""
 
+import geopandas as gpd
 import json
 import math
+import pandas as pd
 from typing import Iterable
 
-import geopandas as gpd
-import pandas as pd
-
-
-PROTECTED_COLS = {"ogc_fid", "geometry"}
+PROT_COLS = {"ogc_fid", "geometry"}
 JSON_COL = "other_attributes"
 
 
 def is_missing(value) -> bool:
-    """True if the value is None or NaN (Python float NaN only).
-
-    Pandas-NA sentinels are deliberately not handled — callers are expected
-    to pass plain Python / numpy scalars from a normalised DataFrame.
-    """
     return value is None or (isinstance(value, float) and math.isnan(value))
 
 
@@ -82,33 +75,19 @@ def _merge_json(existing: pd.Series, extras: pd.Series) -> pd.Series:
     )
 
 
-def split_attributes(
-    gdf: gpd.GeoDataFrame,
-    table_cols: Iterable[str],
-) -> tuple[gpd.GeoDataFrame, pd.Series]:
+def split_attributes(gdf: gpd.GeoDataFrame, table_cols: Iterable[str], ) -> tuple[gpd.GeoDataFrame, pd.Series]:
     """Route the columns of ``gdf`` for write into a spatialite table."""
-    table_cols_set = set(table_cols)
+    col_set = set(table_cols)
     cols = list(gdf.columns)
 
-    known = [
-        c
-        for c in cols
-        if c in table_cols_set and c not in PROTECTED_COLS and c != JSON_COL and not str(c).startswith("_")
-    ]
-    extras = [
-        c
-        for c in cols
-        if c not in table_cols_set and c not in PROTECTED_COLS and c != JSON_COL and not str(c).startswith("_")
-    ]
+    known = [c for c in cols if c in col_set and c not in PROT_COLS and c != JSON_COL and not str(c).startswith("_")]
+    exts = [c for c in cols if c not in col_set and c not in PROT_COLS and c != JSON_COL and not str(c).startswith("_")]
 
-    if "geometry" in cols:
-        direct_cols = known + ["geometry"]
-    else:
-        direct_cols = known
+    direct_cols = known + ["geometry"] if "geometry" in cols else known
     direct = gdf[direct_cols].copy()
 
-    if extras:
-        extra_json = gdf[extras].apply(_row_to_json_dropping_nans, axis=1)
+    if exts:
+        extra_json = gdf[exts].apply(_row_to_json_dropping_nans, axis=1)
     else:
         extra_json = pd.Series([None] * len(gdf), index=gdf.index, dtype="object")
 

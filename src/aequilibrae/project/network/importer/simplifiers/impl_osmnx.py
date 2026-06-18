@@ -6,13 +6,13 @@ from shapely.geometry import LineString, MultiLineString, Point
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import is_missing, to_jsonable
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
+from aequilibrae.project.network.importer.utils import NODE_ID_START
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
 
 _PROVENANCE_OUT_COL = "source_ids"
 _SOURCE_ID_COL = "source_id"
-_NODE_START = 100000
 
 
 def run_osmnx_simplify(
@@ -40,7 +40,7 @@ def run_osmnx_simplify(
 
 def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
     src_attrs = _build_source_attr_map(net.links)
-    osm_to_new = {nid: _NODE_START + i for i, nid in enumerate(graph.nodes)}
+    osm_to_new = {nid: NODE_ID_START + i for i, nid in enumerate(graph.nodes)}
     node_rows = []
     for nid, data in graph.nodes(data=True):
         geom = data.get("geometry") or Point(data["x"], data["y"])

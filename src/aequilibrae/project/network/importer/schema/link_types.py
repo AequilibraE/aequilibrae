@@ -1,15 +1,3 @@
-"""Deterministic, uncapped link-type allocator.
-
-Replaces the legacy 51-cap behaviour. For each distinct ``link_type`` string
-encountered during an import we allocate a single-character ``link_type_id``
-(used by the AequilibraE ``link_types`` table).
-
-Allocation strategy:
-  1. lower-case first letter of the link type
-  2. upper-case first letter
-  3. next free ASCII letter / digit
-"""
-
 import logging
 import string
 from dataclasses import dataclass
@@ -17,8 +5,7 @@ from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
-
-_FALLBACK_ALPHABET = string.ascii_lowercase + string.ascii_uppercase + string.digits
+_FALLBACK_ALPHABET = string.ascii_lowercase + string.ascii_uppercase
 
 
 @dataclass
@@ -46,10 +33,7 @@ class LinkTypeAllocator:
                 self.existing[link_type] = candidate
                 return candidate
 
-        raise RuntimeError(
-            "Exhausted the single-character link_type_id alphabet. "
-            "This should not happen in practice; please report a bug."
-        )
+        raise RuntimeError("Exhausted the single-character alphabet. Reduce the number of link types in your model.")
 
     def assign_many(self, link_types: Iterable[str]) -> dict:
         out = {}

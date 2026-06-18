@@ -1,8 +1,7 @@
 import json
+import pytest
 import sqlite3
 from pathlib import Path
-
-import pytest
 from shapely import to_wkb
 from shapely.geometry import LineString, Point, box
 
@@ -48,8 +47,12 @@ class _FakeReader:
 
 def _install_mock(monkeypatch):
     import overturemaps
+    from aequilibrae.project.network.importer.sources.overture import impl
+
+    monkeypatch.setattr(impl, "get_latest_overture_version", lambda: "2025-01-01.0")
 
     def _fake_rbr(theme_type, bbox=None, **kwargs):
+        assert kwargs["release"] == "2025-01-01.0"
         if theme_type == "connector":
             return _FakeReader(_make_connectors_table())
         if theme_type == "segment":
@@ -88,6 +91,7 @@ def test_overture_writes_raw_payload_to_download_cache(empty_project, monkeypatc
     assert (cache / "connectors.parquet").exists()
     manifest = json.loads((cache / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["source"] == "overture-cloud"
+    assert manifest["release"] == "2025-01-01.0"
     assert manifest["segments_rows"] == 2
     assert manifest["connectors_rows"] == 4
 
@@ -133,5 +137,6 @@ def test_overture_about_provenance(empty_project, monkeypatch):
         }
     assert about["network_source"] == "overture"
     assert about["network_source_backend"] == "cloud"
+    assert about["network_source_release"] == "2025-01-01.0"
     assert "overturemaps-us-west-2" in about["network_source_url"]
     assert about["network_source_download_cache"].startswith("downloaded data/overture-cloud/")

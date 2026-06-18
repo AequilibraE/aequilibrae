@@ -1,5 +1,7 @@
 import pandas as pd
 
+NODE_ID_START = 100000
+
 
 def compute_node_modes(node_ids, links: pd.DataFrame, fallback: str = "") -> list:
     nodes_col = pd.concat([links["a_node"], links["b_node"]], ignore_index=True)

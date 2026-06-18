@@ -30,10 +30,8 @@ class SpatialiteWriter:
         with commit_and_close(self.path, spatial=True) as conn:
             link_cols = list_columns(conn, "links")
             node_cols = list_columns(conn, "nodes")
-            if JSON_COL not in link_cols:
-                raise ImporterError("links table is missing the 'other_attributes' column")
-            if JSON_COL not in node_cols:
-                raise ImporterError("nodes table is missing the 'other_attributes' column")
+            if JSON_COL not in link_cols or JSON_COL not in node_cols:
+                raise ImporterError("You must create a new empty project to import a network from OSM/Overture")
 
             self._ensure_link_types(conn, net.links["link_type"].dropna().astype(str).unique())
 

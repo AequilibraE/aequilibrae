@@ -1,5 +1,4 @@
 import inspect
-
 import pytest
 
 from aequilibrae.project.network.network import Network
@@ -20,7 +19,7 @@ def test_import_from_osm_rejects_xml_path():
     assert "xml_path" not in sig.parameters
 
 
-@pytest.mark.parametrize("banned", ["backend", "parquet_path", "keep_rule_arrays"])
+@pytest.mark.parametrize("banned", ["backend", "parquet_path", "keep_rule_arrays", "release"])
 def test_import_from_overture_rejects_backend_knobs(banned):
     sig = inspect.signature(Network.import_from_overture)
     assert banned not in sig.parameters

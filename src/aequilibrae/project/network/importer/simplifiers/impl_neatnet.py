@@ -5,6 +5,7 @@ import shapely
 from shapely.geometry import Point
 
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
+from aequilibrae.project.network.importer.utils import NODE_ID_START
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ def _gdf_to_staged(edges_gdf: gpd.GeoDataFrame, source_meta: dict) -> StagedNetw
     endpoints = {}
     a_nodes = np.empty(len(edges), dtype=np.int64)
     b_nodes = np.empty(len(edges), dtype=np.int64)
-    next_id = 10000
+    next_id = NODE_ID_START
     for i, (start, end) in enumerate(zip(starts, ends, strict=True)):
         for arr, target in ((start, a_nodes), (end, b_nodes)):
             key = (round(float(arr[0]), 7), round(float(arr[1]), 7))

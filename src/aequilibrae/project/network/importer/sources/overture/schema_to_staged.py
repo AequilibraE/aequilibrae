@@ -1,21 +1,19 @@
+import geopandas as gpd
 import json
 import logging
-from typing import Sequence
-
-import geopandas as gpd
 import numpy as np
 from shapely.ops import substring
+from typing import Sequence
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import to_jsonable
 from aequilibrae.project.network.importer.schema.modes import filter_by_modes
 from aequilibrae.project.network.importer.sources.osm.tags_to_ir import MODE_CODE
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
-from aequilibrae.project.network.importer.utils import compute_node_modes
+from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_node_modes
 
 logger = logging.getLogger(__name__)
 
-_NODE_START = 10000
 _NON_ROAD_SUBTYPES = {"rail", "water"}
 
 _MOTORISED_CLASSES = frozenset(
@@ -75,7 +73,11 @@ def build_staged_from_overture(
         raise ImporterError(f"None of the requested modes {modes!r} match the configured modes {sorted(MODE_CODE)}")
 
     connectors = connectors.to_crs("EPSG:4326").dropna(subset=["geometry"]).reset_index(drop=True)
-    connectors["node_id"] = np.arange(_NODE_START, _NODE_START + len(connectors), dtype=np.int64)
+    connectors["node_id"] = np.arange(
+        NODE_ID_START,
+        NODE_ID_START + len(connectors),
+        dtype=np.int64,
+    )
     connectors["source_id"] = connectors["id"].astype(str)
     gers_to_node = dict(zip(connectors["source_id"], connectors["node_id"], strict=True))
 

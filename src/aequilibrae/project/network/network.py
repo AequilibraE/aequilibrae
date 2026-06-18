@@ -1,11 +1,10 @@
 import logging
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
 from shapely.geometry import Polygon
+from typing import Optional
 
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
@@ -180,7 +179,6 @@ class Network(WorkerThread):
         self,
         *,
         model_area: Polygon,
-        release: Optional[str] = None,
         modes=("car", "transit", "bicycle", "walk"),
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
@@ -197,7 +195,6 @@ class Network(WorkerThread):
             consolidate_tolerance=consolidate_tolerance,
             cache_tag=tag,
             model_area=model_area,
-            release=release,
         )
 
     def create_from_gmns(

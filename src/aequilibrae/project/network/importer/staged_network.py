@@ -1,17 +1,16 @@
+import geopandas as gpd
+import numpy as np
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-import geopandas as gpd
-import numpy as np
-
 from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
+from aequilibrae.project.network.importer.utils import NODE_ID_START
 
 if TYPE_CHECKING:
     import networkx as nx
 
 _REQUIRED_NODE_COLS = ("node_id", "geometry", "modes")
 _REQUIRED_LINK_COLS = ("link_id", "a_node", "b_node", "direction", "modes", "link_type", "distance", "geometry")
-_DEFAULT_NODE_START = 10000
 
 
 @dataclass
@@ -40,8 +39,8 @@ class StagedNetwork:
             raise StagedNetworkValidationError(f"nodes.node_id must be integer dtype, got {dtype}")
         if self.nodes["node_id"].duplicated().any():
             raise StagedNetworkValidationError("nodes.node_id contains duplicates")
-        if (self.nodes["node_id"] < _DEFAULT_NODE_START).any():
-            raise StagedNetworkValidationError(f"nodes.node_id values must be >= {_DEFAULT_NODE_START}")
+        if (self.nodes["node_id"] < NODE_ID_START).any():
+            raise StagedNetworkValidationError(f"nodes.node_id values must be >= {NODE_ID_START}")
 
         node_ids = set(self.nodes["node_id"].tolist())
         a_missing = ~self.links["a_node"].isin(node_ids)

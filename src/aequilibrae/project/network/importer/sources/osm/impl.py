@@ -1,12 +1,11 @@
-import logging
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Sequence
-
 import geopandas as gpd
+import logging
 import numpy as np
 import pandas as pd
+from datetime import datetime, timezone
+from pathlib import Path
 from shapely.geometry import Point
+from typing import Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
@@ -20,12 +19,11 @@ from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
     parse_direction,
 )
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
-from aequilibrae.project.network.importer.utils import compute_node_modes
+from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_node_modes
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
 
-_NODE_START = 10000
 _RESERVED_LINK_COLS = {
     "a_node",
     "b_node",
@@ -268,7 +266,11 @@ def _prepare_nodes(nodes_gdf: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]
     nodes_gdf = nodes_gdf.to_crs("EPSG:4326")
     nodes_gdf["osm_id"] = nodes_gdf["osm_id"].astype("int64")
     nodes_gdf = nodes_gdf.drop_duplicates(subset=["osm_id"]).reset_index(drop=True)
-    nodes_gdf["node_id"] = np.arange(_NODE_START, _NODE_START + len(nodes_gdf), dtype=np.int64)
+    nodes_gdf["node_id"] = np.arange(
+        NODE_ID_START,
+        NODE_ID_START + len(nodes_gdf),
+        dtype=np.int64,
+    )
     return nodes_gdf, dict(zip(nodes_gdf["osm_id"], nodes_gdf["node_id"], strict=True))
 
 
