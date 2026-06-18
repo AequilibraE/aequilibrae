@@ -11,7 +11,7 @@ from aequilibrae.project.network.importer.exceptions import StagedNetworkValidat
 def _make_minimal_staged():
     nodes = gpd.GeoDataFrame(
         {
-            "node_id": [10000, 10001, 10002],
+            "node_id": [100000, 100001, 100002],
             "geometry": [Point(0, 0), Point(0, 1), Point(1, 1)],
             "modes": ["c", "c", "c"],
         },
@@ -20,8 +20,8 @@ def _make_minimal_staged():
     links = gpd.GeoDataFrame(
         {
             "link_id": [1, 2],
-            "a_node": [10000, 10001],
-            "b_node": [10001, 10002],
+            "a_node": [100000, 100001],
+            "b_node": [100001, 100002],
             "direction": [0, 1],
             "modes": ["c", "c"],
             "link_type": ["residential", "primary"],

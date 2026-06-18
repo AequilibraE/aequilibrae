@@ -87,7 +87,7 @@ tests = [
   "wheel",
 ]
 
-dev = ['aequilibrae[tests, docs]']
+dev = ['aequilibrae[tests, docs, create]']
 
 # simwrapper CLI
 [project.scripts]
