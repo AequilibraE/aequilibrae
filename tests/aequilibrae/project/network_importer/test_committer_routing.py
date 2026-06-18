@@ -11,7 +11,7 @@ from aequilibrae.project.network.importer.staged_network import StagedNetwork
 def _basic_inputs():
     nodes = gpd.GeoDataFrame(
         {
-            "node_id": [10000, 10001, 10002, 10003],
+            "node_id": [100000, 100001, 100002, 100003],
             "geometry": [Point(0, 0), Point(0, 1), Point(1, 1), Point(1, 0)],
             "modes": ["c", "c", "c", "c"],
             "custom_node_attr": ["n0", "n1", "n2", "n3"],
@@ -22,8 +22,8 @@ def _basic_inputs():
     links = gpd.GeoDataFrame(
         {
             "link_id": [1, 2, 3],
-            "a_node": [10000, 10001, 10002],
-            "b_node": [10001, 10002, 10003],
+            "a_node": [100000, 100001, 100002],
+            "b_node": [100001, 100002, 100003],
             "direction": [0, 0, 0],
             "modes": ["c", "c", "c"],
             "link_type": ["residential", "residential", "primary"],
