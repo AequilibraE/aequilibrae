@@ -1,10 +1,4 @@
-"""OSM tag → staged-network conversion (typed fields + mode rules).
-
-There is no ``highway`` allow-list filter. Every value of ``highway`` is
-preserved as ``link_type``. Mode assignment uses access semantics only
-(``access``, ``motor_vehicle``, ``bicycle``, ``foot``, ``vehicle``,
-``service``, ``junction``, …).
-"""
+"""OSM tag parsing for staged networks."""
 
 import re
 from typing import Mapping
@@ -12,7 +6,6 @@ from typing import Mapping
 from aequilibrae.project.network.importer.schema.modes import ModeRule
 
 
-# AequilibraE default mode codes (matches parameters.yml)
 MODE_CODE = {
     "car": "c",
     "transit": "t",
@@ -37,14 +30,11 @@ def _explicit_allowed(tags: Mapping, key: str) -> bool:
     return _has(tags, key, "yes", "designated", "permissive", "official")
 
 
-# --- Mode predicates ---
-
 
 def _allow_car(tags: Mapping) -> bool:
     highway = str(tags.get("highway", "")).lower()
     if not highway:
         return False
-    # Hard exclusions for pedestrian/cycle-only ways unless explicitly allowed
     pedestrian_only = {
         "footway",
         "pedestrian",
@@ -59,14 +49,12 @@ def _allow_car(tags: Mapping) -> bool:
     }
     if highway in pedestrian_only:
         return _explicit_allowed(tags, "motor_vehicle") or _explicit_allowed(tags, "vehicle")
-    # Generic access denials
     if _denied(tags, "access") and not _explicit_allowed(tags, "motor_vehicle"):
         return False
     if _denied(tags, "motor_vehicle"):
         return False
     if _denied(tags, "vehicle") and not _explicit_allowed(tags, "motor_vehicle"):
         return False
-    # service=parking_aisle/driveway/private gets dropped
     if highway == "service" and _has(tags, "service", "parking_aisle", "driveway", "private", "emergency_access"):
         return False
     return True
@@ -110,7 +98,6 @@ def _allow_transit(tags: Mapping) -> bool:
         return False
     if highway in {"bus_guideway", "busway"}:
         return True
-    # Most road types are bus-capable; mimic the legacy parameters.yml transit set.
     bus_capable = {
         "motorway",
         "motorway_link",

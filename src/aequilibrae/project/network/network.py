@@ -107,31 +107,9 @@ class Network(WorkerThread):
         return all_modes
 
     def create_from_osm(self, *args, **kwargs) -> None:
-        """Removed in favour of :meth:`import_from_osm`.
+        """Removed in favour of :meth:`import_from_osm`."""
+        raise AttributeError("Network.create_from_osm was removed. Use Network.import_from_osm(...).")
 
-        The legacy ``create_from_osm`` writer was deprecated and removed as
-        part of the pluggable network-acquisition framework. The replacement is:
-
-        .. code-block:: python
-
-            project.network.import_from_osm(
-                place_name="...",            # or model_area=..., or pbf_path=...
-                modes=("car", "transit", "bicycle", "walk"),
-                simplify="osmnx",
-            )
-
-        See the migration guide for the full list of behavioural changes.
-        """
-        raise AttributeError(
-            "Network.create_from_osm was removed. Use Network.import_from_osm("
-            "place_name=..., model_area=..., or pbf_path=...). "
-            "See docs/source/modeling_with_aequilibrae/network/importing.rst."
-        )
-
-    # ------------------------------------------------------------------
-    # New pluggable network-acquisition framework
-    # See .kilo/plans/replace-osm-importer.md
-    # ------------------------------------------------------------------
 
     def import_network(
         self,
@@ -205,7 +183,6 @@ class Network(WorkerThread):
                 consolidate_tolerance=consolidate_tolerance,
                 cache_tag=str(pbf_path),
                 pbf_path=pbf_path,
-                custom_filter=custom_filter,
             )
         else:
             self.import_network(

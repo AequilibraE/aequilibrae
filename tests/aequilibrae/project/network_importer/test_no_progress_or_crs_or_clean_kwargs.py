@@ -1,9 +1,3 @@
-"""Plan §1.3 rule 4: no ``progress`` / ``projected_crs`` / ``clean`` / ``commit`` kwargs.
-
-Also: ``import_from_osm`` rejects ``xml_path``; ``import_from_overture`` rejects
-``backend`` / ``parquet_path`` / ``keep_rule_arrays``.
-"""
-
 import inspect
 
 import pytest

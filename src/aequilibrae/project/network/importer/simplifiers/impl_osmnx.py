@@ -3,6 +3,7 @@ import json
 import logging
 from shapely.geometry import LineString, MultiLineString, Point
 
+from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import is_missing, to_jsonable
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 from aequilibrae.utils.optional_dependency import require
@@ -18,63 +19,42 @@ def run_osmnx_simplify(
     net: StagedNetwork,
     *,
     consolidate_tolerance=10.0,
-    edge_attr_aggs=None,
 ) -> StagedNetwork:
-    """Apply OSMnx ``simplify_graph`` + ``consolidate_intersections``."""
     ox = require("osmnx", feature="OSMnx simplification")
 
-    g = net.to_graph()
-    if g.number_of_nodes() == 0 or g.number_of_edges() == 0:
-        logger.warning("OSMnx simplifier received an empty graph; returning unchanged")
-        return net
+    graph = net.to_graph()
+    if graph.number_of_nodes() == 0 or graph.number_of_edges() == 0:
+        raise ImporterError("OSMnx simplifier received an empty graph")
 
-    g_proj = ox.projection.project_graph(g)
-    g_simp = ox.simplification.simplify_graph(g_proj, edge_attrs_differ=("link_type", "name"))
+    projected = ox.projection.project_graph(graph)
+    simplified = ox.simplification.simplify_graph(projected, edge_attrs_differ=("link_type", "name"))
     if consolidate_tolerance:
-        g_simp = ox.simplification.consolidate_intersections(
-            g_simp,
+        simplified = ox.simplification.consolidate_intersections(
+            simplified,
             tolerance=float(consolidate_tolerance),
             rebuild_graph=True,
             dead_ends=True,
         )
-    g_geo = ox.projection.project_graph(g_simp, to_crs="EPSG:4326")
-    return _graph_to_staged(net, g_geo)
+    return _graph_to_staged(net, ox.projection.project_graph(simplified, to_crs="EPSG:4326"))
 
 
-def _graph_to_staged(net: StagedNetwork, g) -> StagedNetwork:
-    """Build a staged network from a simplified MultiDiGraph, reconstructing provenance."""
+def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
     src_attrs = _build_source_attr_map(net.links)
-
-    # ---- Nodes
-    osm_to_new = {nid: _NODE_START + i for i, nid in enumerate(g.nodes)}
+    osm_to_new = {nid: _NODE_START + i for i, nid in enumerate(graph.nodes)}
     node_rows = []
-    for nid, data in g.nodes(data=True):
+    for nid, data in graph.nodes(data=True):
         geom = data.get("geometry") or Point(data["x"], data["y"])
-        node_rows.append(
-            {
-                "node_id": osm_to_new[nid],
-                "geometry": geom,
-                "modes": _coerce_modes(data.get("modes")),
-            }
-        )
-    nodes_out = gpd.GeoDataFrame(node_rows, geometry="geometry", crs="EPSG:4326")
+        node_rows.append({"node_id": osm_to_new[nid], "geometry": geom, "modes": _coerce_modes(data.get("modes"))})
 
-    # ---- Links
     link_rows = []
-    for link_id, (u, v, data) in enumerate(g.edges(data=True), start=1):
-        geom = data.get("geometry") or LineString(
-            [
-                (g.nodes[u]["x"], g.nodes[u]["y"]),
-                (g.nodes[v]["x"], g.nodes[v]["y"]),
-            ]
-        )
+    for link_id, (u, v, data) in enumerate(graph.edges(data=True), start=1):
+        geom = data.get("geometry") or LineString([(graph.nodes[u]["x"], graph.nodes[u]["y"]), (graph.nodes[v]["x"], graph.nodes[v]["y"])])
         if isinstance(geom, MultiLineString):
             geom = max(geom.geoms, key=lambda p: p.length)
 
         source_ids = _source_ids_for_edge(data)
         primary = source_ids[0] if source_ids else str(link_id)
         primary_attrs = src_attrs.get(primary, {})
-
         link_rows.append(
             {
                 "link_id": link_id,
@@ -96,9 +76,9 @@ def _graph_to_staged(net: StagedNetwork, g) -> StagedNetwork:
         )
 
     if not link_rows:
-        logger.warning("OSMnx simplification produced zero links; returning original staged network")
-        return net
+        raise ImporterError("OSMnx simplification produced zero links")
 
+    nodes_out = gpd.GeoDataFrame(node_rows, geometry="geometry", crs="EPSG:4326")
     links_out = gpd.GeoDataFrame(link_rows, geometry="geometry", crs="EPSG:4326")
     used = set(links_out["a_node"]) | set(links_out["b_node"])
     nodes_out = nodes_out[nodes_out["node_id"].isin(used)].reset_index(drop=True)
@@ -109,7 +89,6 @@ def _graph_to_staged(net: StagedNetwork, g) -> StagedNetwork:
 
 
 def _coerce_modes(value) -> str:
-    """OSMnx returns merged-node modes as a list; coerce to AequilibraE's char-string form."""
     if value is None:
         return "c"
     if isinstance(value, str):
@@ -122,7 +101,6 @@ def _coerce_modes(value) -> str:
 
 
 def _build_source_attr_map(links_gdf: gpd.GeoDataFrame) -> dict:
-    """Lookup of pre-simplification ``_source_id`` → attribute dict (last write wins)."""
     if "_source_id" not in links_gdf.columns:
         return {}
     skip = {
@@ -130,29 +108,17 @@ def _build_source_attr_map(links_gdf: gpd.GeoDataFrame) -> dict:
         "b_node",
         "link_id",
         "geometry",
-        "modes",
         "direction",
-        "link_type",
         "distance",
-        "speed_ab",
-        "speed_ba",
-        "lanes_ab",
-        "lanes_ba",
-        "name",
         "_source_id",
         _PROVENANCE_OUT_COL,
         _PROVENANCE_PRIMARY,
     }
-    routing = {"link_type", "name", "speed_ab", "speed_ba", "lanes_ab", "lanes_ba"}
     out = {}
     for rec in links_gdf.to_dict(orient="records"):
         attrs = {}
         for col, val in rec.items():
-            if is_missing(val):
-                continue
-            if col in skip or str(col).startswith("_"):
-                if col in routing:
-                    attrs[col] = to_jsonable(val)
+            if is_missing(val) or col in skip or str(col).startswith("_"):
                 continue
             attrs[str(col)] = to_jsonable(val)
         out[str(rec["_source_id"])] = attrs
@@ -178,20 +144,17 @@ def _build_provenance(source_ids: list, src_attrs: dict):
 def _aggregate_modes(source_ids: list, src_attrs: dict, fallback) -> str:
     chars = set()
     for sid in source_ids:
-        m = src_attrs.get(sid, {}).get("modes")
-        if isinstance(m, str):
-            chars.update(m)
+        modes = src_attrs.get(sid, {}).get("modes")
+        if isinstance(modes, str):
+            chars.update(modes)
     if not chars and isinstance(fallback, str):
         chars.update(fallback)
     return "".join(sorted(chars)) or "c"
 
 
 def _aggregate_distance(geom, data: dict) -> float:
-    """Distance in metres — prefer osmnx's pre-computed length, else project geometry."""
     length = data.get("length")
     if length is not None:
         return float(length)
-    if geom is None:
-        return 0.0
     series = gpd.GeoSeries([geom], crs="EPSG:4326")
     return float(series.to_crs(series.estimate_utm_crs()).length.iloc[0])

@@ -8,6 +8,7 @@ pyfiles = [
   'exceptions.py',
   'importer.py',
   'staged_network.py',
+  'utils.py',
 ]
 
 pkgs = [

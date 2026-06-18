@@ -1,14 +1,3 @@
-"""Staged network value passed between sources, simplifiers, and the writer.
-
-A ``StagedNetwork`` is the in-flight (nodes, links) pair plus the source
-provenance dict that the orchestrator carries from a ``Source`` through the
-optional simplifier and into the spatialite committer.
-
-Sources are encouraged to surface every attribute they extract as free-form
-columns; the committer decides per column whether it lands in a real DB
-column or is JSON-encoded into ``other_attributes``.
-"""
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -20,7 +9,6 @@ from aequilibrae.project.network.importer.exceptions import StagedNetworkValidat
 if TYPE_CHECKING:
     import networkx as nx
 
-
 _REQUIRED_NODE_COLS = ("node_id", "geometry", "modes")
 _REQUIRED_LINK_COLS = ("link_id", "a_node", "b_node", "direction", "modes", "link_type", "distance", "geometry")
 _DEFAULT_NODE_START = 10000
@@ -28,35 +16,12 @@ _DEFAULT_NODE_START = 10000
 
 @dataclass
 class StagedNetwork:
-    """In-memory network value staged for commit to the project tables.
-
-    :Attributes:
-        **nodes** (:obj:`gpd.GeoDataFrame`): At minimum ``node_id`` (int),
-        ``geometry`` (Point, EPSG:4326), ``modes`` (str). May carry arbitrary
-        free-form columns and columns starting with ``_`` (scratch columns).
-
-        **links** (:obj:`gpd.GeoDataFrame`): At minimum ``link_id``, ``a_node``,
-        ``b_node``, ``direction``, ``modes``, ``link_type``, ``distance`` (m),
-        ``geometry`` (LineString, EPSG:4326). May carry arbitrary free-form
-        columns. ``_source_id`` is the scratch column used by the simplifier
-        for per-merged-edge attribute reconciliation.
-
-        **crs_geo** (:obj:`str`): Always ``"EPSG:4326"`` at staged-network
-        boundaries.
-
-        **source_meta** (:obj:`dict`): Drives both ``other_attributes``
-        per-row provenance and the ``about``-table whole-import provenance.
-        Keys: ``source``, ``backend``, ``source_url``, ``release``,
-        ``fetched_at``, ``download_cache``.
-    """
-
     nodes: gpd.GeoDataFrame
     links: gpd.GeoDataFrame
     crs_geo: str = "EPSG:4326"
     source_meta: dict = field(default_factory=dict)
 
     def validate(self) -> None:
-        """Assert the schema invariants of this staged network."""
         missing_nodes = [c for c in _REQUIRED_NODE_COLS if c not in self.nodes.columns]
         if missing_nodes:
             raise StagedNetworkValidationError(f"nodes GeoDataFrame missing required columns: {missing_nodes}")
@@ -71,9 +36,7 @@ class StagedNetwork:
             raise StagedNetworkValidationError(f"links CRS must be EPSG:4326, got {self.links.crs}")
 
         if not np.issubdtype(self.nodes["node_id"].dtype, np.integer):
-            raise StagedNetworkValidationError(
-                f"nodes.node_id must be integer dtype, got {self.nodes['node_id'].dtype}"
-            )
+            raise StagedNetworkValidationError(f"nodes.node_id must be integer dtype, got {self.nodes['node_id'].dtype}")
         if self.nodes["node_id"].duplicated().any():
             raise StagedNetworkValidationError("nodes.node_id contains duplicates")
         if (self.nodes["node_id"] < _DEFAULT_NODE_START).any():
@@ -89,30 +52,23 @@ class StagedNetwork:
 
         if (self.links["distance"] <= 0).any():
             raise StagedNetworkValidationError("links.distance must be > 0 (metres)")
-
         if not self.links["direction"].isin([-1, 0, 1]).all():
             raise StagedNetworkValidationError("links.direction values must be in {-1, 0, 1}")
-
         if (self.links["modes"].fillna("").str.len() == 0).any():
             raise StagedNetworkValidationError("links.modes must be a non-empty string for every row")
 
     def to_graph(self) -> "nx.MultiDiGraph":
-        """Build a networkx MultiDiGraph copy of the staged network.
-
-        Used as the canonical input shape for the OSMnx simplifier. Free-form
-        columns flow through as edge / node attributes.
-        """
         import networkx as nx
 
-        g = nx.MultiDiGraph()
-        g.graph["crs"] = self.crs_geo
+        graph = nx.MultiDiGraph()
+        graph.graph["crs"] = self.crs_geo
 
         node_cols = [c for c in self.nodes.columns if c != "geometry"]
         xs = self.nodes.geometry.x.to_numpy()
         ys = self.nodes.geometry.y.to_numpy()
         for rec, x, y in zip(self.nodes[node_cols].to_dict(orient="records"), xs, ys):
             nid = int(rec["node_id"])
-            g.add_node(nid, x=x, y=y, **rec)
+            graph.add_node(nid, x=x, y=y, **rec)
 
         for rec, geom in zip(
             self.links.drop(columns=["geometry"]).to_dict(orient="records"),
@@ -123,21 +79,20 @@ class StagedNetwork:
             attrs = {**rec, "geometry": geom}
             direction = int(rec["direction"])
             if direction == 1:
-                g.add_edge(a, b, key=link_id, **attrs)
+                graph.add_edge(a, b, key=link_id, **attrs)
             elif direction == -1:
-                g.add_edge(b, a, key=link_id, **attrs)
+                graph.add_edge(b, a, key=link_id, **attrs)
             else:
-                g.add_edge(a, b, key=link_id, **attrs)
-                g.add_edge(b, a, key=link_id, **attrs)
-        return g
+                graph.add_edge(a, b, key=link_id, **attrs)
+                graph.add_edge(b, a, key=link_id, **attrs)
+        return graph
 
     @classmethod
-    def from_graph(cls, g, source_meta=None):
-        """Convert a MultiDiGraph (as produced by OSMnx) back to a StagedNetwork."""
+    def from_graph(cls, graph, source_meta=None):
         from shapely.geometry import Point
 
         node_records = []
-        for nid, data in g.nodes(data=True):
+        for nid, data in graph.nodes(data=True):
             geom = data.get("geometry")
             if geom is None:
                 geom = Point(data.get("x"), data.get("y"))
@@ -147,14 +102,14 @@ class StagedNetwork:
             node_records.append(rec)
 
         link_records = []
-        for u, v, k, data in g.edges(keys=True, data=True):
+        for u, v, key, data in graph.edges(keys=True, data=True):
             rec = dict(data)
             rec.setdefault("a_node", int(u))
             rec.setdefault("b_node", int(v))
-            rec.setdefault("link_id", int(k) if isinstance(k, int) else 0)
+            rec.setdefault("link_id", int(key) if isinstance(key, int) else 0)
             link_records.append(rec)
 
-        crs = g.graph.get("crs", "EPSG:4326")
+        crs = graph.graph.get("crs", "EPSG:4326")
         nodes_gdf = gpd.GeoDataFrame(node_records, geometry="geometry", crs=crs)
         links_gdf = gpd.GeoDataFrame(link_records, geometry="geometry", crs=crs)
         return cls(nodes=nodes_gdf, links=links_gdf, crs_geo=str(crs), source_meta=source_meta or {})

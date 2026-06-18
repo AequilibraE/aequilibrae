@@ -1,11 +1,4 @@
-"""Schema-aware committer that writes a ``StagedNetwork`` into spatialite.
-
-The committer is strictly non-schema-modifying: it issues no ``ALTER TABLE``
-statements at all. Source-specific tags / properties / free-form attributes
-are JSON-encoded into the existing ``other_attributes`` column on
-``links`` / ``nodes``; if that column is missing the import fails with a
-documented actionable error.
-"""
+"""Write staged networks into project Spatialite tables."""
 
 import logging
 from typing import TYPE_CHECKING, Iterable
@@ -28,11 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class SpatialiteWriter:
-    """Atomic committer for a staged network.
-
-    Issues zero ``ALTER TABLE`` statements. Requires the existing
-    ``other_attributes`` column on both ``links`` and ``nodes``.
-    """
 
     def __init__(self, project: "Project"):
         self.project = project
@@ -43,17 +31,9 @@ class SpatialiteWriter:
             link_cols = list_columns(conn, "links")
             node_cols = list_columns(conn, "nodes")
             if JSON_COL not in link_cols:
-                raise ImporterError(
-                    "links table is missing the 'other_attributes' column. "
-                    "Recreate the project with the current AequilibraE version, or add "
-                    "the column manually: ALTER TABLE links ADD COLUMN other_attributes TEXT;"
-                )
+                raise ImporterError("links table is missing the 'other_attributes' column")
             if JSON_COL not in node_cols:
-                raise ImporterError(
-                    "nodes table is missing the 'other_attributes' column. "
-                    "Recreate the project with the current AequilibraE version, or add "
-                    "the column manually: ALTER TABLE nodes ADD COLUMN other_attributes TEXT;"
-                )
+                raise ImporterError("nodes table is missing the 'other_attributes' column")
 
             self._ensure_link_types(conn, net.links["link_type"].dropna().astype(str).unique())
 
@@ -63,8 +43,6 @@ class SpatialiteWriter:
                 self._insert_links(conn, net.links, link_cols)
             finally:
                 add_triggers(conn, "network")
-
-    # ---------- link_types ----------
 
     def _ensure_link_types(self, conn, link_types: Iterable[str]) -> None:
         existing = {row[0]: row[1] for row in conn.execute("SELECT link_type, link_type_id FROM link_types").fetchall()}
@@ -80,8 +58,6 @@ class SpatialiteWriter:
                 "INSERT INTO link_types (link_type_id, link_type, description) VALUES (?, ?, ?)",
                 new_rows,
             )
-
-    # ---------- nodes ----------
 
     def _insert_nodes(self, conn, nodes_gdf: gpd.GeoDataFrame, table_cols: list) -> None:
         direct, extra_json = split_attributes(nodes_gdf, table_cols)
@@ -100,8 +76,6 @@ class SpatialiteWriter:
         ys = direct.geometry.y.to_numpy()
         records = _to_records(direct, col_names)
         conn.executemany(sql, [r + (float(x), float(y)) for r, x, y in zip(records, xs, ys)])
-
-    # ---------- links ----------
 
     def _insert_links(self, conn, links_gdf: gpd.GeoDataFrame, table_cols: list) -> None:
         direct, extra_json = split_attributes(links_gdf, table_cols)

@@ -1,17 +1,9 @@
-"""``NetworkImporter`` orchestrator.
-
-Composes a ``Source`` → ``Simplifier`` → ``SpatialiteWriter`` →
-``AboutWriter`` pipeline. The import is atomic: success writes the project,
-failure leaves it unchanged (apart from any raw payload written to
-``<project>/downloaded data/`` before the failure point).
-"""
-
 import logging
 from typing import TYPE_CHECKING, Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
-from aequilibrae.project.network.importer.simplifiers.base import Simplifier, resolve_simplifier
-from aequilibrae.project.network.importer.sources.base import Source, resolve_source
+from aequilibrae.project.network.importer.simplifiers.base import resolve_simplifier
+from aequilibrae.project.network.importer.sources.base import resolve_source
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 if TYPE_CHECKING:
@@ -25,8 +17,6 @@ def _default_modes():
 
 
 class NetworkImporter:
-    """Single-shot orchestrator for one network import."""
-
     def __init__(self, project: "Project"):
         self.project = project
 
@@ -40,7 +30,6 @@ class NetworkImporter:
         cache_tag: str = "",
         **source_kwargs,
     ) -> None:
-        """Run the full import pipeline atomically."""
         from aequilibrae.project.network.importer.about_writer import AboutWriter
         from aequilibrae.project.network.importer.db_writer import SpatialiteWriter
 
@@ -55,10 +44,7 @@ class NetworkImporter:
         )
 
         logger.info(f"Acquiring network from source '{source_obj.name}' (modes={modes_tuple})")
-        net: StagedNetwork = source_obj.acquire(
-            modes=modes_tuple,
-            download_cache=download_cache,
-        )
+        net: StagedNetwork = source_obj.acquire(modes=modes_tuple, download_cache=download_cache)
         net.validate()
         logger.info(f"Acquired {len(net.nodes)} nodes and {len(net.links)} links")
 

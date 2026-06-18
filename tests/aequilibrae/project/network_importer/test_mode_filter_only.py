@@ -1,5 +1,3 @@
-"""Plan §11.4: mode filtering is the only filter; no link-type filter exists."""
-
 import inspect
 import json
 import sqlite3
@@ -32,7 +30,7 @@ _BANNED_FILTER_KWARGS = (
 def test_no_link_type_filter_kwarg(method_name, kwarg):
     method = getattr(Network, method_name)
     sig = inspect.signature(method)
-    assert kwarg not in sig.parameters, f"{method_name}() must not accept '{kwarg}' (plan §1.3 rule 2)"
+    assert kwarg not in sig.parameters, f"{method_name}() must not accept '{kwarg}'"
 
 
 def test_modes_kwarg_exists():

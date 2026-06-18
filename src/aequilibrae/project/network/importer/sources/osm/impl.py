@@ -1,10 +1,3 @@
-"""Implementation backbone for OSM sources.
-
-Both ``OSMOverpassSource`` (osmnx) and ``OSMPbfSource`` (pyrosm) produce
-geopandas frames and run them through the same staged-network construction
-code path.
-"""
-
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,10 +20,10 @@ from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
     parse_direction,
 )
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
+from aequilibrae.project.network.importer.utils import compute_node_modes
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
-
 
 _NODE_START = 10000
 _RESERVED_LINK_COLS = {
@@ -52,11 +45,6 @@ _RESERVED_LINK_COLS = {
 _NON_TAG_COLS = {"u", "v", "key", "a_node", "b_node", "geometry", "distance", "osmid", "osm_id"}
 
 
-# =============================================================================
-# Overpass backend (osmnx)
-# =============================================================================
-
-
 def acquire_overpass(
     *,
     modes: Sequence[str],
@@ -65,11 +53,6 @@ def acquire_overpass(
     place_name=None,
     custom_filter=None,
 ) -> StagedNetwork:
-    """Download an OSM graph via Overpass through osmnx.
-
-    Exactly one of ``model_area`` / ``place_name`` must be supplied. Raises
-    :class:`ImporterError` on Overpass HTTP errors and on empty responses.
-    """
     ox = require("osmnx", feature="OSM Overpass download")
     _configure_osmnx(ox)
 
@@ -83,27 +66,22 @@ def acquire_overpass(
     fetch_kwargs = dict(network_type="all", simplify=False, retain_all=True, custom_filter=custom_filter)
     try:
         if model_area is not None:
-            G = ox.graph_from_polygon(model_area, **fetch_kwargs)
+            graph = ox.graph_from_polygon(model_area, **fetch_kwargs)
         else:
-            G = ox.graph_from_place(place_name, **fetch_kwargs)
+            graph = ox.graph_from_place(place_name, **fetch_kwargs)
     except ox.exceptions.InsufficientResponseError as exc:
         raise ImporterError(f"Overpass returned an empty or partial response for {source_url}: {exc}") from exc
     except Exception as exc:
         from requests.exceptions import RequestException
 
         if isinstance(exc, RequestException):
-            raise ImporterError(
-                f"Overpass request failed: {exc}. Check connectivity and the "
-                f"endpoint configured in parameters.yml::osm.overpass_endpoint."
-            ) from exc
+            raise ImporterError(f"Overpass request failed: {exc}") from exc
         raise
 
-    if G is None or G.number_of_edges() == 0:
-        raise ImporterError(
-            f"Overpass returned no edges for the requested area ({source_url}). Widen the bbox or adjust custom_filter."
-        )
+    if graph is None or graph.number_of_edges() == 0:
+        raise ImporterError(f"Overpass returned no edges for the requested area ({source_url})")
 
-    nodes_gdf, edges_gdf = ox.convert.graph_to_gdfs(G, nodes=True, edges=True)
+    nodes_gdf, edges_gdf = ox.convert.graph_to_gdfs(graph, nodes=True, edges=True)
     nodes_gdf = nodes_gdf.reset_index()
     edges_gdf = edges_gdf.reset_index()
 
@@ -127,7 +105,6 @@ def acquire_overpass(
 
 
 def _configure_osmnx(ox) -> None:
-    """Apply project-level osmnx settings from the parameters file."""
     from aequilibrae.parameters import Parameters
 
     params = Parameters().parameters.get("osm", {}) or {}
@@ -149,28 +126,24 @@ def _persist_overpass_payload(
     modes,
     custom_filter,
 ) -> None:
-    """Consolidate (nodes, edges) into a single GeoDataFrame and persist as GeoParquet."""
     combined = pd.concat(
         [nodes_gdf.assign(feature_type="node"), edges_gdf.assign(feature_type="edge")],
         ignore_index=True,
     )
     combined_gdf = gpd.GeoDataFrame(combined, geometry="geometry", crs=nodes_gdf.crs or "EPSG:4326")
     download_cache.write_geoparquet("osm.parquet", combined_gdf)
-    download_cache.write_manifest({
-        "source": "osm-overpass",
-        "backend": "osmnx",
-        "place_name": place_name,
-        "bbox": list(model_area.bounds) if model_area is not None else None,
-        "modes": list(modes),
-        "custom_filter": custom_filter,
-        "n_nodes": int(len(nodes_gdf)),
-        "n_edges": int(len(edges_gdf)),
-    })
-
-
-# =============================================================================
-# PBF backend (pyrosm)
-# =============================================================================
+    download_cache.write_manifest(
+        {
+            "source": "osm-overpass",
+            "backend": "osmnx",
+            "place_name": place_name,
+            "bbox": list(model_area.bounds) if model_area is not None else None,
+            "modes": list(modes),
+            "custom_filter": custom_filter,
+            "n_nodes": int(len(nodes_gdf)),
+            "n_edges": int(len(edges_gdf)),
+        }
+    )
 
 
 def acquire_pbf(
@@ -178,9 +151,7 @@ def acquire_pbf(
     pbf_path: Path,
     modes: Sequence[str],
     download_cache: DownloadCache,
-    custom_filter=None,
 ) -> StagedNetwork:
-    """Read an OSM .osm.pbf file via pyrosm."""
     pyrosm = require("pyrosm", feature="OSM PBF reading")
 
     pbf_path = Path(pbf_path)
@@ -207,7 +178,6 @@ def acquire_pbf(
 
 
 def _first_last_points(geom):
-    """Return ``(first_point, last_point)`` for a LineString or MultiLineString."""
     if geom is None or geom.is_empty:
         return None, None
     if geom.geom_type == "LineString":
@@ -226,7 +196,6 @@ def _first_last_points(geom):
 
 
 def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Build a staged nodes frame from pyrosm's nodes + edges output."""
     used_ids: set = set()
     for col in ("u", "v"):
         if col in edges.columns:
@@ -242,7 +211,6 @@ def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) ->
 
     missing_ids = used_ids - set(keep["osm_id"].tolist())
     if missing_ids:
-        # Only iterate edges that reference a missing endpoint
         candidates = edges.loc[edges["u"].isin(missing_ids) | edges["v"].isin(missing_ids)]
         synth: dict = {}
         for row in candidates.itertuples(index=False):
@@ -258,16 +226,12 @@ def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) ->
         if synth:
             extra = gpd.GeoDataFrame(
                 {"osm_id": list(synth), "geometry": list(synth.values())},
-                geometry="geometry", crs=keep.crs or "EPSG:4326",
+                geometry="geometry",
+                crs=keep.crs or "EPSG:4326",
             )
             keep = pd.concat([keep, extra], ignore_index=True)
 
     return gpd.GeoDataFrame(keep, geometry="geometry", crs="EPSG:4326")
-
-
-# =============================================================================
-# Staged-network construction (shared)
-# =============================================================================
 
 
 def _edges_nodes_to_staged(
@@ -278,11 +242,25 @@ def _edges_nodes_to_staged(
     source_meta: dict,
     clip_to,
 ) -> StagedNetwork:
+    requested_codes = _requested_mode_codes(modes)
+    nodes_gdf, osm_to_node = _prepare_nodes(nodes_gdf)
+    edges = _prepare_edges(edges_gdf, osm_to_node)
+    edges = _add_osm_attributes(edges, requested_codes)
+    edges = _filter_edges(edges, modes, clip_to)
+    edges = _finalize_edges(edges)
+    nodes_out = _staged_nodes(nodes_gdf, edges)
+    links_out = gpd.GeoDataFrame(edges, geometry="geometry", crs="EPSG:4326")
+    return StagedNetwork(nodes=nodes_out, links=links_out, source_meta=source_meta)
+
+
+def _requested_mode_codes(modes: Sequence[str]) -> set:
     requested_codes = {MODE_CODE[m] for m in modes if m in MODE_CODE}
     if not requested_codes:
         raise ImporterError(f"None of the requested modes {modes!r} match the configured modes {sorted(MODE_CODE)}")
+    return requested_codes
 
-    # ---- Nodes
+
+def _prepare_nodes(nodes_gdf: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:
     if "osm_id" not in nodes_gdf.columns and "osmid" in nodes_gdf.columns:
         nodes_gdf = nodes_gdf.rename(columns={"osmid": "osm_id"})
     if "osm_id" not in nodes_gdf.columns:
@@ -291,28 +269,32 @@ def _edges_nodes_to_staged(
     nodes_gdf["osm_id"] = nodes_gdf["osm_id"].astype("int64")
     nodes_gdf = nodes_gdf.drop_duplicates(subset=["osm_id"]).reset_index(drop=True)
     nodes_gdf["node_id"] = np.arange(_NODE_START, _NODE_START + len(nodes_gdf), dtype=np.int64)
-    osm_to_node = dict(zip(nodes_gdf["osm_id"], nodes_gdf["node_id"]))
+    return nodes_gdf, dict(zip(nodes_gdf["osm_id"], nodes_gdf["node_id"]))
 
-    # ---- Edges
+
+def _prepare_edges(edges_gdf: gpd.GeoDataFrame, osm_to_node: dict) -> gpd.GeoDataFrame:
     if "u" not in edges_gdf.columns or "v" not in edges_gdf.columns:
         raise ImporterError("Edges frame must contain 'u' and 'v' columns (OSM node ids)")
     edges = edges_gdf.to_crs("EPSG:4326")
+    before = len(edges)
     edges = edges[edges["u"].isin(osm_to_node) & edges["v"].isin(osm_to_node)].copy()
+    dropped_unmapped = before - len(edges)
     edges["a_node"] = edges["u"].map(osm_to_node).astype("int64")
     edges["b_node"] = edges["v"].map(osm_to_node).astype("int64")
+    before_geometry = len(edges)
     edges = edges[~edges.geometry.isna()].reset_index(drop=True)
-
+    dropped_geometry = before_geometry - len(edges)
+    if dropped_unmapped or dropped_geometry:
+        logger.info(f"Dropped {dropped_unmapped} OSM edges with unmapped nodes and {dropped_geometry} without geometry")
     if len(edges) == 0:
         raise ImporterError("OSM acquisition produced zero usable edges after node mapping")
-
-    # ---- Distance via auto-UTM (vectorised)
     utm = edges.geometry.estimate_utm_crs().to_string()
     edges["distance"] = edges.geometry.to_crs(utm).length.astype(float)
+    return edges
 
-    # ---- Per-row tag interpretation
-    tag_columns = [c for c in edges.columns if c not in _NON_TAG_COLS]
-    records = edges[tag_columns].to_dict(orient="records")
 
+def _add_osm_attributes(edges: gpd.GeoDataFrame, requested_codes: set) -> gpd.GeoDataFrame:
+    records = edges[[c for c in edges.columns if c not in _NON_TAG_COLS]].to_dict(orient="records")
     modes_strs, directions = [], []
     speed_abs, speed_bas = [], []
     lanes_abs, lanes_bas = [], []
@@ -320,21 +302,21 @@ def _edges_nodes_to_staged(
 
     for tags in records:
         tags = {k: v for k, v in tags.items() if v is not None and not _is_nan(v)}
-        hw = tags.get("highway")
-        if isinstance(hw, list) and hw:
-            tags["highway"] = hw[0]
+        highway = tags.get("highway")
+        if isinstance(highway, list) and highway:
+            tags["highway"] = highway[0]
         modes_strs.append(filter_by_modes(compute_modes_string(tags, MODE_RULES), requested_codes))
         directions.append(parse_direction(tags))
-        sab, sba = directional_speeds(tags)
-        speed_abs.append(sab)
-        speed_bas.append(sba)
-        lab, lba = directional_lanes(tags)
-        lanes_abs.append(lab)
-        lanes_bas.append(lba)
+        speed_ab, speed_ba = directional_speeds(tags)
+        speed_abs.append(speed_ab)
+        speed_bas.append(speed_ba)
+        lanes_ab, lanes_ba = directional_lanes(tags)
+        lanes_abs.append(lanes_ab)
+        lanes_bas.append(lanes_ba)
         link_types.append(str(tags.get("highway") or "unknown"))
         names.append(tags.get("name"))
 
-    edges = edges.assign(
+    return edges.assign(
         modes=modes_strs,
         direction=directions,
         speed_ab=speed_abs,
@@ -345,20 +327,24 @@ def _edges_nodes_to_staged(
         name=names,
     )
 
-    # ---- Drop links the user did not ask for
+
+def _filter_edges(edges: gpd.GeoDataFrame, modes: Sequence[str], clip_to) -> gpd.GeoDataFrame:
     before = len(edges)
     edges = edges[edges["modes"].str.len() > 0].reset_index(drop=True)
     logger.info(f"Mode filter kept {len(edges)} / {before} links")
     if len(edges) == 0:
-        raise ImporterError(f"After mode filtering ({modes!r}) no links remain. Try a wider modes set.")
+        raise ImporterError(f"After mode filtering ({modes!r}) no links remain")
 
-    # ---- Optional clip to model_area polygon
     if clip_to is not None:
         before = len(edges)
         edges = edges[edges.geometry.intersects(clip_to)].reset_index(drop=True)
         logger.info(f"Model-area clip kept {len(edges)} / {before} links")
+        if len(edges) == 0:
+            raise ImporterError("Model-area clip removed all OSM links")
+    return edges
 
-    # ---- Allocate link_id and _source_id
+
+def _finalize_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     edges["link_id"] = np.arange(1, len(edges) + 1, dtype=np.int64)
     if "osmid" in edges.columns:
         edges["_source_id"] = edges["osmid"].map(lambda v: str(v[0]) if isinstance(v, list) and v else str(v))
@@ -370,43 +356,26 @@ def _edges_nodes_to_staged(
         edges["_source_id"] = edges["link_id"].astype(str)
 
     edges = edges.drop(columns=[c for c in ("u", "v", "key", "osmid") if c in edges.columns])
-
-    # Normalise tag-key column names (colons → underscores)
     rename_map = {
         c: normalise_tag_key(c) for c in edges.columns if c not in _RESERVED_LINK_COLS and normalise_tag_key(c) != c
     }
-    if rename_map:
-        edges = edges.rename(columns=rename_map)
+    return edges.rename(columns=rename_map) if rename_map else edges
 
-    # ---- Node staged frame
+
+def _staged_nodes(nodes_gdf: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     used_nodes = set(edges["a_node"]) | set(edges["b_node"])
-    node_modes = _compute_node_modes(nodes_gdf["node_id"].to_numpy(), edges)
     nodes_out = gpd.GeoDataFrame(
         {
             "node_id": nodes_gdf["node_id"].astype(np.int64),
             "geometry": nodes_gdf["geometry"],
-            "modes": node_modes,
+            "modes": compute_node_modes(nodes_gdf["node_id"].to_numpy(), edges, fallback="c"),
             "_source_id": nodes_gdf["osm_id"].astype(str),
         },
-        geometry="geometry", crs="EPSG:4326",
+        geometry="geometry",
+        crs="EPSG:4326",
     )
-    nodes_out = nodes_out[nodes_out["node_id"].isin(used_nodes)].reset_index(drop=True)
-    links_out = gpd.GeoDataFrame(edges, geometry="geometry", crs="EPSG:4326")
-    return StagedNetwork(nodes=nodes_out, links=links_out, source_meta=source_meta)
-
-
-def _compute_node_modes(node_ids: np.ndarray, edges: pd.DataFrame) -> list:
-    """Vectorised: for each node, union of mode chars across every incident link."""
-    nodes_col = pd.concat([edges["a_node"], edges["b_node"]], ignore_index=True)
-    modes_col = pd.concat([edges["modes"], edges["modes"]], ignore_index=True).map(set)
-    per_node = (
-        pd.DataFrame({"node": nodes_col, "modes": modes_col})
-        .groupby("node")["modes"]
-        .agg(lambda s: "".join(sorted(set().union(*s))))
-        .to_dict()
-    )
-    return [per_node.get(int(nid), "") or "c" for nid in node_ids]
+    return nodes_out[nodes_out["node_id"].isin(used_nodes)].reset_index(drop=True)
 
 
 def _is_nan(value) -> bool:
-    return isinstance(value, float) and value != value  # noqa: PLR0124
+    return isinstance(value, float) and value != value
