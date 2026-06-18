@@ -11,7 +11,7 @@ def test_supported_sources_are_explicit():
 
 
 def test_supported_simplifiers_are_explicit():
-    assert set(SIMPLIFIERS.keys()) == {"osmnx"}
+    assert set(SIMPLIFIERS.keys()) == {"osmnx", "neatnet"}
 
 
 def test_resolve_unknown_source_raises_with_available_list():

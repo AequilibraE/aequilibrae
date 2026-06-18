@@ -12,9 +12,10 @@ class Simplifier(Protocol):
 
 
 def _simplifiers() -> dict:
+    from aequilibrae.project.network.importer.simplifiers.neatnet_simplifier import NeatnetSimplifier
     from aequilibrae.project.network.importer.simplifiers.osmnx_simplifier import OSMnxSimplifier
 
-    return {OSMnxSimplifier.name: OSMnxSimplifier}
+    return {OSMnxSimplifier.name: OSMnxSimplifier, NeatnetSimplifier.name: NeatnetSimplifier}
 
 
 SIMPLIFIERS = _simplifiers()
