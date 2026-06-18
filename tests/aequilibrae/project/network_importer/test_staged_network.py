@@ -88,5 +88,5 @@ def test_graph_round_trip_preserves_topology():
     assert g.number_of_edges() == 3
 
     back = StagedNetwork.from_graph(g)
-    assert set(back.nodes["node_id"]) == {10000, 10001, 10002}
+    assert set(back.nodes["node_id"]) == {100000, 100001, 100002}
     assert len(back.links) == 3

@@ -15,14 +15,14 @@ def test_missing_other_attributes_raises(empty_project):
         conn.execute("ALTER TABLE links RENAME COLUMN other_attributes TO _dropped_other")
 
     nodes = gpd.GeoDataFrame(
-        {"node_id": [10000], "geometry": [Point(0, 0)], "modes": ["c"]},
+        {"node_id": [100000], "geometry": [Point(0, 0)], "modes": ["c"]},
         crs="EPSG:4326",
     )
     links = gpd.GeoDataFrame(
         {
             "link_id": [1],
-            "a_node": [10000],
-            "b_node": [10000],
+            "a_node": [100000],
+            "b_node": [100000],
             "direction": [0],
             "modes": ["c"],
             "link_type": ["residential"],
