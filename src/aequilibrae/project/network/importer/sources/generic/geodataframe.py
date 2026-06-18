@@ -62,13 +62,10 @@ class GeoDataFrameSource:
             raise StagedNetworkValidationError(
                 f"GeoDataFrameSource expects a geopandas.GeoDataFrame; got {type(gdf).__name__}"
             )
-        gdf = gdf.copy()
         if gdf.crs is None and self.crs is not None:
             gdf = gdf.set_crs(self.crs)
         if gdf.crs is None:
             raise StagedNetworkValidationError(
                 "GeoDataFrame has no CRS and no `crs` was supplied to GeoDataFrameSource"
             )
-        if str(gdf.crs).upper() != "EPSG:4326":
-            gdf = gdf.to_crs("EPSG:4326")
-        return gdf
+        return gdf.to_crs("EPSG:4326")

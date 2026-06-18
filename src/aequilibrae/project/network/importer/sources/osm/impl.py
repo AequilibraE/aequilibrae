@@ -17,10 +17,7 @@ from shapely.geometry import Point
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
-from aequilibrae.project.network.importer.schema.modes import (
-    compute_modes_string,
-    filter_by_modes,
-)
+from aequilibrae.project.network.importer.schema.modes import compute_modes_string, filter_by_modes
 from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
     MODE_CODE,
     MODE_RULES,
@@ -52,17 +49,7 @@ _RESERVED_LINK_COLS = {
     "geometry",
     "_source_id",
 }
-_NON_TAG_COLS = {
-    "u",
-    "v",
-    "key",
-    "a_node",
-    "b_node",
-    "geometry",
-    "distance",
-    "osmid",
-    "osm_id",
-}
+_NON_TAG_COLS = {"u", "v", "key", "a_node", "b_node", "geometry", "distance", "osmid", "osm_id"}
 
 
 # =============================================================================
@@ -93,23 +80,12 @@ def acquire_overpass(
         f"overpass:place={place_name}" if place_name is not None else f"overpass:bbox={list(model_area.bounds)}"
     )
 
+    fetch_kwargs = dict(network_type="all", simplify=False, retain_all=True, custom_filter=custom_filter)
     try:
         if model_area is not None:
-            G = ox.graph_from_polygon(
-                model_area,
-                network_type="all",
-                simplify=False,
-                retain_all=True,
-                custom_filter=custom_filter,
-            )
+            G = ox.graph_from_polygon(model_area, **fetch_kwargs)
         else:
-            G = ox.graph_from_place(
-                place_name,
-                network_type="all",
-                simplify=False,
-                retain_all=True,
-                custom_filter=custom_filter,
-            )
+            G = ox.graph_from_place(place_name, **fetch_kwargs)
     except ox.exceptions.InsufficientResponseError as exc:
         raise ImporterError(f"Overpass returned an empty or partial response for {source_url}: {exc}") from exc
     except Exception as exc:
@@ -175,26 +151,21 @@ def _persist_overpass_payload(
 ) -> None:
     """Consolidate (nodes, edges) into a single GeoDataFrame and persist as GeoParquet."""
     combined = pd.concat(
-        [
-            nodes_gdf.assign(feature_type="node"),
-            edges_gdf.assign(feature_type="edge"),
-        ],
+        [nodes_gdf.assign(feature_type="node"), edges_gdf.assign(feature_type="edge")],
         ignore_index=True,
     )
     combined_gdf = gpd.GeoDataFrame(combined, geometry="geometry", crs=nodes_gdf.crs or "EPSG:4326")
     download_cache.write_geoparquet("osm.parquet", combined_gdf)
-    download_cache.write_manifest(
-        {
-            "source": "osm-overpass",
-            "backend": "osmnx",
-            "place_name": place_name,
-            "bbox": list(model_area.bounds) if model_area is not None else None,
-            "modes": list(modes),
-            "custom_filter": custom_filter,
-            "n_nodes": int(len(nodes_gdf)),
-            "n_edges": int(len(edges_gdf)),
-        }
-    )
+    download_cache.write_manifest({
+        "source": "osm-overpass",
+        "backend": "osmnx",
+        "place_name": place_name,
+        "bbox": list(model_area.bounds) if model_area is not None else None,
+        "modes": list(modes),
+        "custom_filter": custom_filter,
+        "n_nodes": int(len(nodes_gdf)),
+        "n_edges": int(len(edges_gdf)),
+    })
 
 
 # =============================================================================
@@ -272,9 +243,9 @@ def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) ->
     missing_ids = used_ids - set(keep["osm_id"].tolist())
     if missing_ids:
         # Only iterate edges that reference a missing endpoint
-        candidate_mask = edges["u"].isin(missing_ids) | edges["v"].isin(missing_ids)
+        candidates = edges.loc[edges["u"].isin(missing_ids) | edges["v"].isin(missing_ids)]
         synth: dict = {}
-        for row in edges.loc[candidate_mask].itertuples(index=False):
+        for row in candidates.itertuples(index=False):
             first, last = _first_last_points(row.geometry)
             if first is None:
                 continue
@@ -287,8 +258,7 @@ def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) ->
         if synth:
             extra = gpd.GeoDataFrame(
                 {"osm_id": list(synth), "geometry": list(synth.values())},
-                geometry="geometry",
-                crs=keep.crs or "EPSG:4326",
+                geometry="geometry", crs=keep.crs or "EPSG:4326",
             )
             keep = pd.concat([keep, extra], ignore_index=True)
 
@@ -317,20 +287,16 @@ def _edges_nodes_to_staged(
         nodes_gdf = nodes_gdf.rename(columns={"osmid": "osm_id"})
     if "osm_id" not in nodes_gdf.columns:
         nodes_gdf = nodes_gdf.reset_index()
-    nodes_gdf = nodes_gdf.copy()
+    nodes_gdf = nodes_gdf.to_crs("EPSG:4326")
     nodes_gdf["osm_id"] = nodes_gdf["osm_id"].astype("int64")
-    if str(nodes_gdf.crs).upper() != "EPSG:4326":
-        nodes_gdf = nodes_gdf.to_crs("EPSG:4326")
     nodes_gdf = nodes_gdf.drop_duplicates(subset=["osm_id"]).reset_index(drop=True)
     nodes_gdf["node_id"] = np.arange(_NODE_START, _NODE_START + len(nodes_gdf), dtype=np.int64)
     osm_to_node = dict(zip(nodes_gdf["osm_id"], nodes_gdf["node_id"]))
 
     # ---- Edges
-    edges = edges_gdf.copy()
-    if str(edges.crs).upper() != "EPSG:4326":
-        edges = edges.to_crs("EPSG:4326")
-    if "u" not in edges.columns or "v" not in edges.columns:
+    if "u" not in edges_gdf.columns or "v" not in edges_gdf.columns:
         raise ImporterError("Edges frame must contain 'u' and 'v' columns (OSM node ids)")
+    edges = edges_gdf.to_crs("EPSG:4326")
     edges = edges[edges["u"].isin(osm_to_node) & edges["v"].isin(osm_to_node)].copy()
     edges["a_node"] = edges["u"].map(osm_to_node).astype("int64")
     edges["b_node"] = edges["v"].map(osm_to_node).astype("int64")
@@ -422,30 +388,23 @@ def _edges_nodes_to_staged(
             "modes": node_modes,
             "_source_id": nodes_gdf["osm_id"].astype(str),
         },
-        geometry="geometry",
-        crs="EPSG:4326",
+        geometry="geometry", crs="EPSG:4326",
     )
     nodes_out = nodes_out[nodes_out["node_id"].isin(used_nodes)].reset_index(drop=True)
-
-    return StagedNetwork(
-        nodes=nodes_out,
-        links=gpd.GeoDataFrame(edges, geometry="geometry", crs="EPSG:4326"),
-        source_meta=source_meta,
-    )
+    links_out = gpd.GeoDataFrame(edges, geometry="geometry", crs="EPSG:4326")
+    return StagedNetwork(nodes=nodes_out, links=links_out, source_meta=source_meta)
 
 
 def _compute_node_modes(node_ids: np.ndarray, edges: pd.DataFrame) -> list:
     """Vectorised: for each node, union of mode chars across every incident link."""
-    # Stack (a_node, modes) and (b_node, modes), explode chars, group by node.
-    incident = pd.concat(
-        [
-            pd.DataFrame({"node": edges["a_node"].to_numpy(), "modes": edges["modes"].to_numpy()}),
-            pd.DataFrame({"node": edges["b_node"].to_numpy(), "modes": edges["modes"].to_numpy()}),
-        ],
-        ignore_index=True,
+    nodes_col = pd.concat([edges["a_node"], edges["b_node"]], ignore_index=True)
+    modes_col = pd.concat([edges["modes"], edges["modes"]], ignore_index=True).map(set)
+    per_node = (
+        pd.DataFrame({"node": nodes_col, "modes": modes_col})
+        .groupby("node")["modes"]
+        .agg(lambda s: "".join(sorted(set().union(*s))))
+        .to_dict()
     )
-    incident["modes"] = incident["modes"].map(set)
-    per_node = incident.groupby("node")["modes"].agg(lambda s: "".join(sorted(set().union(*s)))).to_dict()
     return [per_node.get(int(nid), "") or "c" for nid in node_ids]
 
 

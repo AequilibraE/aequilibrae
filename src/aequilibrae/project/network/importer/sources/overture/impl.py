@@ -14,9 +14,7 @@ from aequilibrae.utils.optional_dependency import require
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
-from aequilibrae.project.network.importer.sources.overture.schema_to_staged import (
-    build_staged_from_overture,
-)
+from aequilibrae.project.network.importer.sources.overture.schema_to_staged import build_staged_from_overture
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 logger = logging.getLogger(__name__)

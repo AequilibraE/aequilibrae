@@ -22,16 +22,7 @@ if TYPE_CHECKING:
 
 
 _REQUIRED_NODE_COLS = ("node_id", "geometry", "modes")
-_REQUIRED_LINK_COLS = (
-    "link_id",
-    "a_node",
-    "b_node",
-    "direction",
-    "modes",
-    "link_type",
-    "distance",
-    "geometry",
-)
+_REQUIRED_LINK_COLS = ("link_id", "a_node", "b_node", "direction", "modes", "link_type", "distance", "geometry")
 _DEFAULT_NODE_START = 10000
 
 
@@ -73,15 +64,10 @@ class StagedNetwork:
         if missing_links:
             raise StagedNetworkValidationError(f"links GeoDataFrame missing required columns: {missing_links}")
 
-        if self.nodes.crs is None or str(self.nodes.crs).upper() not in (
-            "EPSG:4326",
-            str(self.crs_geo).upper(),
-        ):
+        allowed_crs = ("EPSG:4326", str(self.crs_geo).upper())
+        if self.nodes.crs is None or str(self.nodes.crs).upper() not in allowed_crs:
             raise StagedNetworkValidationError(f"nodes CRS must be EPSG:4326, got {self.nodes.crs}")
-        if self.links.crs is None or str(self.links.crs).upper() not in (
-            "EPSG:4326",
-            str(self.crs_geo).upper(),
-        ):
+        if self.links.crs is None or str(self.links.crs).upper() not in allowed_crs:
             raise StagedNetworkValidationError(f"links CRS must be EPSG:4326, got {self.links.crs}")
 
         if not np.issubdtype(self.nodes["node_id"].dtype, np.integer):

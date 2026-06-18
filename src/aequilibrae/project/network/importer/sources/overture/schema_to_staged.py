@@ -30,46 +30,16 @@ logger = logging.getLogger(__name__)
 _NODE_START = 10000
 _NON_ROAD_SUBTYPES = {"rail", "water"}
 
-_MOTORISED_CLASSES = frozenset(
-    {
-        "motorway",
-        "trunk",
-        "primary",
-        "secondary",
-        "tertiary",
-        "residential",
-        "living_street",
-        "unclassified",
-        "service",
-        "motorway_link",
-        "trunk_link",
-        "primary_link",
-        "secondary_link",
-        "tertiary_link",
-        "road",
-    }
-)
-_MIXED_TRAFFIC_CLASSES = frozenset(
-    {
-        "residential",
-        "living_street",
-        "unclassified",
-        "tertiary",
-        "secondary",
-        "primary",
-    }
-)
+_MOTORISED_CLASSES = frozenset({
+    "motorway", "trunk", "primary", "secondary", "tertiary",
+    "residential", "living_street", "unclassified", "service",
+    "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "road",
+})
+_MIXED_TRAFFIC_CLASSES = frozenset({
+    "residential", "living_street", "unclassified", "tertiary", "secondary", "primary",
+})
 _HIGHWAY_LIKE_CLASSES = frozenset({"trunk", "motorway", "trunk_link", "motorway_link"})
-_PEDESTRIAN_CLASSES = frozenset(
-    {
-        "footway",
-        "pedestrian",
-        "path",
-        "sidewalk",
-        "steps",
-        "crosswalk",
-    }
-)
+_PEDESTRIAN_CLASSES = frozenset({"footway", "pedestrian", "path", "sidewalk", "steps", "crosswalk"})
 _BICYCLE_FRIENDLY_PED_CLASSES = frozenset({"path", "crosswalk"})
 _BICYCLE_CLASSES = frozenset({"cycleway", "bicycle_path"})
 
@@ -91,24 +61,19 @@ def build_staged_from_overture(
         raise ImporterError(f"None of the requested modes {modes!r} match the configured modes {sorted(MODE_CODE)}")
 
     # ---- Connector → AeQ node_id map
-    if str(connectors.crs).upper() != "EPSG:4326":
-        connectors = connectors.to_crs("EPSG:4326")
-    connectors = connectors.dropna(subset=["geometry"]).reset_index(drop=True)
+    connectors = connectors.to_crs("EPSG:4326").dropna(subset=["geometry"]).reset_index(drop=True)
     connectors["node_id"] = np.arange(_NODE_START, _NODE_START + len(connectors), dtype=np.int64)
     connectors["_source_id"] = connectors["id"].astype(str)
     gers_to_node = dict(zip(connectors["_source_id"], connectors["node_id"]))
 
     # ---- Segments → sub-link rows
-    if str(segments.crs).upper() != "EPSG:4326":
-        segments = segments.to_crs("EPSG:4326")
+    segments = segments.to_crs("EPSG:4326")
 
     # to_dict(records) preserves the actual column names (incl. reserved words
     # like 'class'); itertuples mangles them into _N.
     link_rows = []
-    for seg, geom in zip(
-        segments.drop(columns=["geometry"]).to_dict(orient="records"),
-        segments.geometry,
-    ):
+    seg_records = segments.drop(columns=["geometry"]).to_dict(orient="records")
+    for seg, geom in zip(seg_records, segments.geometry):
         link_rows.extend(_segment_to_links(seg, geom, gers_to_node, requested_codes))
 
     if not link_rows:
@@ -161,24 +126,22 @@ def _segment_to_links(seg: dict, geom, gers_to_node: dict, requested_codes: set)
         sub = substring(geom, at_a, at_b, normalized=True)
         if sub.is_empty:
             continue
-        out.append(
-            {
-                "a_node": gers_to_node[cid_a],
-                "b_node": gers_to_node[cid_b],
-                "direction": direction,
-                "modes": filtered_modes,
-                "link_type": link_type,
-                "name": seg.get("primary_name") or seg.get("names.primary"),
-                "speed_ab": speed_ab,
-                "speed_ba": speed_ba,
-                "lanes_ab": None,
-                "lanes_ba": None,
-                "geometry": sub,
-                "_source_id": sid,
-                "gers_id": sid,
-                **free_attrs,
-            }
-        )
+        out.append({
+            "a_node": gers_to_node[cid_a],
+            "b_node": gers_to_node[cid_b],
+            "direction": direction,
+            "modes": filtered_modes,
+            "link_type": link_type,
+            "name": seg.get("primary_name") or seg.get("names.primary"),
+            "speed_ab": speed_ab,
+            "speed_ba": speed_ba,
+            "lanes_ab": None,
+            "lanes_ba": None,
+            "geometry": sub,
+            "_source_id": sid,
+            "gers_id": sid,
+            **free_attrs,
+        })
     return out
 
 
@@ -281,24 +244,10 @@ def _speeds_for_segment(seg: dict, direction: int) -> tuple:
 
 
 _PASS_THROUGH_KEYS = (
-    "subtype",
-    "class",
-    "subclass",
-    "road_flags",
-    "road_surface",
-    "level_rules",
-    "routes",
-    "destinations",
-    "width_rules",
-    "names",
-    "primary_name",
+    "subtype", "class", "subclass", "road_flags", "road_surface",
+    "level_rules", "routes", "destinations", "width_rules", "names", "primary_name",
 )
-_RULE_ARRAY_KEYS = (
-    "access_restrictions",
-    "prohibited_transitions",
-    "subclass_rules",
-    "speed_limits",
-)
+_RULE_ARRAY_KEYS = ("access_restrictions", "prohibited_transitions", "subclass_rules", "speed_limits")
 
 
 def _free_attrs(seg: dict) -> dict:
@@ -321,13 +270,12 @@ def _free_attrs(seg: dict) -> dict:
 
 def _compute_node_modes(node_ids: np.ndarray, links: gpd.GeoDataFrame) -> list:
     """Vectorised union of mode chars per node."""
-    incident = pd.concat(
-        [
-            pd.DataFrame({"node": links["a_node"].to_numpy(), "modes": links["modes"].to_numpy()}),
-            pd.DataFrame({"node": links["b_node"].to_numpy(), "modes": links["modes"].to_numpy()}),
-        ],
-        ignore_index=True,
+    nodes_col = pd.concat([links["a_node"], links["b_node"]], ignore_index=True)
+    modes_col = pd.concat([links["modes"], links["modes"]], ignore_index=True).map(set)
+    per_node = (
+        pd.DataFrame({"node": nodes_col, "modes": modes_col})
+        .groupby("node")["modes"]
+        .agg(lambda s: "".join(sorted(set().union(*s))))
+        .to_dict()
     )
-    incident["modes"] = incident["modes"].map(set)
-    per_node = incident.groupby("node")["modes"].agg(lambda s: "".join(sorted(set().union(*s)))).to_dict()
     return [per_node.get(int(nid), "") or "c" for nid in node_ids]
