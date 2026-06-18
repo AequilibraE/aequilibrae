@@ -1,28 +1,25 @@
-"""Schema-aware committer that writes a ``RoutableNetwork`` into spatialite.
+"""Schema-aware committer that writes a ``StagedNetwork`` into spatialite.
 
-Per plan §4.4 the committer is **strictly non-schema-modifying**: it issues
-**no ``ALTER TABLE`` statements at all**. Source-specific tags / properties /
-free-form attributes are JSON-encoded into the existing ``other_attributes``
-column on ``links`` / ``nodes``; if that column is missing the import fails
-with a documented actionable error.
+The committer is strictly non-schema-modifying: it issues no ``ALTER TABLE``
+statements at all. Source-specific tags / properties / free-form attributes
+are JSON-encoded into the existing ``other_attributes`` column on
+``links`` / ``nodes``; if that column is missing the import fails with a
+documented actionable error.
 """
-
-from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Iterable
 
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry.base import BaseGeometry
 
 from aequilibrae.project.project_creation import add_triggers, remove_triggers
 from aequilibrae.utils.db_utils import commit_and_close, list_columns
 
 from .exceptions import ImporterError
-from .ir import RoutableNetwork
 from .schema.attributes import JSON_COL, split_attributes
 from .schema.link_types import LinkTypeAllocator
+from .staged_network import StagedNetwork
 
 if TYPE_CHECKING:
     from aequilibrae.project import Project
@@ -31,17 +28,17 @@ logger = logging.getLogger(__name__)
 
 
 class SpatialiteWriter:
-    """Atomic committer for an IR.
+    """Atomic committer for a staged network.
 
-    Issues zero ``ALTER TABLE``s. Validates that ``other_attributes`` exists
-    on both ``links`` and ``nodes``; raises if missing.
+    Issues zero ``ALTER TABLE`` statements. Requires the existing
+    ``other_attributes`` column on both ``links`` and ``nodes``.
     """
 
     def __init__(self, project: "Project"):
         self.project = project
         self.path = project.path_to_file
 
-    def write(self, net: RoutableNetwork) -> None:
+    def write(self, net: StagedNetwork) -> None:
         with commit_and_close(self.path, spatial=True) as conn:
             link_cols = list_columns(conn, "links")
             node_cols = list_columns(conn, "nodes")
@@ -58,9 +55,6 @@ class SpatialiteWriter:
                     "the column manually: ALTER TABLE nodes ADD COLUMN other_attributes TEXT;"
                 )
 
-            # Ensure link_types referenced by links exist in the link_types table.
-            # This is the only schema-management we do (insert into link_types,
-            # never ALTER any table).
             self._ensure_link_types(conn, net.links["link_type"].dropna().astype(str).unique())
 
             remove_triggers(conn, "network")
@@ -92,17 +86,15 @@ class SpatialiteWriter:
 
     # ---------- nodes ----------
 
-    def _insert_nodes(self, conn, nodes_gdf: gpd.GeoDataFrame, table_cols: list[str]) -> None:
+    def _insert_nodes(self, conn, nodes_gdf: gpd.GeoDataFrame, table_cols: list) -> None:
         direct, extra_json = split_attributes(nodes_gdf, table_cols)
         direct = direct.copy()
         direct[JSON_COL] = extra_json
 
-        # Geometry: insert via MakePoint
         if "geometry" not in direct.columns:
             raise ImporterError("nodes IR missing geometry column")
 
         col_names = [c for c in direct.columns if c != "geometry"]
-        # If is_centroid not provided, default to 0
         if "is_centroid" in table_cols and "is_centroid" not in col_names:
             direct["is_centroid"] = 0
             col_names.append("is_centroid")
@@ -113,20 +105,15 @@ class SpatialiteWriter:
             f"VALUES ({placeholders}, MakePoint(?, ?, 4326))"
         )
 
+        records = _to_records(direct, col_names)
         rows = []
-        for _, row in direct.iterrows():
-            geom: BaseGeometry = row["geometry"]
-            values = []
-            for c in col_names:
-                values.append(_normalise_value(row[c]))
-            values.append(float(geom.x))
-            values.append(float(geom.y))
-            rows.append(values)
+        for record, geom in zip(records, direct.geometry, strict=True):
+            rows.append(record + (float(geom.x), float(geom.y)))
         conn.executemany(sql, rows)
 
     # ---------- links ----------
 
-    def _insert_links(self, conn, links_gdf: gpd.GeoDataFrame, table_cols: list[str]) -> None:
+    def _insert_links(self, conn, links_gdf: gpd.GeoDataFrame, table_cols: list) -> None:
         direct, extra_json = split_attributes(links_gdf, table_cols)
         direct = direct.copy()
         direct[JSON_COL] = extra_json
@@ -138,37 +125,20 @@ class SpatialiteWriter:
             f"VALUES ({placeholders}, GeomFromWKB(?, 4326))"
         )
 
+        records = _to_records(direct, col_names)
         rows = []
-        for _, row in direct.iterrows():
-            geom: BaseGeometry = row["geometry"]
-            values = []
-            for c in col_names:
-                values.append(_normalise_value(row[c]))
-            values.append(geom.wkb)
-            rows.append(values)
+        for record, geom in zip(records, direct.geometry, strict=True):
+            rows.append(record + (geom.wkb,))
         conn.executemany(sql, rows)
 
 
-def _normalise_value(value):
-    """Coerce pandas / numpy scalars to plain Python types for sqlite3."""
-    import math
+def _to_records(direct: gpd.GeoDataFrame, col_names: list) -> list:
+    """Return per-row tuples (NaN → None) for the given columns.
 
-    if value is None:
-        return None
-    if isinstance(value, float) and math.isnan(value):
-        return None
-    if isinstance(value, (int, float, str, bytes, bool)):
-        return value
-    try:
-        if pd.isna(value):
-            return None
-    except (TypeError, ValueError):
-        pass
-    # numpy scalar?
-    item = getattr(value, "item", None)
-    if callable(item):
-        try:
-            return item()
-        except Exception:
-            pass
-    return str(value)
+    Uses pandas' bulk NaN→None conversion so sqlite3 receives valid scalars
+    without per-cell defensive coercion.
+    """
+    if not col_names:
+        return [() for _ in range(len(direct))]
+    sub = direct[col_names].where(pd.notna(direct[col_names]), None)
+    return [tuple(row) for row in sub.itertuples(index=False, name=None)]

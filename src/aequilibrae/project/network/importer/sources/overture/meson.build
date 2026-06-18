@@ -4,7 +4,7 @@ pyfiles = [
   '__init__.py',
   'cloud.py',
   'impl.py',
-  'schema_to_ir.py',
+  'schema_to_staged.py',
 ]
 
 py.install_sources(

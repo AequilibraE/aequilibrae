@@ -23,7 +23,6 @@ pyfiles = [
 
 pkgs = [
   'importer',
-  'osm',
 ]
 
 py.install_sources(

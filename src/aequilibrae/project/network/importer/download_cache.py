@@ -1,37 +1,43 @@
 """Raw-download cache under ``<project>/downloaded data/``.
 
-Every source that retrieves data over the network writes the raw, untransformed
-payload to a project-local folder **before any parsing/transformation runs**.
-Local-file sources do not write anything.
+Every source that retrieves data over the network writes the raw payload to a
+project-local folder **before any parsing/transformation runs**. Local-file
+sources do not write anything.
 
-Layout (see plan §4.6):
+Layout:
 
     <project_path>/
       downloaded data/
         <source_name>/
           <ISO timestamp>__<short tag>/
-            <payload files>
+            <payload files>            # .parquet (Parquet) or .json
             manifest.json
+
+Only three on-disk payload formats are supported:
+  - GeoParquet (``write_geoparquet`` for ``gpd.GeoDataFrame``)
+  - Parquet (``write_parquet`` for ``pyarrow.Table``)
+  - JSON (``write_json`` for the manifest and small metadata documents)
+
+There is no gzip, no raw-bytes path, no per-source raw format. Sources that
+naturally produce JSON (e.g. Overpass) must consolidate their data into a
+single ``GeoDataFrame`` first and persist it as GeoParquet.
 """
 
-from __future__ import annotations
-
-import gzip
 import hashlib
 import json
 import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import geopandas as gpd
     import pyarrow as pa
 
 logger = logging.getLogger(__name__)
 
 
-_GZIP_THRESHOLD_BYTES = 10 * 1024 * 1024  # 10 MB
 _BASE_FOLDER_NAME = "downloaded data"
 
 
@@ -47,27 +53,23 @@ def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
 
 
-def _sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+def _sha256_of_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 class DownloadCache:
     """Per-import handle for writing raw payloads under ``<project>/downloaded data/``.
 
-    The folder is created lazily on first write. Local-file sources may construct
-    a cache and never write anything; in that case no folder is created and
-    ``relative_path`` returns ``None``.
+    The folder is created lazily on first write. Local-file sources may
+    construct a cache and never write anything; in that case no folder is
+    created and ``relative_path`` returns ``None``.
     """
 
-    def __init__(self, project_base_path: str | Path, source_name: str, tag: str):
-        """
-        :Arguments:
-            **project_base_path**: The path returned by ``project.project_base_path``.
-            **source_name**: Source identifier, e.g. ``"osm-overpass"``,
-            ``"overture-cloud"``. Becomes a subfolder name.
-            **tag**: A short, human-readable tag — e.g. a slugified place name
-            or bbox tuple. Used in the timestamped subfolder name.
-        """
+    def __init__(self, project_base_path, source_name: str, tag: str):
         self._project_base_path = Path(project_base_path)
         self._source_name = _slugify(source_name)
         self._timestamp = _utc_timestamp()
@@ -79,21 +81,18 @@ class DownloadCache:
             / f"{self._timestamp}__{self._tag}"
         )
         self._created = False
-        self._sha256s: dict[str, str] = {}
+        self._sha256s: dict = {}
 
     @property
     def folder(self) -> Path:
         return self._folder
 
     @property
-    def relative_path(self) -> str | None:
+    def relative_path(self):
         """The path relative to the project base, or ``None`` if nothing written."""
         if not self._created:
             return None
-        try:
-            rel = self._folder.relative_to(self._project_base_path)
-        except ValueError:
-            return str(self._folder)
+        rel = self._folder.relative_to(self._project_base_path)
         return str(rel).replace("\\", "/")
 
     def _ensure_folder(self) -> None:
@@ -102,51 +101,61 @@ class DownloadCache:
             self._created = True
             logger.info(f"Download cache folder: {self._folder}")
 
-    def write_bytes(self, name: str, payload: bytes, *, allow_gzip: bool = True) -> Path:
-        """Write a raw byte payload.
+    def write_geoparquet(self, name: str, gdf) -> Path:
+        """Write a GeoDataFrame as GeoParquet.
 
-        If ``allow_gzip`` is True and the payload exceeds ``_GZIP_THRESHOLD_BYTES``,
-        the file is written with a ``.gz`` suffix using gzip compression.
+        :Arguments:
+            **name**: File name (the ``.parquet`` extension is added if missing).
+            **gdf**: A ``geopandas.GeoDataFrame``.
         """
         self._ensure_folder()
-        self._sha256s[name] = _sha256(payload)
+        if not name.endswith(".parquet"):
+            name = name + ".parquet"
         target = self._folder / name
-        if allow_gzip and len(payload) > _GZIP_THRESHOLD_BYTES:
-            target = target.with_suffix(target.suffix + ".gz")
-            with gzip.open(target, "wb") as handle:
-                handle.write(payload)
-        else:
-            target.write_bytes(payload)
+        gdf.to_parquet(target)
+        self._sha256s[name] = _sha256_of_file(target)
         return target
 
-    def write_text(self, name: str, payload: str, *, allow_gzip: bool = True) -> Path:
-        return self.write_bytes(name, payload.encode("utf-8"), allow_gzip=allow_gzip)
+    def write_parquet(self, name: str, table) -> Path:
+        """Write a pyarrow Table as Parquet (no geopandas round-trip).
 
-    def write_table(self, name: str, table: "pa.Table") -> Path:
-        """Write a ``pyarrow.Table`` as parquet (no geopandas round-trip).
-
-        Used by the Overture cloud source.
+        :Arguments:
+            **name**: File name (the ``.parquet`` extension is added if missing).
+            **table**: A ``pyarrow.Table``.
         """
         import pyarrow.parquet as pq
 
         self._ensure_folder()
+        if not name.endswith(".parquet"):
+            name = name + ".parquet"
         target = self._folder / name
         pq.write_table(table, target)
-        # SHA-256 of the written file (so identical-content tables across imports match)
-        try:
-            self._sha256s[name] = _sha256(target.read_bytes())
-        except OSError:
-            self._sha256s[name] = ""
+        self._sha256s[name] = _sha256_of_file(target)
         return target
 
-    def write_manifest(self, manifest: dict[str, Any]) -> Path:
-        """Write a ``manifest.json`` describing the request and payloads."""
+    def write_json(self, name: str, payload) -> Path:
+        """Write a JSON document.
+
+        :Arguments:
+            **name**: File name (the ``.json`` extension is added if missing).
+            **payload**: A dict or list serialisable via ``json.dumps(..., default=str)``.
+        """
         self._ensure_folder()
+        if not name.endswith(".json"):
+            name = name + ".json"
+        target = self._folder / name
+        target.write_text(
+            json.dumps(payload, indent=2, default=str),
+            encoding="utf-8",
+        )
+        self._sha256s[name] = _sha256_of_file(target)
+        return target
+
+    def write_manifest(self, manifest: dict) -> Path:
+        """Convenience wrapper that writes ``manifest.json`` with provenance defaults."""
         payload = dict(manifest)
         payload.setdefault("source", self._source_name)
         payload.setdefault("tag", self._tag)
         payload.setdefault("fetched_at", self._timestamp)
         payload["sha256"] = dict(self._sha256s)
-        target = self._folder / "manifest.json"
-        target.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-        return target
+        return self.write_json("manifest.json", payload)

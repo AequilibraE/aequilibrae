@@ -1,69 +1,60 @@
-"""Schema-aware routing of free-form IR columns into ``other_attributes`` JSON.
+"""Schema-aware routing of free-form staged-network columns into ``other_attributes``.
 
-Implements ``_split_attributes`` from plan §4.4. The function decides per
-column whether it lands in a same-named existing table column or is JSON-encoded
-into ``other_attributes``.
+Implements the column-routing rules used by ``SpatialiteWriter``. The function
+decides per column whether it lands in a same-named existing table column or
+is JSON-encoded into ``other_attributes``.
 
-The committer never issues ``ALTER TABLE``: this is the single place that
-enforces that property.
+This module also hosts the project-wide ``is_missing`` and ``to_jsonable``
+helpers; they are imported by the OSMnx simplifier and the Overture source
+to avoid drift.
 """
 
-from __future__ import annotations
-
 import json
-import logging
 import math
 from typing import Iterable
 
 import geopandas as gpd
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 
 PROTECTED_COLS = {"ogc_fid", "geometry"}
 JSON_COL = "other_attributes"
 
 
-def _is_nan_like(value) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, float) and math.isnan(value):
-        return True
-    if isinstance(value, str) and value == "":
-        return False  # empty string is meaningful
-    try:
-        # pandas NA
-        return bool(pd.isna(value))
-    except (TypeError, ValueError):
-        return False
+# ---------------------------------------------------------------------------
+# Shared, single-copy JSON helpers
+# ---------------------------------------------------------------------------
+
+def is_missing(value) -> bool:
+    """True if the value is None or NaN (Python float NaN only).
+
+    Pandas-NA sentinels are deliberately not handled — callers are expected
+    to pass plain Python / numpy scalars from a normalised DataFrame.
+    """
+    return value is None or (isinstance(value, float) and math.isnan(value))
 
 
-def _json_safe(value):
-    """Best-effort conversion of a value to a JSON-serialisable form."""
-    if _is_nan_like(value):
+def to_jsonable(value):
+    """Convert a value to a JSON-serialisable form."""
+    if is_missing(value):
         return None
     if isinstance(value, (str, int, bool)):
         return value
     if isinstance(value, float):
         return value if math.isfinite(value) else None
     if isinstance(value, (list, tuple)):
-        return [_json_safe(v) for v in value]
+        return [to_jsonable(v) for v in value]
     if isinstance(value, dict):
-        return {str(k): _json_safe(v) for k, v in value.items()}
-    # Fallback: stringify
-    try:
-        return str(value)
-    except Exception:  # pragma: no cover
-        return None
+        return {str(k): to_jsonable(v) for k, v in value.items()}
+    return str(value)
 
 
-def _row_to_json_dropping_nans(row: pd.Series) -> str | None:
+def _row_to_json_dropping_nans(row: pd.Series):
     payload = {}
     for key, value in row.items():
-        if _is_nan_like(value):
+        if is_missing(value):
             continue
-        payload[str(key)] = _json_safe(value)
+        payload[str(key)] = to_jsonable(value)
     if not payload:
         return None
     return json.dumps(payload, separators=(",", ":"), default=str)
@@ -72,33 +63,26 @@ def _row_to_json_dropping_nans(row: pd.Series) -> str | None:
 def _merge_json(existing: pd.Series, extras: pd.Series) -> pd.Series:
     """Merge per-row ``other_attributes`` JSON strings.
 
-    ``existing`` is whatever the source already put in the IR column called
-    ``other_attributes`` (may be None / NaN); ``extras`` is the JSON computed
-    from all the non-DB-mapped IR columns. The extras are merged INTO the
-    existing dict (extras win on key collisions, since they represent the more
-    recent acquisition).
+    ``existing`` is whatever the source put in the IR ``other_attributes``
+    column; ``extras`` is the JSON computed from non-DB-mapped columns.
+    The extras are merged INTO the existing dict (extras win on key
+    collisions, since they represent the more recent acquisition).
     """
 
     def merge_one(existing_value, extras_value):
         base = {}
-        if existing_value is not None and not _is_nan_like(existing_value):
+        if not is_missing(existing_value):
             if isinstance(existing_value, str):
-                try:
-                    parsed = json.loads(existing_value)
-                    if isinstance(parsed, dict):
-                        base = parsed
-                except json.JSONDecodeError:
-                    pass
+                parsed = json.loads(existing_value)
+                if isinstance(parsed, dict):
+                    base = parsed
             elif isinstance(existing_value, dict):
                 base = dict(existing_value)
-        if extras_value is not None and not _is_nan_like(extras_value):
+        if not is_missing(extras_value):
             if isinstance(extras_value, str):
-                try:
-                    extra = json.loads(extras_value)
-                    if isinstance(extra, dict):
-                        base.update(extra)
-                except json.JSONDecodeError:
-                    pass
+                extra = json.loads(extras_value)
+                if isinstance(extra, dict):
+                    base.update(extra)
             elif isinstance(extras_value, dict):
                 base.update(extras_value)
         if not base:
@@ -115,18 +99,7 @@ def split_attributes(
     gdf: gpd.GeoDataFrame,
     table_cols: Iterable[str],
 ) -> tuple[gpd.GeoDataFrame, pd.Series]:
-    """Route the columns of ``gdf`` for write into a spatialite table.
-
-    :Returns:
-        ``(direct, extra_json)`` where:
-          - ``direct`` is a copy of ``gdf`` containing only the columns that
-            map to existing real columns of the target table (plus geometry).
-          - ``extra_json`` is a per-row JSON string (or ``None``) holding the
-            non-mapped columns, merged with any pre-existing
-            ``other_attributes`` value the IR supplied.
-
-    See plan §4.4 routing rules.
-    """
+    """Route the columns of ``gdf`` for write into a spatialite table."""
     table_cols_set = set(table_cols)
     cols = list(gdf.columns)
 

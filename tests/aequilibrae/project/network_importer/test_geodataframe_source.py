@@ -5,7 +5,7 @@ import pytest
 from shapely.geometry import LineString, Point
 
 from aequilibrae.project.network.importer import DownloadCache
-from aequilibrae.project.network.importer.exceptions import IRValidationError
+from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
 from aequilibrae.project.network.importer.sources.generic.geodataframe import (
     GeoDataFrameSource,
 )
@@ -65,7 +65,7 @@ def test_raises_when_crs_missing(tmp_path):
     nodes = nodes.set_crs(None, allow_override=True)
     links = links.set_crs(None, allow_override=True)
     src = GeoDataFrameSource(nodes=nodes, links=links)
-    with pytest.raises(IRValidationError, match="CRS"):
+    with pytest.raises(StagedNetworkValidationError, match="CRS"):
         src.acquire(modes=("car",), download_cache=cache)
 
 
@@ -89,5 +89,5 @@ def test_validation_rejects_dangling_a_node(tmp_path):
     links = _links()
     links.loc[0, "a_node"] = 99999
     src = GeoDataFrameSource(nodes=nodes, links=links)
-    with pytest.raises(IRValidationError, match="a_node"):
+    with pytest.raises(StagedNetworkValidationError, match="a_node"):
         src.acquire(modes=("car",), download_cache=cache)

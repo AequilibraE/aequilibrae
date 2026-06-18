@@ -1,28 +1,23 @@
-"""``OSMPbfSource``: OSM via local .osm.pbf using pyrosm.
-
-Implemented in PR 3. Placeholder until then.
-"""
-
-from __future__ import annotations
+"""``OSMPbfSource``: OSM via a local .osm.pbf file using pyrosm."""
 
 from pathlib import Path
 from typing import ClassVar
 
 from ...download_cache import DownloadCache
-from ...ir import RoutableNetwork
+from ...staged_network import StagedNetwork
 from ..base import register_source
 
 
 @register_source
 class OSMPbfSource:
     name: ClassVar[str] = "osm-pbf"
-    required_extras: ClassVar[tuple[str, ...]] = ("pyrosm",)
+    required_extras: ClassVar[tuple] = ("pyrosm",)
 
-    def __init__(self, *, pbf_path: str | Path, **kwargs):
+    def __init__(self, *, pbf_path, **kwargs):
         self.pbf_path = Path(pbf_path)
         self.kwargs = kwargs
 
-    def acquire(self, *, modes, download_cache: DownloadCache) -> RoutableNetwork:
+    def acquire(self, *, modes, download_cache: DownloadCache) -> StagedNetwork:
         from .impl import acquire_pbf
 
         return acquire_pbf(

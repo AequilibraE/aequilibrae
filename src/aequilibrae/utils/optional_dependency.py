@@ -9,8 +9,6 @@ actionable message when an optional package is missing rather than a stack
 trace from an inner module.
 """
 
-from __future__ import annotations
-
 import importlib
 from types import ModuleType
 
@@ -22,7 +20,7 @@ class OptionalDependencyError(ImportError):
 _EXTRA_NAME = "create"
 
 
-def require(package_name: str, *, feature: str | None = None) -> ModuleType:
+def require(package_name: str, *, feature=None) -> ModuleType:
     """Import an optional package, raising ``OptionalDependencyError`` if missing.
 
     :Arguments:

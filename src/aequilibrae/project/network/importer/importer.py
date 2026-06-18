@@ -4,19 +4,15 @@ Composes a ``Source`` → ``Simplifier`` → ``SpatialiteWriter`` →
 ``AboutWriter`` pipeline. The import is atomic: success writes the project,
 failure leaves it unchanged (apart from any raw payload written to
 ``<project>/downloaded data/`` before the failure point).
-
-See plan §4.1, §5.1.
 """
-
-from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Sequence
 
 from .download_cache import DownloadCache
-from .ir import RoutableNetwork
 from .simplifiers.base import Simplifier, resolve_simplifier
 from .sources.base import Source, resolve_source
+from .staged_network import StagedNetwork
 
 if TYPE_CHECKING:
     from aequilibrae.project import Project
@@ -24,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _default_modes() -> tuple[str, ...]:
+def _default_modes():
     return ("car", "transit", "bicycle", "walk")
 
 
@@ -36,37 +32,17 @@ class NetworkImporter:
 
     def run(
         self,
-        source: "Source | str",
+        source,
         *,
         modes: Sequence[str] = _default_modes(),
-        simplify: "Simplifier | str | bool" = "osmnx",
-        consolidate_tolerance: float | None = 10.0,
+        simplify="osmnx",
+        consolidate_tolerance=10.0,
         cache_tag: str = "",
         **source_kwargs,
     ) -> None:
-        """Run the full import pipeline atomically.
-
-        :Arguments:
-            **source**: ``Source`` instance or registered name (e.g.
-            ``"osm-overpass"``, ``"osm-pbf"``, ``"overture-cloud"``,
-            ``"geodataframe"``, ``"file"``, ``"gmns"``).
-
-            **modes**: Sequence of AequilibraE mode names to retain. This is
-            the only filter the importer applies.
-
-            **simplify**: ``"osmnx"`` (default), ``"neatnet"``, or ``False``
-            to skip simplification.
-
-            **consolidate_tolerance**: Tolerance (m, in auto-UTM) for
-            ``osmnx.consolidate_intersections``. Ignored by ``neatnet`` and
-            when ``simplify=False``.
-
-            **cache_tag**: Short human-readable label for the
-            ``<project>/downloaded data/`` subfolder (e.g. place name or
-            ``bbox_xmin_ymin_xmax_ymax``).
-        """
-        from .db_writer import SpatialiteWriter
+        """Run the full import pipeline atomically."""
         from .about_writer import AboutWriter
+        from .db_writer import SpatialiteWriter
 
         modes_tuple = tuple(modes)
         source_obj = resolve_source(source, **source_kwargs)
@@ -79,7 +55,7 @@ class NetworkImporter:
         )
 
         logger.info(f"Acquiring network from source '{source_obj.name}' (modes={modes_tuple})")
-        net: RoutableNetwork = source_obj.acquire(
+        net: StagedNetwork = source_obj.acquire(
             modes=modes_tuple,
             download_cache=download_cache,
         )
@@ -95,8 +71,6 @@ class NetworkImporter:
             net.validate()
             logger.info(f"After simplification: {len(net.nodes)} nodes, {len(net.links)} links")
 
-        # Persist source provenance to the about table FIRST so it's always
-        # recorded even if the spatialite write fails halfway.
         AboutWriter(self.project).write(
             source_meta=net.source_meta,
             modes=modes_tuple,

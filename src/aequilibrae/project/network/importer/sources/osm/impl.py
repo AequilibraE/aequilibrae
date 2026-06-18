@@ -1,29 +1,26 @@
 """Implementation backbone for OSM sources.
 
-Both ``OSMOverpassSource`` (osmnx) and ``OSMPbfSource`` (pyrosm) produce a
-``networkx.MultiDiGraph`` (or geopandas frames) and run them through the same
-IR-construction code path. This module hosts the shared logic.
+Both ``OSMOverpassSource`` (osmnx) and ``OSMPbfSource`` (pyrosm) produce
+geopandas frames and run them through the same staged-network construction
+code path.
 """
 
-from __future__ import annotations
-
-import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Sequence
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from shapely.geometry import LineString, Point, box
+from shapely.geometry import Point
 
 from aequilibrae.utils.optional_dependency import require
 
 from ...download_cache import DownloadCache
 from ...exceptions import ImporterError
-from ...ir import RoutableNetwork
 from ...schema.modes import compute_modes_string, filter_by_modes
+from ...staged_network import StagedNetwork
 from .tags_to_ir import (
     MODE_CODE,
     MODE_RULES,
@@ -37,26 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 _NODE_START = 10000
-_ROUTING_KEYS_HANDLED = {
-    "oneway",
-    "junction",
-    "maxspeed",
-    "maxspeed:forward",
-    "maxspeed:backward",
-    "lanes",
-    "lanes:forward",
-    "lanes:backward",
-    "highway",
-    "name",
-}
-
-
-def _utm_crs_for(geometry: gpd.GeoSeries) -> str:
-    """Pick the auto-UTM EPSG code for a geometry series in WGS84.
-
-    No user override — plan §1.3 rule 4.
-    """
-    return geometry.estimate_utm_crs().to_string()
 
 
 # =============================================================================
@@ -68,65 +45,22 @@ def acquire_overpass(
     modes: Sequence[str],
     download_cache: DownloadCache,
     model_area=None,
-    place_name: str | None = None,
-    custom_filter: str | None = None,
-) -> RoutableNetwork:
+    place_name=None,
+    custom_filter=None,
+) -> StagedNetwork:
     """Download an OSM graph via Overpass through osmnx.
 
     Exactly one of ``model_area`` / ``place_name`` must be supplied.
+
+    Raises :class:`ImporterError` on Overpass HTTP errors and on empty
+    responses; everything else surfaces its own exception.
     """
     ox = require("osmnx", feature="OSM Overpass download")
+    _configure_osmnx(ox)
 
     if (model_area is None) == (place_name is None):
         raise ImporterError(
             "OSMOverpassSource requires exactly one of `model_area` or `place_name`"
-        )
-
-    _configure_osmnx(ox)
-
-    # ---- Acquire raw OSM JSON via osmnx's internal Overpass utilities so we
-    # can write the raw payload to the download cache before any parsing.
-    raw_payload, query_string = _overpass_fetch_raw(
-        ox=ox,
-        model_area=model_area,
-        place_name=place_name,
-        custom_filter=custom_filter,
-    )
-    download_cache.write_text("query.overpassql", query_string)
-    download_cache.write_bytes(
-        "response.json",
-        json.dumps(raw_payload).encode("utf-8"),
-    )
-    manifest = {
-        "source": "osm-overpass",
-        "backend": "osmnx",
-        "place_name": place_name,
-        "bbox": list(model_area.bounds) if model_area is not None else None,
-        "modes": list(modes),
-        "custom_filter": custom_filter,
-        "raw_elements": len(raw_payload.get("elements", [])),
-    }
-    download_cache.write_manifest(manifest)
-
-    # ---- Build the graph from the raw response. osmnx's settings cache layer
-    # lets us route the same payload through `graph_from_polygon` style by
-    # leveraging the internal API; but the cleaner approach is to ask osmnx to
-    # do the full download (it'll hit its own cache for the second call).
-    if model_area is not None:
-        G = ox.graph_from_polygon(
-            model_area,
-            network_type="all",
-            simplify=False,
-            retain_all=True,
-            custom_filter=custom_filter,
-        )
-    else:
-        G = ox.graph_from_place(
-            place_name,
-            network_type="all",
-            simplify=False,
-            retain_all=True,
-            custom_filter=custom_filter,
         )
 
     source_url = (
@@ -134,80 +68,115 @@ def acquire_overpass(
         if place_name is not None
         else f"overpass:bbox={list(model_area.bounds)}"
     )
-    return _multidigraph_to_ir(
-        G,
+
+    # Only Overpass HTTP failures + empty payloads are caught (per the
+    # explicit user policy on defensive coding).
+    try:
+        if model_area is not None:
+            G = ox.graph_from_polygon(
+                model_area,
+                network_type="all",
+                simplify=False,
+                retain_all=True,
+                custom_filter=custom_filter,
+            )
+        else:
+            G = ox.graph_from_place(
+                place_name,
+                network_type="all",
+                simplify=False,
+                retain_all=True,
+                custom_filter=custom_filter,
+            )
+    except ox.exceptions.InsufficientResponseError as exc:
+        raise ImporterError(
+            f"Overpass returned an empty or partial response for {source_url}: {exc}"
+        ) from exc
+    except Exception as exc:  # network/transport errors from requests/urllib3
+        from requests.exceptions import RequestException
+
+        if isinstance(exc, RequestException):
+            raise ImporterError(
+                f"Overpass request failed: {exc}. Check connectivity and the "
+                f"endpoint configured in parameters.yml::osm.overpass_endpoint."
+            ) from exc
+        raise
+
+    if G is None or G.number_of_edges() == 0:
+        raise ImporterError(
+            f"Overpass returned no edges for the requested area ({source_url}). "
+            "Widen the bbox or adjust custom_filter."
+        )
+
+    nodes_gdf, edges_gdf = ox.convert.graph_to_gdfs(G, nodes=True, edges=True)
+    nodes_gdf = nodes_gdf.reset_index()
+    edges_gdf = edges_gdf.reset_index()  # multiindex u/v/key → columns
+
+    # ---- Persist the consolidated raw payload as a single GeoParquet file
+    _persist_overpass_payload(
+        download_cache=download_cache,
+        nodes_gdf=nodes_gdf,
+        edges_gdf=edges_gdf,
+        place_name=place_name,
+        model_area=model_area,
         modes=modes,
-        source_meta={
-            "source": "osm",
-            "backend": "osmnx-overpass",
-            "source_url": source_url,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-        },
-        clip_to=model_area,
+        custom_filter=custom_filter,
+    )
+
+    source_meta = {
+        "source": "osm",
+        "backend": "osmnx-overpass",
+        "source_url": source_url,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return _edges_nodes_to_staged(
+        edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area
     )
 
 
 def _configure_osmnx(ox) -> None:
     """Apply project-level osmnx settings from the parameters file."""
-    try:
-        from aequilibrae.parameters import Parameters
+    from aequilibrae.parameters import Parameters
 
-        params = Parameters().parameters.get("osm", {}) or {}
-        if "overpass_endpoint" in params:
-            url = params["overpass_endpoint"].rstrip("/") + "/interpreter"
-            try:
-                ox.settings.overpass_url = url
-            except AttributeError:  # pragma: no cover
-                pass
-        if "timeout" in params:
-            try:
-                ox.settings.timeout = int(params["timeout"])
-            except (AttributeError, ValueError, TypeError):  # pragma: no cover
-                pass
-        if "accept_language" in params:
-            try:
-                ox.settings.http_accept_language = params["accept_language"]
-            except AttributeError:  # pragma: no cover
-                pass
-    except Exception:  # pragma: no cover - parameters access shouldn't break import
-        logger.debug("Could not load osmnx settings from parameters.yml", exc_info=True)
+    params = Parameters().parameters.get("osm", {}) or {}
+    if "overpass_endpoint" in params:
+        ox.settings.overpass_url = params["overpass_endpoint"].rstrip("/") + "/interpreter"
+    if "timeout" in params:
+        ox.settings.timeout = int(params["timeout"])
+    if "accept_language" in params:
+        ox.settings.http_accept_language = params["accept_language"]
 
 
-def _overpass_fetch_raw(*, ox, model_area, place_name, custom_filter):
-    """Use osmnx's lower-level helpers to fetch the raw Overpass JSON payload.
-
-    Returns ``(raw_json, query_string)``. Best-effort: if the osmnx internals
-    change shape across versions we fall back to an empty payload so the user
-    still gets the data via the high-level call, just without raw caching.
-    """
-    try:
-        # osmnx 2.x: ``ox._overpass.create_overpass_query`` and ``_download_overpass_network``
-        # are internal but stable enough for this purpose; we use them through a
-        # very narrow surface and only as a best-effort raw capture.
-        from osmnx import _overpass  # type: ignore[attr-defined]
-    except Exception:  # pragma: no cover
-        logger.warning("Could not access osmnx._overpass for raw payload capture")
-        return {"elements": []}, "(unavailable)"
-
-    if model_area is not None:
-        polygon = model_area
-    else:
-        gdf = ox.geocoder.geocode_to_gdf(place_name)
-        polygon = gdf.geometry.iloc[0]
-
-    # network_type='all' so we capture everything for the modes filter to do its job
-    network_type = "all"
-    try:
-        query = _overpass.create_overpass_query(polygon, network_type=network_type)
-    except Exception:  # pragma: no cover
-        logger.warning("Could not build Overpass query string for raw capture")
-        return {"elements": []}, "(unavailable)"
-
-    # Many osmnx versions return a dict already from the helper; otherwise call
-    # the download function. We don't actually network here — that's done by
-    # the high-level call. We only need the *query string* and we'll let the
-    # high-level call hit Overpass for real.
-    return {"elements": []}, query
+def _persist_overpass_payload(
+    *,
+    download_cache: DownloadCache,
+    nodes_gdf: gpd.GeoDataFrame,
+    edges_gdf: gpd.GeoDataFrame,
+    place_name,
+    model_area,
+    modes,
+    custom_filter,
+) -> None:
+    """Consolidate (nodes_gdf, edges_gdf) into a single GeoDataFrame and persist as GeoParquet."""
+    nodes_to_write = nodes_gdf.copy()
+    nodes_to_write["feature_type"] = "node"
+    edges_to_write = edges_gdf.copy()
+    edges_to_write["feature_type"] = "edge"
+    combined = pd.concat([nodes_to_write, edges_to_write], ignore_index=True)
+    combined_gdf = gpd.GeoDataFrame(
+        combined, geometry="geometry", crs=nodes_gdf.crs or "EPSG:4326"
+    )
+    download_cache.write_geoparquet("osm.parquet", combined_gdf)
+    download_cache.write_manifest({
+        "source": "osm-overpass",
+        "backend": "osmnx",
+        "place_name": place_name,
+        "bbox": list(model_area.bounds) if model_area is not None else None,
+        "modes": list(modes),
+        "custom_filter": custom_filter,
+        "n_nodes": int(len(nodes_gdf)),
+        "n_edges": int(len(edges_gdf)),
+    })
 
 
 # =============================================================================
@@ -219,8 +188,8 @@ def acquire_pbf(
     pbf_path: Path,
     modes: Sequence[str],
     download_cache: DownloadCache,
-    custom_filter: str | None = None,
-) -> RoutableNetwork:
+    custom_filter=None,
+) -> StagedNetwork:
     """Read an OSM .osm.pbf file via pyrosm."""
     pyrosm = require("pyrosm", feature="OSM PBF reading")
 
@@ -229,8 +198,6 @@ def acquire_pbf(
         raise FileNotFoundError(f"PBF file not found: {pbf_path}")
 
     osm = pyrosm.OSM(str(pbf_path))
-    # pyrosm's get_network with nodes=True returns (nodes, edges). The edges
-    # frame carries 'u'/'v' OSM node ids only when nodes=True is requested.
     result = osm.get_network(network_type="all", nodes=True)
     if result is None:
         raise ImporterError(f"pyrosm returned no data from {pbf_path}")
@@ -246,7 +213,7 @@ def acquire_pbf(
         "source_url": str(pbf_path),
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
-    return _edges_nodes_to_ir(
+    return _edges_nodes_to_staged(
         edges, nodes, modes=modes, source_meta=source_meta, clip_to=None
     )
 
@@ -274,14 +241,8 @@ def _first_last_points(geom):
 
 
 def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Build a routable nodes frame from pyrosm's nodes + edges output.
-
-    pyrosm's nodes frame contains all OSM nodes in the bounding box (including
-    nodes that are not endpoints of any edge). We restrict to nodes that any
-    edge actually references and fall back to edge-endpoint geometry when the
-    nodes table is missing.
-    """
-    used_ids: set[int] = set()
+    """Build a routable nodes frame from pyrosm's nodes + edges output."""
+    used_ids: set = set()
     for col in ("u", "v"):
         if col in edges.columns:
             used_ids.update(int(x) for x in edges[col].dropna().unique())
@@ -294,10 +255,9 @@ def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) ->
     keep = keep.rename(columns={"id": "osm_id"})
     keep = keep[["osm_id", "geometry"]]
 
-    # If any used id is missing from the nodes table, synthesise from edge endpoints
     missing_ids = used_ids - set(int(x) for x in keep["osm_id"].tolist())
     if missing_ids:
-        synth: dict[int, Point] = {}
+        synth: dict = {}
         for _, row in edges.iterrows():
             first, last = _first_last_points(row.geometry)
             if first is None:
@@ -320,40 +280,17 @@ def _pyrosm_nodes_frame(nodes_raw: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) ->
 
 
 # =============================================================================
-# IR construction (shared)
+# Staged-network construction (shared)
 # =============================================================================
 
-def _multidigraph_to_ir(
-    G,
-    *,
-    modes: Sequence[str],
-    source_meta: dict,
-    clip_to,
-) -> RoutableNetwork:
-    """Convert an osmnx MultiDiGraph to a RoutableNetwork."""
-    import osmnx as ox
-
-    nodes_gdf, edges_gdf = ox.convert.graph_to_gdfs(G, nodes=True, edges=True)
-    nodes_gdf = nodes_gdf.reset_index().rename(columns={"index": "osm_id"})
-    if "osmid" in nodes_gdf.columns and "osm_id" not in nodes_gdf.columns:
-        nodes_gdf = nodes_gdf.rename(columns={"osmid": "osm_id"})
-    elif "osm_id" not in nodes_gdf.columns and nodes_gdf.index.name == "osmid":
-        nodes_gdf = nodes_gdf.reset_index().rename(columns={"osmid": "osm_id"})
-
-    edges_gdf = edges_gdf.reset_index()  # multiindex u/v/key → columns
-    return _edges_nodes_to_ir(
-        edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=clip_to
-    )
-
-
-def _edges_nodes_to_ir(
+def _edges_nodes_to_staged(
     edges_gdf: gpd.GeoDataFrame,
     nodes_gdf: gpd.GeoDataFrame,
     *,
     modes: Sequence[str],
     source_meta: dict,
     clip_to,
-) -> RoutableNetwork:
+) -> StagedNetwork:
     requested_codes = {MODE_CODE[m] for m in modes if m in MODE_CODE}
     if not requested_codes:
         raise ImporterError(
@@ -362,8 +299,9 @@ def _edges_nodes_to_ir(
         )
 
     # ---- Normalise node frame: 'osm_id' int64, geometry, allocate node_id
+    if "osm_id" not in nodes_gdf.columns and "osmid" in nodes_gdf.columns:
+        nodes_gdf = nodes_gdf.rename(columns={"osmid": "osm_id"})
     if "osm_id" not in nodes_gdf.columns:
-        # osmnx puts it as the index name
         nodes_gdf = nodes_gdf.reset_index()
     nodes_gdf = nodes_gdf.copy()
     nodes_gdf["osm_id"] = nodes_gdf["osm_id"].astype("int64")
@@ -377,20 +315,18 @@ def _edges_nodes_to_ir(
     edges = edges_gdf.copy()
     if str(edges.crs).upper() != "EPSG:4326":
         edges = edges.to_crs("EPSG:4326")
-    # osmnx: u/v/key columns; pyrosm: u/v columns
     if "u" not in edges.columns or "v" not in edges.columns:
         raise ImporterError("Edges frame must contain 'u' and 'v' columns (OSM node ids)")
     edges = edges[edges["u"].isin(osm_to_node) & edges["v"].isin(osm_to_node)].copy()
     edges["a_node"] = edges["u"].map(osm_to_node).astype("int64")
     edges["b_node"] = edges["v"].map(osm_to_node).astype("int64")
-
-    # Drop edges that have no geometry
     edges = edges[~edges.geometry.isna()].reset_index(drop=True)
 
-    # ---- Compute distance in metres via auto-UTM
     if len(edges) == 0:
         raise ImporterError("OSM acquisition produced zero usable edges after node mapping")
-    utm = _utm_crs_for(edges.geometry)
+
+    # ---- distance via auto-UTM
+    utm = edges.geometry.estimate_utm_crs().to_string()
     edges["distance"] = edges.geometry.to_crs(utm).length.astype(float)
 
     # ---- Per-row mode + direction + speeds + lanes derived from tags
@@ -405,26 +341,22 @@ def _edges_nodes_to_ir(
             val = row.get(col)
             if val is None:
                 continue
-            try:
-                if pd.isna(val):
-                    continue
-            except (TypeError, ValueError):
-                pass
+            if isinstance(val, float) and np.isnan(val):
+                continue
             out[str(col)] = val
-        # Normalise the highway tag if present (pyrosm sometimes uses lists)
         hw = out.get("highway")
         if isinstance(hw, list) and hw:
             out["highway"] = hw[0]
         return out
 
-    modes_strs: list[str] = []
-    directions: list[int] = []
-    speed_abs: list[float | None] = []
-    speed_bas: list[float | None] = []
-    lanes_abs: list[int | None] = []
-    lanes_bas: list[int | None] = []
-    link_types: list[str] = []
-    names: list = []
+    modes_strs = []
+    directions = []
+    speed_abs = []
+    speed_bas = []
+    lanes_abs = []
+    lanes_bas = []
+    link_types = []
+    names = []
 
     for _, row in edges.iterrows():
         tags = _row_tags(row)
@@ -465,7 +397,7 @@ def _edges_nodes_to_ir(
         edges = edges[edges.geometry.intersects(clip_to)].reset_index(drop=True)
         logger.info(f"Model-area clip kept {len(edges)} / {before} links")
 
-    # ---- Allocate link_id and _source_id (for simplifier)
+    # ---- Allocate link_id and _source_id
     edges["link_id"] = np.arange(1, len(edges) + 1, dtype=np.int64)
     if "osmid" in edges.columns:
         edges["_source_id"] = edges["osmid"].apply(
@@ -478,14 +410,11 @@ def _edges_nodes_to_ir(
     else:
         edges["_source_id"] = edges["link_id"].astype(str)
 
-    # ---- Drop unused intermediate columns; keep the rest as free-form for the
-    # committer to route into other_attributes JSON.
+    # ---- Drop unused intermediate columns
     drop_cols = {"u", "v", "key", "osmid"}
     edges = edges.drop(columns=[c for c in drop_cols if c in edges.columns])
 
-    # Normalise tag-key column names that osmnx/pyrosm sometimes produce as
-    # "addr:housenumber" etc. (committer is happy with any names but the user
-    # will be querying these from SQL, so make them safe.)
+    # Normalise tag-key column names (colons → underscores)
     rename_map = {}
     for c in list(edges.columns):
         if c in {"a_node", "b_node", "link_id", "distance", "modes", "direction",
@@ -498,7 +427,7 @@ def _edges_nodes_to_ir(
     if rename_map:
         edges = edges.rename(columns=rename_map)
 
-    # ---- Build node IR
+    # ---- Build node staged frame
     nodes_out = gpd.GeoDataFrame(
         {
             "node_id": nodes_gdf["node_id"].astype(np.int64),
@@ -514,17 +443,16 @@ def _edges_nodes_to_ir(
     used_nodes = set(edges["a_node"]).union(edges["b_node"])
     nodes_out = nodes_out[nodes_out["node_id"].isin(used_nodes)].reset_index(drop=True)
 
-    ir = RoutableNetwork(
+    return StagedNetwork(
         nodes=nodes_out,
         links=gpd.GeoDataFrame(edges, geometry="geometry", crs="EPSG:4326"),
         source_meta=source_meta,
     )
-    return ir
 
 
-def _compute_node_modes(node_ids: Iterable[int], edges: pd.DataFrame) -> list[str]:
+def _compute_node_modes(node_ids: Iterable[int], edges: pd.DataFrame) -> list:
     """For each node, union of modes from every incident link."""
-    by_node: dict[int, set[str]] = {nid: set() for nid in node_ids}
+    by_node: dict = {nid: set() for nid in node_ids}
     for _, row in edges.iterrows():
         a = int(row["a_node"])
         b = int(row["b_node"])

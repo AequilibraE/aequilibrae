@@ -1,26 +1,20 @@
 """neatnet-based simplifier implementation (opt-in)."""
 
-from __future__ import annotations
-
 import logging
 
 from aequilibrae.utils.optional_dependency import require
 
-from ..ir import RoutableNetwork
+from ..staged_network import StagedNetwork
 
 logger = logging.getLogger(__name__)
 
 
-def run_neatnet_simplify(net: RoutableNetwork, **_) -> RoutableNetwork:
-    """Run ``neatnet.simplify_network`` on the IR's edges and reproject back.
-
-    Implementation note: neatnet operates on a GeoDataFrame of LineStrings in
-    a projected CRS. We project to auto-UTM, run, and reproject to EPSG:4326.
+def run_neatnet_simplify(net: StagedNetwork, **_) -> StagedNetwork:
+    """Run ``neatnet.simplify_network`` on the staged network's edges and reproject back.
 
     The neatnet result loses per-edge provenance (the package does not
-    propagate input attributes one-for-one). For now we drop the dict-of-dicts
-    after neatnet simplification — users wanting full provenance should use
-    the default ``simplify="osmnx"``.
+    propagate input attributes one-for-one). Users wanting full provenance
+    should use the default ``simplify="osmnx"``.
     """
     require("neatnet", feature="neatnet simplification")
     import neatnet  # type: ignore
@@ -32,20 +26,13 @@ def run_neatnet_simplify(net: RoutableNetwork, **_) -> RoutableNetwork:
     utm = str(edges.geometry.estimate_utm_crs())
     edges_proj = edges.to_crs(utm)
 
-    try:
-        simplified = neatnet.simplify_network(edges_proj)
-    except AttributeError:
-        # Older API
-        simplified = neatnet.simplify(edges_proj)  # type: ignore[attr-defined]
+    simplified = neatnet.simplify_network(edges_proj)
 
     simplified_geo = simplified.to_crs("EPSG:4326")
-
-    # neatnet returns only the simplified link geometries. We rebuild nodes
-    # from endpoints and re-derive ids.
-    return _gdf_to_ir(simplified_geo, source_meta=net.source_meta)
+    return _gdf_to_staged(simplified_geo, source_meta=net.source_meta)
 
 
-def _gdf_to_ir(edges_gdf, source_meta: dict) -> RoutableNetwork:
+def _gdf_to_staged(edges_gdf, source_meta: dict) -> StagedNetwork:
     import geopandas as gpd
     import numpy as np
     from shapely.geometry import Point
@@ -54,8 +41,7 @@ def _gdf_to_ir(edges_gdf, source_meta: dict) -> RoutableNetwork:
     if edges.crs is None:
         edges = edges.set_crs("EPSG:4326")
 
-    # Build endpoint nodes
-    endpoints: dict[tuple[float, float], int] = {}
+    endpoints: dict = {}
     next_id = 10000
 
     def _node_id_for(x, y):
@@ -81,18 +67,18 @@ def _gdf_to_ir(edges_gdf, source_meta: dict) -> RoutableNetwork:
         edges["modes"] = "c"
     if "link_type" not in edges.columns:
         edges["link_type"] = "unknown"
-    utm = edges.crs if str(edges.crs).upper() != "EPSG:4326" else edges.geometry.estimate_utm_crs()
+    utm = (
+        edges.crs
+        if str(edges.crs).upper() != "EPSG:4326"
+        else edges.geometry.estimate_utm_crs()
+    )
     edges["distance"] = edges.geometry.to_crs(utm).length.astype(float)
 
     node_rows = []
     for (x, y), nid in endpoints.items():
-        node_rows.append({
-            "node_id": nid,
-            "geometry": Point(x, y),
-            "modes": "c",
-        })
+        node_rows.append({"node_id": nid, "geometry": Point(x, y), "modes": "c"})
     nodes = gpd.GeoDataFrame(node_rows, geometry="geometry", crs="EPSG:4326")
 
-    ir = RoutableNetwork(nodes=nodes, links=edges, source_meta=dict(source_meta))
-    ir.validate()
-    return ir
+    out = StagedNetwork(nodes=nodes, links=edges, source_meta=dict(source_meta))
+    out.validate()
+    return out

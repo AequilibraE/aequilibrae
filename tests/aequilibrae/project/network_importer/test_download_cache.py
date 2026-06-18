@@ -1,10 +1,12 @@
-"""Direct tests for the ``DownloadCache`` helper (plan §4.6)."""
+"""Direct tests for the ``DownloadCache`` helper."""
 
-import gzip
 import hashlib
 import json
 
+import geopandas as gpd
+import pyarrow as pa
 import pytest
+from shapely.geometry import Point
 
 from aequilibrae.project.network.importer import DownloadCache
 
@@ -16,31 +18,53 @@ def test_cache_is_lazy(tmp_path):
     assert not (tmp_path / "downloaded data").exists()
 
 
-def test_write_bytes_creates_folder(tmp_path):
-    cache = DownloadCache(tmp_path, "osm-overpass", "vatican")
-    path = cache.write_bytes("response.json", b'{"hello": "world"}')
+def test_write_geoparquet_creates_folder_and_round_trips(tmp_path):
+    cache = DownloadCache(tmp_path, "osm-overpass", "test")
+    gdf = gpd.GeoDataFrame(
+        {"name": ["a", "b"], "geometry": [Point(0, 0), Point(1, 1)]},
+        crs="EPSG:4326",
+    )
+    path = cache.write_geoparquet("payload", gdf)
     assert path.exists()
-    assert path.read_bytes() == b'{"hello": "world"}'
+    assert path.suffix == ".parquet"
     assert cache.relative_path is not None
     assert "downloaded data" in cache.relative_path
     assert "osm-overpass" in cache.relative_path
-    assert "vatican" in cache.relative_path
+    assert "test" in cache.relative_path
+
+    back = gpd.read_parquet(path)
+    assert len(back) == 2
+    assert list(back["name"]) == ["a", "b"]
 
 
-def test_large_payloads_are_gzipped(tmp_path):
-    """Payloads > 10 MB land as .gz."""
-    cache = DownloadCache(tmp_path, "osm-overpass", "huge")
-    payload = b"x" * (11 * 1024 * 1024)
-    path = cache.write_bytes("response.json", payload)
-    assert path.suffix == ".gz"
-    with gzip.open(path, "rb") as fh:
-        assert fh.read() == payload
+def test_write_parquet_round_trips(tmp_path):
+    cache = DownloadCache(tmp_path, "overture-cloud", "bbox")
+    table = pa.table({"id": [1, 2, 3], "name": ["x", "y", "z"]})
+    path = cache.write_parquet("segments", table)
+    assert path.exists()
+    assert path.suffix == ".parquet"
+
+    import pyarrow.parquet as pq
+    back = pq.read_table(path)
+    assert back.num_rows == 3
+
+
+def test_write_json_round_trips(tmp_path):
+    cache = DownloadCache(tmp_path, "osm-overpass", "test")
+    path = cache.write_json("notes", {"hello": "world"})
+    assert path.exists()
+    assert path.suffix == ".json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload == {"hello": "world"}
 
 
 def test_manifest_includes_sha256(tmp_path):
     cache = DownloadCache(tmp_path, "osm-overpass", "test")
-    payload = b'{"hello": "world"}'
-    cache.write_bytes("response.json", payload)
+    gdf = gpd.GeoDataFrame(
+        {"geometry": [Point(0, 0)]},
+        crs="EPSG:4326",
+    )
+    written = cache.write_geoparquet("payload", gdf)
     cache.write_manifest({"bbox": [0, 0, 1, 1], "modes": ["car"]})
 
     manifest_path = cache.folder / "manifest.json"
@@ -50,22 +74,22 @@ def test_manifest_includes_sha256(tmp_path):
     assert manifest["bbox"] == [0, 0, 1, 1]
     assert manifest["modes"] == ["car"]
     assert "fetched_at" in manifest
-    expected_sha = hashlib.sha256(payload).hexdigest()
-    assert manifest["sha256"]["response.json"] == expected_sha
+    expected_sha = hashlib.sha256(written.read_bytes()).hexdigest()
+    assert manifest["sha256"]["payload.parquet"] == expected_sha
 
 
 def test_tag_is_slugified(tmp_path):
     cache = DownloadCache(tmp_path, "osm-overpass", "São Paulo, Brazil!")
-    cache.write_bytes("x", b"x")
+    gdf = gpd.GeoDataFrame({"geometry": [Point(0, 0)]}, crs="EPSG:4326")
+    cache.write_geoparquet("payload", gdf)
     assert cache.folder.exists()
-    # No special chars
     folder_name = cache.folder.name
     for ch in folder_name:
-        assert ch.isalnum() or ch in "-_.T"  # T allowed (timestamp), other alnum / - _ .
+        assert ch.isalnum() or ch in "-_.T"
 
 
 def test_relative_path_uses_forward_slashes(tmp_path):
     cache = DownloadCache(tmp_path, "overture-cloud", "bbox_0_0_1_1")
-    cache.write_bytes("connectors.parquet", b"PAR1...")
+    cache.write_parquet("connectors", pa.table({"id": [1]}))
     assert cache.relative_path is not None
     assert "\\" not in cache.relative_path

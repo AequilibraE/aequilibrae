@@ -1,34 +1,29 @@
 """``Simplifier`` protocol + string-name registry."""
 
-from __future__ import annotations
-
 from typing import ClassVar, Protocol, runtime_checkable
 
 from ..exceptions import SourceResolutionError
-from ..ir import RoutableNetwork
+from ..staged_network import StagedNetwork
 
 
 @runtime_checkable
 class Simplifier(Protocol):
     name: ClassVar[str]
-    required_extras: ClassVar[tuple[str, ...]]
+    required_extras: ClassVar[tuple]
 
-    def simplify(self, net: RoutableNetwork, **kwargs) -> RoutableNetwork:  # pragma: no cover
+    def simplify(self, net: StagedNetwork, **kwargs) -> StagedNetwork:
         ...
 
 
-SIMPLIFIERS: dict[str, type] = {}
+SIMPLIFIERS: dict = {}
 
 
 def register_simplifier(cls: type) -> type:
-    name = getattr(cls, "name", None)
-    if not name:
-        raise ValueError(f"{cls.__name__} must define a class attribute `name`")
-    SIMPLIFIERS[name] = cls
+    SIMPLIFIERS[cls.name] = cls
     return cls
 
 
-def resolve_simplifier(simplifier: "Simplifier | str | bool", **kwargs) -> Simplifier | None:
+def resolve_simplifier(simplifier, **kwargs):
     """Resolve a Simplifier from an instance, string name, or boolean.
 
     ``True`` resolves to the default (``"osmnx"``); ``False`` returns ``None``

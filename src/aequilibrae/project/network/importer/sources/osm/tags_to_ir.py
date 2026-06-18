@@ -1,12 +1,10 @@
-"""OSM tag → IR conversion (routing-relevant fields + mode rules).
+"""OSM tag → staged-network conversion (typed fields + mode rules).
 
-Per plan §1.3 rule 2 there is **no** ``highway`` allow-list filter. Every value
-of ``highway`` is preserved as ``link_type``. Mode assignment uses access
-semantics only (``access``, ``motor_vehicle``, ``bicycle``, ``foot``,
-``vehicle``, ``service``, ``junction`` etc.) — see plan §6.1.
+There is no ``highway`` allow-list filter. Every value of ``highway`` is
+preserved as ``link_type``. Mode assignment uses access semantics only
+(``access``, ``motor_vehicle``, ``bicycle``, ``foot``, ``vehicle``,
+``service``, ``junction``, …).
 """
-
-from __future__ import annotations
 
 import re
 from typing import Mapping

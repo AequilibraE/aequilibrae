@@ -7,7 +7,7 @@ pyfiles = [
   'download_cache.py',
   'exceptions.py',
   'importer.py',
-  'ir.py',
+  'staged_network.py',
 ]
 
 pkgs = [
