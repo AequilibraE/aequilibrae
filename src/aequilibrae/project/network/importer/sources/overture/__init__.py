@@ -6,6 +6,6 @@ API single-pathway. Power users wanting offline re-imports can construct a
 ``<project>/downloaded data/overture-cloud/...``.
 """
 
-from .cloud import OvertureCloudSource
+from aequilibrae.project.network.importer.sources.overture.cloud import OvertureCloudSource
 
 __all__ = ["OvertureCloudSource"]

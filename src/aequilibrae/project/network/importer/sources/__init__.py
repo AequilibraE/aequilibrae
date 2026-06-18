@@ -1,5 +1,5 @@
-"""Source adapters that produce a ``RoutableNetwork``."""
+"""Source adapters that produce a ``StagedNetwork``."""
 
-from .base import Source, SOURCES, register_source
+from aequilibrae.project.network.importer.sources.base import Source, SOURCES, register_source
 
 __all__ = ["Source", "SOURCES", "register_source"]

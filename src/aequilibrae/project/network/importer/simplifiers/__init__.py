@@ -1,5 +1,10 @@
-"""Simplifier adapters that transform a ``RoutableNetwork`` in place."""
+"""Simplifier adapters that transform a ``StagedNetwork`` in place."""
 
-from .base import Simplifier, SIMPLIFIERS, register_simplifier, resolve_simplifier
+from aequilibrae.project.network.importer.simplifiers.base import (
+    SIMPLIFIERS,
+    Simplifier,
+    register_simplifier,
+    resolve_simplifier,
+)
 
 __all__ = ["Simplifier", "SIMPLIFIERS", "register_simplifier", "resolve_simplifier"]

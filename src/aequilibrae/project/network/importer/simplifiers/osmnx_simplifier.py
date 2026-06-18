@@ -2,8 +2,8 @@
 
 from typing import ClassVar
 
-from ..staged_network import StagedNetwork
-from .base import register_simplifier
+from aequilibrae.project.network.importer.simplifiers.base import register_simplifier
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 @register_simplifier
@@ -12,6 +12,6 @@ class OSMnxSimplifier:
     required_extras: ClassVar[tuple] = ("osmnx",)
 
     def simplify(self, net: StagedNetwork, **kwargs) -> StagedNetwork:
-        from .impl_osmnx import run_osmnx_simplify
+        from aequilibrae.project.network.importer.simplifiers.impl_osmnx import run_osmnx_simplify
 
         return run_osmnx_simplify(net, **kwargs)

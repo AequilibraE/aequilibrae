@@ -3,10 +3,10 @@
 from pathlib import Path
 from typing import ClassVar
 
-from ...download_cache import DownloadCache
-from ...staged_network import StagedNetwork
-from ..base import register_source
-from .geodataframe import GeoDataFrameSource
+from aequilibrae.project.network.importer.download_cache import DownloadCache
+from aequilibrae.project.network.importer.sources.base import register_source
+from aequilibrae.project.network.importer.sources.generic.geodataframe import GeoDataFrameSource
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 @register_source
@@ -32,22 +32,12 @@ class FileSource:
     def acquire(self, *, modes, download_cache: DownloadCache) -> StagedNetwork:
         import geopandas as gpd
 
-        links = (
-            gpd.read_file(self.links_path, layer=self.layer_links)
-            if self.layer_links
-            else gpd.read_file(self.links_path)
-        )
         if self.nodes_path is None:
             raise NotImplementedError(
                 "FileSource currently requires both `links_path` and `nodes_path`. "
                 "Auto-noding from links alone is a future enhancement."
             )
-        nodes = (
-            gpd.read_file(self.nodes_path, layer=self.layer_nodes)
-            if self.layer_nodes
-            else gpd.read_file(self.nodes_path)
-        )
-        inner = GeoDataFrameSource(
-            nodes=nodes, links=links, column_mapping=self.column_mapping
-        )
+        links = gpd.read_file(self.links_path, layer=self.layer_links)
+        nodes = gpd.read_file(self.nodes_path, layer=self.layer_nodes)
+        inner = GeoDataFrameSource(nodes=nodes, links=links, column_mapping=self.column_mapping)
         return inner.acquire(modes=modes, download_cache=download_cache)

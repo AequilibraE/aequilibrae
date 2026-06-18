@@ -11,10 +11,10 @@ from typing import ClassVar
 
 import geopandas as gpd
 
-from ...download_cache import DownloadCache
-from ...exceptions import StagedNetworkValidationError
-from ...staged_network import StagedNetwork
-from ..base import register_source
+from aequilibrae.project.network.importer.download_cache import DownloadCache
+from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
+from aequilibrae.project.network.importer.sources.base import register_source
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 logger = logging.getLogger(__name__)
 

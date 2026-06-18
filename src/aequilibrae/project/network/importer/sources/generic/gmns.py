@@ -9,10 +9,10 @@ as the public entry point. ``GMNSSource`` exists in the registry so that
 from pathlib import Path
 from typing import ClassVar
 
-from ...download_cache import DownloadCache
-from ...exceptions import ImporterError
-from ...staged_network import StagedNetwork
-from ..base import register_source
+from aequilibrae.project.network.importer.download_cache import DownloadCache
+from aequilibrae.project.network.importer.exceptions import ImporterError
+from aequilibrae.project.network.importer.sources.base import register_source
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 @register_source

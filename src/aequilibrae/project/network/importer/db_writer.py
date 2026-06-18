@@ -16,10 +16,10 @@ import pandas as pd
 from aequilibrae.project.project_creation import add_triggers, remove_triggers
 from aequilibrae.utils.db_utils import commit_and_close, list_columns
 
-from .exceptions import ImporterError
-from .schema.attributes import JSON_COL, split_attributes
-from .schema.link_types import LinkTypeAllocator
-from .staged_network import StagedNetwork
+from aequilibrae.project.network.importer.exceptions import ImporterError
+from aequilibrae.project.network.importer.schema.attributes import JSON_COL, split_attributes
+from aequilibrae.project.network.importer.schema.link_types import LinkTypeAllocator
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 if TYPE_CHECKING:
     from aequilibrae.project import Project
@@ -88,35 +88,30 @@ class SpatialiteWriter:
 
     def _insert_nodes(self, conn, nodes_gdf: gpd.GeoDataFrame, table_cols: list) -> None:
         direct, extra_json = split_attributes(nodes_gdf, table_cols)
-        direct = direct.copy()
-        direct[JSON_COL] = extra_json
+        direct = direct.assign(**{JSON_COL: extra_json})
 
         if "geometry" not in direct.columns:
             raise ImporterError("nodes IR missing geometry column")
 
-        col_names = [c for c in direct.columns if c != "geometry"]
-        if "is_centroid" in table_cols and "is_centroid" not in col_names:
+        if "is_centroid" in table_cols and "is_centroid" not in direct.columns:
             direct["is_centroid"] = 0
-            col_names.append("is_centroid")
 
+        col_names = [c for c in direct.columns if c != "geometry"]
         placeholders = ",".join(["?"] * len(col_names))
         sql = (
             f"INSERT INTO nodes ({', '.join(col_names)}, geometry) "
             f"VALUES ({placeholders}, MakePoint(?, ?, 4326))"
         )
-
+        xs = direct.geometry.x.to_numpy()
+        ys = direct.geometry.y.to_numpy()
         records = _to_records(direct, col_names)
-        rows = []
-        for record, geom in zip(records, direct.geometry, strict=True):
-            rows.append(record + (float(geom.x), float(geom.y)))
-        conn.executemany(sql, rows)
+        conn.executemany(sql, [r + (float(x), float(y)) for r, x, y in zip(records, xs, ys)])
 
     # ---------- links ----------
 
     def _insert_links(self, conn, links_gdf: gpd.GeoDataFrame, table_cols: list) -> None:
         direct, extra_json = split_attributes(links_gdf, table_cols)
-        direct = direct.copy()
-        direct[JSON_COL] = extra_json
+        direct = direct.assign(**{JSON_COL: extra_json})
 
         col_names = [c for c in direct.columns if c != "geometry"]
         placeholders = ",".join(["?"] * len(col_names))
@@ -124,21 +119,14 @@ class SpatialiteWriter:
             f"INSERT INTO links ({', '.join(col_names)}, geometry) "
             f"VALUES ({placeholders}, GeomFromWKB(?, 4326))"
         )
-
+        wkbs = direct.geometry.to_wkb()
         records = _to_records(direct, col_names)
-        rows = []
-        for record, geom in zip(records, direct.geometry, strict=True):
-            rows.append(record + (geom.wkb,))
-        conn.executemany(sql, rows)
+        conn.executemany(sql, [r + (wkb,) for r, wkb in zip(records, wkbs)])
 
 
 def _to_records(direct: gpd.GeoDataFrame, col_names: list) -> list:
-    """Return per-row tuples (NaN → None) for the given columns.
-
-    Uses pandas' bulk NaN→None conversion so sqlite3 receives valid scalars
-    without per-cell defensive coercion.
-    """
+    """Per-row tuples (NaN → None) for the given columns, via vectorised conversion."""
     if not col_names:
         return [() for _ in range(len(direct))]
-    sub = direct[col_names].where(pd.notna(direct[col_names]), None)
-    return [tuple(row) for row in sub.itertuples(index=False, name=None)]
+    sub = direct[col_names].astype(object).where(pd.notna(direct[col_names]), None)
+    return list(sub.itertuples(index=False, name=None))

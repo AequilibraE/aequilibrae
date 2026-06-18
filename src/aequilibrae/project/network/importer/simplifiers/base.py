@@ -2,8 +2,8 @@
 
 from typing import ClassVar, Protocol, runtime_checkable
 
-from ..exceptions import SourceResolutionError
-from ..staged_network import StagedNetwork
+from aequilibrae.project.network.importer.exceptions import SourceResolutionError
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 @runtime_checkable

@@ -9,7 +9,7 @@ preserved as ``link_type``. Mode assignment uses access semantics only
 import re
 from typing import Mapping
 
-from ...schema.modes import ModeRule
+from aequilibrae.project.network.importer.schema.modes import ModeRule
 
 
 # AequilibraE default mode codes (matches parameters.yml)

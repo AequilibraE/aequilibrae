@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import geopandas as gpd
 import numpy as np
 
-from .exceptions import StagedNetworkValidationError
+from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -137,27 +137,28 @@ class StagedNetwork:
         g = nx.MultiDiGraph()
         g.graph["crs"] = self.crs_geo
 
-        for _, row in self.nodes.iterrows():
-            attrs = {k: v for k, v in row.items() if k != "geometry"}
-            geom = row.geometry
-            attrs["x"] = geom.x
-            attrs["y"] = geom.y
-            g.add_node(int(row["node_id"]), **attrs)
+        node_cols = [c for c in self.nodes.columns if c != "geometry"]
+        xs = self.nodes.geometry.x.to_numpy()
+        ys = self.nodes.geometry.y.to_numpy()
+        for rec, x, y in zip(self.nodes[node_cols].to_dict(orient="records"), xs, ys):
+            nid = int(rec["node_id"])
+            g.add_node(nid, x=x, y=y, **rec)
 
-        for _, row in self.links.iterrows():
-            attrs = {k: v for k, v in row.items() if k != "geometry"}
-            attrs["geometry"] = row.geometry
-            a = int(row["a_node"])
-            b = int(row["b_node"])
-            direction = int(row["direction"])
+        for rec, geom in zip(
+            self.links.drop(columns=["geometry"]).to_dict(orient="records"),
+            self.links.geometry,
+        ):
+            a, b = int(rec["a_node"]), int(rec["b_node"])
+            link_id = int(rec["link_id"])
+            attrs = {**rec, "geometry": geom}
+            direction = int(rec["direction"])
             if direction == 1:
-                g.add_edge(a, b, key=int(row["link_id"]), **attrs)
+                g.add_edge(a, b, key=link_id, **attrs)
             elif direction == -1:
-                g.add_edge(b, a, key=int(row["link_id"]), **attrs)
+                g.add_edge(b, a, key=link_id, **attrs)
             else:
-                # bidirectional → two directed edges
-                g.add_edge(a, b, key=int(row["link_id"]), **attrs)
-                g.add_edge(b, a, key=int(row["link_id"]), **attrs)
+                g.add_edge(a, b, key=link_id, **attrs)
+                g.add_edge(b, a, key=link_id, **attrs)
         return g
 
     @classmethod

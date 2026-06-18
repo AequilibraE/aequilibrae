@@ -2,9 +2,9 @@
 
 from typing import ClassVar, Protocol, runtime_checkable
 
-from ..download_cache import DownloadCache
-from ..exceptions import SourceResolutionError
-from ..staged_network import StagedNetwork
+from aequilibrae.project.network.importer.download_cache import DownloadCache
+from aequilibrae.project.network.importer.exceptions import SourceResolutionError
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 @runtime_checkable

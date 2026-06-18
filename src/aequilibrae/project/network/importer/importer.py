@@ -9,10 +9,10 @@ failure leaves it unchanged (apart from any raw payload written to
 import logging
 from typing import TYPE_CHECKING, Sequence
 
-from .download_cache import DownloadCache
-from .simplifiers.base import Simplifier, resolve_simplifier
-from .sources.base import Source, resolve_source
-from .staged_network import StagedNetwork
+from aequilibrae.project.network.importer.download_cache import DownloadCache
+from aequilibrae.project.network.importer.simplifiers.base import Simplifier, resolve_simplifier
+from aequilibrae.project.network.importer.sources.base import Source, resolve_source
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 if TYPE_CHECKING:
     from aequilibrae.project import Project
@@ -41,8 +41,8 @@ class NetworkImporter:
         **source_kwargs,
     ) -> None:
         """Run the full import pipeline atomically."""
-        from .about_writer import AboutWriter
-        from .db_writer import SpatialiteWriter
+        from aequilibrae.project.network.importer.about_writer import AboutWriter
+        from aequilibrae.project.network.importer.db_writer import SpatialiteWriter
 
         modes_tuple = tuple(modes)
         source_obj = resolve_source(source, **source_kwargs)
