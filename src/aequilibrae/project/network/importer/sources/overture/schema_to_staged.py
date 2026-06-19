@@ -2,6 +2,8 @@ import geopandas as gpd
 import json
 import logging
 import numpy as np
+import pandas as pd
+from shapely.geometry import Point
 from shapely.ops import substring
 from typing import Sequence
 
@@ -84,12 +86,24 @@ def build_staged_from_overture(
     segments = segments.to_crs("EPSG:4326")
     link_rows = []
     filtered_by_mode = 0
+    synthetic_nodes = []
+    next_node_id = int(connectors["node_id"].max()) + 1 if len(connectors) else NODE_ID_START
     for seg, geom in zip(segments.drop(columns=["geometry"]).to_dict(orient="records"), segments.geometry, strict=True):
-        rows = _segment_to_links(seg, geom, gers_to_node, requested_codes)
+        rows, next_node_id = _segment_to_links(
+            seg,
+            geom,
+            gers_to_node,
+            requested_codes,
+            synthetic_nodes,
+            next_node_id,
+        )
         if not rows:
             filtered_by_mode += 1
         link_rows.extend(rows)
 
+    if synthetic_nodes:
+        connectors = pd.concat([connectors, gpd.GeoDataFrame(synthetic_nodes, geometry="geometry", crs="EPSG:4326")], ignore_index=True)
+        logger.info(f"Synthesized {len(synthetic_nodes)} Overture connectors from segment geometries")
     logger.info(f"Mode filter removed {filtered_by_mode} Overture segments")
     if not link_rows:
         raise ImporterError(f"After mode filtering ({modes!r}) no Overture links remain")
@@ -118,25 +132,45 @@ def build_staged_from_overture(
     return StagedNetwork(nodes=nodes_out, links=links_gdf, source_meta=source_meta)
 
 
-def _segment_to_links(seg: dict, geom, gers_to_node: dict, requested_codes: set) -> list:
+def _segment_to_links(
+    seg: dict,
+    geom,
+    gers_to_node: dict,
+    requested_codes: set,
+    synthetic_nodes: list,
+    next_node_id: int,
+) -> tuple[list, int]:
     if geom is None or geom.is_empty:
         raise ImporterError(f"Overture segment {seg.get('id')!r} has empty geometry")
 
     pairs = _parse_connectors_field(seg.get("connectors"))
     if len(pairs) < 2:
         raise ImporterError(f"Overture segment {seg.get('id')!r} has fewer than two connectors")
-    missing = [cid for cid, _ in pairs if cid not in gers_to_node]
-    if missing:
-        raise ImporterError(f"Overture segment {seg.get('id')!r} references missing connectors: {missing}")
 
     filtered_modes = filter_by_modes(_modes_for_segment(seg), requested_codes)
     if not filtered_modes:
-        return []
+        return [], next_node_id
 
+    next_node_id = _ensure_connector_nodes(pairs, geom, gers_to_node, synthetic_nodes, next_node_id)
     rows = _split_segment_rows(seg, geom, pairs, gers_to_node, filtered_modes)
     if not rows:
         raise ImporterError(f"Overture segment {seg.get('id')!r} produced no valid geometry splits")
-    return rows
+    return rows, next_node_id
+
+
+def _ensure_connector_nodes(pairs: list, geom, gers_to_node: dict, synthetic_nodes: list, next_node_id: int) -> int:
+    for connector_id, at in pairs:
+        if connector_id in gers_to_node:
+            continue
+        point = substring(geom, at, at, normalized=True)
+        if point.is_empty:
+            raise ImporterError(f"Cannot synthesize Overture connector {connector_id!r} from empty geometry point")
+        if not isinstance(point, Point):
+            point = Point(point.coords[0])
+        gers_to_node[connector_id] = next_node_id
+        synthetic_nodes.append({"node_id": next_node_id, "geometry": point, "source_id": connector_id})
+        next_node_id += 1
+    return next_node_id
 
 
 def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filtered_modes: str) -> list:

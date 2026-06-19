@@ -30,7 +30,7 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          uv run --extra tests \
+          uv run --extra tests --extra create \
             pytest tests/ \
             --cov=aequilibrae \
             --cov-branch \
