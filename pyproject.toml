@@ -53,10 +53,8 @@ create = [
   "scikit-learn",
   "pyrosm>=0.6.2",
   "neatnet>=0.1.6",
-  "overturemaps>=1.0",
+  "overturemaps>=1.0"
 ]
-# Back-compat alias for one release; deprecated in the next minor.
-osm = ["aequilibrae[create]"]
 
 docs = [
   "enum34",
@@ -86,7 +84,9 @@ tests = [
   "wheel",
 ]
 
-dev = ['aequilibrae[tests, docs, create]']
+dev = [
+  "aequilibrae[tests, docs, create]"
+]
 
 # simwrapper CLI
 [project.scripts]

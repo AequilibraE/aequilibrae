@@ -15,10 +15,8 @@
 import os
 import sys
 from datetime import datetime
+from importlib.metadata import version as package_version
 from pathlib import Path
-from sphinx_gallery.sorting import ExplicitOrder
-import pkg_resources
-import sphinx
 
 project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
@@ -29,7 +27,7 @@ project_dir = os.path.abspath("../../")
 if str(project_dir) not in sys.path:
     sys.path.insert(0, project_dir)
 
-release_version = pkg_resources.get_distribution("aequilibrae").version
+release_version = package_version("aequilibrae")
 
 # -- Project information -----------------------------------------------------
 

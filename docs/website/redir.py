@@ -1,16 +1,15 @@
 import os
-import sys
 import shutil
-import pkg_resources
+import sys
+from importlib.metadata import version
 
 npth = os.path.abspath(".")
 if npth not in sys.path:
     sys.path.append(npth)
 
-release_version = pkg_resources.get_distribution("aequilibrae").version
-
-version = f"V.{release_version}"
+release_version = version("aequilibrae")
+version_folder = f"V.{release_version}"
 
 docs = npth + "/docs/build/html"
-docs_dest = npth + f"/docs/build/htmlv/{version}"
+docs_dest = npth + f"/docs/build/htmlv/{version_folder}"
 shutil.copytree(docs, docs_dest)
