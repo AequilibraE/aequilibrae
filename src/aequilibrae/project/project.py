@@ -191,7 +191,6 @@ class Project:
 
         self.__create_empty_network()
         self.__load_objects()
-        self.about.create()
         logger.info(f"Created project on {base_path}")
 
     def close(self) -> None:
