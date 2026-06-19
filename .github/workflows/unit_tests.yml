@@ -109,4 +109,6 @@ jobs:
 
         uv pip install ".[dev]" -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         echo LD_PRELOAD=$(gcc -print-file-name=libasan.so)
-        LD_PRELOAD=$(gcc -print-file-name=libasan.so) PYTHONMALLOC=malloc pytest tests/
+        LD_PRELOAD=$(gcc -print-file-name=libasan.so) PYTHONMALLOC=malloc pytest tests/ || true
+        echo after
+        exit 1
