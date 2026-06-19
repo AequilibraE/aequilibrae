@@ -32,5 +32,5 @@ def test_missing_other_attributes_raises(empty_project):
         crs="EPSG:4326",
     )
 
-    with pytest.raises(ImporterError, match="other_attributes"):
+    with pytest.raises(ImporterError, match="You must create a new empty project"):
         SpatialiteWriter(empty_project).write(StagedNetwork(nodes=nodes, links=links))
