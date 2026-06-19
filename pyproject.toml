@@ -50,7 +50,6 @@ dependencies = [
 
 create = [
   "osmnx>=2.0,<3",
-  "networkx>=3.0",
   "scikit-learn",
   "pyrosm>=0.6.2",
   "neatnet>=0.1.6",
