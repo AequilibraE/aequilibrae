@@ -105,5 +105,5 @@ jobs:
       run: |
         export ASAN_OPTIONS=detect_leaks=0
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
-        uv pip install ".[dev]" -v -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
+        uv pip install ".[dev]" -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         LD_PRELOAD=$(gcc -print-file-name=libasan.so) pytest tests/
