@@ -103,8 +103,10 @@ jobs:
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
       run: |
-        export ASAN_OPTIONS=detect_leaks=0
+        export ASAN_OPTIONS=detect_leaks=0:print_stacktrace=1
+        export UBSAN_OPTIONS=print_stacktrace=1
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
-        export LD_PRELOAD=$(gcc -print-file-name=libasan.so)
         uv pip install ".[dev]" -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
-        pytest tests/
+        export LD_PRELOAD=$(gcc -print-file-name=libasan.so)
+        export PYTHONMALLOC=malloc
+        python -X faulthandler -m pytest tests/
