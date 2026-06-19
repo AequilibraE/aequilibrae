@@ -59,11 +59,11 @@ _RULE_ARRAY_KEYS = ("access_restrictions", "prohibited_transitions", "subclass_r
 
 
 def build_staged_from_overture(
-    *,
-    connectors: gpd.GeoDataFrame,
-    segments: gpd.GeoDataFrame,
-    modes: Sequence[str],
-    source_meta: dict,
+        *,
+        connectors: gpd.GeoDataFrame,
+        segments: gpd.GeoDataFrame,
+        modes: Sequence[str],
+        source_meta: dict,
 ) -> StagedNetwork:
     if len(segments) == 0:
         raise ImporterError("Overture returned no segments in the requested area")
@@ -102,7 +102,8 @@ def build_staged_from_overture(
         link_rows.extend(rows)
 
     if synthetic_nodes:
-        connectors = pd.concat([connectors, gpd.GeoDataFrame(synthetic_nodes, geometry="geometry", crs="EPSG:4326")], ignore_index=True)
+        connectors = pd.concat([connectors, gpd.GeoDataFrame(synthetic_nodes, geometry="geometry", crs="EPSG:4326")],
+                               ignore_index=True)
         logger.info(f"Synthesized {len(synthetic_nodes)} Overture connectors from segment geometries")
     logger.info(f"Mode filter removed {filtered_by_mode} Overture segments")
     if not link_rows:
@@ -133,12 +134,12 @@ def build_staged_from_overture(
 
 
 def _segment_to_links(
-    seg: dict,
-    geom,
-    gers_to_node: dict,
-    requested_codes: set,
-    synthetic_nodes: list,
-    next_node_id: int,
+        seg: dict,
+        geom,
+        gers_to_node: dict,
+        requested_codes: set,
+        synthetic_nodes: list,
+        next_node_id: int,
 ) -> tuple[list, int]:
     if geom is None or geom.is_empty:
         raise ImporterError(f"Overture segment {seg.get('id')!r} has empty geometry")
