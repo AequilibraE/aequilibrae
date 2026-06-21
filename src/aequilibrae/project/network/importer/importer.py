@@ -44,11 +44,14 @@ class NetworkImporter:
         )
 
         logger.info(f"Acquiring network from source '{source_obj.name}' (modes={modes_tuple})")
+        logger.info("Data download started")
         net: StagedNetwork = source_obj.acquire(modes=modes_tuple, download_cache=download_cache)
+        logger.info("Data download finished")
         net.validate()
         logger.info(f"Acquired {len(net.nodes)} nodes and {len(net.links)} links")
 
         if simplifier_obj is not None:
+            logger.info("Simplification started")
             logger.info(f"Simplifying with '{simplifier_obj.name}'")
             simplify_kwargs = {}
             if consolidate_tolerance is not None and simplifier_obj.name == "osmnx":
@@ -56,6 +59,7 @@ class NetworkImporter:
             net = simplifier_obj.simplify(net, **simplify_kwargs)
             net.validate()
             logger.info(f"After simplification: {len(net.nodes)} nodes, {len(net.links)} links")
+            logger.info("Simplification finished")
 
         AboutWriter(self.project).write(
             source_meta=net.source_meta,
@@ -65,5 +69,7 @@ class NetworkImporter:
             download_cache_relpath=download_cache.relative_path,
         )
 
+        logger.info("Saving to the database started")
         SpatialiteWriter(self.project).write(net)
-        logger.info("Network import complete")
+        logger.info("Saving to the database finished")
+        logger.info("Network build complete")

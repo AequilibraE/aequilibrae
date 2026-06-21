@@ -28,7 +28,10 @@ def run_osmnx_simplify(
     if graph.number_of_nodes() == 0 or graph.number_of_edges() == 0:
         raise ImporterError("OSMnx simplifier received an empty graph")
 
+    graph.graph["simplified"] = True  # Ensure OSMnx projects edge geometries
     projected = ox.projection.project_graph(graph)
+    projected.graph["simplified"] = False  # Unset so simplify_graph can run
+
     simplified = ox.simplification.simplify_graph(projected, edge_attrs_differ=("link_type", "name"))
     if consolidate_tolerance:
         simplified = ox.simplification.consolidate_intersections(
@@ -71,7 +74,7 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
     # Geometry: fill missing with straight line, resolve MultiLineString
     def _resolve_geom(row):
         g = row.get("geometry")
-        if g is None or (hasattr(g, "is_empty") and g.is_empty):
+        if is_missing(g) or (hasattr(g, "is_empty") and g.is_empty):
             g = LineString([node_xy[row["_u"]], node_xy[row["_v"]]])
         if isinstance(g, MultiLineString):
             g = max(g.geoms, key=lambda p: p.length)
@@ -96,7 +99,7 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
 
     # Modes: aggregate from source attrs, fall back to edge value (resolve lists first)
     edge_modes = df["modes"].apply(_coerce_modes) if "modes" in df.columns else pd.Series("c", index=df.index)
-    df["modes"] = [_aggregate_modes(sids, src_attrs, m) for sids, m in zip(df["_source_ids"], edge_modes)]
+    df["modes"] = [_aggregate_modes(sids, src_attrs, m) for sids, m in zip(df["_source_ids"], edge_modes, strict=True)]
 
     # Link type: primary_attrs > edge data > "unknown"
     pa_lt = pa.apply(lambda a: a.get("link_type"))

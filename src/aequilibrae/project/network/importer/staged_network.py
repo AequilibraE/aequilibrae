@@ -82,10 +82,16 @@ class StagedNetwork:
             if direction == 1:
                 graph.add_edge(a, b, key=link_id, **attrs)
             elif direction == -1:
-                graph.add_edge(b, a, key=link_id, **attrs)
+                from shapely.geometry import LineString
+                rev_geom = LineString(geom.coords[::-1]) if geom is not None else None
+                attrs_rev = {**rec, "geometry": rev_geom}
+                graph.add_edge(b, a, key=link_id, **attrs_rev)
             else:
                 graph.add_edge(a, b, key=link_id, **attrs)
-                graph.add_edge(b, a, key=link_id, **attrs)
+                from shapely.geometry import LineString
+                rev_geom = LineString(geom.coords[::-1]) if geom is not None else None
+                attrs_rev = {**rec, "geometry": rev_geom}
+                graph.add_edge(b, a, key=link_id, **attrs_rev)
         return graph
 
     @classmethod
