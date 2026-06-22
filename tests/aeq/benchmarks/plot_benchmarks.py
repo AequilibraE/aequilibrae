@@ -64,7 +64,7 @@ def plot_single(
     n_trials = len(trials)
 
     # Build x values: time or iteration index per trial
-    x_col = _x_column(plot_time)
+    # x_col = _x_column(plot_time)
     trial_x: list[np.ndarray] = []
     trial_rgap: list[np.ndarray] = []
     for t in trials:
