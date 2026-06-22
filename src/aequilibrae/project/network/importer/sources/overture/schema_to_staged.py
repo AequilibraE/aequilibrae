@@ -16,6 +16,14 @@ from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_no
 
 logger = logging.getLogger(__name__)
 
+_REQUIRED_CONNECTOR_COLS = ("id", "geometry")
+_REQUIRED_SEGMENT_COLS = ("id", "geometry", "connectors", "class", "subtype")
+_OPTIONAL_SEGMENT_DEFAULTS = {
+    "primary_name": None,
+    "access_restrictions": None,
+    "speed_limits": None,
+}
+
 _NON_ROAD_SUBTYPES = {"rail", "water"}
 
 _MOTORISED_CLASSES = frozenset(
@@ -74,7 +82,7 @@ def build_staged_from_overture(
     if not requested_codes:
         raise ImporterError(f"None of the requested modes {modes!r} match the configured modes {sorted(MODE_CODE)}")
 
-    connectors = connectors.to_crs("EPSG:4326").dropna(subset=["geometry"]).reset_index(drop=True)
+    connectors = _normalize_connectors(connectors)
     connectors["node_id"] = np.arange(
         NODE_ID_START,
         NODE_ID_START + len(connectors),
@@ -83,7 +91,7 @@ def build_staged_from_overture(
     connectors["source_id"] = connectors["id"].astype(str)
     gers_to_node = dict(zip(connectors["source_id"], connectors["node_id"], strict=True))
 
-    segments = segments.to_crs("EPSG:4326")
+    segments = _normalize_segments(segments)
     link_rows = []
     filtered_by_mode = 0
     synthetic_nodes = []
@@ -142,11 +150,11 @@ def _segment_to_links(
         next_node_id: int,
 ) -> tuple[list, int]:
     if geom is None or geom.is_empty:
-        raise ImporterError(f"Overture segment {seg.get('id')!r} has empty geometry")
+        raise ImporterError(f"Overture segment {seg['id']!r} has empty geometry")
 
-    pairs = _parse_connectors_field(seg.get("connectors"))
+    pairs = _parse_connectors_field(seg["connectors"])
     if len(pairs) < 2:
-        raise ImporterError(f"Overture segment {seg.get('id')!r} has fewer than two connectors")
+        raise ImporterError(f"Overture segment {seg['id']!r} has fewer than two connectors")
 
     filtered_modes = filter_by_modes(_modes_for_segment(seg), requested_codes)
     if not filtered_modes:
@@ -155,7 +163,7 @@ def _segment_to_links(
     next_node_id = _ensure_connector_nodes(pairs, geom, gers_to_node, synthetic_nodes, next_node_id)
     rows = _split_segment_rows(seg, geom, pairs, gers_to_node, filtered_modes)
     if not rows:
-        raise ImporterError(f"Overture segment {seg.get('id')!r} produced no valid geometry splits")
+        raise ImporterError(f"Overture segment {seg['id']!r} produced no valid geometry splits")
     return rows, next_node_id
 
 
@@ -177,8 +185,8 @@ def _ensure_connector_nodes(pairs: list, geom, gers_to_node: dict, synthetic_nod
 def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filtered_modes: str) -> list:
     direction = _direction_for_segment(seg)
     speed_ab, speed_ba = _speeds_for_segment(seg, direction)
-    link_type = str(seg.get("class") or "unknown")
-    sid = str(seg.get("id") or "")
+    link_type = str(seg["class"] or "unknown")
+    sid = str(seg["id"] or "")
     free_attrs = _free_attrs(seg)
     rows = []
 
@@ -195,7 +203,7 @@ def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filter
                 "direction": direction,
                 "modes": filtered_modes,
                 "link_type": link_type,
-                "name": seg.get("primary_name") or seg.get("names.primary"),
+                "name": seg["primary_name"],
                 "speed_ab": speed_ab,
                 "speed_ba": speed_ba,
                 "lanes_ab": None,
@@ -225,10 +233,10 @@ def _parse_connectors_field(value) -> list:
 
 
 def _modes_for_segment(seg: dict) -> str:
-    subtype = str(seg.get("subtype") or "").lower()
+    subtype = str(seg["subtype"] or "").lower()
     if subtype in _NON_ROAD_SUBTYPES:
         return ""
-    cls = str(seg.get("class") or "").lower()
+    cls = str(seg["class"] or "").lower()
 
     out: set = set()
     if subtype in ("road", "") and cls in _MOTORISED_CLASSES:
@@ -251,7 +259,7 @@ def _modes_for_segment(seg: dict) -> str:
 
 
 def _direction_for_segment(seg: dict) -> int:
-    restrictions = seg.get("access_restrictions")
+    restrictions = seg["access_restrictions"]
     if restrictions is None:
         return 0
     has_forward_deny = False
@@ -273,7 +281,7 @@ def _direction_for_segment(seg: dict) -> int:
 
 
 def _speeds_for_segment(seg: dict, direction: int) -> tuple:
-    limits = seg.get("speed_limits")
+    limits = seg["speed_limits"]
     if limits is None:
         return (None, None)
     speed = None
@@ -317,3 +325,22 @@ def _free_attrs(seg: dict) -> dict:
         value = value.tolist() if isinstance(value, np.ndarray) else value
         out[key] = json.dumps(to_jsonable(value), default=str)
     return out
+
+
+def _normalize_connectors(connectors: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    missing = [col for col in _REQUIRED_CONNECTOR_COLS if col not in connectors.columns]
+    if missing:
+        raise ImporterError(f"Overture connectors missing required columns: {missing}")
+    return connectors.to_crs("EPSG:4326").dropna(subset=["geometry"]).reset_index(drop=True)
+
+
+def _normalize_segments(segments: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    missing = [col for col in _REQUIRED_SEGMENT_COLS if col not in segments.columns]
+    if missing:
+        raise ImporterError(f"Overture segments missing required columns: {missing}")
+    segments = segments.to_crs("EPSG:4326").copy()
+    for col, default in _OPTIONAL_SEGMENT_DEFAULTS.items():
+        if col not in segments.columns:
+            segments[col] = default
+    return segments
+

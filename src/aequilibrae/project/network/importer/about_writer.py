@@ -1,10 +1,4 @@
-"""Whole-import provenance writer that targets the ``about`` table.
-
-The importer issues no ``ALTER TABLE`` statements on ``links`` or ``nodes``.
-Whole-import metadata lives in the existing ``about`` key/value table, using
-``About.add_info_field()`` (idempotent — only adds the field if it does not
-already exist).
-"""
+"""Write network-import provenance into the project's ``about`` table."""
 
 import logging
 from datetime import datetime, timezone
@@ -48,13 +42,11 @@ class AboutWriter:
         download_cache_relpath,
     ) -> None:
         values = {
-            "network_source": str(source_meta.get("source", "")),
-            "network_source_backend": str(source_meta.get("backend", "")),
-            "network_source_url": str(source_meta.get("source_url", "")),
-            "network_source_release": str(source_meta.get("release", "") or ""),
-            "network_source_fetched_at": str(
-                source_meta.get("fetched_at", "") or datetime.now(timezone.utc).isoformat()
-            ),
+            "network_source": str(source_meta["source"]),
+            "network_source_backend": str(source_meta["backend"]),
+            "network_source_url": str(source_meta["source_url"]),
+            "network_source_release": str(source_meta["release"]),
+            "network_source_fetched_at": str(source_meta["fetched_at"] or datetime.now(timezone.utc).isoformat()),
             "network_source_modes": ",".join(modes),
             "network_source_simplify": str(simplify),
             "network_source_consolidate_tolerance": (

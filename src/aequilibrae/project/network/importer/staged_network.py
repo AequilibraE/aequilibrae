@@ -77,21 +77,34 @@ class StagedNetwork:
         ):
             a, b = int(rec["a_node"]), int(rec["b_node"])
             link_id = int(rec["link_id"])
-            attrs = {**rec, "geometry": geom}
             direction = int(rec["direction"])
+            base_source_id = _base_source_id(rec)
+            attrs_ab = {
+                **rec,
+                "geometry": geom,
+                "_source_ref": f"{base_source_id}::ab",
+                "_travel_speed": rec.get("speed_ab"),
+                "_travel_lanes": rec.get("lanes_ab"),
+            }
             if direction == 1:
-                graph.add_edge(a, b, key=link_id, **attrs)
-            elif direction == -1:
-                from shapely.geometry import LineString
-                rev_geom = LineString(geom.coords[::-1]) if geom is not None else None
-                attrs_rev = {**rec, "geometry": rev_geom}
-                graph.add_edge(b, a, key=link_id, **attrs_rev)
+                graph.add_edge(a, b, key=link_id, **attrs_ab)
+                continue
+
+            from shapely.geometry import LineString
+
+            rev_geom = LineString(geom.coords[::-1]) if geom is not None else None
+            attrs_ba = {
+                **rec,
+                "geometry": rev_geom,
+                "_source_ref": f"{base_source_id}::ba",
+                "_travel_speed": rec.get("speed_ba"),
+                "_travel_lanes": rec.get("lanes_ba"),
+            }
+            if direction == -1:
+                graph.add_edge(b, a, key=link_id, **attrs_ba)
             else:
-                graph.add_edge(a, b, key=link_id, **attrs)
-                from shapely.geometry import LineString
-                rev_geom = LineString(geom.coords[::-1]) if geom is not None else None
-                attrs_rev = {**rec, "geometry": rev_geom}
-                graph.add_edge(b, a, key=link_id, **attrs_rev)
+                graph.add_edge(a, b, key=link_id, **attrs_ab)
+                graph.add_edge(b, a, key=link_id, **attrs_ba)
         return graph
 
     @classmethod
@@ -120,3 +133,11 @@ class StagedNetwork:
         nodes_gdf = gpd.GeoDataFrame(node_records, geometry="geometry", crs=crs)
         links_gdf = gpd.GeoDataFrame(link_records, geometry="geometry", crs=crs)
         return cls(nodes=nodes_gdf, links=links_gdf, crs_geo=str(crs), source_meta=source_meta or {})
+
+
+def _base_source_id(rec: dict) -> str:
+    source_id = rec.get("source_id")
+    if source_id is None:
+        return str(rec["link_id"])
+    return str(source_id)
+

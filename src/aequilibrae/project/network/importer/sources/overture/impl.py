@@ -33,8 +33,11 @@ def acquire_cloud(
     segments_table = _fetch_table(overturemaps, "segment", bbox, release=release)
     connectors_table = _fetch_table(overturemaps, "connector", bbox, release=release)
 
-    download_cache.write_parquet("segments.parquet", segments_table)
-    download_cache.write_parquet("connectors.parquet", connectors_table)
+    segments_gdf = _table_to_gdf(segments_table)
+    connectors_gdf = _table_to_gdf(connectors_table)
+
+    download_cache.write_geoparquet("segments.parquet", segments_gdf)
+    download_cache.write_geoparquet("connectors.parquet", connectors_gdf)
     download_cache.write_manifest(
         {
             "source": "overture-cloud",
@@ -42,13 +45,11 @@ def acquire_cloud(
             "release": release,
             "bbox": list(bbox),
             "modes": list(modes),
-            "segments_rows": segments_table.num_rows,
-            "connectors_rows": connectors_table.num_rows,
+            "segments_rows": len(segments_gdf),
+            "connectors_rows": len(connectors_gdf),
         }
     )
 
-    segments_gdf = _table_to_gdf(segments_table)
-    connectors_gdf = _table_to_gdf(connectors_table)
     source_meta = {
         "source": "overture",
         "backend": "cloud",
@@ -83,12 +84,12 @@ def _fetch_table(overturemaps, theme_type: str, bbox, *, release):
 
 
 def _table_to_gdf(table) -> gpd.GeoDataFrame:
-    from shapely import from_wkb
 
     df = table.to_pandas(use_threads=True)
-    if "geometry" in df.columns:
-        df["geometry"] = df["geometry"].apply(lambda v: from_wkb(v) if v is not None else None)
-    return gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
+    if "geometry" not in df.columns:
+        raise ImporterError("Overture table must contain a geometry column")
+    df["geometry"] = gpd.GeoSeries.from_wkb(df["geometry"], crs="EPSG:4326")
+    return gpd.GeoDataFrame(df, geometry="geometry")
 
 
 def _overture_url(release) -> str:

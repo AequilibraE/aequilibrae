@@ -32,7 +32,10 @@ def _make_segments_table():
                 ],
             ],
             "speed_limits": [None, [{"max_speed": {"value": 50, "unit": "km/h"}, "between": None, "when": None}]],
-            "access_restrictions": [None, None],
+            "access_restrictions": [
+                None,
+                [{"access_type": "denied", "when": {"heading": "backward"}, "heading": None}],
+            ],
         }
     )
 
@@ -107,7 +110,38 @@ def test_overture_speed_limit_parsed(empty_project, monkeypatch):
         rows = list(conn.execute("SELECT speed_ab, speed_ba, link_type FROM links WHERE link_type='primary'"))
     assert rows
     for speed_ab, speed_ba, _link_type in rows:
-        assert speed_ab == 50.0 or speed_ba == 50.0
+        assert speed_ab == 50.0
+        assert speed_ba is None
+
+
+def test_overture_direction_inferred_from_access_restrictions(empty_project, monkeypatch):
+    _install_mock(monkeypatch)
+    empty_project.network.import_from_overture(
+        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
+        modes=("car",),
+        simplify=False,
+    )
+    with sqlite3.connect(empty_project.path_to_file) as conn:
+        directions = [
+            row[0] for row in conn.execute("SELECT direction FROM links WHERE link_type='primary' ORDER BY link_id")
+        ]
+    assert directions == [1, 1]
+
+
+def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(empty_project, monkeypatch):
+    _install_mock(monkeypatch)
+    empty_project.network.import_from_overture(
+        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
+        modes=("car",),
+        simplify=False,
+    )
+    with sqlite3.connect(empty_project.path_to_file) as conn:
+        rows = list(conn.execute("SELECT other_attributes FROM links WHERE link_type='primary'"))
+    assert rows
+    for (other_attributes,) in rows:
+        payload = json.loads(other_attributes) if other_attributes else {}
+        assert "lanes_ab" not in payload
+        assert "lanes_ba" not in payload
 
 
 def test_overture_rule_arrays_land_in_other_attributes(empty_project, monkeypatch):

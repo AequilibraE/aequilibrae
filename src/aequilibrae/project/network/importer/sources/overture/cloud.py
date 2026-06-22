@@ -1,4 +1,3 @@
-"""``OvertureCloudSource``: Overture Maps transportation theme via the official client."""
 
 from typing import ClassVar
 

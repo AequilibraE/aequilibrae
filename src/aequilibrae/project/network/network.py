@@ -120,7 +120,14 @@ class Network(WorkerThread):
         cache_tag: str = "",
         **source_kwargs,
     ) -> None:
-        """Import from ``osm-overpass``, ``osm-pbf``, or ``overture-cloud``."""
+        """Import from ``osm-overpass``, ``osm-pbf``, or ``overture-cloud``.
+
+        ``simplify="osmnx"`` is the safer choice when you want merged links to
+        retain coarse forward/backward speed and lane data. ``simplify="neatnet"``
+        is better at removing geometric artifacts such as roundabouts and false
+        intersection faces, but it may collapse parallel one-way carriageways into
+        a single coarse link.
+        """
         from aequilibrae.project.network.importer.importer import NetworkImporter
 
         NetworkImporter(self.project).run(
@@ -148,6 +155,11 @@ class Network(WorkerThread):
         Exactly one of ``model_area``, ``place_name``, ``pbf_path`` must be
         provided. XML / .osm / .osm.bz2 is not supported — convert with
         ``osmium cat in.osm -o out.osm.pbf`` first.
+
+        For ``simplify``, prefer ``"osmnx"`` when directional speed/lane fields
+        matter after merging. Prefer ``"neatnet"`` when cleaning roundabouts and
+        other geometric artifacts matters more than preserving separate parallel
+        carriageways.
         """
         provided = sum(x is not None for x in (model_area, place_name, pbf_path))
         if provided != 1:
@@ -183,7 +195,12 @@ class Network(WorkerThread):
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
     ) -> None:
-        """Import a network from Overture Maps (cloud backend; rule arrays always preserved)."""
+        """Import a network from Overture Maps.
+
+        Rule arrays are always preserved. For ``simplify``, ``"osmnx"`` keeps
+        coarse directional link attributes more predictably, while ``"neatnet"``
+        is stronger at artifact cleanup but may merge parallel one-way carriageways.
+        """
         if model_area is None:
             raise ValueError("import_from_overture requires a `model_area` Polygon")
         bounds = model_area.bounds

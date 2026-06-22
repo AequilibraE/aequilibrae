@@ -1,4 +1,3 @@
-"""``OSMPbfSource``: OSM via a local .osm.pbf file using pyrosm."""
 
 from pathlib import Path
 from typing import ClassVar

@@ -2,35 +2,51 @@ import geopandas as gpd
 import logging
 import numpy as np
 import shapely
+import warnings
 from shapely.geometry import Point
 
+from aequilibrae.project.network.importer.simplifiers.impl_osmnx import (
+    _build_oriented_source_attr_map,
+    _build_provenance,
+    _build_source_attr_map,
+)
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_node_modes
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
 
+_DUAL_CARRIAGEWAY_WARNING = (
+    "neatnet simplification may collapse parallel one-way carriageways into a single coarse link. "
+    "When that happens, direction, speed, and lane fields are reconstructed heuristically after simplification."
+)
+_PROVENANCE_OUT_COL = "source_ids"
+_SOURCE_ID_COL = "source_id"
+_SOURCE_REFS_TMP_COL = "_source_refs"
 
-def run_neatnet_simplify(net: StagedNetwork, **_) -> StagedNetwork:
+
+def run_neatnet_simplify(net: StagedNetwork, *, exclusion_mask=None, **_) -> StagedNetwork:
     require("neatnet", feature="neatnet simplification")
-    import warnings
 
     import neatnet
+
+    warnings.warn(_DUAL_CARRIAGEWAY_WARNING, UserWarning, stacklevel=2)
+    logger.warning(_DUAL_CARRIAGEWAY_WARNING)
 
     if len(net.links) == 0:
         return net
 
     edges = net.links.copy()
     utm = edges.geometry.estimate_utm_crs()
-
-    # Strip all non-geometry columns before passing to neatnet so it cannot
-    # mangle AequilibraE-specific attributes (direction, modes, …) during
-    # edge merging.  Keep only the geometry for the simplifier.
     geom_only = gpd.GeoDataFrame(geometry=edges.geometry, crs=edges.crs).to_crs(utm)
+
+    neatify_kwargs = {}
+    if exclusion_mask is not None:
+        neatify_kwargs["exclusion_mask"] = exclusion_mask.to_crs(utm).geometry
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="neatnet")
-        simplified = neatnet.neatify(geom_only).to_crs("EPSG:4326")
+        simplified = neatnet.neatify(geom_only, **neatify_kwargs).to_crs("EPSG:4326")
 
     return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta)
 
@@ -44,7 +60,6 @@ def _gdf_to_staged(
     if edges.crs is None:
         edges = edges.set_crs("EPSG:4326")
 
-    # ---- Build topology (nodes from endpoints) ----
     coords, indices = shapely.get_coordinates(edges.geometry, return_index=True)
     last_pos = np.searchsorted(indices, np.arange(len(edges)), side="right") - 1
     first_pos = np.searchsorted(indices, np.arange(len(edges)), side="left")
@@ -68,19 +83,16 @@ def _gdf_to_staged(
     edges["b_node"] = b_nodes
     edges["link_id"] = np.arange(1, len(edges) + 1, dtype=np.int64)
 
-    # ---- Spatial matching: recover attributes from original network ----
     _transfer_attributes(edges, original_links)
 
-    # ---- Distance (always recompute from geometry) ----
     utm = edges.geometry.estimate_utm_crs()
     edges["distance"] = edges.geometry.to_crs(utm).length.astype(float)
 
-    # ---- Nodes ----
     nodes = gpd.GeoDataFrame(
         {
             "node_id": list(endpoints.values()),
             "geometry": [Point(x, y) for x, y in endpoints],
-            "modes": "c",  # placeholder, overwritten below
+            "modes": "c",
         },
         geometry="geometry",
         crs="EPSG:4326",
@@ -94,15 +106,12 @@ _BUFFER_DIST = 25.0  # metres – search radius for matching original edges
 
 
 def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame) -> None:
-    """Match each simplified edge to nearby originals and aggregate attributes.
-
-    Dual carriageways (two opposing one-way links) are detected and merged
-    into a single bidirectional link with correct per-direction speed and
-    lane values.
-    """
+    """Match each simplified edge to nearby originals and aggregate attributes."""
     utm = simplified.geometry.estimate_utm_crs()
     simp_geoms = simplified.geometry.to_crs(utm).values
     orig_geoms = original.geometry.to_crs(utm).values
+    src_attrs = _build_source_attr_map(original)
+    oriented_src_attrs = _build_oriented_source_attr_map(original)
 
     tree = shapely.STRtree(orig_geoms)
 
@@ -115,16 +124,15 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     speed_ba = [None] * n
     lanes_ab = [None] * n
     lanes_ba = [None] * n
+    primary_source_ids = [None] * n
+    provenance = [None] * n
+    source_refs = [[] for _ in range(n)]
 
-    # Pre-extract original columns as arrays for fast indexing
-    orig_dir = original["direction"].values if "direction" in original.columns else np.zeros(len(original), dtype=int)
-    orig_modes = original["modes"].values if "modes" in original.columns else np.full(len(original), "c")
-    orig_lt = original["link_type"].values if "link_type" in original.columns else np.full(len(original), "unknown")
-    orig_name = original["name"].values if "name" in original.columns else np.full(len(original), None, dtype=object)
-    orig_spd_ab = original["speed_ab"].values if "speed_ab" in original.columns else np.full(len(original), None, dtype=object)
-    orig_spd_ba = original["speed_ba"].values if "speed_ba" in original.columns else np.full(len(original), None, dtype=object)
-    orig_ln_ab = original["lanes_ab"].values if "lanes_ab" in original.columns else np.full(len(original), None, dtype=object)
-    orig_ln_ba = original["lanes_ba"].values if "lanes_ba" in original.columns else np.full(len(original), None, dtype=object)
+    orig_dir = original["direction"].to_numpy()
+    orig_modes = original["modes"].to_numpy()
+    orig_lt = original["link_type"].to_numpy()
+    orig_name = original["name"].to_numpy()
+    orig_source_ids = original[_SOURCE_ID_COL].astype(str).to_numpy()
 
     for i in range(n):
         sg = simp_geoms[i]
@@ -132,33 +140,32 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
         if len(hits) == 0:
             hits = np.array([tree.nearest(sg)])
 
-        # Classify each hit as contributing forward (a→b) or backward (b→a)
-        # flow relative to the *simplified* edge, based on geometric alignment
-        # and the original link's direction.
-        #   aligned + dir=1  → forward flow    aligned + dir=-1 → backward flow
-        #   anti    + dir=1  → backward flow   anti    + dir=-1 → forward flow
-        #   dir=0            → both flows (regardless of alignment)
-        fwd_candidates = []  # (orig_idx, distance, aligned)
-        bwd_candidates = []  # (orig_idx, distance, aligned)
+        fwd_candidates = []
+        bwd_candidates = []
 
         for oidx in hits:
             aligned = _is_forward_aligned(sg, orig_geoms[oidx])
             d = int(orig_dir[oidx])
             dist = float(sg.distance(orig_geoms[oidx]))
+            base_id = orig_source_ids[oidx]
 
             if d == 0:
-                fwd_candidates.append((oidx, dist, aligned))
-                bwd_candidates.append((oidx, dist, aligned))
+                if aligned:
+                    fwd_candidates.append((f"{base_id}::ab", dist))
+                    bwd_candidates.append((f"{base_id}::ba", dist))
+                else:
+                    fwd_candidates.append((f"{base_id}::ba", dist))
+                    bwd_candidates.append((f"{base_id}::ab", dist))
             elif d == 1:
                 if aligned:
-                    fwd_candidates.append((oidx, dist, True))
+                    fwd_candidates.append((f"{base_id}::ab", dist))
                 else:
-                    bwd_candidates.append((oidx, dist, False))
+                    bwd_candidates.append((f"{base_id}::ab", dist))
             elif d == -1:
                 if aligned:
-                    bwd_candidates.append((oidx, dist, True))
+                    bwd_candidates.append((f"{base_id}::ba", dist))
                 else:
-                    fwd_candidates.append((oidx, dist, False))
+                    fwd_candidates.append((f"{base_id}::ba", dist))
 
         has_fwd = len(fwd_candidates) > 0
         has_bwd = len(bwd_candidates) > 0
@@ -169,14 +176,16 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
             directions[i] = 1
         elif has_bwd:
             directions[i] = -1
-        # else stays 0 (default)
-
-        # Scalar attributes from the single nearest original
         nearest_oidx = int(tree.nearest(sg))
         link_types[i] = str(orig_lt[nearest_oidx])
         names[i] = orig_name[nearest_oidx]
 
-        # Modes: union across all matched originals
+        ordered_refs = _unique_source_refs(fwd_candidates + bwd_candidates)
+        source_refs[i] = ordered_refs
+        ordered_source_ids = _ordered_source_ids(ordered_refs)
+        primary_source_ids[i] = ordered_source_ids[0] if ordered_source_ids else orig_source_ids[nearest_oidx]
+        provenance[i] = _build_provenance(ordered_source_ids, src_attrs)
+
         all_modes: set = set()
         for oidx in hits:
             m = orig_modes[oidx]
@@ -184,26 +193,13 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
                 all_modes.update(m)
         modes_arr[i] = "".join(sorted(all_modes)) or "c"
 
-        # Speed / lanes from closest contributor in each direction.
-        # When aligned:      ab(orig) → ab(simp),  ba(orig) → ba(simp)
-        # When anti-aligned:  ba(orig) → ab(simp),  ab(orig) → ba(simp)
         if fwd_candidates:
-            oidx, _, aligned = min(fwd_candidates, key=lambda t: t[1])
-            if aligned:
-                speed_ab[i] = orig_spd_ab[oidx]
-                lanes_ab[i] = orig_ln_ab[oidx]
-            else:
-                speed_ab[i] = orig_spd_ba[oidx]
-                lanes_ab[i] = orig_ln_ba[oidx]
+            speed_ab[i] = _nearest_oriented_value(fwd_candidates, oriented_src_attrs, "speed")
+            lanes_ab[i] = _nearest_oriented_value(fwd_candidates, oriented_src_attrs, "lanes")
 
         if bwd_candidates:
-            oidx, _, aligned = min(bwd_candidates, key=lambda t: t[1])
-            if aligned:
-                speed_ba[i] = orig_spd_ba[oidx]
-                lanes_ba[i] = orig_ln_ba[oidx]
-            else:
-                speed_ba[i] = orig_spd_ab[oidx]
-                lanes_ba[i] = orig_ln_ab[oidx]
+            speed_ba[i] = _nearest_oriented_value(bwd_candidates, oriented_src_attrs, "speed")
+            lanes_ba[i] = _nearest_oriented_value(bwd_candidates, oriented_src_attrs, "lanes")
 
     simplified["direction"] = directions
     simplified["modes"] = modes_arr
@@ -213,16 +209,45 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     simplified["speed_ba"] = speed_ba
     simplified["lanes_ab"] = lanes_ab
     simplified["lanes_ba"] = lanes_ba
+    simplified[_SOURCE_ID_COL] = primary_source_ids
+    simplified[_PROVENANCE_OUT_COL] = provenance
+    simplified[_SOURCE_REFS_TMP_COL] = source_refs
 
 
 def _is_forward_aligned(geom_a, geom_b) -> bool:
-    """True if *geom_b* flows roughly in the same direction as *geom_a*.
-
-    Compares the start→end direction vectors using a dot-product sign test.
-    """
+    """Return whether ``geom_b`` flows roughly in the same direction as ``geom_a``."""
     ca = geom_a.coords
     cb = geom_b.coords
     va = (ca[-1][0] - ca[0][0], ca[-1][1] - ca[0][1])
     vb = (cb[-1][0] - cb[0][0], cb[-1][1] - cb[0][1])
     return (va[0] * vb[0] + va[1] * vb[1]) >= 0
+
+
+def _nearest_oriented_value(candidates: list[tuple[str, float]], oriented_src_attrs: dict, field: str):
+    for source_ref, _dist in sorted(candidates, key=lambda item: item[1]):
+        value = oriented_src_attrs.get(source_ref, {}).get(field)
+        if value is not None:
+            return value
+    return None
+
+
+def _unique_source_refs(candidates: list[tuple[str, float]]) -> list[str]:
+    seen = set()
+    ordered = []
+    for source_ref, _dist in sorted(candidates, key=lambda item: item[1]):
+        if source_ref in seen:
+            continue
+        seen.add(source_ref)
+        ordered.append(source_ref)
+    return ordered
+
+
+def _ordered_source_ids(source_refs: list[str]) -> list[str]:
+    source_ids = []
+    for source_ref in source_refs:
+        source_id, _sep, _suffix = source_ref.partition("::")
+        if source_id and source_id not in source_ids:
+            source_ids.append(source_id)
+    return source_ids
+
 

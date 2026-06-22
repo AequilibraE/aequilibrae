@@ -1,4 +1,3 @@
-"""``OSMOverpassSource``: OSM via Overpass + osmnx."""
 
 from typing import ClassVar
 

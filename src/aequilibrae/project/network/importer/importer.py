@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
+from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.simplifiers.base import resolve_simplifier
 from aequilibrae.project.network.importer.sources.base import resolve_source
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
@@ -10,6 +11,17 @@ if TYPE_CHECKING:
     from aequilibrae.project import Project
 
 logger = logging.getLogger(__name__)
+
+_LINK_DEFAULTS = {
+    "name": None,
+    "speed_ab": None,
+    "speed_ba": None,
+    "lanes_ab": None,
+    "lanes_ba": None,
+    "source_id": None,
+}
+_NODE_DEFAULTS = {"source_id": None}
+_SOURCE_META_KEYS = ("source", "backend", "source_url", "fetched_at", "release")
 
 
 def _default_modes():
@@ -47,6 +59,8 @@ class NetworkImporter:
         logger.info("Data download started")
         net: StagedNetwork = source_obj.acquire(modes=modes_tuple, download_cache=download_cache)
         logger.info("Data download finished")
+        _normalize_importer_columns(net)
+        _normalize_source_meta(net)
         net.validate()
         logger.info(f"Acquired {len(net.nodes)} nodes and {len(net.links)} links")
 
@@ -56,6 +70,12 @@ class NetworkImporter:
             simplify_kwargs = {}
             if consolidate_tolerance is not None and simplifier_obj.name == "osmnx":
                 simplify_kwargs["consolidate_tolerance"] = consolidate_tolerance
+            if simplifier_obj.name == "neatnet":
+                from aequilibrae.project.network.importer.buildings import fetch_building_footprints
+
+                buildings_gdf = fetch_building_footprints(net, download_cache)
+                if buildings_gdf is not None:
+                    simplify_kwargs["exclusion_mask"] = buildings_gdf
             net = simplifier_obj.simplify(net, **simplify_kwargs)
             net.validate()
             logger.info(f"After simplification: {len(net.nodes)} nodes, {len(net.links)} links")
@@ -73,3 +93,24 @@ class NetworkImporter:
         SpatialiteWriter(self.project).write(net)
         logger.info("Saving to the database finished")
         logger.info("Network build complete")
+
+
+def _normalize_importer_columns(net: StagedNetwork) -> None:
+    for column, default in _NODE_DEFAULTS.items():
+        if column not in net.nodes.columns:
+            net.nodes[column] = default
+    for column, default in _LINK_DEFAULTS.items():
+        if column not in net.links.columns:
+            net.links[column] = default
+
+
+def _normalize_source_meta(net: StagedNetwork) -> None:
+    if not isinstance(net.source_meta, dict):
+        raise ImporterError("StagedNetwork.source_meta must be a dict")
+
+    missing = [key for key in _SOURCE_META_KEYS[:-1] if key not in net.source_meta]
+    if missing:
+        raise ImporterError(f"StagedNetwork.source_meta missing required keys: {missing}")
+
+    net.source_meta = {key: net.source_meta.get(key, "") for key in _SOURCE_META_KEYS}
+
