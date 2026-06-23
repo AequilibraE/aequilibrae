@@ -23,6 +23,10 @@ _FIELDS = (
     "network_source_consolidate_tolerance",
     "network_source_download_cache",
     "network_source_aequilibrae_version",
+    "network_source_building_mask_status",
+    "network_source_building_mask_attempted",
+    "network_source_building_mask_retries",
+    "network_source_building_mask_reason",
 )
 
 
@@ -54,6 +58,10 @@ class AboutWriter:
             ),
             "network_source_download_cache": ("" if download_cache_relpath is None else download_cache_relpath),
             "network_source_aequilibrae_version": str(_aequilibrae_version),
+            "network_source_building_mask_status": str(source_meta.get("building_mask_status", "")),
+            "network_source_building_mask_attempted": str(source_meta.get("building_mask_attempted", "")),
+            "network_source_building_mask_retries": str(source_meta.get("building_mask_retries", "")),
+            "network_source_building_mask_reason": str(source_meta.get("building_mask_reason", "")),
         }
 
         about = self.project.about

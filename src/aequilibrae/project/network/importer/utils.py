@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 
 NODE_ID_START = 100000
@@ -46,7 +48,29 @@ def _geodesic_lengths(geoms) -> "pd.Series":
 _ALIGNMENT_SAMPLES = 16
 
 
-def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES) -> bool:
+def bearing_degrees(start, end) -> float:
+    return math.degrees(math.atan2(float(end[1]) - float(start[1]), float(end[0]) - float(start[0])))
+
+
+def angular_difference_degrees(a: float, b: float) -> float:
+    return abs((a - b + 180.0) % 360.0 - 180.0)
+
+
+def line_straightness(geom) -> float:
+    """Chord/length ratio in [0, 1]; 1 means perfectly straight."""
+    if geom is None or getattr(geom, "is_empty", False):
+        return 1.0
+    coords = geom.coords
+    if len(coords) < 2:
+        return 1.0
+    chord = math.hypot(coords[-1][0] - coords[0][0], coords[-1][1] - coords[0][1])
+    length = float(getattr(geom, "length", 0.0))
+    if length <= 0.0:
+        return 1.0
+    return max(0.0, min(1.0, chord / length))
+
+
+def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES, metrics: dict | None = None) -> bool:
     """Whether ``geom_b`` traces roughly the same directed path as ``geom_a``.
 
     The legacy implementation compared the *global* start->end vectors of the two
@@ -67,6 +91,9 @@ def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES) ->
     if getattr(geom_a, "is_empty", False) or getattr(geom_b, "is_empty", False):
         return True
 
+    from time import perf_counter
+
+    start = perf_counter()
     fractions = [i / samples for i in range(samples + 1)]
     pts_a = [geom_a.interpolate(f, normalized=True) for f in fractions]
     pts_b = [geom_b.interpolate(f, normalized=True) for f in fractions]
@@ -76,7 +103,11 @@ def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES) ->
     for k in range(samples + 1):
         forward_err += pts_a[k].distance(pts_b[k])
         reverse_err += pts_a[k].distance(pts_b[samples - k])
-    return forward_err <= reverse_err
+    result = forward_err <= reverse_err
+    if metrics is not None:
+        metrics["aligned_calls"] = int(metrics.get("aligned_calls", 0)) + 1
+        metrics["aligned_time_s"] = float(metrics.get("aligned_time_s", 0.0)) + (perf_counter() - start)
+    return result
 
 
 def compute_node_modes(node_ids, links: pd.DataFrame, fallback: str = "") -> list:

@@ -14,8 +14,11 @@ from aequilibrae.project.network.importer.staged_network import StagedNetwork
 from aequilibrae.project.network.importer.utils import (
     NODE_ID_START,
     aligned_along_geometry,
+    angular_difference_degrees,
+    bearing_degrees,
     compute_lengths,
     compute_node_modes,
+    line_straightness,
 )
 from aequilibrae.utils.optional_dependency import require
 
@@ -28,9 +31,13 @@ _DUAL_CARRIAGEWAY_WARNING = (
 _PROVENANCE_OUT_COL = "source_ids"
 _SOURCE_ID_COL = "source_id"
 _SOURCE_REFS_TMP_COL = "_source_refs"
+_BEARING_MAX_DIFF_DEGREES = 35.0
+_STRAIGHTNESS_THRESHOLD = 0.97
+_DEKINK_MAX_POINTS = 3
+_DEKINK_MIN_TURN_DEGREES = 40.0
 
 
-def run_neatnet_simplify(net: StagedNetwork, *, exclusion_mask=None, **_) -> StagedNetwork:
+def run_neatnet_simplify(net: StagedNetwork, *, exclusion_mask=None, metrics=None, **_) -> StagedNetwork:
     require("neatnet", feature="neatnet simplification")
 
     import neatnet
@@ -49,17 +56,23 @@ def run_neatnet_simplify(net: StagedNetwork, *, exclusion_mask=None, **_) -> Sta
     if exclusion_mask is not None:
         neatify_kwargs["exclusion_mask"] = exclusion_mask.to_crs(utm).geometry
 
+    from time import perf_counter
+
+    t0 = perf_counter()
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="neatnet")
         simplified = neatnet.neatify(geom_only, **neatify_kwargs).to_crs("EPSG:4326")
+    if metrics is not None:
+        metrics["neatify_time_s"] = perf_counter() - t0
 
-    return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta)
+    return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta, metrics=metrics)
 
 
 def _gdf_to_staged(
     edges_gdf: gpd.GeoDataFrame,
     original_links: gpd.GeoDataFrame,
     source_meta: dict,
+    metrics: dict | None = None,
 ) -> StagedNetwork:
     edges = edges_gdf.copy().reset_index(drop=True)
     if edges.crs is None:
@@ -88,7 +101,8 @@ def _gdf_to_staged(
     edges["b_node"] = b_nodes
     edges["link_id"] = np.arange(1, len(edges) + 1, dtype=np.int64)
 
-    _transfer_attributes(edges, original_links)
+    _transfer_attributes(edges, original_links, metrics=metrics)
+    edges["geometry"] = [_dekink_endpoints_local(geom) for geom in edges.geometry]
 
     edges["distance"] = compute_lengths(edges.geometry).to_numpy()
 
@@ -109,8 +123,11 @@ def _gdf_to_staged(
 _BUFFER_DIST = 25.0  # metres – search radius for matching original edges
 
 
-def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame) -> None:
+def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame, metrics: dict | None = None) -> None:
     """Match each simplified edge to nearby originals and aggregate attributes."""
+    from time import perf_counter
+
+    t0 = perf_counter()
     utm = simplified.geometry.estimate_utm_crs()
     simp_geoms = simplified.geometry.to_crs(utm).values
     orig_geoms = original.geometry.to_crs(utm).values
@@ -137,46 +154,47 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     orig_lt = original["link_type"].to_numpy()
     orig_name = original["name"].to_numpy()
     orig_source_ids = original[_SOURCE_ID_COL].astype(str).to_numpy()
+    orig_straightness = np.array([line_straightness(g) for g in orig_geoms], dtype=float)
+
+    raw_hit_counts = []
+    reduced_counts = []
+    bearing_counts = []
+    fallback_counts = []
 
     for i in range(n):
         sg = simp_geoms[i]
         hits = tree.query(sg.buffer(_BUFFER_DIST))
         if len(hits) == 0:
             hits = np.array([tree.nearest(sg)])
-
-        fwd_candidates = []
-        bwd_candidates = []
-        contributing_oidx: list[int] = []
+        raw_hit_counts.append(int(len(hits)))
 
         nearest_oidx = int(tree.nearest(sg))
         nearest_lt = str(orig_lt[nearest_oidx])
+        simp_summary = _geometry_summary(sg)
 
-        for oidx in hits:
-            if not _link_type_compatible(nearest_lt, str(orig_lt[oidx])):
-                continue
-            aligned = _is_forward_aligned(sg, orig_geoms[oidx])
-            d = int(orig_dir[oidx])
-            dist = float(sg.distance(orig_geoms[oidx]))
-            base_id = orig_source_ids[oidx]
-            contributing_oidx.append(int(oidx))
+        compatible = [int(oidx) for oidx in hits if _link_type_compatible(nearest_lt, str(orig_lt[oidx]))]
+        reduced = _reduce_candidates_by_overlap(sg, orig_geoms, compatible)
+        reduced_counts.append(int(len(reduced)))
 
-            if d == 0:
-                if aligned:
-                    fwd_candidates.append((f"{base_id}::ab", dist))
-                    bwd_candidates.append((f"{base_id}::ba", dist))
-                else:
-                    fwd_candidates.append((f"{base_id}::ba", dist))
-                    bwd_candidates.append((f"{base_id}::ab", dist))
-            elif d == 1:
-                if aligned:
-                    fwd_candidates.append((f"{base_id}::ab", dist))
-                else:
-                    bwd_candidates.append((f"{base_id}::ab", dist))
-            elif d == -1:
-                if aligned:
-                    bwd_candidates.append((f"{base_id}::ba", dist))
-                else:
-                    fwd_candidates.append((f"{base_id}::ba", dist))
+        (
+            fwd_candidates,
+            bwd_candidates,
+            contributing_oidx,
+            bearing_direct,
+            fallback,
+        ) = _classify_candidates(
+            reduced=reduced,
+            simp_geom=sg,
+            simp_summary=simp_summary,
+            orig_geoms=orig_geoms,
+            orig_straightness=orig_straightness,
+            orig_dir=orig_dir,
+            orig_source_ids=orig_source_ids,
+            metrics=metrics,
+        )
+
+        bearing_counts.append(bearing_direct)
+        fallback_counts.append(fallback)
 
         has_fwd = len(fwd_candidates) > 0
         has_bwd = len(bwd_candidates) > 0
@@ -196,10 +214,6 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
         primary_source_ids[i] = ordered_source_ids[0] if ordered_source_ids else orig_source_ids[nearest_oidx]
         provenance[i] = _build_provenance(ordered_source_ids, src_attrs)
 
-        # Only inherit modes from originals that actually contributed as
-        # aligned, link-type-compatible candidates. A naive union over every
-        # geometry within the buffer would let a nearby sidewalk or cycleway
-        # bleed walk/bike modes onto an unrelated highway.
         all_modes: set = set()
         for oidx in contributing_oidx:
             m = orig_modes[oidx]
@@ -230,6 +244,13 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     simplified[_SOURCE_ID_COL] = primary_source_ids
     simplified[_PROVENANCE_OUT_COL] = provenance
     simplified[_SOURCE_REFS_TMP_COL] = source_refs
+
+    if metrics is not None:
+        metrics["transfer_time_s"] = perf_counter() - t0
+        metrics["raw_hit_counts"] = raw_hit_counts
+        metrics["reduced_candidate_counts"] = reduced_counts
+        metrics["bearing_direct_counts"] = bearing_counts
+        metrics["fallback_alignment_counts"] = fallback_counts
 
 
 # Highway classes grouped by function. Modes are only inherited between
@@ -281,9 +302,138 @@ def _link_type_compatible(reference: str, candidate: str) -> bool:
     return ref_family is cand_family
 
 
-def _is_forward_aligned(geom_a, geom_b) -> bool:
+def _geometry_summary(geom) -> dict:
+    coords = geom.coords
+    start = coords[0]
+    end = coords[-1]
+    return {
+        "start": start,
+        "end": end,
+        "bearing": bearing_degrees(start, end),
+        "straightness": line_straightness(geom),
+        "length": float(geom.length),
+    }
+
+
+def _reduce_candidates_by_overlap(simplified_geom, orig_geoms, compatible: list[int]) -> list[tuple[int, float]]:
+    if not compatible:
+        return []
+    simp_buffer = simplified_geom.buffer(_BUFFER_DIST)
+    scored = []
+    for oidx in compatible:
+        og = orig_geoms[oidx]
+        overlap = simp_buffer.intersection(og).length if simp_buffer.intersects(og) else 0.0
+        dist = float(simplified_geom.distance(og))
+        scored.append((oidx, overlap, dist))
+    scored.sort(key=lambda item: (-item[1], item[2]))
+    return [(oidx, dist) for oidx, _overlap, dist in scored[: min(5, len(scored))]]
+
+
+def _classify_candidates(
+    *,
+    reduced: list[tuple[int, float]],
+    simp_geom,
+    simp_summary: dict,
+    orig_geoms,
+    orig_straightness,
+    orig_dir,
+    orig_source_ids,
+    metrics: dict | None,
+):
+    fwd_candidates = []
+    bwd_candidates = []
+    contributing_oidx: list[int] = []
+    bearing_direct = 0
+    fallback = 0
+
+    for oidx, dist in reduced:
+        orientation = _classify_orientation_fast(simp_summary, orig_geoms[oidx], orig_straightness[oidx])
+        if orientation is None:
+            fallback += 1
+            orientation = _is_forward_aligned(simp_geom, orig_geoms[oidx], metrics=metrics)
+        else:
+            bearing_direct += 1
+
+        d = int(orig_dir[oidx])
+        base_id = orig_source_ids[oidx]
+        contributing_oidx.append(int(oidx))
+
+        if d == 0:
+            if orientation:
+                fwd_candidates.append((f"{base_id}::ab", dist))
+                bwd_candidates.append((f"{base_id}::ba", dist))
+            else:
+                fwd_candidates.append((f"{base_id}::ba", dist))
+                bwd_candidates.append((f"{base_id}::ab", dist))
+        elif d == 1:
+            if orientation:
+                fwd_candidates.append((f"{base_id}::ab", dist))
+            else:
+                bwd_candidates.append((f"{base_id}::ab", dist))
+        elif d == -1:
+            if orientation:
+                bwd_candidates.append((f"{base_id}::ba", dist))
+            else:
+                fwd_candidates.append((f"{base_id}::ba", dist))
+
+    return fwd_candidates, bwd_candidates, contributing_oidx, bearing_direct, fallback
+
+
+def _classify_orientation_fast(simp_summary: dict, orig_geom, orig_straightness: float) -> bool | None:
+    orig_summary = _geometry_summary(orig_geom)
+    if simp_summary["straightness"] < _STRAIGHTNESS_THRESHOLD or orig_straightness < _STRAIGHTNESS_THRESHOLD:
+        return None
+
+    same_cost = shapely.Point(simp_summary["start"]).distance(shapely.Point(orig_summary["start"])) + shapely.Point(
+        simp_summary["end"]
+    ).distance(shapely.Point(orig_summary["end"]))
+    rev_cost = shapely.Point(simp_summary["start"]).distance(shapely.Point(orig_summary["end"])) + shapely.Point(
+        simp_summary["end"]
+    ).distance(shapely.Point(orig_summary["start"]))
+    bearing_fwd = angular_difference_degrees(simp_summary["bearing"], orig_summary["bearing"])
+    bearing_rev = angular_difference_degrees(simp_summary["bearing"], (orig_summary["bearing"] + 180.0) % 360.0)
+
+    if same_cost < rev_cost and bearing_fwd <= _BEARING_MAX_DIFF_DEGREES:
+        return True
+    if rev_cost < same_cost and bearing_rev <= _BEARING_MAX_DIFF_DEGREES:
+        return False
+    return None
+
+
+def _is_forward_aligned(geom_a, geom_b, metrics: dict | None = None) -> bool:
     """Return whether ``geom_b`` flows roughly in the same direction as ``geom_a``."""
-    return aligned_along_geometry(geom_a, geom_b)
+    return aligned_along_geometry(geom_a, geom_b, metrics=metrics)
+
+
+def _dekink_endpoints_local(geom):
+    if geom is None or getattr(geom, "is_empty", False):
+        return geom
+    coords = list(geom.coords)
+    if len(coords) < 4:
+        return geom
+
+    coords = _prune_endpoint_kinks(coords, reverse=False)
+    coords = _prune_endpoint_kinks(coords, reverse=True)
+    return shapely.LineString(coords)
+
+
+def _prune_endpoint_kinks(coords: list, *, reverse: bool) -> list:
+    work = list(reversed(coords)) if reverse else list(coords)
+    max_steps = min(_DEKINK_MAX_POINTS, len(work) - 3)
+    for _ in range(max_steps):
+        if len(work) < 4:
+            break
+        a, b, c = work[0], work[1], work[2]
+        ang1 = bearing_degrees(a, b)
+        ang2 = bearing_degrees(b, c)
+        if angular_difference_degrees(ang1, ang2) < _DEKINK_MIN_TURN_DEGREES:
+            break
+        trial = [work[0]] + work[2:]
+        if shapely.LineString(trial).is_simple:
+            work = trial
+        else:
+            break
+    return list(reversed(work)) if reverse else work
 
 
 def _nearest_oriented_value(candidates: list[tuple[str, float]], oriented_src_attrs: dict, field: str):

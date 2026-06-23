@@ -3,7 +3,7 @@
 import geopandas as gpd
 from shapely.geometry import LineString, Point
 
-from aequilibrae.project.network.importer.buildings import fetch_building_footprints
+from aequilibrae.project.network.importer.buildings import BuildingMaskResult, fetch_building_footprints
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
@@ -39,11 +39,43 @@ def _net(span_degrees):
     return StagedNetwork(nodes=nodes, links=links)
 
 
-def test_buildings_disabled_by_default():
-    assert fetch_building_footprints(_net(0.1), _DummyCache()) is None
+def test_buildings_disabled_explicitly():
+    result = fetch_building_footprints(_net(0.1), _DummyCache(), enabled=False)
+    assert isinstance(result, BuildingMaskResult)
+    assert result.gdf is None
+    assert result.status == "disabled"
+    assert result.attempted is False
 
 
 def test_buildings_skipped_for_large_bbox_even_when_enabled():
-    # Span well above the limit must skip the download (returns None) without
-    # ever importing overturemaps.
-    assert fetch_building_footprints(_net(5.0), _DummyCache(), enabled=True) is None
+    # Span well above the limit must skip the download without ever importing overturemaps.
+    result = fetch_building_footprints(_net(5.0), _DummyCache(), enabled=True)
+    assert result.gdf is None
+    assert result.status == "skipped"
+    assert result.reason == "bbox_guard"
+
+
+def test_buildings_retry_once_then_fallback(monkeypatch):
+    net = _net(0.1)
+
+    class _FailingOverture:
+        def __init__(self):
+            self.calls = 0
+
+        def record_batch_reader(self, *args, **kwargs):
+            self.calls += 1
+            raise RuntimeError("boom")
+
+    fake = _FailingOverture()
+    monkeypatch.setattr("aequilibrae.project.network.importer.buildings.require", lambda *a, **k: fake)
+    monkeypatch.setattr(
+        "aequilibrae.project.network.importer.sources.overture.impl.get_latest_overture_version",
+        lambda: "test-release",
+    )
+
+    result = fetch_building_footprints(net, _DummyCache(), enabled=True)
+    assert result.gdf is None
+    assert result.status == "fallback"
+    assert result.retries == 1
+    assert result.reason == "RuntimeError"
+    assert fake.calls == 2

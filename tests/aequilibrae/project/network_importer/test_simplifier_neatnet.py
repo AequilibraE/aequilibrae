@@ -6,6 +6,9 @@ from shapely.geometry import Point
 
 from aequilibrae.project.network.importer.simplifiers.impl_neatnet import (
     _DUAL_CARRIAGEWAY_WARNING,
+    _classify_orientation_fast,
+    _dekink_endpoints_local,
+    _geometry_summary,
     _link_type_compatible,
     _transfer_attributes,
     run_neatnet_simplify,
@@ -66,6 +69,24 @@ def test_link_type_compatibility_blocks_cross_family_transfer():
     assert _link_type_compatible("primary", "cycleway") is False
     # Unknown types stay permissive so we never drop the only candidate.
     assert _link_type_compatible("primary", "some_custom_type") is True
+
+
+def test_orientation_fast_classifies_straight_links_but_not_curved_ones():
+    straight = LineString([(0.0, 0.0), (0.0, 0.002)])
+    straight_rev = LineString([(0.0, 0.002), (0.0, 0.0)])
+    curved = LineString([(0.0, 0.0), (0.001, 0.001), (0.0, 0.002)])
+
+    assert _classify_orientation_fast(_geometry_summary(straight), straight, 1.0) is True
+    assert _classify_orientation_fast(_geometry_summary(straight), straight_rev, 1.0) is False
+    assert _classify_orientation_fast(_geometry_summary(curved), curved, 0.7) is None
+
+
+def test_dekink_endpoints_preserves_endpoints_and_removes_local_spike():
+    geom = LineString([(0.0, 0.0), (0.0002, 0.0), (-0.0001, 0.00005), (0.0, 0.001), (0.0, 0.002)])
+    out = _dekink_endpoints_local(geom)
+    assert out.coords[0] == geom.coords[0]
+    assert out.coords[-1] == geom.coords[-1]
+    assert len(out.coords) < len(geom.coords)
 
 
 def test_transfer_attributes_does_not_bleed_sidewalk_modes_onto_highway():
