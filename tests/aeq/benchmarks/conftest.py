@@ -236,6 +236,14 @@ def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorit
     combined.to_csv(benchmark_reports_dir / f"{model_name}_{algorithm}.csv", index=False)
 
 
+def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: str, algorithm: str):
+    """Save multi-trial convergence reports as a single CSV."""
+    benchmark_reports_dir = Path(os.environ["BENCHMARK_REPORTS_DIR"])
+    benchmark_reports_dir.mkdir(exist_ok=True)
+
+    results_with_nodes.to_parquet(benchmark_reports_dir / f"{model_name}_{algorithm}_results_with_nodes.parquet")
+
+
 def run_validation(
     benchmark,
     graph,
@@ -300,22 +308,27 @@ def run_validation(
     trials: list[pd.DataFrame] = []
 
     def _benchmarked():
-        assig = _make_assignment()
+        assig: TrafficAssignment = _make_assignment()
         assig.execute()
         trials.append(assig.report())
         return assig
 
-    assig = benchmark(_benchmarked)
+    assig: TrafficAssignment = benchmark(_benchmarked)
+    assert isinstance(assig, TrafficAssignment)
 
     link_lookup = graph.network[["link_id", "a_node", "b_node"]].set_index("link_id")
-    merged = assig.results()[["PCE_AB"]].join(link_lookup).merge(reference, on=["a_node", "b_node"], how="right")
-    assert len(merged) > 0, "No matching links between assignment results and TNTP reference"
+    results_with_nodes = (
+        assig.results()[["PCE_AB"]].join(link_lookup).merge(reference, on=["a_node", "b_node"], how="right")
+    )
+    assert len(results_with_nodes) > 0, "No matching links between assignment results and TNTP reference"
+
+    save_flow_results_with_nodes(results_with_nodes, stub, algorithm)
 
     save_convergence_report(trials, stub, algorithm)
 
     assert_flow_regression(
-        merged["PCE_AB"].values,
-        merged["TNTP Solution"].values,
+        results_with_nodes["PCE_AB"].values,
+        results_with_nodes["TNTP Solution"].values,
         r2_limit=r2_limit,
         int_limit=int_limit,
     )

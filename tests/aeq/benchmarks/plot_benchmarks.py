@@ -17,12 +17,99 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy.stats import linregress
+
 
 matplotlib.use("Agg")  # non-interactive backend
 
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_REPORTS_DIR = HERE / "_convergence_reports"
+
+
+def plot_flow_dashboard(
+    aeq_with_nodes: pd.DataFrame,
+    model_name: str,
+    method: str,
+    rgap_target: float,
+    save_path: Path,
+):
+    """
+    Combined flow comparison dashboard for AequilibraE vs TNTP
+    """
+    sns.set_theme(style="whitegrid", context="paper")
+
+    fig = plt.figure(figsize=(16, 8), dpi=150)
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.45, 1.0], wspace=0.10, hspace=0.35)
+    ax_main = fig.add_subplot(gs[:, 0])
+
+    def add_scatter(ax, x_flows, y_flows, x_label, y_label, title, marker_size, show_grid_lines):
+        ax.scatter(x_flows, y_flows, alpha=0.5, s=marker_size, label="Link flows")
+
+        x_max = float(np.max(x_flows)) * 1.02 if len(x_flows) else 1.0
+        y_max = float(np.max(y_flows)) * 1.02 if len(y_flows) else 1.0
+        limit = max(x_max, y_max, 1.0)
+
+        # power = np.floor(np.log10(limit))
+
+        # print(0, limit, power, np.ceil(limit / 10 ** power) * 10 ** power, n_ticks)
+        # major_ticks = np.linspace(0, np.ceil(limit / 10 ** power) * 10 ** power, n_ticks)
+
+        reg = linregress(x_flows, y_flows)
+        x_line = np.array([0.0, limit])
+        y_line = reg.intercept + reg.slope * x_line
+        ax.plot(
+            x_line,
+            y_line,
+            linestyle="--",
+            linewidth=1.8,
+            color="red",
+            label=f"Regression  R²={reg.rvalue**2:.4f}\ny = {reg.slope:.4f}x + {reg.intercept:.4f}",
+        )
+        if len(x_flows) > 0 and len(y_flows) > 0:
+            ax.plot(
+                [0.0, limit],
+                [0.0, limit],
+                linestyle="-",
+                color="grey",
+                alpha=0.5,
+                label="1:1",
+            )
+
+        ax.set_xlim(0.0, limit)
+        ax.set_ylim(0.0, limit)
+        ax.set_aspect("equal", adjustable="box")
+        steps = [4, 6, 8]
+        ax.xaxis.set_major_locator(plt.MaxNLocator(steps=steps))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(steps=steps))
+        ax.set_anchor("W")
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.set_title(title, fontweight="bold", fontsize=11)
+        ax.legend(frameon=True, framealpha=0.9, edgecolor="0.8", loc="upper left", fontsize=8)
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+            spine.set_color("black")
+
+    add_scatter(
+        ax_main,
+        aeq_with_nodes["TNTP Solution"],
+        aeq_with_nodes["PCE_AB"],
+        "TNTP Reference Flow",
+        "AequilibraE Flow",
+        "AequilibraE vs TNTP",
+        marker_size=16,
+        show_grid_lines=True,
+    )
+
+    fig.suptitle(
+        f"Flow Validation - {model_name}\n{method.upper()}",
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
+    )
+
+    plt.savefig(save_path, dpi=plt.gcf().dpi, bbox_inches="tight")
 
 
 def _load_all_reports(reports_dir: Path) -> pd.DataFrame:
@@ -237,7 +324,7 @@ def plot_method_comparison(
     plt.close(fig)
 
 
-def main(reports_dir: Path, plot_time: bool):
+def plot_all_convergence(reports_dir: Path, plot_time: bool):
     all_data = _load_all_reports(reports_dir)
     out_dir = reports_dir  # write plots alongside CSVs
 
@@ -268,8 +355,20 @@ def main(reports_dir: Path, plot_time: bool):
     print(f"Plots written to {out_dir}")
 
 
+def compare_flows_with_tntp(reports_dir: Path):
+    out_dir = reports_dir
+
+    model = "Anaheim"
+    alg = "bfw"
+
+    results_with_nodes = pd.read_parquet(reports_dir / f"{model}_{alg}_results_with_nodes.parquet")
+    plot_flow_dashboard(results_with_nodes, model, alg, 0, out_dir / f"{model}_{alg}_flow_comparison.png")
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate convergence plots from benchmark CSV reports.")
+    parser = argparse.ArgumentParser(
+        description="Generate convergence plots from benchmark CSV reports and/or compare flow to benchmark results."
+    )
     parser.add_argument(
         "--reports-dir",
         type=Path,
@@ -277,10 +376,27 @@ if __name__ == "__main__":
         help=f"Directory containing CSV report files (default: {DEFAULT_REPORTS_DIR})",
     )
     parser.add_argument(
+        "--convergence",
+        action="store_true",
+        default=False,
+        help="Make convergence plots (default: False)",
+    )
+    parser.add_argument(
         "--x-axis",
         choices=["time", "iterations"],
         default="iterations",
         help="X-axis mode: 'time' (wall clock seconds) or 'iterations' (default)",
     )
+    parser.add_argument(
+        "--compare-flow",
+        action="store_true",
+        default=False,
+        help="Make flow comparison plots (default: False)",
+    )
     args = parser.parse_args()
-    main(args.reports_dir, plot_time=(args.x_axis == "time"))
+    if args.convergence:
+        print("Plotting convergence...")
+        plot_all_convergence(args.reports_dir, plot_time=(args.x_axis == "time"))
+    if args.compare_flow:
+        print("Comparing flow...")
+        compare_flows_with_tntp(args.reports_dir)
