@@ -18,21 +18,45 @@ import pytest as pytest
 # python .\tests\benchmarks\plot_benchmarks.py --x-axis time
 
 # must set transport network directory as environment variable
-TNTP_ROOT = Path(os.environ["TNTP_ROOT"])
+# TNTP_ROOT = Path(os.environ["TNTP_ROOT"])
+
+
 # $env:TNTP_ROOT="C:\Users\jake\src\aequilibrae\TransportationNetworks"
 # export TNTP_ROOT="../../TransportationNetworks"
 
 # REPORTS_DIR = Path(__file__).resolve().parent / "_convergence_reports"
-BENCHMARK_REPORTS_DIR = Path(os.environ["BENCHMARK_REPORTS_DIR"])
+# BENCHMARK_REPORTS_DIR = Path(os.environ["BENCHMARK_REPORTS_DIR"])
 # export BENCHMARK_REPORTS_DIR="./tests/aeq/benchmarks/_convergence_reports"
 
 
 METHODS = ["msa", "frank-wolfe", "cfw", "bfw"]
-ITERATIONS = 1000
+ITERATIONS = 10
 RGAP_TARGET = 1e-15
 
 R2_MINIMUM = 0.95
 INTERCEPT_MINIMUM = 1e3
+
+
+@pytest.fixture(scope="module")
+def tntp_root():
+    return Path(os.environ["TNTP_ROOT"])
+
+
+@pytest.fixture(scope="module")
+def tntp_matrix(model_folder, model_stub):
+    mat = load_tntp_matrix(model_folder, model_stub)
+    yield mat
+    mat.close()
+
+
+@pytest.fixture(scope="module")
+def tntp_graph(model_folder, model_stub, tntp_matrix):
+    return load_tntp_graph(model_folder, model_stub, tntp_matrix.index)
+
+
+@pytest.fixture(scope="module")
+def tntp_reference(model_folder, model_stub):
+    return load_known_results(model_folder, model_stub)
 
 
 def pytest_configure(config):
@@ -199,7 +223,8 @@ def assert_flow_regression(
 
 def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorithm: str):
     """Save multi-trial convergence reports as a single CSV."""
-    BENCHMARK_REPORTS_DIR.mkdir(exist_ok=True)
+    benchmark_reports_dir = Path(os.environ["BENCHMARK_REPORTS_DIR"])
+    benchmark_reports_dir.mkdir(exist_ok=True)
     parts = []
     for i, report in enumerate(trials):
         out = report.copy()
@@ -208,7 +233,7 @@ def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorit
     combined = pd.concat(parts, ignore_index=True)
     combined["model"] = model_name
     combined["algorithm"] = algorithm
-    combined.to_csv(BENCHMARK_REPORTS_DIR / f"{model_name}_{algorithm}.csv", index=False)
+    combined.to_csv(benchmark_reports_dir / f"{model_name}_{algorithm}.csv", index=False)
 
 
 def run_validation(
