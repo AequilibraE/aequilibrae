@@ -237,7 +237,7 @@ def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorit
 
 
 def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: str, algorithm: str):
-    """Save multi-trial convergence reports as a single CSV."""
+    """Save flow results."""
     benchmark_reports_dir = Path(os.environ["BENCHMARK_REPORTS_DIR"])
     benchmark_reports_dir.mkdir(exist_ok=True)
 

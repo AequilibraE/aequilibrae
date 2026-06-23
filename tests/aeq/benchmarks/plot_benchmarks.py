@@ -1,12 +1,15 @@
 """Plot convergence charts from saved benchmark CSVs.
 
 Usage:
-    python plot_benchmarks.py [--reports-dir PATH] [--x-axis {time,iterations}]
+    python plot_benchmarks.py [--convergence] [--compare-flow] [--reports-dir PATH] [--x-axis {time,iterations}]
 
-Reads CSV files from _convergence_reports/ (or --reports-dir) and produces:
+If --convergence is specified, reads CSV files from _convergence_reports/ (or --reports-dir) and produces:
   - per-model per-algorithm convergence plots  (one line per trial)
   - per-model combined method comparison plots (mean lines + faint per-trial traces)
-Output written alongside the CSVs.
+If --compare-flow is specified, reads parquet files from _convergence_reports/ (or --reports-dir) and produces:
+  - per-model per-algorithm plots that compare the found flows between nodes to known solutions
+Output written alongside the CSVs and parquet files.
+
 """
 
 import argparse
@@ -324,7 +327,9 @@ def plot_method_comparison(
     plt.close(fig)
 
 
-def plot_all_convergence(reports_dir: Path, plot_time: bool):
+def make_all_convergence_plots(reports_dir: Path, plot_time: bool):
+    print("Making convergence plots...")
+
     all_data = _load_all_reports(reports_dir)
     out_dir = reports_dir  # write plots alongside CSVs
 
@@ -351,23 +356,29 @@ def plot_all_convergence(reports_dir: Path, plot_time: bool):
             out_dir / f"{model}_all_methods_convergence_{mode}.png",
             plot_time=plot_time,
         )
+    print(f"    Convergence plots written to {out_dir}")
 
-    print(f"Plots written to {out_dir}")
 
+def make_all_flow_comparison_plots(reports_dir: Path):
+    print("Making flow comparison plots...")
 
-def compare_flows_with_tntp(reports_dir: Path):
     out_dir = reports_dir
-
-    model = "Anaheim"
-    alg = "bfw"
-
-    results_with_nodes = pd.read_parquet(reports_dir / f"{model}_{alg}_results_with_nodes.parquet")
-    plot_flow_dashboard(results_with_nodes, model, alg, 0, out_dir / f"{model}_{alg}_flow_comparison.png")
+    parquet_files = sorted(reports_dir.glob("*_results_with_nodes.parquet"))
+    if not parquet_files:
+        print(f"No parquet files found in {reports_dir}")
+        return
+    for parquet_path in parquet_files:
+        # Parse model and algorithm from filename: {model}_{alg}_results_with_nodes.parquet
+        stem = parquet_path.stem.replace("_results_with_nodes", "")
+        model, alg = stem.rsplit("_", 1)
+        results_with_nodes = pd.read_parquet(parquet_path)
+        plot_flow_dashboard(results_with_nodes, model, alg, 0, out_dir / f"{model}_{alg}_flow_comparison.png")
+    print(f"    Flow comparison plots written to {out_dir}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate convergence plots from benchmark CSV reports and/or compare flow to benchmark results."
+        description="Generate convergence plots from benchmark CSV reports and/or compare flows to benchmark results."
     )
     parser.add_argument(
         "--reports-dir",
@@ -395,8 +406,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if args.convergence:
-        print("Plotting convergence...")
-        plot_all_convergence(args.reports_dir, plot_time=(args.x_axis == "time"))
+        make_all_convergence_plots(args.reports_dir, plot_time=(args.x_axis == "time"))
     if args.compare_flow:
-        print("Comparing flow...")
-        compare_flows_with_tntp(args.reports_dir)
+        make_all_flow_comparison_plots(args.reports_dir)
