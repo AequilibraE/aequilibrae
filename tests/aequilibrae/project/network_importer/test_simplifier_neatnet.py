@@ -113,7 +113,7 @@ def test_suspicious_node_detection_requires_degree_family_mix_and_short_branch()
     assert _select_branch_to_unmerge(edges, 100000) == 3
 
 
-def test_same_coordinate_unmerge_reassigns_selected_branch_only():
+def test_unmerge_reassigns_selected_branch_and_offsets_it_slightly():
     edges = gpd.GeoDataFrame(
         {
             "geometry": [
@@ -135,7 +135,8 @@ def test_same_coordinate_unmerge_reassigns_selected_branch_only():
     assert split != base
     assert int(out.loc[1, "a_node"]) == base
     assert int(out.loc[2, "a_node"]) == base
-    assert node_coords[base] == node_coords[split]
+    assert node_coords[base] != node_coords[split]
+    assert list(out.loc[3, "geometry"].coords)[0] == node_coords[split]
 
 
 def test_transfer_attributes_does_not_bleed_sidewalk_modes_onto_highway():

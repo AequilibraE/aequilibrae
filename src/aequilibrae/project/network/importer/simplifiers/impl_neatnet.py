@@ -39,6 +39,8 @@ _DEKINK_MIN_TURN_DEGREES = 25.0
 _DEKINK_MAX_ENDPOINT_LENGTH = 0.00045
 _SUSPICIOUS_NODE_DEGREE = 4
 _SHORT_BRANCH_DEGREES = 0.00035
+_UNMERGE_OFFSET_FRACTION = 0.2
+_UNMERGE_OFFSET_MAX_DEGREES = 0.00003
 
 
 def run_neatnet_simplify(
@@ -132,11 +134,12 @@ def _assign_and_unmerge_suspicious_nodes(edges: gpd.GeoDataFrame, metrics: dict 
         branch_idx = _select_branch_to_unmerge(edges, node_id)
         if branch_idx is None:
             continue
-        coord = _node_coord_from_edges(edges, branch_idx, node_id)
+        new_coord, new_geom, split_at_a = _offset_branch_endpoint(edges.loc[branch_idx], node_id)
         new_id = next_id
         next_id += 1
-        node_coords[new_id] = coord
-        if int(edges.at[branch_idx, "a_node"]) == int(node_id):
+        node_coords[new_id] = new_coord
+        edges.at[branch_idx, "geometry"] = new_geom
+        if split_at_a:
             edges.at[branch_idx, "a_node"] = new_id
         else:
             edges.at[branch_idx, "b_node"] = new_id
@@ -234,11 +237,32 @@ def _local_branch_length(geom, node_id: int, a_node: int, b_node: int) -> float:
     return shapely.LineString(segment).length
 
 
-def _node_coord_from_edges(edges: gpd.GeoDataFrame, branch_idx: int, node_id: int):
-    row = edges.loc[branch_idx]
+def _offset_branch_endpoint(row, node_id: int):
     coords = list(row.geometry.coords)
-    coord = coords[0] if int(row.a_node) == int(node_id) else coords[-1]
-    return (round(float(coord[0]), 7), round(float(coord[1]), 7))
+    split_at_a = int(row.a_node) == int(node_id)
+    if split_at_a:
+        anchor = coords[0]
+        nxt = coords[1] if len(coords) > 1 else coords[0]
+    else:
+        anchor = coords[-1]
+        nxt = coords[-2] if len(coords) > 1 else coords[-1]
+
+    dx = float(nxt[0]) - float(anchor[0])
+    dy = float(nxt[1]) - float(anchor[1])
+    seg = math.hypot(dx, dy)
+    if seg > 0.0:
+        step = min(seg * _UNMERGE_OFFSET_FRACTION, _UNMERGE_OFFSET_MAX_DEGREES)
+        ox = float(anchor[0]) + dx / seg * step
+        oy = float(anchor[1]) + dy / seg * step
+    else:
+        ox, oy = float(anchor[0]), float(anchor[1])
+    offset = (round(ox, 7), round(oy, 7))
+
+    if split_at_a:
+        coords[0] = offset
+    else:
+        coords[-1] = offset
+    return offset, shapely.LineString(coords), split_at_a
 
 
 def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame, metrics: dict | None = None) -> None:
