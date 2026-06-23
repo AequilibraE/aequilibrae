@@ -1,5 +1,6 @@
 import geopandas as gpd
 import logging
+import math
 import numpy as np
 import shapely
 import warnings
@@ -33,8 +34,9 @@ _SOURCE_ID_COL = "source_id"
 _SOURCE_REFS_TMP_COL = "_source_refs"
 _BEARING_MAX_DIFF_DEGREES = 35.0
 _STRAIGHTNESS_THRESHOLD = 0.97
-_DEKINK_MAX_POINTS = 3
-_DEKINK_MIN_TURN_DEGREES = 40.0
+_DEKINK_MAX_POINTS = 6
+_DEKINK_MIN_TURN_DEGREES = 25.0
+_DEKINK_MAX_ENDPOINT_LENGTH = 0.00045
 
 
 def run_neatnet_simplify(net: StagedNetwork, *, exclusion_mask=None, metrics=None, **_) -> StagedNetwork:
@@ -318,15 +320,25 @@ def _geometry_summary(geom) -> dict:
 def _reduce_candidates_by_overlap(simplified_geom, orig_geoms, compatible: list[int]) -> list[tuple[int, float]]:
     if not compatible:
         return []
+    # Real line/buffer intersections for every candidate were measurably expensive
+    # in benchmarking. For ranking purposes we only need a cheap proxy that keeps
+    # the plausible corridor candidates near the top.
     simp_buffer = simplified_geom.buffer(_BUFFER_DIST)
+    sx0, sy0 = simplified_geom.coords[0]
+    sx1, sy1 = simplified_geom.coords[-1]
     scored = []
     for oidx in compatible:
         og = orig_geoms[oidx]
-        overlap = simp_buffer.intersection(og).length if simp_buffer.intersects(og) else 0.0
+        intersects = 1 if simp_buffer.intersects(og) else 0
         dist = float(simplified_geom.distance(og))
-        scored.append((oidx, overlap, dist))
-    scored.sort(key=lambda item: (-item[1], item[2]))
-    return [(oidx, dist) for oidx, _overlap, dist in scored[: min(5, len(scored))]]
+        (ox0, oy0), (ox1, oy1) = og.coords[0], og.coords[-1]
+        endpoint_cost = min(
+            math.hypot(sx0 - ox0, sy0 - oy0) + math.hypot(sx1 - ox1, sy1 - oy1),
+            math.hypot(sx0 - ox1, sy0 - oy1) + math.hypot(sx1 - ox0, sy1 - oy0),
+        )
+        scored.append((oidx, intersects, dist, endpoint_cost))
+    scored.sort(key=lambda item: (-item[1], item[2], item[3]))
+    return [(oidx, dist) for oidx, _intersects, dist, _endpoint_cost in scored[: min(4, len(scored))]]
 
 
 def _classify_candidates(
@@ -420,6 +432,8 @@ def _dekink_endpoints_local(geom):
 def _prune_endpoint_kinks(coords: list, *, reverse: bool) -> list:
     work = list(reversed(coords)) if reverse else list(coords)
     max_steps = min(_DEKINK_MAX_POINTS, len(work) - 3)
+
+    # First: greedily remove sharp immediate spikes.
     for _ in range(max_steps):
         if len(work) < 4:
             break
@@ -433,6 +447,28 @@ def _prune_endpoint_kinks(coords: list, *, reverse: bool) -> list:
             work = trial
         else:
             break
+
+    # Second: collapse a short endpoint approach chain if it is noticeably more
+    # sinuous than the direct chord to the first stable interior point. This
+    # targets staircase-like last sections such as the one observed in manual experiments.
+    for idx in range(2, min(len(work) - 1, _DEKINK_MAX_POINTS + 1)):
+        chain = work[: idx + 1]
+        chain_len = shapely.LineString(chain).length
+        chord_len = shapely.LineString([chain[0], chain[-1]]).length
+        if chord_len <= 0 or chain_len > _DEKINK_MAX_ENDPOINT_LENGTH:
+            break
+        if chain_len / chord_len < 1.02:
+            continue
+        if idx + 1 < len(work):
+            stable_bearing = bearing_degrees(chain[-1], work[idx + 1])
+            approach_bearing = bearing_degrees(chain[0], chain[-1])
+            if angular_difference_degrees(approach_bearing, stable_bearing) > 55.0:
+                continue
+        trial = [work[0], work[idx]] + work[idx + 1 :]
+        if shapely.LineString(trial).is_simple:
+            work = trial
+            break
+
     return list(reversed(work)) if reverse else work
 
 
