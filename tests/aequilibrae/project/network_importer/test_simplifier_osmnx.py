@@ -40,7 +40,9 @@ def test_simplify_osmnx_runs_and_reduces(empty_project):
                 if isinstance(inner, str):
                     inner = json.loads(inner)
                 assert isinstance(inner, dict)
-                for key, value in inner.items():
+                assert inner.get("schema_version") == 1
+                assert isinstance(inner.get("sources"), dict)
+                for key, value in inner["sources"].items():
                     assert isinstance(key, str)
                     assert isinstance(value, dict)
                 return

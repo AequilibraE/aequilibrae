@@ -36,17 +36,6 @@ def test_write_geoparquet_creates_folder_and_round_trips(tmp_path):
     assert list(back["name"]) == ["a", "b"]
 
 
-def test_write_parquet_round_trips(tmp_path):
-    cache = DownloadCache(tmp_path, "overture-cloud", "bbox")
-    table = pa.table({"id": [1, 2, 3], "name": ["x", "y", "z"]})
-    path = cache.write_parquet("segments", table)
-    assert path.exists()
-    assert path.suffix == ".parquet"
-
-    import pyarrow.parquet as pq
-
-    back = pq.read_table(path)
-    assert back.num_rows == 3
 
 
 def test_write_json_round_trips(tmp_path):
@@ -90,6 +79,7 @@ def test_tag_is_slugified(tmp_path):
 
 def test_relative_path_uses_forward_slashes(tmp_path):
     cache = DownloadCache(tmp_path, "overture-cloud", "bbox_0_0_1_1")
-    cache.write_parquet("connectors", pa.table({"id": [1]}))
+    gdf = gpd.GeoDataFrame({"geometry": [Point(0, 0)]}, crs="EPSG:4326")
+    cache.write_geoparquet("connectors", gdf)
     assert cache.relative_path is not None
     assert "\\" not in cache.relative_path

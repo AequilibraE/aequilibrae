@@ -13,9 +13,8 @@ Layout:
             <payload files>            # .parquet (Parquet) or .json
             manifest.json
 
-Only three on-disk payload formats are supported:
+Only two on-disk payload formats are supported:
   - GeoParquet (``write_geoparquet`` for ``gpd.GeoDataFrame``)
-  - Parquet (``write_parquet`` for ``pyarrow.Table``)
   - JSON (``write_json`` for the manifest and small metadata documents)
 
 There is no gzip, no raw-bytes path, no per-source raw format. Sources that
@@ -107,22 +106,6 @@ class DownloadCache:
         self._sha256s[name] = _sha256_of_file(target)
         return target
 
-    def write_parquet(self, name: str, table) -> Path:
-        """Write a pyarrow Table as Parquet (no geopandas round-trip).
-
-        :Arguments:
-            **name**: File name (the ``.parquet`` extension is added if missing).
-            **table**: A ``pyarrow.Table``.
-        """
-        import pyarrow.parquet as pq
-
-        self._ensure_folder()
-        if not name.endswith(".parquet"):
-            name = name + ".parquet"
-        target = self._folder / name
-        pq.write_table(table, target)
-        self._sha256s[name] = _sha256_of_file(target)
-        return target
 
     def write_json(self, name: str, payload) -> Path:
         """Write a JSON document.
