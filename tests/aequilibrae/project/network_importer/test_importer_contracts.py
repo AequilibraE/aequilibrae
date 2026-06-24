@@ -51,28 +51,6 @@ def test_normalize_importer_columns_adds_expected_optional_fields():
     assert {"name", "speed_ab", "speed_ba", "lanes_ab", "lanes_ba", "source_id"}.issubset(net.links.columns)
 
 
-def test_normalize_source_meta_requires_core_keys():
-    net = _minimal_net({"source": "osm"})
-
-    with pytest.raises(ImporterError, match="source_meta missing required keys"):
-        _normalize_source_meta(net)
-
-
-def test_normalize_source_meta_adds_release_key():
-    net = _minimal_net(
-        {
-            "source": "osm",
-            "backend": "pyrosm",
-            "source_url": "test.osm.pbf",
-            "fetched_at": "2026-06-22T00:00:00+00:00",
-        }
-    )
-
-    _normalize_source_meta(net)
-
-    assert net.source_meta["release"] == ""
-
-
 def test_source_meta_key_split_is_explicit_and_documented():
     # 'release' is OPTIONAL (unversioned sources like raw OSM); everything else
     # is REQUIRED. This guards the contract against accidental mutation.
@@ -92,6 +70,7 @@ def test_missing_release_is_allowed_but_missing_other_keys_rejected():
         }
     )
     _normalize_source_meta(ok)
+    assert ok.source_meta["release"] == ""
 
     # Missing any required key must raise, naming the missing key.
     for required in REQUIRED_SOURCE_META_KEYS:

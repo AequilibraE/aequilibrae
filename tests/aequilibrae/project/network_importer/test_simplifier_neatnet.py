@@ -54,7 +54,6 @@ def test_transfer_attributes_collapses_opposing_carriageways_to_coarse_bidirecti
     assert row["lanes_ab"] == 3
     assert row["lanes_ba"] == 2
     assert row["source_id"] == "fwd"
-    assert row["_source_refs"] == ["fwd::ab", "bwd::ba"]
     payload = json.loads(row["source_ids"])
     assert payload["schema_version"] == 1
     assert set(payload["sources"]) == {"fwd", "bwd"}

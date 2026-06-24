@@ -108,10 +108,6 @@ def test_graph_round_trip_is_idempotent():
 def test_from_graph_requires_source_ref():
     import networkx as nx
 
-    from shapely.geometry import LineString
-
-    from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
-
     g = nx.MultiDiGraph()
     g.graph["crs"] = "EPSG:4326"
     g.add_node(100000, x=0.0, y=0.0)

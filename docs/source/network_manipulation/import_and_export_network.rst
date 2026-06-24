@@ -172,8 +172,8 @@ The main entry points are:
 
 .. seealso::
 
-    * :ref:`plot_from_osm`
-        OSM import example
+    * :ref:`plot_from_overture`
+        Network import example (Overture Maps, with OSM as an alternative)
     * :ref:`parameters_file`
         Project parameter file
 

@@ -31,7 +31,6 @@ _DUAL_CARRIAGEWAY_WARNING = (
 )
 _PROVENANCE_OUT_COL = "source_ids"
 _SOURCE_ID_COL = "source_id"
-_SOURCE_REFS_TMP_COL = "_source_refs"
 _BEARING_MAX_DIFF_DEGREES = 35.0
 _STRAIGHTNESS_THRESHOLD = 0.97
 _DEKINK_MAX_POINTS = 6
@@ -158,7 +157,6 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     lanes_ba = [None] * n
     primary_source_ids = [None] * n
     provenance = [None] * n
-    source_refs = [[] for _ in range(n)]
 
     orig_dir = original["direction"].to_numpy()
     orig_modes = original["modes"].to_numpy()
@@ -202,21 +200,12 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
         link_types[i] = nearest_lt
         names[i] = orig_name[nearest_oidx]
 
-        ordered_refs = _unique_source_refs(fwd_candidates + bwd_candidates)
-        source_refs[i] = ordered_refs
-        ordered_source_ids = _ordered_source_ids(ordered_refs)
+        ordered_source_ids = _ordered_source_ids(fwd_candidates + bwd_candidates)
         primary_source_ids[i] = ordered_source_ids[0] if ordered_source_ids else orig_source_ids[nearest_oidx]
         provenance[i] = _build_provenance(ordered_source_ids, src_attrs)
 
-        all_modes: set = set()
-        for oidx in contributing_oidx:
-            m = orig_modes[oidx]
-            if isinstance(m, str):
-                all_modes.update(m)
-        if not all_modes:
-            m = orig_modes[nearest_oidx]
-            if isinstance(m, str):
-                all_modes.update(m)
+        sources = contributing_oidx or [nearest_oidx]
+        all_modes = set().union(*(orig_modes[o] for o in sources if isinstance(orig_modes[o], str)), set())
         modes_arr[i] = "".join(sorted(all_modes)) or "c"
 
         if fwd_candidates:
@@ -237,7 +226,6 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     simplified["lanes_ba"] = lanes_ba
     simplified[_SOURCE_ID_COL] = primary_source_ids
     simplified[_PROVENANCE_OUT_COL] = provenance
-    simplified[_SOURCE_REFS_TMP_COL] = source_refs
 
 
 # Highway classes grouped by function. Modes are only inherited between
@@ -245,21 +233,8 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
 # nearest original, which stops e.g. footway/cycleway modes bleeding onto roads.
 _LINK_TYPE_FAMILIES = (
     {"motorway", "motorway_link", "trunk", "trunk_link"},
-    {
-        "primary",
-        "primary_link",
-        "secondary",
-        "secondary_link",
-        "tertiary",
-        "tertiary_link",
-        "unclassified",
-        "residential",
-        "living_street",
-        "service",
-        "road",
-        "busway",
-        "bus_guideway",
-    },
+    {"primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
+     "unclassified", "residential", "living_street", "service", "road", "busway", "bus_guideway"},
     {"footway", "pedestrian", "steps", "path", "corridor", "elevator", "escalator", "bridleway"},
     {"cycleway"},
 )
@@ -370,16 +345,14 @@ def _classify_candidates(
 
 
 def _classify_orientation_fast(simp_summary: dict, orig_geom, orig_straightness: float) -> bool | None:
-    orig_summary = _geometry_summary(orig_geom)
     if simp_summary["straightness"] < _STRAIGHTNESS_THRESHOLD or orig_straightness < _STRAIGHTNESS_THRESHOLD:
         return None
+    orig_summary = _geometry_summary(orig_geom)
+    (sx0, sy0), (sx1, sy1) = simp_summary["start"], simp_summary["end"]
+    (ox0, oy0), (ox1, oy1) = orig_summary["start"], orig_summary["end"]
 
-    same_cost = shapely.Point(simp_summary["start"]).distance(shapely.Point(orig_summary["start"])) + shapely.Point(
-        simp_summary["end"]
-    ).distance(shapely.Point(orig_summary["end"]))
-    rev_cost = shapely.Point(simp_summary["start"]).distance(shapely.Point(orig_summary["end"])) + shapely.Point(
-        simp_summary["end"]
-    ).distance(shapely.Point(orig_summary["start"]))
+    same_cost = math.hypot(sx0 - ox0, sy0 - oy0) + math.hypot(sx1 - ox1, sy1 - oy1)
+    rev_cost = math.hypot(sx0 - ox1, sy0 - oy1) + math.hypot(sx1 - ox0, sy1 - oy0)
     bearing_fwd = angular_difference_degrees(simp_summary["bearing"], orig_summary["bearing"])
     bearing_rev = angular_difference_degrees(simp_summary["bearing"], (orig_summary["bearing"] + 180.0) % 360.0)
 
@@ -451,21 +424,11 @@ def _nearest_oriented_value(candidates: list[tuple[str, float]], oriented_src_at
     return None
 
 
-def _unique_source_refs(candidates: list[tuple[str, float]]) -> list[str]:
-    seen = set()
-    ordered = []
-    for source_ref, _dist in sorted(candidates, key=lambda item: item[1]):
-        if source_ref in seen:
-            continue
-        seen.add(source_ref)
-        ordered.append(source_ref)
-    return ordered
-
-
-def _ordered_source_ids(source_refs: list[str]) -> list[str]:
+def _ordered_source_ids(candidates: list[tuple[str, float]]) -> list[str]:
+    """Base source ids from ``(source_ref, distance)`` candidates, nearest first, de-duplicated."""
     source_ids = []
-    for source_ref in source_refs:
-        source_id, _sep, _suffix = source_ref.partition("::")
+    for source_ref, _dist in sorted(candidates, key=lambda item: item[1]):
+        source_id = source_ref.partition("::")[0]
         if source_id and source_id not in source_ids:
             source_ids.append(source_id)
     return source_ids

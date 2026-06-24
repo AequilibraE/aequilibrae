@@ -1,6 +1,7 @@
 import geopandas as gpd
 import numpy as np
 from dataclasses import dataclass, field
+from shapely.geometry import LineString, Point
 from typing import TYPE_CHECKING
 
 from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
@@ -99,8 +100,6 @@ class StagedNetwork:
                 graph.add_edge(a, b, key=link_id, **attrs_ab)
                 continue
 
-            from shapely.geometry import LineString
-
             rev_geom = LineString(geom.coords[::-1]) if geom is not None else None
             attrs_ba = {
                 **rec,
@@ -127,8 +126,6 @@ class StagedNetwork:
         round-trip preserves link cardinality and never emits duplicate
         ``link_id`` values.
         """
-        from shapely.geometry import Point
-
         node_records = []
         for nid, data in graph.nodes(data=True):
             geom = data.get("geometry")
@@ -212,8 +209,6 @@ def _canonicalize_directed_edges(directed: list) -> list:
         rec["direction"] = int(direction)
 
         if direction == -1 and rec.get("geometry") is not None:
-            from shapely.geometry import LineString
-
             rec["geometry"] = LineString(rec["geometry"].coords[::-1])
 
         ab_data = ab[2] if ab is not None else None
