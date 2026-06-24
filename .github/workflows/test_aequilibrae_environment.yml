@@ -32,5 +32,5 @@ jobs:
 
     - name: Runs test
       run: |
-        python -m uv pip install numpy==1.26.4 --force-reinstall
+        python -m uv pip install numpy==2.4.6 --force-reinstall
         pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose

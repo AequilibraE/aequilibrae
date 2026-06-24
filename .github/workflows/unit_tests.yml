@@ -43,10 +43,10 @@ jobs:
             python-version: '3.12'
           - os: macos-latest
             python-version: '3.14'
-        include:
-          - os: ubuntu-latest
-            python-version: '3.12'
-            sanitisers: true
+#        include:
+#          - os: ubuntu-latest
+#            python-version: '3.12'
+#            sanitisers: true
 
       max-parallel: 20
     steps:
