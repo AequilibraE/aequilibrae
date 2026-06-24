@@ -118,7 +118,6 @@ class Network(WorkerThread):
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
         cache_tag: str = "",
-        download_buildings: bool = True,
         metrics: Optional[dict] = None,
         **source_kwargs,
     ) -> None:
@@ -138,7 +137,6 @@ class Network(WorkerThread):
             simplify=simplify,
             consolidate_tolerance=consolidate_tolerance,
             cache_tag=cache_tag,
-            download_buildings=download_buildings,
             metrics=metrics,
             **source_kwargs,
         )
@@ -153,7 +151,6 @@ class Network(WorkerThread):
         custom_filter: Optional[str] = None,
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
-        download_buildings: bool = True,
         metrics: Optional[dict] = None,
     ) -> None:
         """Import a network from OpenStreetMap.
@@ -179,7 +176,6 @@ class Network(WorkerThread):
                 simplify=simplify,
                 consolidate_tolerance=consolidate_tolerance,
                 cache_tag=str(pbf_path),
-                download_buildings=download_buildings,
                 metrics=metrics,
                 pbf_path=pbf_path,
             )
@@ -190,7 +186,6 @@ class Network(WorkerThread):
                 simplify=simplify,
                 consolidate_tolerance=consolidate_tolerance,
                 cache_tag=place_name or "bbox",
-                download_buildings=download_buildings,
                 metrics=metrics,
                 model_area=model_area,
                 place_name=place_name,
@@ -204,7 +199,6 @@ class Network(WorkerThread):
         modes=("car", "transit", "bicycle", "walk"),
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
-        download_buildings: bool = True,
         metrics: Optional[dict] = None,
     ) -> None:
         """Import a network from Overture Maps.
@@ -223,7 +217,6 @@ class Network(WorkerThread):
             simplify=simplify,
             consolidate_tolerance=consolidate_tolerance,
             cache_tag=tag,
-            download_buildings=download_buildings,
             metrics=metrics,
             model_area=model_area,
         )

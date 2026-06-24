@@ -37,9 +37,6 @@ _STRAIGHTNESS_THRESHOLD = 0.97
 _DEKINK_MAX_POINTS = 6
 _DEKINK_MIN_TURN_DEGREES = 25.0
 _DEKINK_MAX_ENDPOINT_LENGTH = 0.00045
-_DENSE_CLUSTER_RADIUS = 20.0
-_DENSE_CLUSTER_MIN_INCIDENT = 6
-_DENSE_CLUSTER_NODE_BUFFER = 10.0
 
 
 def run_neatnet_simplify(
@@ -71,17 +68,8 @@ def run_neatnet_simplify(
         "simplification_factor": float(simplification_factor),
         "min_dangle_length": float(min_dangle_length),
     }
-    dense_mask = _dense_cluster_exclusion_mask(geom_only)
-    combined_mask = dense_mask
     if exclusion_mask is not None:
-        bmask = exclusion_mask.to_crs(utm).geometry
-        combined_mask = bmask if combined_mask is None else gpd.GeoSeries(
-            list(bmask) + list(combined_mask), crs=utm
-        )
-    if combined_mask is not None and len(combined_mask) > 0:
-        neatify_kwargs["exclusion_mask"] = combined_mask
-    if metrics is not None:
-        metrics["dense_cluster_mask_count"] = 0 if dense_mask is None else int(len(dense_mask))
+        neatify_kwargs["exclusion_mask"] = exclusion_mask.to_crs(utm).geometry
 
     from time import perf_counter
 
@@ -93,33 +81,6 @@ def run_neatnet_simplify(
         metrics["neatify_time_s"] = perf_counter() - t0
 
     return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta, metrics=metrics)
-
-
-def _dense_cluster_exclusion_mask(projected_edges: gpd.GeoDataFrame):
-    if len(projected_edges) == 0:
-        return None
-    coords, indices = shapely.get_coordinates(projected_edges.geometry, return_index=True)
-    last_pos = np.searchsorted(indices, np.arange(len(projected_edges)), side="right") - 1
-    first_pos = np.searchsorted(indices, np.arange(len(projected_edges)), side="left")
-    endpoints = np.vstack([coords[first_pos], coords[last_pos]])
-    if len(endpoints) == 0:
-        return None
-
-    endpoint_geoms = shapely.points(endpoints[:, 0], endpoints[:, 1])
-    tree = shapely.STRtree(endpoint_geoms)
-    dense_buffers = []
-    seen = set()
-    for i, pt in enumerate(endpoint_geoms):
-        if i in seen:
-            continue
-        hits = tree.query(pt.buffer(_DENSE_CLUSTER_RADIUS))
-        if len(hits) < _DENSE_CLUSTER_MIN_INCIDENT:
-            continue
-        seen.update(int(h) for h in hits)
-        dense_buffers.append(pt.buffer(_DENSE_CLUSTER_NODE_BUFFER))
-    if not dense_buffers:
-        return None
-    return gpd.GeoSeries(dense_buffers, crs=projected_edges.crs)
 
 
 def _gdf_to_staged(

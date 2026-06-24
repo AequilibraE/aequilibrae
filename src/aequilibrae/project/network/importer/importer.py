@@ -48,7 +48,6 @@ class NetworkImporter:
         simplify="osmnx",
         consolidate_tolerance=10.0,
         cache_tag: str = "",
-        download_buildings: bool = True,
         metrics: dict | None = None,
         **source_kwargs,
     ) -> None:
@@ -83,7 +82,7 @@ class NetworkImporter:
             if simplifier_obj.name == "neatnet":
                 from aequilibrae.project.network.importer.buildings import fetch_building_footprints
 
-                buildings = fetch_building_footprints(net, download_cache, enabled=download_buildings)
+                buildings = fetch_building_footprints(net, download_cache)
                 net.source_meta.update(buildings.as_meta())
                 if buildings.gdf is not None:
                     simplify_kwargs["exclusion_mask"] = buildings.gdf
