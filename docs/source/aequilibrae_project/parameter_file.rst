@@ -90,60 +90,22 @@ to the use of **integer**, **numeric** and **varchar**.
     :scale: 80 %
     :alt: Link example
 
-For the case of all non-mandatory fields, two more parameters are possible: 'osm_source' and
-'osm_behaviour'. Those two fields provide the necessary information for importing data from
-`OpenStreetMap <https://www.openstreetmap.org/>`_ in case such resource is required, and
-they work in the following way:
+.. note::
 
-'osm_source': The name of the tag for which data needs to be retrieved. Common tags are
-**highway**, **maxspeed** and **name**. The import result will contain a null value for all
-links that do not contain a value for such tag.
-
-Within OSM, there is the concept of tags for each link direction, such as **maxspeed:forward**
-and **maxspeed:backward**. However, it is not always that a two-directional link contains tag
-values for both directions, and it might have only a tag value for **maxspeed**.
-
-Although for **maxspeed** (which is the value for posted speed) we might want to copy the same
-value for both directions, that would not be true for parameters such as **lanes**, which we
-might want to split in half for both directions (cases with an odd number of lanes usually have
-forward/backward values tagged). For this reason, one can use the parameter 'osm_behaviour'
-to define what to do with numeric tag values that have not been tagged for both directions.
-the allowed values for this parameter are **copy** and **divide**, as shown below.
-
-.. image:: ../_images/parameters_links_osm_behaviour.png
-    :align: center
-    :scale: 80 %
-    :alt: OSM behaviour examples
-
-The example below also shows that it is possible to mix fields that will be imported from
-`OSM <https://www.openstreetmap.org/>`_ posted speed and number of lanes, and fields that need
-to be in the network but should not be imported from OSM, such as link capacities.
+   The OSM/Overture importers (:func:`~aequilibrae.project.network.network.Network.import_from_osm`
+   and :func:`~aequilibrae.project.network.network.Network.import_from_overture`) do not use the
+   link-field parameter specification to decide which tags to read. They parse OSM/Overture tags
+   internally and store any attribute that does not map to a real table column in the
+   ``other_attributes`` JSON column. Directional handling is also built in: ``maxspeed`` is applied
+   to both directions, while a total ``lanes`` count for a two-way link is split across directions
+   (the remainder of an odd count going to the AB direction). See
+   :ref:`importing_from_osm` for details.
 
 Node fields
 ~~~~~~~~~~~
 
 The specification for node fields is similar to the one for link fields, with the key difference
-that it does not make sense to have fields for one or two directions and that it is not possible
-yet to import any tagged values from OSM at the moment, and therefore the parameter *osm_source*
-would have no effect here.
-
-OpenStreetMap
-~~~~~~~~~~~~~
-
-The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
-
-**modes** contains the list of key tags we will import for each mode. Description of tags can be found on
-`OpenStreetMap Wiki <https://wiki.openstreetmap.org/>`_, and we recommend
-not changing the standard parameters unless you are exactly sure of what you are doing.
-
-For each mode to be imported there is also a mode filter to control for non-default
-behaviour. For example, in some cities pedestrians a generally allowed on cycleways, but
-they might be forbidden in specific links, which would be tagged as **pedestrian:no**.
-This feature is stored under the key *mode_filter* under each mode to be imported.
-
-There is also the possibility that not all keywords for link types for the region being
-imported, and therefore unknown link type tags are treated as a special case for each
-mode, and that is controlled by the key *unknown_tags* in the parameters file.
+that it does not make sense to have fields for one or two directions.
 
 GMNS
 ~~~~
@@ -193,23 +155,26 @@ the case of the *driving side* and  *default_directory* parameters.
 
 .. _parameters_osm:
 
-Open Streeet Maps
------------------
-The OSM section of the parameter file is relevant only when one plans to
-download a substantial amount of data from an Overpass API, in which case it is
-recommended to deploy a local Overpass server.
+Open Street Maps
+----------------
+The OSM section of the parameter file configures the Overpass download used by
+:func:`~aequilibrae.project.network.network.Network.import_from_osm`. It is
+relevant only when one plans to download a substantial amount of data from an
+Overpass API, in which case it is recommended to deploy a local Overpass server
+and point ``overpass_endpoint`` at it.
 
-.. image:: ../_images/parameters_osm_example.png
-    :align: center
-    :scale: 80 %
-    :alt: OSM example
+The available settings are:
 
-The user is also welcome to change the maximum area for a single query to the
-Overpass API (m\ :sup:`2`) and the pause duration between successive
-requests *sleeptime*.
+* ``overpass_endpoint``: base URL of the Overpass API to query;
+* ``nominatim_endpoint``: base URL of the Nominatim server used to resolve
+  ``place_name`` lookups;
+* ``accept_language``: language tag requested for tag values such as names;
+* ``timeout``: how long (in seconds) to wait for an Overpass response before
+  giving up.
 
-It is also possible to set a custom address for the Nominatim server, but its
-use by AequilibraE is so small that it is likely not necessary to do so.
+These values are applied to ``osmnx`` through ``osmnx.settings`` at import time.
+Tiling of large queries and request retries are handled by ``osmnx`` internally,
+so there is no separate maximum-query-area or sleep-time setting.
 
 .. seealso::
 
