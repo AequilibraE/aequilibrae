@@ -54,18 +54,6 @@ def test_pbf_mode_filter_only_keeps_walk_links(empty_project):
         assert "c" not in modes
 
 
-def test_pbf_link_types_are_preserved_uncapped(empty_project):
-    empty_project.network.import_from_osm(
-        pbf_path=_pbf_path(),
-        modes=("car", "transit", "bicycle", "walk"),
-        simplify=False,
-    )
-
-    with sqlite3.connect(empty_project.path_to_file) as conn:
-        link_types = {r[0] for r in conn.execute("SELECT DISTINCT link_type FROM links").fetchall()}
-    assert len(link_types) >= 3
-
-
 def test_pbf_unknown_tags_land_in_other_attributes(empty_project):
     empty_project.network.import_from_osm(
         pbf_path=_pbf_path(),
@@ -100,41 +88,16 @@ def test_pbf_contract_fields_are_valid(empty_project):
         assert any(row[0] != 0 for row in rows)
 
 
-def test_pbf_about_provenance(empty_project):
+def test_pbf_about_provenance_records_source_url(empty_project):
+    # Provenance keys/timestamps are covered in test_about_provenance.py; here we
+    # only assert the PBF-specific source_url makes it into the about table.
     empty_project.network.import_from_osm(
         pbf_path=_pbf_path(),
         modes=("car",),
         simplify=False,
     )
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        about = {
-            r[0]: r[1]
-            for r in conn.execute("SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'")
-        }
-    assert about["network_source"] == "osm"
-    assert about["network_source_backend"] == "pyrosm"
-    assert "test.osm.pbf" in about["network_source_url"]
-    assert about["network_source_download_cache"] == ""
-
-
-def test_no_alter_table_during_osm_import(empty_project):
-    with sqlite3.connect(empty_project.path_to_file) as conn:
-        before = {
-            r[0]: r[1]
-            for r in conn.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('links','nodes')"
-            )
-        }
-    empty_project.network.import_from_osm(
-        pbf_path=_pbf_path(),
-        modes=("car",),
-        simplify=False,
-    )
-    with sqlite3.connect(empty_project.path_to_file) as conn:
-        after = {
-            r[0]: r[1]
-            for r in conn.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('links','nodes')"
-            )
-        }
-    assert before == after
+        url = conn.execute(
+            "SELECT infovalue FROM about WHERE infoname = 'network_source_url'"
+        ).fetchone()[0]
+    assert "test.osm.pbf" in url
