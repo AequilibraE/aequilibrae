@@ -37,10 +37,9 @@ _STRAIGHTNESS_THRESHOLD = 0.97
 _DEKINK_MAX_POINTS = 6
 _DEKINK_MIN_TURN_DEGREES = 25.0
 _DEKINK_MAX_ENDPOINT_LENGTH = 0.00045
-_SUSPICIOUS_NODE_DEGREE = 4
-_SHORT_BRANCH_DEGREES = 0.00035
-_UNMERGE_OFFSET_FRACTION = 0.2
-_UNMERGE_OFFSET_MAX_DEGREES = 0.00003
+_DENSE_CLUSTER_RADIUS = 20.0
+_DENSE_CLUSTER_MIN_INCIDENT = 6
+_DENSE_CLUSTER_NODE_BUFFER = 10.0
 
 
 def run_neatnet_simplify(
@@ -72,8 +71,17 @@ def run_neatnet_simplify(
         "simplification_factor": float(simplification_factor),
         "min_dangle_length": float(min_dangle_length),
     }
+    dense_mask = _dense_cluster_exclusion_mask(geom_only)
+    combined_mask = dense_mask
     if exclusion_mask is not None:
-        neatify_kwargs["exclusion_mask"] = exclusion_mask.to_crs(utm).geometry
+        bmask = exclusion_mask.to_crs(utm).geometry
+        combined_mask = bmask if combined_mask is None else gpd.GeoSeries(
+            list(bmask) + list(combined_mask), crs=utm
+        )
+    if combined_mask is not None and len(combined_mask) > 0:
+        neatify_kwargs["exclusion_mask"] = combined_mask
+    if metrics is not None:
+        metrics["dense_cluster_mask_count"] = 0 if dense_mask is None else int(len(dense_mask))
 
     from time import perf_counter
 
@@ -85,6 +93,33 @@ def run_neatnet_simplify(
         metrics["neatify_time_s"] = perf_counter() - t0
 
     return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta, metrics=metrics)
+
+
+def _dense_cluster_exclusion_mask(projected_edges: gpd.GeoDataFrame):
+    if len(projected_edges) == 0:
+        return None
+    coords, indices = shapely.get_coordinates(projected_edges.geometry, return_index=True)
+    last_pos = np.searchsorted(indices, np.arange(len(projected_edges)), side="right") - 1
+    first_pos = np.searchsorted(indices, np.arange(len(projected_edges)), side="left")
+    endpoints = np.vstack([coords[first_pos], coords[last_pos]])
+    if len(endpoints) == 0:
+        return None
+
+    endpoint_geoms = shapely.points(endpoints[:, 0], endpoints[:, 1])
+    tree = shapely.STRtree(endpoint_geoms)
+    dense_buffers = []
+    seen = set()
+    for i, pt in enumerate(endpoint_geoms):
+        if i in seen:
+            continue
+        hits = tree.query(pt.buffer(_DENSE_CLUSTER_RADIUS))
+        if len(hits) < _DENSE_CLUSTER_MIN_INCIDENT:
+            continue
+        seen.update(int(h) for h in hits)
+        dense_buffers.append(pt.buffer(_DENSE_CLUSTER_NODE_BUFFER))
+    if not dense_buffers:
+        return None
+    return gpd.GeoSeries(dense_buffers, crs=projected_edges.crs)
 
 
 def _gdf_to_staged(
@@ -102,13 +137,15 @@ def _gdf_to_staged(
     _transfer_attributes(edges, original_links, metrics=metrics)
     edges["geometry"] = [_dekink_endpoints_local(geom) for geom in edges.geometry]
 
-    edges, node_coords = _assign_and_unmerge_suspicious_nodes(edges, metrics=metrics)
+    endpoints, a_nodes, b_nodes, _next_id = _build_endpoint_index(edges.geometry)
+    edges["a_node"] = a_nodes
+    edges["b_node"] = b_nodes
     edges["distance"] = compute_lengths(edges.geometry).to_numpy()
 
     nodes = gpd.GeoDataFrame(
         {
-            "node_id": list(node_coords.keys()),
-            "geometry": [Point(x, y) for x, y in node_coords.values()],
+            "node_id": list(endpoints.keys()),
+            "geometry": [Point(x, y) for x, y in endpoints.values()],
             "modes": "c",
         },
         geometry="geometry",
@@ -122,35 +159,6 @@ def _gdf_to_staged(
 _BUFFER_DIST = 25.0  # metres – search radius for matching original edges
 
 
-def _assign_and_unmerge_suspicious_nodes(edges: gpd.GeoDataFrame, metrics: dict | None = None):
-    node_lookup, node_coords, a_nodes, b_nodes, next_id = _build_endpoint_index(edges.geometry)
-    edges = edges.copy()
-    edges["a_node"] = a_nodes
-    edges["b_node"] = b_nodes
-
-    suspicious = _find_suspicious_nodes(edges)
-    unmerged = 0
-    for node_id in suspicious:
-        branch_idx = _select_branch_to_unmerge(edges, node_id)
-        if branch_idx is None:
-            continue
-        new_coord, new_geom, split_at_a = _offset_branch_endpoint(edges.loc[branch_idx], node_id)
-        new_id = next_id
-        next_id += 1
-        node_coords[new_id] = new_coord
-        edges.at[branch_idx, "geometry"] = new_geom
-        if split_at_a:
-            edges.at[branch_idx, "a_node"] = new_id
-        else:
-            edges.at[branch_idx, "b_node"] = new_id
-        unmerged += 1
-
-    if metrics is not None:
-        metrics["suspicious_node_count"] = len(suspicious)
-        metrics["unmerged_node_count"] = unmerged
-    return edges, node_coords
-
-
 def _build_endpoint_index(geoms):
     coords, indices = shapely.get_coordinates(geoms, return_index=True)
     last_pos = np.searchsorted(indices, np.arange(len(geoms)), side="right") - 1
@@ -159,7 +167,6 @@ def _build_endpoint_index(geoms):
     ends = coords[last_pos]
 
     node_lookup = {}
-    node_coords = {}
     a_nodes = np.empty(len(geoms), dtype=np.int64)
     b_nodes = np.empty(len(geoms), dtype=np.int64)
     next_id = NODE_ID_START
@@ -170,99 +177,10 @@ def _build_endpoint_index(geoms):
             if nid is None:
                 nid = next_id
                 node_lookup[key] = nid
-                node_coords[nid] = key
                 next_id += 1
             target[i] = nid
-    return node_lookup, node_coords, a_nodes, b_nodes, next_id
-
-
-def _find_suspicious_nodes(edges: gpd.GeoDataFrame) -> list[int]:
-    suspicious = []
-    node_ids = sorted(set(edges["a_node"]).union(set(edges["b_node"])))
-    for node_id in node_ids:
-        incident = edges[(edges["a_node"] == node_id) | (edges["b_node"] == node_id)]
-        if len(incident) < _SUSPICIOUS_NODE_DEGREE:
-            continue
-        families = {_branch_priority(_link_type_family(str(lt))) for lt in incident["link_type"].fillna("unknown")}
-        if len(families) < 2:
-            continue
-        branch_lengths = [
-            _local_branch_length(geom, node_id, a, b)
-            for geom, a, b in zip(incident.geometry, incident["a_node"], incident["b_node"], strict=True)
-        ]
-        if min(branch_lengths, default=1.0) > _SHORT_BRANCH_DEGREES:
-            continue
-        suspicious.append(int(node_id))
-    return suspicious
-
-
-def _select_branch_to_unmerge(edges: gpd.GeoDataFrame, node_id: int):
-    incident = edges[(edges["a_node"] == node_id) | (edges["b_node"] == node_id)].copy()
-    if len(incident) < _SUSPICIOUS_NODE_DEGREE:
-        return None
-    dominant_name = incident["name"].dropna().astype(str).mode()
-    dominant_name = dominant_name.iloc[0] if len(dominant_name) else None
-
-    ranked = []
-    for idx, row in incident.iterrows():
-        fam = _link_type_family(str(row.get("link_type") or ""))
-        priority = _branch_priority(fam)
-        local_len = _local_branch_length(row.geometry, node_id, row.a_node, row.b_node)
-        same_name = int(dominant_name is not None and str(row.get("name") or "") == dominant_name)
-        ranked.append((priority, local_len, same_name, int(idx)))
-    ranked.sort(key=lambda item: (item[0], item[1], item[2]))
-    return ranked[0][3] if ranked else None
-
-
-def _branch_priority(family) -> int:
-    if family == _LINK_TYPE_FAMILIES[2]:
-        return 0
-    if family == _LINK_TYPE_FAMILIES[3]:
-        return 1
-    if family is None:
-        return 2
-    if family == _LINK_TYPE_FAMILIES[1]:
-        return 3
-    if family == _LINK_TYPE_FAMILIES[0]:
-        return 4
-    return 2
-
-
-def _local_branch_length(geom, node_id: int, a_node: int, b_node: int) -> float:
-    coords = list(geom.coords)
-    if len(coords) < 2:
-        return 0.0
-    forward = int(a_node) == int(node_id)
-    segment = coords[:2] if forward else coords[-2:]
-    return shapely.LineString(segment).length
-
-
-def _offset_branch_endpoint(row, node_id: int):
-    coords = list(row.geometry.coords)
-    split_at_a = int(row.a_node) == int(node_id)
-    if split_at_a:
-        anchor = coords[0]
-        nxt = coords[1] if len(coords) > 1 else coords[0]
-    else:
-        anchor = coords[-1]
-        nxt = coords[-2] if len(coords) > 1 else coords[-1]
-
-    dx = float(nxt[0]) - float(anchor[0])
-    dy = float(nxt[1]) - float(anchor[1])
-    seg = math.hypot(dx, dy)
-    if seg > 0.0:
-        step = min(seg * _UNMERGE_OFFSET_FRACTION, _UNMERGE_OFFSET_MAX_DEGREES)
-        ox = float(anchor[0]) + dx / seg * step
-        oy = float(anchor[1]) + dy / seg * step
-    else:
-        ox, oy = float(anchor[0]), float(anchor[1])
-    offset = (round(ox, 7), round(oy, 7))
-
-    if split_at_a:
-        coords[0] = offset
-    else:
-        coords[-1] = offset
-    return offset, shapely.LineString(coords), split_at_a
+    endpoints = {nid: key for key, nid in node_lookup.items()}
+    return endpoints, a_nodes, b_nodes, next_id
 
 
 def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame, metrics: dict | None = None) -> None:

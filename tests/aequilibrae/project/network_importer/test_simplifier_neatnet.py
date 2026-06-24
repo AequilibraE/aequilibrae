@@ -6,13 +6,10 @@ from shapely.geometry import Point
 
 from aequilibrae.project.network.importer.simplifiers.impl_neatnet import (
     _DUAL_CARRIAGEWAY_WARNING,
-    _assign_and_unmerge_suspicious_nodes,
     _classify_orientation_fast,
     _dekink_endpoints_local,
-    _find_suspicious_nodes,
     _geometry_summary,
     _link_type_compatible,
-    _select_branch_to_unmerge,
     _transfer_attributes,
     run_neatnet_simplify,
 )
@@ -90,53 +87,6 @@ def test_dekink_endpoints_preserves_endpoints_and_removes_local_spike():
     assert out.coords[0] == geom.coords[0]
     assert out.coords[-1] == geom.coords[-1]
     assert len(out.coords) < len(geom.coords)
-
-
-def test_suspicious_node_detection_requires_degree_family_mix_and_short_branch():
-    edges = gpd.GeoDataFrame(
-        {
-            "geometry": [
-                LineString([(0, 0), (1, 0)]),
-                LineString([(0, 0), (-1, 0)]),
-                LineString([(0, 0), (0, 1)]),
-                LineString([(0, 0), (0.0001, 0.0001)]),
-            ],
-            "a_node": [100000, 100000, 100000, 100000],
-            "b_node": [100001, 100002, 100003, 100004],
-            "link_type": ["primary", "primary", "primary", "footway"],
-            "name": ["Main", "Main", "Main", None],
-        },
-        geometry="geometry",
-        crs="EPSG:4326",
-    )
-    assert _find_suspicious_nodes(edges) == [100000]
-    assert _select_branch_to_unmerge(edges, 100000) == 3
-
-
-def test_unmerge_reassigns_selected_branch_and_offsets_it_slightly():
-    edges = gpd.GeoDataFrame(
-        {
-            "geometry": [
-                LineString([(0, 0), (1, 0)]),
-                LineString([(0, 0), (-1, 0)]),
-                LineString([(0, 0), (0, 1)]),
-                LineString([(0, 0), (0.0001, 0.0001)]),
-            ],
-            "link_id": [1, 2, 3, 4],
-            "link_type": ["primary", "primary", "primary", "footway"],
-            "name": ["Main", "Main", "Main", None],
-        },
-        geometry="geometry",
-        crs="EPSG:4326",
-    )
-    out, node_coords = _assign_and_unmerge_suspicious_nodes(edges)
-    base = int(out.loc[0, "a_node"])
-    split = int(out.loc[3, "a_node"])
-    assert split != base
-    assert int(out.loc[1, "a_node"]) == base
-    assert int(out.loc[2, "a_node"]) == base
-    assert node_coords[base] != node_coords[split]
-    assert list(out.loc[3, "geometry"].coords)[0] == node_coords[split]
 
 
 def test_transfer_attributes_does_not_bleed_sidewalk_modes_onto_highway():
