@@ -30,7 +30,6 @@ def _explicit_allowed(tags: Mapping, key: str) -> bool:
     return _has(tags, key, "yes", "designated", "permissive", "official")
 
 
-
 def _allow_car(tags: Mapping) -> bool:
     highway = str(tags.get("highway", "")).lower()
     if not highway:

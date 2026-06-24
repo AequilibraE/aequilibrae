@@ -273,7 +273,7 @@ def _aggregate_directional_attrs(geom, source_refs: list[str], oriented_src_attr
         attrs = oriented_src_attrs.get(source_ref)
         if attrs is None or attrs["geometry"] is None:
             continue
-        candidate = forward if _is_forward_aligned(geom, attrs["geometry"]) else backward
+        candidate = forward if aligned_along_geometry(geom, attrs["geometry"]) else backward
         candidate.append((geom.distance(attrs["geometry"]), attrs))
 
     if forward and backward:
@@ -309,7 +309,3 @@ def _first_non_missing(values, *, fallback=None, default=None):
     if not is_missing(fallback):
         return fallback
     return default
-
-
-def _is_forward_aligned(geom_a, geom_b) -> bool:
-    return aligned_along_geometry(geom_a, geom_b)
