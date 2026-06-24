@@ -43,7 +43,6 @@ def run_neatnet_simplify(
     net: StagedNetwork,
     *,
     exclusion_mask=None,
-    metrics=None,
     consolidation_tolerance: float = 10.0,
     simplification_factor: float = 2.0,
     min_dangle_length: float = 20.0,
@@ -71,23 +70,17 @@ def run_neatnet_simplify(
     if exclusion_mask is not None:
         neatify_kwargs["exclusion_mask"] = exclusion_mask.to_crs(utm).geometry
 
-    from time import perf_counter
-
-    t0 = perf_counter()
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="neatnet")
         simplified = neatnet.neatify(geom_only, **neatify_kwargs).to_crs("EPSG:4326")
-    if metrics is not None:
-        metrics["neatify_time_s"] = perf_counter() - t0
 
-    return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta, metrics=metrics)
+    return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta)
 
 
 def _gdf_to_staged(
     edges_gdf: gpd.GeoDataFrame,
     original_links: gpd.GeoDataFrame,
     source_meta: dict,
-    metrics: dict | None = None,
 ) -> StagedNetwork:
     edges = edges_gdf.copy().reset_index(drop=True)
     if edges.crs is None:
@@ -95,7 +88,7 @@ def _gdf_to_staged(
 
     edges["link_id"] = np.arange(1, len(edges) + 1, dtype=np.int64)
 
-    _transfer_attributes(edges, original_links, metrics=metrics)
+    _transfer_attributes(edges, original_links)
     edges["geometry"] = [_dekink_endpoints_local(geom) for geom in edges.geometry]
 
     endpoints, a_nodes, b_nodes, _next_id = _build_endpoint_index(edges.geometry)
@@ -144,11 +137,8 @@ def _build_endpoint_index(geoms):
     return endpoints, a_nodes, b_nodes, next_id
 
 
-def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame, metrics: dict | None = None) -> None:
+def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame) -> None:
     """Match each simplified edge to nearby originals and aggregate attributes."""
-    from time import perf_counter
-
-    t0 = perf_counter()
     utm = simplified.geometry.estimate_utm_crs()
     simp_geoms = simplified.geometry.to_crs(utm).values
     orig_geoms = original.geometry.to_crs(utm).values
@@ -177,17 +167,11 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     orig_source_ids = original[_SOURCE_ID_COL].astype(str).to_numpy()
     orig_straightness = np.array([line_straightness(g) for g in orig_geoms], dtype=float)
 
-    raw_hit_counts = []
-    reduced_counts = []
-    bearing_counts = []
-    fallback_counts = []
-
     for i in range(n):
         sg = simp_geoms[i]
         hits = tree.query(sg.buffer(_BUFFER_DIST))
         if len(hits) == 0:
             hits = np.array([tree.nearest(sg)])
-        raw_hit_counts.append(int(len(hits)))
 
         nearest_oidx = int(tree.nearest(sg))
         nearest_lt = str(orig_lt[nearest_oidx])
@@ -195,15 +179,8 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
 
         compatible = [int(oidx) for oidx in hits if _link_type_compatible(nearest_lt, str(orig_lt[oidx]))]
         reduced = _reduce_candidates_by_overlap(sg, orig_geoms, compatible)
-        reduced_counts.append(int(len(reduced)))
 
-        (
-            fwd_candidates,
-            bwd_candidates,
-            contributing_oidx,
-            bearing_direct,
-            fallback,
-        ) = _classify_candidates(
+        fwd_candidates, bwd_candidates, contributing_oidx = _classify_candidates(
             reduced=reduced,
             simp_geom=sg,
             simp_summary=simp_summary,
@@ -211,11 +188,7 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
             orig_straightness=orig_straightness,
             orig_dir=orig_dir,
             orig_source_ids=orig_source_ids,
-            metrics=metrics,
         )
-
-        bearing_counts.append(bearing_direct)
-        fallback_counts.append(fallback)
 
         has_fwd = len(fwd_candidates) > 0
         has_bwd = len(bwd_candidates) > 0
@@ -265,13 +238,6 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     simplified[_SOURCE_ID_COL] = primary_source_ids
     simplified[_PROVENANCE_OUT_COL] = provenance
     simplified[_SOURCE_REFS_TMP_COL] = source_refs
-
-    if metrics is not None:
-        metrics["transfer_time_s"] = perf_counter() - t0
-        metrics["raw_hit_counts"] = raw_hit_counts
-        metrics["reduced_candidate_counts"] = reduced_counts
-        metrics["bearing_direct_counts"] = bearing_counts
-        metrics["fallback_alignment_counts"] = fallback_counts
 
 
 # Highway classes grouped by function. Modes are only inherited between
@@ -332,7 +298,6 @@ def _geometry_summary(geom) -> dict:
         "end": end,
         "bearing": bearing_degrees(start, end),
         "straightness": line_straightness(geom),
-        "length": float(geom.length),
     }
 
 
@@ -369,21 +334,15 @@ def _classify_candidates(
     orig_straightness,
     orig_dir,
     orig_source_ids,
-    metrics: dict | None,
 ):
     fwd_candidates = []
     bwd_candidates = []
     contributing_oidx: list[int] = []
-    bearing_direct = 0
-    fallback = 0
 
     for oidx, dist in reduced:
         orientation = _classify_orientation_fast(simp_summary, orig_geoms[oidx], orig_straightness[oidx])
         if orientation is None:
-            fallback += 1
-            orientation = _is_forward_aligned(simp_geom, orig_geoms[oidx], metrics=metrics)
-        else:
-            bearing_direct += 1
+            orientation = aligned_along_geometry(simp_geom, orig_geoms[oidx])
 
         d = int(orig_dir[oidx])
         base_id = orig_source_ids[oidx]
@@ -407,7 +366,7 @@ def _classify_candidates(
             else:
                 fwd_candidates.append((f"{base_id}::ba", dist))
 
-    return fwd_candidates, bwd_candidates, contributing_oidx, bearing_direct, fallback
+    return fwd_candidates, bwd_candidates, contributing_oidx
 
 
 def _classify_orientation_fast(simp_summary: dict, orig_geom, orig_straightness: float) -> bool | None:
@@ -431,14 +390,7 @@ def _classify_orientation_fast(simp_summary: dict, orig_geom, orig_straightness:
     return None
 
 
-def _is_forward_aligned(geom_a, geom_b, metrics: dict | None = None) -> bool:
-    """Return whether ``geom_b`` flows roughly in the same direction as ``geom_a``."""
-    return aligned_along_geometry(geom_a, geom_b, metrics=metrics)
-
-
 def _dekink_endpoints_local(geom):
-    if geom is None or getattr(geom, "is_empty", False):
-        return geom
     coords = list(geom.coords)
     if len(coords) < 4:
         return geom
@@ -469,7 +421,7 @@ def _prune_endpoint_kinks(coords: list, *, reverse: bool) -> list:
 
     # Second: collapse a short endpoint approach chain if it is noticeably more
     # sinuous than the direct chord to the first stable interior point. This
-    # targets staircase-like last sections such as the one observed in manual experiments.
+    # targets staircase-like last sections near intersections.
     for idx in range(2, min(len(work) - 1, _DEKINK_MAX_POINTS + 1)):
         chain = work[: idx + 1]
         chain_len = shapely.LineString(chain).length

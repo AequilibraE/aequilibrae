@@ -72,7 +72,7 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
 
     def _resolve_geom(row):
         g = row.get("geometry")
-        if is_missing(g) or (hasattr(g, "is_empty") and g.is_empty):
+        if is_missing(g) or g.is_empty:
             g = LineString([node_xy[row["_u"]], node_xy[row["_v"]]])
         if isinstance(g, MultiLineString):
             g = max(g.geoms, key=lambda p: p.length)
@@ -145,7 +145,6 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
         _PROVENANCE_OUT_COL,
     ]
     links_out = gpd.GeoDataFrame(df[[c for c in out_cols if c in df.columns]], geometry="geometry", crs="EPSG:4326")
-
 
     nodes_out = gpd.GeoDataFrame(node_rows, geometry="geometry", crs="EPSG:4326")
     used = set(links_out["a_node"]) | set(links_out["b_node"])

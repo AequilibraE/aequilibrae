@@ -1,6 +1,8 @@
 import math
 
+import geopandas as gpd
 import pandas as pd
+from pyproj import Geod
 
 NODE_ID_START = 100000
 
@@ -10,7 +12,7 @@ NODE_ID_START = 100000
 _MAX_UTM_SPAN_DEGREES = 3.0
 
 
-def compute_lengths(geoms) -> "pd.Series":
+def compute_lengths(geoms) -> pd.Series:
     """Length in metres for a GeoSeries of EPSG:4326 LineStrings.
 
     For small extents the geometries are projected to the estimated local UTM
@@ -18,8 +20,6 @@ def compute_lengths(geoms) -> "pd.Series":
     single UTM zone would badly distort distances near its edges, so an
     ellipsoidal geodesic length is computed instead.
     """
-    import geopandas as gpd
-
     if not isinstance(geoms, gpd.GeoSeries):
         geoms = gpd.GeoSeries(geoms, crs="EPSG:4326")
     if geoms.crs is None:
@@ -35,14 +35,10 @@ def compute_lengths(geoms) -> "pd.Series":
     return _geodesic_lengths(geoms)
 
 
-def _geodesic_lengths(geoms) -> "pd.Series":
-    from pyproj import Geod
-
+def _geodesic_lengths(geoms) -> pd.Series:
     geod = Geod(ellps="WGS84")
-    values = [
-        0.0 if (g is None or getattr(g, "is_empty", False)) else float(geod.geometry_length(g)) for g in geoms
-    ]
-    return pd.Series(values, index=geoms.index, dtype=float)
+    return pd.Series([float(geod.geometry_length(g)) for g in geoms], index=geoms.index, dtype=float)
+
 
 # Number of fractional sample positions used when comparing two geometries.
 _ALIGNMENT_SAMPLES = 16
@@ -58,42 +54,27 @@ def angular_difference_degrees(a: float, b: float) -> float:
 
 def line_straightness(geom) -> float:
     """Chord/length ratio in [0, 1]; 1 means perfectly straight."""
-    if geom is None or getattr(geom, "is_empty", False):
-        return 1.0
     coords = geom.coords
     if len(coords) < 2:
         return 1.0
     chord = math.hypot(coords[-1][0] - coords[0][0], coords[-1][1] - coords[0][1])
-    length = float(getattr(geom, "length", 0.0))
+    length = float(geom.length)
     if length <= 0.0:
         return 1.0
     return max(0.0, min(1.0, chord / length))
 
 
-def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES, metrics: dict | None = None) -> bool:
+def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES) -> bool:
     """Whether ``geom_b`` traces roughly the same directed path as ``geom_a``.
 
-    The legacy implementation compared the *global* start->end vectors of the two
-    lines. That is meaningless for curved roads, U-shaped ramps, loop ramps and
-    roundabout segments, where the start->end chord says nothing about the
-    direction of travel along the geometry (and is degenerate for closed loops).
-
-    This implementation samples each line at matching fractional distances and
-    measures how well ``geom_b`` follows ``geom_a`` versus its reverse: for every
-    sample point of ``geom_a`` we accumulate its distance to the same-fraction
-    point of ``geom_b`` (forward) and to the mirror-fraction point (reverse). The
-    smaller total wins. This is robust for near-coincident candidate geometries
-    of arbitrary curvature, which is exactly how the simplifiers use it (matching
-    a simplified link against the original links that lie on top of it).
+    Samples each line at matching fractional distances and measures how well
+    ``geom_b`` follows ``geom_a`` versus its reverse: for every sample point of
+    ``geom_a`` we accumulate its distance to the same-fraction point of
+    ``geom_b`` (forward) and to the mirror-fraction point (reverse). The smaller
+    total wins. This is robust for near-coincident candidate geometries of
+    arbitrary curvature, including curves, loops and roundabout segments where a
+    global start-to-end vector is meaningless.
     """
-    if geom_a is None or geom_b is None:
-        return True
-    if getattr(geom_a, "is_empty", False) or getattr(geom_b, "is_empty", False):
-        return True
-
-    from time import perf_counter
-
-    start = perf_counter()
     fractions = [i / samples for i in range(samples + 1)]
     pts_a = [geom_a.interpolate(f, normalized=True) for f in fractions]
     pts_b = [geom_b.interpolate(f, normalized=True) for f in fractions]
@@ -103,11 +84,7 @@ def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES, me
     for k in range(samples + 1):
         forward_err += pts_a[k].distance(pts_b[k])
         reverse_err += pts_a[k].distance(pts_b[samples - k])
-    result = forward_err <= reverse_err
-    if metrics is not None:
-        metrics["aligned_calls"] = int(metrics.get("aligned_calls", 0)) + 1
-        metrics["aligned_time_s"] = float(metrics.get("aligned_time_s", 0.0)) + (perf_counter() - start)
-    return result
+    return forward_err <= reverse_err
 
 
 def compute_node_modes(node_ids, links: pd.DataFrame, fallback: str = "") -> list:

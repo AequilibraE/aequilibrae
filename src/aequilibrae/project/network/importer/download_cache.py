@@ -28,6 +28,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,7 +106,6 @@ class DownloadCache:
         gdf.to_parquet(target)
         self._sha256s[name] = _sha256_of_file(target)
         return target
-
 
     def write_json(self, name: str, payload) -> Path:
         """Write a JSON document.

@@ -118,7 +118,6 @@ class Network(WorkerThread):
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
         cache_tag: str = "",
-        metrics: Optional[dict] = None,
         **source_kwargs,
     ) -> None:
         """Import from ``osm-overpass``, ``osm-pbf``, or ``overture-cloud``.
@@ -137,7 +136,6 @@ class Network(WorkerThread):
             simplify=simplify,
             consolidate_tolerance=consolidate_tolerance,
             cache_tag=cache_tag,
-            metrics=metrics,
             **source_kwargs,
         )
 
@@ -151,7 +149,6 @@ class Network(WorkerThread):
         custom_filter: Optional[str] = None,
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
-        metrics: Optional[dict] = None,
     ) -> None:
         """Import a network from OpenStreetMap.
 
@@ -176,7 +173,6 @@ class Network(WorkerThread):
                 simplify=simplify,
                 consolidate_tolerance=consolidate_tolerance,
                 cache_tag=str(pbf_path),
-                metrics=metrics,
                 pbf_path=pbf_path,
             )
         else:
@@ -186,7 +182,6 @@ class Network(WorkerThread):
                 simplify=simplify,
                 consolidate_tolerance=consolidate_tolerance,
                 cache_tag=place_name or "bbox",
-                metrics=metrics,
                 model_area=model_area,
                 place_name=place_name,
                 custom_filter=custom_filter,
@@ -199,7 +194,6 @@ class Network(WorkerThread):
         modes=("car", "transit", "bicycle", "walk"),
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
-        metrics: Optional[dict] = None,
     ) -> None:
         """Import a network from Overture Maps.
 
@@ -217,7 +211,6 @@ class Network(WorkerThread):
             simplify=simplify,
             consolidate_tolerance=consolidate_tolerance,
             cache_tag=tag,
-            metrics=metrics,
             model_area=model_area,
         )
 

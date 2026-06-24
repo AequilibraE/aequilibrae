@@ -1,9 +1,5 @@
-import logging
 import string
 from dataclasses import dataclass
-from typing import Iterable
-
-logger = logging.getLogger(__name__)
 
 _FALLBACK_ALPHABET = string.ascii_lowercase + string.ascii_uppercase
 
@@ -40,9 +36,3 @@ class LinkTypeAllocator:
                 return candidate
 
         raise RuntimeError("Exhausted the single-character alphabet. Reduce the number of link types in your model.")
-
-    def assign_many(self, link_types: Iterable[str]) -> dict:
-        out = {}
-        for lt in link_types:
-            out[lt] = self.allocate(lt)
-        return out
