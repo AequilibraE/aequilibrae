@@ -44,8 +44,16 @@ jobs:
       - name: Generate plots
         run: uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --compare-flow
 
+      - name: Test adding markdown text to summary 
+        run: |
+          echo "This is the lead in sentence for the list" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY # this is a blank line
+          echo "- Lets add a bullet point" >> $GITHUB_STEP_SUMMARY
+          echo "- Lets add a second bullet point" >> $GITHUB_STEP_SUMMARY
+          echo "- How about a third one?" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload plots as artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-plots
           path: ${{ env.BENCHMARK_REPORTS_DIR }}/**/*.png
