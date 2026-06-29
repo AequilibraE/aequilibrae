@@ -14,23 +14,32 @@ from scipy.stats import linregress
 import pytest as pytest
 
 
-# pytest .\tests\benchmarks\
-# python .\tests\benchmarks\plot_benchmarks.py --x-axis time
-
-# must set transport network directory as environment variable
-# TNTP_ROOT = Path(os.environ["TNTP_ROOT"])
-
+# pytest .\tests\aeq\benchmarks\* -- benchmark
+# python .\tests\aeq\benchmarks\plot_benchmarks.py [--convergence] [--compare-flow] [--reports-dir PATH] [--x-axis {time,iterations}]
 
 # $env:TNTP_ROOT="C:\Users\jake\src\aequilibrae\TransportationNetworks"
-# export TNTP_ROOT="../../TransportationNetworks"
 
-# REPORTS_DIR = Path(__file__).resolve().parent / "_convergence_reports"
-# BENCHMARK_REPORTS_DIR = Path(os.environ["BENCHMARK_REPORTS_DIR"])
-# export BENCHMARK_REPORTS_DIR="./tests/aeq/benchmarks/_convergence_reports"
+"""
+The path to the repo "TransportationNetworks" must be set using the environment variable TNTP_ROOT.
+Found at https://github.com/bstabler/TransportationNetworks
+
+The output directory where the csv results files will be placed also needs to be set using the environment variable BENCHMARK_REPORTS_DIR
+
+e.g.
+export TNTP_ROOT="../../TransportationNetworks"
+export BENCHMARK_REPORTS_DIR="./tests/aeq/benchmarks/_convergence_reports"
+
+To run these tests, the arugment --benchmark needs to be specified:
+pytest ./tests/aeq/benchmarks/* --benchmark
+
+So these tests are skipped with:
+pytest .
+
+"""
 
 
 METHODS = ["msa", "frank-wolfe", "cfw", "bfw"]
-ITERATIONS = 10
+ITERATIONS = 1000
 RGAP_TARGET = 1e-15
 
 R2_MINIMUM = 0.95
