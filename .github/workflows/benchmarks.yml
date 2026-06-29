@@ -7,6 +7,7 @@ env:
   AEQ_SHOW_PROGRESS: "0"
   TNTP_ROOT: ${{ github.workspace }}/TransportationNetworks
   BENCHMARK_REPORTS_DIR: ${{ github.workspace }}/tests/aeq/benchmarks/_convergence_reports
+  PYTHON_VERSION: '3.13'
 
 jobs:
   benchmark:
@@ -23,7 +24,10 @@ jobs:
       - name: Set up Python
         uses: astral-sh/setup-uv@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python and create virtual environment
+        run: uv venv .venv --python ${{ env.PYTHON_VERSION }} --python-preference only-managed  --clear
 
       - name: Install spatialite
         run: |
