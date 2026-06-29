@@ -38,7 +38,7 @@ def plot_flow_dashboard(
     save_path: Path,
 ):
     """
-    Combined flow comparison dashboard for AequilibraE vs TNTP
+    Flow comparison dashboard for AequilibraE vs TNTP
     """
     sns.set_theme(style="whitegrid", context="paper")
 
@@ -227,8 +227,11 @@ def plot_method_comparison(
     save_path: Path,
     *,
     plot_time: bool = False,
+    plot_all_trials: bool = False,
 ):
-    """Per-model comparison of all algorithms. Mean lines in legend, faint per-trial traces behind."""
+    """Per-model comparison of all algorithms. Mean lines in legend. If the x axis is time, it will also plot the
+    slowest and fastest trials. If the x axis is iterations, it will also plot the worst performing and best performing
+    trails based on the relative gap."""
     sns.set_theme(style="whitegrid", context="paper")
     palette = sns.color_palette()
 
@@ -238,18 +241,41 @@ def plot_method_comparison(
     alg_trials: dict[str, list[tuple[np.ndarray, np.ndarray]]] = {}
     alg_means: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
+    alg_best_trial: dict[str, int] = {}
+    alg_worst_trial: dict[str, int] = {}
+
     for alg in algorithms:
+        best_trial_quantity = float("inf")  # worst case for iter is large gap, worst case for time is large time
+        worst_trial_quantity = -1  # best case for iter is small gap, best case for time is small time
         sub = df[df["algorithm"] == alg]
         trials = sorted(sub["trial"].unique())
-        pairs = []
-        for t in trials:
+        x_y_pairs = []
+        for i, t in enumerate(trials):
             tdf = sub[sub["trial"] == t].reset_index(drop=True)
             if plot_time:
                 x = tdf["time"].values
             else:
                 x = np.arange(len(tdf), dtype=float)
-            pairs.append((x, tdf["rgap"].values))
-        alg_trials[alg] = pairs
+            y = tdf["rgap"].values
+            x_y_pairs.append((x, y))
+            if plot_time:
+                # compare times for best and worst trial
+                if x[-1] < best_trial_quantity:
+                    alg_best_trial[alg] = i
+                    best_trial_quantity = x[-1]
+                if x[-1] > worst_trial_quantity:
+                    alg_worst_trial[alg] = i
+                    worst_trial_quantity = x[-1]
+            else:
+                # compare gaps for best and worst trial
+                if y[-1] < best_trial_quantity:
+                    alg_best_trial[alg] = i
+                    best_trial_quantity = y[-1]
+                if y[-1] > worst_trial_quantity:
+                    alg_worst_trial[alg] = i
+                    worst_trial_quantity = y[-1]
+
+        alg_trials[alg] = x_y_pairs
 
         # Mean: align by iteration index regardless of x-axis mode
         tdf_idx = sub.copy()
@@ -269,15 +295,39 @@ def plot_method_comparison(
 
     # faint per-trial traces (no legend), only when >1 trial exists
     if n_trials_total > len(algorithms):
-        for i, alg in enumerate(algorithms):
-            color = palette[i % len(palette)]
-            for x, y in alg_trials[alg]:
+        if plot_all_trials:
+            for i, alg in enumerate(algorithms):
+                color = palette[i % len(palette)]
+                for x, y in alg_trials[alg]:
+                    ax.plot(
+                        x,
+                        y,
+                        color=color,
+                        linewidth=1.5,
+                        alpha=0.5,
+                    )
+        else:
+            for i, alg in enumerate(algorithms):
+                color = palette[i % len(palette)]
+                best_x, best_y = alg_trials[alg][alg_best_trial[alg]]
+                worst_x, worst_y = alg_trials[alg][alg_worst_trial[alg]]
                 ax.plot(
-                    x,
-                    y,
+                    best_x,
+                    best_y,
                     color=color,
                     linewidth=1.5,
-                    alpha=0.5,
+                    alpha=0.8,
+                    linestyle="dashed",
+                    label=f"{alg.upper()} best trial: {alg_best_trial[alg]}",
+                )
+                ax.plot(
+                    worst_x,
+                    worst_y,
+                    color=color,
+                    linewidth=1.5,
+                    alpha=0.8,
+                    linestyle="dotted",
+                    label=f"{alg.upper()} worst trial: {alg_worst_trial[alg]}",
                 )
 
     for i, alg in enumerate(algorithms):
@@ -285,13 +335,14 @@ def plot_method_comparison(
         sns.lineplot(
             x=x_mean,
             y=y_mean,
-            label=alg.upper(),
+            label=f"{alg.upper()} mean",
             ax=ax,
             marker="^",
             markevery=markevery,
             markersize=6,
             color=palette[i % len(palette)],
-            linewidth=2,
+            linewidth=1,
+            alpha=0.8,
         )
 
     ax.set_xlim(left=0)
