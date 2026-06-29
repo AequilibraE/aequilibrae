@@ -39,18 +39,14 @@ jobs:
         run: uv pip install -e ".[dev]"
 
       - name: Run benchmarks
-        run: uv run pytest tests/aeq/benchmarks/test_anaheim.py --benchmark
+        run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_anaheim.py --benchmark
 
       - name: Generate plots
         run: uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --compare-flow
 
-      - name: Test adding markdown text to summary 
+      - name: Test adding pytest-benchmark output to summary
         run: |
-          echo "This is the lead in sentence for the list" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY # this is a blank line
-          echo "- Lets add a bullet point" >> $GITHUB_STEP_SUMMARY
-          echo "- Lets add a second bullet point" >> $GITHUB_STEP_SUMMARY
-          echo "- How about a third one?" >> $GITHUB_STEP_SUMMARY
+          pytest-benchmark compare 0001 >> $GITHUB_STEP_SUMMARY
 
       - name: Upload plots as artifacts
         uses: actions/upload-artifact@v5
