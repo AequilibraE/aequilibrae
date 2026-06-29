@@ -71,6 +71,7 @@ tests = [
   "pytest-cov",
   "pytest-subtests",
   "pytest-random-order",
+  "pytest-benchmark",
   "coveralls",
   "ruff==0.14.8",
   "wheel",
