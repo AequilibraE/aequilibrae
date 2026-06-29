@@ -24,7 +24,7 @@ import pytest as pytest
 The path to the repo "TransportationNetworks" must be set using the environment variable TNTP_ROOT.
 Found at https://github.com/bstabler/TransportationNetworks
 
-The output directory where the csv results files will be placed also needs to be set 
+The output directory where the csv results files will be placed also needs to be set
 using the environment variable BENCHMARK_REPORTS_DIR
 
 e.g.
