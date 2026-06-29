@@ -15,7 +15,8 @@ import pytest as pytest
 
 
 # pytest .\tests\aeq\benchmarks\* -- benchmark
-# python .\tests\aeq\benchmarks\plot_benchmarks.py [--convergence] [--compare-flow] [--reports-dir PATH] [--x-axis {time,iterations}]
+
+# python plot_benchmarks.py [--convergence] [--compare-flow] [--reports-dir PATH] [--x-axis {time,iterations}]
 
 # $env:TNTP_ROOT="C:\Users\jake\src\aequilibrae\TransportationNetworks"
 
@@ -23,7 +24,8 @@ import pytest as pytest
 The path to the repo "TransportationNetworks" must be set using the environment variable TNTP_ROOT.
 Found at https://github.com/bstabler/TransportationNetworks
 
-The output directory where the csv results files will be placed also needs to be set using the environment variable BENCHMARK_REPORTS_DIR
+The output directory where the csv results files will be placed also needs to be set 
+using the environment variable BENCHMARK_REPORTS_DIR
 
 e.g.
 export TNTP_ROOT="../../TransportationNetworks"
