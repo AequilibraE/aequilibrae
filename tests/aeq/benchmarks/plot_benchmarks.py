@@ -41,78 +41,52 @@ def plot_flow_dashboard(
     Flow comparison dashboard for AequilibraE vs TNTP
     """
     sns.set_theme(style="whitegrid", context="paper")
+    fig, ax = plt.subplots(figsize=(7, 7), dpi=150)
 
-    fig = plt.figure(figsize=(16, 8), dpi=150)
-    gs = fig.add_gridspec(2, 2, width_ratios=[1.45, 1.0], wspace=0.10, hspace=0.35)
-    ax_main = fig.add_subplot(gs[:, 0])
+    x_flows = aeq_with_nodes["TNTP Solution"]
+    y_flows = aeq_with_nodes["PCE_AB"]
 
-    def add_scatter(ax, x_flows, y_flows, x_label, y_label, title, marker_size, show_grid_lines):
-        ax.scatter(x_flows, y_flows, alpha=0.5, s=marker_size, label="Link flows")
+    ax.scatter(x_flows, y_flows, alpha=0.5, s=16, label="Link flows")
 
-        x_max = float(np.max(x_flows)) * 1.02 if len(x_flows) else 1.0
-        y_max = float(np.max(y_flows)) * 1.02 if len(y_flows) else 1.0
-        limit = max(x_max, y_max, 1.0)
+    x_max = float(np.max(x_flows)) * 1.02 if len(x_flows) else 1.0
+    y_max = float(np.max(y_flows)) * 1.02 if len(y_flows) else 1.0
+    limit = max(x_max, y_max, 1.0)
 
-        # power = np.floor(np.log10(limit))
-
-        # print(0, limit, power, np.ceil(limit / 10 ** power) * 10 ** power, n_ticks)
-        # major_ticks = np.linspace(0, np.ceil(limit / 10 ** power) * 10 ** power, n_ticks)
-
-        reg = linregress(x_flows, y_flows)
-        x_line = np.array([0.0, limit])
-        y_line = reg.intercept + reg.slope * x_line
-        ax.plot(
-            x_line,
-            y_line,
-            linestyle="--",
-            linewidth=1.8,
-            color="red",
-            label=f"Regression  R²={reg.rvalue**2:.4f}\ny = {reg.slope:.4f}x + {reg.intercept:.4f}",
-        )
-        if len(x_flows) > 0 and len(y_flows) > 0:
-            ax.plot(
-                [0.0, limit],
-                [0.0, limit],
-                linestyle="-",
-                color="grey",
-                alpha=0.5,
-                label="1:1",
-            )
-
-        ax.set_xlim(0.0, limit)
-        ax.set_ylim(0.0, limit)
-        ax.set_aspect("equal", adjustable="box")
-        steps = [4, 6, 8]
-        ax.xaxis.set_major_locator(plt.MaxNLocator(steps=steps))
-        ax.yaxis.set_major_locator(plt.MaxNLocator(steps=steps))
-        ax.set_anchor("W")
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-        ax.set_title(title, fontweight="bold", fontsize=11)
-        ax.legend(frameon=True, framealpha=0.9, edgecolor="0.8", loc="upper left", fontsize=8)
-        for spine in ax.spines.values():
-            spine.set_linewidth(1.5)
-            spine.set_color("black")
-
-    add_scatter(
-        ax_main,
-        aeq_with_nodes["TNTP Solution"],
-        aeq_with_nodes["PCE_AB"],
-        "TNTP Reference Flow",
-        "AequilibraE Flow",
-        "AequilibraE vs TNTP",
-        marker_size=16,
-        show_grid_lines=True,
+    reg = linregress(x_flows, y_flows)
+    x_line = np.array([0.0, limit])
+    y_line = reg.intercept + reg.slope * x_line
+    ax.plot(
+        x_line,
+        y_line,
+        linestyle="--",
+        linewidth=1.8,
+        color="red",
+        label=f"Regression  R²={reg.rvalue**2:.4f}\ny = {reg.slope:.4f}x + {reg.intercept:.4f}",
     )
+    ax.plot([0.0, limit], [0.0, limit], linestyle="-", color="grey", alpha=0.5, label="1:1")
 
-    fig.suptitle(
-        f"Flow Validation - {model_name}\n{method.upper()}",
-        fontsize=14,
+    ax.set_xlim(0.0, limit)
+    ax.set_ylim(0.0, limit)
+    ax.set_aspect("equal", adjustable="box")
+
+    steps = [4, 6, 8]
+    ax.xaxis.set_major_locator(plt.MaxNLocator(steps=steps))
+    ax.yaxis.set_major_locator(plt.MaxNLocator(steps=steps))
+
+    ax.set_xlabel("TNTP Reference Flow")
+    ax.set_ylabel("AequilibraE Flow")
+    ax.set_title(
+        f"Flow Validation for {model_name} with {method.upper()}",
         fontweight="bold",
-        y=0.98,
+        fontsize=11,
     )
+    ax.legend(frameon=True, framealpha=0.9, edgecolor="0.8", loc="upper left", fontsize=8)
+    for spine in ax.spines.values():
+        spine.set_linewidth(1.5)
+        spine.set_color("black")
 
-    plt.savefig(save_path, dpi=plt.gcf().dpi, bbox_inches="tight")
+    plt.savefig(save_path, dpi=fig.dpi, bbox_inches="tight")
+    plt.close(fig)
 
 
 def _load_all_reports(reports_dir: Path) -> pd.DataFrame:
