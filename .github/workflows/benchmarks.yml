@@ -1,6 +1,7 @@
 name: Benchmarks
 on:
   workflow_dispatch:
+  pull_request:
 
 env:
   AEQ_SHOW_PROGRESS: "0"
