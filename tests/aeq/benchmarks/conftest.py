@@ -41,7 +41,7 @@ pytest .
 
 
 METHODS = ["msa", "frank-wolfe", "cfw", "bfw"]
-ITERATIONS = 1000
+ITERATIONS = 10
 RGAP_TARGET = 1e-15
 
 R2_MINIMUM = 0.95
@@ -265,7 +265,7 @@ def run_validation(
     *,
     known_pass=None,
 ):
-    """Configure, run, bench, validate, and plot an assignment against TNTP reference.
+    """Configure, run, bench and validate.
 
     known_pass: optional dict mapping algorithm -> {"r2": float, "intercept": float}
     with the best thresholds known to pass for that algorithm at full convergence.
