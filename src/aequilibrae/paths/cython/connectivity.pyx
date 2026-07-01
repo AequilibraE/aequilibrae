@@ -20,7 +20,7 @@ def connectivity_multi_threaded(tester):
     all_threads = {"count": 0, "run": 0}
     results = {"disconnected": []}
 
-    disconn_array = np.zeros((cores, graph.num_zones, 2), dtype=ITYPE)
+    disconn_array = np.zeros((cores, graph.num_zones, 2), dtype=np.int64)
     for i, orig in enumerate(list(graph.centroids)):
         args = (orig, graph, aux_result, disconn_array, all_threads, results, signal)
         pool.apply_async(connectivity_single_threaded, args=args)

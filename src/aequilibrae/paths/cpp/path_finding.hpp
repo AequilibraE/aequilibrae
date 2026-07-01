@@ -44,7 +44,7 @@ size_t dijkstra(size_t origin, const size_t max_size, const double *costs,
                 const size_t *csr, const size_t *fs, size_t *predecessors,
                 const size_t *ids, size_t *connectors, size_t *reached_first,
                 const unsigned char *destinations, long long destination_count,
-                AeqLogClosure *b) noexcept {
+                AeqLogClosure *c) noexcept {
   static_assert(std::is_base_of<PriorityQueueBase<Queue>, Queue>::value,
                 "Queue provided does not derive from PriorityQueueBase");
 
@@ -53,7 +53,7 @@ size_t dijkstra(size_t origin, const size_t max_size, const double *costs,
   const bool early_exit_enabled = destination_count >= 0;
   long long remaining = destination_count;
 
-  AEQ_LOG(b, AEQ_LOG_DEBUG,
+  AEQ_LOG(c, AEQ_LOG_DEBUG,
           aeq_format_string("Running Dijkstra's with origin = ", origin,
                             " with ", typeid(Queue).name()));
 
