@@ -41,7 +41,7 @@ pytest .
 
 
 METHODS = ["msa", "frank-wolfe", "cfw", "bfw"]
-ITERATIONS = 10
+ITERATIONS = 100
 RGAP_TARGET = 1e-15
 
 R2_MINIMUM = 0.95
