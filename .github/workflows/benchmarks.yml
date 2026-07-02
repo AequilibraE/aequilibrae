@@ -1,7 +1,16 @@
 name: Benchmarks
+run-name: "Benchmarks for PR #${{ inputs.pr-number }}"
 on:
   workflow_dispatch:
-  pull_request:
+    inputs:
+      pr-number:
+        description: 'PR number to comment on'
+        required: true
+        type: string
+      iterations:
+        description: 'Number of iterations for benchmarking'
+        required: false
+        type: string
 
 env:
   AEQ_SHOW_PROGRESS: "0"
@@ -14,6 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Set benchmark iterations
+        if: ${{ inputs.iterations != '' }}
+        run: echo "BENCHMARK_ITERATIONS=${{ inputs.iterations }}" >> $GITHUB_ENV
 
       - name: Clone TransportationNetworks
         run: git clone https://github.com/bstabler/TransportationNetworks ${{ env.TNTP_ROOT }}
