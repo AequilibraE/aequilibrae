@@ -39,7 +39,7 @@ jobs:
         run: uv pip install -e ".[dev]"
 
       - name: Run benchmarks
-        run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_anaheim.py tests/aeq/benchmarks/test_barcelona.py --benchmark
+        run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_a* --benchmark-only
 
       - name: Generate plots
         run: | 

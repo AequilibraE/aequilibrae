@@ -20,7 +20,6 @@ def model_folder(tntp_root):
     return tntp_root / "chicago-regional"
 
 
-@pytest.mark.benchmark
 @pytest.mark.parametrize("algorithm", METHODS)
 def test_chicago_regional(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm, model_stub):
     run_validation(

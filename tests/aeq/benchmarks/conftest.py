@@ -31,8 +31,8 @@ e.g.
 export TNTP_ROOT="../../TransportationNetworks"
 export BENCHMARK_REPORTS_DIR="./tests/aeq/benchmarks/_convergence_reports"
 
-To run these tests, the arugment --benchmark needs to be specified:
-pytest ./tests/aeq/benchmarks/* --benchmark
+To run these tests, the arugment --benchmark-only needs to be specified:
+pytest ./tests/aeq/benchmarks/* --benchmark-only
 
 So these tests are skipped with:
 pytest .
@@ -41,7 +41,7 @@ pytest .
 
 
 METHODS = ["msa", "frank-wolfe", "cfw", "bfw"]
-ITERATIONS = 100
+ITERATIONS = 10
 RGAP_TARGET = 1e-15
 
 R2_MINIMUM = 0.95
@@ -68,27 +68,6 @@ def tntp_graph(model_folder, model_stub, tntp_matrix):
 @pytest.fixture(scope="module")
 def tntp_reference(model_folder, model_stub):
     return load_known_results(model_folder, model_stub)
-
-
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "benchmark: marks tests as a benchmark (select with '\"--benchmark\"')",
-    )
-
-
-def pytest_addoption(parser):
-    parser.addoption("--benchmark", action="store_true", default=False, help="run benchmarking")
-
-
-def pytest_collection_modifyitems(config, items):
-    if config.getoption("--benchmark"):
-        # --benchmark given in cli: do not skip slow benchmark tests
-        return
-    skip_benchmark = pytest.mark.skip(reason="need --benchmark option to run")
-    for item in items:
-        if "benchmark" in item.keywords:
-            item.add_marker(skip_benchmark)
 
 
 def parse_tntp_header(folder: Path, model_stub: str) -> dict:

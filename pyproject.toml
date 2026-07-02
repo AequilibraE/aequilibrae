@@ -87,6 +87,9 @@ dev = ['aequilibrae[build, tests, docs]']
 [project.scripts]
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
 
+[tool.pytest.ini_options]
+addopts = ["--benchmark-skip"]
+
 [tool.setuptools.dynamic]
 version = { attr = "aequilibrae.version" }
 
