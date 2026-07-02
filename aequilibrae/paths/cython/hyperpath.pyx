@@ -190,6 +190,7 @@ cdef void compute_SF_in_parallel(
     uint32_t[::1] head_view,
     uint32_t[:] d_vert_ids_view,  # destination vertices
     uint32_t[:] destination_vertex_indices_view,
+    uint32_t[:] demand_indptr_view,  # start of each destination's slice in the destination-sorted demand arrays
     uint32_t[:] rest_of_destinations_view,  # Used when skimming to lookup the rest of the destinations to skim from
     uint32_t[::1] o_vert_ids_view,  # origin vertices
     double[::1] demand_vls_view,  # volume
@@ -273,15 +274,16 @@ cdef void compute_SF_in_parallel(
 
             if i < destination_vertex_indices_view.shape[0]:
                 demand_size = 0
-                for j in range(d_vert_ids_view.shape[0]):
-                    if d_vert_ids_view[j] == destination_vertex:
-                        if nodes_to_indices[o_vert_ids_view[j]] == -1:
-                            continue
+                # the demand arrays are sorted by destination, so this destination's
+                # demand is the contiguous slice demand_indptr[i]:demand_indptr[i + 1]
+                for j in range(<size_t>demand_indptr_view[i], <size_t>demand_indptr_view[i + 1]):
+                    if nodes_to_indices[o_vert_ids_view[j]] == -1:
+                        continue
 
-                        thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
-                        thread_demand_values[demand_size] = demand_vls_view[j]
-                        # demand_size += 1 is not allowed as cython believes this is a reduction
-                        demand_size = demand_size + 1
+                    thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
+                    thread_demand_values[demand_size] = demand_vls_view[j]
+                    # demand_size += 1 is not allowed as cython believes this is a reduction
+                    demand_size = demand_size + 1
             else:
                 demand_size = o_vert_ids_view.shape[0]
                 for j in range(demand_size):
@@ -387,6 +389,8 @@ cdef void compute_SF_in(
         DATATYPE_t u_r, u_i
         size_t i, j, h_a_count
         uint32_t vert_idx
+        uint32_t *hyperpath_order
+        uint32_t *hyperpath_ids
         int cent_dest
         double tmp
 
@@ -463,23 +467,30 @@ cdef void compute_SF_in(
             if f_i_vec[i] < MIN_FREQ:
                 f_i_vec[i] = MIN_FREQ
 
+        # Sort only the edges on the hyperpath with decreasing order of u_j + c_a
+        # (the sort function sorts in increasing order, so we sort on the negated
+        # values). Compacting the hyperpath edges first, rather than sorting the
+        # full edge array, avoids sorting the ~O(edge_count) edges that are not on
+        # the hyperpath at all. Those all carried the same placeholder key, and a
+        # quicksort-based qsort (e.g. MSVC's) degrades toward quadratic time on
+        # such tie-heavy input, which dominated the entire assignment runtime.
         h_a_count = 0
         for i in range(<size_t>edge_count):
-            u_j_c_a_vec[i] *= -1.0
-            h_a_count += <size_t>h_a_vec[i]
+            if h_a_vec[i] != 0:
+                # in-place compaction is safe: h_a_count <= i on every iteration
+                u_j_c_a_vec[h_a_count] = -u_j_c_a_vec[i]
+                edge_indices[h_a_count] = <uint32_t>i
+                h_a_count = h_a_count + 1
 
-        # Sort the links with decreasing order of u_j + c_a.
-        # Because the sort function sorts in increasing order, we sort a
-        # transformed array, multiplied by -1, and set the items
-        # corresponding to edges that are not in the hyperpath to a
-        # positive value (they will be at the end of the sorted array).
-        # The items corresponding to edges that are in the hyperpath have a
-        # negative transformed value.
-        for i in range(<size_t>edge_count):
-            if h_a_vec[i] == 0:  # if the edge is not on the hyperpath
-                u_j_c_a_vec[i] = 1.0
-
-        argsort(u_j_c_a_vec, edge_indices, edge_count)
+        hyperpath_order = <uint32_t *> malloc(sizeof(uint32_t) * h_a_count)
+        hyperpath_ids = <uint32_t *> malloc(sizeof(uint32_t) * h_a_count)
+        argsort(u_j_c_a_vec, hyperpath_order, h_a_count)
+        for i in range(h_a_count):
+            hyperpath_ids[i] = edge_indices[hyperpath_order[i]]
+        for i in range(h_a_count):
+            edge_indices[i] = hyperpath_ids[i]
+        free(hyperpath_order)
+        free(hyperpath_ids)
 
         _SF_in_second_pass(
             edge_indices,
