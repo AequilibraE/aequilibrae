@@ -52,6 +52,7 @@ def test_relative_gap_ignores_constant_preload():
     assignment.preload = np.array([100.0, 100.0])
     assignment.fw_total_flow = cls.results.total_link_loads + assignment.preload
     assignment.rgap_target = 0.1
+    assignment.stepsize = 0.1  # not 1.0
 
     assert assignment.check_convergence()
 
@@ -76,6 +77,7 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
     assignment.step_direction = {"car": SimpleNamespace(total_link_loads=np.zeros(2))}
 
     assignment.rgap_target = 0.1
+    assignment.stepsize = 0.1  # not 1.0
 
     assert not assignment.check_convergence()
     assert np.isinf(assignment.rgap)
@@ -89,7 +91,7 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None)
+    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
     monkeypatch.setattr(
@@ -135,7 +137,7 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assignment.current_direction = "fw"
     assignment.next_direction = "cfw"
     assignment.iteration_issue = []
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None)
+    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
 
     monkeypatch.setattr(
         assignment,
@@ -168,7 +170,7 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None)
+    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
     monkeypatch.setattr(
@@ -212,7 +214,7 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None)
+    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
     monkeypatch.setattr(
@@ -246,5 +248,3 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
     assert assignment.stepsize == 1e-2 / assignment.iter
     assert assignment.stepsize > 0.0
     assert any("invalid stepsize" in msg for msg in assignment.iteration_issue)
-
-
