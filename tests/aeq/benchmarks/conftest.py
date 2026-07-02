@@ -41,7 +41,10 @@ pytest .
 
 
 METHODS = ["msa", "frank-wolfe", "cfw", "bfw"]
-ITERATIONS = 10
+ITERATIONS = 1000
+if "BENCHMARK_ITERATIONS" in os.environ:
+    ITERATIONS = int(os.environ["BENCHMARK_ITERATIONS"])
+    assert ITERATIONS > 0, "BENCHMARK_ITERATIONS must be above 0"
 RGAP_TARGET = 1e-15
 
 R2_MINIMUM = 0.95
