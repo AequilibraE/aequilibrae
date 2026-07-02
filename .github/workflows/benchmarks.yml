@@ -42,9 +42,10 @@ jobs:
         run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_anaheim.py --benchmark
 
       - name: Generate plots
-        run: uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time
-        run: uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
-        run: uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
+        run: | 
+          uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time
+          uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
+          uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
 
       - name: Add pytest-benchmark output to summary
         run: |
