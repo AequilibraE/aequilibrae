@@ -301,8 +301,8 @@ class HyperpathGenerating:
 
         # get the list of all destinations, we use "rest of" for skimming
         # and the start of each destination's slice in the (destination-sorted) demand arrays
-        destinations, demand_indptr = np.unique(destination_column, return_index=True)
-        demand_indptr = demand_indptr.astype(np.uint32)
+destinations, demand_indptr = np.unique(destination_column, return_index=True)
+demand_indptr = np.append(demand_indptr, destination_column.size).astype(np.uint32)
         if self._skimming:
             rest_of_destinations = self._d_vert_ids[
                 np.isin(self._d_vert_ids, destinations, invert=True, assume_unique=True)
