@@ -13,6 +13,7 @@ Output written alongside the CSVs and parquet files.
 """
 
 import argparse
+import os
 from pathlib import Path
 
 import matplotlib
@@ -21,7 +22,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.stats import linregress
-
 
 matplotlib.use("Agg")  # non-interactive backend
 
@@ -408,7 +408,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reports-dir",
         type=Path,
-        default=DEFAULT_REPORTS_DIR,
+        default=(os.environ.get("BENCHMARK_REPORTS_DIR") or DEFAULT_REPORTS_DIR),
         help=f"Directory containing CSV report files (default: {DEFAULT_REPORTS_DIR})",
     )
     parser.add_argument(
