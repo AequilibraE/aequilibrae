@@ -45,9 +45,12 @@ cdef struct IndexedElement:
     size_t index
     DATATYPE_t value
 
-cdef int _compare(const_void *a, const_void *b) noexcept:
-    cdef DATATYPE_t v = (<IndexedElement*> a).value-(<IndexedElement*> b).value
-    if v < 0:
+cdef int _compare(const_void *a, const_void *b) noexcept nogil:
+    cdef DATATYPE_t a_v = (<IndexedElement*> a).value
+    cdef DATATYPE_t b_v = (<IndexedElement*> b).value
+    if a_v == b_v:
+        return 0
+    elif a_v < b_v:
         return -1
     else:
         return 1
@@ -222,6 +225,8 @@ cdef void compute_SF_in_parallel(
         double *thread_v_i_vec
         uint8_t *thread_h_a_vec
         uint32_t *thread_edge_indices
+        uint32_t *thread_hyperpath_order
+        uint32_t *thread_hyperpath_ids
 
         double *thread_skim_i_vec
         double *thread_skim_j_vec
@@ -254,6 +259,8 @@ cdef void compute_SF_in_parallel(
         thread_v_i_vec      = <double *> malloc(sizeof(double) * vertex_count)
         thread_h_a_vec      = <uint8_t   *> malloc(sizeof(uint8_t)   * edge_count)
         thread_edge_indices = <uint32_t  *> malloc(sizeof(uint32_t)  * edge_count)
+        thread_hyperpath_order = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
+        thread_hyperpath_ids   = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
 
         thread_skim_j_vec = <double *> calloc(edge_count, sizeof(double) * n_skim_cols)
 
@@ -285,13 +292,15 @@ cdef void compute_SF_in_parallel(
                     # demand_size += 1 is not allowed as cython believes this is a reduction
                     demand_size = demand_size + 1
             else:
-                demand_size = o_vert_ids_view.shape[0]
-                for j in range(demand_size):
+                demand_size = 0
+                for j in range(o_vert_ids_view.shape[0]):
                     if nodes_to_indices[o_vert_ids_view[j]] == -1:
                         continue
 
-                    thread_demand_origins[j] = nodes_to_indices[o_vert_ids_view[j]]
-                    thread_demand_values[j] = 0.0
+                    thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
+                    thread_demand_values[demand_size] = 0.0
+                    # demand_size += 1 is not allowed as cython believes this is a reduction
+                    demand_size = demand_size + 1
 
             # S&F
             compute_SF_in(
@@ -311,6 +320,8 @@ cdef void compute_SF_in_parallel(
                 thread_v_i_vec,
                 thread_h_a_vec,
                 thread_edge_indices,
+                thread_hyperpath_order,
+                thread_hyperpath_ids,
                 vertex_count,
                 nodes_to_indices[destination_vertex],
                 skim_col_view,
@@ -332,6 +343,8 @@ cdef void compute_SF_in_parallel(
         free(thread_v_i_vec)
         free(thread_h_a_vec)
         free(thread_edge_indices)
+        free(thread_hyperpath_order)
+        free(thread_hyperpath_ids)
         free(thread_skim_j_vec)
 
     # Accumulate results into output buffer. This could be parallelised over the output indexes but
@@ -370,6 +383,8 @@ cdef void compute_SF_in(
     double *v_i_vec,
     uint8_t *h_a_vec,
     uint32_t *edge_indices,
+    uint32_t *hyperpath_order,
+    uint32_t *hyperpath_ids,
     size_t vertex_count,
     int dest_vert_index,
     double[:, ::1] skim_col_vec,
@@ -389,8 +404,6 @@ cdef void compute_SF_in(
         DATATYPE_t u_r, u_i
         size_t i, j, h_a_count
         uint32_t vert_idx
-        uint32_t *hyperpath_order
-        uint32_t *hyperpath_ids
         int cent_dest
         double tmp
 
@@ -482,15 +495,13 @@ cdef void compute_SF_in(
                 edge_indices[h_a_count] = <uint32_t>i
                 h_a_count = h_a_count + 1
 
-        hyperpath_order = <uint32_t *> malloc(sizeof(uint32_t) * h_a_count)
-        hyperpath_ids = <uint32_t *> malloc(sizeof(uint32_t) * h_a_count)
+        # hyperpath_order/hyperpath_ids are thread-local scratch buffers sized
+        # edge_count, preallocated once per thread by the caller (h_a_count <= edge_count).
         argsort(u_j_c_a_vec, hyperpath_order, h_a_count)
         for i in range(h_a_count):
             hyperpath_ids[i] = edge_indices[hyperpath_order[i]]
         for i in range(h_a_count):
             edge_indices[i] = hyperpath_ids[i]
-        free(hyperpath_order)
-        free(hyperpath_ids)
 
         _SF_in_second_pass(
             edge_indices,
