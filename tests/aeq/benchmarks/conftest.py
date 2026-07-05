@@ -31,7 +31,7 @@ e.g.
 export TNTP_ROOT="../../TransportationNetworks"
 export BENCHMARK_REPORTS_DIR="./tests/aeq/benchmarks/_convergence_reports"
 
-To run these tests, the arugment --benchmark-only needs to be specified:
+To run these tests, the argument --benchmark-only needs to be specified:
 pytest ./tests/aeq/benchmarks/* --benchmark-only
 
 So these tests are skipped with:
@@ -53,7 +53,10 @@ INTERCEPT_MINIMUM = 1e3
 
 @pytest.fixture(scope="module")
 def tntp_root():
-    return Path(os.environ["TNTP_ROOT"])
+    root = os.environ.get("TNTP_ROOT")
+    if not root:
+        raise RuntimeError("TNTP_ROOT env var must be set to run TNTP benchmark tests")
+    return Path(root)
 
 
 @pytest.fixture(scope="module")
@@ -216,8 +219,11 @@ def assert_flow_regression(
 
 def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorithm: str):
     """Save multi-trial convergence reports as a single CSV."""
-    benchmark_reports_dir = Path(os.environ["BENCHMARK_REPORTS_DIR"])
-    benchmark_reports_dir.mkdir(exist_ok=True)
+reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
+if not reports_dir:
+    raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
+benchmark_reports_dir = Path(reports_dir)
+benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
     parts = []
     for i, report in enumerate(trials):
         out = report.copy()
@@ -231,8 +237,11 @@ def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorit
 
 def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: str, algorithm: str):
     """Save flow results."""
-    benchmark_reports_dir = Path(os.environ["BENCHMARK_REPORTS_DIR"])
-    benchmark_reports_dir.mkdir(exist_ok=True)
+reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
+if not reports_dir:
+    raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
+benchmark_reports_dir = Path(reports_dir)
+benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
 
     results_with_nodes.to_parquet(benchmark_reports_dir / f"{model_name}_{algorithm}_results_with_nodes.parquet")
 
