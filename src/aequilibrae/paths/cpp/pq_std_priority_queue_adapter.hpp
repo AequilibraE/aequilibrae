@@ -14,6 +14,8 @@ namespace aequilibrae::paths::cpp {
 class StdPriorityQueueAdapter final
     : public PriorityQueueBase<StdPriorityQueueAdapter> {
 public:
+  static constexpr const char *kName = "StdPriorityQueueAdapter";
+
   StdPriorityQueueAdapter() noexcept = default;
 
   ~StdPriorityQueueAdapter() { free_heap(); }
@@ -62,6 +64,10 @@ private:
   }
 
   void insert_impl(std::size_t element_idx, double key) noexcept {
+    assert(element_idx < states_.size());
+    // SCANNED elements may be re-inserted (A* with an inconsistent heuristic).
+    assert(states_[element_idx] != ElementState::IN_HEAP);
+    assert(key < kInfinity);
     keys_[element_idx] = key;
     states_[element_idx] = ElementState::IN_HEAP;
     pq_.push({key, element_idx});

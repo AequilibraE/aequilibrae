@@ -4,7 +4,6 @@
 #include <cmath>
 #include <limits>
 #include <type_traits>
-#include <typeinfo>
 #include <vector>
 
 namespace aequilibrae::paths::cpp {
@@ -55,7 +54,7 @@ size_t dijkstra(size_t origin, const size_t max_size, const double *costs,
 
   AEQ_LOG(c, AEQ_LOG_DEBUG,
           aeq_format_string("Running Dijkstra's with origin = ", origin,
-                            " with ", typeid(Queue).name()));
+                            " with ", Queue::kName));
 
   for (size_t i = 0; i < max_size; i++) {
     predecessors[i] = SENTINEL;
@@ -67,8 +66,10 @@ size_t dijkstra(size_t origin, const size_t max_size, const double *costs,
   queue.insert(origin, 0.0);
 
   while (!queue.is_empty()) {
-    const double tail_value = queue.peek();
+    // Read the key after extraction: lazy-deletion queues may hold stale
+    // entries whose peek() disagrees with the element extract_min() returns.
     const size_t tail_vertex = queue.extract_min();
+    const double tail_value = queue.element_key(tail_vertex);
     reached_first[found] = tail_vertex;
     found++;
 
@@ -128,7 +129,7 @@ void a_star(size_t origin, size_t destination, const size_t max_size,
   AEQ_LOG(b, AEQ_LOG_DEBUG,
           aeq_format_string("Running A* with origin = ", origin,
                             " destination = ", destination_vert, " with ",
-                            typeid(Queue).name()));
+                            Queue::kName));
 
   std::vector<double> gScore(max_size, std::numeric_limits<double>::infinity());
 

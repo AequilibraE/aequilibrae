@@ -242,19 +242,19 @@ cdef class RouteChoiceSet:
 
             # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this
             # memory
-            double [:, :] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
-            long long [:, :] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] b_nodes_matrix = np.broadcast_to(
+            double [:, ::1] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
+            long long [:, ::1] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, ::1] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, ::1] b_nodes_matrix = np.broadcast_to(
                 self.b_nodes_view,
                 (c_cores, self.b_nodes_view.shape[0])
             ).copy()
 
             # This matrix is never read from, it exists to allow using the Dijkstra's method without changing the
             # interface.
-            long long [:, :] _reached_first_matrix
+            long long [:, ::1] _reached_first_matrix
 
-            unsigned char [:, :] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
+            unsigned char [:, ::1] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
 
             # self.a_star = a_star
 
@@ -541,12 +541,12 @@ cdef class RouteChoiceSet:
         RouteChoiceSet self,
         long origin_index,
         long dest_index,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        unsigned char [:] thread_destinations
+        double [::1] thread_cost,
+        long long [::1] thread_predecessors,
+        long long [::1] thread_conn,
+        long long [::1] thread_b_nodes,
+        long long [::1] _thread_reached_first,
+        unsigned char [::1] thread_destinations
     ) noexcept nogil:
         """Small wrapper around path finding, thread locals should be passes as arguments."""
         if self.a_star:
@@ -592,12 +592,12 @@ cdef class RouteChoiceSet:
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        unsigned char [:] thread_destinations,
+        double [::1] thread_cost,
+        long long [::1] thread_predecessors,
+        long long [::1] thread_conn,
+        long long [::1] thread_b_nodes,
+        long long [::1] _thread_reached_first,
+        unsigned char [::1] thread_destinations,
         double penalty,
         unsigned int seed
     ) noexcept nogil:
@@ -775,12 +775,12 @@ cdef class RouteChoiceSet:
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        unsigned char [:] thread_destinations,
+        double [::1] thread_cost,
+        long long [::1] thread_predecessors,
+        long long [::1] thread_conn,
+        long long [::1] thread_b_nodes,
+        long long [::1] _thread_reached_first,
+        unsigned char [::1] thread_destinations,
         double penalty,
         unsigned int seed
     ) noexcept nogil:

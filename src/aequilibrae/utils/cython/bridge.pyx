@@ -150,10 +150,8 @@ cdef class Bridge:
         cdef string msg
 
         while not self.c._log_queue.empty():
-            tmp = self.c._log_queue.front()
-
-            level = tmp.first
-            msg = move(tmp.second)
+            level = self.c._log_queue.front().first
+            msg = move(self.c._log_queue.front().second)
 
             self.__logger.log(level, msg.decode("UTF-8"))
 

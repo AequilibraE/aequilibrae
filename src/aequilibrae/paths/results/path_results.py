@@ -1,7 +1,7 @@
 from typing import Union, List
 
 import numpy as np
-from aequilibrae.paths.cython.AoN import update_path_trace, path_computation, HEURISTIC_MAP
+from aequilibrae.paths.cython.AoN import update_path_trace, path_computation, HEURISTIC_MAP, HEAP_MAP
 from aequilibrae.paths.graph import Graph
 
 
@@ -64,6 +64,8 @@ class PathResults:
         self._early_exit = self.early_exit
         self._a_star = self.a_star
         self._heuristic = "equirectangular"
+        # None defers to the module-wide default set via aequilibrae.paths.set_default_heap
+        self._heap = None
 
     def compute_path(
         self,
@@ -72,6 +74,7 @@ class PathResults:
         early_exit: bool = False,
         a_star: bool = False,
         heuristic: Union[str, None] = None,
+        heap: Union[str, None] = None,
     ) -> None:
         """Computes the path between two nodes in the network.
 
@@ -89,6 +92,10 @@ class PathResults:
             When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
 
             **heuristic** (:obj:`str`): Heuristic to use if ``a_star`` is enabled. Default is ``None``.
+
+            **heap** (:obj:`str`): Priority queue implementation to use, one of ``get_heaps()``.
+            Defaults to ``None``, deferring to the module-wide default
+            (see :func:`aequilibrae.paths.set_default_heap`).
         """
 
         if self.graph is None:
@@ -101,6 +108,8 @@ class PathResults:
         self.a_star = self._a_star = a_star
         if heuristic is not None:
             self.set_heuristic(heuristic)
+        if heap is not None:
+            self.set_heap(heap)
         path_computation(origin, destination, self.graph, self)
         self.__skim_path()
 
@@ -155,6 +164,7 @@ class PathResults:
             self._early_exit = self.early_exit = False
             self._a_star = self.a_star = False
             self._heuristic = "equirectangular"
+            self._heap = None
 
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")
@@ -197,6 +207,22 @@ class PathResults:
     def get_heuristics(self) -> List[str]:
         """Return the available heuristics."""
         return list(HEURISTIC_MAP.keys())
+
+    def set_heap(self, heap: str) -> None:
+        """
+        Set the priority queue implementation used for path computation. Must be one of ``get_heaps()``.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        if heap not in HEAP_MAP:
+            raise ValueError(f"heap must be one of {self.get_heaps()}")
+
+        self._heap = heap
+
+    def get_heaps(self) -> List[str]:
+        """Return the available priority queue implementations."""
+        return list(HEAP_MAP.keys())
 
     def __skim_path(self):
         if self.graph.skim_fields:

@@ -9,6 +9,8 @@ namespace aequilibrae::paths::cpp {
 
 class PairingHeap final : public PriorityQueueBase<PairingHeap> {
 public:
+  static constexpr const char *kName = "PairingHeap";
+
   PairingHeap() noexcept = default;
 
   ~PairingHeap() { free_heap(); }
@@ -31,7 +33,13 @@ private:
 
   void alloc_heap_impl(std::size_t length) noexcept { init_heap(length); }
 
-  void reset_heap_impl() noexcept {}
+  void reset_heap_impl() noexcept {
+    size_ = 0;
+    root_ = kNullIdx;
+    for (std::size_t i = 0; i < length_; ++i) {
+      initialize_element(i);
+    }
+  }
 
   void free_heap_impl() noexcept {
     delete[] elements_;
@@ -45,7 +53,8 @@ private:
   void insert_impl(std::size_t element_idx, double key) noexcept {
     assert(element_idx < length_);
     assert(size_ < length_);
-    assert(elements_[element_idx].state == NOT_IN_HEAP);
+    // SCANNED elements may be re-inserted (A* with an inconsistent heuristic).
+    assert(elements_[element_idx].state != IN_HEAP);
     assert(key < kInfinity);
 
     Element &element = elements_[element_idx];

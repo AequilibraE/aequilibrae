@@ -4,6 +4,8 @@ from aequilibrae.utils.cython.bridge cimport AeqLogClosure
 
 cdef extern from "path_finding.hpp" namespace "aequilibrae::paths::cpp" nogil:
 
+    const size_t SENTINEL
+
     cdef enum Heuristic:
         HAVERSINE
         EQUIRECTANGULAR

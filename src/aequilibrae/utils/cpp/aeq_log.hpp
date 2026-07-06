@@ -1,17 +1,19 @@
 #pragma once
 
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <utility>
 
 class AeqLogClosure {
 public:
   std::mutex _log_queue_mutex;
   std::deque<std::pair<int, std::string>> _log_queue;
-  uint8_t c_level;
+  std::uint8_t c_level;
 
-  inline void _log(uint8_t level, std::string msg) {
+  inline void _log(std::uint8_t level, std::string msg) {
     std::unique_lock<std::mutex> lock{this->_log_queue_mutex};
     this->_log_queue.emplace_back(level, msg);
   }

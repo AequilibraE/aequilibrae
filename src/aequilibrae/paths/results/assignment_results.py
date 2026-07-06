@@ -1,9 +1,10 @@
 import multiprocessing as mp
 from abc import ABC, abstractmethod
+from typing import List
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.cython.AoN import sum_axis1, assign_link_loads
+from aequilibrae.paths.cython.AoN import sum_axis1, assign_link_loads, HEAP_MAP
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
@@ -102,6 +103,25 @@ class AssignmentResults(AssignmentResultsBase):
         self.save_path_file = False
         self.path_file_dir = None
         self.write_feather = True  # we use feather as default, parquet is slower but with better compression
+
+        # None defers to the module-wide default set via aequilibrae.paths.set_default_heap
+        self._heap = None
+
+    def set_heap(self, heap: str) -> None:
+        """
+        Set the priority queue implementation used for path computation. Must be one of ``get_heaps()``.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        if heap not in HEAP_MAP:
+            raise ValueError(f"heap must be one of {self.get_heaps()}")
+
+        self._heap = heap
+
+    def get_heaps(self) -> List[str]:
+        """Return the available priority queue implementations."""
+        return list(HEAP_MAP.keys())
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:

@@ -9,6 +9,7 @@ from aequilibrae.paths.cython.path_finding cimport (
     HeuristicFn,
     haversine_heuristic,
     equirectangular_heuristic,
+    SENTINEL,
 )
 from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, msleep
 
@@ -59,10 +60,10 @@ def run_dijkstra_example(type_of_heap: str = "FourAryHeap",
     ids[1] = 1
     ids[2] = 2
 
-    # Set up destinations / early exit
+    # Set up destinations / early exit. dijkstra() re-initialises predecessors to SENTINEL itself.
     for i in range(max_size):
         destinations[i] = 0
-        predecessors[i] = max_size
+        predecessors[i] = SENTINEL
 
     if destination is not None:
         destinations[<size_t>destination] = 1
@@ -86,12 +87,13 @@ def run_dijkstra_example(type_of_heap: str = "FourAryHeap",
         else:
             raise ValueError("Unknown heap type")
 
-    # Reconstruct path to destination if early exit was used
+    # Reconstruct path to destination if early exit was used. Unreachable
+    # nodes keep the SENTINEL predecessor written by dijkstra().
     cdef size_t dnode
     path = None
     if destination is not None:
         dnode = <size_t>destination
-        if predecessors[dnode] != max_size:
+        if predecessors[dnode] != SENTINEL:
             path = [int(dnode)]
             dnode = predecessors[dnode]
             while True:
@@ -178,7 +180,7 @@ def run_a_star_example(type_of_heap: str = "FourAryHeap", heuristic: str = "have
     # nodes_to_indices: identity for this simple example
     for i in range(max_size):
         nodes_to_indices[i] = i
-        predecessors[i] = max_size
+        predecessors[i] = SENTINEL
 
     # Select heuristic
     if heuristic == "haversine":
@@ -213,15 +215,17 @@ def run_a_star_example(type_of_heap: str = "FourAryHeap", heuristic: str = "have
         else:
             raise ValueError("Unknown heap type")
 
-    # Reconstruct path
-    path = []
+    # Reconstruct path, guarding against an unreachable destination (SENTINEL predecessor)
+    path = None
     cdef size_t node = destination
-    while True:
-        path.append(int(node))
-        if node == origin:
-            break
-        node = predecessors[node]
-    path.reverse()
+    if node == origin or predecessors[node] != SENTINEL:
+        path = []
+        while True:
+            path.append(int(node))
+            if node == origin:
+                break
+            node = predecessors[node]
+        path.reverse()
 
     return {
         "heap": type_of_heap,

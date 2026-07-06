@@ -12,6 +12,40 @@ include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
 include 'connectivity.pyx'
 
+_DEFAULT_HEAP = "4ary"
+
+
+def set_default_heap(heap: str) -> None:
+    """Set the priority queue used by all shortest path computations. Must be one of ``available_heaps()``.
+
+    Calling ``set_heap`` on a results object (``PathResults``, ``AssignmentResults``, ``SkimResults``,
+    or ``TrafficClass``) takes precedence over this default.
+
+    :Arguments:
+        **heap** (:obj:`str`): Heap to use.
+    """
+    global _DEFAULT_HEAP
+    if heap not in HEAP_MAP:
+        raise ValueError(f"heap must be one of {list(HEAP_MAP.keys())}")
+    _DEFAULT_HEAP = heap
+
+
+def get_default_heap() -> str:
+    """Return the name of the priority queue currently used by shortest path computations."""
+    return _DEFAULT_HEAP
+
+
+def available_heaps() -> list:
+    """Return the available priority queue implementations."""
+    return list(HEAP_MAP.keys())
+
+
+def _resolve_heap(result):
+    # Every results object reaching the path finding entry points (PathResults, AssignmentResults,
+    # SkimResults) carries a _heap attribute; None defers to the module-wide default.
+    return HEAP_MAP[result._heap or _DEFAULT_HEAP]
+
+
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
     cdef long nodes, orig, block_flows_through_centroids, classes, b, origin_index, zones, links
@@ -41,7 +75,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     # Destination set
     cdef long long nnz_destinations = 0
-    cdef unsigned char [:] destinations
+    cdef unsigned char [::1] destinations
+
+    cdef HeapType heap_type = _resolve_heap(result)
 
     tmp = np.zeros(nodes, dtype=bool)
     if not skims:
@@ -61,9 +97,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         nnz_destinations = -1
 
     # views from the graph
-    cdef long long [:] graph_fs_view = graph.compact_fs
-    cdef double [:] g_view = graph.compact_cost
-    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef long long [::1] graph_fs_view = graph.compact_fs
+    cdef double [::1] g_view = graph.compact_cost
+    cdef const long long [::1] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
     cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
 
     if skims > 0:
@@ -80,11 +116,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] final_skim_matrices_view = fskm
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
-    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
-    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
+    cdef long long [::1] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [::1] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [::1] conn_view = aux_result.connectors[curr_thread, :]
     cdef double [:, :] link_loads_view = aux_result.temp_link_loads[curr_thread, :, :]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
+    cdef long long [::1] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
 
     # path saving file paths
     cdef bint write_feather = True
@@ -131,7 +167,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                          predecessors_view,
                          ids_graph_view,
                          conn_view,
-                         reached_first_view)
+                         reached_first_view,
+                         heap_type)
 
         if block_flows_through_centroids:  # Re-blocks the centroid if that is the case
             b = 1
@@ -208,6 +245,13 @@ def path_computation(origin, destination, graph, results):
     if results._graph_id != graph._id:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
+    # nodes_to_indices maps unknown nodes to -1. Without these guards A* would silently target
+    # node 0 and Dijkstra's early exit would target an arbitrary node.
+    if origin_index < 0:
+        raise ValueError(f"Origin {orig} does not exist in the graph")
+    if dest_index < 0:
+        raise ValueError(f"Destination {dest} does not exist in the graph")
+
     # We transform the python variables in Cython variables
     nodes = graph.num_nodes
     zones = graph.num_zones
@@ -220,25 +264,27 @@ def path_computation(origin, destination, graph, results):
 
     # In order to release the GIL for this procedure, we create all the
     # memory views we will need
-    cdef double [:] g_view = graph.cost
+    cdef double [::1] g_view = graph.cost
     cdef const long long [:] original_b_nodes_view = graph.graph.b_node.to_numpy(copy=False)
-    cdef long long [:] graph_fs_view = graph.fs
+    cdef long long [::1] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    cdef const long long [:] ids_graph_view = graph.graph.id.to_numpy(copy=False)
+    cdef const long long [::1] ids_graph_view = graph.graph.id.to_numpy(copy=False)
     block_flows_through_centroids = graph.block_centroid_flows
 
-    cdef long long [:] predecessors_view = results.predecessors
-    cdef long long [:] conn_view = results.connectors
+    cdef long long [::1] predecessors_view = results.predecessors
+    cdef long long [::1] conn_view = results.connectors
     cdef double [:, :] skim_matrix_view = results._skimming_array
-    cdef long long [:] reached_first_view = results.reached_first
+    cdef long long [::1] reached_first_view = results.reached_first
 
     new_b_nodes = graph.graph.b_node.values.copy()
-    cdef long long [:] b_nodes_view = new_b_nodes
+    cdef long long [::1] b_nodes_view = new_b_nodes
+
+    cdef HeapType heap_type = _resolve_heap(results)
 
     cdef bint a_star_bint = results.a_star
-    cdef const double [:] lat_view
-    cdef const double [:] lon_view
-    cdef long long [:] nodes_to_indices_view
+    cdef const double [::1] lat_view
+    cdef const double [::1] lon_view
+    cdef long long [::1] nodes_to_indices_view
     cdef Heuristic heuristic
     if results.a_star:
         lat_view = graph.lonlat_index.lat.to_numpy(copy=False)
@@ -247,7 +293,7 @@ def path_computation(origin, destination, graph, results):
         heuristic = HEURISTIC_MAP[results._heuristic]
 
     # Destination set
-    cdef unsigned char [:] destinations
+    cdef unsigned char [::1] destinations
     if early_exit_bint and not a_star_bint:
         destinations = np.zeros(nodes, dtype=bool)
         destinations[dest_index] = True
@@ -278,7 +324,8 @@ def path_computation(origin, destination, graph, results):
                 predecessors_view,
                 ids_graph_view,
                 conn_view,
-                heuristic
+                heuristic,
+                heap_type
             )
         else:
             w = path_finding(origin_index,
@@ -290,7 +337,8 @@ def path_computation(origin, destination, graph, results):
                              predecessors_view,
                              ids_graph_view,
                              conn_view,
-                             reached_first_view)
+                             reached_first_view,
+                             heap_type)
 
         if skims > 0 and not a_star_bint:
             skim_single_path(origin_index,
@@ -438,23 +486,25 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # memory views we will need
 
     # views from the graph
-    cdef long long [:] graph_fs_view = graph_fs
-    cdef double [:] g_view = graph.compact_cost
-    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef long long [::1] graph_fs_view = graph_fs
+    cdef double [::1] g_view = graph.compact_cost
+    cdef const long long [::1] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
     cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
     cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
 
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
-    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
-    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
+    cdef long long [::1] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [::1] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [::1] conn_view = aux_result.connectors[curr_thread, :]
+    cdef long long [::1] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
     cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
 
-    # Destination set
-    cdef unsigned char [:] destinations = np.array([], dtype=bool)
+    # Destination set. Early exit is disabled so this mask is never read.
+    cdef unsigned char [::1] destinations = np.array([], dtype=bool)
+
+    cdef HeapType heap_type = _resolve_heap(result)
 
     # Now we do all procedures with NO GIL
     with nogil:
@@ -475,7 +525,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                          predecessors_view,
                          ids_graph_view,
                          conn_view,
-                         reached_first_view)
+                         reached_first_view,
+                         heap_type)
 
         skim_multiple_fields(origin_index,
                              nodes,

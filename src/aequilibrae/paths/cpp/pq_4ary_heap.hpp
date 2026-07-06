@@ -10,6 +10,8 @@ namespace aequilibrae::paths::cpp {
 
 class FourAryHeap final : public PriorityQueueBase<FourAryHeap> {
 public:
+  static constexpr const char *kName = "FourAryHeap";
+
   FourAryHeap() noexcept = default;
 
   ~FourAryHeap() { free_heap(); }
@@ -34,17 +36,18 @@ private:
     }
   }
 
+  // O(1) reset: bumping the epoch invalidates every element (effective_state
+  // treats a stale epoch as NOT_IN_HEAP and insert overwrites the stale key).
+  // Only on epoch wrap-around do we pay for a full reinitialisation.
   void reset_heap_impl() noexcept {
-    assert(size_ == 0);
-
+    size_ = 0;
     current_epoch_ += 1;
+
     if (current_epoch_ == 0) {
       current_epoch_ = 1;
-    }
-
-    for (std::size_t i = 0; i < length_; ++i) {
-      elements_[i].state = NOT_IN_HEAP;
-      elements_[i].epoch = 0;
+      for (std::size_t i = 0; i < length_; ++i) {
+        initialize_element(i);
+      }
     }
   }
 
@@ -62,6 +65,8 @@ private:
   void insert_impl(std::size_t element_idx, double key) noexcept {
     assert(element_idx < length_);
     assert(size_ < length_);
+    // SCANNED elements may be re-inserted (A* with an inconsistent heuristic).
+    assert(effective_state(element_idx) != IN_HEAP);
     assert(key < kInfinity);
 
     const std::size_t node_idx = size_;
@@ -69,6 +74,9 @@ private:
     elements_[element_idx].state = IN_HEAP;
     elements_[element_idx].epoch = current_epoch_;
     elements_[element_idx].node_idx = node_idx;
+    // The element may carry a stale key from a previous epoch; make the
+    // sift-up below a genuine decrease.
+    elements_[element_idx].key = kInfinity;
     heap_[node_idx] = element_idx;
     decrease_key_from_node_index(node_idx, key);
   }
