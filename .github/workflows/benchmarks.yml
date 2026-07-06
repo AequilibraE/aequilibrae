@@ -1,0 +1,73 @@
+name: Benchmarks
+run-name: "Benchmarks for PR #${{ inputs.pr-number }}"
+on:
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR number to comment on'
+        required: true
+        type: string
+      iterations:
+        description: 'Number of iterations for benchmarking'
+        required: false
+        type: string
+
+env:
+  AEQ_SHOW_PROGRESS: "0"
+  TNTP_ROOT: ${{ github.workspace }}/TransportationNetworks
+  BENCHMARK_REPORTS_DIR: ${{ github.workspace }}/tests/aeq/benchmarks/_convergence_reports
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set benchmark iterations
+        if: ${{ inputs.iterations != '' }}
+        run: echo "BENCHMARK_ITERATIONS=${{ inputs.iterations }}" >> $GITHUB_ENV
+
+      - name: Clone TransportationNetworks
+        run: git clone https://github.com/bstabler/TransportationNetworks ${{ env.TNTP_ROOT }}
+
+      - name: Create reports directory
+        run: mkdir -p ${{ env.BENCHMARK_REPORTS_DIR }}
+
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python and create virtual environment
+        run: uv venv .venv --python ${{ env.PYTHON_VERSION }} --python-preference only-managed  --clear
+
+      - name: Install spatialite
+        run: |
+          sudo apt update
+          sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
+          sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+
+      - name: Install dependencies
+        run: uv pip install -e ".[dev]"
+
+      - name: Run benchmarks
+        run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_* --benchmark-only
+
+      - name: Generate plots
+        run: | 
+          uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time
+          uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
+          uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
+
+      - name: Add pytest-benchmark output to summary
+        run: |
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          uv run pytest-benchmark compare 0001 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload plots as artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: benchmark-plots
+          path: ${{ env.BENCHMARK_REPORTS_DIR }}/**/*.png
