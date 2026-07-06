@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: refs/pull/${{ inputs.pr-number }}/head
 
       - name: Set benchmark iterations
         if: ${{ inputs.iterations != '' }}
@@ -55,7 +57,7 @@ jobs:
         run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_* --benchmark-only
 
       - name: Generate plots
-        run: | 
+        run: |
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
