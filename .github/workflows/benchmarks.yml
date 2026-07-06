@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       pr-number:
-        description: 'PR number to comment on'
+        description: 'PR number to run benchmarks on'
         required: true
         type: string
       iterations:
@@ -37,6 +37,17 @@ jobs:
       - name: Set benchmark iterations
         if: ${{ inputs.iterations != '' }}
         run: echo "BENCHMARK_ITERATIONS=${{ inputs.iterations }}" >> $GITHUB_ENV
+      
+      - name: Get PR details
+        run: |
+          gh pr view ${{ inputs.pr-number }} --json title,url | \
+            jq -r '"PR_TITLE=\(.title)\nPR_URL=\(.url)"' >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ github.token }}
+        
+      - name: Add PR details to summary
+        run: |
+          echo "# Benchmarks for [#${{ inputs.pr-number }} ${{ env.PR_TITLE }}](${{ env.PR_URL }})" >> $GITHUB_STEP_SUMMARY
 
       - name: Clone TransportationNetworks
         run: git clone https://github.com/bstabler/TransportationNetworks ${{ env.TNTP_ROOT }}
