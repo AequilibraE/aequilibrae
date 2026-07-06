@@ -72,6 +72,8 @@ tests = [
   "pytest-cov",
   "pytest-subtests",
   "pytest-random-order",
+  "pytest-benchmark",
+  "seaborn",
   "coveralls",
   "ruff==0.14.8",
   "wheel",
@@ -82,6 +84,9 @@ dev = ['aequilibrae[tests, docs]']
 # simwrapper CLI
 [project.scripts]
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
+
+[tool.pytest.ini_options]
+addopts = "--benchmark-skip"
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]
