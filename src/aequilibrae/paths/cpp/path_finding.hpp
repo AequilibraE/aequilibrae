@@ -48,13 +48,13 @@ size_t dijkstra(size_t origin, const size_t max_size, const double *costs,
                 "Queue provided does not derive from PriorityQueueBase");
 
   Queue queue{};
+  queue.attach_logger(c);
   size_t found = 0;
   const bool early_exit_enabled = destination_count >= 0;
   long long remaining = destination_count;
 
   AEQ_LOG(c, AEQ_LOG_DEBUG,
-          aeq_format_string("Running Dijkstra's with origin = ", origin,
-                            " with ", Queue::kName));
+          aeq_format_string("Running Dijkstra's with origin = ", origin));
 
   for (size_t i = 0; i < max_size; i++) {
     predecessors[i] = SENTINEL;
@@ -124,12 +124,12 @@ void a_star(size_t origin, size_t destination, const size_t max_size,
                 "Queue provided does not derive from PriorityQueueBase");
 
   Queue queue{};
+  queue.attach_logger(b);
   const size_t destination_vert = (destination != SENTINEL) ? destination : 0;
 
   AEQ_LOG(b, AEQ_LOG_DEBUG,
           aeq_format_string("Running A* with origin = ", origin,
-                            " destination = ", destination_vert, " with ",
-                            Queue::kName));
+                            " destination = ", destination_vert));
 
   std::vector<double> gScore(max_size, std::numeric_limits<double>::infinity());
 

@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <limits>
 
+#include "aeq_log.hpp"
+
 namespace aequilibrae::paths::cpp {
 
 enum ElementState {
@@ -20,7 +22,16 @@ public:
   PriorityQueueBase(PriorityQueueBase &&) = delete;
   PriorityQueueBase &operator=(PriorityQueueBase &&) = delete;
 
+  // Attach an AeqLogClosure (from a Bridge) so the heap can report its use.
+  // nullptr (the default) disables logging entirely.
+  void attach_logger(AeqLogClosure *closure) noexcept {
+    log_closure_ = closure;
+  }
+
   void init_heap(std::size_t length) noexcept {
+    AEQ_LOG(log_closure_, AEQ_LOG_DEBUG,
+            aeq_format_string(Derived::kName, ": init_heap(length = ", length,
+                              ")"));
     derived().init_heap_impl(length);
   }
 
@@ -28,7 +39,11 @@ public:
     derived().alloc_heap_impl(length);
   }
 
-  void reset_heap() noexcept { derived().reset_heap_impl(); }
+  void reset_heap() noexcept {
+    AEQ_LOG(log_closure_, AEQ_LOG_DEBUG,
+            aeq_format_string(Derived::kName, ": reset_heap()"));
+    derived().reset_heap_impl();
+  }
 
   void free_heap() noexcept { derived().free_heap_impl(); }
 
@@ -62,6 +77,8 @@ public:
 protected:
   PriorityQueueBase() = default;
   ~PriorityQueueBase() = default;
+
+  AeqLogClosure *log_closure_ = nullptr;
 
 private:
   Derived &derived() noexcept { return *static_cast<Derived *>(this); }

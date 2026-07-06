@@ -1,8 +1,12 @@
+import logging
 from typing import Union, List
 
 import numpy as np
 from aequilibrae.paths.cython.AoN import update_path_trace, path_computation, HEURISTIC_MAP, HEAP_MAP
 from aequilibrae.paths.graph import Graph
+from aequilibrae.utils.logging_utils import debug_bridge
+
+logger = logging.getLogger(__name__)
 
 
 class PathResults:
@@ -110,7 +114,8 @@ class PathResults:
             self.set_heuristic(heuristic)
         if heap is not None:
             self.set_heap(heap)
-        path_computation(origin, destination, self.graph, self)
+        with debug_bridge(logger) as bridge:
+            path_computation(origin, destination, self.graph, self, bridge=bridge)
         self.__skim_path()
 
     def prepare(self, graph: Graph) -> None:

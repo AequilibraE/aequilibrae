@@ -1,5 +1,6 @@
 import logging
 import sys
+from contextlib import nullcontext
 
 from aequilibrae.utils.qgis_utils import inside_qgis
 
@@ -87,6 +88,25 @@ def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEF
     logger.addHandler(handler)
 
     return handler
+
+
+def debug_bridge(logger: logging.Logger):
+    """
+    Context manager yielding a :obj:`Bridge` when ``logger`` is enabled for DEBUG, or ``None`` otherwise.
+
+    The Bridge surfaces DEBUG-level messages emitted from C++/Cython (e.g. which priority queue the
+    path finding is using). Since a Bridge runs a monitoring thread whose teardown can take up to its
+    polling interval, it is only spun up when those messages would actually be logged.
+
+    :Arguments:
+        **logger** (:obj:`logging.Logger`): The logger the Bridge should dispatch to.
+
+    :Returns:
+        **context manager**: yields a :obj:`Bridge` or ``None``.
+    """
+    from aequilibrae.utils.cython.bridge import Bridge
+
+    return Bridge(logger) if logger.isEnabledFor(logging.DEBUG) else nullcontext()
 
 
 def default_log_file_config(handler: logging.Handler, format: str = DEFAULT_FORMAT):

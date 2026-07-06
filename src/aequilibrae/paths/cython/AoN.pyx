@@ -1,6 +1,7 @@
 # cython: language_level=3
 import os
 
+from aequilibrae.utils.cython.bridge cimport Bridge
 
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
@@ -46,7 +47,7 @@ def _resolve_heap(result):
     return HEAP_MAP[result._heap or _DEFAULT_HEAP]
 
 
-def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
+def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=None):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
     cdef long nodes, orig, block_flows_through_centroids, classes, b, origin_index, zones, links
     cdef int skims
@@ -78,6 +79,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef unsigned char [::1] destinations
 
     cdef HeapType heap_type = _resolve_heap(result)
+    cdef Bridge br = bridge
+    cdef AeqLogClosure *closure = br.c if br is not None else <AeqLogClosure*>NULL
 
     tmp = np.zeros(nodes, dtype=bool)
     if not skims:
@@ -168,7 +171,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                          ids_graph_view,
                          conn_view,
                          reached_first_view,
-                         heap_type)
+                         heap_type,
+                         closure)
 
         if block_flows_through_centroids:  # Re-blocks the centroid if that is the case
             b = 1
@@ -225,7 +229,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     return origin
 
 
-def path_computation(origin, destination, graph, results):
+def path_computation(origin, destination, graph, results, bridge=None):
     # type: (int, int, Graph, PathResults) -> (None)
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
@@ -280,6 +284,8 @@ def path_computation(origin, destination, graph, results):
     cdef long long [::1] b_nodes_view = new_b_nodes
 
     cdef HeapType heap_type = _resolve_heap(results)
+    cdef Bridge br = bridge
+    cdef AeqLogClosure *closure = br.c if br is not None else <AeqLogClosure*>NULL
 
     cdef bint a_star_bint = results.a_star
     cdef const double [::1] lat_view
@@ -325,7 +331,8 @@ def path_computation(origin, destination, graph, results):
                 ids_graph_view,
                 conn_view,
                 heuristic,
-                heap_type
+                heap_type,
+                closure
             )
         else:
             w = path_finding(origin_index,
@@ -338,7 +345,8 @@ def path_computation(origin, destination, graph, results):
                              ids_graph_view,
                              conn_view,
                              reached_first_view,
-                             heap_type)
+                             heap_type,
+                             closure)
 
         if skims > 0 and not a_star_bint:
             skim_single_path(origin_index,
@@ -451,7 +459,7 @@ def update_path_trace(results, destination, graph):
             results.milepost = None
 
 
-def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
+def skimming_single_origin(origin, graph, result, aux_result, curr_thread, bridge=None):
     """
     :param origin:
     :param graph:
@@ -505,6 +513,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     cdef unsigned char [::1] destinations = np.array([], dtype=bool)
 
     cdef HeapType heap_type = _resolve_heap(result)
+    cdef Bridge br = bridge
+    cdef AeqLogClosure *closure = br.c if br is not None else <AeqLogClosure*>NULL
 
     # Now we do all procedures with NO GIL
     with nogil:
@@ -526,7 +536,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                          ids_graph_view,
                          conn_view,
                          reached_first_view,
-                         heap_type)
+                         heap_type,
+                         closure)
 
         skim_multiple_fields(origin_index,
                              nodes,

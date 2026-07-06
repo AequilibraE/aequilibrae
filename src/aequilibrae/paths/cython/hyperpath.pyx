@@ -13,7 +13,7 @@ from libc.stdint cimport int64_t, uint8_t, uint32_t, uint64_t
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
-from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f
+from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure, log, aeq_format_string as f
 from aequilibrae.utils.cython.bar cimport Bar
 
 ctypedef double DATATYPE_t
@@ -331,7 +331,8 @@ cdef void compute_SF_in_parallel(
                 o_indices,
                 od_index_to_taz_index,
                 skimming,
-                is_travel_time
+                is_travel_time,
+                bridge.c
             )
             bar.inc()
 
@@ -392,6 +393,7 @@ cdef void compute_SF_in(
     int64_t[::1] od_index_to_taz_index,
     bint skimming,
     bint is_travel_time,
+    AeqLogClosure *closure,
 ) noexcept nogil:
 
     cdef:
@@ -434,7 +436,8 @@ cdef void compute_SF_in(
         skim_i_vec,
         skim_j_vec,
         n_skim_cols,
-        vertex_count
+        vertex_count,
+        closure
     )
 
     if skimming:
@@ -526,6 +529,7 @@ cdef void _SF_in_first_pass_full(
     double *skim_j_vec,
     size_t n_skim_cols,
     size_t vertex_count,
+    AeqLogClosure *closure,
 ) noexcept nogil:
     """All vertices are visited."""
 
@@ -542,6 +546,7 @@ cdef void _SF_in_first_pass_full(
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
+    queue.attach_logger(closure)
     queue.init_heap(<size_t>edge_count)
 
     # only the incoming edges of the target vertex are inserted into the

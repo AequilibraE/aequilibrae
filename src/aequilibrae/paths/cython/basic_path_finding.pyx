@@ -25,6 +25,7 @@ from aequilibrae.paths.cython.path_finding cimport (
     haversine_heuristic,
     equirectangular_heuristic,
 )
+from aequilibrae.utils.cython.bridge cimport AeqLogClosure
 
 
 cdef enum HeapType:
@@ -291,7 +292,7 @@ cpdef void skim_multiple_fields(long origin,
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn of bounds-checking for entire function
-cpdef int path_finding(
+cdef int path_finding(
     long origin,
     unsigned char [::1] destinations,
     long long destination_count,
@@ -302,7 +303,8 @@ cpdef int path_finding(
     const long long [::1] ids,
     long long [::1] connectors,
     long long [::1] reached_first,
-    HeapType heap=FOUR_ARY_HEAP
+    HeapType heap=FOUR_ARY_HEAP,
+    AeqLogClosure *closure=NULL
 ) noexcept nogil:
     cdef:
         size_t origin_vert = <size_t>origin
@@ -320,13 +322,13 @@ cpdef int path_finding(
 
     if heap == PAIRING_HEAP:
         return <int>dijkstra[PairingHeap](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
-                                          ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, NULL)
+                                          ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
     elif heap == STD_PRIORITY_QUEUE:
         return <int>dijkstra[StdPriorityQueueAdapter](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
-                                                      ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, NULL)
+                                                      ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
     else:
         return <int>dijkstra[FourAryHeap](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
-                                          ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, NULL)
+                                          ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
 
 
 @cython.wraparound(False)
@@ -375,19 +377,20 @@ HEURISTIC_MAP = {"haversine": HAVERSINE, "equirectangular": EQUIRECTANGULAR}
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void path_finding_a_star(long origin,
-                               long destination,
-                               double[::1] graph_costs,
-                               long long [::1] csr_indices,
-                               long long [::1] graph_fs,
-                               long long [::1] nodes_to_indices,
-                               const double [::1] lats,
-                               const double [::1] lons,
-                               long long [::1] pred,
-                               const long long [::1] ids,
-                               long long [::1] connectors,
-                               Heuristic heuristic,
-                               HeapType heap=FOUR_ARY_HEAP) noexcept nogil:
+cdef void path_finding_a_star(long origin,
+                              long destination,
+                              double[::1] graph_costs,
+                              long long [::1] csr_indices,
+                              long long [::1] graph_fs,
+                              long long [::1] nodes_to_indices,
+                              const double [::1] lats,
+                              const double [::1] lons,
+                              long long [::1] pred,
+                              const long long [::1] ids,
+                              long long [::1] connectors,
+                              Heuristic heuristic,
+                              HeapType heap=FOUR_ARY_HEAP,
+                              AeqLogClosure *closure=NULL) noexcept nogil:
     cdef:
         HeuristicFn heur_fn
         void* heur_data
@@ -415,10 +418,10 @@ cpdef void path_finding_a_star(long origin,
 
     if heap == PAIRING_HEAP:
         a_star[PairingHeap](origin_vert, destination_vert, max_size, costs_ptr, csr_ptr, fs_ptr, nti_ptr,
-                            lats_ptr, lons_ptr, pred_ptr, ids_ptr, conn_ptr, heur_fn, heur_data, NULL)
+                            lats_ptr, lons_ptr, pred_ptr, ids_ptr, conn_ptr, heur_fn, heur_data, closure)
     elif heap == STD_PRIORITY_QUEUE:
         a_star[StdPriorityQueueAdapter](origin_vert, destination_vert, max_size, costs_ptr, csr_ptr, fs_ptr, nti_ptr,
-                                        lats_ptr, lons_ptr, pred_ptr, ids_ptr, conn_ptr, heur_fn, heur_data, NULL)
+                                        lats_ptr, lons_ptr, pred_ptr, ids_ptr, conn_ptr, heur_fn, heur_data, closure)
     else:
         a_star[FourAryHeap](origin_vert, destination_vert, max_size, costs_ptr, csr_ptr, fs_ptr, nti_ptr,
-                            lats_ptr, lons_ptr, pred_ptr, ids_ptr, conn_ptr, heur_fn, heur_data, NULL)
+                            lats_ptr, lons_ptr, pred_ptr, ids_ptr, conn_ptr, heur_fn, heur_data, closure)

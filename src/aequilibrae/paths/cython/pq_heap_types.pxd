@@ -1,5 +1,7 @@
 from libc.stddef cimport size_t
 
+from aequilibrae.utils.cython.bridge cimport AeqLogClosure
+
 cdef extern from "pq_heap_base.hpp" namespace "aequilibrae::paths::cpp" nogil:
     cdef enum ElementState:
         SCANNED
@@ -7,6 +9,7 @@ cdef extern from "pq_heap_base.hpp" namespace "aequilibrae::paths::cpp" nogil:
         IN_HEAP
 
     cdef cppclass PriorityQueueBase:
+        void attach_logger(AeqLogClosure *closure) noexcept
         void init_heap(size_t length) noexcept
         void alloc_heap(size_t length) noexcept
         void reset_heap() noexcept
