@@ -109,10 +109,14 @@ def load_tntp_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
         orig = blocks[k].split("\n")
         dests = orig[1:]
         orig = int(orig[0])
-        d = [eval("{" + a.replace(";", ",").replace(" ", "") + "}") for a in dests]
         destinations = {}
-        for i in d:
-            destinations = {**destinations, **i}
+        for line in dests:
+            split_line = line.split(";")
+            pairs = [pair.split(":") for pair in split_line]
+            for pair in pairs:
+                if len(pair) != 2:
+                    break
+                destinations[int(pair[0])] = float(pair[1])  # strip whitespace
         matrix[orig] = destinations
     zones = max(matrix.keys())
     index = np.arange(zones) + 1
@@ -219,11 +223,11 @@ def assert_flow_regression(
 
 def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorithm: str):
     """Save multi-trial convergence reports as a single CSV."""
-reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
-if not reports_dir:
-    raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
-benchmark_reports_dir = Path(reports_dir)
-benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
+    if not reports_dir:
+        raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
+    benchmark_reports_dir = Path(reports_dir)
+    benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
     parts = []
     for i, report in enumerate(trials):
         out = report.copy()
@@ -237,11 +241,11 @@ benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
 
 def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: str, algorithm: str):
     """Save flow results."""
-reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
-if not reports_dir:
-    raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
-benchmark_reports_dir = Path(reports_dir)
-benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
+    if not reports_dir:
+        raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
+    benchmark_reports_dir = Path(reports_dir)
+    benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
 
     results_with_nodes.to_parquet(benchmark_reports_dir / f"{model_name}_{algorithm}_results_with_nodes.parquet")
 
