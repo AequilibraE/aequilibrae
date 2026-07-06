@@ -70,18 +70,21 @@ jobs:
         run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_* --benchmark-only
 
       - name: Generate plots
+        if: always() # always generate plots, especially if some benchmarks fail
         run: |
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
 
       - name: Add pytest-benchmark output to summary
+        if: always()
         run: |
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           uv run pytest-benchmark compare 0001 >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload plots as artifacts
+        if: always()
         uses: actions/upload-artifact@v5
         with:
           name: benchmark-plots
