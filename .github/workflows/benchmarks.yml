@@ -11,6 +11,14 @@ on:
         description: 'Number of iterations for benchmarking'
         required: false
         type: string
+      build-ver:
+        description: 'Aequilibrae version for build'
+        required: true
+        default: 'Aequilibrae 1'
+        type: choice
+        options:
+        - Aequilibrae 1
+        - Aequilibrae 2
 
 env:
   AEQ_SHOW_PROGRESS: "0"
@@ -50,8 +58,13 @@ jobs:
           sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
           sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
-      - name: Install dependencies
+      - name: Install dependencies version 1
+        if: ${{ inputs.build-ver == 'Aequilibrae 1' }}
         run: uv pip install -e ".[dev]"
+      
+      - name: Install dependencies version 2
+        if: ${{ inputs.build-ver == 'Aequilibrae 2' }}
+        run: uv pip install ".[dev]"
 
       - name: Run benchmarks
         run: uv run pytest --benchmark-autosave tests/aeq/benchmarks/test_* --benchmark-only
