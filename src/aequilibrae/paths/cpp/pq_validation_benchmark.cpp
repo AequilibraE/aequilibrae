@@ -349,10 +349,10 @@ int main(int argc, char **argv) {
               << '\n';
     std::cout << "  StdPriorityQueueAdapter: " << adapter_result.ms << " ms"
               << " (x" << adapter_vs_std << " vs std)" << '\n';
-    std::cout << "  FourAryHeap: " << four_ary_result.ms << " ms"
-              << " (x" << four_ary_vs_std << " vs std)" << '\n';
-    std::cout << "  PairingHeap: " << pairing_result.ms << " ms"
-              << " (x" << pairing_vs_std << " vs std)" << '\n';
+    std::cout << "  FourAryHeap: " << four_ary_result.ms << " ms" << " (x"
+              << four_ary_vs_std << " vs std)" << '\n';
+    std::cout << "  PairingHeap: " << pairing_result.ms << " ms" << " (x"
+              << pairing_vs_std << " vs std)" << '\n';
     std::cout << "Validation passed" << '\n';
   }
   return 0;
