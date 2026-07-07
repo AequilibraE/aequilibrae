@@ -3,18 +3,18 @@ import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
 import numpy as np
-from aequilibrae.paths.cython.AoN import one_to_all, assign_link_loads
 
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+from aequilibrae.paths.cython.AoN import assign_link_loads, one_to_all
+from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.logging_utils import debug_bridge
+
 from .multi_threaded_aon import MultiThreadedAoN
 
 logger = logging.getLogger(__name__)
-
-from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.graph import Graph
-from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 
 class allOrNothing(WorkerThread):
