@@ -24,6 +24,57 @@ jobs:
           version: 0.14.8
           args: check --output-format=github
 
+  clang-tidy:
+    runs-on: ubuntu-latest
+    name: clang-tidy
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-clang-tidy
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang-tidy
+        run: |
+          sudo apt update
+          sudo apt install -y clang-tidy
+
+      - name: Set Python environment
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install build dependencies
+        run: uv venv --python 3.13 --python-preference only-managed --clear && uv pip install meson ninja cython cysignals
+
+      - name: Configure build (generates compile_commands.json)
+        run: |
+          . .venv/bin/activate
+          meson setup build
+
+      - name: Run clang-tidy on src/
+        run: |
+          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
+            | xargs -0 clang-tidy -p build --quiet --warnings-as-errors='*'
+
+  clang-format:
+    runs-on: ubuntu-latest
+    name: clang-format
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-clang-format
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang-format
+        run: |
+          sudo apt update
+          sudo apt install -y clang-format
+
+      - name: Check formatting of src/
+        run: |
+          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
+            | xargs -0 clang-format --dry-run --Werror
+
   testing:
     needs: linting
     name: Testing on ${{ matrix.os }}, Python ${{ matrix.python-version }}${{ matrix.sanitisers && ', with sanitisers enabled' || ' '  }}
