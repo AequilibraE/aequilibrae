@@ -26,8 +26,8 @@ private:
 
     length_ = length;
     size_ = 0;
-    heap_ = length > 0 ? new std::size_t[length] : nullptr;
-    elements_ = length > 0 ? new Element[length] : nullptr;
+    heap_ = new std::size_t[length];
+    elements_ = new Element[length];
     current_epoch_ = 1;
 
     for (std::size_t i = 0; i < length_; ++i) {
