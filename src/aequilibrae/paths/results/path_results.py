@@ -68,8 +68,7 @@ class PathResults:
         self._early_exit = self.early_exit
         self._a_star = self.a_star
         self._heuristic = "equirectangular"
-        # None defers to the module-wide default set via aequilibrae.paths.set_default_heap
-        self._heap = None
+        self._heap = "4ary"
 
     def compute_path(
         self,
@@ -98,8 +97,7 @@ class PathResults:
             **heuristic** (:obj:`str`): Heuristic to use if ``a_star`` is enabled. Default is ``None``.
 
             **heap** (:obj:`str`): Priority queue implementation to use, one of ``get_heaps()``.
-            Defaults to ``None``, deferring to the module-wide default
-            (see :func:`aequilibrae.paths.set_default_heap`).
+            Defaults to ``None``, leaving the object's current heap (see :func:`set_heap`) unchanged.
         """
 
         if self.graph is None:
@@ -169,7 +167,7 @@ class PathResults:
             self._early_exit = self.early_exit = False
             self._a_star = self.a_star = False
             self._heuristic = "equirectangular"
-            self._heap = None
+            self._heap = "4ary"
 
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")

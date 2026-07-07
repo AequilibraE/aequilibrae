@@ -104,8 +104,7 @@ class AssignmentResults(AssignmentResultsBase):
         self.path_file_dir = None
         self.write_feather = True  # we use feather as default, parquet is slower but with better compression
 
-        # None defers to the module-wide default set via aequilibrae.paths.set_default_heap
-        self._heap = None
+        self._heap = "4ary"
 
     def set_heap(self, heap: str) -> None:
         """

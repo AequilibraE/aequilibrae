@@ -13,29 +13,6 @@ include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
 include 'connectivity.pyx'
 
-_DEFAULT_HEAP = "4ary"
-
-
-def set_default_heap(heap: str) -> None:
-    """Set the priority queue used by all shortest path computations. Must be one of ``available_heaps()``.
-
-    Calling ``set_heap`` on a results object (``PathResults``, ``AssignmentResults``, ``SkimResults``,
-    or ``TrafficClass``) takes precedence over this default.
-
-    :Arguments:
-        **heap** (:obj:`str`): Heap to use.
-    """
-    global _DEFAULT_HEAP
-    if heap not in HEAP_MAP:
-        raise ValueError(f"heap must be one of {list(HEAP_MAP.keys())}")
-    _DEFAULT_HEAP = heap
-
-
-def get_default_heap() -> str:
-    """Return the name of the priority queue currently used by shortest path computations."""
-    return _DEFAULT_HEAP
-
-
 def available_heaps() -> list:
     """Return the available priority queue implementations."""
     return list(HEAP_MAP.keys())
@@ -43,8 +20,8 @@ def available_heaps() -> list:
 
 def _resolve_heap(result):
     # Every results object reaching the path finding entry points (PathResults, AssignmentResults,
-    # SkimResults) carries a _heap attribute; None defers to the module-wide default.
-    return HEAP_MAP[result._heap or _DEFAULT_HEAP]
+    # SkimResults) carries a _heap attribute.
+    return HEAP_MAP[result._heap]
 
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=None):

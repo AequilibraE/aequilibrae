@@ -128,8 +128,7 @@ class TrafficClass(TransportClassBase):
     def set_heap(self, heap: str) -> None:
         """Sets the priority queue implementation used for path finding when assigning this class.
 
-        Must be one of ``AssignmentResults.get_heaps()``. If not set, the module-wide default applies
-        (see :func:`aequilibrae.paths.set_default_heap`).
+        Must be one of ``AssignmentResults.get_heaps()``. Defaults to the 4-ary heap if not set.
 
         :Arguments:
             **heap** (:obj:`str`): Heap to use.

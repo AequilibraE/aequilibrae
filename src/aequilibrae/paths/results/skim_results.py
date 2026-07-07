@@ -44,8 +44,7 @@ class SkimResults:
         self.num_skims = -1
         self._graph_id = None
         self.graph = Graph()
-        # None defers to the module-wide default set via aequilibrae.paths.set_default_heap
-        self._heap = None
+        self._heap = "4ary"
 
     def prepare(self, graph: Graph):
         """
