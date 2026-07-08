@@ -271,8 +271,13 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
         :link-type: url
         :text-align: center
 
+<<<<<<< HEAD
     .. grid-item-card:: 2.0.0
         :link:  https://www.aequilibrae.com/docs/python/v2.0.0/
+=======
+    .. grid-item-card:: 1.7.0
+        :link:  https://www.aequilibrae.com/docs/python/v1.7.0/
+>>>>>>> origin/pedro/latest_validation
         :link-type: url
         :text-align: center
 
