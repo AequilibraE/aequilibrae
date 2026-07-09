@@ -94,11 +94,11 @@ def plot_flow_dashboard(
 def _load_all_reports(reports_dir: Path) -> pd.DataFrame:
     """Load and concatenate all CSVs in *reports_dir*."""
     dfs = []
-    for csv_path in sorted(reports_dir.glob("*.csv")):
+    for csv_path in sorted(reports_dir.glob("**/*.csv")):
         df = pd.read_csv(csv_path)
         dfs.append(df)
     if not dfs:
-        raise FileNotFoundError(f"No CSV files found in {reports_dir}")
+        raise FileNotFoundError(f"No CSV files found in {reports_dir} or subdirectories")
     return pd.concat(dfs, ignore_index=True)
 
 
@@ -360,7 +360,7 @@ def make_all_convergence_plots(reports_dir: Path, plot_time: bool):
     print("Making convergence plots...")
 
     all_data = _load_all_reports(reports_dir)
-    out_dir = reports_dir  # write plots alongside CSVs
+    base_out_dir = reports_dir  # write plots alongside CSVs
 
     mode = "time" if plot_time else "iters"
     models = sorted(all_data["model"].unique())
@@ -369,8 +369,8 @@ def make_all_convergence_plots(reports_dir: Path, plot_time: bool):
         model_df = all_data[all_data["model"] == model]
         algorithms = sorted(model_df["algorithm"].unique(), key=str.upper)
         heaps = sorted(model_df["heap"].unique(), key=str.upper)
+        out_dir = base_out_dir / model
         for heap in heaps:
-
             for alg in algorithms:
                 sub = model_df[(model_df["algorithm"] == alg) & (model_df["heap"] == heap)].reset_index(drop=True)
                 plot_single(
@@ -378,7 +378,7 @@ def make_all_convergence_plots(reports_dir: Path, plot_time: bool):
                     model,
                     alg,
                     heap,
-                    out_dir / f"{model}_{alg}_{heap}_convergence_{mode}.png",
+                    out_dir / f"{model}_{heap}_{alg}_convergence_{mode}.png",
                     plot_time=plot_time,
                 )
 
@@ -396,16 +396,18 @@ def make_all_flow_comparison_plots(reports_dir: Path):
     print("Making flow comparison plots...")
 
     out_dir = reports_dir
-    parquet_files = sorted(reports_dir.glob("*_results_with_nodes.parquet"))
+    parquet_files = sorted(reports_dir.glob("**/*_results_with_nodes.parquet"))
     if not parquet_files:
         print(f"No parquet files found in {reports_dir}")
         return
     for parquet_path in parquet_files:
         # Parse model and algorithm from filename: {model}_{alg}_results_with_nodes.parquet
         stem = parquet_path.stem.replace("_results_with_nodes", "")
-        model, alg, heap = stem.rsplit("_", 2)
+        model, heap, alg = stem.rsplit("_", 2)
         results_with_nodes = pd.read_parquet(parquet_path)
-        plot_flow_dashboard(results_with_nodes, model, alg, heap, 0, out_dir / f"{model}_{alg}_{heap}_flow_comparison.png")
+        plot_flow_dashboard(
+            results_with_nodes, model, alg, heap, 0, out_dir / f"{model}/{model}_{alg}_{heap}_flow_comparison.png"
+        )
     print(f"    Flow comparison plots written to {out_dir}")
 
 

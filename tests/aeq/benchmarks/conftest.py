@@ -231,6 +231,8 @@ def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorit
         raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
     benchmark_reports_dir = Path(reports_dir)
     benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
+    model_dir = benchmark_reports_dir / model_name
+    model_dir.mkdir(parents=True, exist_ok=True)
     parts = []
     for i, report in enumerate(trials):
         out = report.copy()
@@ -240,7 +242,7 @@ def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorit
     combined["model"] = model_name
     combined["algorithm"] = algorithm
     combined["heap"] = heap
-    combined.to_csv(benchmark_reports_dir / f"{model_name}_{algorithm}_{heap}.csv", index=False)
+    combined.to_csv(model_dir / f"{model_name}_{heap}_{algorithm}.csv", index=False)
 
 
 def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: str, algorithm: str, heap: str):
@@ -250,8 +252,10 @@ def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: s
         raise RuntimeError("BENCHMARK_REPORTS_DIR env var must be set to write benchmark reports")
     benchmark_reports_dir = Path(reports_dir)
     benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
+    model_dir = benchmark_reports_dir / model_name
+    model_dir.mkdir(parents=True, exist_ok=True)
 
-    results_with_nodes.to_parquet(benchmark_reports_dir / f"{model_name}_{algorithm}_{heap}_results_with_nodes.parquet")
+    results_with_nodes.to_parquet(model_dir / f"{model_name}_{heap}_{algorithm}_results_with_nodes.parquet")
 
 
 def run_validation(
