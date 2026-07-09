@@ -8,7 +8,7 @@ from aequilibrae.paths.cython.parallel_numpy import sum_axis1, assign_link_loads
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
-from aequilibrae.utils.core_setter import resolve_threading_threshold
+from aequilibrae.utils.core_setter import resolve_cores, resolve_threading_threshold
 
 """
 TO-DO:
@@ -24,10 +24,7 @@ class AssignmentResultsBase(ABC):
         self.no_path = None  # The list os paths
         self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
         sys_params = Parameters().parameters["system"]
-        p = sys_params["cpus"]
-        if not isinstance(p, int):
-            p = 0
-        self.set_cores(p, resolve_threading_threshold(sys_params))
+        self.set_cores(resolve_cores(sys_params), resolve_threading_threshold(sys_params))
 
         self.nodes = -1
         self.zones = -1
@@ -74,9 +71,7 @@ class AssignmentResultsBase(ABC):
         elif cores == 0:
             self.cores = mp.cpu_count()
         elif cores > 0:
-            cores = min(mp.cpu_count(), cores)
-            if self.cores != cores:
-                self.cores = cores
+            self.cores = min(mp.cpu_count(), cores)
         if self.link_loads.shape[0]:
             self.__redim()
 

@@ -4,6 +4,21 @@ import os
 DEFAULT_THREADING_THRESHOLD = 10_000
 
 
+def resolve_cores(system_parameters: dict) -> int:
+    """Resolves the requested number of cores, before clamping by ``set_cores``.
+
+    The ``AEQ_CPUS`` environment variable wins over the project's ``parameters.yml``
+    because the core count is a property of the machine, while the parameter file
+    travels with the project. Values that cannot be interpreted as an integer
+    resolve to 0 (all cores).
+    """
+    value = os.environ.get("AEQ_CPUS", system_parameters.get("cpus", 0))
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def resolve_threading_threshold(system_parameters: dict) -> int:
     """Resolves the minimum array size for threaded execution of elementwise kernels.
 
