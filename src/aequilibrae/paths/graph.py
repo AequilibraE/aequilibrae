@@ -375,7 +375,6 @@ class GraphBase(ABC):  # noqa: B024
         """
         return disconnected_analysis(self)
 
-
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = list(self.required_default_fields)
         types = list(self.__required_default_types)

@@ -121,4 +121,3 @@ class NetworkSkimming(WorkerThread):
         record.timestamp = self.procedure_date
         record.procedure = "Network skimming"
         record.save()
-
