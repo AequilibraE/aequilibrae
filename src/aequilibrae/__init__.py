@@ -47,14 +47,9 @@ __all__ = [
     "paths",
 ]
 
-<<<<<<< HEAD:src/aequilibrae/__init__.py
 logger = global_logger = logging.getLogger(__name__)
 
 version = importlib.metadata.version("aequilibrae")
-=======
-# When updating the version, one must also update the docs/source/useful_links/version_history.rst file
-version = "1.7.0"
->>>>>>> origin/pedro/latest_validation:aequilibrae/__init__.py
 
 # On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
 if sys.platform == "darwin" and get_start_method(allow_none=True) != "fork":
