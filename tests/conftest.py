@@ -3,6 +3,7 @@
 # needing to import them (pytest will automatically discover them).
 
 import faulthandler
+import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -20,6 +21,11 @@ faulthandler.enable()
 
 DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_env():
+    os.environ["AEQ_SHOW_PROGRESS"] = "0"
 
 
 @pytest.fixture(scope="session")

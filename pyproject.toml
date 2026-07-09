@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python>=0.15.0", "ninja", "cython", "cysignals"]
+requires = ["meson-python>=0.15.0", "ninja", "cython>=3.1", "cysignals"]
 
 [tool.meson-python.args]
 setup = ['--vsenv']
