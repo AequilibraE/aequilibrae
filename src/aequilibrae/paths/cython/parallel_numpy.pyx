@@ -15,11 +15,11 @@ cpdef cython.floating[::1] sum_axis1(
         Py_ssize_t l = out.shape[0]
         Py_ssize_t k = multiples.shape[1]
         Py_ssize_t i, j
-        bool use_threads = l > threading_threshold and threading_threshold >= 0
+        bool use_threads = l * k > threading_threshold and threading_threshold >= 0
 
     assert multiples.shape[0] == l, "mismatched shape"
 
-    for i in prange(l, nogil=True, use_threads_if=use_threads):
+    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
         out[i] = 0
         for j in range(k):
             out[i] += multiples[i, j]
@@ -42,7 +42,7 @@ cpdef cython.floating sum_a_times_b_minus_c(
 
     assert l == array2.shape[0] == array3.shape[0]
 
-    for i in prange(l, nogil=True, use_threads_if=use_threads):
+    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
         result += array1[i] * (array2[i] - array3[i])
 
     return result
@@ -63,7 +63,7 @@ cpdef cython.floating[::1] linear_combination_1d(
 
     assert l == array1.shape[0] == array2.shape[0]
 
-    for i in prange(l, nogil=True, use_threads_if=use_threads):
+    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
         results[i] = array1[i] * stepsize + array2[i] * (1.0 - stepsize)
 
     return results
@@ -85,7 +85,7 @@ cpdef cython.floating[:, ::1] linear_combination(
     assert array1.shape[0] == l and array2.shape[0] == l, "mismatched shape"
     assert array1.shape[1] == k and array2.shape[1] == k, "mismatched shape"
 
-    for i in prange(l, nogil=True, use_threads_if=use_threads):
+    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
         for j in range(k):
             results[i, j] = array1[i, j] * stepsize + array2[i, j] * (1.0 - stepsize)
 
