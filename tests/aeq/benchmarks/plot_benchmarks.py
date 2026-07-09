@@ -35,6 +35,7 @@ def plot_flow_dashboard(
     aeq_with_nodes: pd.DataFrame,
     model_name: str,
     method: str,
+    heap: str,
     rgap_target: float,
     save_path: Path,
 ):
@@ -77,7 +78,7 @@ def plot_flow_dashboard(
     ax.set_xlabel("TNTP Reference Flow")
     ax.set_ylabel("AequilibraE Flow")
     ax.set_title(
-        f"Flow Validation for {model_name} with {method.upper()}",
+        f"Flow Validation for {model_name} with heap {heap} using {method.upper()}",
         fontweight="bold",
         fontsize=11,
     )
@@ -117,6 +118,7 @@ def plot_single(
     df: pd.DataFrame,
     model: str,
     algorithm: str,
+    heap: str,
     save_path: Path,
     *,
     plot_time: bool = False,
@@ -169,7 +171,7 @@ def plot_single(
     ax.set_ylabel("Relative Gap", labelpad=10)
     title_extra = f"  ({n_trials} trials)" if n_trials > 1 else ""
     ax.set_title(
-        f"Convergence - {model}\n{algorithm.upper()}{title_extra}",
+        f"Convergence - {model}, heap {heap}\n{algorithm.upper()}{title_extra}",
         pad=14,
         fontweight="bold",
         fontsize=14,
@@ -199,6 +201,7 @@ def plot_single(
 def plot_method_comparison(
     df: pd.DataFrame,
     model: str,
+    heap: str,
     save_path: Path,
     *,
     plot_time: bool = False,
@@ -326,7 +329,7 @@ def plot_method_comparison(
     ax.set_xlabel(_x_label(plot_time), labelpad=10)
     ax.set_ylabel("Relative Gap", labelpad=10)
     ax.set_title(
-        f"Convergence - {model}\nAll Methods",
+        f"Convergence - {model}, heap {heap}\nAll Methods",
         pad=14,
         fontweight="bold",
         fontsize=14,
@@ -365,23 +368,27 @@ def make_all_convergence_plots(reports_dir: Path, plot_time: bool):
     for model in models:
         model_df = all_data[all_data["model"] == model]
         algorithms = sorted(model_df["algorithm"].unique(), key=str.upper)
+        heaps = sorted(model_df["heap"].unique(), key=str.upper)
+        for heap in heaps:
 
-        for alg in algorithms:
-            sub = model_df[model_df["algorithm"] == alg].reset_index(drop=True)
-            plot_single(
-                sub,
+            for alg in algorithms:
+                sub = model_df[(model_df["algorithm"] == alg) & (model_df["heap"] == heap)].reset_index(drop=True)
+                plot_single(
+                    sub,
+                    model,
+                    alg,
+                    heap,
+                    out_dir / f"{model}_{alg}_{heap}_convergence_{mode}.png",
+                    plot_time=plot_time,
+                )
+
+            plot_method_comparison(
+                model_df[(model_df["heap"] == heap)].reset_index(drop=True),
                 model,
-                alg,
-                out_dir / f"{model}_{alg}_convergence_{mode}.png",
+                heap,
+                out_dir / f"{model}_{heap}_all_methods_convergence_{mode}.png",
                 plot_time=plot_time,
             )
-
-        plot_method_comparison(
-            model_df.reset_index(drop=True),
-            model,
-            out_dir / f"{model}_all_methods_convergence_{mode}.png",
-            plot_time=plot_time,
-        )
     print(f"    Convergence plots written to {out_dir}")
 
 
@@ -396,9 +403,9 @@ def make_all_flow_comparison_plots(reports_dir: Path):
     for parquet_path in parquet_files:
         # Parse model and algorithm from filename: {model}_{alg}_results_with_nodes.parquet
         stem = parquet_path.stem.replace("_results_with_nodes", "")
-        model, alg = stem.rsplit("_", 1)
+        model, alg, heap = stem.rsplit("_", 2)
         results_with_nodes = pd.read_parquet(parquet_path)
-        plot_flow_dashboard(results_with_nodes, model, alg, 0, out_dir / f"{model}_{alg}_flow_comparison.png")
+        plot_flow_dashboard(results_with_nodes, model, alg, heap, 0, out_dir / f"{model}_{alg}_{heap}_flow_comparison.png")
     print(f"    Flow comparison plots written to {out_dir}")
 
 

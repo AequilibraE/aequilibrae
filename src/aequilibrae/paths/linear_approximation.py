@@ -759,7 +759,7 @@ class LinearApproximation(WorkerThread):
         clipped = min(max(float(stepsize), 0.0), upper_bound)
         if clipped != stepsize:
             msg = f"Stepsize {stepsize} outside [0, {upper_bound}]; clipping to {clipped}."
-            self.logger.debug(msg)
+            logger.debug(msg)
             self.iteration_issue.append(msg)
         return clipped
 
@@ -808,7 +808,7 @@ class LinearApproximation(WorkerThread):
                     log_message = f"# Alert: {message} Adding {tiny_step} as step size to make it non-zero."
                 else:
                     log_message = f"# Alert: Adding {tiny_step} as step size to make it non-zero."
-                self.logger.debug(log_message)
+                logger.debug(log_message)
                 self.stepsize = self.__clip_stepsize(tiny_step, alpha_max)
 
             try:

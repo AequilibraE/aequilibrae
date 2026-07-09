@@ -9,6 +9,7 @@ import pandas as pd
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficAssignment
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.paths.results.assignment_results import AssignmentResults
 from scipy.stats import linregress
 
 import pytest as pytest
@@ -49,6 +50,8 @@ RGAP_TARGET = 1e-15
 
 R2_MINIMUM = 0.95
 INTERCEPT_MINIMUM = 1e3
+
+HEAPS = AssignmentResults.get_heaps(5)
 
 
 @pytest.fixture(scope="module")
@@ -221,7 +224,7 @@ def assert_flow_regression(
     assert abs(reg.intercept) <= int_limit, f"intercept={reg.intercept:.4f} exceeds {int_limit}"
 
 
-def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorithm: str):
+def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorithm: str, heap: str):
     """Save multi-trial convergence reports as a single CSV."""
     reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
     if not reports_dir:
@@ -236,10 +239,11 @@ def save_convergence_report(trials: list[pd.DataFrame], model_name: str, algorit
     combined = pd.concat(parts, ignore_index=True)
     combined["model"] = model_name
     combined["algorithm"] = algorithm
-    combined.to_csv(benchmark_reports_dir / f"{model_name}_{algorithm}.csv", index=False)
+    combined["heap"] = heap
+    combined.to_csv(benchmark_reports_dir / f"{model_name}_{algorithm}_{heap}.csv", index=False)
 
 
-def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: str, algorithm: str):
+def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: str, algorithm: str, heap: str):
     """Save flow results."""
     reports_dir = os.environ.get("BENCHMARK_REPORTS_DIR")
     if not reports_dir:
@@ -247,7 +251,7 @@ def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: s
     benchmark_reports_dir = Path(reports_dir)
     benchmark_reports_dir.mkdir(parents=True, exist_ok=True)
 
-    results_with_nodes.to_parquet(benchmark_reports_dir / f"{model_name}_{algorithm}_results_with_nodes.parquet")
+    results_with_nodes.to_parquet(benchmark_reports_dir / f"{model_name}_{algorithm}_{heap}_results_with_nodes.parquet")
 
 
 def run_validation(
@@ -257,6 +261,7 @@ def run_validation(
     reference,
     stub,
     algorithm,
+    heap: str,
     *,
     known_pass=None,
 ):
@@ -296,6 +301,7 @@ def run_validation(
     # --- factory for a clean TrafficAssignment per trial ---
     def _make_assignment():
         tc = TrafficClass("car", graph, matrix)
+        tc.set_heap(heap)
         if "toll" in graph.network.columns:
             tc.set_fixed_cost("toll")
             tc.set_vot(1.0)
@@ -315,6 +321,7 @@ def run_validation(
 
     def _benchmarked():
         assig: TrafficAssignment = _make_assignment()
+        # HEAP_MAP = {"4ary": FOUR_ARY_HEAP, "pairing": PAIRING_HEAP, "std": STD_PRIORITY_QUEUE}
         assig.execute()
         trials.append(assig.report())
         return assig
@@ -328,9 +335,9 @@ def run_validation(
     )
     assert len(results_with_nodes) > 0, "No matching links between assignment results and TNTP reference"
 
-    save_flow_results_with_nodes(results_with_nodes, stub, algorithm)
+    save_flow_results_with_nodes(results_with_nodes, stub, algorithm, heap)
 
-    save_convergence_report(trials, stub, algorithm)
+    save_convergence_report(trials, stub, algorithm, heap)
 
     assert_flow_regression(
         results_with_nodes["PCE_AB"].values,
