@@ -8,6 +8,7 @@ from aequilibrae.paths.cython.parallel_numpy import sum_axis1, assign_link_loads
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
+from aequilibrae.utils.core_setter import resolve_threading_threshold
 
 """
 TO-DO:
@@ -22,10 +23,11 @@ class AssignmentResultsBase(ABC):
         self.link_loads = np.array([])  # The actual results for assignment
         self.no_path = None  # The list os paths
         self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
-        p = Parameters().parameters["system"]["cpus"]
+        sys_params = Parameters().parameters["system"]
+        p = sys_params["cpus"]
         if not isinstance(p, int):
             p = 0
-        self.set_cores(p)
+        self.set_cores(p, resolve_threading_threshold(sys_params))
 
         self.nodes = -1
         self.zones = -1
@@ -41,7 +43,7 @@ class AssignmentResultsBase(ABC):
     def reset(self) -> None:
         pass
 
-    def set_cores(self, cores: int) -> None:
+    def set_cores(self, cores: int, threading_threshold: int | None = None) -> None:
         """
         Sets number of cores (threads) to be used in computation
 
@@ -53,10 +55,19 @@ class AssignmentResultsBase(ABC):
 
         :Arguments:
             **cores** (:obj:`int`): Number of cores to be used in computation
+
+            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
+            operations to be threaded. Negative values disable threading for those operations. When not provided,
+            the current value is kept
         """
 
         if not isinstance(cores, int):
             raise ValueError("Number of cores needs to be an integer")
+
+        if threading_threshold is not None:
+            if not isinstance(threading_threshold, int):
+                raise ValueError("Threading threshold needs to be an integer")
+            self.threading_threshold = threading_threshold
 
         if cores < 0:
             self.cores = max(1, mp.cpu_count() + cores)
@@ -229,7 +240,7 @@ class AssignmentResults(AssignmentResultsBase):
 
         Results are placed into *total_link_loads* class member
         """
-        sum_axis1(self.total_link_loads, self.link_loads, self.cores)
+        sum_axis1(self.total_link_loads, self.link_loads, self.cores, self.threading_threshold)
 
     def get_graph_to_network_mapping(self):
         return _get_graph_to_network_mapping(self.lids, self.direcs)
@@ -280,7 +291,13 @@ class AssignmentResults(AssignmentResultsBase):
             # Link flows initialised
             link_flows = np.full((self.links, self.classes["number"]), np.nan)
             # maps link flows from the compressed graph to the uncompressed graph
-            assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
+            assign_link_loads(
+                link_flows,
+                self.select_link_loading[name],
+                self._graph_compressed_ids,
+                self.cores,
+                self.threading_threshold,
+            )
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
                 flow_ab = res[f"{name}_{n}_ab"].to_numpy(copy=True)

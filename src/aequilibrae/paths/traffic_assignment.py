@@ -67,6 +67,7 @@ class AssignmentBase(ABC):
         self.free_flow_tt: np.ndarray = None
         self.total_flow: np.ndarray = None
         self.cores: int = None
+        self.threading_threshold: int = None
         self._config = {}
 
         self.description: str = ""
@@ -85,7 +86,7 @@ class AssignmentBase(ABC):
         pass
 
     @abstractmethod
-    def set_cores(self, cores: int) -> None:
+    def set_cores(self, cores: int, threading_threshold: int | None = None) -> None:
         pass
 
     def execute(self, log_specification=True) -> None:
@@ -449,21 +450,26 @@ class TrafficAssignment(AssignmentBase):
         self.__dict__["vdf_parameters"] = pars
         self._config["VDF function"] = self.vdf.function.lower()
 
-    def set_cores(self, cores: int) -> None:
+    def set_cores(self, cores: int, threading_threshold: int | None = None) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
 
         Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
+
+            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
+            operations to be threaded. Negative values disable threading for those operations. When not provided,
+            the current value is kept
         """
         if not self.classes:
             raise RuntimeError("You need load traffic classes before overwriting the number of cores")
 
         self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(self.cores)
-            c._aon_results.set_cores(self.cores)
+            c.results.set_cores(self.cores, threading_threshold)
+            c._aon_results.set_cores(self.cores, threading_threshold)
+        self.threading_threshold = self.classes[0].results.threading_threshold
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -520,6 +526,7 @@ class TrafficAssignment(AssignmentBase):
         c = self.classes[0]
 
         self.cores = c.results.cores
+        self.threading_threshold = c.results.threading_threshold
         self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
@@ -1033,20 +1040,24 @@ class TransitAssignment(AssignmentBase):
         self._config["Algorithm"] = algo
         self.assignment = OptimalStrategies(self)
 
-    def set_cores(self, cores: int) -> None:
+    def set_cores(self, cores: int, threading_threshold: int | None = None) -> None:
         """Allows one to set the number of cores to be used AFTER transit classes have been added
 
         Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
+
+            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
+            operations to be threaded. Negative values disable threading for those operations. When not provided,
+            the current value is kept
         """
         if not self.classes:
             raise RuntimeError("You need load transit classes before overwriting the number of cores")
 
         self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(self.cores)
+            c.results.set_cores(self.cores, threading_threshold)
 
     def info(self) -> dict:
         """Returns information for the transit assignment procedure

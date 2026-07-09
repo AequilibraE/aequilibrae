@@ -9,7 +9,7 @@ cpdef cython.floating[::1] sum_axis1(
     cython.floating[::1] out,
     const cython.floating[:, ::1] multiples,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef:
         Py_ssize_t l = out.shape[0]
@@ -32,7 +32,7 @@ cpdef cython.floating sum_a_times_b_minus_c(
     const cython.floating[::1] array2,
     const cython.floating[::1] array3,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef:
         Py_ssize_t l = array1.shape[0]
@@ -54,7 +54,7 @@ cpdef cython.floating[::1] linear_combination_1d(
     const cython.floating[::1] array2,
     const cython.floating stepsize,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef:
         Py_ssize_t l = results.shape[0]
@@ -75,7 +75,7 @@ cpdef cython.floating[:, ::1] linear_combination(
     const cython.floating[:, ::1] array2,
     const cython.floating stepsize,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j
     cdef Py_ssize_t l = results.shape[0]
@@ -98,7 +98,7 @@ cpdef cython.floating[:, :, ::1] linear_combination_skims(
     const cython.floating[:, :, ::1] array2,
     const cython.floating stepsize,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j, k
     cdef Py_ssize_t a = results.shape[0]
@@ -125,7 +125,7 @@ cpdef cython.floating[:, ::1] triple_linear_combination(
     const cython.floating[:, ::1] array3,
     const cython.floating[::1] stepsizes,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j
     cdef Py_ssize_t l = results.shape[0]
@@ -150,7 +150,7 @@ cpdef cython.floating[:, :, ::1] triple_linear_combination_skims(
     const cython.floating[:, :, ::1] array3,
     const cython.floating[::1] stepsizes,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j, k
     cdef Py_ssize_t a = results.shape[0]
@@ -176,7 +176,7 @@ cpdef cython.floating[::1] copy_one_dimension(
     cython.floating[::1] target,
     const cython.floating[::1] source,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i
     cdef Py_ssize_t l = target.shape[0]
@@ -194,7 +194,7 @@ cpdef cython.floating[:, ::1] copy_two_dimensions(
     cython.floating[:, ::1] target,
     const cython.floating[:, ::1] source,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j
     cdef Py_ssize_t l = target.shape[0]
@@ -214,7 +214,7 @@ cpdef cython.floating[:, :, ::1] copy_three_dimensions(
     cython.floating[:, :, ::1] target,
     const cython.floating[:, :, ::1] source,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j, k
     cdef Py_ssize_t a = target.shape[0]
@@ -262,7 +262,7 @@ cpdef cython.floating[:, ::1] assign_link_loads(
     const cython.floating[:, ::1] compressed,
     const long long[::1] crosswalk,
     int cores,
-    Py_ssize_t threading_threshold=1000000,
+    Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j
     cdef long long k

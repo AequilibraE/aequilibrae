@@ -1,4 +1,18 @@
 import multiprocessing as mp
+import os
+
+DEFAULT_THREADING_THRESHOLD = 10_000
+
+
+def resolve_threading_threshold(system_parameters: dict) -> int:
+    """Resolves the minimum array size for threaded execution of elementwise kernels.
+
+    The ``AEQ_THREADING_THRESHOLD`` environment variable wins over the project's
+    ``parameters.yml`` because the ideal threshold is a property of the machine,
+    while the parameter file travels with the project.
+    """
+    value = os.environ.get("AEQ_THREADING_THRESHOLD", system_parameters.get("threading_threshold"))
+    return DEFAULT_THREADING_THRESHOLD if value is None else int(value)
 
 
 def set_cores(cores_count: int):

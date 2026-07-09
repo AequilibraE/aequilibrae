@@ -69,7 +69,11 @@ class allOrNothing(WorkerThread):
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
-            self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
+            self.results.link_loads,
+            self.results.compact_link_loads,
+            self.results.crosswalk,
+            self.results.cores,
+            self.results.threading_threshold,
         )
 
     def func_assig_thread(self, origin, all_threads):
