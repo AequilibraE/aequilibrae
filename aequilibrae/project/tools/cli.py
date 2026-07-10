@@ -12,7 +12,7 @@ from aequilibrae.utils.model_run_utils import import_file_as_module
 def add_subcommand_from_function(subparsers, func, defaults: dict):
     """Create an sub-command from a function's signature."""
     parser = subparsers.add_parser(func.__name__, description=func.__doc__)
-    parser.set_defaults(func=func)
+    parser.set_defaults(_internal_target_func=func)
 
     sig = inspect.signature(func)
 
@@ -20,15 +20,17 @@ def add_subcommand_from_function(subparsers, func, defaults: dict):
         # Determine if parameter has a default value
         annotation_type = param.annotation if param.annotation is not inspect.Parameter.empty else str
 
+        param_cli_name = param_name.replace("_", "-")
         if param.default is inspect.Parameter.empty:
             # Required positional argument
-            parser.add_argument(param_name, type=annotation_type, default=defaults.get(param_name))
+            if default := defaults.get(param_name):
+                parser.add_argument(param_cli_name, type=annotation_type, default=default)
+            else:
+                parser.add_argument(param_cli_name, type=annotation_type)
         else:
             # Optional argument with default
             parser.add_argument(
-                f"--{param_name}",
-                default=defaults.get(param_name, param.default),
-                type=annotation_type
+                f"--{param_cli_name}", default=defaults.get(param_name, param.default), type=annotation_type
             )
 
         # No handling of POSITIONAL_ONLY, VAR_POSITIONAL or VAR_KEYWORD, inspect docs say we could check the argument
@@ -73,10 +75,11 @@ def run(args, unparsed_args):
 
     args = vars(new_parser.parse_args(args=unparsed_args))
 
-    # Because of the .set_defaults trick we need to remove this "func" argument from the parsed arguments. "func"
-    # corresponds to the run module function we should run. It does not have the parameters.yml arguments applied via
-    # functools.partial like project.run does, but they should have been set as the defaults
-    target_function = args.pop("func")
+    # Because of the .set_defaults trick we need to remove this "_internal_target_func" argument from the parsed
+    # arguments. "_internal_target_func" corresponds to the run module function we should run. It does not have the
+    # parameters.yml arguments applied via functools.partial like project.run does, but they should have been set as the
+    # defaults
+    target_function = args.pop("_internal_target_func")
 
     try:
         res = target_function(**args)
@@ -96,19 +99,19 @@ def cli():
     # We'll add out sub-commands via a sub-parser. The function correspond to the sub-command is set via the
     # .set_defaults trick given in the docs
     # https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser.add_subparsers
-    subparsers = parser.add_subparsers(
-        title="commands", help="Available run commands", required=True
-    )
+    subparsers = parser.add_subparsers(title="commands", help="Available run commands", required=True)
 
     run_parser = subparsers.add_parser("run", help="Run project commands")
-    run_parser.add_argument("--no-defaults", action="store_true", help="do no use default arguments from parameters.yml")
-    run_parser.set_defaults(func=run)
+    run_parser.add_argument(
+        "--no-defaults", action="store_true", help="do no use default arguments from parameters.yml"
+    )
+    run_parser.set_defaults(_internal_func=run)
 
     list_functions_parser = subparsers.add_parser("list", help="List project commands")
     list_functions_parser.set_defaults(func=functools.partial(list_functions, list_functions_parser))
 
     args, unparsed_args = parser.parse_known_args()
 
-    # args now contains the project and the "func" to run from .set_defaults. unparsed_args should contain everything
-    # else.
-    args.func(args, unparsed_args)
+    # args now contains the project and the "_internal_func" to run from .set_defaults. unparsed_args should contain
+    # everything else.
+    args._internal_func(args, unparsed_args)
