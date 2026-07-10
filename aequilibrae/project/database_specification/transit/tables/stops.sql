@@ -5,9 +5,9 @@
 --@ 
 --@ **stop_id** is an unique identifier for a stop
 --@ 
---@ **stop** idenfifies a stop, statio, or station entrance
+--@ **stop** identifies a stop, station, or station entrance
 --@ 
---@ **agency_id** identifies the agency fot the specified route
+--@ **agency_id** identifies the agency for the specified route
 --@ 
 --@ **link** identifies the *link_id* in the links table that corresponds to the
 --@ pattern matching
@@ -27,7 +27,7 @@
 --@ 
 --@ **transit_fare_zone** identifies the transit fare zone for a stop
 --@ 
---@ **route_type** indicates the type of transporation used on a route
+--@ **route_type** indicates the type of transportation used on a route
 
 CREATE TABLE IF NOT EXISTS stops (
 	stop_id           TEXT    PRIMARY KEY,

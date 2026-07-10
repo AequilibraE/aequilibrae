@@ -6,7 +6,7 @@ Network simplifier
 
 In this example we use Nauru network to show how one can simplify the network,
 merging short links into longer ones or turning links into nodes, and saving
-theses changes into the project.
+these changes into the project.
 
 We use Folium to visualize the resulting network.
 """

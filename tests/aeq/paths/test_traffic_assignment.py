@@ -1,16 +1,12 @@
 import random
-import sqlite3
 import string
-from os.path import join, isfile
-from pathlib import Path
 from random import choice
 
 import numpy as np
-import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
-from ...data import siouxfalls_project
+from aequilibrae import Graph, TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import all_vdf_functions
 
 
 @pytest.fixture(scope="function")
@@ -121,19 +117,29 @@ def test_set_algorithm(assignment, assigclass):
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
-    for algo in ALGORITHMS:
+    for _algo in ALGORITHMS:
         for _ in range(10):
             pass  # Placeholder for any repeated logic if needed
     with pytest.raises(AttributeError):
         assignment.set_algorithm("not a valid algorithm")
 
 
-def test_set_vdf_parameters(assignment, assigclass):
+@pytest.mark.parametrize(
+    "vdf,parameters",
+    [
+        *[(k, {"alpha": "b", "beta": "power"}) for k in all_vdf_functions if k != "akcelik"],
+        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
+        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in all_vdf_functions if k != "akcelik"],
+        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
+        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
+    ],
+)
+def test_set_vdf_parameters(assignment, assigclass, vdf, parameters):
     with pytest.raises(RuntimeError):
-        assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_vdf("bpr")
+        assignment.set_vdf_parameters(parameters)
+    assignment.set_vdf(vdf)
     assignment.add_class(assigclass)
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_vdf_parameters(parameters)
 
 
 def test_set_time_field(assignment, assigclass):

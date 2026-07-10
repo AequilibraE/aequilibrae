@@ -3,6 +3,7 @@ import pickle
 import uuid
 import warnings
 from abc import ABC
+from copy import deepcopy
 from datetime import datetime
 from os.path import join
 from typing import List, Optional, Tuple, Union
@@ -11,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_logger
-from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 
 @dataclasses.dataclass
@@ -139,6 +140,16 @@ class GraphBase(ABC):  # noqa: B024
         else:
             raise ValueError("It must be either a int or a float")
 
+    def reverse(self):
+        g = deepcopy(self)
+        g.network = g.network.rename(columns={"a_node": "b_node", "b_node": "a_node"})
+        g.prepare_graph(self.centroids)
+        if self.cost_field:
+            g.set_graph(self.cost_field)
+        if self.skim_fields:
+            g.set_skimming(self.skim_fields)
+        return g
+
     def prepare_graph(self, centroids: Optional[np.ndarray] = None, remove_dead_ends: bool = True) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids.
@@ -225,7 +236,8 @@ class GraphBase(ABC):  # noqa: B024
         not_pos = pd.DataFrame(not_pos, copy=True)[neg_names]
         not_pos.columns = names
 
-        # Swap the a and b nodes of these edges. Direction is used for mapping the graph.graph back to the network. It does not indicate the direction of the link.
+        # Swap the a and b nodes of these edges. Direction is used for mapping the graph.graph back
+        # to the network. It does not indicate the direction of the link.
         not_pos.loc[:, "direction"] = -1
         aux = np.array(not_pos.a_node.values, copy=True)
         not_pos.loc[:, "a_node"] = not_pos.loc[:, "b_node"]
@@ -248,7 +260,9 @@ class GraphBase(ABC):  # noqa: B024
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
         present_centroids = np.isin(centroids, nodes, assume_unique=True)
         if not present_centroids.all():
-            warnings.warn("Found centroids not present in the graph!\n" + str(centroids[~present_centroids]))
+            warnings.warn(
+                "Found centroids not present in the graph!\n" + str(centroids[~present_centroids]), stacklevel=2
+            )
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
         all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 

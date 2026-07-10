@@ -14,9 +14,9 @@ def geometry_grid(model_area, srid) -> gpd.GeoDataFrame:
     dy = (maxy - miny) / subd
     elements = []
     x1 = minx
-    for i in range(subd):
+    for _i in range(subd):
         j1 = miny
-        for j in range(subd):
+        for _j in range(subd):
             elements.append(Polygon([[x1, j1], [x1, j1 + dy], [x1 + dx, j1 + dy], [x1 + dx, j1]]))
             j1 += dy
         x1 += dx

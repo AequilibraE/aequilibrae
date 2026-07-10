@@ -307,7 +307,8 @@ class AequilibraeMatrix(object):
             **compressed** (:obj:`bool`, *Optional*): Boolean for whether we should compress the output matrix.
             Not yet implemented
 
-            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only. Defaults to ``True``
+            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in
+                memory only. Defaults to ``True``
 
         """
 
@@ -383,7 +384,7 @@ class AequilibraeMatrix(object):
                 )
 
                 # Copy all cores
-                for ncore, core in zip(core_names, do_cores):
+                for ncore, core in zip(core_names, do_cores, strict=True):
                     self.matrix[ncore][:, :] = np.array(src[core])[:, :]
                 self.__flush(self.matrices)
 
@@ -709,7 +710,7 @@ class AequilibraeMatrix(object):
     def __getattr__(self, mat_name: str):
         if mat_name in object.__dict__:
             if mat_name == "matrix" and self.__omx:
-                warnings.warn("You can't access OMX matrix cores like that")
+                warnings.warn("You can't access OMX matrix cores like that", stacklevel=2)
                 return
             return self.__dict__[mat_name]
 
@@ -981,7 +982,9 @@ class AequilibraeMatrix(object):
         if not memory_only:
             output.matrices.flush()
         self.computational_view(orig_mat_view)
-        output.computational_view([core for core, old_name in zip(mnames, mcores) if old_name in orig_mat_view])
+        output.computational_view(
+            [core for core, old_name in zip(mnames, mcores, strict=True) if old_name in orig_mat_view]
+        )
         return output
 
     def rows(self) -> np.ndarray:

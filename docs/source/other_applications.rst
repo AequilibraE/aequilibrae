@@ -8,4 +8,5 @@ subject.
    :caption: Other Applications
    :maxdepth: 2
 
+   simwrapper
    _auto_examples/other_applications/index

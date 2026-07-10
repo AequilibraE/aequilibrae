@@ -6,7 +6,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 import yaml
-from aequilibrae.distribution.ipf_core import ipf_core
+from aequilibrae.distribution.cython.ipf_core import ipf_core
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
@@ -25,7 +25,10 @@ class Ipf:
         >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
 
-        >>> vectors = pd.DataFrame({"productions":np.zeros(matrix.zones), "attractions":np.zeros(matrix.zones)}, index=matrix.index)
+        >>> vectors = pd.DataFrame(
+        ...     {"productions": np.zeros(matrix.zones), "attractions": np.zeros(matrix.zones)},
+        ...     index=matrix.index,
+        ... )
 
         >>> vectors["productions"] = matrix.rows()
         >>> vectors["attractions"] = matrix.columns()
@@ -131,13 +134,13 @@ class Ipf:
         # check balancing:
         sum_rows = np.nansum(row_data)
         sum_cols = np.nansum(col_data)
-        self.__col_vector = col_data.to_numpy() * (sum_rows / sum_cols)
-        self.__row_vector = row_data.to_numpy()
+        self.__col_vector = col_data.to_numpy()  # No need to be editable
+        self.__row_vector = row_data.to_numpy()  # No need to be editable
         if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
             self.error = "Vectors are not balanced"
         else:
             # guarantees that they are precisely balanced
-            self.__col_vector = col_data.to_numpy() * (sum_rows / sum_cols)
+            self.__col_vector = self.__col_vector * (sum_rows / sum_cols)
 
     def __check_parameters(self):
         for i in self.__required_parameters:

@@ -15,3 +15,5 @@ __date__ = "$Date: 2016-07-02$"
 from .assignment_results import AssignmentResults, TransitAssignmentResults
 from .path_results import PathResults
 from .skim_results import SkimResults
+
+__all__ = ["AssignmentResults", "TransitAssignmentResults", "PathResults", "SkimResults"]

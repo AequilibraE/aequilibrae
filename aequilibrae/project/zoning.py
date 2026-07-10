@@ -61,7 +61,7 @@ class Zoning(BasicTable):
         if zone_id in self.__items:
             raise Exception(f"Zone ID {zone_id} already exists")
 
-        data = {key: None for key in self.__fields}
+        data = dict.fromkeys(self.__fields)
         data["zone_id"] = zone_id
 
         self.project.logger.info(f"Zone with id {zone_id} was created")

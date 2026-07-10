@@ -4,17 +4,17 @@
 Running IPF with NumPy array
 ============================
 
-In this example, we show how to use ``aequilibrae.distribution.ipf_core``, a high-performance 
+In this example, we show how to use ``aequilibrae.distribution.cython.ipf_core``, a high-performance
 alternative for all those who want to (re)balance values within a matrix making direct use of
 growth factors. ``ipf_core`` was built to suit countless applications rather than being limited
 to trip distribution.
 
 We demonstrate the usage of ``ipf_core`` with a 4x4 matrix with 64-bit data, which is indeed very
 small. Additionally, a more comprehensive discussion of the algorithm's performance
-with a 32-bit or 64-bit seed matrices is provided in 
+with a 32-bit or 64-bit seed matrices is provided in
 :doc:`../../distribution_procedures/IPF_benchmark`.
 
-The data used in this example comes from Table 5.6 in 
+The data used in this example comes from Table 5.6 in
 `Ortúzar & Willumsen (2011) <https://www.wiley.com/en-us/Modelling+Transport%2C+4th+Edition-p-9780470760390>`_.
 
 """
@@ -28,14 +28,14 @@ The data used in this example comes from Table 5.6 in
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.distribution.ipf_core`
+#     * :func:`aequilibrae.distribution.cython.ipf_core`
 
 # %%
 
 # Imports
 import numpy as np
 
-from aequilibrae.distribution.ipf_core import ipf_core
+from aequilibrae.distribution.cython.ipf_core import ipf_core
 
 # sphinx_gallery_thumbnail_path = '../source/_images/ipf.png'
 
@@ -55,5 +55,5 @@ matrix
 
 # %%
 # Notice that the matrix value was updated, and results are the same as in :ref:`plot_ipf_without_model`
-# - and this is no coincidence. Under the hood, when we call ``aequilibrae.distribution.Ipf``, we 
+# - and this is no coincidence. Under the hood, when we call ``aequilibrae.distribution.Ipf``, we
 # are actually calling the ``ipf_core`` method.

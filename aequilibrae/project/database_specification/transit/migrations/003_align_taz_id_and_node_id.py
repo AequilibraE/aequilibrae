@@ -1,13 +1,14 @@
-import sqlite3
 import pathlib
+import sqlite3
 from typing import Optional
 
-from aequilibrae import Project, logger
-from aequilibrae.transit import Transit
-from aequilibrae.context import get_active_project
-from aequilibrae.project.project_creation import add_triggers, remove_triggers, recreate_columns
-
 import numpy as np
+
+from aequilibrae.context import get_active_project
+from aequilibrae.log import logger
+from aequilibrae.project.project import Project
+from aequilibrae.project.project_creation import add_triggers, remove_triggers
+from aequilibrae.transit import Transit
 
 
 def migrate(

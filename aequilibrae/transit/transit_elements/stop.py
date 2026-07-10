@@ -41,7 +41,7 @@ class Stop(BasicPTElement):
         self.__map_matching_id__: Dict[Any, Any] = {}
         self.__moved_map_matching__ = 0
 
-        for key, value in zip(headers, record):
+        for key, value in zip(headers, record, strict=True):
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in Stops.txt is unknown field for that file on GTFS")
             key = key if key != "stop_id" else "stop"
@@ -54,9 +54,11 @@ class Stop(BasicPTElement):
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
-        sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
-                                    parent_station, description, street, zone_id, transit_fare_zone, route_type, geometry)
-                 values (?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
+        sql = (
+            "insert into stops (stop_id, stop, agency_id, link, dir, name, "
+            "parent_station, description, street, zone_id, transit_fare_zone, route_type, "
+            "geometry) values (?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"
+        )
 
         dt = self.data
         conn.execute(sql, dt)

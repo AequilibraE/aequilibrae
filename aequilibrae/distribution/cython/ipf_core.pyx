@@ -38,11 +38,11 @@ def ipf_core(
     factor_attr = np.zeros_like(target_attractions, np.float64)
 
     cdef double [:] prod_tot = mat_prod_tot
-    cdef double [:] prod_tgt = target_productions
+    cdef const double [:] prod_tgt = target_productions
     cdef double [:] prod_factor = factor_prod
 
     cdef double [::1] attr_tot = np.ascontiguousarray(mat_attr_tot)
-    cdef double [:] attr_tgt = target_attractions
+    cdef const double [:] attr_tgt = target_attractions
     cdef double [:] attr_factor = factor_attr
 
     # This uses a Cython fused type cython.floating to defer to the float or double method without duplicated code
@@ -82,15 +82,15 @@ def ipf_core(
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef object _fratar(cython.floating[:, :] flows,
-                    double[:] prod_tot,
-                    double[:] prod_tgt,
-                    double[:] prod_factor,
-                    double[::1] attr_tot,
-                    double[:] attr_tgt,
-                    double[:] attr_factor,
-                    int max_iter,
-                    double toler,
-                    int cpus):
+                double[:] prod_tot,
+                const double[:] prod_tgt,
+                double[:] prod_factor,
+                double[::1] attr_tot,
+                const double[:] attr_tgt,
+                double[:] attr_factor,
+                int max_iter,
+                double toler,
+                int cpus):
 
     cdef double err = 1.0
     cdef int iter = 0
@@ -131,9 +131,9 @@ cdef object _fratar(cython.floating[:, :] flows,
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void _total_attra(cython.floating[:, :] flows,
-                        double[:] prod_tgt,
-                        double[::1] attr_tot,
-                        int cpus) noexcept:
+                    const double[:] prod_tgt,
+                    double[::1] attr_tot,
+                    int cpus) noexcept:
     cdef long i, j, jk
     cdef double *local_buf
     cdef long I = flows.shape[0]
@@ -168,9 +168,9 @@ cpdef void _total_attra(cython.floating[:, :] flows,
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void _total_prods(cython.floating[:, :] flows,
-                        double[:] prod_tgt,
-                        double[:] prod_tot,
-                        int cpus) noexcept nogil:
+                    const double[:] prod_tgt,
+                    double[:] prod_tot,
+                    int cpus) noexcept nogil:
 
     cdef long long i, j
     cdef long long I = flows.shape[0]
@@ -190,10 +190,10 @@ cpdef void _total_prods(cython.floating[:, :] flows,
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 @cython.cdivision(True)
-cpdef double _factors(double[:] target,
-                      double[:] total,
-                      double[:] factor,
-                      int cpus) noexcept:
+cpdef double _factors(const double[:] target,
+                  double[:] total,
+                  double[:] factor,
+                  int cpus) noexcept:
 
     cdef long long i, I = target.shape[0]
     cdef double err = 1.0

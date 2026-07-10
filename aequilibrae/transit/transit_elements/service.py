@@ -1,4 +1,3 @@
-from typing import List
 from aequilibrae.transit.date_tools import create_days_between, day_of_week, format_date
 
 
@@ -38,7 +37,7 @@ class Service:
     def _populate(self, record: tuple, headers: list, from_cal: bool) -> None:
         file = "calendar.txt" if from_cal else "calendar_dates.txt"
 
-        for key, value in zip(headers, record):
+        for key, value in zip(headers, record, strict=True):
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in {file} is unknown field for that file on GTFS")
             self.__dict__[key] = value

@@ -17,11 +17,11 @@ CREATE TABLE  if not exists node_types (node_type     VARCHAR UNIQUE NOT NULL PR
 --#
 INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('default', 'y', 'Default general node type');
 --#
-INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('od', 'n', 'Origin/Desination node type');
+INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('od', 'n', 'Origin/Destination node type');
 --#
 INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('origin', 'o', 'Origin node type');
 --#
-INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('destination', 'd', 'Desination node type');
+INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('destination', 'd', 'Destination node type');
 --#
 INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('stop', 's', 'Stop node type');
 --#

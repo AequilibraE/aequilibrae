@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
+from aequilibrae import TrafficAssignment, TrafficClass
 
 
 @pytest.fixture(scope="function")
@@ -115,35 +115,54 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     tc_spec = "INFO ; Traffic Class specification"
     assert file_text.count(tc_spec) > 1
 
-    tc_graph = "INFO ; {'car': {'Graph': \"{'Mode': 'c', 'Block through centroids': False, 'Number of centroids': 24, 'Links': 76, 'Nodes': 24}\","
+    tc_graph = (
+        "INFO ; {'car': {'Graph': \"{'Mode': 'c', 'Block through centroids': False, "
+        "'Number of centroids': 24, 'Links': 76, 'Nodes': 24}\","
+    )
+
     assert file_text.count(tc_graph) > 1
 
     tc_matrix = "'Number of centroids': 24, 'Matrix cores': ['matrix'], 'Matrix totals': {'matrix': 360600.0}}\"}}"
     assert file_text.count(tc_matrix) > 1
 
-    assig_1 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, 'Target RGAP': 0.0001}}".format(
-        num_cores
-    )
+    assig_1 = (
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, "
+        "'Target RGAP': 0.0001}}"
+    ).format(num_cores)
     assert assig_1 in file_text
 
-    assig_2 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
-        num_cores
-    )
+    assig_2 = (
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, "
+        "'Target RGAP': 0.001}}"
+    ).format(num_cores)
     assert assig_2 in file_text
 
-    assig_3 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
-        num_cores
-    )
+    assig_3 = (
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', "
+        "'Maximum iterations': 500, 'Target RGAP': 0.001}}"
+    ).format(num_cores)
     assert assig_3 in file_text
 
-    assig_4 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
-        num_cores
-    )
+    assig_4 = (
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, "
+        "'Target RGAP': 0.001}}"
+    ).format(num_cores)
     assert assig_4 in file_text
 
-    assig_5 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
-        num_cores
-    )
+    assig_5 = (
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, "
+        "'Target RGAP': 0.001}}"
+    ).format(num_cores)
     assert assig_5 in file_text
 
 

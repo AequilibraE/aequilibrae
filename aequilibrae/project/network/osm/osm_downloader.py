@@ -24,7 +24,7 @@ from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from .osm_params import http_headers, memory
+from .osm_params import default_headers, memory
 
 
 class OSMDownloader(WorkerThread):
@@ -112,7 +112,7 @@ class OSMDownloader(WorkerThread):
         start_time = time.time()
         self.report.append(f'Posting to {url} with timeout={timeout}, "{data}"')
         self.logger.debug(f'Posting to {url} with timeout={timeout}, "{data}"')
-        response = requests.post(url, data=data, timeout=timeout, headers=http_headers)
+        response = requests.post(url, data=data, timeout=timeout, headers=default_headers())
 
         # get the response size and the domain, log result
         size_kb = len(response.content) / 1000.0
@@ -135,8 +135,9 @@ class OSMDownloader(WorkerThread):
                 # pause for error_pause_duration seconds before re-trying request
                 if error_pause_duration is None:
                     error_pause_duration = self.sleeptime + 1
-                msg = "Server at {} returned status code {} and no JSON data. Re-trying request in {:.2f} seconds.".format(
-                    domain, response.status_code, error_pause_duration
+                msg = (
+                    "Server at {} returned status code {} and no JSON data. "
+                    "Re-trying request in {:.2f} seconds.".format(domain, response.status_code, error_pause_duration)
                 )
                 self.report.append(msg)
                 self.logger.info(msg)

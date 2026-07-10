@@ -2,7 +2,7 @@
 --@ in the tables links, link_types, modes, nodes, and zones.
 --@
 --@ By default, these attributes are all documented, but further
---@ attribues can be added into the table.
+--@ attributes can be added into the table.
 --@
 --@ The **name_table** field holds the name of the table that has the attribute
 --@
@@ -11,7 +11,7 @@
 --@ The **description** field holds the description of the attribute
 --@
 --@ It is possible to have one attribute with the same name in two
---@ different tables. However, one cannot have two attibutes with the
+--@ different tables. However, one cannot have two attributes with the
 --@ same name within the same table.
 
 

@@ -1,7 +1,4 @@
 import json
-import pathlib
-import tempfile
-import unittest
 from datetime import datetime
 
 import numpy as np
@@ -11,7 +8,6 @@ import pytest
 from aequilibrae import TrafficAssignment, TrafficClass
 from aequilibrae.paths import TransitAssignment, TransitClass
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.utils.create_example import create_example
 from aequilibrae.transit import Transit
 from aequilibrae.matrix import AequilibraeMatrix
 

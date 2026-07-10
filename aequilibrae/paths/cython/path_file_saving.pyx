@@ -3,8 +3,6 @@
 from libcpp.vector cimport vector
 
 import numpy as np
-cimport numpy as np
-np.import_array()
 
 
 @cython.wraparound(False)
@@ -24,17 +22,12 @@ cpdef void save_path_file(long origin_index,
     # could make this an ndarray and not do the conversion, we know the size of the index array is zones
     cdef vector[long long] size_of_path_arrays
 
-    cdef np.npy_intp dims[1]
-    cdef np.ndarray[np.longlong_t, ndim=1] numpy_array
-    cdef np.npy_intp dims_ind[1]
-    cdef np.ndarray[np.longlong_t, ndim=1] numpy_array_ind
-
     with nogil:
         for node in range(zones):
             predecessor = pred[node]
             # need to check if disconnected, also makes sure o==d is not included
             if predecessor == -1:
-                size_of_path_arrays.push_back(<np.longlong_t> path_data.size())  # need to store index here
+                size_of_path_arrays.push_back(<long long> path_data.size())  # need to store index here
                 continue
             connector = conn[node]
             path_data.push_back(connector)
@@ -44,13 +37,11 @@ cpdef void save_path_file(long origin_index,
                 if (predecessor != -1) and (connector != -1):
                     path_data.push_back(connector)
 
-            size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
+            size_of_path_arrays.push_back(<long long> path_data.size())
 
     # get a view on data underlying vector, then as numpy array. avoids copying.
-    dims[0] = <np.npy_intp> (path_data.size())
-    dims_ind[0] = <np.npy_intp> (size_of_path_arrays.size())
-    numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, &path_data[0])
-    numpy_array_ind = np.PyArray_SimpleNewFromData(1, dims_ind, np.NPY_LONGLONG, &size_of_path_arrays[0])
+    numpy_array = np.asarray(<long long[:path_data.size()]>path_data.data())
+    numpy_array_ind = np.asarray(<long long[:size_of_path_arrays.size()]>size_of_path_arrays.data())
 
     table1 = pd.DataFrame({"data": numpy_array})
     table2 = pd.DataFrame({"data": numpy_array_ind})

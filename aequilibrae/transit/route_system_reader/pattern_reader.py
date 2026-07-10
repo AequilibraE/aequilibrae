@@ -18,7 +18,7 @@ def read_patterns(conn: sqlite3.Connection, transformer):
     data.drop(columns=["matching_quality"], inplace=True)
     data.rename(columns={"pattern": "pattern_hash", "geo": "shape"}, inplace=True)
 
-    for idx, dt in data.iterrows():
+    for _idx, dt in data.iterrows():
         pat = Pattern(None, dt.route_id, None).from_row(dt)
         pat.shape_length = pat.best_shape().length
 

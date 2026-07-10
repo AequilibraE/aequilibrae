@@ -10,7 +10,6 @@ from aequilibrae.transit.gtfs_writer import write_routes, write_agencies, write_
 from aequilibrae.transit.gtfs_writer import write_stops, write_trips, write_stop_times, write_shapes
 from aequilibrae.transit.route_system_reader import read_agencies, read_patterns
 from aequilibrae.transit.route_system_reader import read_stop_times, read_stops, read_trips, read_routes
-from aequilibrae.utils.db_utils import commit_and_close
 
 
 class RouteSystem:

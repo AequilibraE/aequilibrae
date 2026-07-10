@@ -34,7 +34,6 @@ add/remove them at the TOML.
         "sphinx_design",  # adds grids and cards
         "sphinx_copybutton",  # adds the copy button to code blocks
         "sphinx_git",  # adds SHA info to the version history
-        "sphinx_tabs.tabs",  # adds tabs 
         "sphinx_subfigure",  # allows placing more than one figure side by side
     ]
 

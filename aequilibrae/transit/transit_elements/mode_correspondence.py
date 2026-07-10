@@ -1,4 +1,4 @@
-mode_correspondence = {
+mode_corresp = {
     # 0: "R",
     # 1: "R",
     # 2: "R",

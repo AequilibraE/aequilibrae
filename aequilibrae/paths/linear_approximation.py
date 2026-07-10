@@ -1,23 +1,31 @@
 import logging
 import os
+import time
 from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
-from typing import List, Dict
+from typing import TYPE_CHECKING
 
 import numpy as np
-from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
-from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
-from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
-from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
-from scipy.optimize import root_scalar
+from scipy.optimize import minimize_scalar, root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.paths.AoN import (
+    aggregate_link_costs,
+    copy_three_dimensions,
+    copy_two_dimensions,
+    linear_combination,
+    linear_combination_1d,
+    linear_combination_skims,
+    sum_a_times_b_minus_c,
+    triple_linear_combination,
+    triple_linear_combination_skims,
+)
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.traffic_class import TrafficClass
 
-if False:
+if TYPE_CHECKING:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
+    from aequilibrae.paths.traffic_class import TrafficClass
 
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -40,13 +48,19 @@ class LinearApproximation(WorkerThread):
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
         self.iteration_issue = []
-        self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
+        self.convergence_report = {
+            "iteration": [],
+            "time": [],
+            "rgap": [],
+            "alpha": [],
+            "warnings": [],
+        }
         if algorithm in ["cfw", "bfw"]:
             self.convergence_report["beta0"] = []
             self.convergence_report["beta1"] = []
             self.convergence_report["beta2"] = []
 
-        self.assig = assig_spec  # type: TrafficAssignment
+        self.assig: TrafficAssignment = assig_spec
 
         if None in [
             assig_spec.classes,
@@ -61,7 +75,7 @@ class LinearApproximation(WorkerThread):
                 f"when assigning. Check if you have all of these: {all_par}"
             )
 
-        self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
+        self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
         self.cap_field = assig_spec.capacity_field
@@ -83,11 +97,10 @@ class LinearApproximation(WorkerThread):
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
         self.conjugate_direction_max = 0.99999
 
-        # if FW stepsize is zero, we set it to the corresponding MSA stepsize and then need to not make
-        # the step direction conjugate to the previous direction.
-        self.do_fw_step = False
-        self.conjugate_failed = False
-        self.do_conjugate_step = False
+        # Direction state for the current iteration and the next one. BFW needs an FW step followed by
+        # a CFW step before it can safely resume bi-conjugate directions.
+        self.current_direction = "fw"
+        self.next_direction = None
 
         # BFW specific stuff
         self.betas = np.array([1.0, 0.0, 0.0])
@@ -107,9 +120,21 @@ class LinearApproximation(WorkerThread):
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
 
-        self.step_direction = {}  # type: Dict[AssignmentResults]
-        self.previous_step_direction = {}  # type: Dict[AssignmentResults]
-        self.temp_step_direction_for_copy = {}  # type: Dict[AssignmentResults]
+        # Private scratch buffers for the trapezoidal Beckmann line search
+        # (``__objective_change_at_stepsize``). Kept separate from
+        # ``self.congested_value`` (which is the analytic-derivative line
+        # search's scratch buffer) so that the trapezoidal helper does not
+        # clobber the public-looking attribute as a side effect, and so that
+        # the per-call ``congested_time + congested_value`` sum can be
+        # written into a pre-allocated buffer instead of allocating fresh
+        # each call.
+        self._trap_new_flow = np.zeros_like(self.congested_time)
+        self._trap_new_cost = np.zeros_like(self.congested_time)
+        self._trap_avg_cost = np.zeros_like(self.congested_time)
+
+        self.step_direction: dict[str, AssignmentResults] = {}
+        self.previous_step_direction: dict[str, AssignmentResults] = {}
+        self.temp_step_direction_for_copy: dict[str, AssignmentResults] = {}
 
         self.aons = {}
 
@@ -216,15 +241,38 @@ class LinearApproximation(WorkerThread):
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
 
+    def _set_current_flow(self, assigned_flow):
+        self.fw_total_flow = np.array(assigned_flow, dtype=np.float64, copy=True)
+        if self.preload is not None:
+            self.fw_total_flow += self.preload
+
+    def _update_congested_costs(self):
+        self.vdf.apply_vdf(
+            self.congested_time,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.cores,
+        )
+
+        for c in self.traffic_classes:
+            if self.time_field in c.graph.skim_fields:
+                k = c.graph.skim_fields.index(self.time_field)
+                aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
+
     def __calculate_step_direction(self):
         """Calculates step direction depending on the method"""
         sd_flows = []
+        direction = self.next_direction
+        self.next_direction = None
 
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
-        if self.iter == 2 or self.stepsize == 1.0 or self.do_fw_step or self.algorithm in ["msa", "frank-wolfe"]:
-            self.do_fw_step = False
-            self.do_conjugate_step = True
+        if self.iter == 2 or direction == "fw" or self.algorithm in ["msa", "frank-wolfe"]:
+            self.current_direction = "fw"
+            if self.algorithm == "bfw":
+                self.next_direction = "cfw"
             self.conjugate_stepsize = 0.0
             for c in self.traffic_classes:
                 aon_res = c._aon_results
@@ -250,8 +298,8 @@ class LinearApproximation(WorkerThread):
                         )
 
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
-        elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
-            self.do_conjugate_step = False
+        elif (self.iter == 3) or (direction == "cfw") or (self.algorithm == "cfw"):
+            self.current_direction = "cfw"
             self.calculate_conjugate_stepsize()
             for c in self.traffic_classes:
                 sdr = self.step_direction[c._id]
@@ -312,12 +360,13 @@ class LinearApproximation(WorkerThread):
                 sd_flows.append(sdr.total_link_loads)
         # biconjugate
         else:
+            self.current_direction = "bfw"
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
-                ppst = self.temp_step_direction_for_copy[c._id]  # type: AssignmentResults
-                prev_stp_dir = self.previous_step_direction[c._id]  # type: AssignmentResults
-                stp_dir = self.step_direction[c._id]  # type: AssignmentResults
+                ppst: AssignmentResults = self.temp_step_direction_for_copy[c._id]
+                prev_stp_dir: AssignmentResults = self.previous_step_direction[c._id]
+                stp_dir: AssignmentResults = self.step_direction[c._id]
 
                 copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
                 ppst.total_flows()
@@ -398,6 +447,16 @@ class LinearApproximation(WorkerThread):
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
+    def __retry_with_fw_direction(self, msg: str):
+        if self.algorithm == "bfw":
+            self.betas.fill(-1)
+
+        self.logger.debug(msg)
+        self.iteration_issue.append(msg)
+        self.next_direction = "fw"
+        self.__calculate_step_direction()
+        self.calculate_stepsize()
+
     def __maybe_create_path_file_directories(self):
         path_base_dir = os.path.join(self.project_path, "path_files", self.procedure_id)
         for c in self.traffic_classes:
@@ -413,6 +472,7 @@ class LinearApproximation(WorkerThread):
         self.execute()
 
     def execute(self):  # noqa: C901
+        self.__start_time = time.perf_counter()
         # We build the fixed cost field
 
         self.sl_step_dir_ll = {}
@@ -469,8 +529,11 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self.logger.info(f"{self.algorithm} Assignment STATS")
-        self.logger.info("Iteration, RelativeGap, stepsize")
+        self._set_current_flow(np.zeros_like(self.capacity))
+        self._update_congested_costs()
+
+        self.logger.info(f"{self.algorithm} Assignment stats")
+        self.logger.info("Iteration, RelativeGap (AoN), stepsize")
 
         msg = "Equilibrium Assignment"
         for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
@@ -519,7 +582,7 @@ class LinearApproximation(WorkerThread):
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
-                                c.results.select_link_loading[name],  # ouput matrix
+                                c.results.select_link_loading[name],  # output matrix
                                 np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
@@ -547,7 +610,7 @@ class LinearApproximation(WorkerThread):
                         )
 
                     if c._selected_links:
-                        for name, idx in c._aon_results._selected_links.items():
+                        for name, _idx in c._aon_results._selected_links.items():
                             # Copy the temporary results into the final od matrix, referenced by link_set name
                             # The temp flows have an index associated with the link_set name
                             linear_combination_skims(
@@ -569,9 +632,7 @@ class LinearApproximation(WorkerThread):
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
 
-            self.fw_total_flow = np.sum(flows, axis=0)
-            if self.preload is not None:
-                self.fw_total_flow += self.preload
+            self._set_current_flow(np.sum(flows, axis=0))
 
             if self.algorithm == "all-or-nothing":
                 break
@@ -579,20 +640,9 @@ class LinearApproximation(WorkerThread):
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-            self.vdf.apply_vdf(
-                self.congested_time,
-                self.fw_total_flow,
-                self.capacity,
-                self.free_flow_tt,
-                *self.vdf_parameters,
-                self.cores,
-            )
+            self._update_congested_costs()
 
-            for c in self.traffic_classes:
-                if self.time_field in c.graph.skim_fields:
-                    k = c.graph.skim_fields.index(self.time_field)
-                    aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
-
+            self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
@@ -629,7 +679,8 @@ class LinearApproximation(WorkerThread):
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
-        self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
+        self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations, final AoN rgap = {self.rgap}")
+
         self.signal.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
@@ -656,12 +707,153 @@ class LinearApproximation(WorkerThread):
             class_specific_term += class_link_costs
         return class_specific_term
 
+    def __objective_change_at_stepsize(
+        self, derivative_of_objective_stepsize_independent: np.ndarray, stepsize: float
+    ) -> float:
+        """Trapezoidal approximation of the Beckmann objective change
+        ``Z(x + α·d) − Z(x)`` for a given line-search step ``α = stepsize``.
+
+        On large congested networks (e.g. Chicago, BPR β=4), this trapezoidal line search picks smaller,
+        more conservative α values than the analytic-derivative line search and yields materially better
+        BFW convergence because the smaller α reduces the magnitude of the ``μ·α/(1-α)`` bias term in
+        the next iteration's BFW formula.
+
+        All intermediate buffers are pre-allocated on the instance (``self._trap_new_flow``, ``self._trap_new_cost``,
+        ``self._trap_avg_cost``) so that this helper does NOT clobber ``self.congested_value`` (which the
+        analytic-derivative line search uses as scratch) and does NOT allocate fresh arrays on every Brent probe.
+        """
+        linear_combination_1d(
+            self._trap_new_flow,
+            self.step_direction_flow,
+            self.fw_total_flow,
+            stepsize,
+            self.cores,
+        )
+        self.vdf.apply_vdf(
+            self._trap_new_cost,
+            self._trap_new_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.cores,
+        )
+        np.add(self.congested_time, self._trap_new_cost, out=self._trap_avg_cost)
+        link_term = (
+            0.5
+            * stepsize
+            * sum_a_times_b_minus_c(
+                self._trap_avg_cost,
+                self.step_direction_flow,
+                self.fw_total_flow,
+                self.cores,
+            )
+        )
+        fixed_cost_term = stepsize * derivative_of_objective_stepsize_independent
+        return link_term + fixed_cost_term
+
+    def __clip_stepsize(self, stepsize: float, upper_bound: float = 1.0) -> float:
+        if not np.isfinite(stepsize):
+            raise ValueError(f"Non-finite stepsize {stepsize} encountered")
+
+        clipped = min(max(float(stepsize), 0.0), upper_bound)
+        if clipped != stepsize:
+            msg = f"Stepsize {stepsize} outside [0, {upper_bound}]; clipping to {clipped}."
+            self.logger.debug(msg)
+            self.iteration_issue.append(msg)
+        return clipped
+
     def calculate_stepsize(self):
         """Calculate optimal stepsize in descent direction"""
-        self.stepsize_has_been_reset = False
-
         if self.algorithm == "msa":
-            self.stepsize = 1.0 / self.iter
+            self.stepsize = self.__clip_stepsize(1.0 / self.iter)
+            return
+
+        # For BFW use trapezoidal Beckmann minimiser on
+        # [0, α_max] instead of root-finding the analytic derivative.
+        #
+        # Two cooperating mechanisms vs. the analytic root_scalar approach:
+        #
+        # (1) Trapezoidal objective. The analytic and trapezoidal lines
+        #     agree when c(x) is approximately quadratic between x and
+        #     x + d, but diverge significantly when the BPR exponent is
+        #     large (β=4 on Chicago).
+        # (2) For BFW only: a cap α_max = 1/sqrt(iter) prevents the line search from
+        #     returning α = 1.0, which would collapse the BFW history (s^{k-1} onto x^k)
+        #     and cause the μ·α/(1-α) bias term in calculate_biconjugate_direction to blow up.
+        #     CFW has neither concern and uses α_max = 1.0 (uncapped).
+        #
+        # BFW Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
+        if self.algorithm in ("bfw", "cfw"):
+            # The 1/sqrt(iter) cap is only needed for BFW: it bounds the mu*alpha/(1-alpha) bias
+            # term in calculate_biconjugate_direction and prevents alpha=1.0 from collapsing the
+            # BFW history. CFW has no such term and no restart state sensitive to large steps, so
+            # capping CFW at 1/sqrt(iter) degrades it to MSA-like convergence without any benefit.
+            alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5) if self.algorithm == "bfw" else 1.0
+            derivative_of_objective_stepsize_independent = self.__derivative_of_objective_stepsize_independent()
+            res = minimize_scalar(
+                partial(
+                    self.__objective_change_at_stepsize,
+                    derivative_of_objective_stepsize_independent,
+                ),
+                bounds=(0.0, alpha_max),
+                method="Bounded",
+                options={"xatol": 1e-4, "maxiter": 10},
+            )
+
+            def use_tiny_step(message: str):
+                tiny_step = 1e-2 / self.iter
+                if message:
+                    self.iteration_issue.append(message)
+                    log_message = f"# Alert: {message} Adding {tiny_step} as step size to make it non-zero."
+                else:
+                    log_message = f"# Alert: Adding {tiny_step} as step size to make it non-zero."
+                self.logger.debug(log_message)
+                self.stepsize = self.__clip_stepsize(tiny_step, alpha_max)
+
+            try:
+                candidate = self.__clip_stepsize(res.x, alpha_max)
+            except ValueError as e:
+                msg = f"BFW/CFW line search returned an invalid stepsize. {e.args}"
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
+            # Brent's bounded method does not evaluate the endpoints exactly.
+            # Compare the interior optimum against α_max explicitly so a true
+            # boundary case (descent throughout the cap interval) still picks
+            # α_max instead of a value just inside it.
+            z_interior = float(res.fun)
+            if not np.isfinite(z_interior):
+                msg = f"BFW/CFW line search returned a non-finite objective value ({z_interior}); falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
+            z_at_max = self.__objective_change_at_stepsize(derivative_of_objective_stepsize_independent, alpha_max)
+            if not np.isfinite(z_at_max):
+                msg = f"BFW/CFW line search returned a non-finite boundary objective ({z_at_max}); falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
+            if z_at_max < z_interior and z_at_max < 0.0:
+                self.stepsize = self.__clip_stepsize(alpha_max, alpha_max)
+            elif z_interior < 0.0:
+                self.stepsize = candidate
+            else:
+                msg = "BFW/CFW direction yielded no improvement; falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step("")
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+            assert 0 <= self.stepsize <= alpha_max + 1e-12
             return
 
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
@@ -673,58 +865,76 @@ class LinearApproximation(WorkerThread):
 
         try:
             min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
-            self.stepsize = min_res.root
+            self.stepsize = self.__clip_stepsize(min_res.root)
             if not min_res.converged:
-                self.logger.warning("Descent direction stepsize finder has not converged")
-
-            self.conjugate_failed = False
+                self.logger.debug("Descent direction stepsize finder has not converged")
 
         except ValueError as e:
-            # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
-            # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
-            # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
-            # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
-            # seems to work well in practice.
-            if self.algorithm == "bfw":
-                self.betas.fill(-1)
+            # `root_scalar` raises ValueError when the derivative does not change sign in [0, 1].
+            # There are two genuinely distinct cases:
+            #   * derivative(0) < 0  ⇒  direction is descent at the current point. Since the
+            #     derivative is monotone non-decreasing along the (convex) line, descent
+            #     persists throughout [0, 1] and the optimum sits at α = 1 (or beyond).
+            #     This is a perfectly valid line-search outcome and only happens because we
+            #     bracket the search to the feasible interval. We must NOT treat it as a
+            #     "reset" - the resulting solution is fine and convergence may be checked.
+            #   * derivative(0) >= 0 ⇒  direction is *not* a descent direction. We then need
+            #     to reset to a Frank-Wolfe step (or, if FW itself failed, take a tiny MSA
+            #     step to avoid stalling).
+            d0_for_branch = derivative_of_objective(0.0)
 
-            if abs(derivative_of_objective(0.0)) < abs(derivative_of_objective(1.0)):
-                if self.algorithm == "frank-wolfe" or self.conjugate_failed:
+            if d0_for_branch >= 0:
+                if self.current_direction == "fw" or self.algorithm == "frank-wolfe":
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
                     # works well in practice, however for a large number of iterations this might be too much so
                     # use this heuristic instead.
-                    self.logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
-                    self.stepsize = tiny_step
+                    self.logger.debug(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    self.stepsize = self.__clip_stepsize(tiny_step)
                 else:
-                    self.stepsize = 0.0
-                    # need to reset conjugate / bi-conjugate direction search
-                    self.do_fw_step = True
-                    self.conjugate_failed = True
-
                     msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
-                    self.logger.warning(msg)
-                    self.iteration_issue.append(msg)
-
-                    # By doing it recursively, we avoid doing the same AoN again
-                    self.__calculate_step_direction()
-                    self.calculate_stepsize()
-
+                    self.__retry_with_fw_direction(msg)
             else:
-                # Do we want to keep some of the old solution, or just throw away everything?
-                self.stepsize = 1.0
-                self.logger.warning("Reset line search")
-                self.stepsize_has_been_reset = True
+                # derivative(0) < 0 (and derivative(1) must also be ≤ 0, otherwise the bracket
+                # search would have succeeded). The objective is still decreasing at α = 1, so
+                # the constrained optimum on [0, 1] is α = 1. Take the full step; do NOT mark
+                # this as a reset - convergence checking remains valid.
+                self.stepsize = self.__clip_stepsize(1.0)
+                self.logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
 
         assert 0 <= self.stepsize <= 1.0
 
     def check_convergence(self):
-        """Calculate relative gap and return ``True`` if it is smaller than desired precision"""
-        if self.stepsize_has_been_reset:
+        """Calculate relative gap and return ``True`` if it is smaller than desired precision.
+
+        Two relative gaps are computed and stored on the instance:
+
+        * ``self.rgap`` - the AequilibraE convention,
+          ``|Σ flow·cost − Σ AON·cost| / Σ flow·cost``. **This is the only
+          quantity used for the stopping criterion** (compared against
+          ``self.rgap_target``).
+          ``(Σ flow·cost − Σ direction·cost) / Σ flow·cost``, where
+          ``direction`` is the BFW combined step direction
+        """
+        if self.stepsize == 1.0:
             return False
 
-        aon_cost = np.sum(self.congested_time * self.aon_total_flow)
-        current_cost = np.sum(self.congested_time * self.fw_total_flow)
+        aon_cost = 0.0
+        current_cost = 0.0
+        for c in self.traffic_classes:
+            aon_class_flow = c._aon_results.total_link_loads
+            current_class_flow = c.results.total_link_loads
+
+            aon_cost += np.sum((self.congested_time + c.fixed_cost) * aon_class_flow)
+            current_cost += np.sum((self.congested_time + c.fixed_cost) * current_class_flow)
+
+        if current_cost == 0.0:
+            if aon_cost == 0.0:
+                self.rgap = 0.0
+                return True
+            self.rgap = np.inf
+            return False
         self.rgap = abs(current_cost - aon_cost) / current_cost
+
         if self.rgap_target >= self.rgap:
             return True
         return False

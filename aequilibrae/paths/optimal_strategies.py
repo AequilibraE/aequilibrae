@@ -1,13 +1,10 @@
-import logging
 from scipy import sparse
 import numpy as np
-from aequilibrae.paths.public_transport import HyperpathGenerating
+from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 
 class OptimalStrategies:
     def __init__(self, assig_spec):
-        from aequilibrae.paths import TransitAssignment
-
         self.__assig_spec = assig_spec  # type: TransitAssignment
         self.__logger = assig_spec.logger
 
@@ -33,7 +30,8 @@ class OptimalStrategies:
                 )
             except ValueError as e:
                 raise ValueError(
-                    f"matrix core {cls.matrix_core} not found in matrix view. Ensure the matrix is prepared and the core exists"
+                    f"matrix core {cls.matrix_core} not found in matrix view. "
+                    f"Ensure the matrix is prepared and the core exists"
                 ) from e
 
             # Take the COO matrix and lookup the index values (taz_id)

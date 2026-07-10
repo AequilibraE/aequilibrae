@@ -72,7 +72,7 @@ class Links(BasicTable):
             **link** (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
         """
 
-        data = {key: None for key in self.__fields}
+        data = dict.fromkeys(self.__fields)
         data["a_node"] = 0
         data["b_node"] = 0
         data["direction"] = 0
@@ -163,7 +163,7 @@ class Links(BasicTable):
         with self.project.db_connection_spatial as conn:
             data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
-            return dict(zip(self.__fields, data))
+            return dict(zip(self.__fields, data, strict=True))
         raise ValueError("Link_id does not exist on the network")
 
     def __new_link_id(self):

@@ -4,10 +4,8 @@ from typing import Optional
 
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.result_record import ResultRecord
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import add_column_unless_exists, commit_and_close
 
 
 class Results:
@@ -23,8 +21,10 @@ class Results:
 
         Arguments:
             **project**: Project instance this Results object belongs to
-            **project_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the database to use for the results table.
-            **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the results database
+            **project_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
+                database to use for the results table.
+            **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
+                results database
         """
         self.project = project
         self.logger = project.logger

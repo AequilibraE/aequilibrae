@@ -1,5 +1,5 @@
 import math
-from typing import Dict, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -40,7 +40,6 @@ class Network(WorkerThread):
 
     def __init__(self, project) -> None:
         WorkerThread.__init__(self, None)
-        from aequilibrae.paths import Graph
 
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
