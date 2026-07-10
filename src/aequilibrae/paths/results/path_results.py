@@ -25,45 +25,51 @@ class PathResults:
         # It does increase path computation time substantially
         >>> car_graph.set_skimming(['distance', 'free_flow_time'])
 
-        >>> res = PathResults()
-        >>> res.prepare(car_graph)
-        >>> res.compute_path(1, 17)
+        >>> res = PathResults(car_graph, 1, 17)
 
         # Update all the outputs mentioned above for destination 9. Same origin: 1
         >>> res.update_trace(9)
 
-        # clears all computation results
-        >>> res.reset()
 
         >>> project.close()
     """
 
-    def __init__(self) -> None:
-        self.predecessors = None
-        self.connectors = None
-        self.skims = None
-        self._skimming_array = None
-        self.path = None
-        self.path_nodes = None
-        self.path_link_directions = None
-        self.milepost = None
-        self.reached_first = None
-        self.origin = None
-        self.destination = None
-        self.graph: Graph = None
-        self.early_exit = False
-        self.a_star = False
-        self.links = -1
-        self.nodes = -1
-        self.zones = -1
-        self.num_skims = -1
-        self.__integer_type = None
-        self.__float_type = None
-        self._graph_id = None
-        self.__graph_sum = None
-        self._early_exit = self.early_exit
-        self._a_star = self.a_star
-        self._heuristic = "equirectangular"
+    def __init__(
+        self,
+        graph: Graph,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: str | None = None,
+    ) -> None:
+        self.predecessors: np.ndarray
+        self.connectors: np.ndarray
+        self.skims: np.ndarray | None = None
+        self._skimming_array: np.ndarray
+        self.path: np.ndarray[tuple[int], np.dtype[np.int_]] | None = None
+        self.path_nodes: np.ndarray | None = None
+        self.path_link_directions: np.ndarray | None = None
+        self.milepost: np.ndarray | None = None
+        self.reached_first: np.ndarray
+        self.origin: int = origin
+        self.destination: int = destination
+        self.graph: Graph
+        self.early_exit: bool
+        self.a_star: bool
+        self.links: int
+        self.nodes: int
+        self.zones: int
+        self.num_skims: int
+        self._graph_id: str
+        self.__graph_sum: float
+        self._early_exit: bool
+        self._a_star: bool
+        self._heuristic: str = "equirectangular"
+
+        self.set_graph_data(graph)
+
+        self.compute_path(origin, destination, early_exit=early_exit, a_star=a_star, heuristic=heuristic)
 
     def compute_path(
         self,
@@ -101,10 +107,14 @@ class PathResults:
         self.a_star = self._a_star = a_star
         if heuristic is not None:
             self.set_heuristic(heuristic)
-        path_computation(origin, destination, self.graph, self)
+        path, path_nodes, path_link_directions, milepost = path_computation(origin, destination, self)
+        self.path: np.ndarray[tuple[int], np.dtype[np.int_]] | None = path
+        self.path_nodes: np.ndarray | None = path_nodes
+        self.path_link_directions: np.ndarray | None = path_link_directions
+        self.milepost: np.ndarray | None = milepost
         self.__skim_path()
 
-    def prepare(self, graph: Graph) -> None:
+    def set_graph_data(self, graph: Graph) -> None:
         """
         Prepares the object with dimensions corresponding to the graph object
 

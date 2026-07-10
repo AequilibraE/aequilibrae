@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 import geopandas as gpd
 import numpy as np
@@ -11,7 +10,7 @@ from shapely.ops import substring
 
 def split_links_at_stops(
     stops: gpd.GeoDataFrame, links: gpd.GeoDataFrame, tolerance: float = 50
-) -> List[gpd.GeoDataFrame]:
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """
     Breaks links at the closest points for the nodes (transit stops) nearby, within a certain
     tolerance. New nodes are created at split points with IDs continuing from the maximum of the
@@ -23,7 +22,7 @@ def split_links_at_stops(
         tolerance: Search radius.
 
     Returns:
-        List[GeoDataFrame]: A list containing two GeoDataFrames:
+        tuple[GeoDataFrame]: A tuple containing two GeoDataFrames:
             - broken_links: The provided links where some have been split at stop locations.
               Contains updated "a_node", "b_node", and "geometry". Original link attributes are
               preserved (duplicated for splits).
@@ -91,7 +90,7 @@ def split_links_at_stops(
 
     if valid_splits.empty:
         logging.debug("No valid splits found within tolerance? The map-matching will likely fail.")
-        return [links.copy(), gpd.GeoDataFrame([], columns=["node_id", "geometry"], crs=links.crs)]
+        return (links.copy(), gpd.GeoDataFrame([], columns=["node_id", "geometry"], crs=links.crs))
 
     # Identify unique split locations per link
     # A point maps to (link_id, distance).
@@ -167,9 +166,9 @@ def split_links_at_stops(
     broken_links = pd.concat([untouched_links, new_segments_gdf], ignore_index=True)
 
     broken_links = broken_links.assign(original_id=broken_links.link_id)
-    broken_links = broken_links.assign(link_id=np.zeros(broken_links.shape[0]) + 1)
+    broken_links = gpd.GeoDataFrame(broken_links.assign(link_id=np.zeros(broken_links.shape[0]) + 1), crs=links.crs)
     broken_links["distance"] = broken_links.geometry.length
 
     new_points_gdf = gpd.GeoDataFrame(new_points, columns=["node_id", "geometry"], crs=links.crs)
 
-    return [broken_links, new_points_gdf]
+    return (broken_links, new_points_gdf)

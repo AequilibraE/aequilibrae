@@ -1,3 +1,8 @@
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
+
 import shapely.wkb
 from shapely.geometry import Polygon
 
@@ -9,7 +14,7 @@ class BasicTable:
     Basic resources used by all subclasses
     """
 
-    def __init__(self, project):
+    def __init__(self, project: "Project"):
         self.project = project
         self.__table_type__ = ""
 
