@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import pickle
 import uuid
 import warnings
@@ -14,11 +15,12 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from aequilibrae.context import get_logger
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 if TYPE_CHECKING:
     from aequilibrae.paths import PathResults
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -64,7 +66,6 @@ class GraphBase(ABC):  # noqa: B024
     """
 
     def __init__(self, logger=None):
-        self.logger = logger or get_logger()
         self.__integer_type = np.int64
         self.__float_type = np.float64
 
@@ -293,7 +294,7 @@ class GraphBase(ABC):  # noqa: B024
 
         nans = ", ".join([i for i in df.columns if df[i].isnull().any().any()])
         if nans:
-            self.logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
+            logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
 
         df["link_id"] = df["link_id"].astype(self.__integer_type)
         df["b_node"] = df.b_node.values.astype(self.__integer_type)
@@ -358,7 +359,7 @@ class GraphBase(ABC):  # noqa: B024
         filter = self.network.link_id.isin(links)
         # We check is the list makes sense in order to warn the user
         if filter.sum() != len(set(links)):
-            self.logger.warning("At least one link does not exist in the network and therefore cannot be excluded")
+            logger.warning("At least one link does not exist in the network and therefore cannot be excluded")
 
         self.network.loc[filter, "b_node"] = self.network.loc[filter, "a_node"]
 
@@ -434,7 +435,7 @@ class GraphBase(ABC):  # noqa: B024
             self.cost = np.array(self.graph[field].values, copy=True)
         else:
             self.cost = np.array(self.graph[field].values, dtype=self.__float_type)
-            self.logger.warning("Cost field with wrong type. Converting to float64")
+            logger.warning("Cost field with wrong type. Converting to float64")
 
         self.__build_derived_properties()
 
@@ -496,7 +497,7 @@ class GraphBase(ABC):  # noqa: B024
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("Blocking flows through centroids needs to be boolean")
         if self.num_zones == 0:
-            self.logger.warning("No centroids in the model. Nothing to block")
+            logger.warning("No centroids in the model. Nothing to block")
             return
         self.block_centroid_flows = block_centroid_flows
 
@@ -600,7 +601,7 @@ class GraphBase(ABC):  # noqa: B024
             try:
                 new_type = float(new_type)
             except ValueError as verr:
-                self.logger.warning("Could not convert {} - {}".format(new_type, verr.__str__()))
+                logger.warning("Could not convert {} - {}".format(new_type, verr.__str__()))
         if isinstance(new_type, int):
             def_type = int
             if current_type is float:

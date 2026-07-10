@@ -1,13 +1,15 @@
 from collections.abc import Sequence
 import re
 import string
+import logging
 from typing import List, NoReturn, Optional, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from aequilibrae.project import Project
 
-from aequilibrae.context import get_logger
-
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
+
+logger = logging.getLogger(__name__)
 
 
 class FieldEditor:
@@ -41,7 +43,6 @@ class FieldEditor:
 
     def __init__(self, project: "Project", table_name: str) -> None:
         self.project = project
-        self.logger = get_logger()
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -106,13 +107,13 @@ class FieldEditor:
             new_val = self.__dict__[key]
             if new_val != val:
                 self.__run_query_commit(qry.format(new_val, key, self._table))
-                self.logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
+                logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
-        self.logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
+        logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
         with self.project.db_connection_spatial as conn:
             conn.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
             conn.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
-        self.logger.info(f"Updated layer statistics for {self._table}")
+        logger.info(f"Updated layer statistics for {self._table}")
 
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
@@ -150,7 +151,7 @@ class FieldEditor:
             dt = conn.execute(qry).fetchall()
         return dt
 
-    def __run_query_commit(self, qry: str, values: Optional[dict | Sequence]=None) -> None:
+    def __run_query_commit(self, qry: str, values: Optional[dict | Sequence] = None) -> None:
         with self.project.db_connection_spatial as conn:
             if values is None:
                 conn.execute(qry)

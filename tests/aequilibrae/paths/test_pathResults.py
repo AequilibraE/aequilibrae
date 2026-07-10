@@ -1,12 +1,8 @@
-import zipfile
 from itertools import product
-from os.path import join
-from tempfile import gettempdir
 
 import numpy as np
 import pytest
 
-from aequilibrae import Project
 from aequilibrae.paths import path_computation
 from aequilibrae.paths.results import PathResults
 
@@ -201,14 +197,10 @@ def test_triangle_update_trace_full(triangle_blocking_setup):
     assert [r.graph.all_nodes[x] if x != -1 else -1 for x in r.predecessors] == [1, 2, 3, -1, 3, 1, -1]
 
 
-def test_compute_paths_centroid_last_node_id(test_data_path):
-    zipfile.ZipFile(test_data_path / "St_Varent_issue307.zip").extractall(gettempdir())
-    st_varent = join(gettempdir(), "St_Varent")
-    project = Project()
-    project.open(st_varent)
-    project.network.build_graphs()
-    g = project.network.graphs["c"]
+def test_compute_paths_centroid_last_node_id(st_varent):
+    st_varent.network.build_graphs()
+    g = st_varent.network.graphs["c"]
     g.set_graph("distance")
     g.set_skimming("distance")
-    r = PathResults(g, 387, 1067)
-    project.close()
+    PathResults(g, 387, 1067)
+    st_varent.close()

@@ -36,9 +36,21 @@ macOS
 
 AequilibraE does not provide pre-built wheel files for macOS. When installing from PyPi, the source distribution will be used and the library will be compiled locally. AequilibraE can also be built from source. For both methods you will need to:
 
-1. Install LLVM or another C/C++ compiler with OpenMP support: ``brew install llvm``
-2. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
-3. Update the DYLD_LIBRARY_PATH to include libspatialite: ``export DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH``
+#. Install `homebrew <https://brew.sh/>`_, a package manager for macOS, if you do not have it already.
+#. Install LLVM or another C/C++ compiler with OpenMP support: ``brew install llvm``
+#. Install libspatialite: ``brew install libspatialite`` as per `this answer on Stack Overflow <https://stackoverflow.com/a/48370444/1480643>`_
+#. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
+#. Set the ``AEQ_SPATIALITE_DIR`` environment variable to the directory containing ``mod_spatialite``: ``export AEQ_SPATIALITE_DIR="$(brew --prefix)/lib"``
+
+Alternatively, run all steps at once:
+
+::
+
+  brew install llvm
+  brew install libspatialite
+  export CXX=/opt/homebrew/opt/llvm/bin/clang++
+  export CC=/opt/homebrew/opt/llvm/bin/clang
+  export AEQ_SPATIALITE_DIR="/opt/homebrew/lib"
 
 AequilibraE may also require raising the "open files" limit, this can be achieved with ``ulimit -n 10240``. This should be placed in ``.zshrc`` or similar user shell configuration file.
 

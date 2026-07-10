@@ -2,6 +2,9 @@
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.utils.cython.bridge cimport Bridge, log, f, DEBUG, msleep
+from aequilibrae.utils.cython.bar cimport Bar
+
 
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
@@ -174,6 +177,8 @@ cdef class RouteChoiceSet:
         path_size_logit: bool = False,
         beta: float = 1.0,
         cutoff_prob: float = 0.0,
+        *,
+        bridge: Bridge
     ):
         """Compute the a route set for a list of OD pairs.
 
@@ -221,6 +226,8 @@ cdef class RouteChoiceSet:
                 raise ValueError(f"Origin {origin} is not present within the compact graph")
             if self.nodes_to_indices_view[dest] == -1:
                 raise ValueError(f"Destination {dest} is not present within the compact graph")
+
+        cdef Bar bar = bridge.new_bar("{}/{} ODs processed", len(demand.df))
 
         cdef:
             long long origin_index, dest_index
@@ -270,6 +277,9 @@ cdef class RouteChoiceSet:
         unreachable_ods: list[tuple[int]] = []
 
         for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
+            if bridge.should_stop():
+                break
+
             demand._initalise_c_data(grouped_demand_df)
 
             self.results = RouteChoiceSetResults(
@@ -289,10 +299,15 @@ cdef class RouteChoiceSet:
                 thread_id = threadid()
                 found_zero_cost = False  # Make the variable thread local
                 for i in prange(<long int>demand.ods.size(), schedule="guided"):
+                    if bridge.should_stop():
+                        break
+
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
+                    log(bridge, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
 
                     if origin_index == dest_index:
+                        bar.inc()
                         continue
 
                     if self.block_flows_through_centroids:
@@ -376,6 +391,8 @@ cdef class RouteChoiceSet:
                             self.b_nodes_view,
                         )
 
+                    bar.inc()
+
                 del route_set
 
             if store_results:
@@ -394,11 +411,13 @@ cdef class RouteChoiceSet:
 
         if zero_cost_ods:
             warnings.warn(
-                f"found zero cost routes for OD pairs, the entire route set has been masked for: {zero_cost_ods}"
+                f"found zero cost routes for OD pairs, the entire route set has been masked for: {zero_cost_ods}",
+                stacklevel=2,
             )
         if unreachable_ods:
             warnings.warn(
-                f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}"
+                f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}",
+                stacklevel=2,
             )
 
     def assign_from_df(

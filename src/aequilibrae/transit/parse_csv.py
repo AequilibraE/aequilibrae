@@ -29,7 +29,7 @@ def parse_csv(file_name: str, column_order={}):  # noqa B006
     titles: list[str] = tot.pop(0)
     csvfile.close()
     if tot:
-        data = np.rec.fromrecords(tot, names=[x.lower() for x in titles]) # type: ignore
+        data = np.rec.fromrecords(tot, names=[x.lower() for x in titles])  # type: ignore
     else:
         return empty()
 

@@ -7,14 +7,30 @@ from aequilibrae.utils.qgis_utils import inside_qgis
 
 missing_tqdm = iutil.find_spec("tqdm") is None
 
+
+# Source - https://stackoverflow.com/a/39662359
+# Posted by Gustavo Bezerra, modified by community. See post 'Timeline' for change history
+# Retrieved 2025-12-16, License - CC BY-SA 4.0
+def is_notebook() -> bool:
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == "ZMQInteractiveShell":
+            return True  # Jupyter notebook or qtconsole
+        elif shell == "TerminalInteractiveShell":
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False  # Probably standard Python interpreter
+
+
 if not missing_tqdm:
-    notebook = iutil.find_spec("ipywidgets") is not None
-    if notebook:
+    if is_notebook():
         from tqdm.notebook import tqdm  # type: ignore
     else:
         from tqdm import tqdm  # type: ignore
 
-show_status = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE"
+show_status = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE" and not missing_tqdm
 
 
 class PythonSignal:  # type: ignore

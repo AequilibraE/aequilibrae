@@ -1,0 +1,106 @@
+import logging
+import sys
+
+from aequilibrae.utils.qgis_utils import inside_qgis
+
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError:
+    tqdm = None
+
+
+DEFAULT_FORMAT = "%(asctime)s;%(levelname)s ; %(message)s"
+
+
+class AequilibraETQDMStreamHandler(logging.StreamHandler):
+    """
+    Logging handler that writes messages using tqdm.write to avoid interfering with progress bars.
+
+    :Arguments:
+        **args** (:obj:`*args`): Variable length argument list passed to the parent logging.StreamHandler.
+
+        **tqdm_class** (:obj:`type`, optional): The tqdm class to use for writing. Defaults to the imported tqdm.
+
+        **kwargs** (:obj:`**kwargs`): Arbitrary keyword arguments passed to the parent logging.StreamHandler.
+    """
+
+    def __init__(self, *args, tqdm_class=tqdm, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tqdm_class = tqdm_class
+
+    def emit(self, record):
+        """Emits a record.
+
+        Args:
+            record (logging.LogRecord): The log record to emit.
+        """
+        try:
+            msg = self.format(record)
+            self.tqdm_class.write(msg, file=self.stream, end=self.terminator)
+            self.flush()
+        except RecursionError:
+            raise
+        except Exception:
+            self.handleError(record)
+
+
+AequilibraEStreamHandler = (
+    AequilibraETQDMStreamHandler if tqdm is not None and not inside_qgis else logging.StreamHandler
+)
+
+
+def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEFAULT_FORMAT) -> logging.Handler:
+    """
+    Configures the root logger for AequilibraE.
+
+    Sets up a specific handler that works well with tqdm progress bars if available
+    and not running inside QGIS. It disables propagation to avoid interference from
+    root loggers.
+
+    :Arguments:
+        **level** (:obj:`int`, optional): The logging level to set. Defaults to logging.INFO.
+
+        **stream** (:obj:`IO`, optional): The stream to write logs to. Defaults to sys.stdout.
+
+        **format** (:obj:`str`, optional): The log format string. Defaults to DEFAULT_FORMAT.
+
+    :Returns:
+        **handler** (:obj:`logging.Handler`): The handler attached to the 'aequilibrae' logger. If the logger already
+            has a handler writing to standard out or standard error, returns None.
+    """
+    logger = logging.getLogger("aequilibrae")
+
+    if any(
+        isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr or handler.stream == sys.stdout
+        for handler in logger.handlers
+    ):
+        return
+
+    # We disable log propagation up the chain because we don't want the handlers installed on the root logger messing
+    # with our progress bars.
+    logger.propagate = False
+    logger.setLevel(level)
+
+    handler = AequilibraEStreamHandler(stream)
+    handler.setFormatter(logging.Formatter(format))
+
+    logger.addHandler(handler)
+
+    return handler
+
+
+def default_log_file_config(handler: logging.Handler, format: str = DEFAULT_FORMAT):
+    """
+    Attaches a file handler to the AequilibraE logger with default formatting.
+
+    :Arguments:
+        **handler** (:obj:`logging.Handler`): The logging handler (usually a FileHandler) to attach.
+
+        **format** (:obj:`str`, optional): The log format string to use for this handler. Defaults to DEFAULT_FORMAT.
+    """
+    logger = logging.getLogger("aequilibrae")
+
+    handler.setFormatter(logging.Formatter(format))
+    logger.addHandler(handler)
+    # We do not want to set a level on this handler because that should be controlled by the logger, and optionally set
+    # by the user

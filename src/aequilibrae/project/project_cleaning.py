@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from aequilibrae.project import Project
+
 
 def clean(project: "Project") -> None:
     # Since we cannot decide the order of trigger execution in SQLITE, we make sure to remove any

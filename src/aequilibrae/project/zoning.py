@@ -2,6 +2,7 @@ import warnings
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Union, TYPE_CHECKING
+import logging
 
 import pandas as pd
 import shapely.wkb
@@ -19,6 +20,8 @@ from aequilibrae.utils.geo_index import GeoIndex
 
 if TYPE_CHECKING:
     from aequilibrae.project.network import Network
+
+logger = logging.getLogger(__name__)
 
 
 class Zoning(BasicTable):
@@ -66,7 +69,7 @@ class Zoning(BasicTable):
         data = dict.fromkeys(self.__fields)
         data["zone_id"] = zone_id
 
-        self.project.logger.info(f"Zone with id {zone_id} was created")
+        logger.info(f"Zone with id {zone_id} was created")
         return self.__create_return_zone(data)
 
     def create_zoning_layer(self) -> None:
@@ -75,7 +78,7 @@ class Zoning(BasicTable):
         if not self.__has_zoning():
             qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
             with self.network.project.db_connection_spatial as conn:
-                run_queries_from_sql_file(conn, self.project.logger, qry_file)
+                run_queries_from_sql_file(conn, qry_file)
             self.__load()
         else:
             self.project.logger.warning("zones table already exists. Nothing was done", Warning)
@@ -123,12 +126,13 @@ class Zoning(BasicTable):
                 zone.add_centroid(zone.geometry.centroid, robust)
                 i += 1
         if i > 0:
-            self.project.logger.info(f"{i} new centroids added to the network")
+            logger.info(f"{i} new centroids added to the network")
         else:
-            self.project.logger.info("No new centroids added to the network")
+            logger.info("No new centroids added to the network")
 
-    def connect_mode(self, mode_id: str, link_types: str = "", connectors:int = 1, limit_to_zone: bool = True,
-                     bulk: bool = False) -> None:
+    def connect_mode(
+        self, mode_id: str, link_types: str = "", connectors: int = 1, limit_to_zone: bool = True, bulk: bool = False
+    ) -> None:
         """
         Adds centroid connectors for the desired mode to the network file
 
@@ -171,9 +175,7 @@ class Zoning(BasicTable):
                 zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
                 for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
                     if zone_id not in centroids:
-                        self.project.logger.warning(
-                            f"Centroid for zone {zone_id} does not exist. Please create it first."
-                        )
+                        logger.warning(f"Centroid for zone {zone_id} does not exist. Please create it first.")
                         continue
 
                     zone = self.__items[zone_id]

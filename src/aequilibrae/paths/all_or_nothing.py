@@ -82,6 +82,5 @@ class allOrNothing(WorkerThread):
         self.cumulative += 1
         if x != origin:
             self.report.append(x)
-        if self.cumulative % 10 == 0:
-            msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
-            self.signal.emit(["set_text", msg])
+        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
+        self.signal.emit(["set_text", msg])

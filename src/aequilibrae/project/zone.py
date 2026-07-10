@@ -1,4 +1,5 @@
 import random
+import logging
 from sqlite3 import Connection
 from typing import Optional, TYPE_CHECKING
 
@@ -11,6 +12,8 @@ if TYPE_CHECKING:
     from aequilibrae.project.zoning import Zoning
     from aequilibrae.project.network.links import Links
     from aequilibrae.project.network.nodes import Nodes
+
+logger = logging.getLogger(__name__)
 
 
 class Zone(SafeClass):
@@ -70,7 +73,7 @@ class Zone(SafeClass):
 
         with self.project.db_connection_spatial as conn:
             if conn.execute("select count(*) from nodes where node_id=?", [self.zone_id]).fetchone()[0] > 0:
-                self.project.logger.warning("Centroid already exists. Failed to create it")
+                logger.warning("Centroid already exists. Failed to create it")
                 return
 
             sql = "INSERT into nodes (node_id, is_centroid, geometry) VALUES(?,1,GeomFromWKB(?, ?));"
@@ -95,8 +98,13 @@ class Zone(SafeClass):
             conn.execute(sql, data)
 
     def connect_mode(
-        self, mode_id: str, link_types: str = "", connectors: int = 1, conn: Optional[Connection] = None,
-        limit_to_zone: bool = True) -> None:
+        self,
+        mode_id: str,
+        link_types: str = "",
+        connectors: int = 1,
+        conn: Optional[Connection] = None,
+        limit_to_zone: bool = True,
+    ) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
@@ -149,8 +157,6 @@ class Zone(SafeClass):
             row_count += conn.execute(sql, data).rowcount
 
             if row_count:
-                self.project.logger.warning(
-                    f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}"
-                )
+                logger.warning(f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}")
             else:
                 self.project.logger.warning("No centroid connectors for this mode")

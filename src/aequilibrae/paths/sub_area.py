@@ -10,6 +10,8 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import RouteChoice
 from aequilibrae.paths.graph import Graph
 
+logger = logging.getLogger(__name__)
+
 
 class SubAreaAnalysis:
     def __init__(
@@ -39,7 +41,6 @@ class SubAreaAnalysis:
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
-        self.logger = project.logger if project else logging.getLogger("aequilibrae")
         self.graph = graph
         self.sub_area_demand = None
 
@@ -59,7 +60,7 @@ class SubAreaAnalysis:
 
         self.edge_pairs = {x: (x,) for x in itertools.permutations(self.interior_graph.index, r=2)}
         self.single_edges = {x: ((x,),) for x in self.interior_graph.index}
-        self.logger.info(f"Created: {len(self.edge_pairs)} edge pairs from {len(self.single_edges)} edges")
+        logger.info(f"Created: {len(self.edge_pairs)} edge pairs from {len(self.single_edges)} edges")
 
         self.rc = RouteChoice(self.graph)
         self.rc.add_demand(demand)

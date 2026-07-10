@@ -5,14 +5,14 @@ import logging
 import os
 import shutil
 import sqlite3
+import warnings
 from pathlib import Path
 from typing import NoReturn
-import warnings
 
 import pandas as pd
 
 from aequilibrae.context import activate_project, get_active_project
-from aequilibrae.log import get_log_handler, global_logger, Log
+from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
@@ -22,11 +22,14 @@ from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
-from aequilibrae.reference_files import spatialite_database, demo_init_py
+from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close, safe_connect, AequilibraEConnection
+from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
+
+logger = logging.getLogger(__name__)
 
 
 class Project:
@@ -81,14 +84,18 @@ class Project:
             name="root",
             base_path=base_path,
             path_to_file=path_to_file,
+            log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
         )
         self.scenario = self.root_scenario
-        self.scenario.logger = self.__setup_logger()
+
+        # It's possible that if two projects are open at once this could duplicate mix the log outputs, but we don't
+        # have anything to support having more than one project open at a time so we'll assume it's fine.
+        default_log_file_config(self.scenario.log_handler)
 
         self.activate()
 
         self.__load_objects()
-        global_logger.info(f"Opened project on {self.project_base_path}")
+        logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
 
     @property
@@ -102,10 +109,6 @@ class Project:
     @property
     def about(self) -> About:
         return self.scenario.about
-
-    @property
-    def logger(self) -> logging.Logger:
-        return self.scenario.logger
 
     @property
     def network(self) -> Network:
@@ -179,20 +182,23 @@ class Project:
             name="root",
             base_path=base_path,
             path_to_file=path_to_file,
+            log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
         )
         self.scenario = self.root_scenario
-        self.scenario.logger = self.__setup_logger()
+
+        default_log_file_config(self.scenario.log_handler)
+
         self.activate()
 
         self.__create_empty_network()
         self.__load_objects()
         self.about.create()
-        global_logger.info(f"Created project on {base_path}")
+        logger.info(f"Created project on {base_path}")
 
     def close(self) -> None:
         """Safely closes the project"""
         if not self.project_base_path:
-            global_logger.warning("This Aequilibrae project is not opened")
+            logger.warning("This Aequilibrae project is not opened")
             return
 
         try:
@@ -202,20 +208,17 @@ class Project:
             for obj in [self.parameters, self.network]:
                 del obj
 
-            del self.network.link_types
-            del self.network.modes
+            # del self.network.link_types
+            # del self.network.modes
 
-            global_logger.info(f"Closed project on {self.project_base_path}")
+            logger.info(f"Closed project on {self.project_base_path}")
 
+            logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
         except (sqlite3.ProgrammingError, AttributeError):
-            global_logger.warning(f"This project at {self.project_base_path} is already closed")
+            logger.warning(f"This project at {self.project_base_path} is already closed")
+            raise  # FIXME something goes wrong above
 
         finally:
-            handlers = global_logger.handlers[:]  # Make a copy of the handlers list
-            for handler in handlers:
-                handler.close()  # Explicitly close each handler to release file handles
-                global_logger.removeHandler(handler)  # Remove the handler from the logger
-
             self.deactivate()
 
     def activate(self) -> None:
@@ -253,7 +256,7 @@ class Project:
             **ignore_results** (:obj:`bool`, optional): Ignore the results database. No direct migrations will be
                   applied. Defaults to False.
         """
-        global_logger.info("Starting database upgrades")
+        logger.info("Starting database upgrades")
         if ignore_project or ignore_transit or ignore_results:
             warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
 
@@ -264,18 +267,18 @@ class Project:
             targets.append((MigrationManager(MigrationManager.network_migration_file), "project_conn"))
             connections["project_conn"] = connect_spatialite(self._project_database_path)
         else:
-            global_logger.warning("Ignoring project database during upgrade")
+            logger.warning("Ignoring project database during upgrade")
 
         if not ignore_transit and (self.project_base_path / "public_transport.sqlite").exists():
             targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
             connections["transit_conn"] = connect_spatialite(self._transit_database_path)
         else:
-            global_logger.warning("Ignoring transit database during upgrade")
+            logger.warning("Ignoring transit database during upgrade")
 
         if not ignore_results and (self.project_base_path / "results_database.sqlite").exists():
             connections["results_conn"] = safe_connect(self._results_database_path)
         else:
-            global_logger.warning("Ignoring results database during upgrade")
+            logger.warning("Ignoring results database during upgrade")
 
         try:
             for mm, main_conn in targets:
@@ -285,7 +288,7 @@ class Project:
 
             for mm, main_conn in targets:
                 mm.upgrade(main_conn, connections=connections)
-            global_logger.info("Completed database upgrades")
+            logger.info("Completed database upgrades")
         finally:
             for _, main_conn in targets:
                 connections[main_conn].close()
@@ -298,8 +301,6 @@ class Project:
         self.scenario.about = About(self)
         self.scenario.matrices = Matrices(self)
         self.scenario.results = Results(self)
-        self.scenario.transit = Transit(self)
-        self.scenario.zoning = Zoning(self.scenario.network)
 
     @property
     def project_parameters(self) -> Parameters:
@@ -322,7 +323,7 @@ class Project:
             self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
         )
 
-        res: dict [str, Callable] = {}
+        res: dict[str, Callable] = {}
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
@@ -358,20 +359,7 @@ class Project:
         # Create actual tables
         with self.db_connection_spatial as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
-            initialize_tables(self.logger, "network", conn=conn)
-
-    def __setup_logger(self) -> logging.Logger:
-        logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
-        logger.propagate = False
-        logger.setLevel(logging.DEBUG)
-
-        par = self.parameters or self.project_parameters._default
-        do_log = par["system"]["logging"]
-
-        if do_log:
-            logger.addHandler(get_log_handler(self.project_base_path / "aequilibrae.log"))
-
-        return logger
+            initialize_tables("network", conn=conn)
 
     def list_scenarios(self) -> pd.DataFrame:
         """
@@ -395,16 +383,21 @@ class Project:
             if conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone() is None:
                 raise ValueError(f"scenario '{scenario_name}' does not exist")
 
+        logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
+
         if scenario_name == "root":
             self.scenario = self.root_scenario
         else:
+            path = self.root_scenario.base_path / "scenarios" / scenario_name
             self.scenario = Scenario(
                 name=scenario_name,
-                base_path=self.root_scenario.base_path / "scenarios" / scenario_name,
-                path_to_file=self.root_scenario.base_path / "scenarios" / scenario_name / "project_database.sqlite",
+                base_path=path,
+                path_to_file=path / "project_database.sqlite",
+                log_handler=logging.FileHandler(path / "aequilibrae.log"),
             )
 
-        self.scenario.logger = self.__setup_logger()
+        default_log_file_config(self.scenario.log_handler)
+
         self.__load_objects()
 
     def create_empty_scenario(self, scenario_name: str, description: str = "") -> None:
@@ -441,7 +434,7 @@ class Project:
             # Create actual tables
             with commit_and_close(db, spatial=True) as conn:
                 conn.execute("PRAGMA foreign_keys = ON;")
-                initialize_tables(self.logger, "network", conn=conn)
+                initialize_tables("network", conn=conn)
                 conn.execute("DROP TABLE IF EXISTS scenarios")
 
             with self.db_connection as conn:

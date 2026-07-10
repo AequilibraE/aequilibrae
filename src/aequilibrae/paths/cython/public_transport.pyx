@@ -2,6 +2,7 @@
 
 import multiprocessing
 import socket
+import logging
 from pathlib import Path
 import json
 
@@ -12,9 +13,13 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.utils.db_utils import commit_and_close
 
+from aequilibrae.utils.cython.bridge cimport Bridge
+
 include 'hyperpath.pyx'
 
 from typing import Union
+
+logger = logging.getLogger(__name__)
 
 
 class HyperpathGenerating:
@@ -274,12 +279,21 @@ class HyperpathGenerating:
 
         """
 
-        self.origin_column = origin_column.astype(np.uint32)
-        self.destination_column = destination_column.astype(np.uint32)
-        self.demand_column = demand_column.astype(DATATYPE_PY)
+        origin_column = origin_column.astype(np.uint32)
+        destination_column = destination_column.astype(np.uint32)
+        demand_column = demand_column.astype(DATATYPE_PY)
         # check the input demand parameter
         if check_demand:
             self._check_demand(origin_column, destination_column, demand_column)
+
+        # Sort the demand by destination so that each destination's demand is a
+        # contiguous slice (located via demand_indptr below) instead of requiring a
+        # scan of the full demand arrays for every destination. The stable sort
+        # preserves within-destination ordering, so results are unchanged.
+        order = np.argsort(destination_column, kind="stable")
+        origin_column = origin_column[order]
+        destination_column = destination_column[order]
+        demand_column = demand_column[order]
 
         if threads is None:
             threads = 0  # Default to all threads
@@ -291,7 +305,9 @@ class HyperpathGenerating:
         self.u_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
 
         # get the list of all destinations, we use "rest of" for skimming
-        destinations = np.unique(self.destination_column)
+        # and the start of each destination's slice in the (destination-sorted) demand arrays
+        destinations, demand_indptr = np.unique(destination_column, return_index=True)
+        demand_indptr = np.append(demand_indptr, destination_column.size).astype(np.uint32)
         if self._skimming:
             rest_of_destinations = self._d_vert_ids[
                 np.isin(self._d_vert_ids, destinations, invert=True, assume_unique=True)
@@ -308,33 +324,36 @@ class HyperpathGenerating:
 
         self.skim_matrix = np.zeros((n_centroids, n_centroids, n_skim_cols))
 
-        compute_SF_in_parallel(
-            self._indptr[:],
-            self._edge_idx[:],
-            self._trav_time[:],
-            self._freq[:],
-            self._tail[:],
-            self._head[:],
-            self.destination_column[:],
-            destinations[:],
-            rest_of_destinations[:],
-            self.origin_column[:],
-            self.demand_column[:],
-            volume,
-            self.vertex_count,
-            volume.shape[0],
-            (multiprocessing.cpu_count() if threads < 1 else threads),
-            self._skim_cols[:],
-            self.u_i_vec,
-            self.skim_matrix,
-            self._o_vert_ids[:],
-            self._o_indices[:],
-            self._od_index_to_taz_index[:],
-            self._nodes_to_indices[:],
-            self._skimming,
-            self._is_travel_time,
-            len(self._skim_cols_names)
-        )
+        with Bridge(logger) as bridge:
+            compute_SF_in_parallel(
+                self._indptr[:],
+                self._edge_idx[:],
+                self._trav_time[:],
+                self._freq[:],
+                self._tail[:],
+                self._head[:],
+                destination_column[:],
+                destinations[:],
+                demand_indptr[:],
+                rest_of_destinations[:],
+                origin_column[:],
+                demand_column[:],
+                volume,
+                self.vertex_count,
+                volume.shape[0],
+                (multiprocessing.cpu_count() if threads < 1 else threads),
+                self._skim_cols[:],
+                self.u_i_vec,
+                self.skim_matrix,
+                self._o_vert_ids[:],
+                self._o_indices[:],
+                self._od_index_to_taz_index[:],
+                self._nodes_to_indices[:],
+                self._skimming,
+                self._is_travel_time,
+                len(self._skim_cols_names),
+                bridge,
+            )
 
         self._edges["volume"] = volume
 

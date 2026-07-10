@@ -24,7 +24,7 @@ def connector_creation(
     proj_nodes: gpd.GeoDataFrame,
     proj_links: gpd.GeoDataFrame,
     link_types: str = "",
-    connectors:int = 1,
+    connectors: int = 1,
     conn: Optional[Connection] = None,
     delimiting_area: Optional[MultiPolygon] = None,
 ) -> None:
@@ -32,7 +32,6 @@ def connector_creation(
         raise Exception("We can only add centroid connectors for one mode at a time")
 
     with conn or network.project.db_connection as connec:
-        logger = network.project.logger
         if sum(connec.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone()) == 0:
             logger.warning("This centroid does not exist. Please create it first")
             return

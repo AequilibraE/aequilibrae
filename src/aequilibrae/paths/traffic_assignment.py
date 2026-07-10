@@ -47,6 +47,9 @@ def _safe_delay_factor(congested_time, free_flow_time):
     )
 
 
+logger = logging.getLogger(__name__)
+
+
 class AssignmentBase(ABC):
     def __init__(self, project=None):
         self.procedure_id = uuid4().hex
@@ -56,7 +59,6 @@ class AssignmentBase(ABC):
         self.project = proj
 
         self.parameters = proj.parameters if proj else Parameters().parameters
-        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
 
         self.classes: List[TrafficClass] = []
         self.algorithm: str = None
@@ -420,7 +422,7 @@ class TrafficAssignment(AssignmentBase):
         elif self.vdf.function == "INRETS":
             parameter_bounds = {"alpha": (0.0, 1.0)}
         elif self.vdf.function == "AKCELIK":
-            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf"))}
+            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf")), "length": (0.0, float("inf"))}
         else:
             raise ValueError(f"unknown vdf function {self.vdf.function}")
 
@@ -611,12 +613,12 @@ class TrafficAssignment(AssignmentBase):
         return True
 
     def log_specification(self):
-        self.logger.info("Traffic Class specification")
+        logger.info("Traffic Class specification")
         for cls in self.classes:
-            self.logger.info(str(cls.info))
+            logger.info(str(cls.info))
 
-        self.logger.info("Traffic Assignment specification")
-        self.logger.info(self._config)
+        logger.info("Traffic Assignment specification")
+        logger.info(self._config)
 
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite
@@ -1082,12 +1084,12 @@ class TransitAssignment(AssignmentBase):
         return info
 
     def log_specification(self):
-        self.logger.info("Transit Class specification")
+        logger.info("Transit Class specification")
         for cls in self.classes:
-            self.logger.info(str(cls.info))
+            logger.info(str(cls.info))
 
-        self.logger.info("Transit Assignment specification")
-        self.logger.info(self._config)
+        logger.info("Transit Assignment specification")
+        logger.info(self._config)
 
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite

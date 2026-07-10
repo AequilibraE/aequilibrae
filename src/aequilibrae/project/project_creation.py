@@ -10,14 +10,16 @@ req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes"
 req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ["ogc_fid", "geometry"]
 
+logger = logging.getLogger(__name__)
 
-def initialize_tables(logger: logging.Logger, db_type: str, conn: Connection) -> None:
+
+def initialize_tables(db_type: str, conn: Connection) -> None:
     with conn as conn:
-        create_base_tables(conn, logger, db_type)
-        add_triggers(conn, logger, db_type)
+        create_base_tables(conn, db_type)
+        add_triggers(conn, db_type)
 
 
-def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:
+def create_base_tables(conn: Connection, db_type: str) -> None:
     base_folder = Path(__file__).resolve().parent / "database_specification" / db_type
     spec_folder = base_folder / "tables"
 
@@ -28,7 +30,7 @@ def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -
 
     for f in all_tables:
         qry_file = spec_folder / f"{f}.sql"
-        run_queries_from_sql_file(conn, logger, qry_file)
+        run_queries_from_sql_file(conn, qry_file)
 
     # For a new database construction all present migrations should have already been applied implicitly by the new
     # schema. So we mark them all as skipped.
@@ -38,7 +40,7 @@ def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -
         migration.mark_as(conn, MigrationStatus.SKIPPED)
 
 
-def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
+def add_triggers(conn: Connection, db_type: str) -> None:
     """Adds consistency triggers to the project"""
     spec_folder = Path(__file__).resolve().parent / "database_specification" / db_type / "triggers"
     with open(spec_folder / "triggers_list.txt", "r") as file_list:
@@ -46,12 +48,10 @@ def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
     for f in all_trigger_sets:
         qry_file = spec_folder / f"{f}.sql"
-        run_queries_from_sql_file(conn, logger, qry_file)
+        run_queries_from_sql_file(conn, qry_file)
 
 
-def remove_triggers(
-    conn: Connection, logger: logging.Logger, db_type: str, use_aequilibrae_prefix: bool = True
-) -> None:
+def remove_triggers(conn: Connection, db_type: str, use_aequilibrae_prefix: bool = True) -> None:
     spec_folder = Path(__file__).resolve().parent / "database_specification" / db_type / "triggers"
     with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
@@ -83,7 +83,7 @@ def remove_triggers(
                         logger.error(f"Point of failure - > {qry}")
 
 
-def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file: Path) -> None:
+def run_queries_from_sql_file(conn: Connection, qry_file: Path) -> None:
     with open(qry_file, "r") as sql_file:
         query_list = sql_file.read()
 
@@ -98,7 +98,7 @@ def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file
             raise e
 
 
-def recreate_columns(conn: Connection, logger: logging.Logger, table: str, old_table: str) -> dict[str, str]:
+def recreate_columns(conn: Connection, table: str, old_table: str) -> dict[str, str]:
     """
     Recreate columns for a table if any were added. Returns a dict of the old column names to type
     """

@@ -9,13 +9,14 @@ from shapely import LineString
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import linemerge
 
-from aequilibrae.context import get_logger
 from aequilibrae.paths import Graph
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
 from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 DEAD_END_RUN = 40
+
+logger = logging.getLogger(__name__)
 
 
 class RouteMapMatcher(WorkerThread):
@@ -29,8 +30,6 @@ class RouteMapMatcher(WorkerThread):
         super().__init__(None)
 
         utm_zone: str = metre_crs_for_gdf(link_gdf)
-
-        self.logger = get_logger()
 
         self.links: gpd.GeoDataFrame = self.__rename_geo(link_gdf).to_crs(utm_zone)
         stops_gdf: gpd.GeoDataFrame = (
@@ -60,7 +59,7 @@ class RouteMapMatcher(WorkerThread):
             **distance_to_project** (:obj:`float`, *Optional*): Radius search for links to break at the stops.
             Defaults to 50m
         """
-        self.logger.debug("Called build_graph_with_broken_stops")
+        logger.debug("Called build_graph_with_broken_stops")
         if not self.links.shape[0]:
             return
 
@@ -80,7 +79,7 @@ class RouteMapMatcher(WorkerThread):
         return self._build_path_df(path_directions, path_links)
 
     def __build_graph_from_scratch(self):
-        self.logger.debug("Creating map-matching graph")
+        logger.debug("Creating map-matching graph")
 
         broken_links, new_nodes = split_links_at_stops(self.stops, self.links, self.dist_thresh)
 
@@ -153,7 +152,7 @@ class RouteMapMatcher(WorkerThread):
         route_stops: pd.DataFrame = route_stops.merge(self.stop_ids, on="real_stop_id")
 
         if not np.all(np.isin(route_stops.real_stop_id.values, self.available_stops)):
-            self.logger.critical("Route is not completely connected.")
+            logger.critical("Route is not completely connected.")
             return [], []
 
         # We discount the likely links for this route to favor them in the map-matching

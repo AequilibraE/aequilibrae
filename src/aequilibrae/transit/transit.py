@@ -1,4 +1,4 @@
-from __future__ import annotations
+import logging
 import os
 import shutil
 import sqlite3
@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 from aequilibrae.utils.python_signal import PythonSignal
 from aequilibrae.project.network.periods import Periods
-from aequilibrae.log import logger
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
@@ -19,6 +18,8 @@ from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+logger = logging.getLogger(__name__)
 
 
 class Transit(WorkerThread):
@@ -38,7 +39,7 @@ class Transit(WorkerThread):
     graphs: Dict[int, TransitGraphBuilder] = {}
     pt_con: sqlite3.Connection
 
-    def __init__(self, project: Project):
+    def __init__(self, project: "Project"):
         """
         :Arguments:
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
@@ -46,8 +47,7 @@ class Transit(WorkerThread):
         """
         super().__init__(None)
 
-        self.project: Project = project
-        self.logger = logger
+        self.project: "Project" = project
         self.periods: Periods = project.network.periods
 
         self.create_transit_database()
@@ -92,7 +92,7 @@ class Transit(WorkerThread):
         if not os.path.exists(self.project._transit_database_path):
             shutil.copyfile(spatialite_database, self.project._transit_database_path)
             with self.project.transit_connection as conn:
-                initialize_tables(self.logger, "transit", conn=conn)
+                initialize_tables("transit", conn=conn)
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

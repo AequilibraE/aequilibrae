@@ -74,7 +74,7 @@ def ipf_core(
         )
 
     if err > tolerance and warn:
-        warnings.warn(f"Could not reach convergence in {iter} iterations: {err}")
+        warnings.warn(f"Could not reach convergence in {iter} iterations: {err}", stacklevel=2)
     return iter, err
 
 

@@ -3,18 +3,21 @@ import sqlite3
 from dataclasses import dataclass
 from enum import IntEnum
 import contextlib
+import logging
 
 from typing import Optional
 
-from aequilibrae.log import logger
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.db_utils import AequilibraEConnection
+
+logger = logging.getLogger(__name__)
 
 
 class MigrationStatus(IntEnum):
     MISSING = 1
     SKIPPED = 2
     APPLIED = 3
+
 
 @dataclass
 class Migration:
@@ -258,8 +261,12 @@ class MigrationManager:
 
         return res
 
-    def upgrade(self, main_conn: str, connections: dict[str, AequilibraEConnection | sqlite3.Connection],
-                 skip: Optional[set[int]] = None):
+    def upgrade(
+        self,
+        main_conn: str,
+        connections: dict[str, AequilibraEConnection | sqlite3.Connection],
+        skip: Optional[set[int]] = None,
+    ):
         """
         Find and apply all applicable migrations.
 

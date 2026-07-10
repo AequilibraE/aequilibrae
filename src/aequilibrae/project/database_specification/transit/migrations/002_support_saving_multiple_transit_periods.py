@@ -1,11 +1,13 @@
+import logging
 import pathlib
 import sqlite3
 from typing import Optional
 
+from aequilibrae import Project
 from aequilibrae.context import get_active_project
-from aequilibrae.log import logger
-from aequilibrae.project.project import Project
-from aequilibrae.project.project_creation import add_triggers, remove_triggers, recreate_columns
+from aequilibrae.project.project_creation import add_triggers, recreate_columns, remove_triggers
+
+logger = logging.getLogger(__name__)
 
 
 def migrate(
@@ -66,13 +68,13 @@ def migrate(
             *nodes_sql.read().split("--#"),
         ]
 
-    remove_triggers(transit_conn, logger, "transit")
+    remove_triggers(transit_conn, "transit")
     try:
         for sql in sqls:
             transit_conn.execute(sql)
 
         for table in ["links", "nodes"]:
-            columns = recreate_columns(transit_conn, logger, table, f"__old_{table}")
+            columns = recreate_columns(transit_conn, table, f"__old_{table}")
 
             transit_conn.execute(
                 f"INSERT INTO {table}({','.join(columns)},'period_id') "
@@ -81,6 +83,6 @@ def migrate(
             transit_conn.execute(f"SELECT DropTable(NULL, '__old_{table}')")
 
     finally:
-        add_triggers(transit_conn, logger, "transit")
+        add_triggers(transit_conn, "transit")
 
     logger.info("Migration successful")

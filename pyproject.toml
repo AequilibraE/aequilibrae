@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python>=0.15.0", "ninja", "cython"]
+requires = ["meson-python>=0.15.0", "ninja", "cython", "cysignals"]
 
 [tool.meson-python.args]
 setup = ['--vsenv']
@@ -44,7 +44,7 @@ dependencies = [
   "openmatrix",
   "geopandas",
   "tqdm",
-
+  "cysignals",
 ]
 
 [project.optional-dependencies]
@@ -76,7 +76,6 @@ tests = [
   "ruff==0.14.8",
   "wheel",
 ]
-
 
 dev = ['aequilibrae[tests, docs]']
 

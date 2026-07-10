@@ -11,8 +11,18 @@ project(
 
 py = import('python').find_installation(pure: false)
 
+
 openmp = dependency('openmp')
-deps = [openmp]
+
+# See note in resolve_cysignals.py.
+inc_cysignals = run_command(py, 'src/aequilibrae/utils/resolve_cysignals.py', check: true).stdout().strip()
+cysignals = declare_dependency(include_directories: inc_cysignals)
+
+deps = [openmp, cysignals]
+
+incdir = include_directories(
+  'src/aequilibrae/utils/cpp/'
+)
 
 add_project_arguments(
   '-X', 'embedsignature=True',

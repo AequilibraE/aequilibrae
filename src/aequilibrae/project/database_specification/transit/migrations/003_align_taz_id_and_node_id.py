@@ -1,14 +1,16 @@
-import pathlib
 import sqlite3
+import pathlib
+import logging
 from typing import Optional
+
+from aequilibrae import Project
+from aequilibrae.transit import Transit
+from aequilibrae.context import get_active_project
+from aequilibrae.project.project_creation import add_triggers, remove_triggers
 
 import numpy as np
 
-from aequilibrae.context import get_active_project
-from aequilibrae.log import logger
-from aequilibrae.project.project import Project
-from aequilibrae.project.project_creation import add_triggers, remove_triggers
-from aequilibrae.transit import Transit
+logger = logging.getLogger(__name__)
 
 
 def migrate(
@@ -48,7 +50,7 @@ def migrate(
         ]
 
     logger.info("Removing triggers...")
-    remove_triggers(transit_conn, logger, "transit")
+    remove_triggers(transit_conn, "transit")
     try:
         logger.info("Removing/renaming tables...")
         for sql in sqls:
@@ -92,6 +94,6 @@ def migrate(
 
     finally:
         logger.info("Re-adding triggers...")
-        add_triggers(transit_conn, logger, "transit")
+        add_triggers(transit_conn, "transit")
 
     logger.info("Migration successful")

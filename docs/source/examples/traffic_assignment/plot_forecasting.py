@@ -8,7 +8,7 @@ In this example, we present a full forecasting workflow for the Sioux Falls exam
 
 We start creating the skim matrices, running the assignment for the base-year, and then
 distributing these trips into the network. Later, we estimate a set of future demand vectors
-which are going to be the input of a future year assignnment with select link analysis.
+which are going to be the input of a future year assignment with select link analysis.
 """
 # %%
 # .. seealso::
@@ -32,6 +32,8 @@ from tempfile import gettempdir
 import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.logging_utils import basic_config
+
 # sphinx_gallery_thumbnail_number = 3
 # %%
 
@@ -39,7 +41,12 @@ from aequilibrae.utils.create_example import create_example
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
-logger = project.logger
+
+# %%
+
+# We'll also apply a basic logging configuration.
+
+basic_config()
 
 # %%
 # Traffic assignment with skimming
@@ -181,7 +188,7 @@ imped.names
 imped_core = "free_flow_time_final"
 imped.computational_view([imped_core])
 
-# If we run the code below more than once, we will be overwriting the diagonal values with non-sensical data
+# If we run the code below more than once, we will be overwriting the diagonal values with nonsensical data
 # so let's zero it first
 np.fill_diagonal(imped.matrix_view, 0)
 
@@ -311,9 +318,6 @@ proj_matrices.list()
 # Traffic assignment with Select Link Analysis
 # --------------------------------------------
 # We'll perform traffic assignment for the future year.
-logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR WITH SELECT LINK ANALYSIS")
-
-# %%
 # Let's get our future demand matrix, which corresponds to the IPF result we just saved,
 # and see what is the core we ended up getting. It should be ``matrix``.
 demand = proj_matrices.get_matrix("demand_ipfd_omx")
