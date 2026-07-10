@@ -85,16 +85,17 @@ cpdef void akcelik_cython(
     const double [:] fftime,
     const double [:] alpha,
     const double[:] tau,
+    const double[:] length,
     const int cores
 ) noexcept
 
-cpdef void dakcelik_cython(
-    double[:] deltaresult,
-    const double [:] link_flows,
+cpdef void akcelik_cython(
+    double[:] congested_time,
+    const double[:] link_flows,
     const double [:] capacity,
     const double [:] fftime,
     const double [:] alpha,
     const double[:] tau,
+    const double[:] length,
     const int cores
 ) noexcept
-

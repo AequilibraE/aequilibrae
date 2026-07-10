@@ -340,7 +340,7 @@ cpdef void dinrets_cython(
 
 
 
-def akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, cores):
+def akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores):
     cdef int c = cores
 
     cdef double [:] congested_view = congested_times
@@ -349,11 +349,12 @@ def akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, cores):
     cdef double [:] fftime_view = fftime
     cdef double [:] alpha_view = alpha
     cdef double [:] tau_view = tau
+    cdef double [:] length_view = length
 
-    akcelik_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, c)
+    akcelik_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, length_view, c)
 
 
-def delta_akcelik(d_akcelik, link_flows, capacity, fftime, alpha, tau, cores):
+def delta_akcelik(d_akcelik, link_flows, capacity, fftime, alpha, tau, _length, cores):
     cdef int c = cores
 
     cdef double [:] d_akcelik_view = d_akcelik
@@ -376,6 +377,7 @@ cpdef void akcelik_cython(
     const double [:] fftime,
     const double [:] alpha,
     const double[:] tau,
+    const double[:] length,
     const int cores
 ) noexcept:
     # tau is redefined as 8 * tau
@@ -393,7 +395,7 @@ cpdef void akcelik_cython(
 
             congested_time[i] = (
                 fftime[i]  # t_o
-                + alpha[i] * (
+                + length[i] * alpha[i] * (
                     z + sqrt(
                          z * z  # z^2
                          + tau[i] * voc / capacity[i]
@@ -429,4 +431,3 @@ cpdef void dakcelik_cython(
 
         else:
             deltaresult[i] = fftime[i]
-
