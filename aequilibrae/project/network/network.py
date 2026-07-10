@@ -302,7 +302,7 @@ class Network(WorkerThread):
                 ignore_fields = ["ogc_fid", "geometry"]
                 all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
             else:
-                fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
+                fields.extend(["link_id", "a_node", "b_node", "direction", "modes", "link_type"])
                 all_fields = list(set(fields))
 
             if modes is None:
