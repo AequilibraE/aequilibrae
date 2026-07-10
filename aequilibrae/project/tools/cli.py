@@ -1,16 +1,12 @@
 import argparse
 import functools
-import inspect
 import os
-from pathlib import Path
-from pprint import pprint
-
-from aequilibrae.project import Project
-from aequilibrae.utils.model_run_utils import import_file_as_module
 
 
 def add_subcommand_from_function(subparsers, func, defaults: dict):
     """Create an sub-command from a function's signature."""
+    import inspect
+
     parser = subparsers.add_parser(func.__name__, description=func.__doc__)
     parser.set_defaults(_internal_target_func=func)
 
@@ -42,6 +38,10 @@ def list_functions(parser, args, unparsed_args):
     """
     List functions present in the run module.
     """
+    from pprint import pprint
+
+    from aequilibrae.project import Project
+
     # We attempt to parse the remaining arguments to provide a good error message in case something was provided.
     args = parser.parse_args(args=unparsed_args, namespace=args)
 
@@ -57,6 +57,10 @@ def run(args, unparsed_args):
     """
     Execute a function from the run module with argument parsing inferred from the function signature.
     """
+    from pprint import pprint
+
+    from aequilibrae.project import Project
+
     project = Project()
     project.open(args.project)
 
