@@ -5,7 +5,7 @@ from random import choice
 import numpy as np
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
+from aequilibrae import Graph, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import all_vdf_functions
 
 
@@ -128,10 +128,10 @@ def test_set_algorithm(assignment, assigclass):
     "vdf,parameters",
     [
         *[(k, {"alpha": "b", "beta": "power"}) for k in all_vdf_functions if k != "akcelik"],
-        ("akcelik", {"alpha": "b", "tau": "power"}),
+        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
         *[(k, {"alpha": 0.15, "beta": 4.0}) for k in all_vdf_functions if k != "akcelik"],
-        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0}),
-        ("akcelik", {"tau": 0.1 * 8.0}),
+        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
+        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
     ],
 )
 def test_set_vdf_parameters(assignment, assigclass, vdf, parameters):
