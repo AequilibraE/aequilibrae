@@ -45,9 +45,6 @@ dependencies = [
 license = "LicenseRef-AequilibraE"
 license-files = ["LICENSE.TXT"]
 
-[project.scripts]
-aeq = "aequilibrae.project.tools.cli:cli"
-
 [project.optional-dependencies]
 
 docs = [
@@ -86,8 +83,9 @@ build = ["setuptools", "cython", "wheel"]
 
 dev = ['aequilibrae[build, tests, docs]']
 
-# simwrapper CLI
+# CLIs
 [project.scripts]
+aeq = "aequilibrae.project.tools.cli:cli"
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
 
 [tool.pytest.ini_options]
