@@ -61,6 +61,7 @@ class RouteChoice:
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
 
         self.where: Optional[pathlib.Path] = None
+        self.to_parquet_kwargs = {}
         self.index_name = "route_choice_sl_index"
 
         self._config = {}
@@ -177,7 +178,7 @@ class RouteChoice:
         """
         self.cores = cores
 
-    def set_save_routes(self, where: Optional[str] = None) -> None:
+    def set_save_routes(self, where: Optional[str] = None, **to_parquet_kwargs) -> None:
         """
         Set save path for route choice results. Provide ``None`` to disable.
 
@@ -187,7 +188,8 @@ class RouteChoice:
             the results from disk first.
 
         :Arguments:
-            **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
+            **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
 
         if where is not None:
@@ -195,6 +197,7 @@ class RouteChoice:
             if not where.exists():
                 raise ValueError(f"Path does not exist `{where}`")
         self.where = where
+        self.to_parquet_kwargs = to_parquet_kwargs
 
     def add_demand(self, demand, fill: float = 0.0):
         """
@@ -312,6 +315,7 @@ class RouteChoice:
             path_size_logit=perform_assignment,
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
+            to_parquet_kwargs=self.to_parquet_kwargs,
             sl_link_loading=self.sl_link_loading,
             **self.parameters,
         )
@@ -445,7 +449,7 @@ class RouteChoice:
 
         return results
 
-    def save_path_files(self, where: Optional[pathlib.Path] = None):
+    def save_path_files(self, where: Optional[pathlib.Path] = None, **to_parquet_kwargs):
         """
         Save path-files to the directory specific.
 
@@ -454,12 +458,13 @@ class RouteChoice:
 
         :Arguments:
             **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
         where = where if where is not None else self.where
         if where is None:
             raise ValueError("either the 'where' argument or 'self.where' property must not None")
 
-        self.__rc.write_path_files(where)
+        self.__rc.write_path_files(where, to_parquet_kwargs)
 
     def get_load_results(self) -> pd.DataFrame:
         """

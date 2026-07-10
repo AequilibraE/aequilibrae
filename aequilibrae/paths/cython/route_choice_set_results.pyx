@@ -94,7 +94,7 @@ cdef class RouteChoiceSetResults:
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
                 self.__prob_set[i] = make_shared[vector[double]]()
 
-    def write(self, where):
+    def write(self, where, to_parquet_kwargs):
         table = self.make_df_from_results()
 
         engine_name = pd.get_option("io.parquet.engine")
@@ -109,21 +109,27 @@ cdef class RouteChoiceSetResults:
                     "Please install one with: pip install pyarrow OR pip install fastparquet"
                 )
 
+        kwargs = {
+            "path": where,
+            "compression": "zstd",
+            "index": False,
+            "partition_cols": ["origin id"],
+        }
+
         if engine_name == "pyarrow":
-            kwargs = dict(
+            kwargs |= {
                 # can't provide partitioning_flavor and partition_cols through the Pandas API
-                use_threads=True,
-                existing_data_behavior="overwrite_or_ignore",
-                file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
-            )
+                "use_threads": True,
+                "existing_data_behavior": "overwrite_or_ignore",
+            }
         elif engine_name == "fastparquet":
             logger.info("FastParquet back-end doesn't support individual partition logging, writing table now...")
-            kwargs = dict(
-                file_scheme="hive",
+            kwargs |= {
+                "file_scheme": "hive",
                 # no threads option
-                append=False,
+                "append": False,
                 # no visitor option
-            )
+            }
             logger.warn(
                 "FastParquet back-end doesn't support writing a NumPy arrays as Parquet list types, converting to Python lists. "
                 "Watch out for memory consumption..."
@@ -134,13 +140,7 @@ cdef class RouteChoiceSetResults:
                 "encountered unknown Pandas parquet engine, please report this as a bug to the AequilibraE issues page"
             )
 
-        table.to_parquet(
-            path=where,
-            compression="zstd",
-            index=False,
-            partition_cols=["origin id"],
-            **kwargs,
-        )
+        table.to_parquet(**(kwargs | to_parquet_kwargs))
 
     @classmethod
     def read_dataset(cls, where):
