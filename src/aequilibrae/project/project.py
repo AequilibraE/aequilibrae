@@ -1,11 +1,11 @@
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
 import functools
 import logging
 import os
 import shutil
 import sqlite3
 import warnings
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import NoReturn
 
@@ -24,7 +24,7 @@ from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import commit_and_close, safe_connect, AequilibraEConnection
+from aequilibrae.utils.db_utils import AequilibraEConnection, commit_and_close, safe_connect
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -301,6 +301,8 @@ class Project:
         self.scenario.about = About(self)
         self.scenario.matrices = Matrices(self)
         self.scenario.results = Results(self)
+        self.scenario.transit = Transit(self)
+        self.scenario.zoning = Zoning(self.scenario.network)
 
     @property
     def project_parameters(self) -> Parameters:
