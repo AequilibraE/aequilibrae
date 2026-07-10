@@ -423,7 +423,7 @@ class TrafficAssignment(AssignmentBase):
         elif self.vdf.function == "INRETS":
             parameter_bounds = {"alpha": (0.0, 1.0)}
         elif self.vdf.function == "AKCELIK":
-            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf"))}
+            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf")), "length": (0.0, float("inf"))}
         else:
             raise ValueError(f"unknown vdf function {self.vdf.function}")
 
