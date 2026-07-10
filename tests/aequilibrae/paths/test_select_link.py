@@ -290,13 +290,11 @@ def test_multi_iteration(select_link_setup, algorithm):
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
-    res = PathResults()
     # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
     graph.set_graph("free_flow_time")
-    res.prepare(graph)
 
     def g(o, d):
-        res.compute_path(o, d)
+        res = PathResults(graph, o, d)
         return list(res.path_nodes) if (res.path_nodes is not None and o != d) else []
 
     a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]

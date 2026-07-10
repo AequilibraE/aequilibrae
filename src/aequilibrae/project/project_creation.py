@@ -1,7 +1,8 @@
 import logging
-import re
 from pathlib import Path
+import re
 from sqlite3 import Connection
+
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
 
 

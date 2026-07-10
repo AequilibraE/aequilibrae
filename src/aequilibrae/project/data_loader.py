@@ -10,7 +10,7 @@ from aequilibrae.utils.get_table import get_geo_table
 
 
 class DataLoader:
-    def __init__(self, path_to_file: PathLike, table_name: str):
+    def __init__(self, path_to_file: PathLike | str, table_name: str) -> None:
         self.__pth_file = Path(path_to_file)
         self.table_name = table_name
 

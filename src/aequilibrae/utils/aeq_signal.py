@@ -1,16 +1,17 @@
 from aequilibrae.utils.qgis_utils import inside_qgis
+from typing import TYPE_CHECKING
 
 
 def noop(_):
     pass
 
 
-if inside_qgis:
-    from qgis.PyQt.QtCore import pyqtSignal as SIGNAL  # type: ignore
+if inside_qgis and not TYPE_CHECKING:
+    from qgis.PyQt.QtCore import pyqtSignal as SIGNAL
 
     noop(SIGNAL.__class__)  # This should be no-op but it stops PyCharm from "optimising" the above import
 else:
-    from aequilibrae.utils.python_signal import PythonSignal as SIGNAL  # type: ignore
+    from aequilibrae.utils.python_signal import PythonSignal as SIGNAL
 
     noop(SIGNAL.__class__)  # This should be no-op but it stops PyCharm from "optimising" the above import
 
