@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -25,6 +25,9 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,13 +39,13 @@ class Network(WorkerThread):
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
     protected_fields = protected_fields
-    link_types: LinkTypes = None
+    link_types: LinkTypes
     signal = SIGNAL(object)
 
-    def __init__(self, project) -> None:
+    def __init__(self, project: "Project") -> None:
         WorkerThread.__init__(self, None)
 
-        self.graphs = {}  # type: Dict[Graph]
+        self.graphs: dict = {}
         self.project = project
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
@@ -50,7 +53,7 @@ class Network(WorkerThread):
         self.nodes = Nodes(self)
         self.periods = Periods(self)
 
-    def skimmable_fields(self):
+    def skimmable_fields(self) -> list:
         """
         Returns a list of all fields that can be skimmed
 
@@ -100,7 +103,7 @@ class Network(WorkerThread):
 
         return real_fields
 
-    def list_modes(self):
+    def list_modes(self) -> list:
         """
         Returns a list of all the modes in this model
 
@@ -114,20 +117,15 @@ class Network(WorkerThread):
 
     def create_from_osm(
         self,
-        model_area: Optional[Polygon] = None,
-        place_name: Optional[str] = None,
-        modes=("car", "transit", "bicycle", "walk"),
-        clean=True,
+        place: Polygon | str,
+        modes: List[str] | tuple[str, ...] | str = ("car", "transit", "bicycle", "walk"),
+        clean: bool = True,
     ) -> None:
         """
         Downloads the network from OpenStreetMap (OSM)
 
         :Arguments:
-            **area** (:obj:`Polygon`, *Optional*): Polygon for which the network will be downloaded. If not provided,
-            a place name would be required
-
-            **place_name** (:obj:`str`, *Optional*): If not downloading with East-West-North-South boundingbox, this is
-            required
+            **place** (:obj:`Polygon | str`): Either a Polygon for which the network will be downloaded, or a place name
 
             **modes** (:obj:`tuple`, *Optional*): List of all modes to be downloaded. Defaults to the modes in the
             parameter file
@@ -141,7 +139,7 @@ class Network(WorkerThread):
             >>> project.new(project_path)
 
             # Now we can import the network for any place we want
-            >>> project.network.create_from_osm(place_name="my_beautiful_hometown") # doctest: +SKIP
+            >>> project.network.create_from_osm(place="my_beautiful_hometown") # doctest: +SKIP
 
             >>> project.close()
         """
@@ -160,20 +158,16 @@ class Network(WorkerThread):
         else:
             raise ValueError("'modes' needs to be string or list/tuple of string")
 
-        if place_name is None:
-            if (
-                model_area.bounds[0] < -180
-                or model_area.bounds[2] > 180
-                or model_area.bounds[1] < -90
-                or model_area.bounds[3] > 90
-            ):
+        if place is Polygon:
+            if place.bounds[0] < -180 or place.bounds[2] > 180 or place.bounds[1] < -90 or place.bounds[3] > 90:
                 raise ValueError("Coordinates out of bounds. Polygon must be in WGS84")
-            west, south, east, north = model_area.bounds
+            west, south, east, north = place.bounds
+            model_area = place
         else:
             clean = False
-            bbox, report = placegetter(place_name)
+            bbox, report = placegetter(place)
             if bbox is None:
-                msg = f'We could not find a reference for place name "{place_name}"'
+                msg = f'We could not find a reference for place name "{place}"'
                 logger.warning(msg)
                 return
             for i in report:
@@ -225,8 +219,8 @@ class Network(WorkerThread):
         self,
         link_file_path: str,
         node_file_path: str,
-        use_group_path: str = None,
-        geometry_path: str = None,
+        use_group_path: str = "",
+        geometry_path: str = "",
         srid: int = 4326,
     ) -> None:
         """
@@ -264,7 +258,9 @@ class Network(WorkerThread):
 
         logger.info("Network exported successfully")
 
-    def build_graphs(self, fields: list = None, modes: list = None, limit_to_area: Polygon = None) -> None:
+    def build_graphs(
+        self, fields: Optional[list] = None, modes: Optional[list] = None, limit_to_area: Optional[Polygon] = None
+    ) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
@@ -329,13 +325,23 @@ class Network(WorkerThread):
                 else:
                     sql += spatial_add
                     df = (
-                        pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                        pd.read_sql_query(
+                            sql,
+                            conn,
+                            params=[
+                                limit_to_area.wkb,
+                            ],
+                        )
                         .fillna(value=np.nan)
                         .infer_objects(False)
                     )
 
                     # We filter to centroids existing in our filtered area
-                    centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+                    centroids = (
+                        centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+                        if centroids is not None
+                        else None
+                    )
 
             valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
 

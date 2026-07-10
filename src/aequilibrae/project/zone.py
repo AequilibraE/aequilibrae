@@ -1,12 +1,17 @@
 import random
 import logging
 from sqlite3 import Connection
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from shapely.geometry import Point, MultiPolygon
 
 from .network.connector_creation import connector_creation
 from .network.safe_class import SafeClass
+
+if TYPE_CHECKING:
+    from aequilibrae.project.zoning import Zoning
+    from aequilibrae.project.network.links import Links
+    from aequilibrae.project.network.nodes import Nodes
 
 logger = logging.getLogger(__name__)
 
@@ -14,23 +19,23 @@ logger = logging.getLogger(__name__)
 class Zone(SafeClass):
     """Single zone object that can be queried and manipulated in memory"""
 
-    def __init__(self, dataset: dict, zoning):
+    def __init__(self, dataset: dict, zoning: "Zoning") -> None:
         self.geometry = MultiPolygon()
-        self.zone_id = -1
+        self.zone_id: int = -1
         super().__init__(dataset, zoning.project)
         self.__zoning = zoning
         self.__new = dataset["geometry"] is None
-        self.__network_links = zoning.network.links
-        self.__network_nodes = zoning.network.nodes
+        self.__network_links: "Links" = zoning.network.links
+        self.__network_nodes: "Nodes" = zoning.network.nodes
 
-    def delete(self):
+    def delete(self) -> None:
         """Removes the zone from the database"""
         with self.project.db_connection as conn:
             conn.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
         self.__zoning._remove_zone(self.zone_id)
         del self
 
-    def save(self):
+    def save(self) -> None:
         """Saves/Updates the zone data to the database"""
 
         if self.zone_id != self.__original__["zone_id"]:
@@ -52,7 +57,7 @@ class Zone(SafeClass):
                         else:
                             conn.execute(f"update 'zones' set '{key}'=? where zone_id=?", [value, self.zone_id])
 
-    def add_centroid(self, point: Point, robust=True) -> None:
+    def add_centroid(self, point: Optional[Point], robust: bool = True) -> None:
         """Adds a centroid to the network file
 
         :Arguments:
@@ -93,7 +98,12 @@ class Zone(SafeClass):
             conn.execute(sql, data)
 
     def connect_mode(
-        self, mode_id: str, link_types="", connectors=1, conn: Optional[Connection] = None, limit_to_zone=True
+        self,
+        mode_id: str,
+        link_types: str = "",
+        connectors: int = 1,
+        conn: Optional[Connection] = None,
+        limit_to_zone: bool = True,
     ) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
@@ -149,4 +159,4 @@ class Zone(SafeClass):
             if row_count:
                 logger.warning(f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}")
             else:
-                self.project.warning("No centroid connectors for this mode")
+                self.project.logger.warning("No centroid connectors for this mode")

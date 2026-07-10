@@ -118,17 +118,14 @@ def test_exclude_links(sioux_falls_example):
     # excludes a link before any setting or preparation
     graph = graph_for_project(sioux_falls_example)
     graph.set_blocked_centroid_flows(False)
-
+    origin = 20
+    destination = 21
     graph.set_graph("distance")
-    r1 = PathResults()
-    r1.prepare(graph)
-    r1.compute_path(20, 21)
+    r1 = PathResults(graph, origin, destination)
     assert list(r1.path) == [62]
 
-    r1 = PathResults()
     graph.exclude_links([62])
-    r1.prepare(graph)
-    r1.compute_path(20, 21)
+    r1 = PathResults(graph, origin, destination)
     assert list(r1.path) == [63, 69]
 
 

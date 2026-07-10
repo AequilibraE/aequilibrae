@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 from copy import deepcopy
+from os import PathLike
 
 import yaml
 
@@ -54,7 +55,7 @@ class Parameters:
 
     def __init__(self, path: Optional[Path] = None):
         """Loads parameters from file."""
-        self.file = None
+        self.file: PathLike | str = None
         if path is not None:
             self.file = path / "parameters.yml"
         else:

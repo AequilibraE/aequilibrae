@@ -206,8 +206,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
     return origin
 
 
-def path_computation(origin, destination, graph, results, bridge=None):
-    # type: (int, int, Graph, PathResults) -> (None)
+def path_computation(origin, destination, results):
+    # type: (int, int, PathResults) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
@@ -216,15 +216,13 @@ def path_computation(origin, destination, graph, results, bridge=None):
     cdef int64_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long skims, block_flows_through_centroids
     cdef bint early_exit_bint = results.early_exit
-
     results.origin = origin
     results.destination = destination
     orig = origin
     dest = destination
+    graph = results.graph
     origin_index = graph.nodes_to_indices[orig]
     dest_index = graph.nodes_to_indices[dest]
-    if results._graph_id != graph._id:
-        raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
     # nodes_to_indices maps unknown nodes to -1. Without these guards A* would silently target
     # node 0 and Dijkstra's early exit would target an arbitrary node.
@@ -345,6 +343,11 @@ def path_computation(origin, destination, graph, results, bridge=None):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
+    path: np.ndarray | None = None
+    path_nodes: np.ndarray | None = None
+    path_link_directions: np.ndarray | None = None
+    milepost: np.ndarray | None = None
+
     if predecessors_view[dest_index] >= 0:
         all_connectors = []
         link_directions = []
@@ -360,20 +363,18 @@ def path_computation(origin, destination, graph, results, bridge=None):
                 mileposts.append(g_view[connector])
                 all_nodes.append(p)
                 dest_index = p
-            results.path = np.asarray(all_connectors, graph.default_types('int'))[::-1]
-            results.path_nodes = graph.all_nodes[np.asarray(all_nodes, graph.default_types('int'))][::-1]
-            results.path_link_directions = np.asarray(link_directions, graph.default_types('int'))[::-1]
+            path = np.asarray(all_connectors, graph.default_types('int'))[::-1]
+            path_nodes = graph.all_nodes[np.asarray(all_nodes, graph.default_types('int'))][::-1]
+            path_link_directions = np.asarray(link_directions, graph.default_types('int'))[::-1]
             mileposts.append(0)
-            results.milepost = np.cumsum(mileposts[::-1])
+            milepost = np.cumsum(mileposts[::-1])
 
             del all_nodes
             del all_connectors
             del mileposts
-    else:
-        results.path = None
-        results.path_nodes = None
-        results.path_link_directions = None
-        results.milepost = None
+    
+    return path, path_nodes, path_link_directions, milepost
+
 
 
 def update_path_trace(results, destination, graph):
@@ -387,7 +388,7 @@ def update_path_trace(results, destination, graph):
     :param destination: New destination for path computation
     """
     cdef long long p, origin_index, dest_index, connector
-
+    print(f"started updateing trace to {destination}")
     results.destination = destination
     if destination == results.origin:
         results.milepost = np.array([0], dtype=np.float32)
