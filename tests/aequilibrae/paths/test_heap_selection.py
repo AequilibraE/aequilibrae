@@ -21,13 +21,12 @@ def build_graph(project):
 def test_path_computation_identical_across_heaps(sioux_falls_example, heap):
     g = build_graph(sioux_falls_example)
 
-    reference = PathResults()
-    reference.prepare(g)
-    reference.compute_path(1, 20)  # module default heap
+    reference = PathResults(g, 1, 20)
 
-    res = PathResults()
-    res.prepare(g)
-    res.compute_path(1, 20, heap=heap)
+    res = PathResults(g, 1, 20, heap=heap)
+
+    assert res.path_nodes is not None and res.milepost is not None and res.skims is not None
+    assert reference.milepost is not None and reference.skims is not None
 
     assert res._heap == heap
     assert res.path_nodes[0] == 1 and res.path_nodes[-1] == 20
@@ -53,9 +52,7 @@ def test_heap_name_surfaces_through_bridge(sioux_falls_example, heap):
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
     try:
-        res = PathResults()
-        res.prepare(g)
-        res.compute_path(1, 20, heap=heap)
+        res = PathResults(g, 1, 20, heap=heap)
     finally:
         logger.removeHandler(handler)
         logger.setLevel(old_level)

@@ -206,8 +206,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
     return origin
 
 
-def path_computation(origin, destination, results):
-    # type: (int, int, PathResults) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]
+def path_computation(origin: int, destination: int, results, bridge: Bridge | None = None):
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])

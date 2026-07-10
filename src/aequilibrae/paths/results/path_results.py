@@ -1,8 +1,9 @@
 import logging
-from typing import Union, List
+from typing import List, Union
 
 import numpy as np
-from aequilibrae.paths.cython.AoN import update_path_trace, path_computation, HEURISTIC_MAP, HEAP_MAP
+
+from aequilibrae.paths.cython.AoN import HEAP_MAP, HEURISTIC_MAP, path_computation, update_path_trace
 from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.logging_utils import debug_bridge
 
@@ -46,6 +47,7 @@ class PathResults:
         early_exit: bool = False,
         a_star: bool = False,
         heuristic: str | None = None,
+        heap: str | None = None,
     ) -> None:
         self.predecessors: np.ndarray
         self.connectors: np.ndarray
@@ -67,14 +69,19 @@ class PathResults:
         self.num_skims: int
         self._graph_id: str
         self.__graph_sum: float
-        self._early_exit: bool
-        self._a_star: bool
-        self._heuristic: str = "equirectangular"
-        self._heap = "4ary"
+        self._early_exit: bool = early_exit
+        self._a_star: bool = a_star
+
+        self._heap: str
+        self._heuristic: str
+        self.set_heap("4ary" if heap is None else heap)
+        self.set_heuristic("equirectangular" if heuristic is None else heuristic)
 
         self.set_graph_data(graph)
 
-        self.compute_path(origin, destination, early_exit=early_exit, a_star=a_star, heuristic=heuristic)
+        self.compute_path(
+            origin, destination, early_exit=early_exit, a_star=a_star, heuristic=self._heuristic, heap=self._heap
+        )
 
     def compute_path(
         self,
@@ -119,7 +126,9 @@ class PathResults:
         if heap is not None:
             self.set_heap(heap)
         with debug_bridge(logger) as bridge:
-            path_computation(origin, destination, self.graph, self, bridge=bridge)
+            self.path, self.path_nodes, self.path_link_directions, self.milepost = path_computation(
+                origin, destination, self, bridge=bridge
+            )
         self.__skim_path()
 
     def set_graph_data(self, graph: Graph) -> None:
