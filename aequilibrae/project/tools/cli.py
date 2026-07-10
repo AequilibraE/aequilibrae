@@ -112,7 +112,7 @@ def cli():
     run_parser.set_defaults(_internal_func=run)
 
     list_functions_parser = subparsers.add_parser("list", help="List project commands")
-    list_functions_parser.set_defaults(func=functools.partial(list_functions, list_functions_parser))
+    list_functions_parser.set_defaults(_internal_func=functools.partial(list_functions, list_functions_parser))
 
     args, unparsed_args = parser.parse_known_args()
 
