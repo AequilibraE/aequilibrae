@@ -63,6 +63,14 @@ def test_string_escape():
     assert parse_call(f, ["--a", "'1'"]) == {"a": "1"}
 
 
+def test_no_positional_only_args():
+    def f(a: int = 1, /):
+        return {"a": a}
+
+    with pytest.raises(ValueError, match="positional-only parameters"):
+        parse_call(f, ["--a", "1"])
+
+
 def test_functions_without_var_keyword_reject_pairs():
     def f(a="d"):
         return a
@@ -74,6 +82,7 @@ def test_functions_without_var_keyword_reject_pairs():
 def test_help_shows_docstring_and_annotations(capsys):
     def f(zone: int = 1):
         """A very identifiable docstring."""
+        return zone
 
     parser = argparse.ArgumentParser()
     add_subcommand_from_function(parser.add_subparsers(), f, {})

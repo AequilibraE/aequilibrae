@@ -62,7 +62,9 @@ def add_subcommand_from_function(subparsers, func, defaults: dict):
 
     var_keyword = None
     for param_name, param in inspect.signature(func).parameters.items():
-        if param.kind is inspect.Parameter.VAR_KEYWORD:
+        if param.kind is inspect.Parameter.POSITIONAL_ONLY:
+            raise ValueError(f"positional-only parameters ('{param_name}') are not supported by the aeq CLI")
+        elif param.kind is inspect.Parameter.VAR_KEYWORD:
             var_keyword = param_name
             continue
         elif param.kind is inspect.Parameter.VAR_POSITIONAL:
