@@ -119,7 +119,7 @@ class AssignmentResults(AssignmentResultsBase):
         self._heap = heap
 
     @staticmethod
-    def get_heaps(self) -> List[str]:
+    def get_heaps() -> List[str]:
         """Return the available priority queue implementations."""
         return list(HEAP_MAP.keys())
 

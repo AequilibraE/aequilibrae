@@ -51,7 +51,8 @@ RGAP_TARGET = 1e-15
 R2_MINIMUM = 0.95
 INTERCEPT_MINIMUM = 1e3
 
-HEAPS = AssignmentResults.get_heaps(5)
+# HEAPS = ["4ary"]
+HEAPS = AssignmentResults.get_heaps()
 
 
 @pytest.fixture(scope="module")
