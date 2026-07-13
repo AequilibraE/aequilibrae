@@ -52,7 +52,7 @@ def test_heap_name_surfaces_through_bridge(sioux_falls_example, heap):
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
     try:
-        res = PathResults(g, 1, 20, heap=heap)
+        PathResults(g, 1, 20, heap=heap)
     finally:
         logger.removeHandler(handler)
         logger.setLevel(old_level)
