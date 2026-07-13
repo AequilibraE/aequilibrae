@@ -1,3 +1,4 @@
+from aequilibrae.transit.route_map_matcher import RouteMapMatcher
 import logging
 from sqlite3 import Connection
 from typing import List
@@ -151,7 +152,7 @@ class Pattern(BasicPTElement):
         df = pd.DataFrame(
             {"stop_id": [stop.stop_id for stop in self.stops], "geometry": [stop.geo for stop in self.stops]}
         )
-        map_matcher = self.__feed.map_matchers[mode_corresp[self.route_type]]  # type: RouteMapMatcher
+        map_matcher: RouteMapMatcher = self.__feed.map_matchers[mode_corresp[self.route_type]]  # type: RouteMapMatcher
 
         stops = gpd.GeoDataFrame(df, geometry="geometry", crs=f"EPSG:{self.__srid}").to_crs(map_matcher.crs)
 

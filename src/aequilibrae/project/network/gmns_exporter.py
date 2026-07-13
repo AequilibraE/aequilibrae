@@ -1,12 +1,16 @@
 from os.path import join
 
 import pandas as pd
+from typing import TYPE_CHECKING
 
 from aequilibrae.parameters import Parameters
 
+if TYPE_CHECKING:
+    from aequilibrae.project.network import Network
+
 
 class GMNSExporter:
-    def __init__(self, net, path) -> None:
+    def __init__(self, net: "Network", path: str) -> None:
         self.p = Parameters()
         self.links_df = net.links.data
         self.nodes_df = net.nodes.data
@@ -21,7 +25,7 @@ class GMNSExporter:
             cur = conn.execute("select mode_name, mode_id, description, pce, vot, ppv from modes").fetchall()
         self.modes_df = pd.DataFrame(cur, columns=["mode_name", "mode_id", "description", "pce", "vot", "ppv"])
 
-    def doWork(self):
+    def doWork(self) -> None:
         if "ogc_fid" in list(self.links_df.columns):
             self.links_df.drop("ogc_fid", axis=1, inplace=True)
         if "ogc_fid" in list(self.nodes_df.columns):
@@ -45,7 +49,7 @@ class GMNSExporter:
         # Exporting use_definition table
         self.modes_df.to_csv(join(self.output_path, "use_definition.csv"), index=False)
 
-    def update_direction_field(self):
+    def update_direction_field(self) -> None:
         two_way_cols = list({col[:-3] for col in list(self.links_df.columns) if col[-3:] in ["_ab", "_ba"]})
 
         ab_links = pd.DataFrame(self.links_df[self.links_df.direction > -1], copy=True)
@@ -70,7 +74,7 @@ class GMNSExporter:
 
         self.links_df = pd.concat([ab_links, ba_links])
 
-    def update_field_names(self):
+    def update_field_names(self) -> None:
         """
         Updates field names according to equivalency between AequilibraE and GMNS fields.
         """
@@ -105,7 +109,7 @@ class GMNSExporter:
                 )
                 self.nodes_df.drop("geometry", axis=1, inplace=True)
 
-    def reorder_fields(self):
+    def reorder_fields(self) -> None:
         link_cols = list(self.links_df.columns)
         link_req = [k for k in self.gmns_links["fields"] if self.gmns_links["fields"][k]["required"]]
         main_cols = ["link_id", "from_node_id", "to_node_id", "directed"]
@@ -127,7 +131,7 @@ class GMNSExporter:
         self.links_df = self.links_df[link_cols]
         self.nodes_df = self.nodes_df[node_cols]
 
-    def update_modes_fields(self):
+    def update_modes_fields(self) -> None:
         """
         Updates AequilibraE modes table so it can be exported as a GMNS use_definition table.
         """

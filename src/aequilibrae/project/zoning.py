@@ -1,14 +1,13 @@
 import warnings
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, Dict
+from typing import Dict, Union, TYPE_CHECKING
 import logging
 
-import geopandas as gpd
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
-from shapely.geometry import Point, Polygon, LineString, MultiLineString
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
@@ -18,6 +17,9 @@ from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.geo_index import GeoIndex
+
+if TYPE_CHECKING:
+    from aequilibrae.project.network import Network
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +46,10 @@ class Zoning(BasicTable):
         >>> project.close()
     """
 
-    def __init__(self, network):
+    def __init__(self, network: "Network"):
         super().__init__(network.project)
         self.__items: Dict[int, Zone] = {}
-        self.network = network
+        self.network: "Network" = network
         self.__table_type__ = "zones"
         self.__fields = []
         self.__geo_index = GeoIndex()
@@ -70,7 +72,7 @@ class Zoning(BasicTable):
         logger.info(f"Zone with id {zone_id} was created")
         return self.__create_return_zone(data)
 
-    def create_zoning_layer(self):
+    def create_zoning_layer(self) -> None:
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.__has_zoning():
@@ -79,9 +81,9 @@ class Zoning(BasicTable):
                 run_queries_from_sql_file(conn, qry_file)
             self.__load()
         else:
-            self.project.warning("zones table already exists. Nothing was done", Warning)
+            self.project.logger.warning("zones table already exists. Nothing was done", Warning)
 
-    def coverage(self) -> Polygon:
+    def coverage(self) -> MultiPolygon:
         """Returns a single polygon for the entire zoning coverage
 
         :Returns:
@@ -92,7 +94,7 @@ class Zoning(BasicTable):
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return union_all(polygons)
 
-    def get(self, zone_id: str) -> Zone:
+    def get(self, zone_id: int) -> Zone:
         """Get a zone from the model by its ``zone_id``"""
         if zone_id not in self.__items:
             raise ValueError(f"Zone {zone_id} does not exist in the model")
@@ -102,11 +104,11 @@ class Zoning(BasicTable):
         """Returns a dictionary with all Zone objects available in the model, using ``zone_id`` as key"""
         return self.__items
 
-    def save(self):
+    def save(self) -> None:
         for item in self.__items.values():
             item.save()
 
-    def add_centroids(self, robust=True):
+    def add_centroids(self, robust: bool = True) -> None:
         """Adds automatic centroids to the network file. It adds centroids to all zones that do not have one
         Centroid is added to the geographic centroid of the zone.
 
@@ -128,7 +130,9 @@ class Zoning(BasicTable):
         else:
             logger.info("No new centroids added to the network")
 
-    def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True, bulk: bool = False):
+    def connect_mode(
+        self, mode_id: str, link_types: str = "", connectors: int = 1, limit_to_zone: bool = True, bulk: bool = False
+    ) -> None:
         """
         Adds centroid connectors for the desired mode to the network file
 
@@ -232,17 +236,17 @@ class Zoning(BasicTable):
             dists[geo.distance(geometry)] = zone_id
         return dists[min(dists.keys())]
 
-    def refresh_geo_index(self):
+    def refresh_geo_index(self) -> None:
         self.__geo_index.reset()
         for zone_id, zone in self.__items.items():
             self.__geo_index.insert(feature_id=zone_id, geometry=zone.geometry)
 
-    def __has_zoning(self):
+    def __has_zoning(self) -> bool:
         with self.network.project.db_connection as conn:
             dt = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
         return any("zone" in x[0].lower() for x in dt)
 
-    def __load(self):
+    def __load(self) -> None:
         tl = TableLoader()
         with self.network.project.db_connection_spatial as conn:
             zones_list = tl.load_table(conn, "zones")
@@ -260,16 +264,16 @@ class Zoning(BasicTable):
             del self.__items[key]
         self.refresh_geo_index()
 
-    def _remove_zone(self, zone_id: int):
+    def _remove_zone(self, zone_id: int) -> None:
         del self.__items[zone_id]
 
-    def __create_return_zone(self, data):
+    def __create_return_zone(self, data) -> Zone:
         zone = Zone(data, self)
         self.__items[zone.zone_id] = zone
         return zone
 
     @property
-    def data(self) -> gpd.GeoDataFrame:
+    def data(self) -> pd.DataFrame:
         """Returns all zones data as a Pandas DataFrame
 
         :Returns:

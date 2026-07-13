@@ -4,9 +4,10 @@ import os
 import shutil
 import sqlite3
 import warnings
-from collections import namedtuple
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import NoReturn
 
 import pandas as pd
 
@@ -23,7 +24,7 @@ from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import commit_and_close, safe_connect
+from aequilibrae.utils.db_utils import AequilibraEConnection, commit_and_close, safe_connect
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -53,16 +54,16 @@ class Project:
     """
 
     def __init__(self):
-        self.root_scenario: Scenario = None
-        self.scenario: Scenario = None
+        self.root_scenario: Scenario
+        self.scenario: Scenario
 
     @classmethod
-    def from_path(cls, project_folder):
+    def from_path(cls, project_folder: str):
         project = cls()
         project.open(project_folder)
         return project
 
-    def open(self, project_path: str) -> None:
+    def open(self, project_path: os.PathLike | str) -> None:
         """
         Loads project from disk
 
@@ -98,11 +99,11 @@ class Project:
         clean(self)
 
     @property
-    def project_base_path(self):
+    def project_base_path(self) -> Path:
         return self.scenario.base_path
 
     @property
-    def path_to_file(self):
+    def path_to_file(self) -> Path:
         return self.scenario.path_to_file
 
     @property
@@ -139,29 +140,29 @@ class Project:
 
     @property
     @contextmanager
-    def db_connection(self):
+    def db_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._project_database_path, spatial=False) as conn:
             yield conn
 
     @property
     @contextmanager
-    def db_connection_spatial(self):
+    def db_connection_spatial(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
     @property
     @contextmanager
-    def results_connection(self):
+    def results_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._results_database_path, spatial=False, missing_ok=True) as conn:
             yield conn
 
     @property
     @contextmanager
-    def transit_connection(self):
+    def transit_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
         with commit_and_close(self._transit_database_path, spatial=True, missing_ok=True) as conn:
             yield conn
 
-    def new(self, project_path: str) -> None:
+    def new(self, project_path: os.PathLike | str) -> None:
         """Creates a new project
 
         :Arguments:
@@ -220,10 +221,10 @@ class Project:
         finally:
             self.deactivate()
 
-    def activate(self):
+    def activate(self) -> None:
         activate_project(self)
 
-    def deactivate(self):
+    def deactivate(self) -> None:
         if get_active_project(must_exist=False) is self:
             activate_project(None)
 
@@ -259,12 +260,8 @@ class Project:
         if ignore_project or ignore_transit or ignore_results:
             warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
 
-        connections = {
-            "project_conn": None,
-            "transit_conn": None,
-            "results_conn": None,
-        }
-        targets = []
+        connections: dict[str, sqlite3.Connection | AequilibraEConnection] = {}
+        targets: list[tuple[MigrationManager, str]] = []
 
         if not ignore_project:
             targets.append((MigrationManager(MigrationManager.network_migration_file), "project_conn"))
@@ -285,8 +282,9 @@ class Project:
 
         try:
             for mm, main_conn in targets:
-                with connections[main_conn] as conn:
-                    mm.mark_all_as_seen(conn)
+                if connections[main_conn] is not None:
+                    with connections[main_conn] as conn:
+                        mm.mark_all_as_seen(conn)
 
             for mm, main_conn in targets:
                 mm.upgrade(main_conn, connections=connections)
@@ -295,7 +293,7 @@ class Project:
             for _, main_conn in targets:
                 connections[main_conn].close()
 
-    def __load_objects(self):
+    def __load_objects(self) -> None:
         matrix_folder = self.project_base_path / "matrices"
         matrix_folder.mkdir(parents=True, exist_ok=True)
 
@@ -303,6 +301,8 @@ class Project:
         self.scenario.about = About(self)
         self.scenario.matrices = Matrices(self)
         self.scenario.results = Results(self)
+        self.scenario.transit = Transit(self)
+        self.scenario.zoning = Zoning(self.scenario.network)
 
     @property
     def project_parameters(self) -> Parameters:
@@ -313,7 +313,7 @@ class Project:
         return self.project_parameters.parameters
 
     @property
-    def run(self):
+    def run(self) -> dict[str, Callable]:
         """
         Load and return the AequilibraE run module with the default arguments from
         ``parameters.yml`` partially applied.
@@ -325,7 +325,7 @@ class Project:
             self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
         )
 
-        res = []
+        res: dict[str, Callable] = {}
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
@@ -335,20 +335,19 @@ class Project:
                 raise RuntimeError(f"found symbol '{name}' in the run module but it is not callable")
 
             func = functools.partial(attr, **(kwargs if kwargs is not None else {}))
-            res.append((name, func))
+            res[name] = func
 
-        Run = namedtuple("Run", [k for k, _ in res])
-        return Run._make([v for _, v in res])
+        return res
 
-    def check_file_indices(self) -> None:
+    def check_file_indices(self) -> NoReturn:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""
         raise NotImplementedError
 
     @property
-    def zoning(self):
-        return Zoning(self.network)
+    def zoning(self) -> Zoning:
+        return self.scenario.zoning
 
-    def __create_empty_network(self):
+    def __create_empty_network(self) -> None:
         shutil.copyfile(spatialite_database, self.path_to_file)
         pth = self.project_base_path / "run"
         pth.mkdir(parents=True, exist_ok=True)
@@ -364,7 +363,7 @@ class Project:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables("network", conn=conn)
 
-    def list_scenarios(self):
+    def list_scenarios(self) -> pd.DataFrame:
         """
         Lists the existing scenarios.
 
@@ -374,7 +373,7 @@ class Project:
         with self.db_connection as conn:
             return pd.read_sql("SELECT * FROM scenarios", conn)
 
-    def use_scenario(self, scenario_name: str):
+    def use_scenario(self, scenario_name: str) -> None:
         """
         Switch the active scenario.
 
@@ -403,7 +402,7 @@ class Project:
 
         self.__load_objects()
 
-    def create_empty_scenario(self, scenario_name: str, description: str = ""):
+    def create_empty_scenario(self, scenario_name: str, description: str = "") -> None:
         """
         Creates an empty scenario, without any links, nodes, and zones.
 
@@ -447,7 +446,7 @@ class Project:
         finally:
             self.use_scenario(current_scenario)
 
-    def clone_scenario(self, scenario_name: str, description: str = ""):
+    def clone_scenario(self, scenario_name: str, description: str = "") -> None:
         """
         Clones the active scenario.
 
@@ -489,7 +488,8 @@ class Project:
             except FileNotFoundError:
                 pass
 
-            shutil.copy(parameters_path, scenario_path)
+            if parameters_path is not None:
+                shutil.copy(parameters_path, scenario_path)
 
             with commit_and_close(db, spatial=True) as conn:
                 conn.execute("DROP TABLE IF EXISTS scenarios")

@@ -3,11 +3,11 @@
 Volume Delay Functions
 ======================
 
-Volume Delay Functions (VDFs) are mathematical functions that describe the relationship between link 
-travel time and traffic volume. They are essential components of traffic assignment models, representing 
+Volume Delay Functions (VDFs) are mathematical functions that describe the relationship between link
+travel time and traffic volume. They are essential components of traffic assignment models, representing
 how congestion affects travel times as more vehicles use a link.
 
-AequilibraE implements five different VDF formulations, each with distinct characteristics that make 
+AequilibraE implements five different VDF formulations, each with distinct characteristics that make
 them suitable for different modeling traditions.
 
 Available VDF Functions
@@ -17,7 +17,7 @@ AequilibraE currently supports the following VDF functions:
 
 * **BPR** - Bureau of Public Roads (traditional)
 * **BPR2** - Modified BPR with enhanced sensitivity after capacity
-* **Conical** - Spiess' Conical function  
+* **Conical** - Spiess' Conical function
 * **INRETS** - French INRETS function
 * **Akcelik** - Akcelik's function for signalized intersections
 
@@ -47,7 +47,7 @@ The behavior of VDFs near capacity is particularly important for congested urban
    :align: center
    :alt: VDF behavior near capacity
 
-This zoomed view (V/C from 0.5 to 1.5) highlights the differences in how each function transitions 
+This zoomed view (V/C from 0.5 to 1.5) highlights the differences in how each function transitions
 from free-flow to congested conditions.
 
 Detailed VDF Descriptions
@@ -78,8 +78,8 @@ Where:
 
 **Origin and Background:**
 
-The BPR function was developed by the U.S. Bureau of Public Roads in the 1960s and has become the 
-most widely used VDF in transportation planning. Its simplicity and effectiveness have made it the 
+The BPR function was developed by the U.S. Bureau of Public Roads in the 1960s and has become the
+most widely used VDF in transportation planning. Its simplicity and effectiveness have made it the
 standard choice for highway assignment models worldwide.
 
 **Characteristics:**
@@ -126,8 +126,8 @@ After capacity (:math:`v > c`):
 
 **Origin and Background:**
 
-BPR2 is a modification of the traditional BPR function designed to better represent the rapid 
-deterioration of traffic conditions when demand exceeds capacity. The doubling of the exponent 
+BPR2 is a modification of the traditional BPR function designed to better represent the rapid
+deterioration of traffic conditions when demand exceeds capacity. The doubling of the exponent
 after capacity creates a steeper penalty for over-capacity conditions.
 
 **Characteristics:**
@@ -168,8 +168,8 @@ Conical (Spiess)
 
 **Origin and Background:**
 
-Developed by Heinz Spiess in 1990, the Conical function was designed to overcome some theoretical 
-limitations of the BPR function while maintaining computational tractability. It ensures positive 
+Developed by Heinz Spiess in 1990, the Conical function was designed to overcome some theoretical
+limitations of the BPR function while maintaining computational tractability. It ensures positive
 derivatives everywhere and has desirable mathematical properties for convergence.
 
 **Characteristics:**
@@ -217,8 +217,8 @@ After capacity (:math:`v > c`):
 
 **Origin and Background:**
 
-The INRETS function was developed by the French National Institute for Transport and Safety Research 
-(Institut National de Recherche sur les Transports et leur Sécurité). It was designed specifically 
+The INRETS function was developed by the French National Institute for Transport and Safety Research
+(Institut National de Recherche sur les Transports et leur Sécurité). It was designed specifically
 for French urban networks and reflects European traffic flow characteristics.
 
 **Characteristics:**
@@ -253,35 +253,49 @@ Akcelik
    :align: center
    :alt: Akcelik VDF detailed view
 
-**Mathematical Formula:**
+**Mathematical Formula in the Literature:**
 
-.. math:: t = t_0 + \alpha\left(z + \sqrt{z^2 + \frac{\tau v}{c^2}}\right)
+.. math:: t = t_0 + 0.25 \cdot \mathrm{T}_f \left(z + \sqrt{z^2 + \frac{8 \tau v}{ \mathrm{T}_f \cdot c^2}}\right)
 
-Where :math:`z = \frac{v}{c} - 1`
+Where :math:`z = \frac{v}{c} - 1`, :math:`\mathrm{T}_f` is the duration of the analysis period, and :math:`t` and :math:`t_0` are in the units time per distance (inverse of speed), not time. Importantly, the time unit component of :math:`\mathrm{T}_f`, :math:`t`, and :math:`t_0` must match.
+
+The units in this formulation do not match the units of other VDF functions implemented in AequilibraE. To provide a consistent API and usage semantics, we implement the equivalent formulation below.
+
+**Mathematical Formula in the AequilibraE:**
+
+.. math:: t = t_0 + \mathrm{length} \cdot \alpha\left(z + \sqrt{z^2 + \frac{\tau v}{c^2}}\right)
+
+Where :math:`z = \frac{v}{c} - 1`, and :math:`t` and :math:`t_0` are in time units. This formulation introduces a new parameter :math:`\alpha`, and absorbs the :math:`8 / \mathrm{T}_f` factor into :math:`\tau`.
 
 **Standard Parameters:**
-  * :math:`\alpha = 0.25`
-  * :math:`\tau = 0.8` (this is :math:`8 \times 0.1`, see note below)
+  * :math:`\alpha = 0.25 \cdot \mathrm{T}_f`
+  * :math:`\tau = 0.1 \cdot 8 / \mathrm{T}_f` (see note below)
+
+.. note::
+    Different than other VDF functions, Akcelik depends on link length and consistency between its parameters
+    and the units for speed and link length. As it is common for models to use distance in meters, speed in
+    kilometers per hour and to assign time periods longer than one hour, the :math:`\alpha` and :math:`\tau` parameters should be
+    calibrated accordingly.
+
 
 **Origin and Background:**
 
-Developed by Rahmi Akcelik, this function was specifically designed for signalized intersections 
-and urban arterials. It incorporates queue theory and reflects the delay characteristics of 
+Developed by Rahmi Akcelik, this function was specifically designed for signalized intersections
+and urban arterials. It incorporates queue theory and reflects the delay characteristics of
 traffic signals.
 
 **Important Note on τ Parameter:**
 
-In standard Akcelik formulations, the function includes a factor of 8 in the formula. However, 
-in AequilibraE's implementation, this factor of 8 has been absorbed into the :math:`\tau` parameter 
-for computational efficiency. 
+In standard Akcelik formulations, the function includes a factor of :math:`8 / \mathrm{T}_f` in the formula. However,
+in AequilibraE's implementation, this factor of 8 has been absorbed into the :math:`\tau` parameter.
 
 **What this means for users:**
 
-* If academic literature references a :math:`\tau` value (e.g., 0.1), you must multiply it by 8 
-  before setting it in AequilibraE
-* Example: To use :math:`\tau = 0.1`, set ``tau = 0.8`` in AequilibraE
-* Example: To use :math:`\tau = 0.15`, set ``tau = 1.2`` in AequilibraE
-* A value of 0.8 corresponds to a standard :math:`\tau = 0.1`
+* If academic literature references a :math:`\tau` value (e.g., 0.1), you must multiply it by 8
+  before setting it in AequilibraE, then adjust by the duration of the analysis period.
+* Example: To use :math:`\tau = 0.1`, set ``tau = 0.8 / T_f`` in AequilibraE.
+* Example: To use :math:`\tau = 0.15`, set ``tau = 1.2 / T_f`` in AequilibraE.
+* A value of 0.8 corresponds to a standard :math:`\tau = 0.1` for the unit time period.
 
 **Characteristics:**
 
@@ -335,6 +349,8 @@ General Recommendations
 * :math:`\tau` should reflect local traffic signal characteristics
 * Remember to use :math:`8 \times \tau` in AequilibraE
 
+
+
 Calibration Considerations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -350,7 +366,7 @@ When calibrating VDF parameters:
 Setting VDF Parameters in AequilibraE
 --------------------------------------
 
-In AequilibraE, VDF parameters can be set either as network-wide constants or as link-specific 
+In AequilibraE, VDF parameters can be set either as network-wide constants or as link-specific
 attributes:
 
 **Network-wide parameters:**
@@ -358,7 +374,7 @@ attributes:
 .. code-block:: python
 
     from aequilibrae.paths import TrafficAssignment
-    
+
     assig = TrafficAssignment()
     assig.set_vdf('BPR')
     assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -373,7 +389,7 @@ attributes:
 This flexibility allows you to:
 
 * Use different parameters for different facility types
-* Implement spatially varying congestion characteristics  
+* Implement spatially varying congestion characteristics
 * Calibrate specific links or corridors independently
 
 Choosing the Right VDF
@@ -429,12 +445,12 @@ Basic Usage
 .. code-block:: python
 
     from aequilibrae.paths import TrafficAssignment, TrafficClass, VDF
-    
+
     # Check available VDF functions
     vdf = VDF()
     print(vdf.functions_available())
     # Output: ['bpr', 'bpr2', 'conical', 'inrets', 'akcelik']
-    
+
     # Setup traffic assignment with BPR
     assig = TrafficAssignment()
     assig.set_vdf('BPR')
@@ -448,10 +464,10 @@ Using Different VDFs
     # Highway network - standard BPR
     assig.set_vdf('BPR')
     assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    
+
     # Urban network with signals - Akcelik
     assig.set_vdf('AKCELIK')
-    assig.set_vdf_parameters({"alpha": 0.25, "tau": 0.8})
+    assig.set_vdf_parameters({"alpha": 0.25, "tau": 0.8, "legnth": "distance"})
     
     # Network with strong capacity constraints - BPR2
     assig.set_vdf('BPR2')
@@ -476,24 +492,24 @@ References and Further Reading
 
 **Conical Function:**
 
-* Spiess, H. (1990). "Technical Note—Conical Volume-Delay Functions." *Transportation Science*, 24(2): 153-158. 
+* Spiess, H. (1990). "Technical Note—Conical Volume-Delay Functions." *Transportation Science*, 24(2): 153-158.
   https://doi.org/10.1287/trsc.24.2.153
-* Hampton Roads Transportation Planning Organization (2020). *Regional Travel Demand Model V2 Methodology Report*. 
-  Available: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf 
+* Hampton Roads Transportation Planning Organization (2020). *Regional Travel Demand Model V2 Methodology Report*.
+  Available: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
   (accessed February 2026)
 
 **Akcelik Function:**
 
-* Akcelik, R. (1991). "Travel Time Functions for Transport Planning Purposes: Davidson's Function, Its Time Dependent Form and an Alternative Travel Time Function." 
+* Akcelik, R. (1991). "Travel Time Functions for Transport Planning Purposes: Davidson's Function, Its Time Dependent Form and an Alternative Travel Time Function."
   *Australian Road Research*, 21(3): 49-59.
 
 **General Traffic Assignment:**
 
-* Sheffi, Y. (1985). *Urban Transportation Networks: Equilibrium Analysis with Mathematical Programming Methods*. 
+* Sheffi, Y. (1985). *Urban Transportation Networks: Equilibrium Analysis with Mathematical Programming Methods*.
   Prentice-Hall, Englewood Cliffs, NJ.
 * Patriksson, M. (1994). *The Traffic Assignment Problem: Models and Methods*. VSP, Utrecht.
 
 **Multi-class Assignment:**
 
-* Zill, J., Camargo, P., Veitch, T., Daisy, N. (2019). "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes." 
+* Zill, J., Camargo, P., Veitch, T., Daisy, N. (2019). "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes."
   *Transportation Research Record*, 2673(4): 930-940. https://doi.org/10.1177/0361198119837496

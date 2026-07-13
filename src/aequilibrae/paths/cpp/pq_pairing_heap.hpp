@@ -23,7 +23,7 @@ private:
 
     length_ = length;
     size_ = 0;
-    elements_ = length > 0 ? new Element[length] : nullptr;
+    elements_ = new Element[length];
     root_ = kNullIdx;
 
     for (std::size_t i = 0; i < length_; ++i) {

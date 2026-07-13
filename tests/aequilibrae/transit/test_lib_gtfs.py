@@ -44,7 +44,7 @@ def test_map_match_int_exception(route_system_builder):
         route_system_builder.map_match(route_types=[3.5])
 
 
-def test_map_match(route_system_builder):
+def test_map_match(route_system_builder: GTFSRouteSystemBuilder):
     route_system_builder.load_date("2016-04-13")
     route_system_builder.set_allow_map_match(True)
     route_system_builder.map_match([3, 1, 2])
