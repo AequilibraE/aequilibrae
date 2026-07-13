@@ -58,5 +58,4 @@ def test_heap_name_surfaces_through_bridge(sioux_falls_example, heap):
         logger.setLevel(old_level)
 
     expected = f"{HEAP_CLASS_NAMES[heap]}: init_heap"
-    print(records)
     assert any(expected in message for message in records), records

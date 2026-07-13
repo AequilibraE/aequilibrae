@@ -387,7 +387,6 @@ def update_path_trace(results, destination, graph):
     :param destination: New destination for path computation
     """
     cdef long long p, origin_index, dest_index, connector
-    print(f"started updateing trace to {destination}")
     results.destination = destination
     if destination == results.origin:
         results.milepost = np.array([0], dtype=np.float32)
