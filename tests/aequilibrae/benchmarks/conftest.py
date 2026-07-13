@@ -6,16 +6,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Graph, TrafficAssignment
-from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.paths.results.assignment_results import AssignmentResults
+import pytest as pytest
 from scipy.stats import linregress
 
-import pytest as pytest
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths import Graph, TrafficAssignment
+from aequilibrae.paths.results.assignment_results import AssignmentResults
+from aequilibrae.paths.traffic_class import TrafficClass
 
-
-# pytest .\tests\aeq\benchmarks\* -- benchmark
+# pytest .\tests\aequilibrae\benchmarks\* -- benchmark
 
 # python plot_benchmarks.py [--convergence] [--compare-flow] [--reports-dir PATH] [--x-axis {time,iterations}]
 
@@ -30,10 +29,10 @@ using the environment variable BENCHMARK_REPORTS_DIR
 
 e.g.
 export TNTP_ROOT="../../TransportationNetworks"
-export BENCHMARK_REPORTS_DIR="./tests/aeq/benchmarks/_convergence_reports"
+export BENCHMARK_REPORTS_DIR="./tests/aequilibrae/benchmarks/_convergence_reports"
 
 To run these tests, the argument --benchmark-only needs to be specified:
-pytest ./tests/aeq/benchmarks/* --benchmark-only
+pytest ./tests/aequilibrae/benchmarks/* --benchmark-only
 
 So these tests are skipped with:
 pytest .
