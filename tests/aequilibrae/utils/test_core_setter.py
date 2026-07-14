@@ -14,14 +14,14 @@ class TestResolveCores:
 
     def test_missing_key_resolves_to_all_cores(self, monkeypatch):
         monkeypatch.delenv("AEQ_CPUS", raising=False)
-        assert resolve_cores({}) == 0
+        assert resolve_cores({}) == mp.cpu_count()
 
     def test_unparseable_values_resolve_to_all_cores(self, monkeypatch):
         monkeypatch.setenv("AEQ_CPUS", "garbage")
-        assert resolve_cores({"cpus": 12}) == 0
+        assert resolve_cores({"cpus": 12}) == mp.cpu_count()
 
         monkeypatch.delenv("AEQ_CPUS")
-        assert resolve_cores({"cpus": None}) == 0
+        assert resolve_cores({"cpus": None}) == mp.cpu_count()
 
 
 class TestResolveThreadingThreshold:
