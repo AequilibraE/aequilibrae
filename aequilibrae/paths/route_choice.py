@@ -287,6 +287,7 @@ class RouteChoice:
             path_size_logit=bool(demand),
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
+            to_parquet_kwargs=self.to_parquet_kwargs,
             sl_link_loading=self.sl_link_loading,
             **self.parameters,
         )
