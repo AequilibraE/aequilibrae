@@ -4,21 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       pr-number:
-        description: 'PR number to comment on'
+        description: 'PR number to run on'
         required: true
         type: string
       iterations:
         description: 'Number of iterations for benchmarking'
         required: false
         type: string
-      build-ver:
-        description: 'Aequilibrae version for build'
-        required: true
-        default: 'Aequilibrae 1'
-        type: choice
-        options:
-        - Aequilibrae 1
-        - Aequilibrae 2
 
 env:
   AEQ_SHOW_PROGRESS: "0"
@@ -57,34 +49,29 @@ jobs:
           sudo apt update
           sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
           sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-
-      - name: Install dependencies version 1
-        if: ${{ inputs.build-ver == 'Aequilibrae 1' }}
-        run: uv pip install -e ".[dev]"
       
-      - name: Install dependencies version 2
-        if: ${{ inputs.build-ver == 'Aequilibrae 2' }}
+      - name: Install AequilibraE
         run: uv pip install ".[dev]"
 
       - name: Run benchmarks
         run: uv run pytest --benchmark-save benchmark_summary tests/aeq/benchmarks/test_* --benchmark-only
 
       - name: Generate plots
-        if: always() # always generate plots, especially if some benchmarks fail
+        if: success() || failure() # always generate plots, especially if some benchmarks fail
         run: |
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
 
       - name: Add pytest-benchmark output to summary
-        if: always()
+        if: success() || failure()
         run: |
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
           uv run pytest-benchmark compare Linux-CPython-3.13-64bit/0001_benchmark_summary.json >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload plots as artifacts
-        if: always()
+        if: success() || failure()
         uses: actions/upload-artifact@v5
         with:
           name: benchmark-plots
