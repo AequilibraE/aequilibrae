@@ -21,7 +21,7 @@ def test_signature_mapping():
 
     # Required parameters are positional, defaulted ones are --options, values parse as Python literals
     assert parse_call(f, ["1"]) == {"first_arg": 1, "second_arg": 2}
-    assert parse_call(f, ["text", "--second-arg", "5"]) == {"first_arg": "text", "second_arg": 5}
+    assert parse_call(f, ["text", "--second_arg", "5"]) == {"first_arg": "text", "second_arg": 5}
     with pytest.raises(SystemExit):
         parse_call(f, [])  # first_arg is required
 

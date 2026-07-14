@@ -71,31 +71,23 @@ def add_subcommand_from_function(subparsers, func, defaults: dict):
             # We call the function with keyword arguments only, so *args can never be supplied.
             continue
 
-        param_cli_name = param_name.replace("_", "-")
         help_text = _annotation_help(param)
 
         if param.default is inspect.Parameter.empty and param_name not in defaults:
             # Required positional argument. dest must remain the parameter name so the parsed
             # value can be passed back as a keyword argument.
-            parser.add_argument(param_name, metavar=param_cli_name, type=_parse_value, help=help_text)
+            parser.add_argument(param_name, type=_parse_value, help=help_text)
         elif param.default is inspect.Parameter.empty:
             # Required in the signature, but parameters.yml provides a default
-            parser.add_argument(
-                param_name,
-                metavar=param_cli_name,
-                nargs="?",
-                default=argparse.SUPPRESS,
-                type=_parse_value,
-                help=help_text,
-            )
+            parser.add_argument(param_name, nargs="?", default=argparse.SUPPRESS, type=_parse_value, help=help_text)
         elif isinstance(default := defaults.get(param_name, param.default), bool):
             # Boolean defaults become a --flag/--no-flag pair rather than taking a value.
             parser.add_argument(
-                f"--{param_cli_name}", action=argparse.BooleanOptionalAction, default=default, help=help_text
+                f"--{param_name}", action=argparse.BooleanOptionalAction, default=default, help=help_text
             )
         else:
             # Optional argument with default
-            parser.add_argument(f"--{param_cli_name}", default=argparse.SUPPRESS, type=_parse_value, help=help_text)
+            parser.add_argument(f"--{param_name}", default=argparse.SUPPRESS, type=_parse_value, help=help_text)
 
     if var_keyword is not None:
         # Arbitrary keyword arguments are accepted as trailing 'key=value' pairs. parameters.yml
