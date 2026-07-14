@@ -149,7 +149,7 @@ jobs:
       if: matrix.sanitisers == false
       run: |
         uv pip install ".[dev]" -v -Ccompile-args=-v
-        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+        pytest tests/ --durations=50 --dist=loadscope -n 4 --max-worker-restart 0 --random-order --verbose
 
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}

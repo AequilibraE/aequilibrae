@@ -50,7 +50,7 @@ AequilibraEStreamHandler = (
 )
 
 
-def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEFAULT_FORMAT) -> logging.Handler:
+def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEFAULT_FORMAT) -> logging.Handler | None:
     """
     Configures the root logger for AequilibraE.
 
@@ -71,11 +71,11 @@ def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEF
     """
     logger = logging.getLogger("aequilibrae")
 
-    if any(
-        isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr or handler.stream == sys.stdout
-        for handler in logger.handlers
-    ):
-        return
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler) and (
+            handler.stream == sys.stderr or handler.stream == sys.stdout
+        ):
+            return  # if something else has already been configured then we don't want to do anything
 
     # We disable log propagation up the chain because we don't want the handlers installed on the root logger messing
     # with our progress bars.
