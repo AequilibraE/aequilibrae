@@ -4,19 +4,35 @@ cimport cython
 import os
 import numpy as np
 from libc.string cimport memset
+from libc.stdint cimport int64_t
+
 from aequilibrae.paths.cython.skimming_core cimport skim_single_path, _copy_skims
 from aequilibrae.paths.cython.basic_path_finding cimport (
     blocking_centroid_flows,
     path_finding,
     path_finding_a_star,
+    HeapType,
 )
-from aequilibrae.paths.cython.basic_path_finding import HEURISTIC_MAP
+from aequilibrae.paths.cython.path_finding cimport Heuristic
+
+from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
+
+from aequilibrae.paths.cython.basic_path_finding import HEURISTIC_MAP, HEAP_MAP
 from aequilibrae.paths.cython.path_file_saving import save_path_file
 
-include 'parameters.pxi'
+
+def available_heaps() -> list:
+    """Return the available priority queue implementations."""
+    return list(HEAP_MAP.keys())
 
 
-def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
+def _resolve_heap(result):
+    # Every results object reaching the path finding entry points (PathResults, AssignmentResults,
+    # SkimResults) carries a _heap attribute.
+    return HEAP_MAP[result._heap]
+
+
+def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=None):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
     cdef long nodes, orig, block_flows_through_centroids, classes, b, origin_index, zones, links
     cdef int skims
@@ -45,7 +61,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     # Destination set
     cdef long long nnz_destinations = 0
-    cdef unsigned char [:] destinations
+    cdef unsigned char [::1] destinations
+
+    cdef HeapType heap_type = _resolve_heap(result)
+    cdef Bridge br = bridge
+    cdef AeqLogClosure *closure = br.c if br is not None else <AeqLogClosure*>NULL
 
     tmp = np.zeros(nodes, dtype=bool)
     if not skims:
@@ -65,9 +85,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         nnz_destinations = -1
 
     # views from the graph
-    cdef long long [:] graph_fs_view = graph.compact_fs
-    cdef double [:] g_view = graph.compact_cost
-    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef long long [::1] graph_fs_view = graph.compact_fs
+    cdef double [::1] g_view = graph.compact_cost
+    cdef const long long [::1] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
     cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
 
     if skims > 0:
@@ -84,11 +104,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] final_skim_matrices_view = fskm
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
-    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
-    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
+    cdef long long [::1] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [::1] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [::1] conn_view = aux_result.connectors[curr_thread, :]
     cdef double [:, :] link_loads_view = aux_result.temp_link_loads[curr_thread, :, :]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
+    cdef long long [::1] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
 
     # path saving file paths
     cdef bint write_feather = True
@@ -135,7 +155,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                          predecessors_view,
                          ids_graph_view,
                          conn_view,
-                         reached_first_view)
+                         reached_first_view,
+                         heap_type,
+                         closure)
 
         if block_flows_through_centroids:  # Re-blocks the centroid if that is the case
             b = 1
@@ -192,14 +214,13 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     return origin
 
 
-def path_computation(origin, destination, results):
-    # type: (int, int, PathResults) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]
+def path_computation(origin: int, destination: int, results, bridge: Bridge | None = None):
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
     """
-    cdef long long nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
+    cdef int64_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long skims, block_flows_through_centroids
     cdef bint early_exit_bint = results.early_exit
     results.origin = origin
@@ -209,6 +230,13 @@ def path_computation(origin, destination, results):
     graph = results.graph
     origin_index = graph.nodes_to_indices[orig]
     dest_index = graph.nodes_to_indices[dest]
+
+    # nodes_to_indices maps unknown nodes to -1. Without these guards A* would silently target
+    # node 0 and Dijkstra's early exit would target an arbitrary node.
+    if origin_index < 0:
+        raise ValueError(f"Origin {orig} does not exist in the graph")
+    if dest_index < 0:
+        raise ValueError(f"Destination {dest} does not exist in the graph")
 
     # We transform the python variables in Cython variables
     nodes = graph.num_nodes
@@ -222,26 +250,30 @@ def path_computation(origin, destination, results):
 
     # In order to release the GIL for this procedure, we create all the
     # memory views we will need
-    cdef double [:] g_view = graph.cost
+    cdef double [::1] g_view = graph.cost
     cdef const long long [:] original_b_nodes_view = graph.graph.b_node.to_numpy(copy=False)
-    cdef long long [:] graph_fs_view = graph.fs
+    cdef long long [::1] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    cdef const long long [:] ids_graph_view = graph.graph.id.to_numpy(copy=False)
+    cdef const long long [::1] ids_graph_view = graph.graph.id.to_numpy(copy=False)
     block_flows_through_centroids = graph.block_centroid_flows
 
-    cdef long long [:] predecessors_view = results.predecessors
-    cdef long long [:] conn_view = results.connectors
+    cdef long long [::1] predecessors_view = results.predecessors
+    cdef long long [::1] conn_view = results.connectors
     cdef double [:, :] skim_matrix_view = results._skimming_array
-    cdef long long [:] reached_first_view = results.reached_first
+    cdef long long [::1] reached_first_view = results.reached_first
 
     new_b_nodes = graph.graph.b_node.values.copy()
-    cdef long long [:] b_nodes_view = new_b_nodes
+    cdef long long [::1] b_nodes_view = new_b_nodes
+
+    cdef HeapType heap_type = _resolve_heap(results)
+    cdef Bridge br = bridge
+    cdef AeqLogClosure *closure = br.c if br is not None else <AeqLogClosure*>NULL
 
     cdef bint a_star_bint = results.a_star
-    cdef const double [:] lat_view
-    cdef const double [:] lon_view
-    cdef long long [:] nodes_to_indices_view
-    cdef int heuristic
+    cdef const double [::1] lat_view
+    cdef const double [::1] lon_view
+    cdef long long [::1] nodes_to_indices_view
+    cdef Heuristic heuristic
     if results.a_star:
         lat_view = graph.lonlat_index.lat.to_numpy(copy=False)
         lon_view = graph.lonlat_index.lon.to_numpy(copy=False)
@@ -249,7 +281,7 @@ def path_computation(origin, destination, results):
         heuristic = HEURISTIC_MAP[results._heuristic]
 
     # Destination set
-    cdef unsigned char [:] destinations
+    cdef unsigned char [::1] destinations
     if early_exit_bint and not a_star_bint:
         destinations = np.zeros(nodes, dtype=bool)
         destinations[dest_index] = True
@@ -280,7 +312,9 @@ def path_computation(origin, destination, results):
                 predecessors_view,
                 ids_graph_view,
                 conn_view,
-                heuristic
+                heuristic,
+                heap_type,
+                closure
             )
         else:
             w = path_finding(origin_index,
@@ -292,7 +326,9 @@ def path_computation(origin, destination, results):
                              predecessors_view,
                              ids_graph_view,
                              conn_view,
-                             reached_first_view)
+                             reached_first_view,
+                             heap_type,
+                             closure)
 
         if skims > 0 and not a_star_bint:
             skim_single_path(origin_index,
@@ -359,7 +395,6 @@ def update_path_trace(results, destination, graph):
     :param destination: New destination for path computation
     """
     cdef long long p, origin_index, dest_index, connector
-    print(f"started updateing trace to {destination}")
     results.destination = destination
     if destination == results.origin:
         results.milepost = np.array([0], dtype=np.float32)
@@ -406,7 +441,6 @@ def update_path_trace(results, destination, graph):
             results.path_nodes = None
             results.path_link_directions = None
             results.milepost = None
-
 
 
 @cython.wraparound(False)
@@ -510,24 +544,3 @@ cdef void sl_network_loading(
                     sl_link_loading[i, connection, k] += demand[j, k]
                 connection = conn[predecessor]
                 predecessor = pred[predecessor]
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cpdef void put_path_file_on_disk(unsigned int orig,
-                                 unsigned int [:] pred,
-                                 long long [:] predecessors,
-                                 unsigned int [:] conn,
-                                 long long [:] connectors,
-                                 long long [:] all_nodes,
-                                 unsigned int [:] origins_to_write,
-                                 unsigned int [:] nodes_to_write) noexcept nogil:
-    cdef long long i
-    cdef long long k = pred.shape[0]
-
-    for i in range(k):
-        origins_to_write[i] = orig
-        nodes_to_write[i] = all_nodes[i]
-        pred[i] = all_nodes[predecessors[i]]
-        conn[i] = connectors[i]

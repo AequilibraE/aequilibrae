@@ -1,13 +1,15 @@
 import multiprocessing as mp
 from abc import ABC, abstractmethod
+from typing import List
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.cython.parallel_numpy import sum_axis1, assign_link_loads
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
+from aequilibrae.paths.cython.basic_path_finding import HEAP_MAP
+from aequilibrae.paths.cython.parallel_numpy import assign_link_loads, sum_axis1
+from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph, _get_graph_to_network_mapping
 from aequilibrae.utils.core_setter import resolve_cores, resolve_threading_threshold
 
 """
@@ -108,6 +110,25 @@ class AssignmentResults(AssignmentResultsBase):
         self.save_path_file = False
         self.path_file_dir = None
         self.write_feather = True  # we use feather as default, parquet is slower but with better compression
+
+        self._heap = "4ary"
+
+    def set_heap(self, heap: str) -> None:
+        """
+        Set the priority queue implementation used for path computation. Must be one of ``get_heaps()``.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        if heap not in HEAP_MAP:
+            raise ValueError(f"heap must be one of {self.get_heaps()}")
+
+        self._heap = heap
+
+    @staticmethod
+    def get_heaps() -> List[str]:
+        """Return the available priority queue implementations."""
+        return list(HEAP_MAP.keys())
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:

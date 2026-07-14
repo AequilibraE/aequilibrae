@@ -57,22 +57,22 @@ def skimming_parallel(graph, result, long cores):
     cdef long long [:] origin_idx_view = np.asarray(valid_origin_indices, dtype=np.int64)
 
     # Graph views (shared, read-only across threads).
-    cdef long long [:] graph_fs_view = compact_fs
-    cdef double [:] g_view = graph.compact_cost
-    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
-    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
-    cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
+    cdef long long [::1] graph_fs_view = compact_fs
+    cdef double [::1] g_view = graph.compact_cost
+    cdef const long long [::1] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef const long long [::1] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
+    cdef double [:, ::1] graph_skim_view = graph.compact_skims[:, :]
 
     # Output skim cube (origin_index, dest_zone, skim).
     cdef double [:, :, :] final_skim_view = result.skims.matrix_view
 
     # Per-thread aux state (sliced by threadid inside the parallel region).
-    cdef long long [:, :] predecessors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
-    cdef long long [:, :] reached_first_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
-    cdef long long [:, :] connectors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
-    cdef double [:, :, :] skim_mat = np.zeros((cores, compact_nodes, skims), dtype=np.float64)
-    cdef unsigned char [:] destinations = np.empty(0, dtype=np.uint8)
-    cdef long long[:, :] b_nodes_mat = np.tile(graph.compact_graph.b_node.to_numpy(copy=False), (cores, 1))
+    cdef long long [:, ::1] predecessors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
+    cdef long long [:, ::1] reached_first_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
+    cdef long long [:, ::1] connectors_mat = np.zeros((cores, compact_nodes), dtype=np.int64)
+    cdef double [:, :, ::1] skim_mat = np.zeros((cores, compact_nodes, skims), dtype=np.float64)
+    cdef unsigned char [::1] destinations = np.empty(0, dtype=np.uint8)
+    cdef long long[:, ::1] b_nodes_mat = np.tile(graph.compact_graph.b_node.to_numpy(copy=False), (cores, 1))
 
     with nogil, parallel(num_threads=cores):
         tid = threadid()
@@ -147,23 +147,23 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # memory views we will need
 
     # views from the graph
-    cdef long long [:] graph_fs_view = graph_fs
-    cdef double [:] g_view = graph.compact_cost
-    cdef const long long [:] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
-    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
-    cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
+    cdef long long [::1] graph_fs_view = graph_fs
+    cdef double [::1] g_view = graph.compact_cost
+    cdef const long long [::1] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef const long long [::1] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
+    cdef double [:, ::1] graph_skim_view = graph.compact_skims[:, :]
 
-    cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
+    cdef double [:, ::1] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
-    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
-    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
-    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
+    cdef long long [::1] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [::1] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [::1] conn_view = aux_result.connectors[curr_thread, :]
+    cdef long long [::1] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
+    cdef double [:, ::1] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
 
     # Destination set
-    cdef unsigned char [:] destinations = np.array([], dtype=bool)
+    cdef unsigned char [::1] destinations = np.array([], dtype=bool)
 
     # Now we do all procedures with NO GIL
     with nogil:

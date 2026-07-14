@@ -16,6 +16,7 @@ exts = [
   'route_choice_set_results',
   'skimming_core',
   'vdf_core',
+  'new_path_finding'
 ]
 
 py.install_sources(

@@ -13,7 +13,7 @@ from libc.stdint cimport int64_t, uint8_t, uint32_t, uint64_t
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
-from aequilibrae.utils.cython.bridge cimport Bridge, log, f
+from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure, log, aeq_format_string as f
 from aequilibrae.utils.cython.bar cimport Bar
 
 ctypedef double DATATYPE_t
@@ -58,7 +58,7 @@ cdef int _compare(const_void *a, const_void *b) noexcept nogil:
     else:
         return 1
 
-include 'pq_4ary_heap.pyx'  # priority queue
+from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, ElementState, IN_HEAP, NOT_IN_HEAP, SCANNED
 
 
 @cython.boundscheck(False)
@@ -344,7 +344,8 @@ cdef void compute_SF_in_parallel(
                 o_indices,
                 od_index_to_taz_index,
                 skimming,
-                is_travel_time
+                is_travel_time,
+                bridge.c
             )
             bar.inc()
 
@@ -409,6 +410,7 @@ cdef void compute_SF_in(
     int64_t[::1] od_index_to_taz_index,
     bint skimming,
     bint is_travel_time,
+    AeqLogClosure *closure,
 ) noexcept nogil:
 
     cdef:
@@ -451,7 +453,8 @@ cdef void compute_SF_in(
         skim_i_vec,
         skim_j_vec,
         n_skim_cols,
-        vertex_count
+        vertex_count,
+        closure
     )
 
     if skimming:
@@ -548,12 +551,13 @@ cdef void _SF_in_first_pass_full(
     double *skim_j_vec,
     size_t n_skim_cols,
     size_t vertex_count,
+    AeqLogClosure *closure,
 ) noexcept nogil:
     """All vertices are visited."""
 
     cdef:
         int edge_count = tail_indices.shape[0]
-        PriorityQueue pqueue
+        FourAryHeap queue
         ElementState edge_state
         size_t i, j, edge_idx, tail_vert_idx
         DATATYPE_t u_j_c_a, u_i, f_i, beta, u_i_new, f_a
@@ -564,22 +568,23 @@ cdef void _SF_in_first_pass_full(
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
-    init_heap(&pqueue, <size_t>edge_count)
+    queue.attach_logger(closure)
+    queue.init_heap(<size_t>edge_count)
 
     # only the incoming edges of the target vertex are inserted into the
     # priority queue
     for i in range(<size_t>csc_indptr[<size_t>dest_vert_index], <size_t>csc_indptr[<size_t>(dest_vert_index + 1)]):
         edge_idx = csc_edge_idx[i]
-        insert(&pqueue, edge_idx, c_a_vec[edge_idx])
+        queue.insert(edge_idx, c_a_vec[edge_idx])
         u_j_c_a_vec[edge_idx] = c_a_vec[edge_idx]
         for j in range(<size_t>n_skim_cols):
             skim_j_vec[edge_idx + j * edge_count] = skim_col_vec[edge_idx][j]
 
     # first pass
-    while pqueue.size > 0:
+    while not queue.is_empty():
 
-        edge_idx = extract_min(&pqueue)
-        u_j_c_a = pqueue.Elements[edge_idx].key
+        edge_idx = queue.extract_min()
+        u_j_c_a = queue.element_key(edge_idx)
         tail_vert_idx = <size_t>tail_indices[edge_idx]
         u_i = u_i_vec[tail_vert_idx]
 
@@ -632,7 +637,7 @@ cdef void _SF_in_first_pass_full(
         for i in range(<size_t>csc_indptr[tail_vert_idx], <size_t>csc_indptr[tail_vert_idx + 1]):
 
             edge_idx = csc_edge_idx[i]
-            edge_state = pqueue.Elements[edge_idx].state
+            edge_state = queue.effective_state(edge_idx)
 
             if edge_state != SCANNED:
 
@@ -644,19 +649,19 @@ cdef void _SF_in_first_pass_full(
 
                 if edge_state == NOT_IN_HEAP:
 
-                    insert(&pqueue, edge_idx, u_j_c_a)
+                    queue.insert(edge_idx, u_j_c_a)
                     u_j_c_a_vec[edge_idx] = u_j_c_a
                     for j in range(<size_t>n_skim_cols):
                         skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
 
-                elif (pqueue.Elements[edge_idx].key > u_j_c_a):
+                elif (queue.element_key(edge_idx) > u_j_c_a):
 
-                    decrease_key(&pqueue, edge_idx, u_j_c_a)
+                    queue.decrease_key(edge_idx, u_j_c_a)
                     u_j_c_a_vec[edge_idx] = u_j_c_a
                     for j in range(<size_t>n_skim_cols):
                         skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
 
-    free_heap(&pqueue)
+    queue.free_heap()
     free(skim_i_new_vec)
     free(skim_j_new_vec)
 

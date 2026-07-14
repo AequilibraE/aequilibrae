@@ -1,3 +1,4 @@
+# distutils: language=c++
 cimport cython
 
 from libcpp cimport bool
@@ -15,16 +16,8 @@ import logging
 import queue
 
 
-cdef:
-    int DEBUG = logging.DEBUG
-    int INFO = logging.INFO
-    int WARNING = logging.WARNING
-    int ERROR = logging.ERROR
-    int CRITICAL = logging.CRITICAL
-
-
 @cython.final
-cdef public class Bridge [object Bridge, type Bridge_t]:
+cdef class Bridge:
     """
     Thread-safe bridge for logging and progress reporting from C/Cython nogil contexts back to Python.
 
@@ -43,15 +36,21 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         **task** (:obj:`threading.Thread`): The background thread handle running the monitoring loop.
         **bars** (:obj:`list`): A list of active :obj:`Bar` instances being monitored.
     """
+    def __cinit__(self):
+        self.c = new AeqLogClosure()
+
+    def __dealloc__(self):
+        del self.c
+        self.c = NULL
 
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.task = None
         self._stop.store(False, memory_order.memory_order_relaxed)
 
         self.__logger = logger or logging.getLogger()
-        self.__level = self.__logger.level
+        self.c.c_level = self.__logger.level
         if logger is None:
-            self.__logger.warn(
+            self.__logger.warning(
                 "AequilibraE Bridge is using the root logger. To prevent broken progress bars, ensure either progress "
                 "bars are disabled (set AEQ_SHOW_PROGRESS=FALSE), or all StreamHandlers utilise AequilibraEStreamHandler"
             )
@@ -60,26 +59,11 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
 
         self.bars = []
 
-        # Previously we used a global cdef function that forwarded its arguments to "self._log". This was necessary
-        # because "self._log" cannot be accessed directly from C without going through the Cython vtable. While we can
-        # assign it a known C name, that only changes the C name within the vtable. The idea was that the global
-        # function could call "bridge._log", with Cython handling the details. This worked well, but required the global
-        # function to be cimported into other modules because Cython only initialises objects from another extension
-        # module that are cimported. If the user selectively imports using "from ... cimport ...", not all attributes
-        # are imported and initialised. This creates an unusual situation at the C level where everything is declared
-        # (because bridge.pxd is inserted into the extension module with all its declarations) but not
-        # initialised. Instead, we export the function via a function pointer on the Bridge object. C attributes do not
-        # need to be obtained through the vtable because cdef classes must inherit and define all C attributes of their
-        # parents. Additionally, we can use "self._log" directly instead of a wrapper function because Bridge is
-        # final. We can then access this function pointer from the AEQ_LOG macro. All this assumes that AEQ_LOG calls
-        # the class method correctly and nothing fancy is required.
-        self.__log_wrapper_func = self._log
-
     def start(self):
         """
         Starts the background monitoring thread.
         """
-        self.__level = self.__logger.level
+        self.c.c_level = self.__logger.level
         self.task = threading.Thread(target=self.loop)
         self.task.start()
 
@@ -106,7 +90,7 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
     def loop(self):
         # Create the lock, we use the unique_lock wrapper because it is movable while a mutex isn't and Cython loves to
         # generate temporary assignments.
-        cdef unique_lock[mutex] lock = unique_lock[mutex](self.__log_queue_mutex, defer_lock)
+        cdef unique_lock[mutex] lock = unique_lock[mutex](self.c._log_queue_mutex, defer_lock)
 
         # The pattern of this loop should be
         #  - Check termination criteria
@@ -165,28 +149,13 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         cdef int level = 0
         cdef string msg
 
-        while not self.__log_queue.empty():
-            tmp = self.__log_queue.front()
-
-            level = tmp.first
-            msg = move(tmp.second)
+        while not self.c._log_queue.empty():
+            level = self.c._log_queue.front().first
+            msg = move(self.c._log_queue.front().second)
 
             self.__logger.log(level, msg.decode("UTF-8"))
 
-            self.__log_queue.pop_front()
-
-
-    cdef void _log(self, int level, string msg) noexcept nogil:
-        cdef unique_lock[mutex] lock = unique_lock[mutex](self.__log_queue_mutex, defer_lock)
-
-        # We should never try to acquire the log lock while holding the GIL. Cython has helper functions to make this
-        # more cleaner but those are not yet released (15/10/2025)
-        with nogil:
-            lock.lock()
-            try:
-                self.__log_queue.emplace_back(level, msg)
-            finally:
-                lock.unlock()
+            self.c._log_queue.pop_front()
 
     def __enter__(self):
         self.start()
@@ -196,7 +165,7 @@ cdef public class Bridge [object Bridge, type Bridge_t]:
         self.stop()
         self.task.join()
 
-        cdef unique_lock[mutex] lock = unique_lock[mutex](self.__log_queue_mutex, defer_lock)
+        cdef unique_lock[mutex] lock = unique_lock[mutex](self.c._log_queue_mutex, defer_lock)
         try:
             with nogil:
                 lock.lock()

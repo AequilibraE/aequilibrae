@@ -68,7 +68,7 @@ class Parameters:
                 self.parameters = yaml.load(yml, Loader=yaml.SafeLoader)
         else:
             logger = logging.getLogger("aequilibrae")
-            logger.warning("No pre-existing parameter file exists for this project. Will use default")
+            logger.debug("No pre-existing parameter file exists for this project. Will use default")
 
             self.parameters = deepcopy(self._default)
 

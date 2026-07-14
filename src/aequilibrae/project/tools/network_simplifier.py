@@ -158,7 +158,6 @@ class NetworkSimplifier(WorkerThread):
         Literal[1, -1] | None,
         pd.Series | None,
     ]:
-        print(candidates)
         start_node = candidates.loc[link_sequence[0]]["a_node"]
         longest_link_id = candidates.sort_values("distance", ascending=False).index[0]
         speed_ab, speed_ba, geos, lanes_ab, lanes_ba = [], [], [], [], []

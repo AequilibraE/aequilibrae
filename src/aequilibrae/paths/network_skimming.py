@@ -1,8 +1,7 @@
+import logging
 import multiprocessing as mp
-import sys
 from datetime import datetime
 from uuid import uuid4
-
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.cython.skimming_core import skimming_parallel
@@ -11,7 +10,7 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
-sys.dont_write_bytecode = True
+logger = logging.getLogger(__name__)
 
 
 class NetworkSkimming(WorkerThread):
