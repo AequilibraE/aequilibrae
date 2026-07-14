@@ -81,6 +81,9 @@ tests = [
 
 dev = ['aequilibrae[tests, docs]']
 
+[tool.uv.extra-build-dependencies]
+sphinx-autodoc-annotation = ["setuptools"]
+
 # simwrapper CLI
 [project.scripts]
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"

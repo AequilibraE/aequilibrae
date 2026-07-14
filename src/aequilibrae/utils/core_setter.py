@@ -10,13 +10,13 @@ def resolve_cores(system_parameters: dict) -> int:
     The ``AEQ_CPUS`` environment variable wins over the project's ``parameters.yml``
     because the core count is a property of the machine, while the parameter file
     travels with the project. Values that cannot be interpreted as an integer
-    resolve to 0 (all cores).
+    resolve to the total number of available cores.
     """
-    value = os.environ.get("AEQ_CPUS", system_parameters.get("cpus", 0))
+    value = os.environ.get("AEQ_CPUS", system_parameters.get("cpus", mp.cpu_count()))
     try:
         return int(value)
     except (TypeError, ValueError):
-        return 0
+        return mp.cpu_count()
 
 
 def resolve_threading_threshold(system_parameters: dict) -> int:
