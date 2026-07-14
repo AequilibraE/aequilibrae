@@ -132,7 +132,7 @@ class Migration:
             raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
 
         self.mark_as(conn, MigrationStatus.APPLIED)
-        logger.info(f"Completed migration '{self.name}'")
+        logger.info(f"Completed migration '{self.name}'", stack_info=True)
 
     def _apply_sql(self, conn: sqlite3.Connection):
         with open(self.file, "r") as f:
