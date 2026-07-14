@@ -1,3 +1,4 @@
+import logging
 import multiprocessing as mp
 import sys
 import threading
@@ -13,6 +14,9 @@ from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.logging_utils import debug_bridge
+
+logger = logging.getLogger(__name__)
 
 sys.dont_write_bytecode = True
 
@@ -74,16 +78,17 @@ class NetworkSkimming(WorkerThread):
         self.aux_res.prepare(self.graph, self.results.cores, self.results.nodes, self.results.num_skims)
         pool = ThreadPool(self.results.cores)
         all_threads = {"count": 0}
-        for orig in list(self.graph.centroids):
-            i = int(self.graph.nodes_to_indices[orig])
-            if i >= self.graph.nodes_to_indices.shape[0]:
-                self.report.append(f"Centroid {orig} is beyond the domain of the graph")
-            elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
-                self.report.append(f"Centroid {orig} does not exist in the graph")
-            else:
-                pool.apply_async(self.__func_skim_thread, args=(orig, all_threads))
-        pool.close()
-        pool.join()
+        with debug_bridge(logger) as bridge:
+            for orig in list(self.graph.centroids):
+                i = int(self.graph.nodes_to_indices[orig])
+                if i >= self.graph.nodes_to_indices.shape[0]:
+                    self.report.append(f"Centroid {orig} is beyond the domain of the graph")
+                elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
+                    self.report.append(f"Centroid {orig} does not exist in the graph")
+                else:
+                    pool.apply_async(self.__func_skim_thread, args=(orig, all_threads, bridge))
+            pool.close()
+            pool.join()
         self.aux_res = None
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
@@ -128,14 +133,14 @@ class NetworkSkimming(WorkerThread):
         record.procedure = "Network skimming"
         record.save()
 
-    def __func_skim_thread(self, origin, all_threads):
+    def __func_skim_thread(self, origin, all_threads, bridge=None):
         if threading.get_ident() in all_threads:
             th = all_threads[threading.get_ident()]
         else:
             all_threads[threading.get_ident()] = all_threads["count"]
             th = all_threads["count"]
             all_threads["count"] += 1
-        x = skimming_single_origin(origin, self.graph, self.results, self.aux_res, th)
+        x = skimming_single_origin(origin, self.graph, self.results, self.aux_res, th, bridge=bridge)
         self.cumulative += 1
         if x != origin:
             self.report.append(x)

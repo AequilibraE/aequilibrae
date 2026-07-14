@@ -125,6 +125,17 @@ class TrafficClass(TransportClassBase):
             raise ValueError("PCE needs to be either integer or float ")
         self.pce = pce
 
+    def set_heap(self, heap: str) -> None:
+        """Sets the priority queue implementation used for path finding when assigning this class.
+
+        Must be one of ``AssignmentResults.get_heaps()``. Defaults to the 4-ary heap if not set.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        self.results.set_heap(heap)
+        self._aon_results.set_heap(heap)
+
     def set_fixed_cost(self, field_name: str, multiplier=1):
         """Sets value of time
 

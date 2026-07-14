@@ -1,14 +1,13 @@
+import contextlib
+import logging
 import pathlib
 import sqlite3
 from dataclasses import dataclass
 from enum import IntEnum
-import contextlib
-import logging
-
 from typing import Optional
 
-from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.db_utils import AequilibraEConnection
+from aequilibrae.utils.model_run_utils import import_file_as_module
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +132,7 @@ class Migration:
             raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
 
         self.mark_as(conn, MigrationStatus.APPLIED)
-        logger.info(f"Completed migration '{self.name}'")
+        logger.info(f"Completed migration '{self.name}'", stack_info=True)
 
     def _apply_sql(self, conn: sqlite3.Connection):
         with open(self.file, "r") as f:
@@ -229,7 +228,7 @@ class MigrationManager:
             for migration in self.migrations.values():
                 migration.mark_as_seen(conn)
 
-    def find_applicable(self, conn: sqlite3.Connection) -> list[tuple[int, MigrationStatus]]:
+    def find_applicable(self, conn: sqlite3.Connection) -> list[Migration]:
         """
         Find all applicable migrations.
 
@@ -245,7 +244,7 @@ class MigrationManager:
         migrations = list(self.status(conn).items())
 
         for i in range(len(migrations)):
-            k, v = migrations[i]
+            _k, v = migrations[i]
             if v == MigrationStatus.MISSING:
                 break
         else:
@@ -264,7 +263,7 @@ class MigrationManager:
     def upgrade(
         self,
         main_conn: str,
-        connections: dict[str, AequilibraEConnection | sqlite3.Connection],
+        connections: dict[str, AequilibraEConnection],
         skip: Optional[set[int]] = None,
     ):
         """

@@ -20,7 +20,7 @@ def connectivity_multi_threaded(tester):
     all_threads = {"count": 0, "run": 0}
     results = {"disconnected": []}
 
-    disconn_array = np.zeros((cores, graph.num_zones, 2), dtype=ITYPE)
+    disconn_array = np.zeros((cores, graph.num_zones, 2), dtype=np.int64)
     for i, orig in enumerate(list(graph.centroids)):
         args = (orig, graph, aux_result, disconn_array, all_threads, results, signal)
         pool.apply_async(connectivity_single_threaded, args=args)
@@ -51,7 +51,7 @@ cdef connectivity_single_threaded(origin, graph, aux_result, disconn_array, all_
         all_threads["count"] += 1
 
     cdef:
-        ITYPE_t i, b, k
+        size_t i, b, k
         long orig = origin
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long [:] origin_index = graph.compact_nodes_to_indices

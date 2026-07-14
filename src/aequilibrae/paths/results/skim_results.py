@@ -1,6 +1,8 @@
 import multiprocessing as mp
+from typing import List
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+from aequilibrae.paths.cython.AoN import HEAP_MAP
 from aequilibrae.paths.graph import Graph
 
 
@@ -42,6 +44,7 @@ class SkimResults:
         self.num_skims = -1
         self._graph_id = None
         self.graph = Graph()
+        self._heap = "4ary"
 
     def prepare(self, graph: Graph):
         """
@@ -68,3 +71,19 @@ class SkimResults:
         self.skims.matrix_view = self.skims.matrix_view.reshape(self.zones, self.zones, self.num_skims)
         self._graph_id = graph._id
         self.graph = graph
+
+    def set_heap(self, heap: str) -> None:
+        """
+        Set the priority queue implementation used for path computation. Must be one of ``get_heaps()``.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        if heap not in HEAP_MAP:
+            raise ValueError(f"heap must be one of {self.get_heaps()}")
+
+        self._heap = heap
+
+    def get_heaps(self) -> List[str]:
+        """Return the available priority queue implementations."""
+        return list(HEAP_MAP.keys())
