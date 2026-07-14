@@ -130,7 +130,7 @@ cdef class RouteChoiceSetResults:
                 "append": False,
                 # no visitor option
             }
-            logger.warn(
+            logger.warning(
                 "FastParquet back-end doesn't support writing a NumPy arrays as Parquet list types, converting to Python lists. "
                 "Watch out for memory consumption..."
             )
@@ -150,7 +150,7 @@ cdef class RouteChoiceSetResults:
         # FastParquet is stupid and encodes Parquet list objects as json strings!!!
         is_json_encoded = df["route set"].map(lambda x: isinstance(x, (str, bytes)))
         if is_json_encoded.any():
-            logger.warn("Found JSON encoded route sets. Parsing into a NumPy array...")
+            logger.warning("Found JSON encoded route sets. Parsing into a NumPy array...")
             if not is_json_encoded.all():
                 raise TypeError(
                     f"route sets must either be encoded properly as list[int64], or json lists (by FastParquet). The two cannot be mixed"
