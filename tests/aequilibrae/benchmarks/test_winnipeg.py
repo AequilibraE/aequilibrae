@@ -4,7 +4,6 @@ import pytest
 
 from .conftest import (
     METHODS,
-    HEAPS,
     run_validation,
 )
 
@@ -22,8 +21,7 @@ def model_folder(tntp_root, model_stub):
 
 
 @pytest.mark.parametrize("algorithm", METHODS)
-@pytest.mark.parametrize("heap", HEAPS)
-def test_winnipeg(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm, model_stub, heap):
+def test_winnipeg(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm, model_stub):
     run_validation(
         benchmark,
         tntp_graph,
@@ -31,5 +29,4 @@ def test_winnipeg(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm,
         tntp_reference,
         model_stub,
         algorithm,
-        heap,
     )

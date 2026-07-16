@@ -265,8 +265,8 @@ def run_validation(
     reference,
     stub,
     algorithm,
-    heap: str,
     *,
+    heap: str = "4ary",
     known_pass=None,
 ):
     """Configure, run, bench and validate.
@@ -325,7 +325,6 @@ def run_validation(
 
     def _benchmarked():
         assig: TrafficAssignment = _make_assignment()
-        # HEAP_MAP = {"4ary": FOUR_ARY_HEAP, "pairing": PAIRING_HEAP, "std": STD_PRIORITY_QUEUE}
         assig.execute()
         trials.append(assig.report())
         return assig
