@@ -36,13 +36,6 @@ jobs:
           echo "PR_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "BASE_REF=$(gh pr view ${{ inputs.pr-number }} --repo ${{ github.repository }} --json baseRefName -q .baseRefName)" >> $GITHUB_ENV
 
-      - name: Resolve PR head and base branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "PR_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
-          echo "BASE_REF=$(gh pr view ${{ inputs.pr-number }} --repo ${{ github.repository }} --json baseRefName -q .baseRefName)" >> $GITHUB_ENV
-
       - name: Set benchmark iterations
         if: ${{ inputs.iterations != '' }}
         run: echo "BENCHMARK_ITERATIONS=${{ inputs.iterations }}" >> $GITHUB_ENV

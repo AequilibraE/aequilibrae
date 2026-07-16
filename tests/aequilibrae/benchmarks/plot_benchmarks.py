@@ -26,7 +26,6 @@ import pandas as pd
 import seaborn as sns
 from scipy.stats import linregress
 
-
 HERE = Path(__file__).resolve().parent
 DEFAULT_REPORTS_DIR = HERE / "_convergence_reports"
 
