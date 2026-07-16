@@ -19,7 +19,7 @@ permissions:
 env:
   AEQ_SHOW_PROGRESS: "0"
   TNTP_ROOT: ${{ github.workspace }}/TransportationNetworks
-  BENCHMARK_REPORTS_DIR: ${{ github.workspace }}/tests/aeq*/benchmarks/_convergence_reports
+  BENCHMARK_REPORTS_DIR: ${{ github.workspace }}/tests/aequilibrae/benchmarks/_convergence_reports
   PYTHON_VERSION: '3.13'
 
 jobs:
@@ -54,11 +54,22 @@ jobs:
       - name: Install Python and create virtual environment
         run: uv venv .venv --python ${{ env.PYTHON_VERSION }} --python-preference only-managed --clear
 
+      - name: Activate virtualenv
+        if: matrix.os != 'windows-latest'
+        run: |
+          . .venv/bin/activate
+          echo PATH=$PATH >> $GITHUB_ENV
+
+      - name: Activate virtualenv (windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          "$env:PATH" | Out-File -FilePath "$env:GITHUB_PATH" -Append
+
       - name: Install spatialite
         run: |
           sudo apt update
-          sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
-          sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+          sudo apt install -y libsqlite3-mod-spatialite
 
       # clean: false skips the `git clean -ffdx && git reset --hard` that
       # actions/checkout runs by default, so untracked files (.venv,
@@ -75,7 +86,7 @@ jobs:
       - name: Run benchmarks (base)
         env:
           BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/base
-        run: uv run pytest --benchmark-save base tests/aeq*/benchmarks/test_* --benchmark-only
+        run: pytest --benchmark-save base tests/aequilibrae/benchmarks/ --benchmark-only
 
       - name: Checkout PR head
         uses: actions/checkout@v7
@@ -84,20 +95,20 @@ jobs:
           clean: false
 
       - name: Install AequilibraE (PR)
-        run: uv pip install --reinstall ".[dev]"
+        run: uv pip install ".[dev]"
 
       - name: Run benchmarks (PR)
         env:
           BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/pr
-        run: uv run pytest --benchmark-save pr tests/aeq*/benchmarks/test_* --benchmark-only
+        run: pytest --benchmark-save pr tests/aequilibrae/benchmarks/ --benchmark-only
 
       - name: Generate plots
         if: success() || failure() # always generate plots, especially if some benchmarks fail
         run: |
           for run in base pr; do
-            uv run python tests/aeq*/benchmarks/plot_benchmarks.py --convergence --x-axis time --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
-            uv run python tests/aeq*/benchmarks/plot_benchmarks.py --convergence --x-axis iterations --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
-            uv run python tests/aeq*/benchmarks/plot_benchmarks.py --compare-flow --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+            python tests/aequilibrae/benchmarks/plot_benchmarks.py --convergence --x-axis time --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+            python tests/aequilibrae/benchmarks/plot_benchmarks.py --convergence --x-axis iterations --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+            python tests/aequilibrae/benchmarks/plot_benchmarks.py --compare-flow --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
           done
 
       - name: Add benchmark comparison to summary
