@@ -12,6 +12,10 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read # actions/checkout
+  pull-requests: read # gh pr view
+
 env:
   AEQ_SHOW_PROGRESS: "0"
   TNTP_ROOT: ${{ github.workspace }}/TransportationNetworks
@@ -22,9 +26,15 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: refs/pull/${{ inputs.pr-number }}/head
+      - name: Checkout repo
+        uses: actions/checkout@v7
+
+      - name: Resolve PR head and base branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "PR_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "BASE_REF=$(gh pr view ${{ inputs.pr-number }} --repo ${{ github.repository }} --json baseRefName -q .baseRefName)" >> $GITHUB_ENV
 
       - name: Set benchmark iterations
         if: ${{ inputs.iterations != '' }}
@@ -42,19 +52,40 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Python and create virtual environment
-        run: uv venv .venv --python ${{ env.PYTHON_VERSION }} --python-preference only-managed  --clear
+        run: uv venv .venv --python ${{ env.PYTHON_VERSION }} --python-preference only-managed --clear
 
       - name: Install spatialite
         run: |
           sudo apt update
           sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
           sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-      
-      - name: Install AequilibraE
+
+      # clean: false skips the `git clean -ffdx && git reset --hard` that
+      # actions/checkout runs by default, so untracked files (.venv,
+      # .benchmarks, TransportationNetworks) survive the ref switches.
+      - name: Checkout base branch (${{ env.BASE_REF }})
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.BASE_REF }}
+          clean: false
+
+      - name: Install AequilibraE (base)
         run: uv pip install ".[dev]"
 
-      - name: Run benchmarks
-        run: uv run pytest --benchmark-save benchmark_summary tests/aeq/benchmarks/test_* --benchmark-only
+      - name: Run benchmarks (base)
+        run: uv run pytest --verbose --benchmark-save base --benchmark-only
+
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PR_SHA }}
+          clean: false
+
+      - name: Install AequilibraE (PR)
+        run: uv pip install --reinstall ".[dev]"
+
+      - name: Run benchmarks (PR)
+        run: uv run pytest --verbose --benchmark-save pr --benchmark-only
 
       - name: Generate plots
         if: success() || failure() # always generate plots, especially if some benchmarks fail
@@ -63,16 +94,24 @@ jobs:
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
           uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
 
-      - name: Add pytest-benchmark output to summary
+      - name: Add benchmark comparison to summary
         if: success() || failure()
         run: |
+          echo "# Benchmark comparison: ${{ env.BASE_REF }} (0001_base) vs PR #${{ inputs.pr-number }} (0002_pr)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          uv run pytest-benchmark compare Linux-CPython-3.13-64bit/0001_benchmark_summary.json >> $GITHUB_STEP_SUMMARY
+          uv run pytest-benchmark compare 0001_base 0002_pr --group-by func >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload benchmark results as artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: .benchmarks/**/*.json
 
       - name: Upload plots as artifacts
         if: success() || failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-plots
           path: ${{ env.BENCHMARK_REPORTS_DIR }}/**/*.png
