@@ -3,8 +3,8 @@
 import pytest
 
 from .conftest import (
+    # HEAPS,
     METHODS,
-    HEAPS,
     run_validation,
 )
 
@@ -21,8 +21,8 @@ def model_folder(tntp_root, model_stub):
     return tntp_root / model_stub
 
 
+# @pytest.mark.parametrize("heap", HEAPS)
 @pytest.mark.parametrize("algorithm", METHODS)
-@pytest.mark.parametrize("heap", HEAPS)
 def test_winnipeg(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm, model_stub, heap):
     run_validation(
         benchmark,

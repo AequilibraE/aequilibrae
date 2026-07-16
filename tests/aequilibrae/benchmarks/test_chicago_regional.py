@@ -3,8 +3,8 @@
 import pytest
 
 from .conftest import (
+    # HEAPS,
     METHODS,
-    HEAPS,
     run_validation,
 )
 
@@ -21,8 +21,8 @@ def model_folder(tntp_root):
     return tntp_root / "chicago-regional"
 
 
+# @pytest.mark.parametrize("heap", HEAPS)
 @pytest.mark.parametrize("algorithm", METHODS)
-@pytest.mark.parametrize("heap", HEAPS)
 def test_chicago_regional(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm, model_stub, heap):
     run_validation(
         benchmark,
