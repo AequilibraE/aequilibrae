@@ -36,6 +36,13 @@ jobs:
           echo "PR_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "BASE_REF=$(gh pr view ${{ inputs.pr-number }} --repo ${{ github.repository }} --json baseRefName -q .baseRefName)" >> $GITHUB_ENV
 
+      - name: Resolve PR head and base branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "PR_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "BASE_REF=$(gh pr view ${{ inputs.pr-number }} --repo ${{ github.repository }} --json baseRefName -q .baseRefName)" >> $GITHUB_ENV
+
       - name: Set benchmark iterations
         if: ${{ inputs.iterations != '' }}
         run: echo "BENCHMARK_ITERATIONS=${{ inputs.iterations }}" >> $GITHUB_ENV
@@ -43,8 +50,8 @@ jobs:
       - name: Clone TransportationNetworks
         run: git clone https://github.com/bstabler/TransportationNetworks ${{ env.TNTP_ROOT }}
 
-      - name: Create reports directory
-        run: mkdir -p ${{ env.BENCHMARK_REPORTS_DIR }}
+      - name: Create reports directories
+        run: mkdir -p ${{ env.BENCHMARK_REPORTS_DIR }}/base ${{ env.BENCHMARK_REPORTS_DIR }}/pr
 
       - name: Set up Python
         uses: astral-sh/setup-uv@v7
@@ -73,7 +80,9 @@ jobs:
         run: uv pip install ".[dev]"
 
       - name: Run benchmarks (base)
-        run: uv run pytest --verbose --benchmark-save base --benchmark-only
+        env:
+          BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/base
+        run: uv run pytest --benchmark-save base tests/aeq/benchmarks/test_* --benchmark-only
 
       - name: Checkout PR head
         uses: actions/checkout@v7
@@ -85,14 +94,18 @@ jobs:
         run: uv pip install --reinstall ".[dev]"
 
       - name: Run benchmarks (PR)
-        run: uv run pytest --verbose --benchmark-save pr --benchmark-only
+        env:
+          BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/pr
+        run: uv run pytest --benchmark-save pr tests/aeq/benchmarks/test_* --benchmark-only
 
       - name: Generate plots
         if: success() || failure() # always generate plots, especially if some benchmarks fail
         run: |
-          uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time
-          uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations
-          uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow
+          for run in base pr; do
+            uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis time --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+            uv run python tests/aeq/benchmarks/plot_benchmarks.py --convergence --x-axis iterations --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+            uv run python tests/aeq/benchmarks/plot_benchmarks.py --compare-flow --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+          done
 
       - name: Add benchmark comparison to summary
         if: success() || failure()
