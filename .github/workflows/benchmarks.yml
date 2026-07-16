@@ -124,7 +124,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
-          path: .benchmarks/**/*.json
+          path: .benchmarks/
 
       - name: Upload plots as artifacts
         if: success() || failure()
