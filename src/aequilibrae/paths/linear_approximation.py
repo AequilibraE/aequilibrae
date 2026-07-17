@@ -48,6 +48,7 @@ class LinearApproximation(WorkerThread):
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
+        self.elementwise_cores = assig_spec.elementwise_cores
         self.threading_threshold = assig_spec.threading_threshold
         self.iteration_issue = []
         self.convergence_report = {
@@ -156,7 +157,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+            self.vdf_der,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.elementwise_cores,
         )
         numerator = 0.0
         denominator = 0.0
@@ -194,7 +200,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+            self.vdf_der,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.elementwise_cores,
         )
         mu_numerator = 0.0
         mu_denominator = 0.0
@@ -255,7 +266,7 @@ class LinearApproximation(WorkerThread):
             self.capacity,
             self.free_flow_tt,
             *self.vdf_parameters,
-            self.cores,
+            self.elementwise_cores,
         )
 
         for c in self.traffic_classes:
@@ -279,11 +290,16 @@ class LinearApproximation(WorkerThread):
             for c in self.traffic_classes:
                 aon_res = c._aon_results
                 stp_dir_res = self.step_direction[c._id]
-                copy_two_dimensions(stp_dir_res.link_loads, aon_res.link_loads, self.cores, self.threading_threshold)
+                copy_two_dimensions(
+                    stp_dir_res.link_loads, aon_res.link_loads, self.elementwise_cores, self.threading_threshold
+                )
                 stp_dir_res.total_flows()
                 if c.results.num_skims > 0:
                     copy_three_dimensions(
-                        stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view, self.cores, self.threading_threshold
+                        stp_dir_res.skims.matrix_view,
+                        aon_res.skims.matrix_view,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
                 sd_flows.append(aon_res.total_link_loads)
 
@@ -293,13 +309,13 @@ class LinearApproximation(WorkerThread):
                         copy_two_dimensions(
                             self.sl_step_dir_ll[c._id][name]["sdr"],
                             np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
                         copy_three_dimensions(
                             self.sl_step_dir_od[c._id][name]["sdr"],
                             np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -311,11 +327,16 @@ class LinearApproximation(WorkerThread):
                 sdr = self.step_direction[c._id]
                 previous = self.previous_step_direction[c._id]
 
-                copy_two_dimensions(previous.link_loads, sdr.link_loads, self.cores, self.threading_threshold)
+                copy_two_dimensions(
+                    previous.link_loads, sdr.link_loads, self.elementwise_cores, self.threading_threshold
+                )
                 previous.total_flows()
                 if c.results.num_skims > 0:
                     copy_three_dimensions(
-                        previous.skims.matrix_view, sdr.skims.matrix_view, self.cores, self.threading_threshold
+                        previous.skims.matrix_view,
+                        sdr.skims.matrix_view,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
 
                 linear_combination(
@@ -323,7 +344,7 @@ class LinearApproximation(WorkerThread):
                     sdr.link_loads,
                     c._aon_results.link_loads,
                     self.conjugate_stepsize,
-                    self.cores,
+                    self.elementwise_cores,
                     self.threading_threshold,
                 )
 
@@ -333,7 +354,7 @@ class LinearApproximation(WorkerThread):
                         sdr.skims.matrix_view,
                         c._aon_results.skims.matrix_view,
                         self.conjugate_stepsize,
-                        self.cores,
+                        self.elementwise_cores,
                         self.threading_threshold,
                     )
 
@@ -346,13 +367,13 @@ class LinearApproximation(WorkerThread):
                         copy_two_dimensions(
                             sl_step_dir_ll["prev_sdr"],
                             sl_step_dir_ll["sdr"],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
                         copy_three_dimensions(
                             sl_step_dir_od["prev_sdr"],
                             sl_step_dir_od["sdr"],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -361,7 +382,7 @@ class LinearApproximation(WorkerThread):
                             sl_step_dir_ll["sdr"],
                             np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             self.conjugate_stepsize,
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -370,7 +391,7 @@ class LinearApproximation(WorkerThread):
                             sl_step_dir_od["sdr"],
                             np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
                             self.conjugate_stepsize,
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -386,11 +407,16 @@ class LinearApproximation(WorkerThread):
                 prev_stp_dir: AssignmentResults = self.previous_step_direction[c._id]
                 stp_dir: AssignmentResults = self.step_direction[c._id]
 
-                copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores, self.threading_threshold)
+                copy_two_dimensions(
+                    ppst.link_loads, stp_dir.link_loads, self.elementwise_cores, self.threading_threshold
+                )
                 ppst.total_flows()
                 if c.results.num_skims > 0:
                     copy_three_dimensions(
-                        ppst.skims.matrix_view, stp_dir.skims.matrix_view, self.cores, self.threading_threshold
+                        ppst.skims.matrix_view,
+                        stp_dir.skims.matrix_view,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
 
                 triple_linear_combination(
@@ -399,7 +425,7 @@ class LinearApproximation(WorkerThread):
                     stp_dir.link_loads,
                     prev_stp_dir.link_loads,
                     self.betas,
-                    self.cores,
+                    self.elementwise_cores,
                     self.threading_threshold,
                 )
 
@@ -411,7 +437,7 @@ class LinearApproximation(WorkerThread):
                         stp_dir.skims.matrix_view,
                         prev_stp_dir.skims.matrix_view,
                         self.betas,
-                        self.cores,
+                        self.elementwise_cores,
                         self.threading_threshold,
                     )
 
@@ -423,13 +449,13 @@ class LinearApproximation(WorkerThread):
                         copy_two_dimensions(
                             sl_step_dir_ll["temp_prev_sdr"],
                             sl_step_dir_ll["sdr"],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
                         copy_three_dimensions(
                             sl_step_dir_od["temp_prev_sdr"],
                             sl_step_dir_od["sdr"],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -439,7 +465,7 @@ class LinearApproximation(WorkerThread):
                             sl_step_dir_ll["sdr"],
                             sl_step_dir_ll["prev_sdr"],
                             self.betas,
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -449,30 +475,35 @@ class LinearApproximation(WorkerThread):
                             sl_step_dir_od["sdr"],
                             sl_step_dir_od["prev_sdr"],
                             self.betas,
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
                         copy_two_dimensions(
                             sl_step_dir_ll["prev_sdr"],
                             sl_step_dir_ll["temp_prev_sdr"],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
                         copy_three_dimensions(
                             sl_step_dir_od["prev_sdr"],
                             sl_step_dir_od["temp_prev_sdr"],
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1))
 
-                copy_two_dimensions(prev_stp_dir.link_loads, ppst.link_loads, self.cores, self.threading_threshold)
+                copy_two_dimensions(
+                    prev_stp_dir.link_loads, ppst.link_loads, self.elementwise_cores, self.threading_threshold
+                )
                 prev_stp_dir.total_flows()
                 if c.results.num_skims > 0:
                     copy_three_dimensions(
-                        prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view, self.cores, self.threading_threshold
+                        prev_stp_dir.skims.matrix_view,
+                        ppst.skims.matrix_view,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
@@ -596,14 +627,17 @@ class LinearApproximation(WorkerThread):
             if self.iter == 1:
                 for c in self.traffic_classes:
                     copy_two_dimensions(
-                        c.results.link_loads, c._aon_results.link_loads, self.cores, self.threading_threshold
+                        c.results.link_loads,
+                        c._aon_results.link_loads,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
                     c.results.total_flows()
                     if c.results.num_skims > 0:
                         copy_three_dimensions(
                             c.results.skims.matrix_view,
                             c._aon_results.skims.matrix_view,
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -616,13 +650,13 @@ class LinearApproximation(WorkerThread):
                                 np.sum(self.aons[c._id].aux_res.temp_sl_od_matrix, axis=0)[
                                     idx, :, :, :
                                 ],  # results after the iteration
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
                             copy_two_dimensions(
                                 c.results.select_link_loading[name],  # output matrix
                                 np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
                     flows.append(c.results.total_link_loads)
@@ -640,7 +674,7 @@ class LinearApproximation(WorkerThread):
                         stp_dir.link_loads,
                         cls_res.link_loads,
                         self.stepsize,
-                        self.cores,
+                        self.elementwise_cores,
                         self.threading_threshold,
                     )
 
@@ -650,7 +684,7 @@ class LinearApproximation(WorkerThread):
                             stp_dir.skims.matrix_view,
                             cls_res.skims.matrix_view,
                             self.stepsize,
-                            self.cores,
+                            self.elementwise_cores,
                             self.threading_threshold,
                         )
 
@@ -663,7 +697,7 @@ class LinearApproximation(WorkerThread):
                                 self.sl_step_dir_od[c._id][name]["sdr"],
                                 cls_res.select_link_od.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
 
@@ -672,7 +706,7 @@ class LinearApproximation(WorkerThread):
                                 self.sl_step_dir_ll[c._id][name]["sdr"],
                                 cls_res.select_link_loading[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
 
@@ -735,12 +769,18 @@ class LinearApproximation(WorkerThread):
         the corresponding contribution needs to be passed in"""
         x = np.zeros_like(self.fw_total_flow)
         linear_combination_1d(
-            x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores, self.threading_threshold
+            x, self.step_direction_flow, self.fw_total_flow, stepsize, self.elementwise_cores, self.threading_threshold
         )
         # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
-        self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
+        self.vdf.apply_vdf(
+            self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.elementwise_cores
+        )
         link_cost_term = sum_a_times_b_minus_c(
-            self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores, self.threading_threshold
+            self.congested_value,
+            self.step_direction_flow,
+            self.fw_total_flow,
+            self.elementwise_cores,
+            self.threading_threshold,
         )
         return link_cost_term + const_term
 
@@ -754,7 +794,7 @@ class LinearApproximation(WorkerThread):
                 c.fixed_cost,
                 self.step_direction[c._id].link_loads[:, 0],
                 c.results.link_loads[:, 0],
-                self.cores,
+                self.elementwise_cores,
                 self.threading_threshold,
             )
             class_specific_term += class_link_costs
@@ -780,7 +820,7 @@ class LinearApproximation(WorkerThread):
             self.step_direction_flow,
             self.fw_total_flow,
             stepsize,
-            self.cores,
+            self.elementwise_cores,
             self.threading_threshold,
         )
         self.vdf.apply_vdf(
@@ -789,7 +829,7 @@ class LinearApproximation(WorkerThread):
             self.capacity,
             self.free_flow_tt,
             *self.vdf_parameters,
-            self.cores,
+            self.elementwise_cores,
         )
         np.add(self.congested_time, self._trap_new_cost, out=self._trap_avg_cost)
         link_term = (
@@ -799,7 +839,7 @@ class LinearApproximation(WorkerThread):
                 self._trap_avg_cost,
                 self.step_direction_flow,
                 self.fw_total_flow,
-                self.cores,
+                self.elementwise_cores,
                 self.threading_threshold,
             )
         )

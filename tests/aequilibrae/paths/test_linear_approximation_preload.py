@@ -15,6 +15,7 @@ class DummyVDF:
 def test_stepsize_derivative_uses_fw_total_flow_state():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
+    assignment.elementwise_cores = 1
     assignment.threading_threshold = 10000
     assignment.preload = np.array([10.0, 20.0])
     assignment.current_assigned_flow = np.array([3.0, 4.0])

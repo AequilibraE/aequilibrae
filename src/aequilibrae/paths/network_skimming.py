@@ -7,7 +7,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.paths.cython.skimming_core import skimming_parallel
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils.aeq_signal import SIGNAL
-from aequilibrae.utils.core_setter import set_cores
+from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class NetworkSkimming(WorkerThread):
         :Arguments:
             **cores** (:obj:`int`): Number of cores to be used in computation
         """
-        self.cores = set_cores(cores)
+        self.cores = clamp_cores(cores)
 
     def save_to_project(self, name: str, format="omx", project=None) -> None:
         """Saves skim results to the project folder and creates record in the database

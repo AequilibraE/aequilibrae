@@ -79,7 +79,7 @@ class allOrNothing(WorkerThread):
             self.results.link_loads,
             self.results.compact_link_loads,
             self.results.crosswalk,
-            self.results.cores,
+            self.results.elementwise_cores,
             self.results.threading_threshold,
         )
 
