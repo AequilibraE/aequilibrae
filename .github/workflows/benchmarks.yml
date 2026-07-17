@@ -20,6 +20,7 @@ env:
   AEQ_SHOW_PROGRESS: "0"
   TNTP_ROOT: ${{ github.workspace }}/TransportationNetworks
   BENCHMARK_REPORTS_DIR: ${{ github.workspace }}/tests/aequilibrae/benchmarks/_convergence_reports
+  BENCHMARK_TIMING_DIR: ${{ github.workspace }}/tests/aequilibrae/benchmarks/_timings
   PYTHON_VERSION: '3.13'
 
 jobs:
@@ -86,7 +87,7 @@ jobs:
       - name: Run benchmarks (base)
         env:
           BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/base
-        run: pytest --benchmark-save base tests/aequilibrae/benchmarks/ --benchmark-only
+        run: pytest --benchmark-save=base --benchmark-save-data --benchmark-storage="file://${{ env.BENCHMARK_TIMING_DIR }}" tests/aequilibrae/benchmarks/ --benchmark-only
 
       - name: Checkout PR head
         uses: actions/checkout@v7
@@ -100,7 +101,7 @@ jobs:
       - name: Run benchmarks (PR)
         env:
           BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/pr
-        run: pytest --benchmark-save pr tests/aequilibrae/benchmarks/ --benchmark-only
+        run: pytest --benchmark-save=pr --benchmark-save-data --benchmark-storage="file://${{ env.BENCHMARK_TIMING_DIR }}" tests/aequilibrae/benchmarks/ --benchmark-only
 
       - name: Generate plots
         if: success() || failure() # always generate plots, especially if some benchmarks fail
@@ -124,7 +125,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
-          path: .benchmarks/
+          path: ${{ env.BENCHMARK_TIMING_DIR }}
 
       - name: Upload plots as artifacts
         if: success() || failure()
