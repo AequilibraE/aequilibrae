@@ -34,4 +34,9 @@ def resolve_source(source, **kwargs) -> Source:
             available = sorted(sources.keys())
             raise SourceResolutionError(f"Unknown source name: {source!r}. Available sources: {available}")
         return sources[source](**kwargs)
+    if kwargs:
+        raise SourceResolutionError(
+            f"Keyword arguments {sorted(kwargs)} only apply when the source is given by name; "
+            "pass them to the source object's constructor instead"
+        )
     return source

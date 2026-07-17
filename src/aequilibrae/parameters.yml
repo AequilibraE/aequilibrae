@@ -277,15 +277,11 @@ network:
         mode_name: use
 osm:
   # Used by Network.import_from_osm to configure osmnx via osmnx.settings.
-  # max_query_area_size, max_attempts, sleeptime were removed: osmnx tiles
-  # and retries internally.
+  # Tiling of large queries and request retries are handled by osmnx internally.
   overpass_endpoint: http://overpass-api.de/api
   nominatim_endpoint: https://nominatim.openstreetmap.org/
   accept_language: "en"
-  max_attempts: 50
   timeout: 540
-  max_query_area_size: 2500000000
-  sleeptime: 5
 
 system:
   cpus: 0

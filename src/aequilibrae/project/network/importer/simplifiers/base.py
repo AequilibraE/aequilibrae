@@ -32,4 +32,9 @@ def resolve_simplifier(simplifier, **kwargs):
             available = sorted(simplifiers.keys())
             raise SourceResolutionError(f"Unknown simplifier name: {simplifier!r}. Available simplifiers: {available}")
         return simplifiers[simplifier](**kwargs)
+    if kwargs:
+        raise SourceResolutionError(
+            f"Keyword arguments {sorted(kwargs)} only apply when the simplifier is given by name; "
+            "pass them to the simplifier object's constructor instead"
+        )
     return simplifier

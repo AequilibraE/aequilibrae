@@ -32,3 +32,25 @@ def test_resolve_simplifier_true_returns_osmnx():
     simplifier = resolve_simplifier(True)
     assert simplifier is not None
     assert simplifier.name == "osmnx"
+
+
+def test_resolve_source_rejects_kwargs_with_source_object():
+    class _Source:
+        name = "custom-source"
+
+        def acquire(self, *, modes, download_cache):
+            raise NotImplementedError
+
+    with pytest.raises(SourceResolutionError, match="by name"):
+        resolve_source(_Source(), model_area="not-forwarded")
+
+
+def test_resolve_simplifier_rejects_kwargs_with_simplifier_object():
+    class _Simplifier:
+        name = "custom-simplifier"
+
+        def simplify(self, net, **kwargs):
+            return net
+
+    with pytest.raises(SourceResolutionError, match="by name"):
+        resolve_simplifier(_Simplifier(), consolidate_tolerance=5.0)

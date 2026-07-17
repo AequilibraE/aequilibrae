@@ -49,3 +49,14 @@ def test_about_keys_updated_in_place_on_reimport(empty_project):
     _import(empty_project)
     second_ts = _about(empty_project.path_to_file)["network_source_fetched_at"]
     assert first_ts != second_ts
+
+def test_about_not_written_when_db_write_fails(empty_project, monkeypatch):
+    from aequilibrae.project.network.importer import db_writer
+
+    def _boom(self, net):
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(db_writer.SpatialiteWriter, "write", _boom)
+    with pytest.raises(RuntimeError, match="simulated write failure"):
+        _import(empty_project)
+    assert _about(empty_project.path_to_file) == {}

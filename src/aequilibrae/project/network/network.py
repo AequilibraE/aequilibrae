@@ -109,7 +109,6 @@ class Network(WorkerThread):
         """Removed in favour of :meth:`import_from_osm`."""
         raise AttributeError("Network.create_from_osm was removed. Use Network.import_from_osm(...).")
 
-
     def import_network(
         self,
         source,
@@ -127,6 +126,11 @@ class Network(WorkerThread):
         is better at removing geometric artifacts such as roundabouts and false
         intersection faces, but it may collapse parallel one-way carriageways into
         a single coarse link.
+
+        ``consolidate_tolerance`` (metres) controls intersection/node
+        consolidation for both simplifiers. ``None`` skips the consolidation
+        pass for ``"osmnx"``; for ``"neatnet"``, where consolidation is integral,
+        ``None`` falls back to the default tolerance.
         """
         from aequilibrae.project.network.importer.importer import NetworkImporter
 

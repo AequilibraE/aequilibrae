@@ -94,11 +94,10 @@ def fetch_building_footprints(
 
     from aequilibrae.project.network.importer.sources.overture.impl import get_latest_overture_version
 
-    release = get_latest_overture_version()
-
     last_reason = ""
     for attempt in range(2):
         try:
+            release = get_latest_overture_version()
             rbr = overturemaps.record_batch_reader("building", bbox=bbox, release=release)
             if rbr is None:
                 last_reason = "no_reader"

@@ -130,10 +130,11 @@ the project database. The ``simplify`` argument accepts:
 * ``"neatnet"``: simplify with neatnet;
 * ``False``: skip simplification.
 
-For OSMnx simplification, ``consolidate_tolerance`` controls intersection
-consolidation in metres after automatic projection to a local UTM CRS. Set it to
+``consolidate_tolerance`` controls intersection/node consolidation in metres
+(after automatic projection to a local UTM CRS) for both simplifiers. Set it to
 ``None`` to run OSMnx topological simplification without intersection
-consolidation::
+consolidation; for neatnet, where node consolidation is integral to the
+algorithm, ``None`` falls back to the default tolerance of 10 metres::
 
     project.network.import_from_osm(
         pbf_path="/path/to/extract.osm.pbf",

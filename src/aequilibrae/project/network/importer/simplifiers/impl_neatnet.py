@@ -1,5 +1,4 @@
 import geopandas as gpd
-import logging
 import math
 import numpy as np
 import shapely
@@ -23,8 +22,6 @@ from aequilibrae.project.network.importer.utils import (
 )
 from aequilibrae.utils.optional_dependency import require
 
-logger = logging.getLogger(__name__)
-
 _DUAL_CARRIAGEWAY_WARNING = (
     "neatnet simplification may collapse parallel one-way carriageways into a single coarse link. "
     "When that happens, direction, speed, and lane fields are reconstructed heuristically after simplification."
@@ -38,31 +35,37 @@ _DEKINK_MIN_TURN_DEGREES = 25.0
 _DEKINK_MAX_ENDPOINT_LENGTH = 0.00045
 
 
+_DEFAULT_CONSOLIDATE_TOLERANCE = 10.0
+
+
 def run_neatnet_simplify(
     net: StagedNetwork,
     *,
     exclusion_mask=None,
-    consolidation_tolerance: float = 10.0,
+    consolidate_tolerance: float | None = _DEFAULT_CONSOLIDATE_TOLERANCE,
     simplification_factor: float = 2.0,
     min_dangle_length: float = 20.0,
-    **_,
 ) -> StagedNetwork:
     require("neatnet", feature="neatnet simplification")
 
     import neatnet
 
     warnings.warn(_DUAL_CARRIAGEWAY_WARNING, UserWarning, stacklevel=2)
-    logger.warning(_DUAL_CARRIAGEWAY_WARNING)
 
     if len(net.links) == 0:
         return net
+
+    # ``None`` disables the optional consolidation pass in the OSMnx simplifier,
+    # but node consolidation is integral to neatify, so fall back to its default.
+    if consolidate_tolerance is None:
+        consolidate_tolerance = _DEFAULT_CONSOLIDATE_TOLERANCE
 
     edges = net.links.copy()
     utm = edges.geometry.estimate_utm_crs()
     geom_only = gpd.GeoDataFrame(geometry=edges.geometry, crs=edges.crs).to_crs(utm)
 
     neatify_kwargs = {
-        "consolidation_tolerance": float(consolidation_tolerance),
+        "consolidation_tolerance": float(consolidate_tolerance),
         "simplification_factor": float(simplification_factor),
         "min_dangle_length": float(min_dangle_length),
     }

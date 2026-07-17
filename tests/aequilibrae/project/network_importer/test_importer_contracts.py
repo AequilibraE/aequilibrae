@@ -4,7 +4,6 @@ from shapely.geometry import LineString, Point
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.importer import (
-    OPTIONAL_SOURCE_META_KEYS,
     REQUIRED_SOURCE_META_KEYS,
     _normalize_importer_columns,
     _normalize_source_meta,
@@ -51,14 +50,6 @@ def test_normalize_importer_columns_adds_expected_optional_fields():
     assert {"name", "speed_ab", "speed_ba", "lanes_ab", "lanes_ba", "source_id"}.issubset(net.links.columns)
 
 
-def test_source_meta_key_split_is_explicit_and_documented():
-    # 'release' is OPTIONAL (unversioned sources like raw OSM); everything else
-    # is REQUIRED. This guards the contract against accidental mutation.
-    assert "release" in OPTIONAL_SOURCE_META_KEYS
-    assert "release" not in REQUIRED_SOURCE_META_KEYS
-    assert set(REQUIRED_SOURCE_META_KEYS) == {"source", "backend", "source_url", "fetched_at"}
-
-
 def test_missing_release_is_allowed_but_missing_other_keys_rejected():
     # Missing only 'release' must pass.
     ok = _minimal_net(
@@ -86,3 +77,34 @@ def test_missing_release_is_allowed_but_missing_other_keys_rejected():
             _normalize_source_meta(_minimal_net(meta))
 
 
+
+def test_run_forwards_consolidate_tolerance_to_any_simplifier(empty_project):
+    from aequilibrae.project.network.importer.importer import NetworkImporter
+
+    class _Source:
+        name = "fake-source"
+
+        def acquire(self, *, modes, download_cache):
+            return _minimal_net(
+                {
+                    "source": "osm",
+                    "backend": "pyrosm",
+                    "source_url": "test.osm.pbf",
+                    "fetched_at": "2026-06-22T00:00:00+00:00",
+                }
+            )
+
+    class _Simplifier:
+        name = "capturing"
+
+        def __init__(self):
+            self.kwargs = None
+
+        def simplify(self, net, **kwargs):
+            self.kwargs = kwargs
+            return net
+
+    simplifier = _Simplifier()
+    NetworkImporter(empty_project).run(_Source(), simplify=simplifier, consolidate_tolerance=17.5)
+
+    assert simplifier.kwargs == {"consolidate_tolerance": 17.5}

@@ -12,7 +12,6 @@ pyfiles = [
   'mode.py',
   'modes.py',
   'network.py',
-  'network.yml',
   'node.py',
   'nodes.py',
   'period.py',

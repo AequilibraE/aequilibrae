@@ -108,6 +108,8 @@ def _configure_osmnx(ox) -> None:
     params = Parameters().parameters.get("osm", {}) or {}
     if "overpass_endpoint" in params:
         ox.settings.overpass_url = params["overpass_endpoint"].rstrip("/") + "/interpreter"
+    if "nominatim_endpoint" in params:
+        ox.settings.nominatim_url = params["nominatim_endpoint"]
     if "timeout" in params:
         ox.settings.timeout = int(params["timeout"])
     if "accept_language" in params:

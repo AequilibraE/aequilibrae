@@ -75,9 +75,7 @@ class NetworkImporter:
         if simplifier_obj is not None:
             logger.info("Simplification started")
             logger.info(f"Simplifying with '{simplifier_obj.name}'")
-            simplify_kwargs = {}
-            if consolidate_tolerance is not None and simplifier_obj.name == "osmnx":
-                simplify_kwargs["consolidate_tolerance"] = consolidate_tolerance
+            simplify_kwargs = {"consolidate_tolerance": consolidate_tolerance}
             if simplifier_obj.name == "neatnet":
                 from aequilibrae.project.network.importer.buildings import fetch_building_footprints
 
@@ -90,17 +88,17 @@ class NetworkImporter:
             logger.info(f"After simplification: {len(net.nodes)} nodes, {len(net.links)} links")
             logger.info("Simplification finished")
 
+        logger.info("Saving to the database started")
+        SpatialiteWriter(self.project).write(net)
+        logger.info("Saving to the database finished")
+
         AboutWriter(self.project).write(
             source_meta=net.source_meta,
             modes=modes_tuple,
             simplify=simplifier_obj.name if simplifier_obj is not None else "false",
-            consolidate_tolerance=consolidate_tolerance,
+            consolidate_tolerance=consolidate_tolerance if simplifier_obj is not None else None,
             download_cache_relpath=download_cache.relative_path,
         )
-
-        logger.info("Saving to the database started")
-        SpatialiteWriter(self.project).write(net)
-        logger.info("Saving to the database finished")
         logger.info("Network build complete")
 
 

@@ -29,11 +29,9 @@ class StagedNetwork:
         if missing_links:
             raise StagedNetworkValidationError(f"links GeoDataFrame missing required columns: {missing_links}")
 
-        allowed_crs = ("EPSG:4326", str(self.crs_geo).upper())
-        if self.nodes.crs is None or str(self.nodes.crs).upper() not in allowed_crs:
-            raise StagedNetworkValidationError(f"nodes CRS must be EPSG:4326, got {self.nodes.crs}")
-        if self.links.crs is None or str(self.links.crs).upper() not in allowed_crs:
-            raise StagedNetworkValidationError(f"links CRS must be EPSG:4326, got {self.links.crs}")
+        for label, gdf in (("nodes", self.nodes), ("links", self.links)):
+            if gdf.crs is None or str(gdf.crs).upper() != "EPSG:4326":
+                raise StagedNetworkValidationError(f"{label} CRS must be EPSG:4326, got {gdf.crs}")
 
         if not np.issubdtype(self.nodes["node_id"].dtype, np.integer):
             dtype = self.nodes["node_id"].dtype

@@ -116,3 +116,10 @@ def test_from_graph_requires_source_ref():
 
     with pytest.raises(StagedNetworkValidationError, match="_source_ref"):
         StagedNetwork.from_graph(g)
+
+
+def test_non_wgs84_crs_raises():
+    net = _make_minimal_staged()
+    net.nodes = net.nodes.to_crs("EPSG:3857")
+    with pytest.raises(StagedNetworkValidationError, match="EPSG:4326"):
+        net.validate()
