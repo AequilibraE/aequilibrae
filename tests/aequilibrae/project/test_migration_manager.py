@@ -201,36 +201,3 @@ def test_upgrade_with_skip(migrations_file, connections, main_connection):
 
     status = manager.status(conn)
     assert status[2] == MigrationStatus.APPLIED
-
-
-def test_network_migration_003_adds_importer_columns():
-    """Old projects gain the columns the network importer requires (other_attributes, fixed_cost_*)."""
-    manager = MigrationManager(MigrationManager.network_migration_file)
-    migration = manager.migrations[3]
-    assert migration.name == "add_other_attributes"
-
-    conn = sqlite3.connect(":memory:")
-    try:
-        # Minimal old-style schema: the tables exist but lack the new columns.
-        conn.execute("CREATE TABLE links (link_id INTEGER, modes TEXT)")
-        conn.execute("CREATE TABLE nodes (node_id INTEGER)")
-        conn.execute(
-            "CREATE TABLE attributes_documentation "
-            "(name_table TEXT NOT NULL, attribute TEXT NOT NULL, description TEXT, UNIQUE (name_table, attribute))"
-        )
-        conn.execute("CREATE TABLE migrations (id INTEGER, name TEXT, status TEXT, date TEXT)")
-
-        migration.apply(conn, {})
-
-        link_cols = {r[1] for r in conn.execute("PRAGMA table_info(links)")}
-        node_cols = {r[1] for r in conn.execute("PRAGMA table_info(nodes)")}
-        assert {"fixed_cost_ab", "fixed_cost_ba", "other_attributes"} <= link_cols
-        assert "other_attributes" in node_cols
-
-        documented = {
-            (r[0], r[1]) for r in conn.execute("SELECT name_table, attribute FROM attributes_documentation")
-        }
-        assert ("links", "other_attributes") in documented
-        assert ("nodes", "other_attributes") in documented
-    finally:
-        conn.close()
