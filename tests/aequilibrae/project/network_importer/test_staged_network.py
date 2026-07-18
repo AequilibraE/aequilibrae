@@ -1,4 +1,4 @@
-"""Tests for ``StagedNetwork`` — schema invariants & MultiDiGraph round-trip."""
+"""Tests for ``StagedNetwork`` — schema invariants & graph decomposition."""
 
 import geopandas as gpd
 import pytest
@@ -80,42 +80,19 @@ def test_node_id_below_floor_raises():
         net.validate()
 
 
-def test_graph_round_trip_preserves_topology():
+def test_to_graph_decomposes_bidirectional_links():
     net = _make_minimal_staged()
     g = net.to_graph()
     assert g.number_of_nodes() == 3
     # 2 links: one bidirectional (2 directed edges), one one-way (1 directed edge) = 3
     assert g.number_of_edges() == 3
 
-    back = StagedNetwork.from_graph(g)
-    assert set(back.nodes["node_id"]) == {100000, 100001, 100002}
-    # The bidirectional link must be recombined into a single staged row, so
-    # the reconstructed network has exactly the 2 original links, not 3.
-    assert len(back.links) == 2
-    assert back.links["link_id"].is_unique
-    assert sorted(back.links["direction"]) == [0, 1]
-
-
-def test_graph_round_trip_is_idempotent():
-    net = _make_minimal_staged()
-    once = StagedNetwork.from_graph(net.to_graph())
-    twice = StagedNetwork.from_graph(once.to_graph())
-    assert len(once.links) == len(twice.links) == 2
-    assert sorted(once.links["direction"]) == sorted(twice.links["direction"])
-    assert twice.links["link_id"].is_unique
-
-
-def test_from_graph_requires_source_ref():
-    import networkx as nx
-
-    g = nx.MultiDiGraph()
-    g.graph["crs"] = "EPSG:4326"
-    g.add_node(100000, x=0.0, y=0.0)
-    g.add_node(100001, x=0.0, y=1.0)
-    g.add_edge(100000, 100001, key=1, geometry=LineString([(0, 0), (0, 1)]))
-
-    with pytest.raises(StagedNetworkValidationError, match="_source_ref"):
-        StagedNetwork.from_graph(g)
+    # Every directed edge carries the orientation-tagged provenance ref the
+    # simplifiers rely on to reconstruct direction and directional attributes.
+    refs = [d["_source_ref"] for _, _, d in g.edges(data=True)]
+    assert all(ref.endswith(("::ab", "::ba")) for ref in refs)
+    assert sum(ref.endswith("::ab") for ref in refs) == 2
+    assert sum(ref.endswith("::ba") for ref in refs) == 1
 
 
 def test_non_wgs84_crs_raises():

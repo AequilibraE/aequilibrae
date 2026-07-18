@@ -1,7 +1,7 @@
 import geopandas as gpd
 import numpy as np
 from dataclasses import dataclass, field
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString
 from typing import TYPE_CHECKING
 
 from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
@@ -113,113 +113,10 @@ class StagedNetwork:
                 graph.add_edge(b, a, key=link_id, **attrs_ba)
         return graph
 
-    @classmethod
-    def from_graph(cls, graph, source_meta=None):
-        """Reconstruct a canonical staged network from a directed MultiDiGraph.
-
-        ``to_graph`` decomposes every bidirectional link into a pair of directed
-        edges tagged ``<base>::ab`` / ``<base>::ba`` via ``_source_ref``. This
-        method recombines those pairs back into a single undirected staged link
-        (recovering ``direction`` and the directional speed/lane fields) so the
-        round-trip preserves link cardinality and never emits duplicate
-        ``link_id`` values.
-        """
-        node_records = []
-        for nid, data in graph.nodes(data=True):
-            geom = data.get("geometry")
-            if geom is None:
-                geom = Point(data.get("x"), data.get("y"))
-            rec = dict(data)
-            # ``x``/``y`` are graph-only scratch attributes that to_graph()
-            # re-derives from geometry; keeping them would collide on the next
-            # to_graph() call (add_node(..., x=.., **rec)).
-            rec.pop("x", None)
-            rec.pop("y", None)
-            rec["node_id"] = int(nid)
-            rec["geometry"] = geom
-            node_records.append(rec)
-
-        directed = []
-        for u, v, key, data in graph.edges(keys=True, data=True):
-            source_ref = data.get("_source_ref")
-            if source_ref is None:
-                raise StagedNetworkValidationError(
-                    "from_graph() requires every edge to carry a '_source_ref' produced by to_graph(); "
-                    "one or more edges are missing it, so direction cannot be reconstructed safely"
-                )
-            base, _, suffix = str(source_ref).partition("::")
-            directed.append((base, suffix, int(u), int(v), key, data))
-
-        link_records = _canonicalize_directed_edges(directed)
-
-        crs = graph.graph.get("crs", "EPSG:4326")
-        nodes_gdf = gpd.GeoDataFrame(node_records, geometry="geometry", crs=crs)
-        links_gdf = gpd.GeoDataFrame(link_records, geometry="geometry", crs=crs)
-        return cls(nodes=nodes_gdf, links=links_gdf, crs_geo=str(crs), source_meta=source_meta or {})
-
 
 def _base_source_id(rec: dict) -> str:
     source_id = rec.get("source_id")
     if source_id is None:
         return str(rec["link_id"])
     return str(source_id)
-
-
-_SCRATCH_KEYS = ("_source_ref", "_travel_speed", "_travel_lanes")
-
-
-def _clean_edge_data(data: dict) -> dict:
-    return {k: v for k, v in data.items() if k not in _SCRATCH_KEYS}
-
-
-def _canonicalize_directed_edges(directed: list) -> list:
-    """Recombine directed (ab/ba) edges into one staged record per base link."""
-    grouped: dict = {}
-    order: list = []
-    for base, suffix, u, v, _key, data in directed:
-        if base not in grouped:
-            grouped[base] = {}
-            order.append(base)
-        grouped[base][suffix] = (u, v, data)
-
-    link_records = []
-    for new_id, base in enumerate(order, start=1):
-        sides = grouped[base]
-        ab = sides.get("ab")
-        ba = sides.get("ba")
-
-        if ab is not None and ba is not None:
-            direction = 0
-            u, v, data = ab
-        elif ab is not None:
-            direction = 1
-            u, v, data = ab
-        else:
-            # Only the BA side survived: the canonical AB orientation is the
-            # reverse of the stored geometry/endpoints.
-            v, u, data = ba
-            direction = -1
-
-        rec = _clean_edge_data(data)
-        rec["a_node"] = int(u)
-        rec["b_node"] = int(v)
-        rec["link_id"] = int(new_id)
-        rec["direction"] = int(direction)
-
-        if direction == -1 and rec.get("geometry") is not None:
-            rec["geometry"] = LineString(rec["geometry"].coords[::-1])
-
-        ab_data = ab[2] if ab is not None else None
-        ba_data = ba[2] if ba is not None else None
-        if ab_data is not None and ab_data.get("_travel_speed") is not None:
-            rec["speed_ab"] = ab_data.get("_travel_speed")
-        if ab_data is not None and ab_data.get("_travel_lanes") is not None:
-            rec["lanes_ab"] = ab_data.get("_travel_lanes")
-        if ba_data is not None and ba_data.get("_travel_speed") is not None:
-            rec["speed_ba"] = ba_data.get("_travel_speed")
-        if ba_data is not None and ba_data.get("_travel_lanes") is not None:
-            rec["lanes_ba"] = ba_data.get("_travel_lanes")
-
-        link_records.append(rec)
-    return link_records
 

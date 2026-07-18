@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
+from aequilibrae.project.network.importer.schema.modes import DEFAULT_MODES
 from aequilibrae.project.network.importer.simplifiers.base import resolve_simplifier
 from aequilibrae.project.network.importer.sources.base import resolve_source
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
@@ -32,10 +33,6 @@ OPTIONAL_SOURCE_META_KEYS = ("release",)
 _SOURCE_META_KEYS = REQUIRED_SOURCE_META_KEYS + OPTIONAL_SOURCE_META_KEYS
 
 
-def _default_modes():
-    return ("car", "transit", "bicycle", "walk")
-
-
 class NetworkImporter:
     def __init__(self, project: "Project"):
         self.project = project
@@ -44,7 +41,7 @@ class NetworkImporter:
         self,
         source,
         *,
-        modes: Sequence[str] = _default_modes(),
+        modes: Sequence[str] = DEFAULT_MODES,
         simplify="osmnx",
         consolidate_tolerance=10.0,
         cache_tag: str = "",

@@ -33,8 +33,8 @@ def acquire_cloud(
     segments_table = _fetch_table(overturemaps, "segment", bbox, release=release)
     connectors_table = _fetch_table(overturemaps, "connector", bbox, release=release)
 
-    segments_gdf = _table_to_gdf(segments_table)
-    connectors_gdf = _table_to_gdf(connectors_table)
+    segments_gdf = table_to_gdf(segments_table)
+    connectors_gdf = table_to_gdf(connectors_table)
 
     download_cache.write_geoparquet("segments.parquet", segments_gdf)
     download_cache.write_geoparquet("connectors.parquet", connectors_gdf)
@@ -83,8 +83,8 @@ def _fetch_table(overturemaps, theme_type: str, bbox, *, release):
     return rbr.read_all()
 
 
-def _table_to_gdf(table) -> gpd.GeoDataFrame:
-
+def table_to_gdf(table) -> gpd.GeoDataFrame:
+    """Convert a pyarrow table with a WKB geometry column into an EPSG:4326 GeoDataFrame."""
     df = table.to_pandas(use_threads=True)
     if "geometry" not in df.columns:
         raise ImporterError("Overture table must contain a geometry column")

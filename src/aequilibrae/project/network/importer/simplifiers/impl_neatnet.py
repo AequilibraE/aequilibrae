@@ -5,10 +5,12 @@ import shapely
 import warnings
 from shapely.geometry import Point
 
-from aequilibrae.project.network.importer.simplifiers.impl_osmnx import (
-    _build_oriented_source_attr_map,
-    _build_provenance,
-    _build_source_attr_map,
+from aequilibrae.project.network.importer.simplifiers.common import (
+    PROVENANCE_OUT_COL,
+    SOURCE_ID_COL,
+    build_oriented_source_attr_map,
+    build_provenance,
+    build_source_attr_map,
 )
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 from aequilibrae.project.network.importer.utils import (
@@ -26,8 +28,6 @@ _DUAL_CARRIAGEWAY_WARNING = (
     "neatnet simplification may collapse parallel one-way carriageways into a single coarse link. "
     "When that happens, direction, speed, and lane fields are reconstructed heuristically after simplification."
 )
-_PROVENANCE_OUT_COL = "source_ids"
-_SOURCE_ID_COL = "source_id"
 _BEARING_MAX_DIFF_DEGREES = 35.0
 _STRAIGHTNESS_THRESHOLD = 0.97
 _DEKINK_MAX_POINTS = 6
@@ -102,7 +102,6 @@ def _gdf_to_staged(
         {
             "node_id": list(endpoints.keys()),
             "geometry": [Point(x, y) for x, y in endpoints.values()],
-            "modes": "c",
         },
         geometry="geometry",
         crs="EPSG:4326",
@@ -144,8 +143,8 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     utm = simplified.geometry.estimate_utm_crs()
     simp_geoms = simplified.geometry.to_crs(utm).values
     orig_geoms = original.geometry.to_crs(utm).values
-    src_attrs = _build_source_attr_map(original)
-    oriented_src_attrs = _build_oriented_source_attr_map(original)
+    src_attrs = build_source_attr_map(original)
+    oriented_src_attrs = build_oriented_source_attr_map(original)
 
     tree = shapely.STRtree(orig_geoms)
 
@@ -165,7 +164,7 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     orig_modes = original["modes"].to_numpy()
     orig_lt = original["link_type"].to_numpy()
     orig_name = original["name"].to_numpy()
-    orig_source_ids = original[_SOURCE_ID_COL].astype(str).to_numpy()
+    orig_source_ids = original[SOURCE_ID_COL].astype(str).to_numpy()
     orig_straightness = np.array([line_straightness(g) for g in orig_geoms], dtype=float)
 
     for i in range(n):
@@ -205,7 +204,7 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
 
         ordered_source_ids = _ordered_source_ids(fwd_candidates + bwd_candidates)
         primary_source_ids[i] = ordered_source_ids[0] if ordered_source_ids else orig_source_ids[nearest_oidx]
-        provenance[i] = _build_provenance(ordered_source_ids, src_attrs)
+        provenance[i] = build_provenance(ordered_source_ids, src_attrs)
 
         sources = contributing_oidx or [nearest_oidx]
         all_modes = set().union(*(orig_modes[o] for o in sources if isinstance(orig_modes[o], str)), set())
@@ -227,8 +226,8 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
     simplified["speed_ba"] = speed_ba
     simplified["lanes_ab"] = lanes_ab
     simplified["lanes_ba"] = lanes_ba
-    simplified[_SOURCE_ID_COL] = primary_source_ids
-    simplified[_PROVENANCE_OUT_COL] = provenance
+    simplified[SOURCE_ID_COL] = primary_source_ids
+    simplified[PROVENANCE_OUT_COL] = provenance
 
 
 # Highway classes grouped by function. Modes are only inherited between

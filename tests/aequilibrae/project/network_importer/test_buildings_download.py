@@ -1,6 +1,7 @@
 """Building-footprint download gating tests for the neatnet exclusion mask."""
 
 import geopandas as gpd
+import pytest
 from shapely.geometry import LineString, Point
 
 from aequilibrae.project.network.importer.buildings import BuildingMaskResult, fetch_building_footprints
@@ -79,3 +80,67 @@ def test_buildings_retry_once_then_fallback(monkeypatch):
     assert result.retries == 1
     assert result.reason == "RuntimeError"
     assert fake.calls == 2
+
+
+def _patch_release(monkeypatch):
+    monkeypatch.setattr(
+        "aequilibrae.project.network.importer.sources.overture.impl.get_latest_overture_version",
+        lambda: "test-release",
+    )
+
+
+def test_buildings_success_path_downloads_and_caches(monkeypatch):
+    pa = pytest.importorskip("pyarrow")
+    from shapely import to_wkb
+    from shapely.geometry import Polygon
+
+    footprint = Polygon([(0, 0), (0, 0.001), (0.001, 0.001), (0.001, 0)])
+    table = pa.table({"id": ["b1"], "geometry": [to_wkb(footprint)]})
+
+    class _Reader:
+        def read_all(self):
+            return table
+
+    class _FakeOverture:
+        def record_batch_reader(self, *args, **kwargs):
+            return _Reader()
+
+    class _RecordingCache:
+        def __init__(self):
+            self.written = []
+
+        def write_geoparquet(self, name, gdf):
+            self.written.append((name, len(gdf)))
+
+    monkeypatch.setattr("aequilibrae.project.network.importer.buildings.require", lambda *a, **k: _FakeOverture())
+    _patch_release(monkeypatch)
+
+    cache = _RecordingCache()
+    result = fetch_building_footprints(_net(0.1), cache, enabled=True)
+    assert result.status == "downloaded"
+    assert result.cache_written is True
+    assert result.retries == 0
+    assert len(result.gdf) == 1
+    assert str(result.gdf.crs).upper() == "EPSG:4326"
+    assert cache.written == [("buildings.parquet", 1)]
+
+
+def test_buildings_zero_rows_twice_falls_back(monkeypatch):
+    pa = pytest.importorskip("pyarrow")
+
+    class _Reader:
+        def read_all(self):
+            return pa.table({"id": pa.array([], type=pa.string())})
+
+    class _FakeOverture:
+        def record_batch_reader(self, *args, **kwargs):
+            return _Reader()
+
+    monkeypatch.setattr("aequilibrae.project.network.importer.buildings.require", lambda *a, **k: _FakeOverture())
+    _patch_release(monkeypatch)
+
+    result = fetch_building_footprints(_net(0.1), _DummyCache(), enabled=True)
+    assert result.gdf is None
+    assert result.status == "fallback"
+    assert result.reason == "zero_rows"
+    assert result.retries == 1

@@ -9,10 +9,9 @@ from typing import Sequence
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import to_jsonable
-from aequilibrae.project.network.importer.schema.modes import filter_by_modes
-from aequilibrae.project.network.importer.sources.osm.tags_to_ir import MODE_CODE
+from aequilibrae.project.network.importer.schema.modes import MODE_CODE, filter_by_modes, requested_mode_codes
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
-from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_node_modes
+from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_lengths, compute_node_modes
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +77,7 @@ def build_staged_from_overture(
     if len(connectors) == 0:
         raise ImporterError("Overture returned no connectors in the requested area")
 
-    requested_codes = {MODE_CODE[m] for m in modes if m in MODE_CODE}
-    if not requested_codes:
-        raise ImporterError(f"None of the requested modes {modes!r} match the configured modes {sorted(MODE_CODE)}")
+    requested_codes = requested_mode_codes(modes)
 
     connectors = _normalize_connectors(connectors)
     connectors["node_id"] = np.arange(
@@ -118,8 +115,7 @@ def build_staged_from_overture(
         raise ImporterError(f"After mode filtering ({modes!r}) no Overture links remain")
 
     links_gdf = gpd.GeoDataFrame(link_rows, geometry="geometry", crs="EPSG:4326")
-    utm = links_gdf.geometry.estimate_utm_crs()
-    links_gdf["distance"] = links_gdf.geometry.to_crs(utm).length.astype(float)
+    links_gdf["distance"] = compute_lengths(links_gdf.geometry).to_numpy()
     links_gdf = links_gdf[links_gdf["distance"] > 0].reset_index(drop=True)
     if len(links_gdf) == 0:
         raise ImporterError("Overture links have zero length after geometry splitting")

@@ -1,6 +1,8 @@
 from typing import ClassVar, Protocol, runtime_checkable
 
 from aequilibrae.project.network.importer.exceptions import SourceResolutionError
+from aequilibrae.project.network.importer.simplifiers.neatnet_simplifier import NeatnetSimplifier
+from aequilibrae.project.network.importer.simplifiers.osmnx_simplifier import OSMnxSimplifier
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
@@ -11,14 +13,7 @@ class Simplifier(Protocol):
     def simplify(self, net: StagedNetwork, **kwargs) -> StagedNetwork: ...
 
 
-def _simplifiers() -> dict:
-    from aequilibrae.project.network.importer.simplifiers.neatnet_simplifier import NeatnetSimplifier
-    from aequilibrae.project.network.importer.simplifiers.osmnx_simplifier import OSMnxSimplifier
-
-    return {OSMnxSimplifier.name: OSMnxSimplifier, NeatnetSimplifier.name: NeatnetSimplifier}
-
-
-SIMPLIFIERS = _simplifiers()
+SIMPLIFIERS = {OSMnxSimplifier.name: OSMnxSimplifier, NeatnetSimplifier.name: NeatnetSimplifier}
 
 
 def resolve_simplifier(simplifier, **kwargs):
@@ -27,11 +22,10 @@ def resolve_simplifier(simplifier, **kwargs):
     if simplifier is True:
         simplifier = "osmnx"
     if isinstance(simplifier, str):
-        simplifiers = _simplifiers()
-        if simplifier not in simplifiers:
-            available = sorted(simplifiers.keys())
+        if simplifier not in SIMPLIFIERS:
+            available = sorted(SIMPLIFIERS)
             raise SourceResolutionError(f"Unknown simplifier name: {simplifier!r}. Available simplifiers: {available}")
-        return simplifiers[simplifier](**kwargs)
+        return SIMPLIFIERS[simplifier](**kwargs)
     if kwargs:
         raise SourceResolutionError(
             f"Keyword arguments {sorted(kwargs)} only apply when the simplifier is given by name; "

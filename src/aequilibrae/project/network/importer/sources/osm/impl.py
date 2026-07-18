@@ -9,9 +9,12 @@ from typing import Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
-from aequilibrae.project.network.importer.schema.modes import compute_modes_string, filter_by_modes
+from aequilibrae.project.network.importer.schema.modes import (
+    compute_modes_string,
+    filter_by_modes,
+    requested_mode_codes,
+)
 from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
-    MODE_CODE,
     MODE_RULES,
     directional_lanes,
     directional_speeds,
@@ -61,13 +64,15 @@ def acquire_overpass(
         f"overpass:place={place_name}" if place_name is not None else f"overpass:bbox={list(model_area.bounds)}"
     )
 
+    from osmnx._errors import InsufficientResponseError
+
     fetch_kwargs = {"network_type": "all", "simplify": False, "retain_all": True, "custom_filter": custom_filter}
     try:
         if model_area is not None:
             graph = ox.graph_from_polygon(model_area, **fetch_kwargs)
         else:
             graph = ox.graph_from_place(place_name, **fetch_kwargs)
-    except ox.exceptions.InsufficientResponseError as exc:
+    except InsufficientResponseError as exc:
         raise ImporterError(f"Overpass returned an empty or partial response for {source_url}: {exc}") from exc
     except Exception as exc:
         from requests.exceptions import RequestException
@@ -242,7 +247,7 @@ def _edges_nodes_to_staged(
     source_meta: dict,
     clip_to,
 ) -> StagedNetwork:
-    requested_codes = _requested_mode_codes(modes)
+    requested_codes = requested_mode_codes(modes)
     nodes_gdf, osm_to_node = _prepare_nodes(nodes_gdf)
     edges = _prepare_edges(edges_gdf, osm_to_node)
     edges = _add_osm_attributes(edges, requested_codes)
@@ -251,13 +256,6 @@ def _edges_nodes_to_staged(
     nodes_out = _staged_nodes(nodes_gdf, edges)
     links_out = gpd.GeoDataFrame(edges, geometry="geometry", crs="EPSG:4326")
     return StagedNetwork(nodes=nodes_out, links=links_out, source_meta=source_meta)
-
-
-def _requested_mode_codes(modes: Sequence[str]) -> set:
-    requested_codes = {MODE_CODE[m] for m in modes if m in MODE_CODE}
-    if not requested_codes:
-        raise ImporterError(f"None of the requested modes {modes!r} match the configured modes {sorted(MODE_CODE)}")
-    return requested_codes
 
 
 def _prepare_nodes(nodes_gdf: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:

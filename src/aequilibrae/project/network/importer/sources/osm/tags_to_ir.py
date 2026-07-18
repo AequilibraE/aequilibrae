@@ -3,15 +3,7 @@
 import re
 from typing import Mapping
 
-from aequilibrae.project.network.importer.schema.modes import ModeRule
-
-
-MODE_CODE = {
-    "car": "c",
-    "transit": "t",
-    "bicycle": "b",
-    "walk": "w",
-}
+from aequilibrae.project.network.importer.schema.modes import MODE_CODE, ModeRule
 
 
 def _has(tags: Mapping, key: str, *values: str) -> bool:

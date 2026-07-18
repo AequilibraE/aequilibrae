@@ -92,7 +92,7 @@ def fetch_building_footprints(
     overturemaps = require("overturemaps", feature="building footprint download for neatnet")
     logger.info(f"Downloading building footprints from Overture Maps for bbox={bbox}")
 
-    from aequilibrae.project.network.importer.sources.overture.impl import get_latest_overture_version
+    from aequilibrae.project.network.importer.sources.overture.impl import get_latest_overture_version, table_to_gdf
 
     last_reason = ""
     for attempt in range(2):
@@ -108,7 +108,7 @@ def fetch_building_footprints(
                 continue
 
             logger.info(f"Downloaded {table.num_rows} building footprints from Overture Maps (release={release})")
-            buildings_gdf = _table_to_gdf(table)
+            buildings_gdf = table_to_gdf(table)
             download_cache.write_geoparquet("buildings.parquet", buildings_gdf)
             logger.info(f"Building footprints GeoDataFrame: {len(buildings_gdf)} rows")
             return BuildingMaskResult(
@@ -155,13 +155,3 @@ def fetch_building_footprints(
         cache_written=False,
         reason=last_reason or "empty",
     )
-
-
-def _table_to_gdf(table) -> gpd.GeoDataFrame:
-    from shapely import from_wkb
-
-    df = table.to_pandas(use_threads=True)
-    if "geometry" not in df.columns:
-        raise ValueError("Overture buildings table must contain a geometry column")
-    df["geometry"] = df["geometry"].apply(lambda v: from_wkb(v) if v is not None else None)
-    return gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")

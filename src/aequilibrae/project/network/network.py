@@ -7,6 +7,7 @@ from shapely.geometry import Polygon
 from typing import Optional
 
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
+from aequilibrae.project.network.importer.schema.modes import DEFAULT_MODES
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
@@ -113,7 +114,7 @@ class Network(WorkerThread):
         self,
         source,
         *,
-        modes=("car", "transit", "bicycle", "walk"),
+        modes=DEFAULT_MODES,
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
         cache_tag: str = "",
@@ -149,7 +150,7 @@ class Network(WorkerThread):
         model_area: Optional[Polygon] = None,
         place_name: Optional[str] = None,
         pbf_path=None,
-        modes=("car", "transit", "bicycle", "walk"),
+        modes=DEFAULT_MODES,
         custom_filter: Optional[str] = None,
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
@@ -195,7 +196,7 @@ class Network(WorkerThread):
         self,
         *,
         model_area: Polygon,
-        modes=("car", "transit", "bicycle", "walk"),
+        modes=DEFAULT_MODES,
         simplify="osmnx",
         consolidate_tolerance: Optional[float] = 10.0,
     ) -> None:
