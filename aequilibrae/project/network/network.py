@@ -404,7 +404,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -414,7 +414,7 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
