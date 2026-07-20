@@ -39,7 +39,7 @@ fldr = Path(gettempdir()) / uuid4().hex
 project = create_example(fldr, "sioux_falls")
 
 # %%
-# All AequilibraE projects presents three types of connections in the form of properties:
+# All AequilibraE projects present three types of connections in the form of properties:
 #
 #    * Spatial connection to the project database
 #    * General connection to the results database

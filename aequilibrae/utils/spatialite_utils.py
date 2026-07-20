@@ -87,10 +87,10 @@ def _load_extension(conn: Connection, path: str) -> None:
 
 
 def _pin_extension(path: str) -> None:
-    # SQLite LoadLibrary's mod_spatialite on every load_extension and FreeLibrary's it when the
-    # connection closes. On Windows, each load/unload cycle leaks a TLS index, and the process
-    # aborts once the ~1088-slot limit is reached (~1000 connections). Holding one extra reference
-    # here keeps the DLL permanently mapped so it is never actually unloaded.
+    # SQLite loads mod_spatialite with LoadLibrary on every load_extension call and frees it with
+    # FreeLibrary when the connection closes. On Windows, each load/unload cycle leaks a TLS index,
+    # and the process aborts once the ~1088-slot limit is reached (~1000 connections). Holding one
+    # extra reference here keeps the DLL permanently mapped so it is never actually unloaded.
     if is_not_windows() or path in _pinned_extensions:
         return
     try:

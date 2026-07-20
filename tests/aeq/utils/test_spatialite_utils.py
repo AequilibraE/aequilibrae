@@ -6,9 +6,9 @@ import pytest
 
 CYCLES = 3000
 
-# Without the DLL pin in spatialite_utils, SQLite LoadLibrary/FreeLibrary's mod_spatialite on
-# every connection open/close, and each cycle leaks a Windows TLS index. The process aborts once
-# the ~1088-slot limit is reached, at roughly 1000 cycles.
+# Without the DLL pin in spatialite_utils, SQLite loads mod_spatialite with LoadLibrary on every
+# connection open/close and frees it with FreeLibrary. Each cycle leaks a Windows TLS index, so the
+# process aborts once the ~1088-slot limit is reached (roughly 1000 cycles).
 SCRIPT = f"""
 import sqlite3
 from aequilibrae.utils import spatialite_utils
