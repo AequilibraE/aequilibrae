@@ -4,6 +4,19 @@ run:
   results_summary:
   example_function_with_kwargs:
     arg1: "parameters.yml argument"
+vdfs:
+  default: "bpr_tyler"
+  bpr_tyler: 
+    function: bpr
+    spec: 
+      alpha:
+        fillNA: 0.15
+        bounds: [0, 10]
+      beta: 4
+  quadratic:
+    funtional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
+    spec:
+      a:
 assignment:
   equilibrium:
     maximum_iterations: 250

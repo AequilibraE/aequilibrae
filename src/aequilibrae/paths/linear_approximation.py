@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import time
@@ -38,7 +40,7 @@ class LinearApproximation(WorkerThread):
     assignment = SIGNAL(object)
     signal = SIGNAL(object)
 
-    def __init__(self, assig_spec, algorithm, project=None) -> None:
+    def __init__(self, assig_spec: TrafficAssignment, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
         self.signal.emit(["set_text", "Linear Approximation"])
 
@@ -117,7 +119,7 @@ class LinearApproximation(WorkerThread):
             self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
 
         self.free_flow_tt = assig_spec.free_flow_tt
-        self.fw_total_flow = assig_spec.total_flow
+        self.total_flow = assig_spec.total_flow
         self.congested_time = assig_spec.congested_time
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
@@ -156,7 +158,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+            self.vdf_der,
+            self.total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            self.cores,
+            **self.vdf_parameters,
         )
         numerator = 0.0
         denominator = 0.0
@@ -194,7 +201,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+            self.vdf_der,
+            self.total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            self.cores,
+            **self.vdf_parameters,
         )
         mu_numerator = 0.0
         mu_denominator = 0.0
@@ -244,18 +256,18 @@ class LinearApproximation(WorkerThread):
         self.betas[2] = mu * self.betas[0]
 
     def _set_current_flow(self, assigned_flow):
-        self.fw_total_flow = np.array(assigned_flow, dtype=np.float64, copy=True)
+        self.total_flow = np.array(assigned_flow, dtype=np.float64, copy=True)
         if self.preload is not None:
-            self.fw_total_flow += self.preload
+            self.total_flow += self.preload
 
     def _update_congested_costs(self):
         self.vdf.apply_vdf(
             self.congested_time,
-            self.fw_total_flow,
+            self.total_flow,
             self.capacity,
             self.free_flow_tt,
-            *self.vdf_parameters,
             self.cores,
+            **self.vdf_parameters,
         )
 
         for c in self.traffic_classes:
@@ -674,12 +686,19 @@ class LinearApproximation(WorkerThread):
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
         the corresponding contribution needs to be passed in"""
-        x = np.zeros_like(self.fw_total_flow)
-        linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
+        x = np.zeros_like(self.total_flow)
+        linear_combination_1d(x, self.step_direction_flow, self.total_flow, stepsize, self.cores)
         # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
-        self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
+        self.vdf.apply_vdf(
+            self.congested_value,
+            x,
+            self.capacity,
+            self.free_flow_tt,
+            self.cores,
+            **self.vdf_parameters,
+        )
         link_cost_term = sum_a_times_b_minus_c(
-            self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
+            self.congested_value, self.step_direction_flow, self.total_flow, self.cores
         )
         return link_cost_term + const_term
 
@@ -713,7 +732,7 @@ class LinearApproximation(WorkerThread):
         linear_combination_1d(
             self._trap_new_flow,
             self.step_direction_flow,
-            self.fw_total_flow,
+            self.total_flow,
             stepsize,
             self.cores,
         )
@@ -722,8 +741,8 @@ class LinearApproximation(WorkerThread):
             self._trap_new_flow,
             self.capacity,
             self.free_flow_tt,
-            *self.vdf_parameters,
             self.cores,
+            **self.vdf_parameters,
         )
         np.add(self.congested_time, self._trap_new_cost, out=self._trap_avg_cost)
         link_term = (
@@ -732,7 +751,7 @@ class LinearApproximation(WorkerThread):
             * sum_a_times_b_minus_c(
                 self._trap_avg_cost,
                 self.step_direction_flow,
-                self.fw_total_flow,
+                self.total_flow,
                 self.cores,
             )
         )

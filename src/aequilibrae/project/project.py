@@ -22,6 +22,7 @@ from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
+from aequilibrae.paths.vdf import VDFsManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import AequilibraEConnection, commit_and_close, safe_connect
@@ -303,6 +304,12 @@ class Project:
         self.scenario.results = Results(self)
         self.scenario.transit = Transit(self)
         self.scenario.zoning = Zoning(self.scenario.network)
+        self.scenario.vdf_manager = VDFsManager()
+        # add all base vdfs
+        # add all vdfs from parameters
+
+    def add_vdf(self):  # add to manager
+        pass
 
     @property
     def project_parameters(self) -> Parameters:

@@ -4,12 +4,13 @@ import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
+from collections.abc import Callable
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
-from numpy import nan_to_num
+from numpy import nan_to_num, ndarray, dtype
 
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
@@ -261,7 +262,7 @@ class TrafficAssignment(AssignmentBase):
 
         self.rgap_target = parameters["rgap"]
         self.max_iter = parameters["maximum_iterations"]
-        self.vdf = VDF()
+        self.vdf = None  # type: VDF
         self.vdf_parameters = None  # type: list
         self.capacity_field = None  # type: str
         self.capacity = None  # type: np.ndarray
@@ -296,11 +297,7 @@ class TrafficAssignment(AssignmentBase):
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
         elif instance == "vdf":
-            v = value.lower()
-            if v not in all_vdf_functions:
-                return False, value, f"Volume-delay function {value} is not available"
-            value = VDF()
-            value.function = v
+            assert isinstance(value, VDF)
         elif instance == "classes":
             if isinstance(value, TrafficClass):
                 value = [value]
@@ -323,14 +320,21 @@ class TrafficAssignment(AssignmentBase):
             return False, value, f"TrafficAssignment class does not have property {instance}"
         return True, value, ""
 
-    def set_vdf(self, vdf_function: str) -> None:
+    def set_vdf(
+        self,
+        name: str,
+        func: Callable,
+        spec: dict,
+        d_func: Callable | None = None,  # central difference
+    ) -> None:
         """
         Sets the Volume-delay function to be used
 
         :Arguments:
             **vdf_function** (:obj:`str`): Name of the VDF to be used
         """
-        self.vdf = vdf_function
+
+        self.vdf = VDF(name, func, spec, d_func)
 
     def set_classes(self, classes: List[TrafficClass]) -> None:
         """
@@ -390,7 +394,7 @@ class TrafficAssignment(AssignmentBase):
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
 
-    def set_vdf_parameters(self, par: dict) -> None:
+    def set_vdf_parameters_old(self, par: dict) -> None:
         """
         Sets the parameters for the Volume-delay function.
 
@@ -448,6 +452,37 @@ class TrafficAssignment(AssignmentBase):
 
         self.__dict__["vdf_parameters"] = pars
         self._config["VDF function"] = self.vdf.function.lower()
+
+    def set_vdf_link_attributes(self, par: dict[str, str | float]):
+        """
+        Sets vdf_link_attributes as a dict of {name: value}
+        Input parameter par:
+        {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
+
+        """
+        vdf_link_attributes: dict[str, np.ndarray] = {}
+
+        for attribute_name, settings in self.vdf.spec.items():
+            if attribute_name in par:
+                value = par[attribute_name]
+            elif "default" in settings:
+                value = settings["default"]
+                print(f"Using default value for {attribute_name} of {value}")
+            else:
+                raise ValueError(f"{attribute_name} should exist in the set of parameters provided")
+
+            if isinstance(value, str):
+                # value is the name of a column
+                c = self.classes[0]
+                array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+                array[c.graph.graph.__supernet_id__] = c.graph.graph[value]
+            else:
+                array: np.ndarray = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+                array.fill(value)
+            vdf_link_attributes[attribute_name] = array
+
+        self.vdf_parameters: dict[str, ndarray[tuple[Any, ...], dtype[Any]]] = vdf_link_attributes
+        # TODO: Check bounds
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
@@ -606,10 +641,10 @@ class TrafficAssignment(AssignmentBase):
         if self.vdf == "":
             raise ValueError("First you need to set the Volume-Delay Function to use")
 
-        par = list(kwargs.keys())
-        q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
-        if len(q) > 0:
-            raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
+        # par = list(kwargs.keys())
+        # q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
+        # if len(q) > 0:
+        #     raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
     def log_specification(self):
