@@ -24,3 +24,14 @@ def test_connection_with_transit(empty_project):
     with read_and_close(join(empty_project.project_base_path, "public_transport.sqlite")) as conn:
         routes = conn.execute("select count(*) from routes").fetchone()[0]
     assert routes == 0, "Returned more routes thant it should have"
+
+
+def test_db_connection_is_spatial(empty_project):
+    with empty_project.db_connection as conn:
+        assert conn.execute("select spatialite_version()").fetchone()[0]
+
+
+def test_db_connection_spatial_is_deprecated(empty_project):
+    with pytest.warns(DeprecationWarning, match="removed in version 2.1"):
+        with empty_project.db_connection_spatial as conn:
+            assert conn.execute("select spatialite_version()").fetchone()[0]

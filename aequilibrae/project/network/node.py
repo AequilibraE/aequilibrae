@@ -42,7 +42,7 @@ class Node(SafeClass):
 
     def save(self):
         """Saves node to database"""
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             if self.node_id != self.__original__["node_id"]:
                 raise ValueError("One cannot change the node_id")
 

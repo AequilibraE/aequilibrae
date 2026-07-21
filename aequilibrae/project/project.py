@@ -139,14 +139,19 @@ class Project:
     @property
     @contextmanager
     def db_connection(self):
-        with commit_and_close(self._project_database_path, spatial=False) as conn:
+        with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
     @property
-    @contextmanager
     def db_connection_spatial(self):
-        with commit_and_close(self._project_database_path, spatial=True) as conn:
-            yield conn
+        """Deprecated alias for ``db_connection``, which is now a spatial connection."""
+        warnings.warn(
+            "'db_connection_spatial' is deprecated and will be removed in version 2.1. "
+            "Use 'db_connection' instead, which is now a spatial connection.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.db_connection
 
     @property
     @contextmanager
@@ -361,7 +366,7 @@ class Project:
         p.write_back()
 
         # Create actual tables
-        with self.db_connection_spatial as conn:
+        with self.db_connection as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables(self.logger, "network", conn=conn)
 
