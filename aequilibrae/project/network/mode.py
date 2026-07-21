@@ -4,7 +4,7 @@ import string
 class Mode:
     """A mode object represents a single record in the *modes* table"""
 
-    __alowed_characters = string.ascii_letters + "_"
+    __allowed_characters = string.ascii_letters + "_"
 
     def __init__(self, mode_id: str, project) -> None:
         self.project = project
@@ -43,11 +43,11 @@ class Mode:
             self.__dict__[instance] = value
 
     def save(self):
-        if self.mode_id not in self.__alowed_characters:
+        if self.mode_id not in self.__allowed_characters:
             raise ValueError("mode_id needs to be a ascii letter")
 
         for letter in self.mode_name:
-            if letter not in self.__alowed_characters:
+            if letter not in self.__allowed_characters:
                 raise ValueError('mode_name can only contain letters and "_"')
 
         with self.project.db_connection as conn:
