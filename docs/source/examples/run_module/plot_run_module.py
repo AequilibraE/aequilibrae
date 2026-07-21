@@ -131,7 +131,7 @@ import geopandas as gpd
 results = project.results.get_results("my_run_module_example").set_index("link_id")
 
 # %%
-with project.db_connection_spatial as conn:
+with project.db_connection as conn:
     links = gpd.read_postgis(
         "SELECT link_id, st_asBinary(geometry) geometry FROM delaunay_network", conn, geom_col="geometry", crs=4326
     )

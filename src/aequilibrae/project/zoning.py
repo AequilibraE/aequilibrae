@@ -1,8 +1,8 @@
+import logging
 import warnings
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Union, TYPE_CHECKING
-import logging
+from typing import TYPE_CHECKING, Dict, Union
 
 import pandas as pd
 import shapely.wkb
@@ -11,7 +11,7 @@ from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
-from aequilibrae.project.network.connector_creation import connector_creation, bulk_connector_creation
+from aequilibrae.project.network.connector_creation import bulk_connector_creation, connector_creation
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
@@ -77,7 +77,7 @@ class Zoning(BasicTable):
 
         if not self.__has_zoning():
             qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
-            with self.network.project.db_connection_spatial as conn:
+            with self.network.project.db_connection as conn:
                 run_queries_from_sql_file(conn, qry_file)
             self.__load()
         else:
@@ -89,7 +89,7 @@ class Zoning(BasicTable):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        with self.network.project.db_connection_spatial as conn:
+        with self.network.project.db_connection as conn:
             dt = conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return union_all(polygons)
@@ -117,7 +117,7 @@ class Zoning(BasicTable):
             Defaults to ``True``.
         """
         i = 0
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             existing_centroids = pd.read_sql("SELECT node_id from Nodes where is_centroid = 1", conn).node_id.to_numpy()
             for zone_id in simple_progress(self.__items.keys(), SIGNAL(object), "Connecting zones"):
                 if zone_id in existing_centroids:
@@ -168,7 +168,7 @@ class Zoning(BasicTable):
         centroid_conn = link_data.query("a_node in @centroids and modes.str.contains(@mode_id)", engine="python")
         connected_centroids = centroid_conn.a_node.to_numpy()
 
-        with self.project.db_connection_spatial as conn, warnings.catch_warnings():
+        with self.project.db_connection as conn, warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
 
             if not bulk:
@@ -248,7 +248,7 @@ class Zoning(BasicTable):
 
     def __load(self) -> None:
         tl = TableLoader()
-        with self.network.project.db_connection_spatial as conn:
+        with self.network.project.db_connection as conn:
             zones_list = tl.load_table(conn, "zones")
         self.__fields = deepcopy(tl.fields)
 
