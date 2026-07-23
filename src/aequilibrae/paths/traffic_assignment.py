@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
 from typing import Dict, List, Optional, Union, Any
-from collections.abc import Callable
 from uuid import uuid4
 
 import numpy as np
@@ -18,7 +17,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
-from aequilibrae.paths.vdf import VDF, all_vdf_functions
+from aequilibrae.paths.vdf import VDF
 from aequilibrae.utils.core_setter import set_cores
 
 
@@ -250,7 +249,7 @@ class TrafficAssignment(AssignmentBase):
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, project=None) -> None:  # should have classes, vdfs in arguments avoiding 2 stage initialisation
         """"""
         self.__dict__["_TrafficAssignment__initalised"] = False
         super().__init__(project=project)
@@ -320,21 +319,18 @@ class TrafficAssignment(AssignmentBase):
             return False, value, f"TrafficAssignment class does not have property {instance}"
         return True, value, ""
 
-    def set_vdf(
-        self,
-        name: str,
-        func: Callable,
-        spec: dict,
-        d_func: Callable | None = None,  # central difference
-    ) -> None:
+    def set_vdf(self, vdf: VDF, name_mapping: dict | None = None) -> None:
         """
-        Sets the Volume-delay function to be used
+        Sets the Volume-delay function to be used, along with the name mapping between the VDF's inputs
+        and columns in the dataframe.
 
         :Arguments:
             **vdf_function** (:obj:`str`): Name of the VDF to be used
         """
 
-        self.vdf = VDF(name, func, spec, d_func)
+        self.vdf = vdf
+
+        self._set_vdf_link_attributes(name_mapping if name_mapping is not None else {})
 
     def set_classes(self, classes: List[TrafficClass]) -> None:
         """
@@ -394,66 +390,66 @@ class TrafficAssignment(AssignmentBase):
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
 
-    def set_vdf_parameters_old(self, par: dict) -> None:
-        """
-        Sets the parameters for the Volume-delay function.
+    # def set_vdf_parameters_old(self, par: dict) -> None:
+    #     """
+    #     Sets the parameters for the Volume-delay function.
 
-        Parameter values can be scalars (same values for the entire network) or network field names
-        (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
+    #     Parameter values can be scalars (same values for the entire network) or network field names
+    #     (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
-        The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it.
-        Users should supply ``8 * tau`` to match other common usages. Additionally the standard
-        ``0.25`` factor can be overridden by supplying the 'alpha' parameter.
+    #     The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it.
+    #     Users should supply ``8 * tau`` to match other common usages. Additionally the standard
+    #     ``0.25`` factor can be overridden by supplying the 'alpha' parameter.
 
-        :Arguments:
-            **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
-        """
-        if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-            raise RuntimeError(
-                "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
-            )
+    #     :Arguments:
+    #         **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
+    #     """
+    #     if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
+    #         raise RuntimeError(
+    #             "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
+    #         )
 
-        # In literature 0.25 is not provided as a parameter. We allow it but default to 0.25 if it wasn't provided.
-        if self.vdf.function == "AKCELIK":
-            par["alpha"] = par.get("alpha", 0.25)
+    #     # In literature 0.25 is not provided as a parameter. We allow it but default to 0.25 if it wasn't provided.
+    #     if self.vdf.function == "AKCELIK":
+    #         par["alpha"] = par.get("alpha", 0.25)
 
-        self.__dict__["vdf_parameters"] = par
-        self._config["VDF parameters"] = par
-        pars = []
+    #     self.__dict__["vdf_parameters"] = par
+    #     self._config["VDF parameters"] = par
+    #     pars = []
 
-        if self.vdf.function in ["BPR", "BPR2", "CONICAL"]:
-            parameter_bounds = {"alpha": (0.0, float("inf")), "beta": (1.0, float("inf"))}
-        elif self.vdf.function == "INRETS":
-            parameter_bounds = {"alpha": (0.0, 1.0)}
-        elif self.vdf.function == "AKCELIK":
-            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf")), "length": (0.0, float("inf"))}
-        else:
-            raise ValueError(f"unknown vdf function {self.vdf.function}")
+    #     if self.vdf.function in ["BPR", "BPR2", "CONICAL"]:
+    #         parameter_bounds = {"alpha": (0.0, float("inf")), "beta": (1.0, float("inf"))}
+    #     elif self.vdf.function == "INRETS":
+    #         parameter_bounds = {"alpha": (0.0, 1.0)}
+    #     elif self.vdf.function == "AKCELIK":
+    #         parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf")), "length": (0.0, float("inf"))}
+    #     else:
+    #         raise ValueError(f"unknown vdf function {self.vdf.function}")
 
-        for p1, (minimum, maximum) in parameter_bounds.items():
-            if p1 not in par:
-                raise ValueError(f"{p1} should exist in the set of parameters provided")
-            p = par[p1]
-            if isinstance(self.vdf_parameters[p1], str):
-                c = self.classes[0]
-                array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-                array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
-            else:
-                array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
-                array.fill(self.vdf_parameters[p1])
-            pars.append(array)
+    #     for p1, (minimum, maximum) in parameter_bounds.items():
+    #         if p1 not in par:
+    #             raise ValueError(f"{p1} should exist in the set of parameters provided")
+    #         p = par[p1]
+    #         if isinstance(self.vdf_parameters[p1], str):
+    #             c = self.classes[0]
+    #             array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+    #             array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
+    #         else:
+    #             array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+    #             array.fill(self.vdf_parameters[p1])
+    #         pars.append(array)
 
-            if np.any(np.isnan(array)):
-                raise ValueError(f"At least one {p1} is NaN")
-            elif array.min() < minimum:
-                raise ValueError(f"At least one {p1} is less than {minimum}")
-            elif array.max() > maximum:
-                raise ValueError(f"At least one {p1} is greater than {maximum}")
+    #         if np.any(np.isnan(array)):
+    #             raise ValueError(f"At least one {p1} is NaN")
+    #         elif array.min() < minimum:
+    #             raise ValueError(f"At least one {p1} is less than {minimum}")
+    #         elif array.max() > maximum:
+    #             raise ValueError(f"At least one {p1} is greater than {maximum}")
 
-        self.__dict__["vdf_parameters"] = pars
-        self._config["VDF function"] = self.vdf.function.lower()
+    #     self.__dict__["vdf_parameters"] = pars
+    #     self._config["VDF function"] = self.vdf.function.lower()
 
-    def set_vdf_link_attributes(self, par: dict[str, str | float]):
+    def _set_vdf_link_attributes(self, par: dict[str, str | float]):
         """
         Sets vdf_link_attributes as a dict of {name: value}
         Input parameter par:
@@ -700,7 +696,7 @@ class TrafficAssignment(AssignmentBase):
         class1 = self.classes[0]
         res1 = assig_results[0]
 
-        tot_flow = self.assignment.fw_total_flow[idx]
+        tot_flow = self.assignment.total_flow[idx]
         voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]

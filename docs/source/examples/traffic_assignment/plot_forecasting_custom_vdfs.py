@@ -41,12 +41,15 @@ from aequilibrae.utils.logging_utils import basic_config
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
+fldr
 
 # %%
 
 # We'll also apply a basic logging configuration.
 
 basic_config()
+
+project.parameters
 
 # %%
 # Traffic assignment with skimming
@@ -111,17 +114,16 @@ from aequilibrae.paths.cython.AoN import (
     delta_akcelik,
 )
 
-bpr_spec = {"alpha": {"default": 0.15}, "beta": {"default": 4.0}}
-project.add_vdf(name="bpr_tyler", function="bpr", spec=bpr_spec)
+bpr_spec = {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}
+project.add_vdf(name="bpr_tyler", function=bpr, spec=bpr_spec)
 
-standard_vdf = project.get_vdfs(standard="bpr", spec=bpr_spec)
+standard_vdf = project.get_vdf("bpr")
 # vdfs are stored in project
 vdf = project.get_vdf(name="bpr_tyler")
-assig.set_vdf(vdf)
-assig.set_vdf("bpr", bpr, {"alpha": {"default": 0.15}, "beta": {"default": 4.0}}, delta_bpr)
+assig.set_vdf(vdf, name_mapping = {"alpha": "b", "beta": "power"})
+# assig.set_vdf("bpr", bpr, {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}, delta_bpr)
 
 # Then we set the volume delay function and its parameters
-assig.set_vdf_link_attributes({"alpha": "b", "beta": "power"})
 
 # The capacity and free flow travel times as they exist in the graph
 assig.set_capacity_field("capacity")
@@ -366,10 +368,9 @@ def quadratic(congested_times, link_flows, capacity, fftime, cores, a, b):
 def quadratic_derivative(result, link_flows, capacity, fftime, cores, a, b):
     result[:] = fftime * (2*a * (link_flows/capacity) + b) / capacity
 
-assig.add_vdf("quadratic", quadratic, {"a": {"default": 0.15, "bounds": (0, float("inf"))}, "b": {"default": 0.1}}, quadratic_derivative)
+assig.add_vdf("quadratic", quadratic, {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}}, quadratic_derivative)
 assig.set_vdf("quadratic")
-# default is filled value
-# default -> fillNA
+# fill_NA is filled value
 
 # Then we set the volume delay function and its parameters
 assig.set_vdf_link_attributes({"a": "b"}) # {"capacity": "this_capacity", }
