@@ -81,8 +81,9 @@ tests = [
 
 dev = ['aequilibrae[tests, docs]']
 
-# simwrapper CLI
+# CLIs
 [project.scripts]
+aeq = "aequilibrae.project.tools.cli:cli"
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
 
 [tool.ruff]
