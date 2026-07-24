@@ -2,7 +2,7 @@ thisdir = 'aequilibrae/project/tools'
 
 pyfiles = [
   '__init__.py',
-  'cli.py'
+  'cli.py',
   'migration_manager.py',
   'network_simplifier.py',
 ]
