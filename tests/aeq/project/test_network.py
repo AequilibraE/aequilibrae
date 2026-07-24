@@ -4,7 +4,8 @@ import pytest
 from shapely.geometry import box, Polygon
 
 
-def test_create_from_osm(empty_project, mock_overpass_api):
+def test_create_from_osm(empty_project, mock_overpass_grid):
+    _ = mock_overpass_grid
     empty_project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
 
     with empty_project.db_connection as conn:
