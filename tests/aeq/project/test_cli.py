@@ -41,6 +41,7 @@ def test_bool_defaults_become_flag_pairs():
 
     assert parse_call(f, []) is False
     assert parse_call(f, ["--overwrite"]) is True
+    assert parse_call(f, [], defaults={"overwrite": True}) is True
     assert parse_call(f, ["--no-overwrite"], defaults={"overwrite": True}) is False
 
 
