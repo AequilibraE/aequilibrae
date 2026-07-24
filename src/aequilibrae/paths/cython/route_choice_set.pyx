@@ -173,6 +173,7 @@ cdef class RouteChoiceSet:
         bfsle: bool = True,
         penalty: float = 1.0,
         where: Optional[str] = None,
+        to_parquet_kwargs: dict | None = None,
         store_results: bool = True,
         path_size_logit: bool = False,
         beta: float = 1.0,
@@ -201,6 +202,7 @@ cdef class RouteChoiceSet:
                 penalisation. Default ``True``.
             **penalty** (:obj:`float`): Penalty to use for Link Penalisation and BFSLE with LP.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
         cdef:
             long long origin, dest
@@ -398,7 +400,7 @@ cdef class RouteChoiceSet:
             if store_results:
                 self.get_results()
                 if where is not None:
-                    self.results.write(where)
+                    self.results.write(where, to_parquet_kwargs if to_parquet_kwargs is not None else {})
 
         if path_size_logit:
             self.ll_results.reduce_link_loading()
@@ -888,7 +890,7 @@ cdef class RouteChoiceSet:
 
         return self.ll_results.sl_od_matrices_structs_to_objects()
 
-    def write_path_files(RouteChoiceSet self, where):
+    def write_path_files(RouteChoiceSet self, where, to_parquet_kwargs):
         """
         Write the path-files to the directory specified
 
@@ -898,4 +900,4 @@ cdef class RouteChoiceSet:
         if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
-        self.results.write(where)
+        self.results.write(where, to_parquet_kwargs)
