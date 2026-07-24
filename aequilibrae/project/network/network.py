@@ -21,7 +21,7 @@ from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
-from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
+from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
@@ -302,7 +302,7 @@ class Network(WorkerThread):
                 ignore_fields = ["ogc_fid", "geometry"]
                 all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
             else:
-                fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
+                fields.extend(["link_id", "a_node", "b_node", "direction", "modes", "link_type"])
                 all_fields = list(set(fields))
 
             if modes is None:
@@ -337,10 +337,8 @@ class Network(WorkerThread):
                     # We filter to centroids existing in our filtered area
                     centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
 
-            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
-
         lonlat = self.nodes.lonlat.set_index("node_id")
-        data = df[valid_fields]
+        data = df[all_fields]
         for m in modes:
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
             # the compressed graph representation is created)
