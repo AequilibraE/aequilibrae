@@ -298,7 +298,7 @@ class Network(WorkerThread):
                 ignore_fields = ["ogc_fid", "geometry"]
                 all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
             else:
-                fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
+                fields.extend(["link_id", "a_node", "b_node", "direction", "modes", "link_type"])
                 all_fields = list(set(fields))
 
             if modes is None:
@@ -343,10 +343,8 @@ class Network(WorkerThread):
                         else None
                     )
 
-            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
-
         lonlat = self.nodes.lonlat.set_index("node_id")
-        data = df[valid_fields]
+        data = df[all_fields]
         for m in modes:
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
             # the compressed graph representation is created)
@@ -410,7 +408,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -420,7 +418,7 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
