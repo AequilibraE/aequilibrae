@@ -7,7 +7,7 @@ import warnings
 from collections.abc import Hashable
 from datetime import datetime
 from functools import cached_property
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 
 import numpy as np
@@ -178,7 +178,7 @@ class RouteChoice:
         """
         self.cores = cores
 
-    def set_save_routes(self, where: Optional[str] = None, **to_parquet_kwargs) -> None:
+    def set_save_routes(self, where: Optional[str] = None, to_parquet_kwargs: dict[str, Any] | None = None) -> None:
         """
         Set save path for route choice results. Provide ``None`` to disable.
 
@@ -197,7 +197,7 @@ class RouteChoice:
             if not where.exists():
                 raise ValueError(f"Path does not exist `{where}`")
         self.where = where
-        self.to_parquet_kwargs = to_parquet_kwargs
+        self.to_parquet_kwargs = to_parquet_kwargs if to_parquet_kwargs is not None else {}
 
     def add_demand(self, demand, fill: float = 0.0):
         """
