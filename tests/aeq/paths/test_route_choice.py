@@ -5,10 +5,10 @@ from os.path import join
 import numpy as np
 import pandas as pd
 import pytest
+from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 
 from aequilibrae.matrix import AequilibraeMatrix, GeneralisedCOODemand
 from aequilibrae.paths.route_choice import RouteChoice
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 
 
 @pytest.fixture(scope="function")
@@ -248,17 +248,17 @@ def test_to_parquet_kwargs(route_choice_setup):
                     codecs.add(metadata.row_group(i).column(j).compression)
         return codecs
 
-    # Without kwargs the default compression applies
+    # Without to_parquet_kwargs the default compression applies
     default_path = pathlib.Path(project.project_base_path) / "default kwargs"
     default_path.mkdir()
     rc.set_save_routes(default_path)
     rc.execute(perform_assignment=True)
     assert compressions(default_path) == {"ZSTD"}
 
-    # kwargs provided to set_save_routes override the defaults of the underlying to_parquet call
+    # to_parquet_kwargs provided to set_save_routes override the defaults of the underlying to_parquet call
     snappy_path = pathlib.Path(project.project_base_path) / "snappy kwargs"
     snappy_path.mkdir()
-    rc.set_save_routes(snappy_path, compression="snappy")
+    rc.set_save_routes(snappy_path, to_parquet_kwargs={"compression": "snappy"})
     rc.execute(perform_assignment=True)
     assert compressions(snappy_path) == {"SNAPPY"}
 
@@ -269,7 +269,7 @@ def test_to_parquet_kwargs(route_choice_setup):
         pd.read_parquet(snappy_path).sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True),
     )
 
-    # save_path_files forwards kwargs in the same manner
+    # save_path_files forwards to_parquet_kwargs in the same manner
     path_files = pathlib.Path(project.project_base_path) / "path files kwargs"
     path_files.mkdir()
     rc.save_path_files(path_files, compression="gzip")
