@@ -318,7 +318,7 @@ class Project:
         return self.project_parameters.parameters
 
     @property
-    def run(self) -> dict[str, Callable]:
+    def run(self) -> dict[str, functools.partial]:
         """
         Load and return the AequilibraE run module with the default arguments from
         ``parameters.yml`` partially applied.
@@ -330,7 +330,7 @@ class Project:
             self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
         )
 
-        res: dict[str, Callable] = {}
+        res: dict[str, functools.partial] = {}
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
