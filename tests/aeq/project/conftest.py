@@ -85,3 +85,46 @@ def mock_overpass_grid():
     """
     with _patch_overpass(_GRID_RESPONSE):
         yield
+
+
+# Canned Nominatim response for "Vatican City", using its real, public
+# bounding box (south, north, west, east) - Nominatim's own JSON schema.
+_VATICAN_CITY_RESPONSE = [
+    {
+        "display_name": "Vatican City",
+        "boundingbox": ["41.9002044", "41.9073912", "12.4457442", "12.4583658"],
+    }
+]
+
+# Nominatim returns an empty list when nothing matches the query.
+_NO_MATCH_RESPONSE = []
+
+
+class _MockNominatimResponse:
+    status_code = 200
+    reason = "OK"
+    text = ""
+    content = b""
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def _mock_get(url, params=None, timeout=None, headers=None):
+    query = (params or {}).get("q", "")
+    payload = _VATICAN_CITY_RESPONSE if query == "Vatican City" else _NO_MATCH_RESPONSE
+    return _MockNominatimResponse(payload)
+
+
+@pytest.fixture(scope="function")
+def mock_nominatim_api():
+    """Replaces real HTTP calls to the Nominatim API with canned responses.
+
+    placegetter calls requests.get directly, keyed here off the "q" query
+    param so different place names can resolve to different canned results.
+    """
+    with patch("aequilibrae.project.network.osm.place_getter.requests.get", side_effect=_mock_get):
+        yield
