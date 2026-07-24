@@ -144,7 +144,7 @@ def run(args, unparsed_args):
         # For each function we'll inspect the signature and create a sort of "best guess" set of arguments to accept.
         # POSITIONAL_ONLY and VAR_POSITIONAL arguments are not supported because we supply everything as keyword
         # arguments. VAR_KEYWORD arguments are accepted as trailing 'key=value' pairs.
-        for func in run_module:
+        for func in run_module.values():
             add_subcommand_from_function(subparsers, func.func, func.keywords if not args.no_defaults else {})
 
         # The parsed arguments contain internal bookkeeping entries from the .set_defaults trick: the run module
