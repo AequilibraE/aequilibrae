@@ -14,7 +14,7 @@ import gc
 import logging
 import re
 import time
-from typing import List, Dict
+from typing import Dict, List
 
 import pandas as pd
 import requests
@@ -24,6 +24,7 @@ from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
 from .osm_params import default_headers, memory
 
 
