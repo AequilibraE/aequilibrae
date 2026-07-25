@@ -8,12 +8,11 @@ import pytest
 from aequilibrae.parameters import Parameters
 
 
-def test_create_from_gmns(empty_project):
-    link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/link.csv"
-    node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/node.csv"
-    use_group_file = (
-        "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/use_group.csv"
-    )
+def test_create_from_gmns(empty_project, test_data_path):
+    arlington = test_data_path / "GMNS" / "examples" / "Arlington_Signals"
+    link_file = arlington / "link.csv"
+    node_file = arlington / "node.csv"
+    use_group_file = arlington / "use_group.csv"
 
     new_link_fields = {
         "bridge": {"description": "bridge flag", "type": "text", "required": False},
