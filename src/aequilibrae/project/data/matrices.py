@@ -1,67 +1,152 @@
-import os
 import logging
+import os
 from os.path import isfile, join
 
 import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project.data.matrix_record import MatrixRecord
-from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.project_table import ProjectTable
 
 logger = logging.getLogger(__name__)
 
 
-class Matrices:
-    """Gateway into the matrices available/recorded in the model"""
+class Matrices(ProjectTable):
+    """Gateway into the matrices available/recorded in the model
+
+    .. code-block:: python
+
+        >>> project = create_example(project_path)
+
+        >>> matrices = project.matrices
+
+        # We can list all matrices in the model
+        >>> matrices.list()  # doctest: +SKIP
+
+        # get the record for one of them
+        >>> record = matrices.get('demand_omx')
+
+        # or the actual matrix data
+        >>> mat = matrices.get_matrix('demand_omx')
+
+        >>> project.close()
+    """
+
+    name = "matrices"
+    key = "name"
+    record_name = "MatrixRecord"
 
     def __init__(self, project):
-        self.project = project
-        self.__items = {}
-        self.__fields = []
-
+        super().__init__(project)
         self.fldr = os.path.join(project.project_base_path, "matrices")
 
-        tl = TableLoader()
-        with self.project.db_connection as conn:
-            matrices_list = tl.load_table(conn, "matrices")
-        self.__fields = list(tl.fields)
-        if matrices_list:
-            self.__properties = list(matrices_list[0].keys())
-        for lt in matrices_list:
-            if lt["name"] in self.__items:
-                if not self.__items[lt["name"]]._exists:
-                    del self.__items[lt["name"]]
-            if lt["name"] not in self.__items:
-                if isfile(join(self.fldr, lt["file_name"])):
-                    lt["fldr"] = self.fldr
-                    self.__items[lt["name"].lower()] = MatrixRecord(lt, project)
+    def create(self, name: str, file_name: str, matrix: AequilibraeMatrix = None):
+        """Creates a record for a matrix, returning it
 
-    def reload(self):
-        """Discards all memory matrices in memory and loads recreate them"""
-        self.__items.clear()
-        self.__init__(self.project)
+        If a matrix is provided, it is exported to ``file_name`` inside the project's
+        matrices folder (which must not exist yet). Otherwise the file must already
+        be on disk.
+
+        :Arguments:
+            **name** (:obj:`str`): Name of the matrix. Must be unique
+
+            **file_name** (:obj:`str`): Name of the file on disk
+
+            **matrix** (:obj:`AequilibraeMatrix`, *Optional*): Matrix to export to ``file_name``
+
+        :Returns:
+            **matrix record**: The record for the new matrix
+        """
+        if name in self:
+            raise ValueError(f"There is already a matrix of name ({name}). It must be unique.")
+
+        with self._read_ctx(None) as conn:
+            sql = "SELECT count(*) FROM matrices WHERE file_name=?"
+            if conn.execute(sql, [file_name]).fetchone()[0] > 0:
+                raise ValueError(f"There is already a matrix record for file name ({file_name}). It must be unique.")
+
+        if matrix is not None and matrix.cores > 0:
+            if isfile(join(self.fldr, file_name)):
+                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
+
+            mat_format = file_name.split(".")[-1].lower()
+            if mat_format not in ["omx", "aem"]:
+                raise ValueError("Matrix needs to be either OMX or native AequilibraE")
+
+            matrix.export(join(self.fldr, file_name))
+            cores = matrix.cores
+        else:
+            if not isfile(join(self.fldr, file_name)):
+                raise FileExistsError(f"{file_name} does not exist. Cannot create this matrix record")
+            cores = self.__cores_on_disk(file_name)
+
+        self.insert(name=name, file_name=file_name, cores=cores)
+        logger.warning("Matrix Record has been saved to the database")
+        return self.get(name)
+
+    def update(self, key, conn=None, **values):
+        """Writes the given columns of one matrix record
+
+        When ``file_name`` changes, the core count is refreshed from the file on disk.
+        """
+        if "file_name" in values and "cores" not in values:
+            values["cores"] = self.__cores_on_disk(values["file_name"])
+        super().update(key, conn=conn, **values)
+
+    def delete(self, name: str, conn=None):
+        """Deletes a matrix record and the underlying data from disk"""
+        record = self.get(name, conn=conn)
+        super().delete(record.name, conn=conn)
+
+        if isfile(join(self.fldr, record.file_name)):
+            try:
+                os.unlink(join(self.fldr, record.file_name))
+            except Exception as e:
+                logger.error(f"Could not remove matrix from disk: {e.args}")
+
+    def get_matrix(self, name: str) -> AequilibraeMatrix:
+        """Returns an AequilibraE matrix available in the project
+
+        Raises an error if the matrix does not exist
+
+        :Arguments:
+            **name** (:obj:`str`): Name of the matrix to be loaded
+
+        :Returns:
+            **matrix** (:obj:`AequilibraeMatrix`): Matrix object
+        """
+        record = self.get(name)
+        mat = AequilibraeMatrix()
+        mat.load(join(self.fldr, record.file_name))
+        return mat
+
+    def check_exists(self, name: str) -> bool:
+        """Checks whether a matrix with a given name exists
+
+        :Returns:
+            **exists** (:obj:`bool`): Does the matrix exist?
+        """
+        return name in self
 
     def clear_database(self) -> None:
         """Removes records from the matrices database that do not exist in disk"""
 
-        with self.project.db_connection as conn:
-            mats = conn.execute("Select name, file_name from matrices;").fetchall()
+        with self._write_ctx(None) as conn:
+            mats = conn.execute("SELECT name, file_name FROM matrices;").fetchall()
 
             remove = [nm for nm, file in mats if not isfile(join(self.fldr, file))]
 
             if remove:
                 logger.warning(f"Matrix records not found in disk cleaned from database: {','.join(remove)}")
 
-                remove = [[x] for x in remove]
-                conn.executemany("DELETE from matrices where name=?;", remove)
+                conn.executemany("DELETE FROM matrices WHERE name=?;", [[x] for x in remove])
 
     def update_database(self) -> None:
         """Adds records to the matrices database for matrix files found on disk"""
         existing_files = os.listdir(self.fldr)
-        paths_for_existing = [mat.file_name for mat in self.__items.values()]
+        paths_for_existing = [rec.file_name for rec in self]
 
         new_files = [x for x in existing_files if x not in paths_for_existing]
-        new_files = [x for x in new_files if os.path.splitext(x.lower())[1] in [".omx", ".aem"]]
+        new_files = [x for x in new_files if os.path.splitext(x)[1] in [".omx", ".aem"]]
 
         if new_files:
             logger.warning(f"New matrix found on disk. Added to the database: {','.join(new_files)}")
@@ -72,20 +157,20 @@ class Matrices:
 
             name = None
             if not mat.is_omx():
-                name = str(mat.name).lower()
+                name = str(mat.name)
 
             if not name:
-                name = fl.lower()
+                name = fl
 
             name = name.replace(".", "_").replace(" ", "_")
 
-            if name in self.__items:
+            if name in self:
                 i = 0
-                while f"{name}_{i}" in self.__items:
+                while f"{name}_{i}" in self:
                     i += 1
                 name = f"{name}_{i}"
-            rec = self.new_record(name, fl)
-            rec.save()
+            mat.close()
+            self.create(name, fl)
 
     def list(self) -> pd.DataFrame:
         """List of all matrices available
@@ -100,101 +185,17 @@ class Matrices:
             else:
                 return "file missing"
 
-        with self.project.db_connection as conn:
-            df = pd.read_sql_query("Select * from matrices;", conn)
+        with self._read_ctx(None) as conn:
+            df = pd.read_sql_query("SELECT * FROM matrices;", conn)
             df = df.assign(status="")
             df.status = df.file_name.apply(check_if_exists)
 
         return df
 
-    def get_matrix(self, matrix_name: str) -> AequilibraeMatrix:
-        """Returns an AequilibraE matrix available in the project
-
-        Raises an error if matrix does not exist
-
-        :Arguments:
-            **matrix_name** (:obj:`str`): Name of the matrix to be loaded
-
-        :Returns:
-            **matrix** (:obj:`AequilibraeMatrix`): Matrix object
-        """
-
-        return self.get_record(matrix_name).get_data()
-
-    def get_record(self, matrix_name: str) -> MatrixRecord:
-        """Returns a model Matrix Record for manipulation in memory"""
-
-        if matrix_name.lower() not in self.__items:
-            raise Exception("There is no matrix record with that name")
-
-        if not self.__items[matrix_name.lower()]._exists:
-            raise Exception("This matrix was deleted during this session")
-
-        return self.__items[matrix_name.lower()]
-
-    def check_exists(self, name: str) -> bool:
-        """Checks whether a matrix with a given name exists
-
-        :Returns:
-            **exists** (:obj:`bool`): Does the matrix exist?
-        """
-        return name.lower() in self.__items
-
-    def delete_record(self, matrix_name: str) -> None:
-        """Deletes a Matrix Record from the model and attempts to remove from disk"""
-        mr = self.get_record(matrix_name)
-        mr.delete()
-
-    def new_record(self, name: str, file_name: str, matrix=None) -> MatrixRecord:
-        """Creates a new record for a matrix in disk, but does not save it
-
-        If the matrix file is not already on disk, it will fail
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the matrix
-
-            **file_name** (:obj:`str`): Name of the file on disk
-
-        :Returns:
-            **matrix_record** (:obj:`MatrixRecord`): A matrix record that can be manipulated in memory before saving
-        """
-        matrix = matrix or AequilibraeMatrix()
-        if name in self.__items:
-            raise ValueError(f"There is already a matrix of name ({name}). It must be unique.")
-
-        for mat in self.__items.values():
-            if mat.file_name == file_name:
-                raise ValueError(f"There is already a matrix record for file name ({file_name}). It must be unique.")
-
-        if matrix.cores > 0:
-            if isfile(join(self.fldr, file_name)):
-                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
-
-            mat_format = file_name.split(".")[-1].lower()
-            if mat_format not in ["omx", "aem"]:
-                raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-
-            matrix.export(join(self.fldr, file_name))
-            cores = matrix.cores
-        else:
-            if not isfile(join(self.fldr, file_name)):
-                raise FileExistsError(f"{file_name} does not exist. Cannot create this matrix record")
-            mat = AequilibraeMatrix()
-            mat.load(join(self.fldr, file_name))
-            cores = mat.cores
-            mat.close()
-            del mat
-
-        tp = dict.fromkeys(self.__fields)
-        tp["name"] = name
-        tp["file_name"] = file_name
-        tp["cores"] = cores
-        mr = MatrixRecord(tp, self.project)
-        mr.save()
-        self.__items[name.lower()] = mr
-        logger.warning("Matrix Record has been saved to the database")
-        return mr
-
-    def _clear(self):
-        """Eliminates records from memory. For internal use only"""
-        self.__items.clear()
+    def __cores_on_disk(self, file_name: str) -> int:
+        mat = AequilibraeMatrix()
+        mat.load(join(self.fldr, file_name))
+        cores = len(mat.names)
+        mat.close()
+        del mat
+        return cores

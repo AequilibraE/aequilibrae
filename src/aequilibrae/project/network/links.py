@@ -1,18 +1,11 @@
-from copy import deepcopy
 import logging
 
-import geopandas as gpd
-import shapely.wkb
-
-from aequilibrae.project.basic_table import BasicTable
-from aequilibrae.project.data_loader import DataLoader
-from aequilibrae.project.network.link import Link
-from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.project_table import ProjectTable
 
 logger = logging.getLogger(__name__)
 
 
-class Links(BasicTable):
+class Links(ProjectTable):
     """
     Access to the API resources to manipulate the links table in the network
 
@@ -20,160 +13,93 @@ class Links(BasicTable):
 
         >>> project = create_example(project_path)
 
-        >>> all_links = project.network.links
+        >>> links = project.network.links
 
-        # We can just get one link in specific
-        >>> link = all_links.get(1)
+        # We can get a single link as an immutable record
+        >>> link = links.get(1)
+        >>> link.modes
+        'cMT'
 
-        # We can save changes for all links we have edited so far
-        >>> all_links.save()
+        # and write any changes explicitly
+        >>> links.update(1, lanes_ab=2, name="First Avenue")
+
+        # Manipulating modes has its own helpers
+        >>> links.add_mode(1, 'b')
+        >>> links.drop_mode(1, 'b')
+
+        # Many changes go in one batch (a single transaction)
+        >>> with links.batch() as batch:
+        ...     for link_id in (2, 3, 4):
+        ...         batch.update(link_id, speed_ab=90.0)
 
         >>> project.close()
     """
 
-    __max_id = -1
-
-    #: Query sql for retrieving links
-    sql = ""
+    name = "links"
+    key = "link_id"
+    record_name = "LinkRecord"
+    spatial = True
+    protected = frozenset(("a_node", "b_node"))
+    defaults = {"a_node": 0, "b_node": 0, "direction": 0, "link_type": "default"}
 
     def __init__(self, net):
         super().__init__(net.project)
-        self.__table_type__ = "links"
-        self.__fields = []
-        self.__items = {}
-        self.__data = None
 
-        if self.sql == "":
-            self.refresh_fields()
+    def copy(self, link_id: int, conn=None) -> int:
+        """Duplicates a link under a new id, returning that id
 
-    def get(self, link_id: int) -> Link:
-        """Get a link from the network by its *link_id*
+        It raises an error if ``link_id`` does not exist
+        """
+        link = self.get(link_id, conn=conn)
+        values = {k: v for k, v in vars(link).items() if k != self.key and k not in self.protected}
+        return self.insert(conn=conn, **values)
 
-        It raises an error if link_id does not exist
+    def add_mode(self, link_id: int, mode, conn=None):
+        """Adds a mode to a link
+
+        Logs a warning if the mode is already allowed on the link
 
         :Arguments:
-            **link_id** (:obj:`int`): Id of a link to retrieve
+            **link_id** (:obj:`int`): Id of the link to change
 
-        :Returns:
-            **link** (:obj:`Link`): Link object for requested link_id
+            **mode** (:obj:`str` or mode record): mode_id or mode to be added to the link
         """
-        link_id = int(link_id)
-        if link_id in self.__items:
-            link = self.__items[link_id]
-            if not link._exists():
-                raise Exception("Link was deleted")
-            return link
-        data = self.__link_data(link_id)
-        if data:
-            return self.__create_return_link(data)
-        self.__existence_error(link_id)
+        mode_id = self.__mode_id_of(mode)
+        modes = self.get(link_id, conn=conn).modes
+        if mode_id in modes:
+            logger.warning("Mode already active for this link")
+            return
+        self.update(link_id, conn=conn, modes=modes + mode_id)
 
-    def new(self) -> Link:
-        """Creates a new link
+    def drop_mode(self, link_id: int, mode, conn=None):
+        """Removes a mode from a link
 
-        :Returns:
-            **link** (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
-        """
-
-        data = dict.fromkeys(self.__fields)
-        data["a_node"] = 0
-        data["b_node"] = 0
-        data["direction"] = 0
-        data["link_type"] = "default"
-        data["link_id"] = self.__new_link_id()
-        return Link(data, self.project)
-        # return self.__create_return_link(data)
-
-    def copy_link(self, link_id: int) -> Link:
-        """Creates a copy of a link with a new id
-
-        It raises an error if link_id does not exist
+        Logs a warning if the mode is already NOT allowed on the link
 
         :Arguments:
-            **link_id** (:obj:`int`): Id of the link to copy
+            **link_id** (:obj:`int`): Id of the link to change
 
-        :Returns:
-            **link** (:obj:`Link`): Link object for requested link_id
+            **mode** (:obj:`str` or mode record): mode_id or mode to be removed from the link
         """
+        mode_id = self.__mode_id_of(mode)
+        modes = self.get(link_id, conn=conn).modes
+        if mode_id not in modes:
+            logger.warning("Mode already inactive for this link")
+            return
+        self.update(link_id, conn=conn, modes=modes.replace(mode_id, ""))
 
-        data = self.__link_data(int(link_id))
-        data["link_id"] = self.__new_link_id()
+    def _check_modes(self, modes) -> str:
+        if not isinstance(modes, str):
+            raise ValueError("Modes field needs to be a string")
+        if modes == "":
+            raise ValueError("Modes field needs to have at least one mode")
+        return modes
 
-        # The geometry wrangling is just a workaround to signalize that the link is new
-        # That allows saving of the link to work properly
-        geo = data["geometry"]
-        data["geometry"] = None
-        link = self.__create_return_link(data)
-        link.geometry = shapely.wkb.loads(geo)
-
-        return link
-
-    def delete(self, link_id: int) -> None:
-        """Removes the link with link_id from the project
-
-        :Arguments:
-            **link_id** (:obj:`int`): Id of a link to delete
-        """
-        d = 1
-        link_id = int(link_id)
-        if link_id in self.__items:
-            link = self.__items.pop(link_id)  # type: Link
-            link.delete()
-        else:
-            with self.project.db_connection_spatial as conn:
-                d = conn.execute("Delete from Links where link_id=?", [link_id]).rowcount
-        if d:
-            logger.warning(f"Link {link_id} was successfully removed from the project database")
-        else:
-            self.__existence_error(link_id)
-
-    def refresh_fields(self) -> None:
-        """After adding a field one needs to refresh all the fields recognized by the software"""
-        tl = TableLoader()
-        with self.project.db_connection_spatial as conn:
-            self.__max_id = conn.execute("select coalesce(max(link_id),0) from Links").fetchone()[0]
-            tl.load_structure(conn, "links")
-        self.sql = tl.sql
-        self.__fields = deepcopy(tl.fields)
-
-    @property
-    def data(self) -> gpd.GeoDataFrame:
-        """Returns all links data as a Pandas DataFrame
-
-        :Returns:
-            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
-        """
-        dl = DataLoader(self.project.path_to_file, "links")
-        return dl.load_table()
-
-    def refresh(self):
-        """Refreshes all the links in memory"""
-        lst = list(self.__items.keys())
-        for k in lst:
-            del self.__items[k]
-
-    def save(self):
-        for item in self.__items.values():
-            item.save()
-
-    def __del__(self):
-        self.__items.clear()
-
-    def __existence_error(self, link_id):
-        raise ValueError(f"Link {link_id} does not exist in the model")
-
-    def __link_data(self, link_id: int) -> dict:
-        with self.project.db_connection_spatial as conn:
-            data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
-        if data:
-            return dict(zip(self.__fields, data, strict=True))
-        raise ValueError("Link_id does not exist on the network")
-
-    def __new_link_id(self):
-        self.__max_id += 1
-        return self.__max_id
-
-    def __create_return_link(self, data):
-        link = Link(data, self.project)
-        self.__items[link.link_id] = link
-        return link
+    @staticmethod
+    def __mode_id_of(mode) -> str:
+        mode_id = getattr(mode, "mode_id", mode)
+        if not isinstance(mode_id, str):
+            raise TypeError("You should provide a mode_id (string) or a mode record")
+        if len(mode_id) != 1:
+            raise ValueError("A mode_id is a single character")
+        return mode_id

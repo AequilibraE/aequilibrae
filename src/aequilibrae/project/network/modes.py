@@ -1,13 +1,9 @@
-from sqlite3 import IntegrityError
-import logging
+import string
 
-from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.project.network.mode import Mode
-
-logger = logging.getLogger(__name__)
+from aequilibrae.project.project_table import ProjectTable
 
 
-class Modes:
+class Modes(ProjectTable):
     """
     Access to the API resources to manipulate the modes table in the network
 
@@ -17,117 +13,47 @@ class Modes:
 
         >>> modes = project.network.modes
 
-        # We can get a dictionary of all modes in the model
-        >>> all_modes = modes.all_modes()
-
-        # And do a bulk change and save it
-        >>> for mode_id, mode_obj in all_modes.items():
-        ...     mode_obj.beta = 1
-        ...     mode_obj.save()
-
-        # or just get one mode in specific
+        # We can get a mode as an immutable record
         >>> car_mode = modes.get('c')
 
-        # or just get this same mode by name
+        # or by name
         >>> car_mode = modes.get_by_name('car')
 
-        # We can change the description of the mode
-        >>> car_mode.description = 'personal autos only'
+        # and write changes explicitly
+        >>> modes.update('c', description='personal autos only', alpha=0.95)
 
-        # Let's say we are using alpha to store the PCE for a future year with much smaller cars
-        >>> car_mode.alpha = 0.95
-
-        # To save this mode we can simply
-        >>> car_mode.save()
-
-        # We can also create a completely new mode and add to the model
-        >>> new_mode = modes.new('k')
-        >>> new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed # other fields are not mandatory
-
-        # We then explicitly add it to the network
-        >>> modes.add(new_mode)
-
-        # we can even keep editing and save it directly once we have added it to the project
-        >>> new_mode.description = 'this is my new description'
-        >>> new_mode.save()
+        # Adding a new mode to the model is a single insert
+        >>> modes.insert(mode_id='k', mode_name='flying_car')
+        'k'
 
         >>> project.close()
     """
 
+    name = "modes"
+    key = "mode_id"
+    record_name = "ModeRecord"
+
+    __allowed_characters = string.ascii_letters + "_"
+
     def __init__(self, net):
-        self.__all_modes = []
-        self.__items = {}
-        self.project = net.project
-        self.__update_list_of_modes()
+        super().__init__(net.project)
 
-    def add(self, mode: Mode) -> None:
-        """We add a mode to the project"""
-        self.__update_list_of_modes()
+    def get_by_name(self, mode_name: str):
+        """Get a mode record from the network by its *mode_name*"""
+        for mode in self:
+            if mode.mode_name == mode_name:
+                return mode
+        raise ValueError(f"Mode {mode_name} does not exist in the model")
 
-        with self.project.db_connection as conn:
-            if mode.mode_id in self.__all_modes:
-                raise ValueError("Mode already exists in the model")
+    def _check_mode_id(self, value) -> str:
+        if not isinstance(value, str) or len(value) != 1 or value not in string.ascii_letters:
+            raise ValueError("Mode IDs must be a single ascii character")
+        return value
 
-            conn.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
-            logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
-            conn.commit()
-            mode.save()
-
-        self.__update_list_of_modes()
-
-    def delete(self, mode_id: str) -> None:
-        """Removes the mode with *mode_id* from the project"""
-        with self.project.db_connection as conn:
-            try:
-                conn.execute(f'delete from modes where mode_id="{mode_id}"')
-            except IntegrityError as e:
-                logger.error(f"Failed to remove mode {mode_id}. {e.args}")
-                raise e
-            logger.warning(f"Mode {mode_id} was successfully removed from the database")
-        self.__update_list_of_modes()
-
-    @property
-    def fields(self) -> FieldEditor:
-        """Returns a FieldEditor class instance to edit the Modes table fields and their metadata"""
-        return FieldEditor(self.project, "modes")
-
-    def get(self, mode_id: str) -> Mode:
-        """Get a mode from the network by its *mode_id*"""
-        self.__update_list_of_modes()
-        if mode_id not in self.__all_modes:
-            raise ValueError(f"Mode {mode_id} does not exist in the model")
-        return Mode(mode_id, self.project)
-
-    def get_by_name(self, mode: str) -> Mode:
-        """Get a mode from the network by its *mode_name*"""
-        self.__update_list_of_modes()
-        with self.project.db_connection as conn:
-            found = conn.execute(f"select mode_id from 'modes' where mode_name='{mode}'").fetchone()
-        if len(found) == 0:
-            raise ValueError(f"Mode {mode} does not exist in the model")
-        return Mode(found[0], self.project)
-
-    def all_modes(self) -> dict:
-        """Returns a dictionary with all mode objects available in the model. mode_id as key"""
-        self.__update_list_of_modes()
-        return {x: Mode(x, self.project) for x in self.__all_modes}
-
-    def new(self, mode_id: str) -> Mode:
-        """Returns a new mode with *mode_id* that can be added to the model later"""
-        if mode_id in self.__all_modes:
-            raise ValueError("Mode already exists in the model. Creating a new one does not make sense")
-
-        return Mode(mode_id, self.project)
-
-    def __update_list_of_modes(self) -> None:
-        with self.project.db_connection as conn:
-            self.__all_modes = [x[0] for x in conn.execute("select mode_id from 'modes'").fetchall()]
-
-    def __copy__(self):
-        raise Exception("Modes object cannot be copied")
-
-    def __deepcopy__(self, memodict=None):
-        raise Exception("Modes object cannot be copied")
-
-    def __del__(self):
-        self.__items.clear()
+    def _check_mode_name(self, value) -> str:
+        if value is None:
+            raise ValueError("mode_name cannot be None")
+        for letter in value:
+            if letter not in self.__allowed_characters:
+                raise ValueError('mode_name can only contain letters and "_"')
+        return value

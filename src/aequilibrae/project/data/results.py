@@ -1,18 +1,38 @@
 import json
-import sqlite3
 import logging
+import sqlite3
+from contextlib import nullcontext
 from typing import Optional
 
 import pandas as pd
 
-from aequilibrae.project.data.result_record import ResultRecord
-from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.project_table import ProjectTable
 
 logger = logging.getLogger(__name__)
 
 
-class Results:
-    """Gateway into the results available/recorded in the model"""
+class Results(ProjectTable):
+    """Gateway into the results available/recorded in the model
+
+    Result metadata lives in the *results* table of the project database, and
+    the data itself in the results database (``results_database.sqlite``).
+
+    .. code-block:: python
+
+        >>> results = project.results  # doctest: +SKIP
+
+        # Record and store a new result in one go
+        >>> results.create("assignment_2026", df, procedure="traffic assignment")  # doctest: +SKIP
+
+        # and read it back
+        >>> df = results.get_results("assignment_2026")  # doctest: +SKIP
+    """
+
+    name = "results"
+    key = "table_name"
+    record_name = "ResultRecord"
+    #: the schema requires these; "" / JSON null mean "not provided"
+    defaults = {"procedure": "", "procedure_id": "", "procedure_report": "null"}
 
     def __init__(
         self,
@@ -22,59 +42,101 @@ class Results:
     ):
         """Initialise the Results object.
 
-        Arguments:
+        :Arguments:
             **project**: Project instance this Results object belongs to
-            **project_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
-                database to use for the results table.
-            **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
-                results database
-        """
-        self.project = project
-        self.__items = {}
-        self.__fields = []
 
+            **project_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
+            database holding the results table.
+
+            **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
+            results database
+        """
+        super().__init__(project)
         self.__project_conn = project_conn
         self.__results_conn = results_conn
 
-        tl = TableLoader()
-        with self.__project_conn or self.project.db_connection as conn:
-            results_list = tl.load_table(conn, "results")
-        self.__fields = list(tl.fields)
-        if results_list:
-            self.__properties = list(results_list[0].keys())
+    def create(
+        self,
+        table_name: str,
+        data: pd.DataFrame = None,
+        *,
+        procedure: str = None,
+        procedure_id: str = None,
+        procedure_report: dict = None,
+        timestamp: str = None,
+        description: str = None,
+        scenario: str = None,
+        year: str = None,
+        reference_table: str = "links",
+        **to_sql,
+    ):
+        """Creates a result record and, if data is given, stores it in the results database
 
-        with self.__project_conn or self.project.db_connection as conn:
-            for lt in results_list:
-                table_name = lt["table_name"]
-                if table_name in self.__items:
-                    if not self.__items[table_name]._exists:
-                        del self.__items[table_name]
+        :Arguments:
+            **table_name** (:obj:`str`): Name for the result. Must be unique
 
-                if table_name not in self.__items:
-                    if conn.execute("SELECT COUNT(*) FROM results WHERE table_name=?", (table_name,)).fetchone()[0]:
-                        self.__items[table_name] = ResultRecord(
-                            lt, project, project_conn=self.__project_conn, results_conn=self.__results_conn
-                        )
+            **data** (:obj:`pd.DataFrame`, *Optional*): Result data, written to the results
+            database via ``pd.DataFrame.to_sql``. Extra keyword arguments are forwarded to it
 
-    def reload(self) -> None:
-        """Reloads the results from the database."""
-        self.__items.clear()
-        self.__init__(self.project, self.__project_conn, self.__results_conn)
+            **procedure**, **procedure_id**, **procedure_report**, **timestamp**, **description**,
+            **scenario**, **year**, **reference_table**: Metadata for the record
+
+        :Returns:
+            **result record**: The record for the new result
+        """
+        if table_name in self:
+            raise ValueError(f"There is already a result of name ({table_name}). It must be unique.")
+
+        self.insert(
+            table_name=table_name,
+            procedure=procedure,
+            procedure_id=procedure_id,
+            procedure_report=json.dumps(procedure_report),
+            timestamp=timestamp,
+            description=description,
+            scenario=scenario,
+            year=year,
+            reference_table=reference_table,
+        )
+
+        if data is not None:
+            with self._results_ctx() as conn:
+                data.to_sql(table_name, conn, **to_sql)
+
+        return self.get(table_name)
+
+    def get_results(self, table_name: str) -> pd.DataFrame:
+        """Returns the data stored for one result
+
+        Raises an error if the result record does not exist.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the result to be loaded
+
+        :Returns:
+            **results** (:obj:`pd.DataFrame`): Results as a DataFrame
+        """
+        record = self.get(table_name)
+        with self._results_ctx() as conn:
+            return pd.read_sql(f'SELECT * FROM "{record.table_name}"', conn)
+
+    def delete(self, table_name: str, conn=None):
+        """Deletes a result record and drops its table from the results database"""
+        super().delete(table_name, conn=conn)
+        with self._results_ctx() as results_conn:
+            results_conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
     def clear_database(self) -> None:
         """Removes records from the results table that do not exist in the results database."""
 
-        with (
-            self.__project_conn or self.project.db_connection as project_conn,
-            self.__results_conn or self.project.results_connection as results_conn,
-        ):
-            mats = [x[0] for x in project_conn.execute("SELECT table_name FROM results").fetchall()]
+        with self._write_ctx(None) as project_conn, self._results_ctx() as results_conn:
+            recorded = [x[0] for x in project_conn.execute("SELECT table_name FROM results").fetchall()]
 
-            remove = set(mats) - {
+            remove = {
                 name
-                for name in mats
+                for name in recorded
                 if results_conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
-                is not None
+                is None
             }
             if remove:
                 logger.warning(f"Results records not found in results database: {','.join(remove)}")
@@ -85,10 +147,7 @@ class Results:
 
     def update_database(self) -> None:
         """Adds records to the results table for results found in the results database."""
-        with (
-            self.__project_conn or self.project.db_connection as project_conn,
-            self.__results_conn or self.project.results_connection as results_conn,
-        ):
+        with self._read_ctx(None) as project_conn, self._results_ctx() as results_conn:
             existing_results = {
                 x[0] for x in results_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             }
@@ -99,134 +158,26 @@ class Results:
         if new_results:
             logger.warning(f"New results found in the results database. Added to the database: {','.join(new_results)}")
             for table in new_results:
-                rec = self.new_record(table)
-                rec.save()
+                self.create(table)
         else:
             logger.info("No new result records to add")
 
     def list(self) -> pd.DataFrame:
         """List of all results available.
 
-        Arguments:
-            **conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to use
-
-        Returns:
+        :Returns:
             **df** (:obj:`pd.DataFrame`): Pandas DataFrame listing all results available in the model
         """
-
-        with self.__project_conn or self.project.db_connection as conn:
+        with self._read_ctx(None) as conn:
             return pd.read_sql_query("SELECT * FROM results;", conn)
 
-    def get_results(self, table_name: str) -> pd.DataFrame:
-        """Returns a DataFrame containing the results.
+    def _read_ctx(self, conn):
+        return super()._read_ctx(conn if conn is not None else self.__project_conn)
 
-        Raises an error if results do not exist.
+    def _write_ctx(self, conn):
+        return super()._write_ctx(conn if conn is not None else self.__project_conn)
 
-        Arguments:
-            **table_name** (:obj:`str`): Name of the results to be loaded
-
-        Returns:
-            **results** (:obj:`pd.DataFrame`): Results as a DataFrame
-
-        Raises:
-            **ValueError**: If the result doesn't exist
-        """
-
-        return self.get_record(table_name).get_data()
-
-    def get_record(self, table_name: str) -> ResultRecord:
-        """Returns a model ResultsRecord for manipulation in memory.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the result record to retrieve
-
-        Returns:
-            **record** (:obj:`ResultRecord`): The requested result record
-
-        Raises:
-            **ValueError**: If the result doesn't exist or was deleted
-        """
-
-        if table_name not in self.__items:
-            raise ValueError("There is no results record with that name")
-
-        if not self.__items[table_name]._exists:
-            raise ValueError("This result was deleted during this session")
-
-        return self.__items[table_name]
-
-    def check_exists(self, table_name: str) -> bool:
-        """Checks whether a result with a given name exists.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the result to check
-
-        Returns:
-            **exists** (:obj:`bool`): Does the result exist?
-        """
-        return table_name in self.__items and self.__items[table_name]._exists
-
-    def delete_record(self, table_name: str) -> None:
-        """Deletes a ResultRecord from the model and attempts to remove it from the results database.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the result to delete
-
-        Raises:
-            **ValueError**: If the result doesn't exist
-        """
-        rr = self.get_record(table_name)
-        rr.delete()
-        del self.__items[table_name]
-
-    def new_record(
-        self,
-        table_name: str,
-        procedure: str = None,
-        procedure_id: str = None,
-        procedure_report: dict = None,
-        timestamp: str = None,
-        description: str = None,
-        scenario: str = None,
-        year: str = None,
-        reference_table: str = "links",
-    ) -> ResultRecord:
-        """Creates a new record for a result.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the table
-            **procedure** (:obj:`str`, optional): Name of the procedure
-            **procedure_id** (:obj:`str`, optional): ID of the procedure
-            **procedure_report** (:obj:`dict`, optional): Report associated with the procedure
-            **timestamp** (:obj:`str`, optional): Timestamp for the record
-            **description** (:obj:`str`, optional): Description of the record
-
-        Returns:
-            **result_record** (:obj:`ResultRecord`): A result record that can be manipulated in memory before saving
-
-        Raises:
-            **ValueError**: If a result with the same name already exists
-        """
-        if table_name in self.__items:
-            raise ValueError(f"There is already a result of name ({table_name}). It must be unique.")
-
-        tp = {
-            "scenario": scenario,
-            "year": year,
-            "table_name": table_name,
-            "procedure": procedure,
-            "procedure_id": procedure_id,
-            "procedure_report": json.dumps(procedure_report),
-            "timestamp": timestamp,
-            "description": description,
-            "reference_table": reference_table,
-        }
-        rr = ResultRecord(tp, self.project, project_conn=self.__project_conn, results_conn=self.__results_conn)
-        rr.save()
-        self.__items[table_name] = rr
-        logger.warning("ResultRecord has been saved to the database")
-        return rr
-
-    def _clear(self) -> None:
-        """Eliminates records from memory. For internal use only."""
-        self.__items.clear()
+    def _results_ctx(self):
+        if self.__results_conn is not None:
+            return nullcontext(self.__results_conn)
+        return self.project.results_connection
