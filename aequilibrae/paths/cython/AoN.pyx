@@ -3,11 +3,14 @@ import os
 
 
 include 'basic_path_finding.pyx'
+
+# Volume-delay functions, in alphabetical order
+include 'akcelik.pyx'
 include 'bpr.pyx'
 include 'bpr2.pyx'
 include 'conical.pyx'
 include 'inrets.pyx'
-include 'akcelik.pyx'
+
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
 include 'connectivity.pyx'

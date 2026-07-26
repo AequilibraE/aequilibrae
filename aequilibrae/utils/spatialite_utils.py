@@ -16,11 +16,8 @@ from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_co
 from aequilibrae.utils.qgis_utils import inside_qgis
 
 # Setup adapters so that we can read/write numpy types directly to DB
-register_adapter(np.int64, int)
-register_adapter(np.int32, int)
-register_adapter(np.float32, float)
-register_adapter(np.float64, float)
-register_adapter(object, str)
+for _type, _converter in ((np.int64, int), (np.int32, int), (np.float32, float), (np.float64, float), (object, str)):
+    register_adapter(_type, _converter)
 
 
 def is_windows():
