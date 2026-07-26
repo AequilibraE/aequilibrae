@@ -23,7 +23,7 @@ Software Design and requirements
 The most important piece of AequilibraE's backend is, without a doubt, `NumPy <http://numpy.org>`__.
 
 Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
-accelerate computation. We use `Cython <https://cython.org/>`_ to integrate compiled code written in Cthon itself and C/C++.
+accelerate computation. We use `Cython <https://cython.org/>`_ to integrate compiled code written in Cython and C/C++.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
 found in `this article <https://doi.org/10.1371/journal.pbio.1001745>`_.
