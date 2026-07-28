@@ -25,7 +25,7 @@ Free support
 ~~~~~~~~~~~~
 
 There are two mechanisms to obtain free support that also allow you to check whether your question was
-already asked in the past, with the first option being the most often used as of December/2023:
+already asked in the past. As of December/2023, the first option sees the most use:
 
 1. Joining the `AequilibraE Google Group <https://groups.google.com/forum/#!forum/aequilibrae>`_
    and sending your question there.

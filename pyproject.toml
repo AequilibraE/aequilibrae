@@ -28,17 +28,17 @@ readme = "README.md"
 requires-python = ">=3.10" # match classifiers above and ruff version below
 
 dependencies = [
-  "numpy",
-  "scipy>=1.4",
-  "pyaml",
-  "requests",
-  "pandas>=2.2",
-  "shapely>=2.0",
-  "pyproj",
-  "rtree",
-  "pyarrow",
-  "openmatrix",
   "geopandas",
+  "numpy",
+  "openmatrix",
+  "pandas>=2.2",
+  "pyaml",
+  "pyarrow",
+  "pyproj",
+  "requests",
+  "rtree",
+  "scipy>=1.4",
+  "shapely>=2.0",
   "tqdm",
 ]
 
