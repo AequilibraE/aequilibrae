@@ -42,17 +42,17 @@ cpdef void conical_cython(
 ) noexcept:
     cdef long long i
     cdef long long l = congested_time.shape[0]
-    cdef double reserve, radical
+    cdef double reserve, radical, alpha_reserve
 
     for i in prange(l, nogil=True, num_threads=cores):
         if link_flows[i] <= 0:
             congested_time[i] = fftime[i]
-            continue
-
-        # `reserve` is the unused share of capacity, which is what shapes the cone
-        reserve = 1.0 - link_flows[i] / capacity[i]
-        radical = sqrt(alpha[i] * alpha[i] * reserve * reserve + beta[i] * beta[i])
-        congested_time[i] = fftime[i] * (2.0 + radical - alpha[i] * reserve - beta[i])
+        else:
+            # `reserve` is the unused share of capacity, which is what shapes the cone
+            reserve = 1.0 - link_flows[i] / capacity[i]
+            alpha_reserve = alpha[i] * reserve
+            radical = sqrt(alpha_reserve * alpha_reserve + beta[i] * beta[i])
+            congested_time[i] = fftime[i] * (2.0 + radical - alpha_reserve - beta[i])
 
 
 @cython.wraparound(False)
@@ -69,13 +69,13 @@ cpdef void dconical_cython(
 ) noexcept:
     cdef long long i
     cdef long long l = deltaresult.shape[0]
-    cdef double reserve, radical
+    cdef double reserve, radical, alpha_reserve
 
     for i in prange(l, nogil=True, num_threads=cores):
         if link_flows[i] <= 0:
             deltaresult[i] = fftime[i]
-            continue
-
-        reserve = 1.0 - link_flows[i] / capacity[i]
-        radical = sqrt(alpha[i] * alpha[i] * reserve * reserve + beta[i] * beta[i])
-        deltaresult[i] = fftime[i] * alpha[i] * (1.0 - alpha[i] * reserve / radical) / capacity[i]
+        else:
+            reserve = 1.0 - link_flows[i] / capacity[i]
+            alpha_reserve = alpha[i] * reserve
+            radical = sqrt(alpha_reserve * alpha_reserve + beta[i] * beta[i])
+            deltaresult[i] = fftime[i] * alpha[i] * (1.0 - alpha_reserve / radical) / capacity[i]
