@@ -49,14 +49,12 @@ class TransportClassBase(ABC):  # noqa: B024
             "Number of centroids": matrix.zones,
             "Matrix cores": matrix.view_names,
         }
+        # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
+        view = np.nan_to_num(matrix.matrix_view)
         if len(matrix.view_names) == 1:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :])) for nm in matrix.view_names
-            }
+            mat_config["Matrix totals"] = {nm: float(view.sum()) for nm in matrix.view_names}
         else:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i])) for i, nm in enumerate(matrix.view_names)
-            }
+            mat_config["Matrix totals"] = {nm: float(view[:, :, i].sum()) for i, nm in enumerate(matrix.view_names)}
         self._config["Matrix"] = str(mat_config)
 
     @property

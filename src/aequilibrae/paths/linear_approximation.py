@@ -254,12 +254,14 @@ class LinearApproximation(WorkerThread):
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
 
-    def _set_current_flow(self, assigned_flow):
-        self.fw_total_flow = np.array(assigned_flow, dtype=np.float64, copy=True)
+    def _apply_assigned_flow(self, link_flows):
+        """Records the flows just assigned, stacking any preload on top of them."""
+        total = np.array(link_flows, dtype=np.float64, copy=True)
         if self.preload is not None:
-            self.fw_total_flow += self.preload
+            total += self.preload
+        self.fw_total_flow = total
 
-    def _update_congested_costs(self):
+    def _refresh_congested_costs(self):
         self.vdf.apply_vdf(
             self.congested_time,
             self.fw_total_flow,
@@ -552,8 +554,8 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self._set_current_flow(np.zeros_like(self.capacity))
-        self._update_congested_costs()
+        self._apply_assigned_flow(np.zeros_like(self.capacity))
+        self._refresh_congested_costs()
 
         logger.info(f"{self.algorithm} Assignment stats")
         logger.info("Iteration, RelativeGap (AoN), stepsize")
@@ -675,7 +677,7 @@ class LinearApproximation(WorkerThread):
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
 
-            self._set_current_flow(np.sum(flows, axis=0))
+            self._apply_assigned_flow(np.sum(flows, axis=0))
 
             if self.algorithm == "all-or-nothing":
                 break
@@ -683,7 +685,7 @@ class LinearApproximation(WorkerThread):
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-            self._update_congested_costs()
+            self._refresh_congested_costs()
 
             self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
             self.convergence_report["iteration"].append(self.iter)
@@ -984,13 +986,13 @@ class LinearApproximation(WorkerThread):
             aon_cost += np.sum((self.congested_time + c.fixed_cost) * aon_class_flow)
             current_cost += np.sum((self.congested_time + c.fixed_cost) * current_class_flow)
 
-        if current_cost == 0.0:
-            if aon_cost == 0.0:
-                self.rgap = 0.0
-                return True
-            self.rgap = np.inf
-            return False
-        self.rgap = abs(current_cost - aon_cost) / current_cost
+        if current_cost != 0.0:
+            self.rgap = abs(current_cost - aon_cost) / current_cost
+        else:
+            # Nothing loaded yet, so we are converged only when the AoN solution carries no cost either
+            trivially_converged = aon_cost == 0.0
+            self.rgap = 0.0 if trivially_converged else np.inf
+            return trivially_converged
 
         if self.rgap_target >= self.rgap:
             return True

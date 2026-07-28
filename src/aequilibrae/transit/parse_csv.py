@@ -1,7 +1,8 @@
-from io import TextIOWrapper
-import numpy as np
-import csv
 import copy
+import csv
+from io import TextIOWrapper
+
+import numpy as np
 from numpy.lib.recfunctions import append_fields
 
 
@@ -29,7 +30,8 @@ def parse_csv(file_name: str, column_order={}):  # noqa B006
     titles: list[str] = tot.pop(0)
     csvfile.close()
     if tot:
-        data = np.rec.fromrecords(tot, names=[x.lower() for x in titles])  # type: ignore
+        lowercase_titles = [title.lower() for title in titles]
+        data = np.rec.fromrecords(tot, names=lowercase_titles)
     else:
         return empty()
 
@@ -48,8 +50,7 @@ def parse_csv(file_name: str, column_order={}):  # noqa B006
                 column_order[c] = object
             else:
                 if data[c].dtype.char.upper() in ["U", "S"]:
-                    mask = data[c] == ""
-                    data[c] = np.where(mask, "0", data[c])
+                    data[c] = np.where(data[c] == "", "0", data[c])
 
         new_data_dt = [(f, column_order[f]) for f in col_names]
 

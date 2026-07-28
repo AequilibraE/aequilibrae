@@ -11,7 +11,16 @@ from aequilibrae.paths.cython.vdf_core import (
     delta_akcelik,
 )
 
-all_vdf_functions = ["bpr", "bpr2", "conical", "inrets", "akcelik"]
+# Maps the VDF name to the pair of kernels that evaluate the curve and its derivative
+VDF_KERNELS = {
+    "BPR": (bpr, delta_bpr),
+    "BPR2": (bpr2, delta_bpr2),
+    "CONICAL": (conical, delta_conical),
+    "INRETS": (inrets, delta_inrets),
+    "AKCELIK": (akcelik, delta_akcelik),
+}
+
+all_vdf_functions = [name.lower() for name in VDF_KERNELS]
 
 
 class VDF:
@@ -33,28 +42,14 @@ class VDF:
         self.__dict__["apply_derivative"] = None
 
     def __setattr__(self, instance, value) -> None:
-        if instance == "function":
-            value = value.upper()
-            self.__dict__[instance] = value
-            if value == "BPR":
-                self.__dict__["apply_vdf"] = bpr
-                self.__dict__["apply_derivative"] = delta_bpr
-            elif value == "BPR2":
-                self.__dict__["apply_vdf"] = bpr2
-                self.__dict__["apply_derivative"] = delta_bpr2
-            elif value == "CONICAL":
-                self.__dict__["apply_vdf"] = conical
-                self.__dict__["apply_derivative"] = delta_conical
-            elif value == "INRETS":
-                self.__dict__["apply_vdf"] = inrets
-                self.__dict__["apply_derivative"] = delta_inrets
-            elif value == "AKCELIK":
-                self.__dict__["apply_vdf"] = akcelik
-                self.__dict__["apply_derivative"] = delta_akcelik
-            else:
-                raise ValueError("VDF function not available")
-        else:
+        if instance != "function":
             raise AttributeError("This class only allows you to set the VDF to use")
+
+        value = value.upper()
+        self.__dict__[instance] = value
+        if value not in VDF_KERNELS:
+            raise ValueError("VDF function not available")
+        self.__dict__["apply_vdf"], self.__dict__["apply_derivative"] = VDF_KERNELS[value]
 
     def functions_available(self) -> list:
         """returns a list of all functions available"""
