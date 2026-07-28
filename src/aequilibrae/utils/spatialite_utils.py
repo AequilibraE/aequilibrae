@@ -98,7 +98,7 @@ def _pin_extension(path: str) -> None:
         # resolving to the same module SQLite loaded.
         _pinned_extensions[path] = ctypes.CDLL(path, winmode=0)
     except OSError as e:
-        global_logger.warning(f"Could not pin mod_spatialite ({path}) in memory: {e}")
+        logger.warning(f"Could not pin mod_spatialite ({path}) in memory: {e}")
 
 
 def is_spatialite(conn):

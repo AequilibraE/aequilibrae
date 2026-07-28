@@ -18,7 +18,7 @@ cdef class RouteChoiceSet:
         double [::1] lat_view
         double [::1] lon_view
         const long long [::1] ids_graph_view
-        const long long [:] graph_compressed_id_view
+        const long long [::1] graph_compressed_id_view
         long long [:] compressed_link_ids
         long long num_nodes
         long long num_links

@@ -1,20 +1,26 @@
 # cython: language_level=3
+cimport cython
+
 import os
+import numpy as np
+from cython.parallel cimport parallel, prange, threadid
+from libc.string cimport memset
+from libc.stdint cimport int64_t
 
-from aequilibrae.utils.cython.bridge cimport Bridge
+from aequilibrae.paths.cython.skimming_core cimport skim_single_path, _copy_skims
+from aequilibrae.paths.cython.basic_path_finding cimport (
+    blocking_centroid_flows,
+    path_finding,
+    path_finding_a_star,
+    HeapType,
+)
+from aequilibrae.paths.cython.path_finding cimport Heuristic
 
-include 'basic_path_finding.pyx'
+from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
 
-# Volume-delay functions, in alphabetical order
-include 'akcelik.pyx'
-include 'bpr.pyx'
-include 'bpr2.pyx'
-include 'conical.pyx'
-include 'inrets.pyx'
+from aequilibrae.paths.cython.basic_path_finding import HEURISTIC_MAP, HEAP_MAP
+from aequilibrae.paths.cython.path_file_saving import save_path_file
 
-include 'parallel_numpy.pyx'
-include 'path_file_saving.pyx'
-include 'connectivity.pyx'
 
 def available_heaps() -> list:
     """Return the available priority queue implementations."""
@@ -25,6 +31,188 @@ def _resolve_heap(result):
     # Every results object reaching the path finding entry points (PathResults, AssignmentResults,
     # SkimResults) carries a _heap attribute.
     return HEAP_MAP[result._heap]
+
+
+def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
+    """OpenMP-parallel all-or-nothing assignment over all origins.
+
+    Runs one shortest path tree, skim and network loading per origin inside a
+    single ``with nogil, parallel`` block, eliminating the per-origin Python
+    ThreadPool dispatch overhead that ``allOrNothing.execute`` paid before.
+    Each OpenMP thread uses its own slice of the per-thread aux arrays
+    (indexed by ``threadid()``), mirroring ``skimming_parallel``.
+
+    Path file saving requires the GIL and is not supported here; callers must
+    dispatch to ``one_to_all`` when ``result.save_path_file`` is set.
+
+    Returns a list of messages for any centroid that could not be processed.
+    """
+    if result._graph_id != graph._id:
+        raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
+    if result.save_path_file:
+        raise ValueError("Path file saving is not supported by the parallel AoN kernel. Use one_to_all")
+
+    cdef:
+        long long nodes = graph.compact_num_nodes
+        long long zones = graph.num_zones
+        long long block_flows_through_centroids = graph.block_centroid_flows
+        int skims = len(graph.skim_fields)
+        long classes = matrix.matrix_view.shape[2]
+        bint select_link = bool(result._selected_links)
+        Py_ssize_t i
+        long long j, k, oi, w, nnz_destinations
+        double demand_sum
+        int tid
+
+    cdef HeapType heap_type = _resolve_heap(result)
+    cdef Bridge br = bridge
+    cdef AeqLogClosure *closure = br.c if br is not None else <AeqLogClosure*>NULL
+
+    # Pre-filter origins on the Python side, exactly as the ThreadPool dispatch
+    # did: origins without demand are skipped silently (unless we are skimming,
+    # where every origin matters) and disconnected centroids are reported.
+    mat = matrix.matrix_view
+    demand_per_origin = np.nansum(mat, axis=(1, 2))
+    nodes_to_indices = graph.nodes_to_indices
+    compact_nodes_to_indices = graph.compact_nodes_to_indices
+    graph_fs = graph.fs
+    report = []
+    valid_origin_indices = []
+    for orig in matrix.index:
+        _i = int(nodes_to_indices[orig])
+        if demand_per_origin[_i] > 0 or skims > 0:
+            if graph_fs[_i] == graph_fs[_i + 1]:
+                report.append("Centroid " + str(orig) + " is not connected")
+            else:
+                valid_origin_indices.append(int(compact_nodes_to_indices[orig]))
+
+    cdef long long n_origins = len(valid_origin_indices)
+    if n_origins == 0:
+        return report
+
+    cdef long long [::1] origin_idx_view = np.asarray(valid_origin_indices, dtype=np.int64)
+
+    # Demand cube (origin, destination, class)
+    cdef double [:, :, :] demand_view = matrix.matrix_view
+
+    # Graph views (shared, read-only across threads)
+    cdef long long [::1] graph_fs_view = graph.compact_fs
+    cdef double [::1] g_view = graph.compact_cost
+    cdef const long long [::1] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
+
+    if skims > 0:
+        gskim = graph.compact_skims
+        fskm = result.skims.matrix_view
+    else:
+        gskim = np.zeros((1, 1))
+        fskm = np.zeros((1, 1, 1))
+    cdef double [:, :] graph_skim_view = gskim
+    cdef double [:, :, :] final_skim_view = fskm
+
+    # Per-thread aux state (sliced by threadid inside the parallel region)
+    cdef long long [:, ::1] predecessors_mat = aux_result.predecessors
+    cdef long long [:, ::1] reached_first_mat = aux_result.reached_first
+    cdef long long [:, ::1] connectors_mat = aux_result.connectors
+    cdef long long [:, ::1] b_nodes_mat = aux_result.temp_b_nodes
+    cdef double [:, :, :] link_loads_mat = aux_result.temp_link_loads
+    cdef double [:, :, :] temp_skims_mat = aux_result.temporary_skims
+    cdef unsigned char [:, ::1] destinations_mat = np.zeros((cores, nodes), dtype=np.uint8)
+
+    cdef:
+        double [:, :, :, :, :] sl_od_matrix_mat
+        double [:, :, :, :] sl_link_loading_mat
+        unsigned char [:, :] has_flow_mask_mat
+        long long [:, :] link_list
+
+    if select_link:
+        has_flow_mask_mat = aux_result.has_flow_mask
+        sl_od_matrix_mat = aux_result.temp_sl_od_matrix
+        sl_link_loading_mat = aux_result.temp_sl_link_loading
+        link_list = aux_result.select_links[:, :]  # Read only, shared across threads
+
+    with nogil, parallel(num_threads=cores):
+        tid = threadid()
+
+        for i in prange(n_origins, schedule="guided"):
+            oi = origin_idx_view[i]
+
+            # Destination set: every destination with non-zero (or NaN, matching
+            # numpy's nonzero semantics) demand from this origin. When skimming
+            # the full tree is required, so early exit is disabled with a
+            # destination count of -1 and the mask is ignored by path_finding.
+            nnz_destinations = -1
+            if skims == 0:
+                nnz_destinations = 0
+                for j in range(nodes):
+                    destinations_mat[tid, j] = 0
+                for j in range(zones):
+                    demand_sum = 0
+                    for k in range(classes):
+                        demand_sum = demand_sum + demand_view[oi, j, k]
+                    if demand_sum != 0:
+                        destinations_mat[tid, j] = 1
+                        nnz_destinations = nnz_destinations + 1
+                # If there's no demand, disable early exit. This case should
+                # never happen in assignment, but it keeps the kernel flexible.
+                if nnz_destinations == 0:
+                    nnz_destinations = -1
+
+            if block_flows_through_centroids:  # Unblocks the centroid if that is the case
+                blocking_centroid_flows(0, oi, zones, graph_fs_view,
+                                        b_nodes_mat[tid], original_b_nodes_view)
+
+            w = path_finding(oi,
+                             destinations_mat[tid],
+                             nnz_destinations,
+                             g_view,
+                             b_nodes_mat[tid],
+                             graph_fs_view,
+                             predecessors_mat[tid],
+                             ids_graph_view,
+                             connectors_mat[tid],
+                             reached_first_mat[tid],
+                             heap_type,
+                             closure)
+
+            if block_flows_through_centroids:  # Re-blocks the centroid if that is the case
+                blocking_centroid_flows(1, oi, zones, graph_fs_view,
+                                        b_nodes_mat[tid], original_b_nodes_view)
+
+            if skims > 0:
+                skim_single_path(oi,
+                                 nodes,
+                                 skims,
+                                 temp_skims_mat[tid],
+                                 predecessors_mat[tid],
+                                 connectors_mat[tid],
+                                 graph_skim_view,
+                                 reached_first_mat[tid],
+                                 w)
+                _copy_skims(temp_skims_mat[tid],
+                            final_skim_view[oi])
+
+            # If we aren't doing SL analysis we use a fast cascade assignment in the
+            # 'network_loading' method. If we are, the link loading happens concurrently
+            # with the SL loading while walking each OD path (see one_to_all).
+            if select_link:
+                sl_network_loading(link_list,
+                                   demand_view[oi],
+                                   predecessors_mat[tid],
+                                   connectors_mat[tid],
+                                   link_loads_mat[tid],
+                                   sl_od_matrix_mat[tid, :, oi, :, :],
+                                   sl_link_loading_mat[tid],
+                                   has_flow_mask_mat[tid],
+                                   classes)
+            else:
+                network_loading(classes,
+                                demand_view[oi],
+                                predecessors_mat[tid],
+                                connectors_mat[tid],
+                                link_loads_mat[tid])
+
+    return report
 
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=None):
@@ -374,9 +562,8 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
             del all_nodes
             del all_connectors
             del mileposts
-    
-    return path, path_nodes, path_link_directions, milepost
 
+    return path, path_nodes, path_link_directions, milepost
 
 
 def update_path_trace(results, destination, graph):
@@ -438,103 +625,104 @@ def update_path_trace(results, destination, graph):
             results.milepost = None
 
 
-def skimming_single_origin(origin, graph, result, aux_result, curr_thread, bridge=None):
-    """
-    :param origin:
-    :param graph:
-    :param results:
-    :return:
-    """
-    cdef long long nodes, orig, origin_index, block_flows_through_centroids, skims, zones, b
-    # We transform the python variables in Cython variables
-    orig = origin
-    origin_index = graph.compact_nodes_to_indices[orig]
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)  # turn off bounds-checking for entire function
+cpdef void network_loading(
+    long classes,
+    double[:, :] demand,
+    long long [:] pred,
+    long long [:] conn,
+    double[:, :] link_loads
+) noexcept nogil:
+    cdef long long i, j, predecessor, connector, node
+    cdef long long zones = demand.shape[0]
 
-    graph_fs = graph.compact_fs
-    if result._graph_id != graph._id:
+    # Traditional loading, without cascading
+    for i in range(zones):
+        node = i
 
-        raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
+        predecessor = pred[node]
+        connector = conn[node]
+        while predecessor >= 0:
+            for j in range(classes):
+                link_loads[connector, j] += demand[i, j]
 
-    if orig not in graph.centroids:
-        raise ValueError("Centroid " + str(orig) + " is outside the range of zones in the graph")
+            connector = conn[predecessor]
+            predecessor = pred[predecessor]
 
-    if origin_index > graph.compact_num_nodes:
-        raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
 
-    if graph_fs[origin_index] == graph_fs[origin_index + 1]:
-        raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cdef void sl_network_loading(
+    long long [:, :] selected_links,
+    double [:, :] demand,
+    long long [:] pred,
+    long long [:] conn,
+    double [:, :] link_loads,
+    double [:, :, :] sl_od_matrix,
+    double [:, :, :] sl_link_loading,
+    unsigned char [:] has_flow_mask,
+    long classes
+) noexcept nogil:
+    # VARIABLES:
+    #   selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
+    #   demand:         The input demand matrix for a given origin. The first index corresponds to destination,
+    #                   second is the class
+    #   pred:           The list of predecessor nodes, i.e. given a node, referencing that node's index in pred
+    #                   yields the previous node in the minimum spanning tree
+    #   conn:           The list of links which connect predecessor nodes. referencing it by the predecessor yields
+    #                   the link it used to connect the two nodes
+    # link_loads:       Stores the loading on each link. Equivalent to link_loads in network_loading
+    # temp_sl_od_matrix:     Stores the OD matrix for each set of selected links sliced for the given origin
+    # The indices are:  set of links, destination, class
+    # temp_sl_link_loading:  Stores the loading on the Selected links, and the paths which use the selected links
+    #                   The indices are: set of links, link_id, class)
+    # has_flow_mask:    An array which acts as a flag for which links were used in retracing a given OD path
+    # classes:          the number of subclasses of vehicles for the given TrafficClass
+    #
+    # Executes regular loading, while keeping track of SL links
+    cdef:
+        int i, j, k, m, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
+        long long predecessor, connection
+        bint found
+    for j in range(dests):
+        memset(&has_flow_mask[0], 0, xshape * sizeof(unsigned char))
+        connection = conn[j]
+        predecessor = pred[j]
 
-    nodes = graph.compact_num_nodes + 1
-    zones = graph.num_zones
-    block_flows_through_centroids = graph.block_centroid_flows
-    skims = result.num_skims
-
-    # In order to release the GIL for this procedure, we create all the
-    # memory views we will need
-
-    # views from the graph
-    cdef long long [::1] graph_fs_view = graph_fs
-    cdef double [::1] g_view = graph.compact_cost
-    cdef const long long [::1] ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
-    cdef const long long [:] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
-    cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
-
-    cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
-
-    # views from the aux-result object
-    cdef long long [::1] predecessors_view = aux_result.predecessors[curr_thread, :]
-    cdef long long [::1] reached_first_view = aux_result.reached_first[curr_thread, :]
-    cdef long long [::1] conn_view = aux_result.connectors[curr_thread, :]
-    cdef long long [::1] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
-    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
-
-    # Destination set. Early exit is disabled so this mask is never read.
-    cdef unsigned char [::1] destinations = np.array([], dtype=bool)
-
-    cdef HeapType heap_type = _resolve_heap(result)
-    cdef Bridge br = bridge
-    cdef AeqLogClosure *closure = br.c if br is not None else <AeqLogClosure*>NULL
-
-    # Now we do all procedures with NO GIL
-    with nogil:
-        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
-            b = 0
-            blocking_centroid_flows(b,
-                                    origin_index,
-                                    zones,
-                                    graph_fs_view,
-                                    b_nodes_view,
-                                    original_b_nodes_view)
-        w = path_finding(origin_index,
-                         destinations,
-                         -1,  # destination index to disable early exit
-                         g_view,
-                         b_nodes_view,
-                         graph_fs_view,
-                         predecessors_view,
-                         ids_graph_view,
-                         conn_view,
-                         reached_first_view,
-                         heap_type,
-                         closure)
-
-        skim_multiple_fields(origin_index,
-                             nodes,
-                             zones,  # ???????????????
-                             skims,
-                             skim_matrix_view,
-                             predecessors_view,
-                             conn_view,
-                             graph_skim_view,
-                             reached_first_view,
-                             w,
-                             final_skim_matrices_view)
-        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
-            b = 1
-            blocking_centroid_flows(b,
-                                    origin_index,
-                                    zones,
-                                    graph_fs_view,
-                                    b_nodes_view,
-                                    original_b_nodes_view)
-    return orig
+        # Walk the path and mark all used links in the has_flow_mask
+        while predecessor >= 0:
+            for k in range(classes):
+                link_loads[connection, k] += demand[j, k]
+            has_flow_mask[connection] = 1
+            connection = conn[predecessor]
+            predecessor = pred[predecessor]
+        # Now iterate through each SL set and see if any of their links were marked
+        for i in range(selected_links.shape[0]):
+            # We check to see if the given OD path marked any of our selected links
+            found = 0
+            m = 0
+            while m < selected_links.shape[1] and found == 0:
+                # Checks to see if the current set of selected links has finished
+                # NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
+                # There is either a serious bug, or the program has reached the end of a set of links in SL.
+                # This lets us early exit from the loop without needing to iterate through the rest of the array
+                # Which just has placeholder values
+                if selected_links[i][m] == -1:
+                    break
+                if has_flow_mask[selected_links[i][m]] != 0:
+                    found = 1
+                m += 1
+            if found == 0:
+                continue
+            for k in range(classes):
+                sl_od_matrix[i, j, k] = demand[j, k]
+            connection = conn[j]
+            predecessor = pred[j]
+            while predecessor >= 0:
+                for k in range(classes):
+                    sl_link_loading[i, connection, k] += demand[j, k]
+                connection = conn[predecessor]
+                predecessor = pred[predecessor]

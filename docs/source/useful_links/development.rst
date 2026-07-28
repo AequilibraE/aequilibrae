@@ -181,10 +181,17 @@ which ``assert`` is failing, you can work your way back through the code that cr
 order to update it. After updating the test targets, re-run the tests to confirm the new code passes all 
 the tests.
 
+Profiling
+^^^^^^^^^
+
+As AequilibraE is performance-critical software, changes to its compute-heavy code should be profiled to ensure they
+do not degrade performance. Our internal profiling workflows, including how to profile the Cython and C++ extensions
+that Python profilers cannot see into, are documented :ref:`in this page <profiling>`.
+
 Documentation
 ^^^^^^^^^^^^^
 
-All the AequilibraE documentation is (unfortunately) written in 
+All the AequilibraE documentation is (unfortunately) written in
 `reStructuredText <http://docutils.sourceforge.net/rst.html>`_  and built with 
 `Sphinx <http://www.sphinx-doc.org/en/stable/>`_.
 Although reStructuredText is often unnecessarily convoluted to write, Sphinx is capable of converting it to standard-

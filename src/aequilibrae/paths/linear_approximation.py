@@ -10,7 +10,7 @@ import numpy as np
 from scipy.optimize import minimize_scalar, root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.cython.AoN import (
+from aequilibrae.paths.cython.parallel_numpy import (
     aggregate_link_costs,
     copy_three_dimensions,
     copy_two_dimensions,
@@ -48,6 +48,8 @@ class LinearApproximation(WorkerThread):
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
+        self.elementwise_cores = assig_spec.elementwise_cores
+        self.threading_threshold = assig_spec.threading_threshold
         self.iteration_issue = []
         self.convergence_report = {
             "iteration": [],
@@ -155,7 +157,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+            self.vdf_der,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.elementwise_cores,
         )
         numerator = 0.0
         denominator = 0.0
@@ -193,7 +200,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+            self.vdf_der,
+            self.fw_total_flow,
+            self.capacity,
+            self.free_flow_tt,
+            *self.vdf_parameters,
+            self.elementwise_cores,
         )
         mu_numerator = 0.0
         mu_denominator = 0.0
@@ -256,7 +268,7 @@ class LinearApproximation(WorkerThread):
             self.capacity,
             self.free_flow_tt,
             *self.vdf_parameters,
-            self.cores,
+            self.elementwise_cores,
         )
 
         for c in self.traffic_classes:
@@ -280,10 +292,17 @@ class LinearApproximation(WorkerThread):
             for c in self.traffic_classes:
                 aon_res = c._aon_results
                 stp_dir_res = self.step_direction[c._id]
-                copy_two_dimensions(stp_dir_res.link_loads, aon_res.link_loads, self.cores)
+                copy_two_dimensions(
+                    stp_dir_res.link_loads, aon_res.link_loads, self.elementwise_cores, self.threading_threshold
+                )
                 stp_dir_res.total_flows()
                 if c.results.num_skims > 0:
-                    copy_three_dimensions(stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view, self.cores)
+                    copy_three_dimensions(
+                        stp_dir_res.skims.matrix_view,
+                        aon_res.skims.matrix_view,
+                        self.elementwise_cores,
+                        self.threading_threshold,
+                    )
                 sd_flows.append(aon_res.total_link_loads)
 
                 if c._selected_links:
@@ -292,38 +311,44 @@ class LinearApproximation(WorkerThread):
                         copy_two_dimensions(
                             self.sl_step_dir_ll[c._id][name]["sdr"],
                             np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
-                            self.cores,
+                            self.elementwise_cores,
+                            self.threading_threshold,
                         )
                         copy_three_dimensions(
                             self.sl_step_dir_od[c._id][name]["sdr"],
                             np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
-                            self.cores,
+                            self.elementwise_cores,
+                            self.threading_threshold,
                         )
 
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
         elif (self.iter == 3) or (direction == "cfw") or (self.algorithm == "cfw"):
             self.current_direction = "cfw"
             self.calculate_conjugate_stepsize()
+            # The conjugate direction is computed into a spare buffer and the
+            # references rotated (current -> previous, spare -> current) instead
+            # of copying the current direction out of the way.
             for c in self.traffic_classes:
                 sdr = self.step_direction[c._id]
-                previous = self.previous_step_direction[c._id]
-
-                copy_two_dimensions(previous.link_loads, sdr.link_loads, self.cores)
-                previous.total_flows()
-                if c.results.num_skims > 0:
-                    copy_three_dimensions(previous.skims.matrix_view, sdr.skims.matrix_view, self.cores)
+                spare = self.temp_step_direction_for_copy[c._id]
 
                 linear_combination(
-                    sdr.link_loads, sdr.link_loads, c._aon_results.link_loads, self.conjugate_stepsize, self.cores
+                    spare.link_loads,
+                    sdr.link_loads,
+                    c._aon_results.link_loads,
+                    self.conjugate_stepsize,
+                    self.elementwise_cores,
+                    self.threading_threshold,
                 )
 
                 if c.results.num_skims > 0:
                     linear_combination_skims(
-                        sdr.skims.matrix_view,
+                        spare.skims.matrix_view,
                         sdr.skims.matrix_view,
                         c._aon_results.skims.matrix_view,
                         self.conjugate_stepsize,
-                        self.cores,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
 
                 if c._selected_links:
@@ -332,68 +357,61 @@ class LinearApproximation(WorkerThread):
                         sl_step_dir_ll = self.sl_step_dir_ll[c._id][name]
                         sl_step_dir_od = self.sl_step_dir_od[c._id][name]
 
-                        copy_two_dimensions(
-                            sl_step_dir_ll["prev_sdr"],
-                            sl_step_dir_ll["sdr"],
-                            self.cores,
-                        )
-                        copy_three_dimensions(
-                            sl_step_dir_od["prev_sdr"],
-                            sl_step_dir_od["sdr"],
-                            self.cores,
-                        )
-
                         linear_combination(
-                            sl_step_dir_ll["sdr"],
+                            sl_step_dir_ll["temp_prev_sdr"],
                             sl_step_dir_ll["sdr"],
                             np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             self.conjugate_stepsize,
-                            self.cores,
+                            self.elementwise_cores,
+                            self.threading_threshold,
                         )
 
                         linear_combination_skims(
-                            sl_step_dir_od["sdr"],
+                            sl_step_dir_od["temp_prev_sdr"],
                             sl_step_dir_od["sdr"],
                             np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
                             self.conjugate_stepsize,
-                            self.cores,
+                            self.elementwise_cores,
+                            self.threading_threshold,
                         )
 
-                sdr.total_flows()
-                sd_flows.append(sdr.total_link_loads)
+                        self.__rotate_select_link_buffers(sl_step_dir_ll, sl_step_dir_od)
+
+                self.__rotate_direction_buffers(c._id)
+
+                spare.total_flows()
+                sd_flows.append(spare.total_link_loads)
         # biconjugate
         else:
             self.current_direction = "bfw"
             self.calculate_biconjugate_direction()
-            # deep copy because we overwrite step_direction but need it on next iteration
+            # The biconjugate direction is computed into a spare buffer and the
+            # references rotated (current -> previous, spare -> current, previous
+            # -> spare) instead of shuffling the arrays through copies.
             for c in self.traffic_classes:
-                ppst: AssignmentResults = self.temp_step_direction_for_copy[c._id]
+                spare: AssignmentResults = self.temp_step_direction_for_copy[c._id]
                 prev_stp_dir: AssignmentResults = self.previous_step_direction[c._id]
                 stp_dir: AssignmentResults = self.step_direction[c._id]
 
-                copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
-                ppst.total_flows()
-                if c.results.num_skims > 0:
-                    copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view, self.cores)
-
                 triple_linear_combination(
-                    stp_dir.link_loads,
+                    spare.link_loads,
                     c._aon_results.link_loads,
                     stp_dir.link_loads,
                     prev_stp_dir.link_loads,
                     self.betas,
-                    self.cores,
+                    self.elementwise_cores,
+                    self.threading_threshold,
                 )
 
-                stp_dir.total_flows()
                 if c.results.num_skims > 0:
                     triple_linear_combination_skims(
-                        stp_dir.skims.matrix_view,
+                        spare.skims.matrix_view,
                         c._aon_results.skims.matrix_view,
                         stp_dir.skims.matrix_view,
                         prev_stp_dir.skims.matrix_view,
                         self.betas,
-                        self.cores,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
 
                 if c._selected_links:
@@ -401,54 +419,58 @@ class LinearApproximation(WorkerThread):
                     for name, idx in c._aon_results._selected_links.items():
                         sl_step_dir_ll = self.sl_step_dir_ll[c._id][name]
                         sl_step_dir_od = self.sl_step_dir_od[c._id][name]
-                        copy_two_dimensions(
-                            sl_step_dir_ll["temp_prev_sdr"],
-                            sl_step_dir_ll["sdr"],
-                            self.cores,
-                        )
-                        copy_three_dimensions(
-                            sl_step_dir_od["temp_prev_sdr"],
-                            sl_step_dir_od["sdr"],
-                            self.cores,
-                        )
 
                         triple_linear_combination(
-                            sl_step_dir_ll["sdr"],
+                            sl_step_dir_ll["temp_prev_sdr"],
                             np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             sl_step_dir_ll["sdr"],
                             sl_step_dir_ll["prev_sdr"],
                             self.betas,
-                            self.cores,
+                            self.elementwise_cores,
+                            self.threading_threshold,
                         )
 
                         triple_linear_combination_skims(
-                            sl_step_dir_od["sdr"],
+                            sl_step_dir_od["temp_prev_sdr"],
                             np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
                             sl_step_dir_od["sdr"],
                             sl_step_dir_od["prev_sdr"],
                             self.betas,
-                            self.cores,
+                            self.elementwise_cores,
+                            self.threading_threshold,
                         )
 
-                        copy_two_dimensions(
-                            sl_step_dir_ll["prev_sdr"],
-                            sl_step_dir_ll["temp_prev_sdr"],
-                            self.cores,
-                        )
-                        copy_three_dimensions(
-                            sl_step_dir_od["prev_sdr"],
-                            sl_step_dir_od["temp_prev_sdr"],
-                            self.cores,
-                        )
+                        self.__rotate_select_link_buffers(sl_step_dir_ll, sl_step_dir_od)
 
-                sd_flows.append(np.sum(stp_dir.link_loads, axis=1))
+                self.__rotate_direction_buffers(c._id)
 
-                copy_two_dimensions(prev_stp_dir.link_loads, ppst.link_loads, self.cores)
-                prev_stp_dir.total_flows()
-                if c.results.num_skims > 0:
-                    copy_three_dimensions(prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view, self.cores)
+                spare.total_flows()
+                sd_flows.append(spare.total_link_loads)
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
+
+    def __rotate_direction_buffers(self, c_id: str):
+        """Promotes the direction just computed into the spare buffer
+        (``temp_step_direction_for_copy``): it becomes the current step
+        direction, the old current becomes the previous and the old previous is
+        recycled as the next spare."""
+        self.step_direction[c_id], self.previous_step_direction[c_id], self.temp_step_direction_for_copy[c_id] = (
+            self.temp_step_direction_for_copy[c_id],
+            self.step_direction[c_id],
+            self.previous_step_direction[c_id],
+        )
+
+    @staticmethod
+    def __rotate_select_link_buffers(sl_step_dir_ll: dict, sl_step_dir_od: dict):
+        """Promotes a select-link direction just computed into ``temp_prev_sdr``:
+        it becomes ``sdr``, the old ``sdr`` becomes ``prev_sdr`` and the old
+        ``prev_sdr`` is recycled as the next scratch buffer."""
+        for buffers in (sl_step_dir_ll, sl_step_dir_od):
+            buffers["sdr"], buffers["prev_sdr"], buffers["temp_prev_sdr"] = (
+                buffers["temp_prev_sdr"],
+                buffers["sdr"],
+                buffers["prev_sdr"],
+            )
 
     def __retry_with_fw_direction(self, msg: str):
         if self.algorithm == "bfw":
@@ -568,10 +590,20 @@ class LinearApproximation(WorkerThread):
             flows = []
             if self.iter == 1:
                 for c in self.traffic_classes:
-                    copy_two_dimensions(c.results.link_loads, c._aon_results.link_loads, self.cores)
+                    copy_two_dimensions(
+                        c.results.link_loads,
+                        c._aon_results.link_loads,
+                        self.elementwise_cores,
+                        self.threading_threshold,
+                    )
                     c.results.total_flows()
                     if c.results.num_skims > 0:
-                        copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
+                        copy_three_dimensions(
+                            c.results.skims.matrix_view,
+                            c._aon_results.skims.matrix_view,
+                            self.elementwise_cores,
+                            self.threading_threshold,
+                        )
 
                     if c._selected_links:
                         for name, idx in c._aon_results._selected_links.items():
@@ -582,12 +614,14 @@ class LinearApproximation(WorkerThread):
                                 np.sum(self.aons[c._id].aux_res.temp_sl_od_matrix, axis=0)[
                                     idx, :, :, :
                                 ],  # results after the iteration
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
+                                self.threading_threshold,
                             )
                             copy_two_dimensions(
                                 c.results.select_link_loading[name],  # output matrix
                                 np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
+                                self.threading_threshold,
                             )
                     flows.append(c.results.total_link_loads)
 
@@ -600,7 +634,12 @@ class LinearApproximation(WorkerThread):
                     cls_res = c.results
 
                     linear_combination(
-                        cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize, self.cores
+                        cls_res.link_loads,
+                        stp_dir.link_loads,
+                        cls_res.link_loads,
+                        self.stepsize,
+                        self.elementwise_cores,
+                        self.threading_threshold,
                     )
 
                     if cls_res.num_skims > 0:
@@ -609,7 +648,8 @@ class LinearApproximation(WorkerThread):
                             stp_dir.skims.matrix_view,
                             cls_res.skims.matrix_view,
                             self.stepsize,
-                            self.cores,
+                            self.elementwise_cores,
+                            self.threading_threshold,
                         )
 
                     if c._selected_links:
@@ -621,7 +661,8 @@ class LinearApproximation(WorkerThread):
                                 self.sl_step_dir_od[c._id][name]["sdr"],
                                 cls_res.select_link_od.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
+                                self.threading_threshold,
                             )
 
                             linear_combination(
@@ -629,7 +670,8 @@ class LinearApproximation(WorkerThread):
                                 self.sl_step_dir_ll[c._id][name]["sdr"],
                                 cls_res.select_link_loading[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
-                                self.cores,  # core count
+                                self.elementwise_cores,  # core count
+                                self.threading_threshold,
                             )
 
                     cls_res.total_flows()
@@ -690,11 +732,19 @@ class LinearApproximation(WorkerThread):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
         the corresponding contribution needs to be passed in"""
         x = np.zeros_like(self.fw_total_flow)
-        linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
+        linear_combination_1d(
+            x, self.step_direction_flow, self.fw_total_flow, stepsize, self.elementwise_cores, self.threading_threshold
+        )
         # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
-        self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
+        self.vdf.apply_vdf(
+            self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.elementwise_cores
+        )
         link_cost_term = sum_a_times_b_minus_c(
-            self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
+            self.congested_value,
+            self.step_direction_flow,
+            self.fw_total_flow,
+            self.elementwise_cores,
+            self.threading_threshold,
         )
         return link_cost_term + const_term
 
@@ -705,7 +755,11 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             # fixed cost is scaled by vot
             class_link_costs = sum_a_times_b_minus_c(
-                c.fixed_cost, self.step_direction[c._id].link_loads[:, 0], c.results.link_loads[:, 0], self.cores
+                c.fixed_cost,
+                self.step_direction[c._id].link_loads[:, 0],
+                c.results.link_loads[:, 0],
+                self.elementwise_cores,
+                self.threading_threshold,
             )
             class_specific_term += class_link_costs
         return class_specific_term
@@ -730,7 +784,8 @@ class LinearApproximation(WorkerThread):
             self.step_direction_flow,
             self.fw_total_flow,
             stepsize,
-            self.cores,
+            self.elementwise_cores,
+            self.threading_threshold,
         )
         self.vdf.apply_vdf(
             self._trap_new_cost,
@@ -738,7 +793,7 @@ class LinearApproximation(WorkerThread):
             self.capacity,
             self.free_flow_tt,
             *self.vdf_parameters,
-            self.cores,
+            self.elementwise_cores,
         )
         np.add(self.congested_time, self._trap_new_cost, out=self._trap_avg_cost)
         link_term = (
@@ -748,7 +803,8 @@ class LinearApproximation(WorkerThread):
                 self._trap_avg_cost,
                 self.step_direction_flow,
                 self.fw_total_flow,
-                self.cores,
+                self.elementwise_cores,
+                self.threading_threshold,
             )
         )
         fixed_cost_term = stepsize * derivative_of_objective_stepsize_independent

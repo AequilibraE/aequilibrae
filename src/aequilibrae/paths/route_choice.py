@@ -21,6 +21,7 @@ from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
+from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.cython.bridge import Bridge
 
 logger = logging.getLogger(__name__)
@@ -177,7 +178,7 @@ class RouteChoice:
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
         """
-        self.cores = cores
+        self.cores = clamp_cores(cores)
 
     def set_save_routes(self, where: Optional[str] = None, to_parquet_kwargs: dict[str, Any] | None = None) -> None:
         """

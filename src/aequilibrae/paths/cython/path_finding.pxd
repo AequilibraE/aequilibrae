@@ -6,7 +6,7 @@ cdef extern from "path_finding.hpp" namespace "aequilibrae::paths::cpp" nogil:
 
     const size_t SENTINEL
 
-    cdef enum Heuristic:
+    cdef enum class Heuristic:
         HAVERSINE
         EQUIRECTANGULAR
 

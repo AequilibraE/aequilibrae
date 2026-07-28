@@ -29,8 +29,9 @@
 # work developed with the software.
 # ---------------------------------------------------------------------------------------------------------------------
 
-import numpy as np
 from types import SimpleNamespace
+
+import numpy as np
 
 import aequilibrae.paths.linear_approximation as linear_approximation
 from aequilibrae.paths.linear_approximation import LinearApproximation
@@ -45,6 +46,8 @@ class DummyVDF:
 def test_stepsize_derivative_uses_fw_total_flow_state():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.preload = np.array([10.0, 20.0])
     assignment.current_assigned_flow = np.array([3.0, 4.0])
     assignment.fw_total_flow = assignment.current_assigned_flow + assignment.preload

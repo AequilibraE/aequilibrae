@@ -50,7 +50,7 @@ cdef class Bridge:
         self.__logger = logger or logging.getLogger()
         self.c.c_level = self.__logger.level
         if logger is None:
-            self.__logger.warn(
+            self.__logger.warning(
                 "AequilibraE Bridge is using the root logger. To prevent broken progress bars, ensure either progress "
                 "bars are disabled (set AEQ_SHOW_PROGRESS=FALSE), or all StreamHandlers utilise AequilibraEStreamHandler"
             )
