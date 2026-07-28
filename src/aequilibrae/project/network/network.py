@@ -20,6 +20,7 @@ from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
+from aequilibrae.project.network.turn_restrictions import TurnRestrictions
 from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -52,6 +53,7 @@ class Network(WorkerThread):
         self.links = Links(self)
         self.nodes = Nodes(self)
         self.periods = Periods(self)
+        self.turn_restrictions = TurnRestrictions(self)
 
     def skimmable_fields(self) -> list:
         """
@@ -343,6 +345,28 @@ class Network(WorkerThread):
                         else None
                     )
 
+            # Load turn restrictions and allow_uturns setting
+            turn_restrictions_df = None
+            allow_uturns = False
+
+            table_check = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='turn_restrictions'"
+            ).fetchone()
+            if table_check:
+                turn_restrictions_df = pd.read_sql("SELECT * FROM turn_restrictions", conn)
+            else:
+                logger.warning(
+                    "This project does not have a 'turn_restrictions' table, consider upgrading the project "
+                    "with 'project.upgrade()'."
+                )
+
+            # Load allow_uturns setting from about table
+            allow_uturns_r = conn.execute("SELECT infovalue FROM about WHERE infoname = 'allow_uturns'").fetchone()
+            if allow_uturns_r:
+                allow_uturns = allow_uturns_r[0] == "1"
+
+        assert turn_restrictions_df is None or "modes" in turn_restrictions_df.columns
+
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[all_fields]
         for m in modes:
@@ -354,11 +378,22 @@ class Network(WorkerThread):
             g = Graph()
             g.mode = m
             g.network = net
+
+            if turn_restrictions_df is not None:
+                g._turn_restrictions = turn_restrictions_df[
+                    turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
+                ].copy()
+
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)
             if centroids is None:
                 logger.warning("Your graph has no centroids")
             g.lonlat_index = lonlat.loc[g.all_nodes]
+
+            # Load turn restrictions if any exist
+            if turn_restrictions_df is not None:
+                g.set_turn_restrictions(g._turn_restrictions, allow_path_uturns=allow_uturns)
+
             self.graphs[m] = g
 
     def set_time_field(self, time_field: str) -> None:

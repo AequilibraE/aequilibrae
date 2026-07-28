@@ -196,6 +196,7 @@ class TrafficAssignment(AssignmentBase):
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
         >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
         >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        >>> # This applies automatic centroid-connector turn bans where needed
         >>> graph.set_blocked_centroid_flows(True)
 
         >>> proj_matrices = project.matrices

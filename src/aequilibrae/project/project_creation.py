@@ -48,7 +48,40 @@ def add_triggers(conn: Connection, db_type: str) -> None:
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
     for f in all_trigger_sets:
         qry_file = spec_folder / f"{f}.sql"
-        run_queries_from_sql_file(conn, qry_file)
+        if f == "turn_restrictions":
+            _run_turn_restrictions_trigger_sql_file(conn, qry_file)
+        else:
+            run_queries_from_sql_file(conn, qry_file)
+
+
+def _run_turn_restrictions_trigger_sql_file(conn: Connection, qry_file: Path) -> None:
+    """Installs the turn restriction triggers, skipping the automatic geometry ones.
+
+    Used by migration ``003_add_turn_restrictions`` when upgrading an existing project,
+    where the spatialite-backed geometry triggers are not applied.
+    """
+    with open(qry_file, "r") as sql_file:
+        query_list = sql_file.read()
+
+    geometry_trigger_names = (
+        "aequilibrae_turn_restrictions_set_geometry_insert",
+        "aequilibrae_turn_restrictions_set_geometry_update",
+        "aequilibrae_turn_restrictions_update_geometry_on_node_move",
+    )
+
+    for cmd in query_list.split("--#"):
+        normalized = cmd.lower()
+        if any(name in normalized for name in geometry_trigger_names):
+            continue
+        try:
+            conn.execute(cmd)
+        except Exception as e:
+            msg = f"Error running SQL command: {e.args}"
+            logger.error(msg)
+            logger.info(cmd)
+            raise e
+
+    logger.info("Skipped automatic turn restriction geometry triggers")
 
 
 def remove_triggers(conn: Connection, db_type: str, use_aequilibrae_prefix: bool = True) -> None:

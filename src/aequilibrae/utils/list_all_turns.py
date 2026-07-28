@@ -92,7 +92,10 @@ def _classify_turns(turn_angle: np.ndarray) -> np.ndarray:
     return np.select([np.abs(deg) >= 150.0, deg > 30.0, deg < -30.0], ["u_turn", "left", "right"], default="through")
 
 
-def list_left_turns(project: Project, mode: str = "c", ):
+def list_left_turns(
+    project: Project,
+    mode: str = "c",
+):
     links = project.network.links.data[["link_id", "a_node", "b_node", "direction", "modes"]].copy()
     nodes = project.network.nodes.data[["node_id", "longitude", "latitude"]].copy()
 
@@ -119,8 +122,8 @@ def list_left_turns(project: Project, mode: str = "c", ):
         in_pos = in_idx[k]
         out_pos = out_idx[k]
 
-        in_slice = in_order[in_starts[in_pos]: in_starts[in_pos] + in_counts[in_pos]]
-        out_slice = out_order[out_starts[out_pos]: out_starts[out_pos] + out_counts[out_pos]]
+        in_slice = in_order[in_starts[in_pos] : in_starts[in_pos] + in_counts[in_pos]]
+        out_slice = out_order[out_starts[out_pos] : out_starts[out_pos] + out_counts[out_pos]]
 
         if in_slice.size == 0 or out_slice.size == 0:
             continue
