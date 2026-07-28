@@ -34,8 +34,7 @@ def aequilibrae_init(proj_path: str, cost: str):
     assignment.set_time_field("distance")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
-    # And we will allow paths to be compute going through other centroids/centroid connectors
-    # required for the Sioux Falls network, as all nodes are centroids
+    # Keep centroid connector turns allowed for Sioux Falls, since all nodes are centroids
     # BE CAREFUL WITH THIS SETTING
     graph.set_blocked_centroid_flows(False)
     return graph, matrix, assignment, car
