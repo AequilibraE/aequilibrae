@@ -299,6 +299,54 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     # We keep all centroids for sure
     counts[graph.centroids] = 999
 
+    # If U-turns are allowed, we need to preserve nodes with bidirectional links
+    # because U-turns can occur at these nodes
+    if graph._allow_uturns_everywhere:
+        # Build lookups from link_id to direction/a_node/b_node for efficient access
+        _link_dir_lookup = dict(zip(df.link_id.values, df.direction.values))
+        _link_a_lookup = dict(zip(df.link_id.values, df.a_node.values))
+        _link_b_lookup = dict(zip(df.link_id.values, df.b_node.values))
+        for node in range(all_nodes_max + 1):
+            if counts[node] == 2:
+                has_incoming = False
+                has_outgoing = False
+                end_idx = links_index[node + 1] if node < all_nodes_max else len(all_links)
+                for i in range(links_index[node], end_idx):
+                    if i >= len(all_links):
+                        continue
+                    link_id = all_links[i]
+                    link_dir = _link_dir_lookup.get(link_id, None)
+                    if link_dir is None:
+                        continue
+                    a = _link_a_lookup.get(link_id)
+                    b = _link_b_lookup.get(link_id)
+                    if a is None or b is None:
+                        continue
+                    if link_dir == 0:  # Bidirectional: both incoming and outgoing
+                        has_incoming = True
+                        has_outgoing = True
+                    elif link_dir == 1:  # AB direction only
+                        if a == node:
+                            has_outgoing = True
+                        if b == node:
+                            has_incoming = True
+                    elif link_dir == -1:  # BA direction only
+                        if b == node:
+                            has_outgoing = True
+                        if a == node:
+                            has_incoming = True
+                    if has_incoming and has_outgoing:
+                        counts[node] = 998
+                        break
+
+    # Preserve nodes that are via-nodes for turn restrictions
+    # These nodes must not be compressed away or the restrictions become unmappable
+    if graph._turn_restrictions is not None and len(graph._turn_restrictions) > 0:
+        for via_node in graph._turn_restrictions["via_node"].to_numpy():
+            via_node = int(via_node)
+            if 0 <= via_node <= all_nodes_max and counts[via_node] == 2:
+                counts[via_node] = 998
+
     degree_two = (counts == 2).astype(np.uint8)
     # Reorder and sum the degree two nodes by how they appear in the network, finds how a particular node is connected,
     # resulting values are

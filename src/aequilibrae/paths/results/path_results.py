@@ -95,6 +95,7 @@ class PathResults:
         """Computes the path between two nodes in the network.
 
         `A*` heuristics are currently only valid distance cost fields.
+        `A*` is not available when the graph has turn restrictions enabled.
 
         :Arguments:
             **origin** (:obj:`int`): Origin for the path
@@ -106,6 +107,7 @@ class PathResults:
 
             **a_star** (:obj:`bool`): Whether or not to use A* over Dijkstra's algorithm.
             When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
+            This option is incompatible with turn restrictions.
 
             **heuristic** (:obj:`str`): Heuristic to use if ``a_star`` is enabled. Default is ``None``.
 

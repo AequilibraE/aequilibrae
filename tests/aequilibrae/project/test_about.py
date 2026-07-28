@@ -28,6 +28,7 @@ def test_create_and_list(sioux_falls_example):
         "model_version",
         "project_id",
         "aequilibrae_version",
+        "allow_uturns",
         "projection",
     ]
     assert not set(fields) ^ set(expected), "About table does not have all expected fields"

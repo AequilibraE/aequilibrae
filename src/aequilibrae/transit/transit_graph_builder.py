@@ -88,8 +88,8 @@ class TransitGraphBuilder:
         **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to
         ``np.inf``.
 
-        **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids.
-        Defaults to ``True``.
+        **blocking_centroid_flows** (:obj:`bool`): Whether to prevent OD connector-through traversal
+        by splitting OD nodes into origin/destination roles. Defaults to ``True``.
 
         **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1``
         for unlimited.
@@ -508,7 +508,7 @@ class TransitGraphBuilder:
         """Create OD vertices from zones.
 
         If zones have not previously been added, add zones from the project.
-        If ``self.blocking_centroid_flow`` is ``True``, a distinction is made between
+        If ``self.blocking_centroid_flows`` is ``True``, a distinction is made between
         ``origin`` and ``destination`` vertices. Otherwise, they are both classified as ``od``.
         """
         if "zones" not in self.__dict__:

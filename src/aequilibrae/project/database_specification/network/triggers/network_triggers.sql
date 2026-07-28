@@ -1,9 +1,6 @@
 -- TODO: allow arbitrary CRS
 -- TODO: allow arbitrary column AND table names
 
--- note that sqlite only recognises 5 basic column affinities (TEXT, NUMERIC, INTEGER, REAL, BLOB); more specific declarations are ignored
--- the 'INTEGER PRIMARY KEY' column is always 64-bit signed integer, AND an alias for 'ROWID'.
-
 -- Note that manually editing the ogc_fid will corrupt the spatial index. Therefore, we leave the
 -- ogc_fid alone, and have a separate link_id and node_id, for network editors who have specific
 -- requirements.
@@ -62,7 +59,7 @@ create trigger aequilibrae_new_link_b_node before insert on links
             EndPoint(new.geometry));
   END;
 --#
--- we use a before ordering here, as it is the only way to guarantee this will run before the nodeid update trigger.
+-- we use a before ordering here, as it is the only way to guarantee this will run before the node_id update trigger.
 -- when inserting a link endpoint to empty space, create a new node
 create trigger aequilibrae_update_link_a_node before update of geometry on links
   when

@@ -135,6 +135,12 @@ class LinearApproximation(WorkerThread):
         self._trap_new_cost = np.zeros_like(self.congested_time)
         self._trap_avg_cost = np.zeros_like(self.congested_time)
 
+        # Turn penalty cost tracking for convergence calculation
+        self.fw_total_turn_cost = 0.0
+        self.aon_total_turn_cost = 0.0
+        self.step_direction_turn_cost = {}
+        self.previous_step_direction_turn_cost = {}
+
         self.step_direction: dict[str, AssignmentResults] = {}
         self.previous_step_direction: dict[str, AssignmentResults] = {}
         self.temp_step_direction_for_copy: dict[str, AssignmentResults] = {}
@@ -145,6 +151,8 @@ class LinearApproximation(WorkerThread):
             r = AssignmentResults()
             r.prepare(c.graph, c.matrix)
             self.step_direction[c._id] = r
+            self.step_direction_turn_cost[c._id] = 0.0
+            self.previous_step_direction_turn_cost[c._id] = 0.0
 
         if self.algorithm in ["cfw", "bfw"]:
             for c in self.traffic_classes:
@@ -304,6 +312,8 @@ class LinearApproximation(WorkerThread):
                         self.threading_threshold,
                     )
                 sd_flows.append(aon_res.total_link_loads)
+                # Step direction for FW/MSA is AoN
+                self.step_direction_turn_cost[c._id] = aon_res.total_turn_penalty
 
                 if c._selected_links:
                     aux_res = self.aons[c._id].aux_res
@@ -350,6 +360,12 @@ class LinearApproximation(WorkerThread):
                         self.elementwise_cores,
                         self.threading_threshold,
                     )
+
+                # Update turn cost with the same conjugate stepsize
+                self.previous_step_direction_turn_cost[c._id] = self.step_direction_turn_cost[c._id]
+                self.step_direction_turn_cost[c._id] = (1.0 - self.conjugate_stepsize) * self.step_direction_turn_cost[
+                    c._id
+                ] + self.conjugate_stepsize * c._aon_results.total_turn_penalty
 
                 if c._selected_links:
                     aux_res = self.aons[c._id].aux_res
@@ -413,6 +429,15 @@ class LinearApproximation(WorkerThread):
                         self.elementwise_cores,
                         self.threading_threshold,
                     )
+
+                # Update turn cost with the same beta weights
+                prev_turn_cost = self.step_direction_turn_cost[c._id]
+                self.step_direction_turn_cost[c._id] = (
+                    self.betas[0] * c._aon_results.total_turn_penalty
+                    + self.betas[1] * self.step_direction_turn_cost[c._id]
+                    + self.betas[2] * self.previous_step_direction_turn_cost[c._id]
+                )
+                self.previous_step_direction_turn_cost[c._id] = prev_turn_cost
 
                 if c._selected_links:
                     aux_res = self.aons[c._id].aux_res
@@ -587,6 +612,9 @@ class LinearApproximation(WorkerThread):
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
+            # Accumulate AoN turn penalty costs from all traffic classes
+            self.aon_total_turn_cost = sum(c._aon_results.total_turn_penalty for c in self.traffic_classes)
+
             flows = []
             if self.iter == 1:
                 for c in self.traffic_classes:
@@ -624,6 +652,9 @@ class LinearApproximation(WorkerThread):
                                 self.threading_threshold,
                             )
                     flows.append(c.results.total_link_loads)
+
+                # For iteration 1, turn cost equals AoN turn cost
+                self.fw_total_turn_cost = self.aon_total_turn_cost
 
             else:
                 self.__calculate_step_direction()
@@ -676,6 +707,15 @@ class LinearApproximation(WorkerThread):
 
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
+
+                # Update aggregate turn cost with the same stepsize used for flows.
+                # Turn penalties are fixed costs (not flow-dependent VDF outputs), so this
+                # convex combination tracks the weighted-average turn cost of the current
+                # flow solution - analogous to how link flows are combined.
+                direction_turn_cost = sum(self.step_direction_turn_cost.values())  # TODO: optimize aggregation
+                self.fw_total_turn_cost = (
+                    self.stepsize * direction_turn_cost + (1.0 - self.stepsize) * self.fw_total_turn_cost
+                )
 
             self._apply_assigned_flow(np.sum(flows, axis=0))
 
@@ -756,8 +796,8 @@ class LinearApproximation(WorkerThread):
             # fixed cost is scaled by vot
             class_link_costs = sum_a_times_b_minus_c(
                 c.fixed_cost,
-                self.step_direction[c._id].link_loads[:, 0],
-                c.results.link_loads[:, 0],
+                self.step_direction[c._id].total_link_loads,
+                c.results.total_link_loads,
                 self.elementwise_cores,
                 self.threading_threshold,
             )
@@ -916,8 +956,13 @@ class LinearApproximation(WorkerThread):
             return
 
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
+        # TODO: optimize aggregation
+        turn_derivative = sum(self.step_direction_turn_cost.values()) - self.fw_total_turn_cost
+        # Turn penalties are constant w.r.t. stepsize (they don't depend on flows or VDF),
+        # so they shift the derivative by a fixed amount. Including them here ensures the
+        # line search accounts for turn costs when finding the optimal stepsize.
         derivative_of_objective = partial(
-            self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term
+            self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term + turn_derivative
         )
 
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
@@ -971,14 +1016,17 @@ class LinearApproximation(WorkerThread):
           ``|Σ flow·cost − Σ AON·cost| / Σ flow·cost``. **This is the only
           quantity used for the stopping criterion** (compared against
           ``self.rgap_target``).
-          ``(Σ flow·cost − Σ direction·cost) / Σ flow·cost``, where
-          ``direction`` is the BFW combined step direction
         """
         if self.stepsize == 1.0:
             return False
 
-        aon_cost = 0.0
-        current_cost = 0.0
+        # Include turn penalty costs in the objective function.
+        # Turn penalties are fixed (not flow-dependent), so they act like additive constants
+        # in the Beckmann objective. They don't affect the VDF derivative, but they must be
+        # included in the gap calculation to correctly measure convergence when turn costs
+        # are a significant fraction of total travel cost.
+        aon_cost = self.aon_total_turn_cost
+        current_cost = self.fw_total_turn_cost
         for c in self.traffic_classes:
             aon_class_flow = c._aon_results.total_link_loads
             current_class_flow = c.results.total_link_loads
@@ -988,6 +1036,11 @@ class LinearApproximation(WorkerThread):
 
         if current_cost != 0.0:
             self.rgap = abs(current_cost - aon_cost) / current_cost
+            # ``step_direction`` is populated by ``__calculate_step_direction``
+            # which only runs when ``self.iter > 1`` (and not for the
+            # all-or-nothing algorithm, which short-circuits before this method
+            # is called). Both conditions are already satisfied by the gate in
+            # ``execute()``: ``converged = self.check_convergence() if self.iter > 1 else False``.
         else:
             # Nothing loaded yet, so we are converged only when the AoN solution carries no cost either
             trivially_converged = aon_cost == 0.0
