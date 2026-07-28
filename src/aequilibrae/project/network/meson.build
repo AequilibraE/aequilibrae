@@ -19,6 +19,7 @@ pyfiles = [
   'period.py',
   'periods.py',
   'safe_class.py',
+  'turn_restrictions.py',
 ]
 
 pkgs = [

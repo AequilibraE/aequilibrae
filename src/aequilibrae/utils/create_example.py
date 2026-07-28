@@ -29,7 +29,9 @@ def create_example(path: os.PathLike | str, from_model="sioux_falls") -> Project
 
     pth.mkdir(parents=True, exist_ok=True)
     zipfile.ZipFile(source).extractall(pth)
-    return Project.from_path(str(pth))
+    project = Project.from_path(str(pth))
+    project.upgrade()
+    return project
 
 
 def list_examples() -> List[str]:
