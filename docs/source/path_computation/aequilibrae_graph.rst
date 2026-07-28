@@ -166,8 +166,8 @@ for an arbitrary number of centroids in parallel, which can be useful when using
 AequilibraE as part of more general analysis pipelines. As seen above, this is also
 necessary when the network has been manipulated in memory.
 
-**When setting regular network nodes as centroids, the user should take care in
-not blocking flows through "centroids".**
+**When setting regular network nodes as centroids, take care when enabling
+centroid-flow blocking.**
 
 .. code-block:: python
 
@@ -181,19 +181,19 @@ not blocking flows through "centroids".**
     * :func:`aequilibrae.paths.graph.TransitGraph`
         Class documentation
 
-Blocking flows through centroids
---------------------------------
+Blocking centroid flows
+-----------------------
 
-When using AequilibraE Graph, it is possible to configure if one wants to allow paths
-through centroids or not. As centroid connectors are a bi-directional link type, in
-practice what blocking flows through centroids does is 'removing' graph links leaving
-from the centroid.
+When using AequilibraE Graph, it is possible to configure whether paths may pass
+through centroid connector turns. In current versions, enabling blocked centroid
+flows applies automatic turn prohibitions between centroid connectors that meet at
+the same node (when a centroid has multiple connectors).
 
-Suppose one wants to compute the shortest path between node N1 and centroid C3 in the 
+Suppose one wants to compute the shortest path between node N1 and centroid C3 in the
 figure below. An initial path guess would be N1 -> N3 -> C2 -> N6 -> C3 because all
-links are bi-directional. However, when we block paths through centroids, it is not
-possible to compute the path between C2 and N6 because we 'removed' the link leaving
-from the centroid.
+links are bi-directional. However, when blocked centroid flows are enabled, the
+connector-to-connector transition at C2 is prohibited, so that intermediary centroid
+traversal is prevented.
 
 .. image:: ../_images/aequilibrae_graph-1.png
     :align: center

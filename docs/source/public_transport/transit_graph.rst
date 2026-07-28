@@ -356,8 +356,8 @@ Users can customize these features using boolean parameters:
 
 - ``with_outer_stop_transfers``: create transfer edges between lines of different stops of a station
 
-- ``blocking_centroid_flow``: duplicate OD nodes into unconnected origin and destination nodes in 
-  order to block centroid flows. Flows starts from an origin node and ends at a destination node. 
+- ``blocking_centroid_flows``: duplicate OD nodes into unconnected origin and destination nodes to
+  block centroid flows. Flows start from an origin node and end at a destination node.
   It is not possible to use an egress connector followed by an access connector in the middle of a
   trip.
 

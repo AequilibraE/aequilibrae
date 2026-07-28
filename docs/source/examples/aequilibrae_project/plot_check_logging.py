@@ -74,7 +74,7 @@ with open(join(fldr, "aequilibrae.log")) as file:
 #
 # In lines 8-9 we get the Traffic Class specifications.
 # We can see that there is only one traffic class (car). Its **graph** key presents information
-# on blocked flow through centroids, number of centroids, links, and nodes.
+# on whether blocked centroid flows are enabled, plus the number of centroids, links, and nodes.
 # In the **matrix** key, we find information on where in the disk the matrix file is located.
 # We also have information on the number of centroids and nodes, as well as on the matrix/matrices
 # used for computation. In our example, we only have one matrix named matrix, and the total
