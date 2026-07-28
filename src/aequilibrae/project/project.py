@@ -4,7 +4,7 @@ import os
 import shutil
 import sqlite3
 import warnings
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import NoReturn
