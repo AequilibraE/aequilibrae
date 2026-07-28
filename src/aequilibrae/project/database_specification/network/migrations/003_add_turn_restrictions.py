@@ -3,7 +3,7 @@ import pathlib
 import sqlite3
 from typing import Optional
 
-from aequilibrae.project.project_creation import _run_turn_restrictions_trigger_sql_file, run_queries_from_sql_file
+from aequilibrae.project.project_creation import run_queries_from_sql_file
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def migrate(
 
         trigger_sql = pathlib.Path(__file__).parent.parent / "triggers" / "turn_restrictions_triggers.sql"
         if trigger_sql.exists():
-            _run_turn_restrictions_trigger_sql_file(project_conn, trigger_sql)
+            run_queries_from_sql_file(project_conn, trigger_sql)
             logger.info("Applied turn restriction triggers")
     else:
         logger.warning(f"Could not find turn_restrictions.sql at {schema}")

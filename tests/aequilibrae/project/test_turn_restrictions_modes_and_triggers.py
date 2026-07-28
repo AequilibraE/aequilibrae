@@ -39,6 +39,23 @@ def test_turn_restrictions_has_modes_column(sioux_falls_example):
         assert "geometry" in cols
 
 
+def test_turn_restriction_geometry_is_populated(sioux_falls_example):
+    # Upgraded projects get their triggers from migration 003 rather than from add_triggers,
+    # so this also covers the geometry triggers being installed on the migration path.
+    with sioux_falls_example.db_connection as conn:
+        pair = _sample_turn_pair(conn)
+        assert pair is not None
+        conn.execute(
+            "INSERT INTO turn_restrictions (from_node, via_node, to_node, penalty, modes) VALUES (?, ?, ?, NULL, 'c')",
+            pair,
+        )
+        geom = conn.execute("SELECT ST_AsText(geometry) FROM turn_restrictions").fetchone()[0]
+        assert geom is not None
+        assert geom.startswith("LINESTRING")
+        # incoming leg, via node, outgoing leg
+        assert len(geom.split(",")) == 3
+
+
 def test_turn_restriction_no_duplicate_mode_overlap(sioux_falls_example):
     with sioux_falls_example.db_connection_spatial as conn:
         pair = _sample_turn_pair(conn)
