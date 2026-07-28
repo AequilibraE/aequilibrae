@@ -14,6 +14,7 @@ pyfiles = [
   'scenarios.sql',
   'table_list.txt',
   'transit_graph_configs.sql',
+  'turn_restrictions.sql',
   'zones.sql',
 ]
 
