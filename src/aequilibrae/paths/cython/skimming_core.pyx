@@ -296,3 +296,52 @@ cpdef void skim_single_path(long origin,
 
         for j in range(skims):
             node_skims[node, j] = node_skims[predecessor, j] + graph_costs[connector, j]
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)  # turn of bounds-checking for entire function
+cpdef void skim_single_path_with_turn_penalties(long origin,
+                                                long nodes,
+                                                long skims,
+                                                double[:, :] node_skims,
+                                                long long[:] pred,
+                                                long long[:] conn,
+                                                double[:, :] graph_costs,
+                                                long long[:] reached_first,
+                                                long found,
+                                                double [:] node_turn_penalties,
+                                                const long long [:] penalty_indices) noexcept nogil:
+    """
+    Like skim_single_path but adds accumulated node turn penalties to every skim
+    field listed in *penalty_indices*.  This lets callers apply the same turn
+    penalty to several skim columns at once (e.g. cost + any other field that
+    shares the same units as the turn penalty).
+    """
+    cdef long long i, node, predecessor, connector, j, k
+
+    # sets all skims to infinity
+    for i in range(nodes):
+        for j in range(skims):
+            node_skims[i, j] = INFINITY
+
+    # Zeroes the intrazonal cost
+    for j in range(skims):
+        node_skims[origin, j] = 0
+
+    # Cascade skimming: base link costs first, then turn penalty on each
+    # specified skim field
+    for i in range(1, found + 1):
+        node = reached_first[i]
+
+        # captures how we got to that node
+        predecessor = pred[node]
+        connector = conn[node]
+
+        for j in range(skims):
+            node_skims[node, j] = node_skims[predecessor, j] + graph_costs[connector, j]
+        # node_turn_penalties holds the *cumulative* penalty to reach each node and
+        # node_skims[predecessor] already includes the predecessor's share, so only
+        # the incremental penalty of the final turn is added here.
+        for k in range(<long>penalty_indices.shape[0]):
+            node_skims[node, penalty_indices[k]] += node_turn_penalties[node] - node_turn_penalties[predecessor]

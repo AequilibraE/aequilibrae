@@ -25,6 +25,16 @@ class MultiThreadedAoN:
         self.temp_sl_link_loading = np.array([])
         # Maps the names of the SL link sets to array indices
         self.sl_idx = {}
+        # Arc predecessors for turn restrictions (arc-based path finding)
+        self.arc_predecessors = np.array([])
+        # Node-level turn penalties for arc-based skimming
+        self.node_turn_penalties = np.array([])
+        # Arc-level turn penalties for network loading (path reconstruction)
+        self.arc_turn_penalties = np.array([])
+        # Total turn penalty accumulator (per thread)
+        self.turn_penalty_accumulator = np.array([])
+        # Arc-based node label costs (per thread)
+        self.node_label_costs = np.array([])
 
     # In case we want to do by hand, we can prepare each method individually
 
@@ -33,6 +43,18 @@ class MultiThreadedAoN:
         ftype = graph.default_types("float")
         compact_b_nodes = graph.compact_graph.b_node.to_numpy(copy=False)
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
+
+        # Allocate arc predecessors if turn restrictions are present
+        size_nodes = results.compact_nodes if graph.has_turn_restrictions else 1
+        self.node_label_costs = np.zeros((results.cores, size_nodes), dtype=ftype)
+        self.node_turn_penalties = np.zeros((results.cores, size_nodes), dtype=ftype)
+
+        self.turn_penalty_accumulator = np.zeros(results.cores, dtype=ftype)
+
+        size_links = graph.compact_num_links + 1 if graph.has_turn_restrictions else 1
+        self.arc_predecessors = np.zeros((results.cores, size_links), dtype=itype)
+        self.arc_turn_penalties = np.zeros((results.cores, size_links), dtype=ftype)
+
         if results._selected_links:
             self.has_flow_mask = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
             # Copying the select link matrices from results

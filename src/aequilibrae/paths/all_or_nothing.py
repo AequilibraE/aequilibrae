@@ -52,18 +52,23 @@ class allOrNothing(WorkerThread):
         Dispatches all origins to a single OpenMP-parallel Cython kernel
         (``aon_parallel``). This avoids the per-origin Python pool dispatch
         overhead the previous ThreadPool-based path paid. Path file saving
-        requires the GIL, so that case keeps the per-origin thread pool.
+        requires the GIL, so that case keeps the per-origin thread pool, as
+        do graphs with turn restrictions, whose arc-based path finding is
+        only implemented in the per-origin ``one_to_all`` kernel.
         """
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
         self.signal.emit(["set_text", msg])
         self.report = []
         self.cumulative = 0
         self.aux_res.prepare(self.graph, self.results)
+        # Reset turn penalty accumulator for this iteration
+        if self.graph.has_turn_restrictions and self.aux_res.turn_penalty_accumulator.size > 0:
+            self.aux_res.turn_penalty_accumulator.fill(0.0)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape(
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
         )
         with debug_bridge(logger) as bridge:
-            if self.results.save_path_file:
+            if self.results.save_path_file or self.graph.has_turn_restrictions:
                 self.__execute_pooled(bridge)  # FIXME: remove this, find another way to write out path files
             else:
                 skipped = aon_parallel(
@@ -82,6 +87,9 @@ class allOrNothing(WorkerThread):
             self.results.elementwise_cores,
             self.results.threading_threshold,
         )
+        # Aggregate turn penalty costs from all threads
+        if self.graph.has_turn_restrictions and self.aux_res.turn_penalty_accumulator.size > 0:
+            self.results.total_turn_penalty = np.sum(self.aux_res.turn_penalty_accumulator)
 
     def __execute_pooled(self, bridge):
         mat = self.matrix.matrix_view

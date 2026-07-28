@@ -119,6 +119,9 @@ class AssignmentResults(AssignmentResultsBase):
         self.path_file_dir = None
         self.write_feather = True  # we use feather as default, parquet is slower but with better compression
 
+        # Turn penalty cost accumulator for equilibrium assignment convergence
+        self.total_turn_penalty = 0.0
+
         self._heap = "4ary"
 
     def set_heap(self, heap: str) -> None:
