@@ -1016,7 +1016,7 @@ cdef void sl_arc_based_network_loading(
     Select link analysis with arc-based path finding.
     """
     cdef:
-        int i, j, k, l, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
+        int i, j, k, m, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
         long long current_arc
         bint found
 
@@ -1043,14 +1043,14 @@ cdef void sl_arc_based_network_loading(
         # 2. Check selected link matches
         for i in range(selected_links.shape[0]):
             found = 0
-            l = 0
+            m = 0
             # Check if any link in the selected set was used
-            while l < selected_links.shape[1] and found == 0:
-                if selected_links[i][l] == -1:
+            while m < selected_links.shape[1] and found == 0:
+                if selected_links[i][m] == -1:
                     break
-                if has_flow_mask[selected_links[i][l]] != 0:
+                if has_flow_mask[selected_links[i][m]] != 0:
                     found = 1
-                l += 1
+                m += 1
 
             if found == 0:
                 continue
