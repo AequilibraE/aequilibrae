@@ -127,8 +127,8 @@ On MacOS one can use brew as per
 Hardware requirements
 ---------------------
 
-AequilibraE's requirements depend heavily on the size of the model you are using
-for computation. The most important things to keep an eye on are:
+How much hardware AequilibraE needs is driven mostly by the size of the model
+being used. The most important things to keep an eye on are:
 
 * Number of zones on your model (size of the matrices you are dealing with)
 * Number of matrices (vehicles classes (and user classes) you are dealing with)

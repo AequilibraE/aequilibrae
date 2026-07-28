@@ -246,8 +246,7 @@ class GTFSReader(WorkerThread):
 
         self.data_arrays[shapestxt] = shapes
         lats, lons = self.transformer.transform(shapes[:]["shape_pt_lat"], shapes[:]["shape_pt_lon"])
-        shapes["shape_pt_lat"] = lats
-        shapes["shape_pt_lon"] = lons
+        shapes["shape_pt_lat"], shapes["shape_pt_lon"] = lats, lons
 
         for shape_id in simple_progress(all_shape_ids, self.signal, "Loading shapes (Step: 4/12)"):
             items = shapes[shapes["shape_id"] == shape_id]
@@ -384,8 +383,9 @@ class GTFSReader(WorkerThread):
             df2.loc[:, "sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
             stoptimes[col] = df2.sec.values
 
-        key = np.char.add(stoptimes["trip_id"].astype(str), np.array(["##"] * stoptimes.shape[0]))
-        key = np.char.add(key, stoptimes["stop_sequence"].astype(str))
+        trips = stoptimes["trip_id"].astype(str)
+        sequences = stoptimes["stop_sequence"].astype(str)
+        key = np.char.add(np.char.add(trips, "##"), sequences)
         if np.unique(key).shape[0] < stoptimes.shape[0]:
             self.__fail("There are repeated stop_sequences for a single trip_id on stop_times.txt")
 
@@ -427,8 +427,7 @@ class GTFSReader(WorkerThread):
             self.__fail("There are repeated stop IDs in stops.txt")
 
         lats, lons = self.transformer.transform(stops[:]["stop_lat"], stops[:]["stop_lon"])
-        stops["stop_lat"] = lats
-        stops["stop_lon"] = lons
+        stops["stop_lat"], stops["stop_lon"] = lats, lons
 
         for line in simple_progress(stops, self.signal, "Loading stops (Step: 2/12)"):
             s = Stop(self.agency.agency_id, line, stops.dtype.names)

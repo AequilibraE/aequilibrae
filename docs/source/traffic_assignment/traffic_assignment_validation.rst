@@ -3,7 +3,7 @@
 Traffic Assignment Validation
 =============================
 
-Similar to other complex algorithms that handle a large amount of data through
+Like any elaborate algorithm that processes large volumes of data through
 complex computations, traffic assignment procedures can always be subject to at
 least one very reasonable question: Are the results right?
 
@@ -249,7 +249,7 @@ as that instance has a comparable size to real-world models.
           :width: 590
           :alt: Algorithm convergence comparison
 
-Not surprisingly, one can see that Frank-Wolfe far outperforms the Method of
+As expected, Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25 in the case of
 Chicago, and is capable of reaching 1.0e-04 just after 800 iterations, while
 MSA is still at 3.5e-4 even after 1,000 iterations for that same case.
