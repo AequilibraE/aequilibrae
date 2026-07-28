@@ -247,17 +247,6 @@ class GraphBase(ABC):  # noqa: B024
         if self.centroids.shape[0]:
             self.__build_compressed_graph(remove_dead_ends)
             self.compact_num_links = self.compact_graph.shape[0]
-        else:
-            self.compact_graph = pd.DataFrame([])
-            self.compact_num_links = -1
-            self.compact_num_nodes = -1
-            self.compact_all_nodes = np.array(0)
-            self.compact_nodes_to_indices = np.array(0)
-            self.compact_fs = np.array([])
-            self.compact_cost = np.array([])
-            self.compact_skims = None
-            self.g_link_crosswalk = np.array([])
-            self.dead_end_links = np.array([], dtype=np.int64)
 
         # The cache property should be recalculated when the graph has been re-prepared
         self.compressed_link_network_mapping_idx = None

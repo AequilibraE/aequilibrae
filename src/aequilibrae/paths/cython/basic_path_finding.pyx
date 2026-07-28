@@ -16,7 +16,14 @@ from libc.stddef cimport size_t
 from libc.stdint cimport int64_t
 from libcpp.vector cimport vector
 
-from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, StdPriorityQueueAdapter
+from aequilibrae.paths.cython.pq_heap_types cimport (
+    FourAryHeap,
+    PairingHeap,
+    StdPriorityQueueAdapter,
+    ElementState,
+    NOT_IN_HEAP,
+    SCANNED,
+)
 from aequilibrae.paths.cython.path_finding cimport (
     dijkstra,
     a_star,
