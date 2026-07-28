@@ -6,6 +6,7 @@ pyfiles = [
   'network_triggers.sql',
   'periods_triggers.sql',
   'triggers_list.txt',
+  'turn_restrictions_triggers.sql',
   'scenarios_triggers.sql',
 ]
 
