@@ -57,6 +57,8 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
     assignment.free_flow_tt = np.zeros(2)
     assignment.vdf_parameters = [1.0, 0.0]
     assignment.vdf = DummyVDF()
+    assignment.aon_total_turn_cost = 0.0
+    assignment.fw_total_turn_cost = 0.0
 
     stepsize = 0.25
     derivative = assignment._LinearApproximation__derivative_of_objective_stepsize_dependent(stepsize, 0.0)
@@ -72,6 +74,8 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
 def test_relative_gap_ignores_constant_preload():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.congested_time = np.array([2.0, 3.0])
+    assignment.aon_total_turn_cost = 0.0
+    assignment.fw_total_turn_cost = 0.0
 
     cls = SimpleNamespace(
         _id="car",
@@ -100,6 +104,8 @@ def test_relative_gap_ignores_constant_preload():
 def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cost():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.congested_time = np.array([2.0, 3.0])
+    assignment.aon_total_turn_cost = 0.0
+    assignment.fw_total_turn_cost = 0.0
 
     cls = SimpleNamespace(
         _id="car",
@@ -125,6 +131,7 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
+    assignment.fw_total_turn_cost = 0.0
     assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
@@ -171,6 +178,7 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assignment.current_direction = "fw"
     assignment.next_direction = "cfw"
     assignment.iteration_issue = []
+    assignment.fw_total_turn_cost = 0.0
     assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
 
     monkeypatch.setattr(
@@ -204,6 +212,7 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
+    assignment.fw_total_turn_cost = 0.0
     assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
@@ -248,6 +257,7 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
+    assignment.fw_total_turn_cost = 0.0
     assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
