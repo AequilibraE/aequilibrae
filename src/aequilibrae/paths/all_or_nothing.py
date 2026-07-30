@@ -51,10 +51,10 @@ class allOrNothing(WorkerThread):
 
         Dispatches all origins to a single OpenMP-parallel Cython kernel
         (``aon_parallel``). This avoids the per-origin Python pool dispatch
-        overhead the previous ThreadPool-based path paid. Path file saving
-        requires the GIL, so that case keeps the per-origin thread pool, as
-        do graphs with turn restrictions, whose arc-based path finding is
-        only implemented in the per-origin ``one_to_all`` kernel.
+        overhead the previous ThreadPool-based path paid. Graphs with turn
+        restrictions are handled there too, by the arc-based branch of that
+        kernel. Path file saving requires the GIL, so it is the only case that
+        still falls back to the per-origin thread pool over ``one_to_all``.
         """
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
         self.signal.emit(["set_text", msg])
@@ -68,7 +68,7 @@ class allOrNothing(WorkerThread):
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
         )
         with debug_bridge(logger) as bridge:
-            if self.results.save_path_file or self.graph.has_turn_restrictions:
+            if self.results.save_path_file:
                 self.__execute_pooled(bridge)  # FIXME: remove this, find another way to write out path files
             else:
                 skipped = aon_parallel(

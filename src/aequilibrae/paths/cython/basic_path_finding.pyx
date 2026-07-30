@@ -289,6 +289,12 @@ cdef int _path_finding_arc_based_core(
         bint has_explicit_entry
         unsigned int i
 
+    # Only the node-indexed outputs are reset. ``arc_pred`` and ``arc_turn_penalties``
+    # deliberately keep whatever the previous origin left behind on this thread's
+    # buffers, which is safe: every backtrack starts at ``connectors[i]``, which is -1
+    # unless node i was reached by *this* run. A reached node's arc was extracted from
+    # the heap, so it was inserted by this run, so its arc_pred/arc_turn_penalties
+    # entries were written by this run. Chains terminate at ORIGIN_ARC_SENTINEL.
     for i in range(num_nodes):
         node_pred[i] = -1
         connectors[i] = -1
