@@ -1,8 +1,10 @@
 # distutils: language = c++
 
+cimport cython
 from libcpp.vector cimport vector
 
 import numpy as np
+import pandas as pd
 
 
 @cython.wraparound(False)

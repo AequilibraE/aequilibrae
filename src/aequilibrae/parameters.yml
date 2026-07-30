@@ -285,6 +285,7 @@ osm:
 
 system:
   cpus: 0
+  threading_threshold: 10000
   default_directory: C:\
   logging: true
   logging_directory: /temp/

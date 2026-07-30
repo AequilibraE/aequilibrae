@@ -13,7 +13,7 @@ from libc.stdint cimport int64_t, uint8_t, uint32_t, uint64_t
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
-from aequilibrae.utils.cython.bridge cimport Bridge, log, f
+from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure, log, aeq_format_string as f
 from aequilibrae.utils.cython.bar cimport Bar
 
 ctypedef double DATATYPE_t
@@ -48,14 +48,17 @@ cdef struct IndexedElement:
     size_t index
     DATATYPE_t value
 
-cdef int _compare(const_void *a, const_void *b) noexcept:
-    cdef DATATYPE_t v = (<IndexedElement*> a).value-(<IndexedElement*> b).value
-    if v < 0:
+cdef int _compare(const_void *a, const_void *b) noexcept nogil:
+    cdef DATATYPE_t a_v = (<IndexedElement*> a).value
+    cdef DATATYPE_t b_v = (<IndexedElement*> b).value
+    if a_v == b_v:
+        return 0
+    elif a_v < b_v:
         return -1
     else:
         return 1
 
-include 'pq_4ary_heap.pyx'  # priority queue
+from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, ElementState, IN_HEAP, NOT_IN_HEAP, SCANNED
 
 
 @cython.boundscheck(False)
@@ -193,6 +196,7 @@ cdef void compute_SF_in_parallel(
     uint32_t[::1] head_view,
     uint32_t[:] d_vert_ids_view,  # destination vertices
     uint32_t[:] destination_vertex_indices_view,
+    uint32_t[:] demand_indptr_view,  # start of each destination's slice in the destination-sorted demand arrays
     uint32_t[:] rest_of_destinations_view,  # Used when skimming to lookup the rest of the destinations to skim from
     uint32_t[::1] o_vert_ids_view,  # origin vertices
     double[::1] demand_vls_view,  # volume
@@ -225,6 +229,8 @@ cdef void compute_SF_in_parallel(
         double *thread_v_i_vec
         uint8_t *thread_h_a_vec
         uint32_t *thread_edge_indices
+        uint32_t *thread_hyperpath_order
+        uint32_t *thread_hyperpath_ids
 
         double *thread_skim_i_vec
         double *thread_skim_j_vec
@@ -264,6 +270,8 @@ cdef void compute_SF_in_parallel(
         thread_v_i_vec      = <double *> malloc(sizeof(double) * vertex_count)
         thread_h_a_vec      = <uint8_t   *> malloc(sizeof(uint8_t)   * edge_count)
         thread_edge_indices = <uint32_t  *> malloc(sizeof(uint32_t)  * edge_count)
+        thread_hyperpath_order = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
+        thread_hyperpath_ids   = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
 
         thread_skim_j_vec = <double *> calloc(edge_count, sizeof(double) * n_skim_cols)
 
@@ -284,23 +292,26 @@ cdef void compute_SF_in_parallel(
 
             if i < destination_vertex_indices_view.shape[0]:
                 demand_size = 0
-                for j in range(d_vert_ids_view.shape[0]):
-                    if d_vert_ids_view[j] == destination_vertex:
-                        if nodes_to_indices[o_vert_ids_view[j]] == -1:
-                            continue
-
-                        thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
-                        thread_demand_values[demand_size] = demand_vls_view[j]
-                        # demand_size += 1 is not allowed as cython believes this is a reduction
-                        demand_size = demand_size + 1
-            else:
-                demand_size = o_vert_ids_view.shape[0]
-                for j in range(demand_size):
+                # the demand arrays are sorted by destination, so this destination's
+                # demand is the contiguous slice demand_indptr[i]:demand_indptr[i + 1]
+                for j in range(<size_t>demand_indptr_view[i], <size_t>demand_indptr_view[i + 1]):
                     if nodes_to_indices[o_vert_ids_view[j]] == -1:
                         continue
 
-                    thread_demand_origins[j] = nodes_to_indices[o_vert_ids_view[j]]
-                    thread_demand_values[j] = 0.0
+                    thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
+                    thread_demand_values[demand_size] = demand_vls_view[j]
+                    # demand_size += 1 is not allowed as cython believes this is a reduction
+                    demand_size = demand_size + 1
+            else:
+                demand_size = 0
+                for j in range(o_vert_ids_view.shape[0]):
+                    if nodes_to_indices[o_vert_ids_view[j]] == -1:
+                        continue
+
+                    thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
+                    thread_demand_values[demand_size] = 0.0
+                    # demand_size += 1 is not allowed as cython believes this is a reduction
+                    demand_size = demand_size + 1
 
             # S&F
             compute_SF_in(
@@ -320,6 +331,8 @@ cdef void compute_SF_in_parallel(
                 thread_v_i_vec,
                 thread_h_a_vec,
                 thread_edge_indices,
+                thread_hyperpath_order,
+                thread_hyperpath_ids,
                 vertex_count,
                 nodes_to_indices[destination_vertex],
                 skim_col_view,
@@ -331,7 +344,8 @@ cdef void compute_SF_in_parallel(
                 o_indices,
                 od_index_to_taz_index,
                 skimming,
-                is_travel_time
+                is_travel_time,
+                bridge.c
             )
             bar.inc()
 
@@ -342,6 +356,8 @@ cdef void compute_SF_in_parallel(
         free(thread_v_i_vec)
         free(thread_h_a_vec)
         free(thread_edge_indices)
+        free(thread_hyperpath_order)
+        free(thread_hyperpath_ids)
         free(thread_skim_j_vec)
 
     # Accumulate results into output buffer. This could be parallelised over the output indexes but
@@ -380,6 +396,8 @@ cdef void compute_SF_in(
     double *v_i_vec,
     uint8_t *h_a_vec,
     uint32_t *edge_indices,
+    uint32_t *hyperpath_order,
+    uint32_t *hyperpath_ids,
     size_t vertex_count,
     int dest_vert_index,
     double[:, ::1] skim_col_vec,
@@ -392,6 +410,7 @@ cdef void compute_SF_in(
     int64_t[::1] od_index_to_taz_index,
     bint skimming,
     bint is_travel_time,
+    AeqLogClosure *closure,
 ) noexcept nogil:
 
     cdef:
@@ -434,7 +453,8 @@ cdef void compute_SF_in(
         skim_i_vec,
         skim_j_vec,
         n_skim_cols,
-        vertex_count
+        vertex_count,
+        closure
     )
 
     if skimming:
@@ -475,23 +495,28 @@ cdef void compute_SF_in(
             if f_i_vec[i] < MIN_FREQ:
                 f_i_vec[i] = MIN_FREQ
 
+        # Sort only the edges on the hyperpath with decreasing order of u_j + c_a
+        # (the sort function sorts in increasing order, so we sort on the negated
+        # values). Compacting the hyperpath edges first, rather than sorting the
+        # full edge array, avoids sorting the ~O(edge_count) edges that are not on
+        # the hyperpath at all. Those all carried the same placeholder key, and a
+        # quicksort-based qsort (e.g. MSVC's) degrades toward quadratic time on
+        # such tie-heavy input, which dominated the entire assignment runtime.
         h_a_count = 0
         for i in range(<size_t>edge_count):
-            u_j_c_a_vec[i] *= -1.0
-            h_a_count += <size_t>h_a_vec[i]
+            if h_a_vec[i] != 0:
+                # in-place compaction is safe: h_a_count <= i on every iteration
+                u_j_c_a_vec[h_a_count] = -u_j_c_a_vec[i]
+                edge_indices[h_a_count] = <uint32_t>i
+                h_a_count = h_a_count + 1
 
-        # Sort the links with decreasing order of u_j + c_a.
-        # Because the sort function sorts in increasing order, we sort a
-        # transformed array, multiplied by -1, and set the items
-        # corresponding to edges that are not in the hyperpath to a
-        # positive value (they will be at the end of the sorted array).
-        # The items corresponding to edges that are in the hyperpath have a
-        # negative transformed value.
-        for i in range(<size_t>edge_count):
-            if h_a_vec[i] == 0:  # if the edge is not on the hyperpath
-                u_j_c_a_vec[i] = 1.0
-
-        argsort(u_j_c_a_vec, edge_indices, edge_count)
+        # hyperpath_order/hyperpath_ids are thread-local scratch buffers sized
+        # edge_count, preallocated once per thread by the caller (h_a_count <= edge_count).
+        argsort(u_j_c_a_vec, hyperpath_order, h_a_count)
+        for i in range(h_a_count):
+            hyperpath_ids[i] = edge_indices[hyperpath_order[i]]
+        for i in range(h_a_count):
+            edge_indices[i] = hyperpath_ids[i]
 
         _SF_in_second_pass(
             edge_indices,
@@ -526,12 +551,13 @@ cdef void _SF_in_first_pass_full(
     double *skim_j_vec,
     size_t n_skim_cols,
     size_t vertex_count,
+    AeqLogClosure *closure,
 ) noexcept nogil:
     """All vertices are visited."""
 
     cdef:
         int edge_count = tail_indices.shape[0]
-        PriorityQueue pqueue
+        FourAryHeap queue
         ElementState edge_state
         size_t i, j, edge_idx, tail_vert_idx
         DATATYPE_t u_j_c_a, u_i, f_i, beta, u_i_new, f_a
@@ -542,22 +568,23 @@ cdef void _SF_in_first_pass_full(
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
-    init_heap(&pqueue, <size_t>edge_count)
+    queue.attach_logger(closure)
+    queue.init_heap(<size_t>edge_count)
 
     # only the incoming edges of the target vertex are inserted into the
     # priority queue
     for i in range(<size_t>csc_indptr[<size_t>dest_vert_index], <size_t>csc_indptr[<size_t>(dest_vert_index + 1)]):
         edge_idx = csc_edge_idx[i]
-        insert(&pqueue, edge_idx, c_a_vec[edge_idx])
+        queue.insert(edge_idx, c_a_vec[edge_idx])
         u_j_c_a_vec[edge_idx] = c_a_vec[edge_idx]
         for j in range(<size_t>n_skim_cols):
             skim_j_vec[edge_idx + j * edge_count] = skim_col_vec[edge_idx][j]
 
     # first pass
-    while pqueue.size > 0:
+    while not queue.is_empty():
 
-        edge_idx = extract_min(&pqueue)
-        u_j_c_a = pqueue.Elements[edge_idx].key
+        edge_idx = queue.extract_min()
+        u_j_c_a = queue.element_key(edge_idx)
         tail_vert_idx = <size_t>tail_indices[edge_idx]
         u_i = u_i_vec[tail_vert_idx]
 
@@ -610,7 +637,7 @@ cdef void _SF_in_first_pass_full(
         for i in range(<size_t>csc_indptr[tail_vert_idx], <size_t>csc_indptr[tail_vert_idx + 1]):
 
             edge_idx = csc_edge_idx[i]
-            edge_state = pqueue.Elements[edge_idx].state
+            edge_state = queue.effective_state(edge_idx)
 
             if edge_state != SCANNED:
 
@@ -622,19 +649,19 @@ cdef void _SF_in_first_pass_full(
 
                 if edge_state == NOT_IN_HEAP:
 
-                    insert(&pqueue, edge_idx, u_j_c_a)
+                    queue.insert(edge_idx, u_j_c_a)
                     u_j_c_a_vec[edge_idx] = u_j_c_a
                     for j in range(<size_t>n_skim_cols):
                         skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
 
-                elif (pqueue.Elements[edge_idx].key > u_j_c_a):
+                elif (queue.element_key(edge_idx) > u_j_c_a):
 
-                    decrease_key(&pqueue, edge_idx, u_j_c_a)
+                    queue.decrease_key(edge_idx, u_j_c_a)
                     u_j_c_a_vec[edge_idx] = u_j_c_a
                     for j in range(<size_t>n_skim_cols):
                         skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
 
-    free_heap(&pqueue)
+    queue.free_heap()
     free(skim_i_new_vec)
     free(skim_j_new_vec)
 

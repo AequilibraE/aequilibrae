@@ -1,13 +1,16 @@
-import multiprocessing as mp
 from abc import ABC, abstractmethod
+from typing import List
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.cython.AoN import sum_axis1, assign_link_loads
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
+from aequilibrae.paths.cython.basic_path_finding import HEAP_MAP
+from aequilibrae.paths.cython.parallel_numpy import assign_link_loads, sum_axis1
+from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph, _get_graph_to_network_mapping
+from aequilibrae.utils.core_setter import clamp_cores, resolve_cores, resolve_elementwise_cores
+from aequilibrae.utils.core_setter import resolve_threading_threshold
 
 """
 TO-DO:
@@ -22,10 +25,9 @@ class AssignmentResultsBase(ABC):
         self.link_loads = np.array([])  # The actual results for assignment
         self.no_path = None  # The list os paths
         self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
-        p = Parameters().parameters["system"]["cpus"]
-        if not isinstance(p, int):
-            p = 0
-        self.set_cores(p)
+        sys_params = Parameters().parameters["system"]
+        self._system_parameters = sys_params
+        self.set_cores(resolve_cores(sys_params), resolve_threading_threshold(sys_params))
 
         self.nodes = -1
         self.zones = -1
@@ -41,7 +43,9 @@ class AssignmentResultsBase(ABC):
     def reset(self) -> None:
         pass
 
-    def set_cores(self, cores: int) -> None:
+    def set_cores(
+        self, cores: int, threading_threshold: int | None = None, elementwise_cores: int | None = None
+    ) -> None:
         """
         Sets number of cores (threads) to be used in computation
 
@@ -53,19 +57,31 @@ class AssignmentResultsBase(ABC):
 
         :Arguments:
             **cores** (:obj:`int`): Number of cores to be used in computation
+
+            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
+            operations to be threaded. Negative values disable threading for those operations. When not provided,
+            the current value is kept
+
+            **elementwise_cores** (:obj:`int`, `Optional`): Number of cores for elementwise
+            (``parallel_numpy``/VDF) operations, following the same zero/negative conventions as **cores**.
+            When not provided, it is resolved from the ``AEQ_ELEMENTWISE_CPUS`` environment variable or
+            ``parameters.yml``, defaulting to at most 8 threads
         """
 
-        if not isinstance(cores, int):
-            raise ValueError("Number of cores needs to be an integer")
+        cores = clamp_cores(cores)
 
-        if cores < 0:
-            self.cores = max(1, mp.cpu_count() + cores)
-        elif cores == 0:
-            self.cores = mp.cpu_count()
-        elif cores > 0:
-            cores = min(mp.cpu_count(), cores)
-            if self.cores != cores:
-                self.cores = cores
+        if threading_threshold is not None:
+            if not isinstance(threading_threshold, int):
+                raise ValueError("Threading threshold needs to be an integer")
+            self.threading_threshold = threading_threshold
+
+        self.cores = cores
+
+        if elementwise_cores is not None:
+            self.elementwise_cores = clamp_cores(elementwise_cores)
+        else:
+            self.elementwise_cores = resolve_elementwise_cores(self._system_parameters, self.cores)
+
         if self.link_loads.shape[0]:
             self.__redim()
 
@@ -102,6 +118,25 @@ class AssignmentResults(AssignmentResultsBase):
         self.save_path_file = False
         self.path_file_dir = None
         self.write_feather = True  # we use feather as default, parquet is slower but with better compression
+
+        self._heap = "4ary"
+
+    def set_heap(self, heap: str) -> None:
+        """
+        Set the priority queue implementation used for path computation. Must be one of ``get_heaps()``.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        if heap not in HEAP_MAP:
+            raise ValueError(f"heap must be one of {self.get_heaps()}")
+
+        self._heap = heap
+
+    @staticmethod
+    def get_heaps() -> List[str]:
+        """Return the available priority queue implementations."""
+        return list(HEAP_MAP.keys())
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
@@ -229,7 +264,7 @@ class AssignmentResults(AssignmentResultsBase):
 
         Results are placed into *total_link_loads* class member
         """
-        sum_axis1(self.total_link_loads, self.link_loads, self.cores)
+        sum_axis1(self.total_link_loads, self.link_loads, self.elementwise_cores, self.threading_threshold)
 
     def get_graph_to_network_mapping(self):
         return _get_graph_to_network_mapping(self.lids, self.direcs)
@@ -280,7 +315,13 @@ class AssignmentResults(AssignmentResultsBase):
             # Link flows initialised
             link_flows = np.full((self.links, self.classes["number"]), np.nan)
             # maps link flows from the compressed graph to the uncompressed graph
-            assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
+            assign_link_loads(
+                link_flows,
+                self.select_link_loading[name],
+                self._graph_compressed_ids,
+                self.elementwise_cores,
+                self.threading_threshold,
+            )
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
                 flow_ab = res[f"{name}_{n}_ab"].to_numpy(copy=True)

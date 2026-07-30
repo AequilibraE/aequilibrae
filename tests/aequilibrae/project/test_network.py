@@ -1,5 +1,8 @@
 import pytest
+from warnings import warn
+
 from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 
 
 def test_create_from_osm_was_removed(empty_project):

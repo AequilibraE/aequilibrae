@@ -7,7 +7,7 @@ import warnings
 from collections.abc import Hashable
 from datetime import datetime
 from functools import cached_property
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 
 import numpy as np
@@ -21,6 +21,7 @@ from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
+from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.cython.bridge import Bridge
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ class RouteChoice:
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
 
         self.where: Optional[pathlib.Path] = None
+        self.to_parquet_kwargs = {}
         self.index_name = "route_choice_sl_index"
 
         self._config = {}
@@ -176,9 +178,9 @@ class RouteChoice:
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
         """
-        self.cores = cores
+        self.cores = clamp_cores(cores)
 
-    def set_save_routes(self, where: Optional[str] = None) -> None:
+    def set_save_routes(self, where: Optional[str] = None, to_parquet_kwargs: dict[str, Any] | None = None) -> None:
         """
         Set save path for route choice results. Provide ``None`` to disable.
 
@@ -188,7 +190,8 @@ class RouteChoice:
             the results from disk first.
 
         :Arguments:
-            **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
+            **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
 
         if where is not None:
@@ -196,6 +199,7 @@ class RouteChoice:
             if not where.exists():
                 raise ValueError(f"Path does not exist `{where}`")
         self.where = where
+        self.to_parquet_kwargs = to_parquet_kwargs if to_parquet_kwargs is not None else {}
 
     def add_demand(self, demand, fill: float = 0.0):
         """
@@ -286,6 +290,7 @@ class RouteChoice:
                 path_size_logit=bool(demand),
                 cores=self.cores,
                 where=str(self.where) if self.where is not None else None,
+                to_parquet_kwargs=self.to_parquet_kwargs,
                 sl_link_loading=self.sl_link_loading,
                 bridge=bridge,
                 **self.parameters,
@@ -316,6 +321,7 @@ class RouteChoice:
                 path_size_logit=perform_assignment,
                 cores=self.cores,
                 where=str(self.where) if self.where is not None else None,
+                to_parquet_kwargs=self.to_parquet_kwargs,
                 sl_link_loading=self.sl_link_loading,
                 bridge=bridge,
                 **self.parameters,
@@ -450,7 +456,7 @@ class RouteChoice:
 
         return results
 
-    def save_path_files(self, where: Optional[pathlib.Path] = None):
+    def save_path_files(self, where: Optional[pathlib.Path] = None, **to_parquet_kwargs):
         """
         Save path-files to the directory specific.
 
@@ -459,12 +465,13 @@ class RouteChoice:
 
         :Arguments:
             **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
         where = where if where is not None else self.where
         if where is None:
             raise ValueError("either the 'where' argument or 'self.where' property must not None")
 
-        self.__rc.write_path_files(where)
+        self.__rc.write_path_files(where, to_parquet_kwargs)
 
     def get_load_results(self) -> pd.DataFrame:
         """

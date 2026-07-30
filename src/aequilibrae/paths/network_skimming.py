@@ -1,20 +1,16 @@
+import logging
 import multiprocessing as mp
-import sys
-import threading
 from datetime import datetime
-from multiprocessing.dummy import Pool as ThreadPool
 from uuid import uuid4
 
-from aequilibrae.paths.cython.AoN import skimming_single_origin
-
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.paths.cython.skimming_core import skimming_parallel
 from aequilibrae.paths.results.skim_results import SkimResults
-from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
-sys.dont_write_bytecode = True
+logger = logging.getLogger(__name__)
 
 
 class NetworkSkimming(WorkerThread):
@@ -56,7 +52,6 @@ class NetworkSkimming(WorkerThread):
         self.graph = graph
         self.cores = mp.cpu_count()
         self.results = SkimResults()
-        self.aux_res = MultiThreadedNetworkSkimming()
         self.report = []
         self.procedure_id = ""
         self.procedure_date = ""
@@ -66,25 +61,23 @@ class NetworkSkimming(WorkerThread):
         self.execute()
 
     def execute(self):
-        """Runs the skimming process as specified in the graph"""
+        """Runs the skimming process as specified in the graph.
+
+        Dispatches all origins to a single OpenMP-parallel Cython kernel
+        (``skimming_parallel``). This avoids the per-origin Python pool
+        dispatch overhead the previous ThreadPool-based path paid.
+        """
         self.signal.emit(["start", self.graph.num_zones, ""])
+
         self.results.cores = self.cores
         self.results.prepare(self.graph)
-        self.aux_res = MultiThreadedNetworkSkimming()
-        self.aux_res.prepare(self.graph, self.results.cores, self.results.nodes, self.results.num_skims)
-        pool = ThreadPool(self.results.cores)
-        all_threads = {"count": 0}
-        for orig in list(self.graph.centroids):
-            i = int(self.graph.nodes_to_indices[orig])
-            if i >= self.graph.nodes_to_indices.shape[0]:
-                self.report.append(f"Centroid {orig} is beyond the domain of the graph")
-            elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
-                self.report.append(f"Centroid {orig} does not exist in the graph")
-            else:
-                pool.apply_async(self.__func_skim_thread, args=(orig, all_threads))
-        pool.close()
-        pool.join()
-        self.aux_res = None
+
+        skipped = skimming_parallel(self.graph, self.results, self.results.cores)
+        for _orig, msg in skipped:
+            self.report.append(msg)
+
+        self.signal.emit(["update", self.graph.num_zones, f"{self.graph.num_zones}/{self.graph.num_zones}"])
+
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
@@ -104,7 +97,7 @@ class NetworkSkimming(WorkerThread):
         :Arguments:
             **cores** (:obj:`int`): Number of cores to be used in computation
         """
-        self.cores = set_cores(cores)
+        self.cores = clamp_cores(cores)
 
     def save_to_project(self, name: str, format="omx", project=None) -> None:
         """Saves skim results to the project folder and creates record in the database
@@ -127,17 +120,3 @@ class NetworkSkimming(WorkerThread):
         record.timestamp = self.procedure_date
         record.procedure = "Network skimming"
         record.save()
-
-    def __func_skim_thread(self, origin, all_threads):
-        if threading.get_ident() in all_threads:
-            th = all_threads[threading.get_ident()]
-        else:
-            all_threads[threading.get_ident()] = all_threads["count"]
-            th = all_threads["count"]
-            all_threads["count"] += 1
-        x = skimming_single_origin(origin, self.graph, self.results, self.aux_res, th)
-        self.cumulative += 1
-        if x != origin:
-            self.report.append(x)
-
-        self.signal.emit(["update", self.cumulative, f"{self.cumulative}/{self.graph.num_zones}"])

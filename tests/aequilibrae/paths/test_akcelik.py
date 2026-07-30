@@ -1,25 +1,24 @@
-from aequilibrae.paths.cython.AoN import akcelik, delta_akcelik
 from multiprocessing import cpu_count
+
 import numpy as np
+from aequilibrae.paths.cython.vdf_core import akcelik, delta_akcelik
 
 
 def test_akcelik_function():
     cores = cpu_count()
 
-    alpha = np.zeros(11)
-    tau = np.zeros(11)
-    fftime = np.zeros(11)
-    capacity = np.zeros(11)
-    congested_times = np.zeros(11)
-    delta = np.zeros(11)
+    num_links = 11
+    congested_times = np.zeros(num_links)
+    capacity = np.ones(num_links)
+    fftime = np.ones(num_links)
+    alpha = np.full(num_links, 0.25)
+    tau = np.full(num_links, 8.0)
+    length = np.ones(num_links)
+    delta = np.zeros(num_links)
 
-    alpha.fill(0.25)
-    tau.fill(8.0)
-    fftime.fill(1)
-    capacity.fill(1)
-    link_flows = np.arange(11).astype(float) * 0.2
+    link_flows = np.arange(num_links, dtype="float64") * 0.2
 
-    akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, cores)
+    akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores)
 
     should_be = np.array(
         [
@@ -41,12 +40,12 @@ def test_akcelik_function():
 
     # Let's check the derivative for sections of the curve
     dx = 0.00000001
-    for i in range(1, 11):
+    for i in range(1, num_links):
         link_flows.fill(1 * 0.2 * i)
-        link_flows += np.arange(11) * dx
+        link_flows += np.arange(num_links) * dx
 
-        akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, cores)
-        delta_akcelik(delta, link_flows, capacity, fftime, alpha, tau, cores)
+        akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores)
+        delta_akcelik(delta, link_flows, capacity, fftime, alpha, tau, length, cores)
 
         # We check if the analytical solution matches the numerical differentiation
         dydx = (congested_times[1] - congested_times[0]) / dx

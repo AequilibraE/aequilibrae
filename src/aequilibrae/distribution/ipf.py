@@ -10,6 +10,7 @@ from aequilibrae.distribution.cython.ipf_core import ipf_core
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.utils.core_setter import resolve_cores
 from aequilibrae.project.data.matrix_record import MatrixRecord
 
 
@@ -240,5 +241,5 @@ class Ipf:
         with open(path + "/parameters.yml", "r") as yml:
             path = yaml.safe_load(yml)
 
-        self.cpus = int(path["system"]["cpus"])
+        self.cpus = resolve_cores(path["system"])
         return path["distribution"][model]

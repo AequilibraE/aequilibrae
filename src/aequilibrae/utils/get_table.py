@@ -16,7 +16,7 @@ def get_table(table_name, conn):
     return pd.read_sql(f"SELECT * FROM {table_name};", con=conn)
 
 
-def get_geo_table(table_name, conn):
+def get_geo_table(table_name, conn) -> pd.DataFrame:
     fields, _, geo_field = find_table_fields(table_name, conn=conn)
     fields = [f'"{x}"' for x in fields]
     keys = ",".join(fields)

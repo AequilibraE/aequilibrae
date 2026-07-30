@@ -1,0 +1,135 @@
+name: Benchmarks
+run-name: "Benchmarks for PR #${{ inputs.pr-number }}"
+on:
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR number to run on'
+        required: true
+        type: string
+      iterations:
+        description: 'Number of iterations for benchmarking'
+        required: false
+        type: string
+
+permissions:
+  contents: read # actions/checkout
+  pull-requests: read # gh pr view
+
+env:
+  AEQ_SHOW_PROGRESS: "0"
+  TNTP_ROOT: ${{ github.workspace }}/TransportationNetworks
+  BENCHMARK_REPORTS_DIR: ${{ github.workspace }}/tests/aequilibrae/benchmarks/_convergence_reports
+  BENCHMARK_TIMING_DIR: ${{ github.workspace }}/tests/aequilibrae/benchmarks/_timings
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7
+
+      - name: Resolve PR head and base branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "PR_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "BASE_REF=$(gh pr view ${{ inputs.pr-number }} --repo ${{ github.repository }} --json baseRefName -q .baseRefName)" >> $GITHUB_ENV
+
+      - name: Set benchmark iterations
+        if: ${{ inputs.iterations != '' }}
+        run: echo "BENCHMARK_ITERATIONS=${{ inputs.iterations }}" >> $GITHUB_ENV
+
+      - name: Clone TransportationNetworks
+        run: git clone https://github.com/bstabler/TransportationNetworks ${{ env.TNTP_ROOT }}
+
+      - name: Create reports directories
+        run: mkdir -p ${{ env.BENCHMARK_REPORTS_DIR }}/base ${{ env.BENCHMARK_REPORTS_DIR }}/pr
+
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python and create virtual environment
+        run: uv venv .venv --python ${{ env.PYTHON_VERSION }} --python-preference only-managed --clear
+
+      - name: Activate virtualenv
+        if: matrix.os != 'windows-latest'
+        run: |
+          . .venv/bin/activate
+          echo PATH=$PATH >> $GITHUB_ENV
+
+      - name: Activate virtualenv (windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          "$env:PATH" | Out-File -FilePath "$env:GITHUB_PATH" -Append
+
+      - name: Install spatialite
+        run: |
+          sudo apt update
+          sudo apt install -y libsqlite3-mod-spatialite
+
+      # clean: false skips the `git clean -ffdx && git reset --hard` that
+      # actions/checkout runs by default, so untracked files (.venv,
+      # .benchmarks, TransportationNetworks) survive the ref switches.
+      - name: Checkout base branch (${{ env.BASE_REF }})
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.BASE_REF }}
+          clean: false
+
+      - name: Install AequilibraE (base)
+        run: uv pip install ".[dev]"
+
+      - name: Run benchmarks (base)
+        env:
+          BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/base
+        run: pytest --benchmark-save=base --benchmark-save-data --benchmark-storage="file://${{ env.BENCHMARK_TIMING_DIR }}" tests/aequilibrae/benchmarks/ --benchmark-only
+
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PR_SHA }}
+          clean: false
+
+      - name: Install AequilibraE (PR)
+        run: uv pip install ".[dev]"
+
+      - name: Run benchmarks (PR)
+        env:
+          BENCHMARK_REPORTS_DIR: ${{ env.BENCHMARK_REPORTS_DIR }}/pr
+        run: pytest --benchmark-save=pr --benchmark-save-data --benchmark-storage="file://${{ env.BENCHMARK_TIMING_DIR }}" tests/aequilibrae/benchmarks/ --benchmark-only
+
+      - name: Generate plots
+        if: success() || failure() # always generate plots, especially if some benchmarks fail
+        run: |
+          for run in base pr; do
+            python tests/aequilibrae/benchmarks/plot_benchmarks.py --convergence --x-axis time --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+            python tests/aequilibrae/benchmarks/plot_benchmarks.py --convergence --x-axis iterations --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+            python tests/aequilibrae/benchmarks/plot_benchmarks.py --compare-flow --reports-dir ${{ env.BENCHMARK_REPORTS_DIR }}/$run
+          done
+
+      - name: Add benchmark comparison to summary
+        if: success() || failure()
+        run: |
+          echo "# Benchmark comparison: ${{ env.BASE_REF }} (0001_base) vs PR #${{ inputs.pr-number }} (0002_pr)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          pytest-benchmark --storage ${{ env.BENCHMARK_TIMING_DIR }} compare 0001_base 0002_pr --group-by func >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload benchmark results as artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: ${{ env.BENCHMARK_TIMING_DIR }}
+
+      - name: Upload plots as artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-plots
+          path: ${{ env.BENCHMARK_REPORTS_DIR }}/**/*.png

@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 from copy import deepcopy
+from os import PathLike
 
 import yaml
 
@@ -53,7 +54,7 @@ class Parameters:
 
     def __init__(self, path: Optional[Path] = None):
         """Loads parameters from file."""
-        self.file = None
+        self.file: PathLike | str = None
         if path is not None:
             self.file = path / "parameters.yml"
         else:
@@ -66,7 +67,7 @@ class Parameters:
                 self.parameters = yaml.load(yml, Loader=yaml.SafeLoader)
         else:
             logger = logging.getLogger("aequilibrae")
-            logger.warning("No pre-existing parameter file exists for this project. Will use default")
+            logger.debug("No pre-existing parameter file exists for this project. Will use default")
 
             self.parameters = deepcopy(self._default)
 

@@ -72,7 +72,7 @@ def list_tables_in_db(conn: Connection):
     return table_list
 
 
-def safe_connect(filepath: PathLike, missing_ok=False):
+def safe_connect(filepath: PathLike | str, missing_ok=False):
     if Path(filepath).exists() or missing_ok or str(filepath) == ":memory:":
         return connect(filepath, factory=AequilibraEConnection)
     raise FileNotFoundError(f"Attempting to open non-existent SQLite database: {filepath}")

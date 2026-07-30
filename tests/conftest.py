@@ -3,6 +3,7 @@
 # needing to import them (pytest will automatically discover them).
 
 import faulthandler
+import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -14,12 +15,15 @@ from aequilibrae.project.project_creation import remove_triggers
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
-from tests.data.reference_files import siouxfalls_project
 
 faulthandler.enable()
 
-DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_env():
+    os.environ["AEQ_SHOW_PROGRESS"] = "0"
 
 
 @pytest.fixture(scope="session")

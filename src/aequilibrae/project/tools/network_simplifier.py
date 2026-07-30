@@ -2,10 +2,14 @@ import warnings
 import logging
 from copy import deepcopy
 from math import ceil
-from typing import List
+from typing import List, TYPE_CHECKING, Optional, Literal
+
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
 
 import numpy as np
 import pandas as pd
+import numpy.typing as npt
 from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge
 from shapely.ops import substring
@@ -22,10 +26,10 @@ logger = logging.getLogger(__name__)
 class NetworkSimplifier(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, project: Optional["Project"] = None) -> None:
         super().__init__(None)
 
-        self.project = project or get_active_project()
+        self.project: Project = project or get_active_project()
         self.network = self.project.network
         self.link_layer = self.network.links.data
 
@@ -78,7 +82,7 @@ class NetworkSimplifier(WorkerThread):
                 continue
 
             link_sequence = [abs(x) for x in link_sequence]
-            self.link_sequence = [x for x in link_sequence if x not in centroid_connectors]
+            self.link_sequence = np.array([x for x in link_sequence if x not in centroid_connectors])
             self.candidates = self.link_layer.query("link_id in @link_sequence").set_index("link_id")
 
             if self.candidates.shape[0] <= 1:
@@ -105,7 +109,7 @@ class NetworkSimplifier(WorkerThread):
             break_into = ceil(new_geo.length)
 
             # Now we build the template for the links we will build
-            main_data = long_lnk.to_dict()
+            main_data = long_lnk.to_dict() if long_lnk is not None else {}
 
             # Some values we will bring from the weighted average
             for field in ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]:
@@ -143,7 +147,17 @@ class NetworkSimplifier(WorkerThread):
 
         logger.warning("Network has been rebuilt. You should run this tool's rebuild network method")
 
-    def __process_link_fields(self, candidates, link_sequence, max_speed_ratio):
+    def __process_link_fields(
+        self,
+        candidates: pd.DataFrame,
+        link_sequence: npt.NDArray[np.int_],
+        max_speed_ratio: float = 1.1,
+    ) -> tuple[
+        pd.DataFrame,
+        list | None,
+        Literal[1, -1] | None,
+        pd.Series | None,
+    ]:
         start_node = candidates.loc[link_sequence[0]]["a_node"]
         longest_link_id = candidates.sort_values("distance", ascending=False).index[0]
         speed_ab, speed_ba, geos, lanes_ab, lanes_ba = [], [], [], [], []
@@ -173,7 +187,7 @@ class NetworkSimplifier(WorkerThread):
 
         return candidates, geos, longest_direction, longest_link
 
-    def __execute_link_deletion_and_addition(self, new_links, links_to_delete):
+    def __execute_link_deletion_and_addition(self, new_links: list[dict], links_to_delete: pd.DataFrame | list):
         df = pd.DataFrame(new_links)
         df = df.drop(columns=["a_node", "b_node", "geometry", "ogc_fid"]).rename({"geo": "geometry"}, axis=1)
         cols = list(df.columns)

@@ -8,8 +8,8 @@ to the platform.
 
 Although modeling with AequilibraE should feel somewhat familiar to seasoned modelers, especially
 those used to programming, the mechanics of traffic assignment in AequilibraE might be foreign to
-some users, so this section of the documentation will include discussions of the mechanics
-of some of these procedures and some light discussion on its motivation.
+part of our audience, so this section of the documentation covers the mechanics
+behind some of these procedures, along with a brief look at their motivation.
 
 
 .. toctree::

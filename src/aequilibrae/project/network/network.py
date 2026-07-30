@@ -1,4 +1,7 @@
 import logging
+import math
+from typing import List, Optional, TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
 import shapely.wkb
@@ -19,6 +22,9 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,13 +36,13 @@ class Network(WorkerThread):
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
     protected_fields = protected_fields
-    link_types: LinkTypes = None
+    link_types: LinkTypes
     signal = SIGNAL(object)
 
-    def __init__(self, project) -> None:
+    def __init__(self, project: "Project") -> None:
         WorkerThread.__init__(self, None)
 
-        self.graphs = {}  # type: Dict[Graph]
+        self.graphs: dict = {}
         self.project = project
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
@@ -44,7 +50,7 @@ class Network(WorkerThread):
         self.nodes = Nodes(self)
         self.periods = Periods(self)
 
-    def skimmable_fields(self):
+    def skimmable_fields(self) -> list:
         """
         Returns a list of all fields that can be skimmed
 
@@ -94,7 +100,7 @@ class Network(WorkerThread):
 
         return real_fields
 
-    def list_modes(self):
+    def list_modes(self) -> list:
         """
         Returns a list of all the modes in this model
 
@@ -223,8 +229,8 @@ class Network(WorkerThread):
         self,
         link_file_path: str,
         node_file_path: str,
-        use_group_path: str = None,
-        geometry_path: str = None,
+        use_group_path: str = "",
+        geometry_path: str = "",
         srid: int = 4326,
     ) -> None:
         """
@@ -262,7 +268,9 @@ class Network(WorkerThread):
 
         logger.info("Network exported successfully")
 
-    def build_graphs(self, fields: list = None, modes: list = None, limit_to_area: Polygon = None) -> None:
+    def build_graphs(
+        self, fields: Optional[list] = None, modes: Optional[list] = None, limit_to_area: Optional[Polygon] = None
+    ) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
@@ -300,7 +308,7 @@ class Network(WorkerThread):
                 ignore_fields = ["ogc_fid", "geometry"]
                 all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
             else:
-                fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
+                fields.extend(["link_id", "a_node", "b_node", "direction", "modes", "link_type"])
                 all_fields = list(set(fields))
 
             if modes is None:
@@ -327,18 +335,26 @@ class Network(WorkerThread):
                 else:
                     sql += spatial_add
                     df = (
-                        pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                        pd.read_sql_query(
+                            sql,
+                            conn,
+                            params=[
+                                limit_to_area.wkb,
+                            ],
+                        )
                         .fillna(value=np.nan)
                         .infer_objects(False)
                     )
 
                     # We filter to centroids existing in our filtered area
-                    centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
-
-            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
+                    centroids = (
+                        centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+                        if centroids is not None
+                        else None
+                    )
 
         lonlat = self.nodes.lonlat.set_index("node_id")
-        data = df[valid_fields]
+        data = df[all_fields]
         for m in modes:
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
             # the compressed graph representation is created)
@@ -402,7 +418,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -412,7 +428,7 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
