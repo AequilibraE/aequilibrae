@@ -182,8 +182,8 @@ class GTFSReader(WorkerThread):
                     times = pd.to_numeric(times, errors="coerce")
                     source_time = pd.to_numeric(source_time, errors="coerce")
 
+                    cleaned_times = stop_times["arrival_time"].ffill().astype(int)
                     assert np.nanmin(times[1:] - times[:-1]) > 0
-                    cleaned_times = np.nan_to_num(times, nan=0).astype(int)
                     stop_times["arrival_time"] = cleaned_times
                     stop_times["departure_time"] = cleaned_times
                     stop_times["source_time"] = np.nan_to_num(source_time, nan=0).astype(int)
