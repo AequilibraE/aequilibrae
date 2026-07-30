@@ -704,7 +704,7 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             # fixed cost is scaled by vot
             class_link_costs = sum_a_times_b_minus_c(
-                c.fixed_cost, self.step_direction[c._id].link_loads[:, 0], c.results.link_loads[:, 0], self.cores
+                c.fixed_cost, self.step_direction[c._id].total_link_loads, c.results.total_link_loads, self.cores
             )
             class_specific_term += class_link_costs
         return class_specific_term
