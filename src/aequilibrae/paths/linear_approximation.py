@@ -55,7 +55,6 @@ class LinearApproximation(WorkerThread):
             "iteration": [],
             "time": [],
             "rgap": [],
-            "rgap_direction": [],
             "alpha": [],
             "warnings": [],
         }
@@ -90,7 +89,6 @@ class LinearApproximation(WorkerThread):
 
         self.iter = 0
         self.rgap = np.inf
-        self.rgap_direction = np.inf
         self.stepsize = 1.0
         self.conjugate_stepsize = 0.0
         self.fw_class_flow = 0
@@ -731,7 +729,6 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
-            self.convergence_report["rgap_direction"].append(self.rgap_direction)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
 
@@ -740,7 +737,7 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
 
-            logger.info(f"{self.iter},{self.rgap},{self.rgap_direction},{self.stepsize}")
+            logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
                 self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
@@ -756,10 +753,7 @@ class LinearApproximation(WorkerThread):
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
 
-            msg = (
-                f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} "
-                f"- RGap: {self.rgap:.6} - rgap_direction: {self.rgap_direction:.6}"
-            )
+            msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
             self.signal.emit(["set_text", msg])
 
         for c in self.traffic_classes:
@@ -769,10 +763,7 @@ class LinearApproximation(WorkerThread):
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
-        logger.info(
-            f"{self.algorithm} Assignment finished. {self.iter} iterations, "
-            f"final AoN rgap = {self.rgap}, final step-direction rgap = {self.rgap_direction}"
-        )
+        logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations, final AoN rgap = {self.rgap}")
 
         self.signal.emit(["finished"])
 
@@ -1022,10 +1013,6 @@ class LinearApproximation(WorkerThread):
           ``|Σ flow·cost − Σ AON·cost| / Σ flow·cost``. **This is the only
           quantity used for the stopping criterion** (compared against
           ``self.rgap_target``).
-        * ``self.rgap_direction`` - the gap in the BFW step direction,
-          ``(Σ flow·cost − Σ direction·cost) / Σ flow·cost``, where
-          ``direction`` is the BFW combined step direction. Reported
-          alongside ``self.rgap``.
         """
         if self.stepsize == 1.0:
             return False
@@ -1037,15 +1024,12 @@ class LinearApproximation(WorkerThread):
         # are a significant fraction of total travel cost.
         aon_cost = self.aon_total_turn_cost
         current_cost = self.fw_total_turn_cost
-        direction_cost = self.fw_total_turn_cost
         for c in self.traffic_classes:
             aon_class_flow = c._aon_results.total_link_loads
             current_class_flow = c.results.total_link_loads
-            step_direction_flow = self.step_direction[c._id].total_link_loads
 
             aon_cost += np.sum((self.congested_time + c.fixed_cost) * aon_class_flow)
             current_cost += np.sum((self.congested_time + c.fixed_cost) * current_class_flow)
-            direction_cost += np.sum((self.congested_time + c.fixed_cost) * step_direction_flow)
 
         if current_cost != 0.0:
             self.rgap = abs(current_cost - aon_cost) / current_cost
@@ -1054,7 +1038,6 @@ class LinearApproximation(WorkerThread):
             # all-or-nothing algorithm, which short-circuits before this method
             # is called). Both conditions are already satisfied by the gate in
             # ``execute()``: ``converged = self.check_convergence() if self.iter > 1 else False``.
-            self.rgap_direction = (current_cost - direction_cost) / current_cost
         else:
             # Nothing loaded yet, so we are converged only when the AoN solution carries no cost either
             trivially_converged = aon_cost == 0.0
