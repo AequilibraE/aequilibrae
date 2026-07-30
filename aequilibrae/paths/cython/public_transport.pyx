@@ -163,12 +163,14 @@ class HyperpathGenerating:
         ) and "link_type" not in edges_cols:
             raise ValueError("predefined skimming type requested but 'link_type' column not present on the graph")
 
+        # assign() rather than __setitem__ throughout: pandas 3's chained-assignment check can't see
+        # locals of a compiled Cython frame, so plain edges[col] = ... warns spuriously here
         for name, col in discerete_link_types.items():
             if name in skim_cols and name not in edges_cols:
                 if isinstance(col, list):
-                    edges[name] = np.where(edges["link_type"].isin(col), 1, 0)
+                    edges = edges.assign(**{name: np.where(edges["link_type"].isin(col), 1, 0)})
                 else:
-                    edges[name] = np.where(edges["link_type"] == col, 1, 0)
+                    edges = edges.assign(**{name: np.where(edges["link_type"] == col, 1, 0)})
 
         if "waiting_time" in skim_cols and "waiting_time" not in edges_cols:
             skim_cols.remove("waiting_time")
@@ -178,9 +180,9 @@ class HyperpathGenerating:
         for name, col in contig_link_types.items():
             if name in skim_cols and name not in edges_cols:
                 if isinstance(col, list):
-                    edges[name] = np.where(edges["link_type"].isin(col), edges[trav_time], 0)
+                    edges = edges.assign(**{name: np.where(edges["link_type"].isin(col), edges[trav_time], 0)})
                 else:
-                    edges[name] = np.where(edges["link_type"] == col, edges[trav_time], 0)
+                    edges = edges.assign(**{name: np.where(edges["link_type"] == col, edges[trav_time], 0)})
 
         return edges, list(skim_cols)
 
