@@ -25,13 +25,13 @@ def test_resolve_unknown_simplifier_raises_with_available_list():
 
 
 def test_resolve_simplifier_false_returns_none():
-    assert resolve_simplifier(False) is None
+    assert resolve_simplifier(False) == (None, None)
 
 
 def test_resolve_simplifier_true_returns_osmnx():
-    simplifier = resolve_simplifier(True)
-    assert simplifier is not None
-    assert simplifier.name == "osmnx"
+    name, simplify_fn = resolve_simplifier(True)
+    assert name == "osmnx"
+    assert callable(simplify_fn)
 
 
 def test_resolve_source_rejects_kwargs_with_source_object():
@@ -43,14 +43,3 @@ def test_resolve_source_rejects_kwargs_with_source_object():
 
     with pytest.raises(SourceResolutionError, match="by name"):
         resolve_source(_Source(), model_area="not-forwarded")
-
-
-def test_resolve_simplifier_rejects_kwargs_with_simplifier_object():
-    class _Simplifier:
-        name = "custom-simplifier"
-
-        def simplify(self, net, **kwargs):
-            return net
-
-    with pytest.raises(SourceResolutionError, match="by name"):
-        resolve_simplifier(_Simplifier(), consolidate_tolerance=5.0)

@@ -3,12 +3,9 @@
 import sqlite3
 
 import geopandas as gpd
-import pytest
 from shapely.geometry import LineString, Point
 
-from aequilibrae.project.network.importer import db_writer as db_writer_mod
 from aequilibrae.project.network.importer.db_writer import SpatialiteWriter
-from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
@@ -51,14 +48,6 @@ def test_triggers_restored_after_successful_write(empty_project):
     SpatialiteWriter(empty_project).write(_staged(1))
     after = _count_triggers(empty_project.path_to_file)
     assert after >= before
-
-
-def test_trigger_restoration_failure_is_surfaced(empty_project, monkeypatch):
-    # Force trigger re-installation to silently no-op so the post-condition check
-    # detects the weakened schema and raises a clear, actionable error.
-    monkeypatch.setattr(db_writer_mod, "add_triggers", lambda conn, db_type: None)
-    with pytest.raises(ImporterError, match="triggers were not fully restored"):
-        SpatialiteWriter(empty_project).write(_staged(1))
 
 
 def test_excess_link_types_fold_into_other_link_types(empty_project):

@@ -58,7 +58,7 @@ def acquire_overpass(
     _configure_osmnx(ox)
 
     if (model_area is None) == (place_name is None):
-        raise ImporterError("OSMOverpassSource requires exactly one of `model_area` or `place_name`")
+        raise ImporterError("The osm-overpass source requires exactly one of `model_area` or `place_name`")
 
     source_url = (
         f"overpass:place={place_name}" if place_name is not None else f"overpass:bbox={list(model_area.bounds)}"

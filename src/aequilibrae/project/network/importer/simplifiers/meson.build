@@ -6,8 +6,6 @@ pyfiles = [
   'common.py',
   'impl_neatnet.py',
   'impl_osmnx.py',
-  'neatnet_simplifier.py',
-  'osmnx_simplifier.py',
 ]
 
 py.install_sources(

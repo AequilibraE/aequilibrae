@@ -1,3 +1,3 @@
-from aequilibrae.project.network.importer.sources.base import SOURCES, Source, resolve_source
+from aequilibrae.project.network.importer.sources.base import SOURCES, resolve_source
 
-__all__ = ["Source", "SOURCES", "resolve_source"]
+__all__ = ["SOURCES", "resolve_source"]

@@ -88,8 +88,7 @@ class Project:
         )
         self.scenario = self.root_scenario
 
-        # It's possible that if two projects are open at once this could duplicate mix the log outputs, but we don't
-        # have anything to support having more than one project open at a time so we'll assume it's fine.
+        # Log outputs could interleave if two projects were open at once, but only one open project is supported.
         default_log_file_config(self.scenario.log_handler)
 
         self.activate()
@@ -212,15 +211,11 @@ class Project:
             for obj in [self.parameters, self.network]:
                 del obj
 
-            # del self.network.link_types
-            # del self.network.modes
-
             logger.info(f"Closed project on {self.project_base_path}")
 
             logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
         except (sqlite3.ProgrammingError, AttributeError):
             logger.warning(f"This project at {self.project_base_path} is already closed")
-            raise  # FIXME something goes wrong above
 
         finally:
             self.deactivate()

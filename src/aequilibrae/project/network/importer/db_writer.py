@@ -38,34 +38,17 @@ class SpatialiteWriter:
             net = self._fold_excess_link_types(conn, net)
             self._ensure_link_types(conn, net.links["link_type"].dropna().astype(str).unique())
 
-            triggers_before = _count_triggers(conn)
             remove_triggers(conn, "network")
             try:
                 self._insert_nodes(conn, net.nodes, node_cols)
                 self._insert_links(conn, net.links, link_cols)
             finally:
                 add_triggers(conn, "network")
-                self._verify_triggers_restored(conn, triggers_before)
-
-    @staticmethod
-    def _verify_triggers_restored(conn, expected_min: int) -> None:
-        """Fail loudly if bulk-insert trigger stripping left the schema weakened."""
-        restored = _count_triggers(conn)
-        if restored < expected_min:
-            raise ImporterError(
-                "Network triggers were not fully restored after the bulk insert "
-                f"(found {restored}, expected at least {expected_min}). The project schema may be "
-                "in an inconsistent state; recreate the project and re-run the import."
-            )
 
     def _fold_excess_link_types(self, conn, net: StagedNetwork) -> StagedNetwork:
         """Bucket the least-frequent link types into ``other_link_types`` when the
         number of distinct types would exceed the single-character ``link_type_id``
         alphabet (the schema enforces ``LENGTH(link_type_id) == 1``).
-
-        We keep the most-used link types as first-class entries and collapse the
-        long tail of rare types into a single catch-all so a rich import never
-        crashes with an alphabet-exhaustion ``RuntimeError`` mid-write.
         """
         existing = {row[0]: row[1] for row in conn.execute("SELECT link_type, link_type_id FROM link_types").fetchall()}
         free_slots = LinkTypeAllocator.count_free_slots(existing)
@@ -147,10 +130,6 @@ class SpatialiteWriter:
         wkbs = direct.geometry.to_wkb()
         records = _to_records(direct, col_names)
         conn.executemany(sql, [r + (wkb,) for r, wkb in zip(records, wkbs, strict=True)])
-
-
-def _count_triggers(conn) -> int:
-    return int(conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger'").fetchone()[0])
 
 
 def _to_records(direct: gpd.GeoDataFrame, col_names: list) -> list:

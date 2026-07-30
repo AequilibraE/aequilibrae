@@ -23,11 +23,8 @@ _LINK_DEFAULTS = {
 }
 _NODE_DEFAULTS = {"source_id": None}
 
-# Provenance keys persisted for every import. ``release`` is OPTIONAL because not
-# every source is versioned (e.g. a raw OSM PBF or Overpass query has no release
-# tag), whereas Overture imports do. Splitting the two avoids rejecting valid
-# unversioned imports while still recording the release when a source provides
-# one. Keep these lists explicit so the contract is not silently mutated.
+# Provenance keys persisted for every import. ``release`` is optional because
+# not every source is versioned (e.g. a raw OSM PBF has no release tag).
 REQUIRED_SOURCE_META_KEYS = ("source", "backend", "source_url", "fetched_at")
 OPTIONAL_SOURCE_META_KEYS = ("release",)
 _SOURCE_META_KEYS = REQUIRED_SOURCE_META_KEYS + OPTIONAL_SOURCE_META_KEYS
@@ -51,49 +48,44 @@ class NetworkImporter:
         from aequilibrae.project.network.importer.db_writer import SpatialiteWriter
 
         modes_tuple = tuple(modes)
-        source_obj = resolve_source(source, **source_kwargs)
-        simplifier_obj = resolve_simplifier(simplify)
+        source_name, acquire = resolve_source(source, **source_kwargs)
+        simplifier_name, simplify_fn = resolve_simplifier(simplify)
 
         download_cache = DownloadCache(
             project_base_path=self.project.project_base_path,
-            source_name=source_obj.name,
-            tag=cache_tag or source_obj.name,
+            source_name=source_name,
+            tag=cache_tag or source_name,
         )
 
-        logger.info(f"Acquiring network from source '{source_obj.name}' (modes={modes_tuple})")
-        logger.info("Data download started")
-        net: StagedNetwork = source_obj.acquire(modes=modes_tuple, download_cache=download_cache)
-        logger.info("Data download finished")
+        logger.info(f"Acquiring network from source '{source_name}' (modes={modes_tuple})")
+        net: StagedNetwork = acquire(modes=modes_tuple, download_cache=download_cache)
         _normalize_importer_columns(net)
         _normalize_source_meta(net)
         net.validate()
         logger.info(f"Acquired {len(net.nodes)} nodes and {len(net.links)} links")
 
-        if simplifier_obj is not None:
-            logger.info("Simplification started")
-            logger.info(f"Simplifying with '{simplifier_obj.name}'")
+        if simplify_fn is not None:
+            logger.info(f"Simplifying with '{simplifier_name}'")
             simplify_kwargs = {"consolidate_tolerance": consolidate_tolerance}
-            if simplifier_obj.name == "neatnet":
+            if simplifier_name == "neatnet":
                 from aequilibrae.project.network.importer.buildings import fetch_building_footprints
 
                 buildings = fetch_building_footprints(net, download_cache)
                 net.source_meta.update(buildings.as_meta())
                 if buildings.gdf is not None:
                     simplify_kwargs["exclusion_mask"] = buildings.gdf
-            net = simplifier_obj.simplify(net, **simplify_kwargs)
+            net = simplify_fn(net, **simplify_kwargs)
             net.validate()
             logger.info(f"After simplification: {len(net.nodes)} nodes, {len(net.links)} links")
-            logger.info("Simplification finished")
 
-        logger.info("Saving to the database started")
+        logger.info("Saving network to the project database")
         SpatialiteWriter(self.project).write(net)
-        logger.info("Saving to the database finished")
 
         AboutWriter(self.project).write(
             source_meta=net.source_meta,
             modes=modes_tuple,
-            simplify=simplifier_obj.name if simplifier_obj is not None else "false",
-            consolidate_tolerance=consolidate_tolerance if simplifier_obj is not None else None,
+            simplify=simplifier_name if simplify_fn is not None else "false",
+            consolidate_tolerance=consolidate_tolerance if simplify_fn is not None else None,
             download_cache_relpath=download_cache.relative_path,
         )
         logger.info("Network build complete")

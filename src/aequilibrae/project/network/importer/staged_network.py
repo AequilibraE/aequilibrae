@@ -56,9 +56,8 @@ class StagedNetwork:
         if (self.links["modes"].fillna("").str.len() == 0).any():
             raise StagedNetworkValidationError("links.modes must be a non-empty string for every row")
 
-        # Links must be simple LineStrings. ``to_graph`` reverses geometries via
-        # ``geom.coords[::-1]``, which raises on MultiLineString, so reject mixed
-        # geometry up front with a clear message instead of an opaque crash.
+        # ``to_graph`` reverses geometries via ``coords[::-1]``, which raises on
+        # MultiLineString, so reject non-LineString geometry up front.
         link_types = set(self.links.geometry.geom_type.dropna().unique())
         if link_types - {"LineString"}:
             raise StagedNetworkValidationError(
@@ -91,8 +90,6 @@ class StagedNetwork:
                 **rec,
                 "geometry": geom,
                 "_source_ref": f"{base_source_id}::ab",
-                "_travel_speed": rec.get("speed_ab"),
-                "_travel_lanes": rec.get("lanes_ab"),
             }
             if direction == 1:
                 graph.add_edge(a, b, key=link_id, **attrs_ab)
@@ -103,8 +100,6 @@ class StagedNetwork:
                 **rec,
                 "geometry": rev_geom,
                 "_source_ref": f"{base_source_id}::ba",
-                "_travel_speed": rec.get("speed_ba"),
-                "_travel_lanes": rec.get("lanes_ba"),
             }
             if direction == -1:
                 graph.add_edge(b, a, key=link_id, **attrs_ba)

@@ -281,9 +281,7 @@ def _geometry_summary(geom) -> dict:
 def _reduce_candidates_by_overlap(simplified_geom, orig_geoms, compatible: list[int]) -> list[tuple[int, float]]:
     if not compatible:
         return []
-    # Real line/buffer intersections for every candidate were measurably expensive
-    # in benchmarking. For ranking purposes we only need a cheap proxy that keeps
-    # the plausible corridor candidates near the top.
+    # Cheap proxy ranking; exact line/buffer intersection lengths proved too slow.
     simp_buffer = simplified_geom.buffer(_BUFFER_DIST)
     sx0, sy0 = simplified_geom.coords[0]
     sx1, sy1 = simplified_geom.coords[-1]

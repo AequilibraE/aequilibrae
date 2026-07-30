@@ -4,7 +4,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import LineString, Point
 
-from aequilibrae.project.network.importer.buildings import BuildingMaskResult, fetch_building_footprints
+from aequilibrae.project.network.importer.buildings import fetch_building_footprints
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
@@ -40,17 +40,9 @@ def _net(span_degrees):
     return StagedNetwork(nodes=nodes, links=links)
 
 
-def test_buildings_disabled_explicitly():
-    result = fetch_building_footprints(_net(0.1), _DummyCache(), enabled=False)
-    assert isinstance(result, BuildingMaskResult)
-    assert result.gdf is None
-    assert result.status == "disabled"
-    assert result.attempted is False
-
-
-def test_buildings_skipped_for_large_bbox_even_when_enabled():
+def test_buildings_skipped_for_large_bbox():
     # Span well above the limit must skip the download without ever importing overturemaps.
-    result = fetch_building_footprints(_net(5.0), _DummyCache(), enabled=True)
+    result = fetch_building_footprints(_net(5.0), _DummyCache())
     assert result.gdf is None
     assert result.status == "skipped"
     assert result.reason == "bbox_guard"
@@ -74,7 +66,7 @@ def test_buildings_retry_once_then_fallback(monkeypatch):
         lambda: "test-release",
     )
 
-    result = fetch_building_footprints(net, _DummyCache(), enabled=True)
+    result = fetch_building_footprints(net, _DummyCache())
     assert result.gdf is None
     assert result.status == "fallback"
     assert result.retries == 1
@@ -116,9 +108,8 @@ def test_buildings_success_path_downloads_and_caches(monkeypatch):
     _patch_release(monkeypatch)
 
     cache = _RecordingCache()
-    result = fetch_building_footprints(_net(0.1), cache, enabled=True)
+    result = fetch_building_footprints(_net(0.1), cache)
     assert result.status == "downloaded"
-    assert result.cache_written is True
     assert result.retries == 0
     assert len(result.gdf) == 1
     assert str(result.gdf.crs).upper() == "EPSG:4326"
@@ -139,7 +130,7 @@ def test_buildings_zero_rows_twice_falls_back(monkeypatch):
     monkeypatch.setattr("aequilibrae.project.network.importer.buildings.require", lambda *a, **k: _FakeOverture())
     _patch_release(monkeypatch)
 
-    result = fetch_building_footprints(_net(0.1), _DummyCache(), enabled=True)
+    result = fetch_building_footprints(_net(0.1), _DummyCache())
     assert result.gdf is None
     assert result.status == "fallback"
     assert result.reason == "zero_rows"

@@ -25,7 +25,7 @@ def acquire_cloud(
     overturemaps = require("overturemaps", feature="Overture cloud download")
 
     if model_area is None:
-        raise ImporterError("OvertureCloudSource requires a `model_area` Polygon")
+        raise ImporterError("The overture-cloud source requires a `model_area` Polygon")
 
     bbox = tuple(model_area.bounds)
     release = get_latest_overture_version()

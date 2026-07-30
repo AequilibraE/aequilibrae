@@ -13,13 +13,9 @@ Layout:
             <payload files>            # .parquet (Parquet) or .json
             manifest.json
 
-Only two on-disk payload formats are supported:
-  - GeoParquet (``write_geoparquet`` for ``gpd.GeoDataFrame``)
-  - JSON (``write_json`` for the manifest and small metadata documents)
-
-There is no gzip, no raw-bytes path, no per-source raw format. Sources that
-naturally produce JSON (e.g. Overpass) must consolidate their data into a
-single ``GeoDataFrame`` first and persist it as GeoParquet.
+Only two on-disk payload formats are supported: GeoParquet (``write_geoparquet``
+for ``gpd.GeoDataFrame``) and JSON (``write_json`` for the manifest and small
+metadata documents).
 """
 
 import hashlib

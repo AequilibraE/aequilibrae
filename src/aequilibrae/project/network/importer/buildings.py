@@ -3,7 +3,6 @@
 import geopandas as gpd
 import logging
 from dataclasses import dataclass
-from time import perf_counter
 from typing import Optional
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
@@ -24,9 +23,6 @@ class BuildingMaskResult:
     status: str
     attempted: bool
     retries: int
-    elapsed_s: float
-    bbox_span_degrees: float
-    cache_written: bool
     reason: str = ""
 
     def as_meta(self) -> dict:
@@ -34,9 +30,6 @@ class BuildingMaskResult:
             "building_mask_status": self.status,
             "building_mask_attempted": self.attempted,
             "building_mask_retries": self.retries,
-            "building_mask_elapsed_s": round(self.elapsed_s, 6),
-            "building_mask_bbox_span_degrees": round(self.bbox_span_degrees, 6),
-            "building_mask_cache_written": self.cache_written,
             "building_mask_reason": self.reason,
         }
 
@@ -45,31 +38,17 @@ def fetch_building_footprints(
     net: StagedNetwork,
     download_cache: DownloadCache,
     *,
-    enabled: bool = True,
     max_bbox_span_degrees: float = _MAX_BUILDINGS_BBOX_SPAN_DEGREES,
 ) -> BuildingMaskResult:
-    """Optionally download buildings covering the current staged network extent.
+    """Download buildings covering the current staged network extent.
 
-    Buildings are enabled by default for neatnet because they can improve the
-    exclusion mask and simplify around built form more cleanly. The import must
-    still remain resilient, so the fetch is retried once and then falls back to
-    "no mask" with a warning if Overture is unavailable or empty.
+    Buildings can improve neatnet's exclusion mask and simplify around built
+    form more cleanly. The import must still remain resilient, so the fetch is
+    retried once and then falls back to "no mask" with a warning if Overture is
+    unavailable or empty.
     """
     bbox = tuple(net.links.total_bounds)
     span = max(float(bbox[2] - bbox[0]), float(bbox[3] - bbox[1]))
-    start = perf_counter()
-
-    if not enabled:
-        logger.info("Building-footprint download is disabled; proceeding without an exclusion mask")
-        return BuildingMaskResult(
-            gdf=None,
-            status="disabled",
-            attempted=False,
-            retries=0,
-            elapsed_s=perf_counter() - start,
-            bbox_span_degrees=span,
-            cache_written=False,
-        )
 
     if span > max_bbox_span_degrees:
         logger.warning(
@@ -78,16 +57,7 @@ def fetch_building_footprints(
             span,
             max_bbox_span_degrees,
         )
-        return BuildingMaskResult(
-            gdf=None,
-            status="skipped",
-            attempted=False,
-            retries=0,
-            elapsed_s=perf_counter() - start,
-            bbox_span_degrees=span,
-            cache_written=False,
-            reason="bbox_guard",
-        )
+        return BuildingMaskResult(gdf=None, status="skipped", attempted=False, retries=0, reason="bbox_guard")
 
     overturemaps = require("overturemaps", feature="building footprint download for neatnet")
     logger.info(f"Downloading building footprints from Overture Maps for bbox={bbox}")
@@ -110,48 +80,14 @@ def fetch_building_footprints(
             logger.info(f"Downloaded {table.num_rows} building footprints from Overture Maps (release={release})")
             buildings_gdf = table_to_gdf(table)
             download_cache.write_geoparquet("buildings.parquet", buildings_gdf)
-            logger.info(f"Building footprints GeoDataFrame: {len(buildings_gdf)} rows")
-            return BuildingMaskResult(
-                gdf=buildings_gdf,
-                status="downloaded",
-                attempted=True,
-                retries=attempt,
-                elapsed_s=perf_counter() - start,
-                bbox_span_degrees=span,
-                cache_written=True,
-            )
+            return BuildingMaskResult(gdf=buildings_gdf, status="downloaded", attempted=True, retries=attempt)
         except Exception as exc:
             last_reason = exc.__class__.__name__
             if attempt == 0:
                 logger.warning("Building-footprint download failed on first attempt (%s); retrying once", exc)
-                continue
-            logger.warning(
-                "Building-footprint download failed after retry (%s); proceeding without an exclusion mask",
-                exc,
-            )
-            return BuildingMaskResult(
-                gdf=None,
-                status="fallback",
-                attempted=True,
-                retries=1,
-                elapsed_s=perf_counter() - start,
-                bbox_span_degrees=span,
-                cache_written=False,
-                reason=last_reason,
-            )
 
     logger.warning(
-        "Overture Maps returned no usable building data for the requested bbox "
-        "(reason=%s); proceeding without exclusion mask",
+        "Building-footprint download failed after retry (reason=%s); proceeding without an exclusion mask",
         last_reason or "unknown",
     )
-    return BuildingMaskResult(
-        gdf=None,
-        status="fallback",
-        attempted=True,
-        retries=1,
-        elapsed_s=perf_counter() - start,
-        bbox_span_degrees=span,
-        cache_written=False,
-        reason=last_reason or "empty",
-    )
+    return BuildingMaskResult(gdf=None, status="fallback", attempted=True, retries=1, reason=last_reason or "empty")
