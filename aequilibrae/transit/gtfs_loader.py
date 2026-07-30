@@ -180,9 +180,10 @@ class GTFSReader(WorkerThread):
                             times[1:] += df.add_time[:].astype(int)
 
                     assert min(times[1:] - times[:-1]) > 0
-                    stop_times["arrival_time"] = times.fillna(0).astype(int)
-                    stop_times["departure_time"] = times.fillna(0).astype(int)
-                    stop_times["source_time"] = source_time.fillna(0).astype(int)
+                    cleaned_times = np.nan_to_num(times, nan=0).astype(int)
+                    stop_times["arrival_time"] = cleaned_times
+                    stop_times["departure_time"] = cleaned_times
+                    stop_times["source_time"] = np.nan_to_num(source_time, nan=0).astype(int)
                     trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
                     trip.departures = stop_times.departure_time.to_numpy(copy=True)
 
