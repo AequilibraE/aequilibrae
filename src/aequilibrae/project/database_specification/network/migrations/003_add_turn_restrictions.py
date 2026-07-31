@@ -17,6 +17,9 @@ def migrate(
     """Migration to add turn restrictions support and allow_uturns setting."""
     logger.info("Beginning migration to add turn restrictions support")
 
+    schema = pathlib.Path(__file__).parent.parent / "tables" / "turn_restrictions.sql"
+    trigger_sql = pathlib.Path(__file__).parent.parent / "triggers" / "turn_restrictions_triggers.sql"
+
     # Add allow_uturns to the about table if it doesn't exist
     cursor = project_conn.execute("SELECT 1 FROM about WHERE infoname = 'allow_uturns'")
     if cursor.fetchone() is None:
@@ -24,17 +27,9 @@ def migrate(
         logger.info("Added 'allow_uturns' setting to about table")
 
     # Create turn_restrictions table (this migration assumes it did not previously exist)
-    schema = pathlib.Path(__file__).parent.parent / "tables" / "turn_restrictions.sql"
-    if schema.exists():
-        run_queries_from_sql_file(project_conn, schema)
-        logger.info("Created turn_restrictions table")
+    run_queries_from_sql_file(project_conn, schema)
+    logger.info("Created turn_restrictions table")
 
-        trigger_sql = pathlib.Path(__file__).parent.parent / "triggers" / "turn_restrictions_triggers.sql"
-        if trigger_sql.exists():
-            run_queries_from_sql_file(project_conn, trigger_sql)
-            logger.info("Applied turn restriction triggers")
-    else:
-        logger.warning(f"Could not find turn_restrictions.sql at {schema}")
-
-    project_conn.commit()
+    run_queries_from_sql_file(project_conn, trigger_sql)
+    logger.info("Applied turn restriction triggers")
     logger.info("Migration for turn restrictions support completed")
