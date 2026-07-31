@@ -583,7 +583,7 @@ class LinearApproximation(WorkerThread):
         self._refresh_congested_costs()
 
         logger.info(f"{self.algorithm} Assignment stats")
-        logger.info("Iteration, RelativeGap (AoN), RelativeGap (Step direction), stepsize")
+        logger.info("Iteration, RelativeGap (AoN), stepsize")
 
         msg = "Equilibrium Assignment"
         for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
@@ -795,8 +795,8 @@ class LinearApproximation(WorkerThread):
             # fixed cost is scaled by vot
             class_link_costs = sum_a_times_b_minus_c(
                 c.fixed_cost,
-                self.step_direction[c._id].link_loads[:, 0],
-                c.results.link_loads[:, 0],
+                self.step_direction[c._id].total_link_loads,
+                c.results.total_link_loads,
                 self.elementwise_cores,
                 self.threading_threshold,
             )
