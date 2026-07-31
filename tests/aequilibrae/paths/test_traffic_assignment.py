@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from aequilibrae import Graph, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import all_vdf_functions
+from aequilibrae.paths.vdf import VDFsManager
 
 
 @pytest.fixture(scope="function")
@@ -40,13 +40,21 @@ def assignment(project):
     return TrafficAssignment(project)
 
 
+@pytest.fixture(scope="function")
+def bpr():
+    vdfs = VDFsManager()
+    vdfs.add_preset_vdf("bpr")
+    return vdfs.get_vdf("bpr")
+
+
 def test_skim_after(project, assigclass):
     assig = TrafficAssignment(project)
 
     assig.add_class(assigclass)
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+    bpr = project.get_vdf("BPR")
+    assig.set_vdf(bpr, name_mapping={"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, name_mapping={"alpha": "b", "beta": "power"})
 
     assig.set_capacity_field("capacity")
     assig.set_time_field("free_flow_time")
@@ -75,10 +83,11 @@ def test_matrix_with_wrong_type(matrix, car_graph):
         TrafficClass("car", car_graph, matrix)
 
 
-def test_set_vdf(assignment):
+def test_set_vdf(assignment, assigclass, bpr):
     with pytest.raises(ValueError):
         assignment.set_vdf("CQS")
-    assignment.set_vdf("BPR")
+    assignment.add_class(assigclass)
+    assignment.set_vdf(bpr)
 
 
 def test_set_classes(assignment, assigclass):
@@ -106,14 +115,14 @@ def test_set_cores(assignment, assigclass):
     assignment.set_cores(3)
 
 
-def test_set_algorithm(assignment, assigclass):
+def test_set_algorithm(assignment, assigclass, bpr):
     with pytest.raises(AttributeError):
         assignment.set_algorithm("not an algo")
     assignment.add_class(assigclass)
     with pytest.raises(Exception):
         assignment.set_algorithm("msa")
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
@@ -122,24 +131,6 @@ def test_set_algorithm(assignment, assigclass):
             pass  # Placeholder for any repeated logic if needed
     with pytest.raises(AttributeError):
         assignment.set_algorithm("not a valid algorithm")
-
-
-@pytest.mark.parametrize(
-    "vdf,parameters",
-    [
-        *[(k, {"alpha": "b", "beta": "power"}) for k in all_vdf_functions if k != "akcelik"],
-        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
-        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in all_vdf_functions if k != "akcelik"],
-        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
-        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
-    ],
-)
-def test_set_vdf_parameters(assignment, assigclass, vdf, parameters):
-    with pytest.raises(RuntimeError):
-        assignment.set_vdf_parameters(parameters)
-    assignment.set_vdf(vdf)
-    assignment.add_class(assigclass)
-    assignment.set_vdf_parameters(parameters)
 
 
 def test_set_time_field(assignment, assigclass):
@@ -171,9 +162,8 @@ def test_info(assignment, assigclass):
     rgap = random.random() / 10000
     algo = choice(ALGORITHMS)
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    bpr = VDFsManager.make_preset_vdf("bpr")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = iterations

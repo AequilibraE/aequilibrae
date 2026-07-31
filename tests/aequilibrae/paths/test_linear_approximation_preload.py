@@ -10,12 +10,12 @@ class DummyVDF:
         congested_time[:] = fftime + scale * link_flows + offset
 
 
-def test_stepsize_derivative_uses_fw_total_flow_state():
+def test_stepsize_derivative_uses_total_flow_state():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
     assignment.preload = np.array([10.0, 20.0])
     assignment.current_assigned_flow = np.array([3.0, 4.0])
-    assignment.fw_total_flow = assignment.current_assigned_flow + assignment.preload
+    assignment.total_flow = assignment.current_assigned_flow + assignment.preload
     assignment.step_direction_flow = np.array([7.0, 8.0])
     assignment.congested_value = np.zeros(2)
     assignment.capacity = np.ones(2)
@@ -26,10 +26,8 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
     stepsize = 0.25
     derivative = assignment._LinearApproximation__derivative_of_objective_stepsize_dependent(stepsize, 0.0)
 
-    candidate_total_flow = assignment.fw_total_flow + stepsize * (
-        assignment.step_direction_flow - assignment.fw_total_flow
-    )
-    expected = np.sum(candidate_total_flow * (assignment.step_direction_flow - assignment.fw_total_flow))
+    candidate_total_flow = assignment.total_flow + stepsize * (assignment.step_direction_flow - assignment.total_flow)
+    expected = np.sum(candidate_total_flow * (assignment.step_direction_flow - assignment.total_flow))
 
     assert np.isclose(derivative, expected)
 
@@ -48,9 +46,9 @@ def test_relative_gap_ignores_constant_preload():
     assignment.traffic_classes = [cls]
     assignment.step_direction = {"car": SimpleNamespace(total_link_loads=np.array([9.0, 1.5]))}
 
-    # Preload contributes to VDF calculations via fw_total_flow but should not affect rgap.
+    # Preload contributes to VDF calculations via total_flow but should not affect rgap.
     assignment.preload = np.array([100.0, 100.0])
-    assignment.fw_total_flow = cls.results.total_link_loads + assignment.preload
+    assignment.total_flow = cls.results.total_link_loads + assignment.preload
     assignment.rgap_target = 0.1
 
     assert assignment.check_convergence()

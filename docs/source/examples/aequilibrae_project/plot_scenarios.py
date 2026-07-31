@@ -24,6 +24,7 @@ within a single project, using different example networks to demonstrate scenari
 # %%
 
 # Imports
+from aequilibrae.paths.vdf import VDFsManager
 from uuid import uuid4
 from tempfile import gettempdir
 from pathlib import Path
@@ -100,9 +101,8 @@ mat.computational_view()
 assigclass = TrafficClass("car", graph, mat)
 assignment = TrafficAssignment(project)
 assignment.add_class(assigclass)
-assignment.set_vdf("BPR")
-
-assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+bpr = VDFsManager.make_preset_vdf("bpr")
+assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
 assignment.set_capacity_field("capacity")
 assignment.set_time_field("distance")
 assignment.max_iter = 10

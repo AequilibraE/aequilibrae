@@ -209,11 +209,9 @@ class TrafficAssignment(AssignmentBase):
         # The first thing to do is to add at list of traffic classes to be assigned
         >>> assig.set_classes([assigclass])
 
-        # Then we set the volume delay function
-        >>> assig.set_vdf("BPR")  # This is not case-sensitive
-
-        # And its parameters
-        >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        # Then we set the volume delay function and its parameters
+        >>> bpr = VDFsManager.make_preset_vdf("bpr") # This is not case-sensitive
+        >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
         # The capacity and free flow travel times as they exist in the graph
         >>> assig.set_capacity_field("capacity")
@@ -296,7 +294,8 @@ class TrafficAssignment(AssignmentBase):
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
         elif instance == "vdf":
-            assert isinstance(value, VDF)
+            if not isinstance(value, VDF):
+                raise ValueError
         elif instance == "classes":
             if isinstance(value, TrafficClass):
                 value = [value]
@@ -325,7 +324,10 @@ class TrafficAssignment(AssignmentBase):
         and columns in the dataframe.
 
         :Arguments:
-            **vdf_function** (:obj:`str`): Name of the VDF to be used
+            **vdf** (:obj:`VDF`): VDF to be used
+            **name_mapping** (:obj:`dict`, *optional*): Mapping between the VDF's argument names (e.g. "alpha",
+            "beta") and the corresponding column names in the dataframe/graph holding their values. Defaults to
+            ``None``, in which case the VDF's argument names are assumed to match the dataframe's columns directly.
         """
 
         self.vdf = vdf
@@ -461,8 +463,8 @@ class TrafficAssignment(AssignmentBase):
         for attribute_name, settings in self.vdf.spec.items():
             if attribute_name in par:
                 value = par[attribute_name]
-            elif "default" in settings:
-                value = settings["default"]
+            elif "fill_NA" in settings:
+                value = settings["fill_NA"]
                 print(f"Using default value for {attribute_name} of {value}")
             else:
                 raise ValueError(f"{attribute_name} should exist in the set of parameters provided")

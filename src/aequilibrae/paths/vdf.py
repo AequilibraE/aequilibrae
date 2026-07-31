@@ -22,11 +22,25 @@ FUNCTION_MAP: dict[str, tuple[Callable, Callable]] = {
 }
 
 DEFAULT_PRESET_SPECS = {
-    "bpr": {"alpha": 0.15, "beta": 4.0},
-    "bpr2": {"alpha": 0.15, "beta": 4.0},
-    "conical": {"alpha": 0.15, "beta": 4.0},
-    "inrets": {"alpha": 1.0},
-    "akcelik": {"alpha": 0.25, "tau": 0.8, "length": {"bounds": (0, float("inf"))}},
+    "bpr": {
+        "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
+        "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+    },
+    "bpr2": {
+        "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
+        "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+    },
+    "conical": {
+        "alpha": {"fill_NA": 1.0, "bounds": (1.0, float("inf"))},
+    },
+    "inrets": {
+        "alpha": {"fill_NA": 1.0, "bounds": (0.0, 1.0)},
+    },
+    "akcelik": {
+        "alpha": {"fill_NA": 0.25, "bounds": (0.0, 1.0)},
+        "tau": {"fill_NA": 0.8, "bounds": (0.0, float("inf"))},
+        "length": {"bounds": (0, float("inf"))},
+    },
 }
 
 
@@ -48,17 +62,17 @@ class VDFsManager:
             function: bpr
             spec:
               alpha:
-                fillNA: 0.15
+                fill_NA: 0.15
                 bounds: [0, 10]
               beta: 4
           quadratic:
             functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
             spec:
               a:
-                fillNA: 0.15
+                fill_NA: 0.15
                 bounds: [0, .inf]
               b:
-                fillNA: 1.0
+                fill_NA: 1.0
                 bounds: [0, .inf]
         """
         vdf_data = dict(vdf_data)  # don't mutate the caller's dict
@@ -79,10 +93,6 @@ class VDFsManager:
                 self.add_vdf(name, func, entry["spec"], derivative, override_existing=True)
 
             elif "functional_form" in entry:
-                # Compiling an arbitrary math expression string into a callable (with a
-                # derivative, correct signature, and cores-based parallelization matching
-                # every other VDF here) isn't implemented yet - needs its own
-                # parser/compiler (e.g. sympy.lambdify + autodiff for the derivative).
                 raise NotImplementedError(
                     f"VDF '{name}' defines a custom 'functional_form', but compiling "
                     "arbitrary VDF expressions into callables isn't implemented yet."
@@ -117,11 +127,21 @@ class VDFsManager:
     def add_preset_vdf(self, name: str, custom_name: str = "", spec: dict | None = None):
         name_lower = name.lower()
         if name_lower not in FUNCTION_MAP:
-            raise ValueError(f"A preset volume delay function of name {name_lower} does not exists.")
+            raise ValueError(f"A preset volume delay function of name {name_lower} does not exist.")
         if spec is None:
             spec = DEFAULT_PRESET_SPECS[name_lower]
         func, derivative = FUNCTION_MAP[name_lower]
         self.add_vdf(custom_name if custom_name else name, func, spec, derivative)
+
+    @staticmethod
+    def make_preset_vdf(name: str, custom_name: str = "", spec: dict | None = None):
+        name_lower = name.lower()
+        if name_lower not in FUNCTION_MAP:
+            raise ValueError(f"A preset volume delay function of name {name_lower} does not exist.")
+        if spec is None:
+            spec = DEFAULT_PRESET_SPECS[name_lower]
+        func, derivative = FUNCTION_MAP[name_lower]
+        return VDF(custom_name if custom_name else name, func, spec, d_func=derivative)
 
     def comparison_plots(self):
         #

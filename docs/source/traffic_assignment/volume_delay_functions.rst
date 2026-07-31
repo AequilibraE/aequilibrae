@@ -161,10 +161,10 @@ Conical (Spiess)
 **Mathematical Formula:**
 
 .. math:: t = t_0 \left(2 + \sqrt{\alpha^2\left(1-\frac{v}{c}\right)^2 + \beta^2} - \alpha\left(1-\frac{v}{c}\right) - \beta\right)
+With :math:`\beta = \frac{2 \alpha-1}{2 \alpha-2}`
 
 **Standard Parameters:**
-  * :math:`\alpha = 0.15`
-  * :math:`\beta = 4.0`
+  * :math:`\alpha = 1.0` (must be :math:`\alpha \ge 1`)
 
 **Origin and Background:**
 

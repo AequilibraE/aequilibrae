@@ -399,8 +399,8 @@ understand, and then we'll perform the assignment.
 
         assig = TrafficAssignment()
         assig.set_classes([assigclass])
-        assig.set_vdf("BPR")
-        assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        bpr = VDFsManager.make_preset_vdf("bpr") # This is not case-sensitive 
+        assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
         assig.set_capacity_field("capacity")
         assig.set_time_field("free_flow_time")
         assig.max_iter = 1000

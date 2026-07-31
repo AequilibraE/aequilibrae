@@ -1,3 +1,4 @@
+from aequilibrae.paths.vdf import VDFsManager
 import os
 import zipfile
 
@@ -21,9 +22,8 @@ def select_link_setup(sioux_falls_single_class):
     assignment = TrafficAssignment()
     assignclass = TrafficClass("car", car_graph, matrix)
     assignment.set_classes([assignclass])
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    bpr = VDFsManager.make_preset_vdf("bpr")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 1
@@ -164,9 +164,8 @@ def test_select_link_network_loading(select_link_setup):
     new_assignment = TrafficAssignment()
     new_assignclass = TrafficClass("car", car_graph, matrix)
     new_assignment.set_classes([new_assignclass])
-    new_assignment.set_vdf("BPR")
-    new_assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    new_assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    bpr = VDFsManager.make_preset_vdf("bpr")
+    new_assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     new_assignment.set_capacity_field("capacity")
     new_assignment.set_time_field("free_flow_time")
     new_assignment.max_iter = 1
@@ -235,8 +234,8 @@ def test_kaitang(test_data_path, tmp_path):
 
     assign = TrafficAssignment()
     assign.set_classes([assign_class])
-    assign.set_vdf("BPR")
-    assign.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+    bpr = VDFsManager.make_preset_vdf("bpr")
+    assign.set_vdf(bpr, {"alpha": "alpha", "beta": "beta"})
     assign.set_capacity_field("capacity")
     assign.set_time_field("fft")
     assign.set_algorithm("bfw")
@@ -266,9 +265,8 @@ def test_multi_iteration(select_link_setup, algorithm):
     assignment = TrafficAssignment()
     assignclass = TrafficClass("car", car_graph, matrix)
     assignment.set_classes([assignclass])
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    bpr = VDFsManager.make_preset_vdf("bpr")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10

@@ -1,3 +1,4 @@
+from aequilibrae.paths.vdf import VDFsManager
 import pandas as pd
 import pytest
 
@@ -64,9 +65,8 @@ def test_save_path_files(assignment_setup, sioux_falls_test):
     project = assignment_setup["project"]
     assignment.add_class(assigclass)
     assignment.set_save_path_files(True)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    bpr = VDFsManager.make_preset_vdf("bpr")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 2

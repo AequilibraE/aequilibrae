@@ -1,3 +1,4 @@
+from aequilibrae.paths.vdf import VDFsManager
 import json
 import uuid
 from itertools import combinations
@@ -107,8 +108,8 @@ class DelaunayAnalysis:
         ta.set_classes([tc])
         ta.set_time_field("distance")
         ta.set_capacity_field("capacity")
-        ta.set_vdf("BPR")
-        ta.set_vdf_parameters({"alpha": 0, "beta": 1.0})
+        bpr = VDFsManager.make_preset_vdf("bpr")
+        ta.set_vdf(bpr, {"alpha": 0, "beta": 1.0})
         ta.set_algorithm("all-or-nothing")
         ta.execute()
 
