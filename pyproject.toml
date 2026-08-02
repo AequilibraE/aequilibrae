@@ -67,6 +67,7 @@ docs = [
 
 tests = [
   "codecov",
+  "networkx>=3.0",
   "pytest",
   "pytest-xdist",
   "pytest-cov",
