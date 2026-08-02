@@ -134,7 +134,7 @@ cdef class RouteChoiceSetResults:
                 "FastParquet back-end doesn't support writing a NumPy arrays as Parquet list types, converting to Python lists. "
                 "Watch out for memory consumption..."
             )
-            # assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
+            # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
             # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
             table = table.assign(**{"route set": table["route set"].map(lambda x: x.tolist())})
         else:
@@ -147,7 +147,7 @@ cdef class RouteChoiceSetResults:
     @classmethod
     def read_dataset(cls, where):
         df = pd.read_parquet(where, partitioning="hive")
-        # assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
+        # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
         # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
         df = df.assign(**{"origin id": df["origin id"].astype(df["destination id"].dtype)})
 
@@ -161,6 +161,8 @@ cdef class RouteChoiceSetResults:
                 )
 
             import json
+            # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
+            # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
             df = df.assign(**{"route set": df["route set"].map(lambda x: np.array(json.loads(x), dtype="int64"))})
 
         return df
