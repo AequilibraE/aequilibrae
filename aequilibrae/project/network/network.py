@@ -327,7 +327,11 @@ class Network(WorkerThread):
                 df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(copy=False)
             else:
                 sql += spatial_add
-                df = pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,)).fillna(value=np.nan).infer_objects(copy=False)
+                df = (
+                    pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                    .fillna(value=np.nan)
+                    .infer_objects(copy=False)
+                )
 
                 # We filter to centroids existing in our filtered area
                 centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
