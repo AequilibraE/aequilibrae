@@ -1,17 +1,15 @@
 import logging
-import math
-from typing import List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
 from shapely.geometry import Polygon
-from typing import Optional
 
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
-from aequilibrae.project.network.importer.schema.modes import DEFAULT_MODES
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
+from aequilibrae.project.network.importer.schema.modes import DEFAULT_MODES
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes

@@ -278,10 +278,15 @@ network:
 osm:
   # Used by Network.import_from_osm to configure osmnx via osmnx.settings.
   # Tiling of large queries and request retries are handled by osmnx internally.
-  overpass_endpoint: http://overpass-api.de/api
+  overpass_endpoint: https://overpass-api.de/api
   nominatim_endpoint: https://nominatim.openstreetmap.org/
   accept_language: "en"
   timeout: 540
+  # Client-side rate limiting against the Overpass status endpoint. Required for
+  # shared public servers. Set to false for a self-hosted server: instances with
+  # an unlimited rate limit report a status layout that makes the client wait
+  # forever for a slot that is already free.
+  overpass_rate_limit: true
 
 system:
   cpus: 0

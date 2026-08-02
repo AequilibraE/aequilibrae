@@ -6,7 +6,7 @@ import networkx as nx
 import pytest
 from shapely.geometry import LineString, Point
 
-from aequilibrae.project.network.importer.simplifiers.impl_osmnx import _graph_to_staged
+from aequilibrae.project.network.importer.simplifiers.impl_osmnx import _graph_to_staged, run_osmnx_simplify
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 osmnx = pytest.importorskip("osmnx")
@@ -209,3 +209,133 @@ def test_graph_to_staged_reorients_reverse_one_way_as_forward_row_geometry():
     assert row["lanes_ba"] is None
 
 
+
+
+def _linear_net(direction, **link_overrides):
+    """Two collinear links sharing a middle node, both with ``direction``."""
+    links = {
+        "link_id": [1, 2],
+        "a_node": [100000, 100001],
+        "b_node": [100001, 100002],
+        "direction": [direction, direction],
+        "modes": ["c", "c"],
+        "link_type": ["primary", "primary"],
+        "distance": [111.0, 111.0],
+        "geometry": [
+            LineString([(0.0, 0.0), (0.0, 0.001)]),
+            LineString([(0.0, 0.001), (0.0, 0.002)]),
+        ],
+        "name": ["Main St", "Main St"],
+        "speed_ab": [60.0, 60.0],
+        "speed_ba": [40.0, 40.0] if direction == 0 else [None, None],
+        "lanes_ab": [3, 3],
+        "lanes_ba": [1, 1] if direction == 0 else [None, None],
+        "source_id": ["s1", "s2"],
+    }
+    links.update(link_overrides)
+    return StagedNetwork(
+        nodes=gpd.GeoDataFrame(
+            {
+                "node_id": [100000, 100001, 100002],
+                "geometry": [Point(0.0, 0.0), Point(0.0, 0.001), Point(0.0, 0.002)],
+                "modes": ["c", "c", "c"],
+                "source_id": ["n0", "n1", "n2"],
+            },
+            geometry="geometry",
+            crs="EPSG:4326",
+        ),
+        links=gpd.GeoDataFrame(links, geometry="geometry", crs="EPSG:4326"),
+        source_meta={
+            "source": "osm",
+            "backend": "pyrosm",
+            "source_url": "test.osm.pbf",
+            "fetched_at": "2026-06-22T00:00:00+00:00",
+            "release": "",
+        },
+    )
+
+
+def test_two_way_links_are_not_doubled_by_simplification():
+    """to_graph() splits two-way links into ::ab/::ba halves; they must recombine.
+
+    Without recombination every two-way street returns as two one-way links,
+    doubling the link count and the total network length.
+    """
+    net = _linear_net(direction=0)
+    before = float(net.links["distance"].sum())
+
+    out = run_osmnx_simplify(net, consolidate_tolerance=None)
+
+    assert len(out.links) == 1
+    assert out.links.iloc[0]["direction"] == 0
+    assert float(out.links["distance"].sum()) == pytest.approx(before, rel=0.02)
+
+
+def test_one_way_links_are_unaffected_by_recombination():
+    net = _linear_net(direction=1)
+    before = float(net.links["distance"].sum())
+
+    out = run_osmnx_simplify(net, consolidate_tolerance=None)
+
+    assert len(out.links) == 1
+    assert out.links.iloc[0]["direction"] == 1
+    assert float(out.links["distance"].sum()) == pytest.approx(before, rel=0.02)
+
+
+def test_recombined_link_keeps_per_direction_speeds_and_lanes():
+    out = run_osmnx_simplify(_linear_net(direction=0), consolidate_tolerance=None)
+
+    row = out.links.iloc[0]
+    assert {row["speed_ab"], row["speed_ba"]} == {60.0, 40.0}
+    assert {row["lanes_ab"], row["lanes_ba"]} == {3, 1}
+    assert set(json.loads(row["source_ids"])["sources"]) == {"s1", "s2"}
+
+
+def test_parallel_one_way_carriageways_are_not_merged():
+    """A divided highway must stay two links: the halves share no source id."""
+    net = StagedNetwork(
+        nodes=gpd.GeoDataFrame(
+            {
+                "node_id": [100000, 100001, 100002, 100003],
+                "geometry": [Point(0.0, 0.0), Point(0.0, 0.002), Point(0.00005, 0.0), Point(0.00005, 0.002)],
+                "modes": ["c"] * 4,
+                "source_id": ["n0", "n1", "n2", "n3"],
+            },
+            geometry="geometry",
+            crs="EPSG:4326",
+        ),
+        links=gpd.GeoDataFrame(
+            {
+                "link_id": [1, 2],
+                "a_node": [100000, 100003],
+                "b_node": [100001, 100002],
+                "direction": [1, 1],
+                "modes": ["c", "c"],
+                "link_type": ["primary", "primary"],
+                "distance": [222.0, 222.0],
+                "geometry": [
+                    LineString([(0.0, 0.0), (0.0, 0.002)]),
+                    LineString([(0.00005, 0.002), (0.00005, 0.0)]),
+                ],
+                "name": ["Dual Rd", "Dual Rd"],
+                "speed_ab": [80.0, 80.0],
+                "speed_ba": [None, None],
+                "lanes_ab": [2, 2],
+                "lanes_ba": [None, None],
+                "source_id": ["north", "south"],
+            },
+            geometry="geometry",
+            crs="EPSG:4326",
+        ),
+        source_meta={
+            "source": "osm",
+            "backend": "pyrosm",
+            "source_url": "test.osm.pbf",
+            "fetched_at": "2026-06-22T00:00:00+00:00",
+            "release": "",
+        },
+    )
+
+    out = run_osmnx_simplify(net, consolidate_tolerance=None)
+
+    assert len(out.links) == 2

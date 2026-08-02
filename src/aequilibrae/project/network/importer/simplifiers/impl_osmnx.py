@@ -65,7 +65,6 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
         raise ImporterError("OSMnx simplification produced zero links")
     df = df.join(pd.json_normalize(df["_data"]))
 
-    df["link_id"] = np.arange(1, len(df) + 1, dtype=np.int64)
     df["a_node"] = df["_u"].map(osm_to_new).astype(np.int64)
     df["b_node"] = df["_v"].map(osm_to_new).astype(np.int64)
 
@@ -80,6 +79,9 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
     df["geometry"] = df.apply(_resolve_geom, axis=1)
 
     df["_source_refs"] = _normalize_source_refs(df)
+    df = _merge_reciprocal_edges(df).reset_index(drop=True)
+
+    df["link_id"] = np.arange(1, len(df) + 1, dtype=np.int64)
     df["_source_ids"] = df["_source_refs"].apply(lambda refs: _base_source_ids(refs, oriented_src_attrs))
     df[SOURCE_ID_COL] = [
         ids[0] if ids else str(lid) for ids, lid in zip(df["_source_ids"], df["link_id"], strict=True)
@@ -166,6 +168,53 @@ def _coerce_modes(value) -> str:
         if isinstance(item, str):
             chars.update(item)
     return "".join(sorted(chars)) or "c"
+
+
+def _merge_reciprocal_edges(df: pd.DataFrame) -> pd.DataFrame:
+    """Recombine the two halves of a bidirectional link into a single row.
+
+    ``StagedNetwork.to_graph`` decomposes every two-way staged link into a pair of
+    opposing directed edges (tagged ``<base>::ab`` / ``<base>::ba``) because that
+    is the topology OSMnx expects. Those halves are simplified independently, so
+    without this pass each two-way street returns as *two* one-way links --
+    doubling both the link count and the total network length.
+
+    Two edges are recombined when they run between the same node pair in opposite
+    directions **and** share at least one base source id, so genuinely distinct
+    parallel links (e.g. separate carriageways) are never collapsed. The surviving
+    row keeps its own geometry and endpoints and inherits the mate's source refs;
+    ``_aggregate_directional_attrs`` then sees both orientations and recovers
+    ``direction=0`` plus the per-direction speed/lane values.
+    """
+    a_nodes = df["a_node"].tolist()
+    b_nodes = df["b_node"].tolist()
+    refs_col = [list(refs) for refs in df["_source_refs"]]
+    bases = [{str(ref).partition("::")[0] for ref in refs} for refs in refs_col]
+
+    pending: dict = {}
+    dropped: set = set()
+
+    for pos in range(len(df)):
+        mate = None
+        bucket = pending.get((b_nodes[pos], a_nodes[pos]))
+        if bucket:
+            for candidate in bucket:
+                if bases[pos] & bases[candidate]:
+                    mate = candidate
+                    break
+        if mate is None:
+            pending.setdefault((a_nodes[pos], b_nodes[pos]), []).append(pos)
+            continue
+        bucket.remove(mate)
+        refs_col[mate] = refs_col[mate] + refs_col[pos]
+        dropped.add(pos)
+
+    if not dropped:
+        return df
+
+    out = df.copy()
+    out["_source_refs"] = refs_col
+    return out.iloc[[pos for pos in range(len(df)) if pos not in dropped]]
 
 
 def _normalize_source_refs(df: pd.DataFrame) -> pd.Series:

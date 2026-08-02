@@ -86,7 +86,7 @@ def acquire_overpass(
 
     nodes_gdf, edges_gdf = ox.convert.graph_to_gdfs(graph, nodes=True, edges=True)
     nodes_gdf = nodes_gdf.reset_index()
-    edges_gdf = edges_gdf.reset_index()
+    edges_gdf = _collapse_reciprocal_edges(edges_gdf.reset_index())
 
     _persist_overpass_payload(
         download_cache=download_cache,
@@ -107,16 +107,64 @@ def acquire_overpass(
     return _edges_nodes_to_staged(edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area)
 
 
+def _collapse_reciprocal_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Keep one row per undirected OSM way segment.
+
+    OSMnx models a two-way street as a reciprocal pair of directed edges
+    (``u->v`` and ``v->u``). Staging both would emit two ``direction=0`` links
+    for the same street, doubling modelled capacity and network length. The
+    direction of travel is recovered from the OSM tags later, so only one row is
+    needed. Ways tagged ``oneway=-1`` exist solely as a reversed edge, so a
+    reversed row with no forward counterpart is preserved.
+    """
+    if "reversed" not in edges.columns or len(edges) == 0:
+        return edges
+
+    def _flag(value):
+        # OSMnx may carry a list here when parallel edges were merged.
+        if isinstance(value, (list, tuple, set)):
+            return bool(next(iter(value))) if value else False
+        return bool(value)
+
+    reversed_flags = edges["reversed"].map(_flag).to_numpy()
+    way_ids = edges["osmid"] if "osmid" in edges.columns else edges.index
+    keys = [(frozenset((u, v)), str(w)) for u, v, w in zip(edges["u"], edges["v"], way_ids, strict=True)]
+    forward_keys = {key for key, is_reversed in zip(keys, reversed_flags, strict=True) if not is_reversed}
+
+    keep, kept_keys = [], set()
+    for key, is_reversed in zip(keys, reversed_flags, strict=True):
+        # Drop a reversed row only when its forward twin is present.
+        if is_reversed and key in forward_keys:
+            keep.append(False)
+        elif key in kept_keys:
+            keep.append(False)
+        else:
+            kept_keys.add(key)
+            keep.append(True)
+
+    dropped = len(edges) - sum(keep)
+    if dropped:
+        logger.info(f"Collapsed {dropped} reciprocal OSMnx edges into their forward counterparts")
+    return edges[keep].reset_index(drop=True)
+
+
 def _configure_osmnx(ox) -> None:
     from aequilibrae.parameters import Parameters
 
     params = Parameters().parameters.get("osm", {}) or {}
     if "overpass_endpoint" in params:
-        ox.settings.overpass_url = params["overpass_endpoint"].rstrip("/") + "/interpreter"
+        # osmnx appends "/interpreter" itself, so this must stay a base URL
+        # (e.g. "https://overpass-api.de/api"). Appending it here too yields
+        # ".../interpreter/interpreter" and the server rejects every request.
+        ox.settings.overpass_url = params["overpass_endpoint"].rstrip("/")
     if "nominatim_endpoint" in params:
         ox.settings.nominatim_url = params["nominatim_endpoint"]
     if "timeout" in params:
-        ox.settings.timeout = int(params["timeout"])
+        # osmnx 2.x calls this ``requests_timeout``; assigning to ``timeout``
+        # silently creates an attribute the library never reads.
+        ox.settings.requests_timeout = int(params["timeout"])
+    if "overpass_rate_limit" in params:
+        ox.settings.overpass_rate_limit = bool(params["overpass_rate_limit"])
     if "accept_language" in params:
         ox.settings.http_accept_language = params["accept_language"]
 

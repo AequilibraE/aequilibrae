@@ -115,13 +115,86 @@ def test_acquire_overpass_empty_graph_raises(monkeypatch, cache):
         acquire_overpass(modes=("car",), download_cache=cache, place_name="Empty")
 
 
-def test_configure_osmnx_applies_project_parameters(monkeypatch):
-    # Pin the current global values so monkeypatch restores them on exit.
-    for attr in ("overpass_url", "nominatim_url", "timeout", "http_accept_language"):
+def _pin_settings(monkeypatch):
+    """Snapshot the osmnx globals we mutate so monkeypatch restores them."""
+    for attr in ("overpass_url", "nominatim_url", "requests_timeout", "http_accept_language",
+                 "overpass_rate_limit"):
         monkeypatch.setattr(osmnx.settings, attr, getattr(osmnx.settings, attr))
 
+
+def test_configure_osmnx_applies_project_parameters(monkeypatch):
+    _pin_settings(monkeypatch)
+
     _configure_osmnx(osmnx)
-    assert osmnx.settings.overpass_url.endswith("/interpreter")
     assert "nominatim" in osmnx.settings.nominatim_url
-    assert osmnx.settings.timeout == 540
+    # osmnx 2.x reads ``requests_timeout``; ``timeout`` is a dead attribute.
+    assert osmnx.settings.requests_timeout == 540
     assert osmnx.settings.http_accept_language == "en"
+
+
+def test_overpass_url_is_a_base_url_not_the_interpreter_endpoint(monkeypatch):
+    """osmnx appends '/interpreter' itself; appending it here too 403s every request."""
+    import aequilibrae.parameters as params_mod
+
+    _pin_settings(monkeypatch)
+
+    custom = "http://192.168.0.10:12345/api"
+
+    class _StubParameters:
+        # Trailing slash included: it must be normalised away, not doubled up.
+        parameters = {"osm": {"overpass_endpoint": custom + "/"}}
+
+    monkeypatch.setattr(params_mod, "Parameters", _StubParameters)
+
+    _configure_osmnx(osmnx)
+    assert osmnx.settings.overpass_url == custom
+    assert not osmnx.settings.overpass_url.endswith("/interpreter")
+    # What osmnx will actually request must contain exactly one '/interpreter'.
+    effective = osmnx.settings.overpass_url.rstrip("/") + "/interpreter"
+    assert effective.count("/interpreter") == 1
+
+
+def test_overpass_rate_limit_is_configurable(monkeypatch):
+    """Self-hosted servers with an unlimited rate limit need client-side limiting off."""
+    import aequilibrae.parameters as params_mod
+
+    _pin_settings(monkeypatch)
+    monkeypatch.setattr(osmnx.settings, "overpass_rate_limit", True)
+
+    class _StubParameters:
+        parameters = {"osm": {"overpass_rate_limit": False}}
+
+    monkeypatch.setattr(params_mod, "Parameters", _StubParameters)
+    _configure_osmnx(osmnx)
+    assert osmnx.settings.overpass_rate_limit is False
+
+
+def _reciprocal_graph():
+    """Two-way street (reciprocal pair) + a oneway=-1 street (reversed only)."""
+    g = nx.MultiDiGraph(crs="EPSG:4326")
+    for nid, (x, y) in {1: (0.0, 0.0), 2: (0.001, 0.0), 3: (0.002, 0.0)}.items():
+        g.add_node(nid, x=x, y=y)
+    fwd = LineString([(0.0, 0.0), (0.001, 0.0)])
+    g.add_edge(1, 2, key=0, osmid=100, highway="residential", oneway=False, reversed=False,
+               length=111.0, geometry=fwd)
+    g.add_edge(2, 1, key=0, osmid=100, highway="residential", oneway=False, reversed=True,
+               length=111.0, geometry=LineString(list(fwd.coords)[::-1]))
+    # An ``oneway=-1`` way: osmnx normalises it to oneway=True and emits a single
+    # already-reversed edge whose geometry runs in the direction of travel.
+    g.add_edge(3, 2, key=0, osmid=200, highway="primary", oneway=True, reversed=True,
+               length=111.0, geometry=LineString([(0.002, 0.0), (0.001, 0.0)]))
+    return g
+
+
+def test_reciprocal_two_way_edges_are_collapsed(monkeypatch, cache):
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _reciprocal_graph())
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(-0.01, -0.01, 0.01, 0.01))
+    net.validate()
+
+    # One row for the two-way street, one for the oneway=-1 street.
+    assert len(net.links) == 2
+    assert sorted(net.links["source_id"].astype(str)) == ["100", "200"]
+
+    # No (a,b)/(b,a) pair may survive: that would double capacity and length.
+    pairs = {(int(a), int(b)) for a, b in zip(net.links["a_node"], net.links["b_node"], strict=True)}
+    assert not any((b, a) in pairs for a, b in pairs)
