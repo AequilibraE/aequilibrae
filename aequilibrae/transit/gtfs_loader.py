@@ -2,7 +2,7 @@ import hashlib
 import zipfile
 from copy import deepcopy
 from datetime import datetime
-from os.path import splitext, basename
+from os.path import basename, splitext
 from typing import Dict
 
 import numpy as np
@@ -12,10 +12,10 @@ from shapely.geometry import LineString
 
 from aequilibrae.context import get_logger
 from aequilibrae.transit.column_order import column_order
-from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
+from aequilibrae.transit.date_tools import create_days_between, format_date, to_seconds
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
-from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
+from aequilibrae.transit.transit_elements import Agency, Fare, FareRule, Route, Service, Stop, Trip
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
@@ -183,7 +183,7 @@ class GTFSReader(WorkerThread):
                     source_time = pd.to_numeric(source_time, errors="coerce")
 
                     cleaned_times = stop_times["arrival_time"].ffill().astype(int)
-                    assert np.nanmin(cleaned_times[1:] - cleaned_times[:-1]) > 0
+                    assert cleaned_times.diff().min(skipna=True) > 0
                     stop_times["arrival_time"] = cleaned_times
                     stop_times["departure_time"] = cleaned_times
                     stop_times["source_time"] = np.nan_to_num(source_time, nan=0).astype(int)
