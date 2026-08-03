@@ -230,8 +230,8 @@ class GMNSBuilder:
         # For node table
         lons, lats = transformer.transform(self.node_df.loc[:, "x_coord"], self.node_df.loc[:, "y_coord"])
         self.node_df = self.node_df.astype({"x_coord": np.float64, "y_coord": np.float64})
-        self.node_df.loc[:, "x_coord"] = np.around(lons, decimals=10)
-        self.node_df.loc[:, "y_coord"] = np.around(lats, decimals=10)
+        self.node_df["x_coord"] = np.around(lons, decimals=10)
+        self.node_df["y_coord"] = np.around(lats, decimals=10)
 
         # For link table
         for idx, row in self.link_df.iterrows():

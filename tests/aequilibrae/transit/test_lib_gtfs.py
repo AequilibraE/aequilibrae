@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from aequilibrae.project.database_connection import database_connection
@@ -21,6 +22,25 @@ def test_set_capacities(route_system_builder):
 def test_set_pces(route_system_builder):
     route_system_builder.set_pces({1: 2.5, 3: 6.2})
     assert route_system_builder.gtfs_data.__dict__["__pces__"] == {1: 2.5, 3: 6.2}
+
+
+def test_set_maximum_speeds(route_system_builder):
+    max_speeds = pd.DataFrame(
+        {
+            "mode": [3, 3, 11],
+            "min_distance": [0, 400, 0],
+            "max_distance": [400, 8000, 8000],
+            "speed": [6, 12, 9],
+        }
+    )
+    route_system_builder.set_maximum_speeds(max_speeds)
+
+    stored = route_system_builder.gtfs_data.__dict__["__max_speeds__"]
+    # GTFSReader looks these up by scalar route_type, so tuple keys would silently disable
+    # max speed enforcement rather than fail
+    assert sorted(stored) == [3, 11]
+    assert stored[3].shape[0] == 2
+    assert stored[11].speed.tolist() == [9]
 
 
 def test_dates_available(route_system_builder):

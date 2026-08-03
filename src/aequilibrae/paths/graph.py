@@ -245,10 +245,10 @@ class GraphBase(ABC):  # noqa: B024
 
         # Swap the a and b nodes of these edges. Direction is used for mapping the graph.graph back
         # to the network. It does not indicate the direction of the link.
-        not_pos.loc[:, "direction"] = -1
+        not_pos["direction"] = -1
         aux = np.array(not_pos.a_node.values, copy=True)
-        not_pos.loc[:, "a_node"] = not_pos.loc[:, "b_node"]
-        not_pos.loc[:, "b_node"] = aux[:]
+        not_pos["a_node"] = not_pos["b_node"]
+        not_pos["b_node"] = aux[:]
         del aux
 
         pos_names = []
@@ -259,7 +259,7 @@ class GraphBase(ABC):  # noqa: B024
                 pos_names.append(name + "_ab")
         not_negs = pd.DataFrame(not_negs, copy=True)[pos_names]
         not_negs.columns = names
-        not_negs.loc[:, "direction"] = 1
+        not_negs["direction"] = 1
 
         df = pd.concat([not_negs, not_pos])
 
@@ -477,7 +477,7 @@ class GraphBase(ABC):  # noqa: B024
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
             gpb = self.__graph_groupby
-            if any(x not in self.__graph_groupby for x in skim_fields):
+            if any(x not in gpb.obj.columns for x in skim_fields):
                 gpb = self.graph.groupby(["__compressed_id__"])
 
             df = gpb.sum(numeric_only=True)[skim_fields].reset_index()

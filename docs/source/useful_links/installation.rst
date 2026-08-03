@@ -18,7 +18,7 @@ as of September 2024.
 Installation
 ------------
 
-1. Install `Python 3.10, 3.11, 3.12, 3.13 & 3.14 <https://www.python.org/downloads/>`_. We recommend Python 3.11 or 3.12
+1. Install `Python 3.11, 3.12, 3.13 & 3.14 <https://www.python.org/downloads/>`_. We recommend Python 3.12 or 3.13
 2. Install AequilibraE
 
 ::

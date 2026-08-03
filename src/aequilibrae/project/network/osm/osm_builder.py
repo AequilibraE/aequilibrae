@@ -42,7 +42,7 @@ class OSMBuilder(WorkerThread):
 
         # Building shapely geometries makes the code surprisingly slower.
         self.node_df = data["nodes"]
-        self.node_df.loc[:, "node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
+        self.node_df["node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
         gc.collect()
         self.links_df = data["links"]
 
@@ -108,7 +108,7 @@ class OSMBuilder(WorkerThread):
         geo_df = pd.DataFrame(geometries, columns=["link_id", "geometry"]).set_index("link_id")
         self.links_df = self.links_df.join(geo_df, how="inner")
 
-        self.links_df.loc[:, "link_id"] = np.arange(self.links_df.shape[0]) + 1
+        self.links_df["link_id"] = np.arange(self.links_df.shape[0]) + 1
 
         self.node_df = self.node_df.reset_index()
 

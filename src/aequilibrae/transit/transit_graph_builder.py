@@ -223,14 +223,17 @@ class TransitGraphBuilder:
         elif not (is_integer_dtype(zones.zone_id.dtype) and zones.zone_id.min() > 0):
             raise ValueError("'zone_id' must consist of integers greater than 0")
 
-        if zones.geometry.dtype is str or zones.geometry.dtype is bytes:
-            geometry = shapely.from_wkt(zones.geometry.values)
+        geo_values = zones.geometry.values
+        if all(isinstance(x, str) for x in geo_values):
+            geometry = shapely.from_wkt(geo_values)
+        elif all(isinstance(x, bytes) for x in geo_values):
+            geometry = shapely.from_wkb(geo_values)
         # Check if the supplied zones df is from geopandas without import geopandas.
         # We check __mro__ in case of inheritance. https://stackoverflow.com/a/63337375/14047443
         elif "GeometryDtype" in [t.__name__ for t in type(zones.geometry.dtype).__mro__] or all(
-            isinstance(x, shapely.geometry.base.BaseGeometry) for x in zones.geometry
+            isinstance(x, shapely.geometry.base.BaseGeometry) for x in geo_values
         ):
-            geometry = zones.geometry.values
+            geometry = geo_values
         else:
             raise TypeError("geometry is not a string, bytes, or shapely.Geometry instance")
 

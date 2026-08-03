@@ -168,12 +168,14 @@ class HyperpathGenerating:
         ) and "link_type" not in edges_cols:
             raise ValueError("predefined skimming type requested but 'link_type' column not present on the graph")
 
+        # Build derived skim columns first and assign once: pandas 3's chained-assignment check
+        derived_cols = {}
         for name, col in discerete_link_types.items():
             if name in skim_cols and name not in edges_cols:
                 if isinstance(col, list):
-                    edges[name] = np.where(edges["link_type"].isin(col), 1, 0)
+                    derived_cols[name] = np.where(edges["link_type"].isin(col), 1, 0)
                 else:
-                    edges[name] = np.where(edges["link_type"] == col, 1, 0)
+                    derived_cols[name] = np.where(edges["link_type"] == col, 1, 0)
 
         if "waiting_time" in skim_cols and "waiting_time" not in edges_cols:
             skim_cols.remove("waiting_time")
@@ -183,9 +185,12 @@ class HyperpathGenerating:
         for name, col in contig_link_types.items():
             if name in skim_cols and name not in edges_cols:
                 if isinstance(col, list):
-                    edges[name] = np.where(edges["link_type"].isin(col), edges[trav_time], 0)
+                    derived_cols[name] = np.where(edges["link_type"].isin(col), edges[trav_time], 0)
                 else:
-                    edges[name] = np.where(edges["link_type"] == col, edges[trav_time], 0)
+                    derived_cols[name] = np.where(edges["link_type"] == col, edges[trav_time], 0)
+
+        if derived_cols:
+            edges = edges.assign(**derived_cols)
 
         return edges, list(skim_cols)
 

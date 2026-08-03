@@ -135,7 +135,9 @@ cdef class RouteChoiceSetResults:
                 "FastParquet back-end doesn't support writing a NumPy arrays as Parquet list types, converting to Python lists. "
                 "Watch out for memory consumption..."
             )
-            table["route set"] = table["route set"].map(lambda x: x.tolist())
+            # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
+            # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
+            table = table.assign(**{"route set": table["route set"].map(lambda x: x.tolist())})
         else:
             raise RuntimeError(
                 "encountered unknown Pandas parquet engine, please report this as a bug to the AequilibraE issues page"
@@ -145,14 +147,10 @@ cdef class RouteChoiceSetResults:
 
     @classmethod
     def read_dataset(cls, where):
-        engine = pd.io.parquet.get_engine('auto').__class__
-        if (engine.__module__, engine.__name__) == ("pandas.io.parquet", "PyArrowImpl"):
-            kwargs = {"partitioning": "hive"}
-        elif (engine.__module__, engine.__name__) == ("pandas.io.parquet", "FastParquetImpl"):
-            kwargs = {"file_scheme": "hive"}
-
-        df = pd.read_parquet(where, **kwargs)
-        df["origin id"] = df["origin id"].astype(df["destination id"].dtype)
+        df = pd.read_parquet(where, partitioning="hive")
+        # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
+        # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
+        df = df.assign(**{"origin id": df["origin id"].astype(df["destination id"].dtype)})
 
         # FastParquet is stupid and encodes Parquet list objects as json strings!!!
         is_json_encoded = df["route set"].map(lambda x: isinstance(x, (str, bytes)))
@@ -164,7 +162,9 @@ cdef class RouteChoiceSetResults:
                 )
 
             import json
-            df["route set"] = df["route set"].map(lambda x: np.array(json.loads(x), dtype="int64"))
+            # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
+            # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
+            df = df.assign(**{"route set": df["route set"].map(lambda x: np.array(json.loads(x), dtype="int64"))})
 
         return df
 
