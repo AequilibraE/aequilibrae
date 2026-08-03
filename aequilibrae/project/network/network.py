@@ -323,19 +323,18 @@ class Network(WorkerThread):
             centroids = np.array([i[0] for i in conn.execute(sql_centroids).fetchall()], np.uint32)
             centroids = centroids if centroids.shape[0] else None
 
-            with pd.option_context("future.no_silent_downcasting", True):
-                if limit_to_area is None:
-                    df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
-                else:
-                    sql += spatial_add
-                    df = (
-                        pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
-                        .fillna(value=np.nan)
-                        .infer_objects(False)
-                    )
+            if limit_to_area is None:
+                df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(copy=False)
+            else:
+                sql += spatial_add
+                df = (
+                    pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                    .fillna(value=np.nan)
+                    .infer_objects(copy=False)
+                )
 
-                    # We filter to centroids existing in our filtered area
-                    centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+                # We filter to centroids existing in our filtered area
+                centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[all_fields]

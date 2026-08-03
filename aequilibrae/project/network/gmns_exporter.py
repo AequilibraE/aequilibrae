@@ -53,20 +53,20 @@ class GMNSExporter:
 
         # treats ab_links and bi-directionals
         if ab_links.shape[0]:
-            ab_links.loc[:, "dir_flag"] = 1
+            ab_links["dir_flag"] = 1
             for col in two_way_cols:
-                ab_links.loc[:, col] = ab_links.loc[:, col + "_ab"]
+                ab_links[col] = ab_links[col + "_ab"]
 
         # treats ba_links and bi-directionals
         if ba_links.shape[0]:
-            ba_links.loc[:, "direction"] = 1
-            ba_links.loc[:, "dir_flag"] = -1
+            ba_links["direction"] = 1
+            ba_links["dir_flag"] = -1
             b = ba_links.b_node.to_numpy()
-            ba_links.loc[:, "b_node"] = ba_links.a_node.to_numpy()[:]
-            ba_links.loc[:, "a_node"] = b[:]
+            ba_links["b_node"] = ba_links.a_node.to_numpy()[:]
+            ba_links["a_node"] = b[:]
 
             for col in two_way_cols:
-                ba_links.loc[:, col] = ba_links.loc[:, col + "_ba"]
+                ba_links[col] = ba_links[col + "_ba"]
 
         self.links_df = pd.concat([ab_links, ba_links])
 

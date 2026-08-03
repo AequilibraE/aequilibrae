@@ -703,7 +703,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
+        agg["Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
@@ -714,7 +714,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
+        agg["Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
         delay_factor_ab = _safe_delay_factor(congested_time[graph_ab_idx], free_flow_tt[graph_ab_idx])
         delay_factor_ba = _safe_delay_factor(congested_time[graph_ba_idx], free_flow_tt[graph_ba_idx])
@@ -727,7 +727,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
+        agg["Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
@@ -738,7 +738,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
+        agg["VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
@@ -749,7 +749,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
+        agg["PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
         return pd.concat(assig_results, axis=1).rename_axis("link_id")
