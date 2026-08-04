@@ -14,6 +14,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v6
+
       - name: Set Python environment
         uses: actions/setup-python@v6
         with:
@@ -23,6 +24,23 @@ jobs:
         with:
           version: 0.16.1
           args: check --output-format=github
+
+    runs-on: ubuntu-latest
+    name: cython-lint
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-cython-lint
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set UV
+        uses: astral-sh/setup-uv@v9
+        with:
+          python-version: '3.13'
+
+      - name: Run cython-lint
+        run: |
+          uvx cython-lint==0.21.0 ./src/ | sed -E 's|^([^:]+):([0-9]+):([0-9]+): (([A-Z][0-9]+) .+)$|::error title=cython-lint (\5),file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|; s|^([^:]+):([0-9]+):([0-9]+): ([^A-Z].+)$|::error title=cython-lint,file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|'
 
   clang-tidy:
     runs-on: ubuntu-latest
