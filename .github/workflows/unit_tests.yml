@@ -25,6 +25,7 @@ jobs:
           version: 0.16.1
           args: check --output-format=github
 
+  cython-lint:
     runs-on: ubuntu-latest
     name: cython-lint
     concurrency:
