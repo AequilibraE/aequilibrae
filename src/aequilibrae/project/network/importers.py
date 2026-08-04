@@ -95,7 +95,8 @@ class Importer:
 
             **custom_filter** (:obj:`str`, *Optional*): Raw Overpass way filter
 
-            **simplify** (:obj:`str`/:obj:`bool`, *Optional*): ``False`` (default), ``"osmnx"``, ``"neatnet"``, or ``True`` (shorthand for ``"osmnx"``)
+            **simplify** (:obj:`str`/:obj:`bool`, *Optional*): ``False`` (default), ``"osmnx"``, ``"neatnet"``,
+                                                               or ``True`` (shorthand for ``"osmnx"``)
 
             **consolidate_tolerance** (:obj:`float`, *Optional*): Intersection consolidation radius in metres
         """
@@ -142,7 +143,8 @@ class Importer:
 
             **modes** (:obj:`tuple`, *Optional*): AequilibraE mode names to keep. Defaults to all
 
-            **simplify** (:obj:`str`/:obj:`bool`, *Optional*): ``False`` (default), ``"osmnx"``, ``"neatnet"``, or ``True`` (shorthand for ``"osmnx"``)
+            **simplify** (:obj:`str`/:obj:`bool`, *Optional*): ``False`` (default), ``"osmnx"``, ``"neatnet"``,
+                                                               or ``True`` (shorthand for ``"osmnx"``)
 
             **consolidate_tolerance** (:obj:`float`, *Optional*): Intersection consolidation radius in metres
         """
