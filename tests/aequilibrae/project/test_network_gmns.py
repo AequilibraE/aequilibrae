@@ -27,7 +27,7 @@ def test_create_from_gmns(empty_project, test_data_path):
     par.parameters["network"]["gmns"]["node"]["fields"].update(new_node_fields)
     par.write_back()
 
-    empty_project.network.create_from_gmns(
+    empty_project.network.importer.gmns(
         link_file_path=link_file, node_file_path=node_file, use_group_path=use_group_file, srid=32619
     )
 
@@ -53,7 +53,7 @@ def test_create_from_gmns(empty_project, test_data_path):
 
 def test_export_to_gmns(sioux_falls_example):
     output_path = sioux_falls_example.project_base_path
-    sioux_falls_example.network.export_to_gmns(output_path)
+    sioux_falls_example.network.exporter.gmns(output_path)
 
     assert os.path.isfile(output_path / "link.csv") is True
     assert os.path.isfile(output_path / "node.csv") is True

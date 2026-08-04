@@ -3,8 +3,10 @@ thisdir = 'aequilibrae/project/network'
 pyfiles = [
   '__init__.py',
   'connector_creation.py',
+  'exporters.py',
   'gmns_builder.py',
   'gmns_exporter.py',
+  'importers.py',
   'link.py',
   'link_type.py',
   'link_types.py',

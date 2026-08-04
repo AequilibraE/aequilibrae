@@ -39,7 +39,7 @@ class NetworkImporter:
         source,
         *,
         modes: Sequence[str] = DEFAULT_MODES,
-        simplify="osmnx",
+        simplify=False,
         consolidate_tolerance=10.0,
         cache_tag: str = "",
         **source_kwargs,

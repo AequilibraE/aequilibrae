@@ -1,21 +1,30 @@
 import pytest
-from warnings import warn
 
 from shapely.geometry import Polygon
-from shapely.geometry import Polygon, box
 
 
-def test_create_from_osm_was_removed(empty_project):
-    """``create_from_osm`` was removed; calling it raises with a migration hint."""
-    with pytest.raises(AttributeError, match="import_from_osm"):
-        empty_project.network.create_from_osm(place_name="Nauru")
+@pytest.mark.parametrize(
+    "removed",
+    ["create_from_osm", "import_from_osm", "import_from_overture", "import_network",
+     "create_from_gmns", "export_to_gmns"],
+)
+def test_legacy_methods_were_replaced_by_namespaces(empty_project, removed):
+    """Import/export moved onto network.importer / network.exporter."""
+    assert not hasattr(empty_project.network, removed)
+
+
+def test_import_export_namespaces_exist(empty_project):
+    importer = empty_project.network.importer
+    exporter = empty_project.network.exporter
+    assert all(hasattr(importer, m) for m in ("osm", "overture", "gmns", "source"))
+    assert all(hasattr(exporter, m) for m in ("gmns", "geo_parquet"))
 
 
 def test_import_from_osm_via_pbf(empty_project):
     pytest.importorskip("pyrosm")
     from pyrosm import get_data
 
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=get_data("test_pbf"),
         modes=("car",),
         simplify=False,

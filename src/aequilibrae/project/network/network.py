@@ -7,9 +7,8 @@ import shapely.wkb
 from shapely import union_all
 from shapely.geometry import Polygon
 
-from aequilibrae.project.network.gmns_builder import GMNSBuilder
-from aequilibrae.project.network.gmns_exporter import GMNSExporter
-from aequilibrae.project.network.importer.schema.modes import DEFAULT_MODES
+from aequilibrae.project.network.exporters import Exporter
+from aequilibrae.project.network.importers import Importer
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
@@ -47,6 +46,8 @@ class Network(WorkerThread):
         self.links = Links(self)
         self.nodes = Nodes(self)
         self.periods = Periods(self)
+        self.importer = Importer(self)
+        self.exporter = Exporter(self)
 
     def skimmable_fields(self) -> list:
         """
@@ -113,158 +114,6 @@ class Network(WorkerThread):
     def create_from_osm(self, *args, **kwargs) -> None:
         """Removed in favour of :meth:`import_from_osm`."""
         raise AttributeError("Network.create_from_osm was removed. Use Network.import_from_osm(...).")
-
-    def import_network(
-        self,
-        source,
-        *,
-        modes=DEFAULT_MODES,
-        simplify="osmnx",
-        consolidate_tolerance: Optional[float] = 10.0,
-        cache_tag: str = "",
-        **source_kwargs,
-    ) -> None:
-        """Import from ``osm-overpass``, ``osm-pbf``, or ``overture-cloud``.
-
-        ``simplify="osmnx"`` is the safer choice when you want merged links to
-        retain coarse forward/backward speed and lane data. ``simplify="neatnet"``
-        is better at removing geometric artifacts such as roundabouts and false
-        intersection faces, but it may collapse parallel one-way carriageways into
-        a single coarse link.
-
-        ``consolidate_tolerance`` (metres) controls intersection/node
-        consolidation for both simplifiers. ``None`` skips the consolidation
-        pass for ``"osmnx"``; for ``"neatnet"``, where consolidation is integral,
-        ``None`` falls back to the default tolerance.
-        """
-        from aequilibrae.project.network.importer.importer import NetworkImporter
-
-        NetworkImporter(self.project).run(
-            source,
-            modes=modes,
-            simplify=simplify,
-            consolidate_tolerance=consolidate_tolerance,
-            cache_tag=cache_tag,
-            **source_kwargs,
-        )
-
-    def import_from_osm(
-        self,
-        *,
-        model_area: Optional[Polygon] = None,
-        place_name: Optional[str] = None,
-        pbf_path=None,
-        modes=DEFAULT_MODES,
-        custom_filter: Optional[str] = None,
-        simplify="osmnx",
-        consolidate_tolerance: Optional[float] = 10.0,
-    ) -> None:
-        """Import a network from OpenStreetMap.
-
-        Exactly one of ``model_area``, ``place_name``, ``pbf_path`` must be
-        provided. XML / .osm / .osm.bz2 is not supported — convert with
-        ``osmium cat in.osm -o out.osm.pbf`` first.
-
-        For ``simplify``, prefer ``"osmnx"`` when directional speed/lane fields
-        matter after merging. Prefer ``"neatnet"`` when cleaning roundabouts and
-        other geometric artifacts matters more than preserving separate parallel
-        carriageways.
-        """
-        provided = sum(x is not None for x in (model_area, place_name, pbf_path))
-        if provided != 1:
-            raise ValueError(
-                "import_from_osm requires exactly one of: model_area, place_name, pbf_path"
-            )
-        if pbf_path is not None:
-            self.import_network(
-                "osm-pbf",
-                modes=modes,
-                simplify=simplify,
-                consolidate_tolerance=consolidate_tolerance,
-                cache_tag=str(pbf_path),
-                pbf_path=pbf_path,
-            )
-        else:
-            self.import_network(
-                "osm-overpass",
-                modes=modes,
-                simplify=simplify,
-                consolidate_tolerance=consolidate_tolerance,
-                cache_tag=place_name or "bbox",
-                model_area=model_area,
-                place_name=place_name,
-                custom_filter=custom_filter,
-            )
-
-    def import_from_overture(
-        self,
-        *,
-        model_area: Polygon,
-        modes=DEFAULT_MODES,
-        simplify="osmnx",
-        consolidate_tolerance: Optional[float] = 10.0,
-    ) -> None:
-        """Import a network from Overture Maps.
-
-        Rule arrays are always preserved. For ``simplify``, ``"osmnx"`` keeps
-        coarse directional link attributes more predictably, while ``"neatnet"``
-        is stronger at artifact cleanup but may merge parallel one-way carriageways.
-        """
-        if model_area is None:
-            raise ValueError("import_from_overture requires a `model_area` Polygon")
-        bounds = model_area.bounds
-        tag = f"bbox_{bounds[0]:.4f}_{bounds[1]:.4f}_{bounds[2]:.4f}_{bounds[3]:.4f}"
-        self.import_network(
-            "overture-cloud",
-            modes=modes,
-            simplify=simplify,
-            consolidate_tolerance=consolidate_tolerance,
-            cache_tag=tag,
-            model_area=model_area,
-        )
-
-    def create_from_gmns(
-        self,
-        link_file_path: str,
-        node_file_path: str,
-        use_group_path: str = "",
-        geometry_path: str = "",
-        srid: int = 4326,
-    ) -> None:
-        """
-        Creates AequilibraE model from links and nodes in GMNS format.
-
-        :Arguments:
-            **link_file_path** (:obj:`str`): Path to a links csv file in GMNS format
-
-            **node_file_path** (:obj:`str`): Path to a nodes csv file in GMNS format
-
-            **use_group_path** (:obj:`str`, *Optional*): Path to a csv table containing groupings of uses.
-            This helps AequilibraE know when a GMNS use is actually a group of other GMNS uses
-
-            **geometry_path** (:obj:`str`, *Optional*): Path to a csv file containing geometry information for a line
-            object, if not specified in the link table
-
-            **srid** (:obj:`int`, *Optional*): Spatial Reference ID in which the GMNS geometries were created
-        """
-
-        gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
-        gmns_builder.doWork()
-
-        logger.info("Network built successfully")
-
-    def export_to_gmns(self, path: str):
-        """
-        Exports AequilibraE network to csv files in GMNS format.
-
-        :Arguments:
-            **path** (:obj:`str`): Output folder path.
-        """
-
-        gmns_exporter = GMNSExporter(self, path)
-        gmns_exporter.doWork()
-
-        logger.info("Network exported successfully")
 
     def build_graphs(
         self, fields: Optional[list] = None, modes: Optional[list] = None, limit_to_area: Optional[Polygon] = None

@@ -189,14 +189,14 @@ def test_consolidate_tolerance_reaches_neatify(monkeypatch):
     monkeypatch.setattr(neatnet, "neatify", fake_neatify)
 
     with pytest.warns(UserWarning):
-        run_neatnet_simplify(_single_link_net(), consolidate_tolerance=17.5)
+        run_neatnet_simplify(_block_net(), consolidate_tolerance=17.5)
     assert captured["consolidation_tolerance"] == 17.5
 
     # None means "skip the consolidation pass" for osmnx; neatify has no such
     # optional pass, so it must fall back to the default tolerance.
     captured.clear()
     with pytest.warns(UserWarning):
-        run_neatnet_simplify(_single_link_net(), consolidate_tolerance=None)
+        run_neatnet_simplify(_block_net(), consolidate_tolerance=None)
     assert captured["consolidation_tolerance"] == 10.0
 
 
@@ -206,3 +206,90 @@ def test_unknown_kwargs_are_rejected():
         run_neatnet_simplify(_single_link_net(), consolidation_tolerance=5.0)
 
 
+
+
+def _net_from(coords, edges, link_type="residential"):
+    """Build a StagedNetwork from explicit coordinates and (from, to) index pairs."""
+    n = len(edges)
+    return StagedNetwork(
+        nodes=gpd.GeoDataFrame(
+            {
+                "node_id": list(range(100000, 100000 + len(coords))),
+                "geometry": [Point(c) for c in coords],
+                "modes": ["c"] * len(coords),
+                "source_id": [f"n{i}" for i in range(len(coords))],
+            },
+            geometry="geometry",
+            crs="EPSG:4326",
+        ),
+        links=gpd.GeoDataFrame(
+            {
+                "link_id": list(range(1, n + 1)),
+                "a_node": [100000 + a for a, _ in edges],
+                "b_node": [100000 + b for _, b in edges],
+                "direction": [0] * n,
+                "modes": ["c"] * n,
+                "link_type": [link_type] * n,
+                "distance": [80.0] * n,
+                "geometry": [LineString([coords[a], coords[b]]) for a, b in edges],
+                "name": [None] * n,
+                "speed_ab": [None] * n,
+                "speed_ba": [None] * n,
+                "lanes_ab": [None] * n,
+                "lanes_ba": [None] * n,
+                "source_id": [f"s{i}" for i in range(n)],
+            },
+            geometry="geometry",
+            crs="EPSG:4326",
+        ),
+        source_meta={
+            "source": "osm",
+            "backend": "pyrosm",
+            "source_url": "test.osm.pbf",
+            "fetched_at": "2026-06-22T00:00:00+00:00",
+            "release": "",
+        },
+    )
+
+
+# A square block plus a spur: polygonises into one enclosed face, so neatnet's
+# artifact detection has something to work with.
+_BLOCK_COORDS = [(0.0, 0.0), (0.002, 0.0), (0.002, 0.002), (0.0, 0.002), (0.004, 0.0), (0.004, 0.002)]
+_BLOCK_EDGES = [(0, 1), (1, 2), (2, 3), (3, 0), (1, 4), (4, 5), (5, 2)]
+
+
+def _block_net():
+    return _net_from(_BLOCK_COORDS, _BLOCK_EDGES)
+
+
+def _path_net(coords):
+    """A tree-like network: consecutive links, no enclosed block."""
+    return _net_from(coords, [(i, i + 1) for i in range(len(coords) - 1)], link_type="path")
+
+
+def test_network_without_enclosed_blocks_is_returned_unsimplified(caplog):
+    """neatnet derives 'face_artifact_index' from enclosed blocks; a tree has none.
+
+    Sparse rural/trail networks used to abort the whole import with a KeyError
+    raised deep inside neatnet.get_artifacts().
+    """
+    pytest.importorskip("neatnet")
+    net = _path_net([(-112.185 + i * 0.0008, 36.59 + (i % 3) * 0.0004) for i in range(8)])
+
+    with caplog.at_level("WARNING"), pytest.warns(UserWarning):
+        out = run_neatnet_simplify(net)
+
+    assert len(out.links) == len(net.links)
+    assert "unsimplified" in "\n".join(caplog.messages)
+
+
+def test_network_with_enclosed_block_is_still_simplified():
+    """The tree-network guard must not disable neatnet for real street grids."""
+    pytest.importorskip("neatnet")
+    net = _block_net()
+
+    with pytest.warns(UserWarning):
+        out = run_neatnet_simplify(net)
+
+    # neatnet actually ran rather than passing the network straight through.
+    assert len(out.links) != len(net.links)

@@ -67,7 +67,7 @@ def _install_mock(monkeypatch):
 
 def test_overture_cloud_import_splits_intermediate_connectors(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.import_from_overture(
+    empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,
@@ -82,7 +82,7 @@ def test_overture_cloud_import_splits_intermediate_connectors(empty_project, mon
 
 def test_overture_writes_raw_payload_to_download_cache(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.import_from_overture(
+    empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,
@@ -101,7 +101,7 @@ def test_overture_writes_raw_payload_to_download_cache(empty_project, monkeypatc
 
 def test_overture_speed_limit_parsed(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.import_from_overture(
+    empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,
@@ -116,7 +116,7 @@ def test_overture_speed_limit_parsed(empty_project, monkeypatch):
 
 def test_overture_direction_inferred_from_access_restrictions(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.import_from_overture(
+    empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,
@@ -130,7 +130,7 @@ def test_overture_direction_inferred_from_access_restrictions(empty_project, mon
 
 def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.import_from_overture(
+    empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,
@@ -146,7 +146,7 @@ def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(empty_pr
 
 def test_overture_rule_arrays_land_in_other_attributes(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.import_from_overture(
+    empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,
@@ -159,7 +159,7 @@ def test_overture_rule_arrays_land_in_other_attributes(empty_project, monkeypatc
 
 def test_overture_about_provenance(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.import_from_overture(
+    empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,

@@ -90,7 +90,7 @@ def build_staged_from_overture(
 
     segments = _normalize_segments(segments)
     link_rows = []
-    filtered_by_mode = 0
+    skipped: dict = {}
     synthetic_nodes = []
     next_node_id = int(connectors["node_id"].max()) + 1 if len(connectors) else NODE_ID_START
     for seg, geom in zip(segments.drop(columns=["geometry"]).to_dict(orient="records"), segments.geometry, strict=True):
@@ -101,16 +101,22 @@ def build_staged_from_overture(
             requested_codes,
             synthetic_nodes,
             next_node_id,
+            skipped,
         )
-        if not rows:
-            filtered_by_mode += 1
         link_rows.extend(rows)
 
     if synthetic_nodes:
         connectors = pd.concat([connectors, gpd.GeoDataFrame(synthetic_nodes, geometry="geometry", crs="EPSG:4326")],
                                ignore_index=True)
         logger.info(f"Synthesized {len(synthetic_nodes)} Overture connectors from segment geometries")
-    logger.info(f"Mode filter removed {filtered_by_mode} Overture segments")
+
+    logger.info(f"Mode filter removed {skipped.get('mode_filter', 0)} Overture segments")
+    malformed = {reason: n for reason, n in skipped.items() if reason != "mode_filter"}
+    if malformed:
+        detail = ", ".join(f"{reason}={n}" for reason, n in sorted(malformed.items()))
+        logger.warning(
+            f"Skipped {sum(malformed.values())} malformed Overture segments out of {len(segments)} ({detail})"
+        )
     if not link_rows:
         raise ImporterError(f"After mode filtering ({modes!r}) no Overture links remain")
 
@@ -144,22 +150,35 @@ def _segment_to_links(
         requested_codes: set,
         synthetic_nodes: list,
         next_node_id: int,
+        skipped: dict,
 ) -> tuple[list, int]:
+    """Convert one Overture segment into staged link rows.
+
+    A malformed segment is skipped (and counted in ``skipped``) rather than
+    raising: a single bad record in a metro-sized download must not abort the
+    whole import. If *every* segment is unusable the caller still fails, because
+    the resulting network would be empty.
+    """
     if geom is None or geom.is_empty:
-        raise ImporterError(f"Overture segment {seg['id']!r} has empty geometry")
+        skipped["empty_geometry"] = skipped.get("empty_geometry", 0) + 1
+        return [], next_node_id
 
     pairs = _parse_connectors_field(seg["connectors"])
     if len(pairs) < 2:
-        raise ImporterError(f"Overture segment {seg['id']!r} has fewer than two connectors")
+        skipped["too_few_connectors"] = skipped.get("too_few_connectors", 0) + 1
+        return [], next_node_id
 
     filtered_modes = filter_by_modes(_modes_for_segment(seg), requested_codes)
     if not filtered_modes:
+        skipped["mode_filter"] = skipped.get("mode_filter", 0) + 1
         return [], next_node_id
 
     next_node_id = _ensure_connector_nodes(pairs, geom, gers_to_node, synthetic_nodes, next_node_id)
     rows = _split_segment_rows(seg, geom, pairs, gers_to_node, filtered_modes)
     if not rows:
-        raise ImporterError(f"Overture segment {seg['id']!r} produced no valid geometry splits")
+        # Every consecutive connector pair was degenerate (identical or
+        # decreasing ``at`` offsets, or a zero-length sub-geometry).
+        skipped["no_valid_splits"] = skipped.get("no_valid_splits", 0) + 1
     return rows, next_node_id
 
 

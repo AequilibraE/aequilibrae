@@ -13,7 +13,7 @@ def _pbf_path():
 
 
 def test_basic_pbf_import_no_simplify(empty_project):
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("car",),
         simplify=False,
@@ -30,7 +30,7 @@ def test_basic_pbf_import_no_simplify(empty_project):
 def test_pbf_writes_no_download_cache(empty_project, tmp_path):
     from pathlib import Path
 
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("car",),
         simplify=False,
@@ -40,7 +40,7 @@ def test_pbf_writes_no_download_cache(empty_project, tmp_path):
 
 
 def test_pbf_mode_filter_only_keeps_walk_links(empty_project):
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("walk",),
         simplify=False,
@@ -55,7 +55,7 @@ def test_pbf_mode_filter_only_keeps_walk_links(empty_project):
 
 
 def test_pbf_unknown_tags_land_in_other_attributes(empty_project):
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("car",),
         simplify=False,
@@ -73,7 +73,7 @@ def test_pbf_unknown_tags_land_in_other_attributes(empty_project):
 
 
 def test_pbf_contract_fields_are_valid(empty_project):
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("car", "walk"),
         simplify=False,
@@ -91,7 +91,7 @@ def test_pbf_contract_fields_are_valid(empty_project):
 def test_pbf_about_provenance_records_source_url(empty_project):
     # Provenance keys/timestamps are covered in test_about_provenance.py; here we
     # only assert the PBF-specific source_url makes it into the about table.
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("car",),
         simplify=False,

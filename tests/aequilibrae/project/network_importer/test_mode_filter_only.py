@@ -7,7 +7,7 @@ def test_osm_import_preserves_all_link_types_for_active_modes(empty_project):
     pytest.importorskip("pyrosm")
     from pyrosm import get_data
 
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=get_data("test_pbf"),
         modes=("walk",),
         simplify=False,

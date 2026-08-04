@@ -20,7 +20,7 @@ def _pbf_path():
 
 
 def test_simplify_osmnx_runs_and_reduces(empty_project):
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("car",),
         simplify="osmnx",
@@ -50,7 +50,7 @@ def test_simplify_osmnx_runs_and_reduces(empty_project):
 
 
 def test_simplify_osmnx_with_consolidation(empty_project):
-    empty_project.network.import_from_osm(
+    empty_project.network.importer.osm(
         pbf_path=_pbf_path(),
         modes=("car", "walk"),
         simplify="osmnx",

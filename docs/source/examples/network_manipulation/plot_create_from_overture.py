@@ -24,8 +24,8 @@ Install the optional dependencies first::
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.network.Network.import_from_overture`
-#     * :func:`aequilibrae.project.network.network.Network.import_from_osm`
+#     * :func:`aequilibrae.project.network.network.Importer.overture`
+#     * :func:`aequilibrae.project.network.network.Importer.osm`
 
 # %%
 from os.path import join
@@ -51,7 +51,7 @@ model_area = box(-112.185, 36.59, -112.179, 36.60)
 # Import from Overture Maps (the recommended default). The importer always uses
 # the latest release advertised by Overture's STAC catalog and records that
 # release in the project's ``about`` table.
-project.network.import_from_overture(model_area=model_area, modes=("car", "walk"), simplify=False)
+project.network.importer.overture(model_area=model_area, modes=("car", "walk"), simplify=False)
 
 # %%
 # To import from OpenStreetMap instead, comment out the Overture call above and
@@ -67,11 +67,11 @@ project.network.import_from_overture(model_area=model_area, modes=("car", "walk"
 #     params.parameters["osm"]["timeout"] = 180  # seconds to wait for Overpass before giving up
 #     params.write_back()
 #
-#     project.network.import_from_osm(model_area=model_area, modes=("car", "walk"), simplify=False)
+#     project.network.importer.osm(model_area=model_area, modes=("car", "walk"), simplify=False)
 #     # or import a whole place by name:
-#     # project.network.import_from_osm(place_name="Nauru")
+#     # project.network.importer.osm(place_name="Nauru")
 #     # or import from a local extract:
-#     # project.network.import_from_osm(pbf_path="path/to/extract.osm.pbf")
+#     # project.network.importer.osm(pbf_path="path/to/extract.osm.pbf")
 
 # %%
 links = project.network.links.data

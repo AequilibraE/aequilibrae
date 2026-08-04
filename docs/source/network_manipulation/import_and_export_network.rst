@@ -28,7 +28,7 @@ The relevant optional packages are:
 Importing from OpenStreetMap
 ----------------------------
 
-Use :func:`aequilibrae.project.network.network.Network.import_from_osm` to create
+Use :func:`aequilibrae.project.network.importers.Importer.osm` to create
 an AequilibraE network from OpenStreetMap. Exactly one source selector must be
 provided:
 
@@ -38,17 +38,17 @@ provided:
 
 Examples::
 
-    project.network.import_from_osm(place_name="Nauru")
+    project.network.importer.osm(place_name="Nauru")
 
     from shapely.geometry import box
 
-    project.network.import_from_osm(
+    project.network.importer.osm(
         model_area=box(-112.185, 36.59, -112.179, 36.60),
         modes=("car", "walk"),
         simplify=False,
     )
 
-    project.network.import_from_osm(
+    project.network.importer.osm(
         pbf_path="/path/to/extract.osm.pbf",
         modes=("car", "transit", "bicycle", "walk"),
         simplify="osmnx",
@@ -73,12 +73,12 @@ download cache because the source file is already local.
 Importing from Overture Maps
 ----------------------------
 
-Use :func:`aequilibrae.project.network.network.Network.import_from_overture` to
+Use :func:`aequilibrae.project.network.importers.Importer.overture` to
 import the Overture Maps transportation network for an EPSG:4326 polygon::
 
     from shapely.geometry import box
 
-    project.network.import_from_overture(
+    project.network.importer.overture(
         model_area=box(-112.185, 36.59, -112.179, 36.60),
         modes=("car", "walk"),
         simplify="osmnx",
@@ -126,9 +126,19 @@ Network simplification
 OSM and Overture imports can simplify the staged network before it is written to
 the project database. The ``simplify`` argument accepts:
 
-* ``"osmnx"``: simplify with OSMnx. This is the default;
-* ``"neatnet"``: simplify with neatnet;
-* ``False``: skip simplification.
+* ``False``: **no simplification. This is the default** -- the imported network
+  mirrors the source;
+* ``"osmnx"``: simplify with OSMnx;
+* ``"neatnet"``: simplify with neatnet.
+
+Simplification is opt-in because it is lossy, and how lossy depends on the
+backend. Measured across the benchmark regions
+(:ref:`network_import_performance`, 113 successful runs), OSMnx preserves total
+network length to within a few per cent (median ratio 1.03 against the
+unsimplified import) while collapsing interstitial nodes; neatnet is more
+aggressive at removing geometric artifacts but discarded 6-54% of total length
+(median ratio 0.62) and ran a median 25x slower. Import first, inspect, then
+decide whether to simplify.
 
 ``consolidate_tolerance`` controls intersection/node consolidation in metres
 (after automatic projection to a local UTM CRS) for both simplifiers. Set it to
@@ -136,19 +146,99 @@ the project database. The ``simplify`` argument accepts:
 consolidation; for neatnet, where node consolidation is integral to the
 algorithm, ``None`` falls back to the default tolerance of 10 metres::
 
-    project.network.import_from_osm(
+    project.network.importer.osm(
         pbf_path="/path/to/extract.osm.pbf",
         simplify="osmnx",
         consolidate_tolerance=None,
     )
 
-    project.network.import_from_overture(
+    project.network.importer.overture(
         model_area=model_area,
         simplify=False,
     )
 
-Simplified links retain source provenance in ``other_attributes``. For OSMnx,
-merged-link provenance is stored under ``source_ids``.
+Simplified links retain source provenance in ``other_attributes``, under
+``source_ids``, for both backends.
+
+neatnet needs enclosed street blocks to detect face artifacts. A tree-like
+network (a sparse rural or trail network with no closed loops) is returned
+unsimplified with a warning rather than failing.
+
+.. _network_import_performance:
+
+Import and simplification performance
+-------------------------------------
+
+The numbers below come from the stress harness in
+``benchmarking/network_importer/``, which imports a matrix of regions from both
+sources with each simplifier and records per-phase wall time. Re-generate them
+with ``python stress_import.py`` followed by ``python make_charts.py``.
+
+.. admonition:: Benchmark environment
+   :class: note
+
+   Windows 11, 24-core CPU, 205 GB RAM, Python 3.13, osmnx 2.1, geopandas 1.1,
+   pyarrow 24.
+
+   **OpenStreetMap timings were measured against a local Overpass server on the
+   same LAN as the machine running the tests** -- effectively a best case for
+   download latency. A public Overpass endpoint is rate-limited and shared, so
+   expect OSM acquisition to be substantially slower, and dominated by queueing
+   rather than by network size. Overture timings are against the public
+   ``overturemaps-us-west-2`` S3 bucket over the internet, so they include real
+   cloud latency and are representative.
+
+Import time vs network size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. image:: ../_images/network_import_timing.png
+    :align: center
+    :alt: Network import time against number of links, for OSM and Overture
+
+Both sources are dominated by a fixed startup cost at small sizes: Overture pays
+a roughly 40 s floor for S3 metadata and Parquet reads regardless of how small
+the area is, while a LAN-local Overpass answers in a couple of seconds. Above
+roughly 10k links the curves converge and time scales with the network.
+
+Simplification time vs network size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. image:: ../_images/network_simplify_timing.png
+    :align: center
+    :alt: Simplification time against number of links, for osmnx and neatnet
+
+Both simplifiers scale essentially linearly with link count (fitted exponents of
+1.04 for each), so the difference between them is a constant factor, not a
+different growth curve -- but that factor is large: neatnet ran 14-41x slower
+than OSMnx on the same network, median 25x. That is enough to make neatnet
+impractical on large metropolitan extracts. In the benchmark run it exceeded a
+one-hour budget on four large-region imports that OSMnx completed in two to
+five minutes.
+
+Acquisition, by contrast, is dominated by fixed overhead at small sizes (fitted
+exponents well below 1), so import time is roughly flat until the network gets
+large.
+
+Indicative timings
+~~~~~~~~~~~~~~~~~~
+
+Median seconds by network size. "Import" is acquisition only, excluding
+simplification and the database write.
+
+.. include:: network_import_timings.rst
+
+.. warning::
+
+   neatnet does not merely restructure the network, it removes a substantial
+   share of it: across 31 benchmark regions the simplified network retained only
+   46-94% of the unsimplified total length (median 62%). Validate total length
+   and connectivity before using a neatnet-simplified network for assignment.
+
+   Both simplifiers also currently introduce self-loops (links whose two
+   endpoints are the same node), which never occur in unsimplified imports.
+   These are not usable for assignment and should be filtered out until the
+   underlying node-consolidation issue is fixed.
+
 
 .. _network_importer_public_api:
 
@@ -157,12 +247,28 @@ Public API summary
 
 The main entry points are:
 
-* :func:`aequilibrae.project.network.network.Network.import_from_osm`;
-* :func:`aequilibrae.project.network.network.Network.import_from_overture`;
-* :func:`aequilibrae.project.network.network.Network.import_network` for explicit
-  source names: ``"osm-overpass"``, ``"osm-pbf"`` and ``"overture-cloud"``.
+* :func:`aequilibrae.project.network.importers.Importer.osm`;
+* :func:`aequilibrae.project.network.importers.Importer.overture`;
+* :func:`aequilibrae.project.network.importers.Importer.source` for explicit
+  source names: ``"osm-overpass"``, ``"osm-pbf"`` and ``"overture-cloud"``;
+* :func:`aequilibrae.project.network.importers.Importer.gmns`;
+* :func:`aequilibrae.project.network.exporters.Exporter.gmns`;
+* :func:`aequilibrae.project.network.exporters.Exporter.geo_parquet`.
 
-``Network.create_from_osm`` was removed. Use ``Network.import_from_osm`` instead.
+Import and export live in two namespaces on the network object::
+
+    project.network.importer.osm(...)
+    project.network.importer.overture(...)
+    project.network.importer.gmns(...)
+
+    project.network.exporter.gmns(folder)
+    project.network.exporter.geo_parquet(folder)
+
+.. note::
+
+   The older flat methods (``create_from_osm``, ``import_from_osm``,
+   ``import_from_overture``, ``import_network``, ``create_from_gmns`` and
+   ``export_to_gmns``) were removed in favour of these namespaces.
 
 .. note::
 
@@ -229,7 +335,7 @@ specification.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.network.Network.create_from_gmns`
+    * :func:`aequilibrae.project.network.importers.Importer.gmns`
         Function documentation
     * :ref:`import_from_gmns`
         Usage example
@@ -271,7 +377,7 @@ You can find the GMNS specification
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.network.Network.export_to_gmns`
+    * :func:`aequilibrae.project.network.exporters.Exporter.gmns`
         Function documentation
     * :ref:`export_to_gmns`
         Usage example

@@ -13,7 +13,7 @@ def _pbf_path():
 
 
 def _import(empty_project):
-    empty_project.network.import_from_osm(pbf_path=_pbf_path(), modes=("car",), simplify=False)
+    empty_project.network.importer.osm(pbf_path=_pbf_path(), modes=("car",), simplify=False)
 
 
 def _about(path):

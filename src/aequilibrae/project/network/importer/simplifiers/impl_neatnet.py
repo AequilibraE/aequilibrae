@@ -1,9 +1,11 @@
 import geopandas as gpd
+import logging
 import math
 import numpy as np
 import shapely
 import warnings
 from shapely.geometry import Point
+from shapely.ops import polygonize
 
 from aequilibrae.project.network.importer.simplifiers.common import (
     PROVENANCE_OUT_COL,
@@ -23,6 +25,8 @@ from aequilibrae.project.network.importer.utils import (
     line_straightness,
 )
 from aequilibrae.utils.optional_dependency import require
+
+logger = logging.getLogger(__name__)
 
 _DUAL_CARRIAGEWAY_WARNING = (
     "neatnet simplification may collapse parallel one-way carriageways into a single coarse link. "
@@ -72,11 +76,37 @@ def run_neatnet_simplify(
     if exclusion_mask is not None:
         neatify_kwargs["exclusion_mask"] = exclusion_mask.to_crs(utm).geometry
 
+    if not _has_enclosed_faces(geom_only):
+        logger.warning(
+            "neatnet needs enclosed street blocks to detect face artifacts, and this network has none "
+            "(it is tree-like, e.g. a sparse trail or rural network). Returning it unsimplified."
+        )
+        return net
+
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="neatnet")
-        simplified = neatnet.neatify(geom_only, **neatify_kwargs).to_crs("EPSG:4326")
+        try:
+            simplified = neatnet.neatify(geom_only, **neatify_kwargs).to_crs("EPSG:4326")
+        except KeyError as exc:
+            # neatnet builds 'face_artifact_index' only when polygonising the
+            # network yields usable faces; without them it raises deep inside
+            # get_artifacts(). Degrade instead of losing the whole import.
+            if "face_artifact_index" not in str(exc):
+                raise
+            logger.warning(
+                "neatnet could not derive face artifacts for this network (%s); returning it unsimplified.", exc
+            )
+            return net
 
     return _gdf_to_staged(simplified, original_links=edges, source_meta=net.source_meta)
+
+
+def _has_enclosed_faces(geom_only: gpd.GeoDataFrame) -> bool:
+    """Whether the street geometries enclose at least one block (polygonisable face)."""
+    try:
+        return any(True for _ in polygonize(geom_only.geometry.values))
+    except Exception:  # pragma: no cover - defensive; let neatnet decide
+        return True
 
 
 def _gdf_to_staged(
