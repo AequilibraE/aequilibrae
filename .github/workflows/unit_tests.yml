@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: '3.13'
 
-      - uses: astral-sh/ruff-action@v3
+      - uses: astral-sh/ruff-action@v4
         with:
           version: 0.16.1
           args: check --output-format=github
@@ -39,7 +39,7 @@ jobs:
           sudo apt install -y clang-tidy
 
       - name: Set Python environment
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9
         with:
           python-version: '3.13'
 
@@ -103,7 +103,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Set Python environment
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v9
       with:
           python-version: ${{ matrix.python-version }}
 
