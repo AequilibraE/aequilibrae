@@ -92,8 +92,8 @@ to the use of **integer**, **numeric** and **varchar**.
 
 .. note::
 
-   The OSM/Overture importers (:func:`~aequilibrae.project.network.network.Importer.osm`
-   and :func:`~aequilibrae.project.network.network.Importer.overture`) do not use the
+   The OSM/Overture importers (:func:`~aequilibrae.project.network.importers.Importer.osm`
+   and :func:`~aequilibrae.project.network.importers.Importer.overture`) do not use the
    link-field parameter specification to decide which tags to read. They parse OSM/Overture tags
    internally and store any attribute that does not map to a real table column in the
    ``other_attributes`` JSON column. Directional handling is also built in: ``maxspeed`` is applied
@@ -158,7 +158,7 @@ the case of the *driving side* and  *default_directory* parameters.
 Open Street Maps
 ----------------
 The OSM section of the parameter file configures the Overpass download used by
-:func:`~aequilibrae.project.network.network.Importer.osm`. It is
+:func:`~aequilibrae.project.network.importers.Importer.osm`. It is
 relevant only when one plans to download a substantial amount of data from an
 Overpass API, in which case it is recommended to deploy a local Overpass server
 and point ``overpass_endpoint`` at it.
@@ -170,7 +170,11 @@ The available settings are:
   ``place_name`` lookups;
 * ``accept_language``: language tag requested for tag values such as names;
 * ``timeout``: how long (in seconds) to wait for an Overpass response before
-  giving up.
+  giving up;
+* ``overpass_rate_limit``: whether osmnx should respect the server's rate-limit
+  status (default ``true``). Set to ``false`` for a self-hosted Overpass server:
+  those report an unlimited rate limit in a format that makes osmnx wait forever
+  for a slot that is already free.
 
 These values are applied to ``osmnx`` through ``osmnx.settings`` at import time.
 Tiling of large queries and request retries are handled by ``osmnx`` internally,

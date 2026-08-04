@@ -83,7 +83,6 @@ class SpatialiteWriter:
         return StagedNetwork(
             nodes=net.nodes,
             links=links,
-            crs_geo=net.crs_geo,
             source_meta=net.source_meta,
         )
 

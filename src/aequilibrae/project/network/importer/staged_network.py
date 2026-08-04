@@ -18,7 +18,6 @@ _REQUIRED_LINK_COLS = ("link_id", "a_node", "b_node", "direction", "modes", "lin
 class StagedNetwork:
     nodes: gpd.GeoDataFrame
     links: gpd.GeoDataFrame
-    crs_geo: str = "EPSG:4326"
     source_meta: dict = field(default_factory=dict)
 
     def validate(self) -> None:
@@ -68,7 +67,7 @@ class StagedNetwork:
         import networkx as nx
 
         graph = nx.MultiDiGraph()
-        graph.graph["crs"] = self.crs_geo
+        graph.graph["crs"] = "EPSG:4326"
 
         node_cols = [c for c in self.nodes.columns if c != "geometry"]
         xs = self.nodes.geometry.x.to_numpy()

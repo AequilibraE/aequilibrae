@@ -171,20 +171,11 @@ def _coerce_modes(value) -> str:
 
 
 def _merge_reciprocal_edges(df: pd.DataFrame) -> pd.DataFrame:
-    """Recombine the two halves of a bidirectional link into a single row.
+    """Recombine ``::ab`` / ``::ba`` halves of a bidirectional link after osmnx simplification.
 
-    ``StagedNetwork.to_graph`` decomposes every two-way staged link into a pair of
-    opposing directed edges (tagged ``<base>::ab`` / ``<base>::ba``) because that
-    is the topology OSMnx expects. Those halves are simplified independently, so
-    without this pass each two-way street returns as *two* one-way links --
-    doubling both the link count and the total network length.
-
-    Two edges are recombined when they run between the same node pair in opposite
-    directions **and** share at least one base source id, so genuinely distinct
-    parallel links (e.g. separate carriageways) are never collapsed. The surviving
-    row keeps its own geometry and endpoints and inherits the mate's source refs;
-    ``_aggregate_directional_attrs`` then sees both orientations and recovers
-    ``direction=0`` plus the per-direction speed/lane values.
+    Without this, every two-way street comes back as two one-way links, doubling
+    count and length. Edges are merged only when they share a base source id, so
+    genuinely distinct parallel carriageways are never collapsed.
     """
     a_nodes = df["a_node"].tolist()
     b_nodes = df["b_node"].tolist()

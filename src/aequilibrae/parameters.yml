@@ -276,7 +276,7 @@ network:
       equivalency:
         mode_name: use
 osm:
-  # Used by Network.import_from_osm to configure osmnx via osmnx.settings.
+  # Used by project.network.importer.osm to configure osmnx via osmnx.settings.
   # Tiling of large queries and request retries are handled by osmnx internally.
   overpass_endpoint: https://overpass-api.de/api
   nominatim_endpoint: https://nominatim.openstreetmap.org/

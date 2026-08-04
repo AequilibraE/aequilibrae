@@ -129,7 +129,8 @@ the project database. The ``simplify`` argument accepts:
 * ``False``: **no simplification. This is the default** -- the imported network
   mirrors the source;
 * ``"osmnx"``: simplify with OSMnx;
-* ``"neatnet"``: simplify with neatnet.
+* ``"neatnet"``: simplify with neatnet;
+* ``True``: shorthand for ``"osmnx"``.
 
 Simplification is opt-in because it is lossy, and how lossy depends on the
 backend. Measured across the benchmark regions
@@ -315,8 +316,8 @@ It is possible to import the following files from a GMNS source:
 You can find the specification for all these tables in the GMNS documentation,
 `here <https://github.com/zephyr-data-specs/GMNS/tree/develop/docs/spec>`_.
 
-By default, the method ``create_from_gmns()`` read all required and optional fields
-specified in the GMNS link and node tables specification. If you need it to read 
+By default, ``importer.gmns()`` reads all required and optional fields
+specified in the GMNS link and node tables specification. If you need it to read
 any additional fields as well, you have to modify the AequilibraE parameters as
 shown in the :ref:`example <import_from_gmns>`.
 

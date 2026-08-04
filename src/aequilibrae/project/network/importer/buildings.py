@@ -40,12 +40,9 @@ def fetch_building_footprints(
     *,
     max_bbox_span_degrees: float = _MAX_BUILDINGS_BBOX_SPAN_DEGREES,
 ) -> BuildingMaskResult:
-    """Download buildings covering the current staged network extent.
+    """Download Overture building footprints for neatnet's exclusion mask.
 
-    Buildings can improve neatnet's exclusion mask and simplify around built
-    form more cleanly. The import must still remain resilient, so the fetch is
-    retried once and then falls back to "no mask" with a warning if Overture is
-    unavailable or empty.
+    Retries once; falls back to no mask on failure.
     """
     bbox = tuple(net.links.total_bounds)
     span = max(float(bbox[2] - bbox[0]), float(bbox[3] - bbox[1]))

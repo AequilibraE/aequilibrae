@@ -108,14 +108,9 @@ def acquire_overpass(
 
 
 def _collapse_reciprocal_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Keep one row per undirected OSM way segment.
+    """Drop the reversed half of each reciprocal OSMnx edge pair.
 
-    OSMnx models a two-way street as a reciprocal pair of directed edges
-    (``u->v`` and ``v->u``). Staging both would emit two ``direction=0`` links
-    for the same street, doubling modelled capacity and network length. The
-    direction of travel is recovered from the OSM tags later, so only one row is
-    needed. Ways tagged ``oneway=-1`` exist solely as a reversed edge, so a
-    reversed row with no forward counterpart is preserved.
+    Keeps reversed-only rows (``oneway=-1``) that have no forward counterpart.
     """
     if "reversed" not in edges.columns or len(edges) == 0:
         return edges

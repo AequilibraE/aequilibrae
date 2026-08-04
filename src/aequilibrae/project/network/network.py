@@ -112,8 +112,8 @@ class Network(WorkerThread):
         return all_modes
 
     def create_from_osm(self, *args, **kwargs) -> None:
-        """Removed in favour of :meth:`import_from_osm`."""
-        raise AttributeError("Network.create_from_osm was removed. Use Network.import_from_osm(...).")
+        """Removed in favour of ``project.network.importer.osm(...)``."""
+        raise AttributeError("Network.create_from_osm was removed. Use project.network.importer.osm(...).")
 
     def build_graphs(
         self, fields: Optional[list] = None, modes: Optional[list] = None, limit_to_area: Optional[Polygon] = None
