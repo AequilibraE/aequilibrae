@@ -35,7 +35,7 @@ dependencies = [
   "geopandas",
   "numpy>=2.0",
   "openmatrix",
-  "pandas>=2.2",
+  "pandas>=3.0",
   "pyaml",
   "pyarrow",
   "pyproj",
