@@ -41,9 +41,10 @@ jobs:
 
       - name: Run cython-lint
         run: |
+          set +e  # We want to save the exit code of cython-lint for later
           uvx cython-lint==0.21.0 ./src/ > cython-lint-errors.txt
           export CYTHON_LINT_EXIT=$?
-          
+          # Echo cython errors in a format GitHub can understand
           sed -E 's|^([^:]+):([0-9]+):([0-9]+): (([A-Z][0-9]+) .+)$|::error title=cython-lint (\5),file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|; s|^([^:]+):([0-9]+):([0-9]+): ([^A-Z].+)$|::error title=cython-lint,file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|' cython-lint-errors.txt
           exit $CYTHON_LINT_EXIT
 
