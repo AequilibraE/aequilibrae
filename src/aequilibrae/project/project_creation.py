@@ -35,7 +35,6 @@ def create_base_tables(conn: Connection, db_type: str) -> None:
     # For a new database construction all present migrations should have already been applied implicitly by the new
     # schema. So we mark them all as skipped.
     mm = MigrationManager(base_folder / "migrations" / "migrations.py")
-    mm.mark_all_as_seen(conn)
     for migration in mm.migrations.values():
         migration.mark_as(conn, MigrationStatus.SKIPPED)
 

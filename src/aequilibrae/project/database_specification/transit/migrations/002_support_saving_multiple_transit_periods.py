@@ -3,8 +3,6 @@ import pathlib
 import sqlite3
 from typing import Optional
 
-from aequilibrae import Project
-from aequilibrae.context import get_active_project
 from aequilibrae.project.project_creation import add_triggers, recreate_columns, remove_triggers
 
 logger = logging.getLogger(__name__)
@@ -16,12 +14,12 @@ def migrate(
     transit_conn: Optional[sqlite3.Connection],
     results_conn: Optional[sqlite3.Connection],
 ):
-    logger.info("Beginning migration to support saving and loading multiple Transit graphs")
-    project: Project = get_active_project(must_exist=True)
+    if project_conn is None:
+        raise RuntimeError("Transit migration 002 requires a project_conn connection")
+    if transit_conn is None:
+        raise RuntimeError("Transit migration 002 requires a transit_conn connection")
 
-    if not transit_conn:
-        logger.info("Migration finished, no 'public_transport.sqlite' connection provided.")
-        return
+    logger.info("Beginning migration to support saving and loading multiple Transit graphs")
 
     links_schema = pathlib.Path(__file__).parent.parent / "tables" / "links.sql"
     if not links_schema.exists():
@@ -32,8 +30,7 @@ def migrate(
         raise FileNotFoundError(str(nodes_schema))
 
     try:
-        with project.db_connection as project_conn:
-            period_ids = project_conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+        period_ids = project_conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
     except sqlite3.OperationalError:
         logger.info("Migration finished, no 'transit_graph_configs' table found.")
         return
@@ -48,7 +45,7 @@ def migrate(
         if existing_links is not None:
             raise ValueError("no period_id found in 'transit_graph_configs' cannot migrate with without period_id")
         else:
-            period_id = project.network.periods.default_period.period_id
+            period_id = 1
     else:
         period_id = period_ids[0][0]
 

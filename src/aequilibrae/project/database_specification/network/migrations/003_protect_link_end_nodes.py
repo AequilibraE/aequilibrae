@@ -13,6 +13,9 @@ def migrate(
     transit_conn: Optional[sqlite3.Connection] = None,
     results_conn: Optional[sqlite3.Connection] = None,
 ):
+    if project_conn is None:
+        raise RuntimeError("Network migration 003 requires a project_conn connection")
+
     logger.info("Beginning migration to protect links.a_node and links.b_node")
 
     if project_conn.execute("SELECT CheckSpatialIndex('nodes', 'geometry')").fetchone()[0] != 1:

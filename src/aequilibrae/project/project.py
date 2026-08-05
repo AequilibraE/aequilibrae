@@ -23,10 +23,9 @@ from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import AequilibraEConnection, commit_and_close, safe_connect
+from aequilibrae.utils.db_utils import AequilibraEConnection, ConnectionClosure, commit_and_close
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 logger = logging.getLogger(__name__)
 
@@ -264,38 +263,26 @@ class Project:
         if ignore_project or ignore_transit or ignore_results:
             warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
 
-        connections: dict[str, sqlite3.Connection | AequilibraEConnection] = {}
-        targets: list[tuple[MigrationManager, str]] = []
-
-        if not ignore_project:
-            targets.append((MigrationManager(MigrationManager.network_migration_file), "project_conn"))
-            connections["project_conn"] = connect_spatialite(self._project_database_path)
-        else:
-            logger.warning("Ignoring project database during upgrade")
-
-        if not ignore_transit and (self.project_base_path / "public_transport.sqlite").exists():
-            targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
-            connections["transit_conn"] = connect_spatialite(self._transit_database_path)
-        else:
-            logger.warning("Ignoring transit database during upgrade")
-
-        if not ignore_results and (self.project_base_path / "results_database.sqlite").exists():
-            connections["results_conn"] = safe_connect(self._results_database_path)
-        else:
-            logger.warning("Ignoring results database during upgrade")
-
+        transit_path = self._transit_database_path if self._transit_database_path.exists() else None
+        results_path = self._results_database_path if self._results_database_path.exists() else None
+        closure = ConnectionClosure(
+            self._project_database_path,
+            results_path=None if ignore_results else results_path,
+            transit_path=None if ignore_transit else transit_path,
+        )
         try:
-            for mm, main_conn in targets:
-                if connections[main_conn] is not None:
-                    with connections[main_conn] as conn:
-                        mm.mark_all_as_seen(conn)
+            if ignore_project:
+                logger.warning("Ignoring project database during upgrade")
+            else:
+                MigrationManager(MigrationManager.network_migration_file).upgrade(closure)
 
-            for mm, main_conn in targets:
-                mm.upgrade(main_conn, connections=connections)
+            if ignore_transit or not closure.has_transit_connection:
+                logger.warning("Ignoring transit database during upgrade")
+            else:
+                MigrationManager(MigrationManager.transit_migration_file).upgrade(closure)
             logger.info("Completed database upgrades")
         finally:
-            for _, main_conn in targets:
-                connections[main_conn].close()
+            closure.close()
 
     def __load_objects(self) -> None:
         matrix_folder = self.project_base_path / "matrices"
