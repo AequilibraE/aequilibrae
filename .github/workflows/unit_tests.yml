@@ -148,13 +148,13 @@ jobs:
     - name: Compile and test
       if: matrix.sanitisers == false
       run: |
-        uv pip install ".[dev]" -v -Ccompile-args=-v
+        uv pip install ".[dev]" -Ccompile-args=-v
         pytest tests/ --durations=50 --dist=loadscope -n 4 --max-worker-restart 0 --random-order --verbose
 
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
       run: |
-        uv pip install ".[dev]" -v -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
+        uv pip install ".[dev]" -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         export ASAN_OPTIONS=detect_leaks=1
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
         LD_PRELOAD=$(gcc -print-file-name=libasan.so) pytest tests/
