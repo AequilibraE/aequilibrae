@@ -1,13 +1,12 @@
+import logging
 import pathlib
 import sqlite3
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional
-import contextlib
-import logging
 
-from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.db_utils import AequilibraEConnection
+from aequilibrae.utils.model_run_utils import import_file_as_module
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +22,21 @@ class Migration:
     """
     Small utility class to wrap files used for database upgrades/migrations.
 
-    Individual migrations can report their status, be marked as 'seen' or as another status, and applied. SQL migrations
-    are executed using ``sqlite3.executescript``. Python migrations are loaded as a module, they should expose a
-    ``migrate`` function which accepts an ``sqlite3.Connection`` as a single positional argument.
+    Individual migrations can report their status, be marked as 'seen' or as
+    another status, and applied.  Migrations are Python modules that expose a
+    ``migrate`` function accepting keyword arguments for each open database
+    connection.
 
-    Marking a migration as 'seen' will add it to the ``migrations`` table as ``MISSING`` if it is not already
-    present. If it is present no change is made.
+    Marking a migration as 'seen' will add it to the ``migrations`` table as
+    ``MISSING`` if it is not already present.  If it is present no change is made.
 
-    Applying a migration will update the status to 'APPLIED' with the current timestamp.
+    Applying a migration will update the status to 'APPLIED' with the current
+    timestamp.
 
     A migration's status cannot be downgraded without force.
 
-    Migrations are identified based on their ``id`` attribute and the ``id`` field of the ``migrations`` table.
+    Migrations are identified based on their ``id`` attribute and the ``id``
+    field of the ``migrations`` table.
     """
 
     id: int
@@ -45,10 +47,8 @@ class Migration:
     def __post_init__(self):
         if self.file.suffix == ".py":
             self.type = "py"
-        elif self.file.suffix == ".sql":
-            self.type = "sql"
         else:
-            raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
+            raise ValueError("only '.py' files are supported for migrations")
 
     def status(self, conn: sqlite3.Connection) -> MigrationStatus:
         """
@@ -111,30 +111,20 @@ class Migration:
 
         Successful application will mark the migration as ``APPLIED``.
 
-        Python migrations should never use ``executescript`` as it will commit the pending transaction and place SQLite
-        in autocommit mode. If the migration then fails the database will be bad state.
+        ``executescript()`` is banned in all migrations.  It issues an implicit
+        ``COMMIT``, breaks the migration transaction, and leaves the database in
+        an inconsistent state on failure.
 
         :Arguments:
-            **conn** (:obj:`sqlite3.Connection`): Main SQLite database connection. This is connection
-            is used for the migrations table and '.sql' migrations.
+            **conn** (:obj:`sqlite3.Connection`): Main SQLite database connection.
+                Used for the migrations table.
 
-            **connections** (:obj:`dict[str, sqlite3.Connection]`): All open SQLite connections. Passed as keyword
-            arguments for Python migrations.
+            **connections** (:obj:`dict[str, sqlite3.Connection]`): All open SQLite
+                connections. Passed as keyword arguments for the ``migrate`` function.
         """
-        if self.type == "py":
-            self._apply_python(connections)
-        elif self.type == "sql":
-            self._apply_sql(conn)
-        else:
-            raise ValueError("only Python ('.py') and SQL ('.sql') files are supported for migrations")
-
+        self._apply_python(connections)
         self.mark_as(conn, MigrationStatus.APPLIED)
         logger.info(f"Completed migration '{self.name}'")
-
-    def _apply_sql(self, conn: sqlite3.Connection):
-        with open(self.file, "r") as f:
-            contents = f.read()
-        conn.executescript(contents)
 
     def _apply_python(self, connections: dict[str, sqlite3.Connection]):
         module = import_file_as_module(self.file, self.name, force=True)
