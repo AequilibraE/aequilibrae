@@ -154,7 +154,12 @@ jobs:
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
       run: |
+        set -x
         uv pip install ".[dev]" -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
+        echo $?
         export ASAN_OPTIONS=detect_leaks=1
+        echo $ASAN_OPTIONS
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
+        echo $LSAN_OPTIONS
         LD_PRELOAD=$(gcc -print-file-name=libasan.so) pytest tests/
+        echo $?
