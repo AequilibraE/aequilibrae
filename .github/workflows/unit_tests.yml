@@ -96,7 +96,7 @@ jobs:
             python-version: '3.13'
         include:
           - os: ubuntu-latest
-            python-version: '3.14'
+            python-version: '3.13'
             sanitisers: true
 
       max-parallel: 20
