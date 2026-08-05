@@ -1,4 +1,4 @@
-# noqa: E402
+# ruff: noqa: E402
 
 import os
 import uuid
