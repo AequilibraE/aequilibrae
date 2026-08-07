@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Callable
 from aequilibrae.paths.cython.AoN import (
     bpr,
@@ -11,6 +12,9 @@ from aequilibrae.paths.cython.AoN import (
     akcelik,
     delta_akcelik,
 )
+
+import numpy as np
+import numexpr as ne
 
 
 FUNCTION_MAP: dict[str, tuple[Callable, Callable]] = {
@@ -57,23 +61,24 @@ class VDFsManager:
         """Populate self.vdfs from the parsed "vdfs" section of parameters.yml, e.g.:
 
         vdfs:
-          default: "bpr_tyler"
-          bpr_tyler:
-            function: bpr
-            spec:
-              alpha:
-                fill_NA: 0.15
-                bounds: [0, 10]
-              beta: 4
-          quadratic:
-            functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
-            spec:
-              a:
-                fill_NA: 0.15
-                bounds: [0, .inf]
-              b:
-                fill_NA: 1.0
-                bounds: [0, .inf]
+            default: "bpr_tyler"
+            bpr_tyler:
+                function: bpr
+                spec:
+                    alpha:
+                        fillNA: 0.15
+                        bounds: [0, 10]
+                    beta: 4
+            quadratic:
+                functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
+                derivative_functional_form: "fftime * (2 * a * (link_flows/capacity) + b) / capacity"
+                spec:
+                    a:
+                        fillNA: 0.15
+                        bounds: [0, .inf]
+                    b:
+                        fillNA: 1.0
+                        bounds: [0, .inf]
         """
         vdf_data = dict(vdf_data)  # don't mutate the caller's dict
         self.default = vdf_data.pop("default", None)
@@ -93,10 +98,11 @@ class VDFsManager:
                 self.add_vdf(name, func, entry["spec"], derivative, override_existing=True)
 
             elif "functional_form" in entry:
-                raise NotImplementedError(
-                    f"VDF '{name}' defines a custom 'functional_form', but compiling "
-                    "arbitrary VDF expressions into callables isn't implemented yet."
-                )
+                func = entry["functional_form"]
+                derivative = None
+                if "derivative_functional_form" in entry:
+                    derivative = entry["derivative_functional_form"]
+                self.add_vdf(name, func, entry["spec"], derivative, override_existing=True)
 
             else:
                 raise ValueError(
@@ -104,18 +110,43 @@ class VDFsManager:
                     "'functional_form' (a custom expression)."
                 )
 
+    @staticmethod
+    def convert_str_function_into_function(function_def: str) -> Callable:
+        def func(out: np.ndarray, link_flows, capacity, fftime, cores, **link_attributes):
+            # def bpr(congested_times, link_flows, capacity, fftime, cores, alpha, beta):
+
+            ne.evaluate(
+                function_def,
+                out=out,
+                local_dict={"link_flows": link_flows, "capacity": capacity, "fftime": fftime} | link_attributes,
+                global_dict={},
+                # disable_cache=True,
+            )
+            # MAKE fftime, capacity into parameters into spec, link flows is in assignment so keep it called "colume"
+
+        return func
+
     def add_vdf(
-        self, name: str, function: Callable, spec: dict, derivative: Callable | None, override_existing: bool = False
+        self,
+        name: str,
+        function: Callable | str,
+        spec: dict,
+        derivative: Callable | str | None,
+        override_existing: bool = False,
     ):
         # bpr_spec = {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}
         # project.add_vdf(name="bpr_tyler", function="bpr", spec=bpr_spec)
         # have wrapper in project that passes all arguments here
+        if isinstance(function, str):
+            function: Callable = VDFsManager.convert_str_function_into_function(function)
+        if isinstance(derivative, str):
+            derivative: Callable = VDFsManager.convert_str_function_into_function(derivative)
         if not override_existing and name in self.vdfs:
             raise ValueError(f"A volume delay function of name {name} is already stored.")
         new_vdf = VDF(name, function, spec, derivative)
         self.vdfs[name] = new_vdf
 
-    def get_vdf(self, name):
+    def get_vdf(self, name) -> VDF:
         name_lower = name.lower()
         if name_lower in FUNCTION_MAP:
             name = name_lower
@@ -191,7 +222,7 @@ class VDF:
         self.func(congested_time, link_flows, capacity, fftime, cores, **link_attributes)
 
     def apply_derivative(self, congested_time, link_flows, capacity, fftime, cores: int, **link_attributes):
-        self.func(congested_time, link_flows, capacity, fftime, cores, **link_attributes)
+        self.d_func(congested_time, link_flows, capacity, fftime, cores, **link_attributes)
 
 
 class VDF_old:
