@@ -1,6 +1,4 @@
 import logging
-import threading
-from multiprocessing.dummy import Pool as ThreadPool
 
 import numpy as np
 

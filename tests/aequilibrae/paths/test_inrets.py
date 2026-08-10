@@ -29,14 +29,14 @@
 # work developed with the software.
 # ---------------------------------------------------------------------------------------------------------------------
 
-from multiprocessing import cpu_count
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 import numpy as np
 from aequilibrae.paths.cython.vdf_core import inrets, delta_inrets
 
 
 def test_inrets_function():
-    cores = cpu_count()
+    cores = omp_get_max_threads()
 
     alpha = np.zeros(11)
     fftime = np.ones(11)

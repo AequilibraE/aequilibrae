@@ -1,7 +1,6 @@
 import importlib.metadata
 import logging
 import sys
-from multiprocessing import get_start_method, set_start_method
 
 from aequilibrae import distribution, matrix, paths, project, transit
 from aequilibrae.distribution import GravityApplication, GravityCalibration, Ipf, SyntheticGravityModel
@@ -50,13 +49,3 @@ __all__ = [
 logger = global_logger = logging.getLogger(__name__)
 
 version = importlib.metadata.version("aequilibrae")
-
-# On macos, we start multiprocessing with 'fork' to avoid segfaults. Other platform defaults are fine
-if sys.platform == "darwin" and get_start_method(allow_none=True) != "fork":
-    try:
-        set_start_method("fork")
-    except RuntimeError:
-        logger.critical(
-            "multiprocessing start method already set. On MacOS, AequilibraE requires the 'fork' start method. "
-            "AequilibraE may crash when using procedures that utilise multiprocessing or progress bars."
-        )

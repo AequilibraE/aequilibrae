@@ -1,4 +1,4 @@
-import multiprocessing as mp
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 import os
 
 DEFAULT_THREADING_THRESHOLD = 10_000
@@ -10,17 +10,17 @@ ELEMENTWISE_CORES_CAP = 8
 
 
 def clamp_cores(cores_count: int):
-    """Clamps a requested core count to ``[1, mp.cpu_count()]``.
+    """Clamps a requested core count to ``[1, omp_get_max_threads()]``.
 
     Zero means all available cores; negative values leave that many cores out.
     """
     if isinstance(cores_count, int):
         if cores_count < 0:
-            return max(1, mp.cpu_count() + cores_count)
+            return max(1, omp_get_max_threads() + cores_count)
         if cores_count == 0:
-            return mp.cpu_count()
+            return omp_get_max_threads()
         elif cores_count > 0:
-            return min(mp.cpu_count(), cores_count)
+            return min(omp_get_max_threads(), cores_count)
     else:
         raise ValueError("Number of cores needs to be an integer")
 
@@ -33,11 +33,11 @@ def resolve_cores(system_parameters: dict) -> int:
     travels with the project. Values that cannot be interpreted as an integer
     resolve to the total number of available cores.
     """
-    value = os.environ.get("AEQ_CPUS", system_parameters.get("cpus", mp.cpu_count()))
+    value = os.environ.get("AEQ_CPUS", system_parameters.get("cpus", omp_get_max_threads()))
     try:
         return clamp_cores(int(value))
     except (TypeError, ValueError):
-        return mp.cpu_count()
+        return omp_get_max_threads()
 
 
 def resolve_threading_threshold(system_parameters: dict) -> int:

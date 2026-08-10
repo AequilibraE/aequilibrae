@@ -1,11 +1,11 @@
-from multiprocessing import cpu_count
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 import numpy as np
 from aequilibrae.paths.cython.vdf_core import akcelik, delta_akcelik
 
 
 def test_akcelik_function():
-    cores = cpu_count()
+    cores = omp_get_max_threads()
 
     num_links = 11
     congested_times = np.zeros(num_links)
