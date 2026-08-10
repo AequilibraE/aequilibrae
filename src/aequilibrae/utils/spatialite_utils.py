@@ -2,6 +2,7 @@ import ctypes
 import logging
 import os
 import shutil
+import sys
 import urllib
 import warnings
 from os.path import basename, join
@@ -29,6 +30,10 @@ def is_windows():
 
 def is_not_windows():
     return os.name != "nt"
+
+
+def is_macos():
+    return sys.platform == "darwin"
 
 
 def connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False) -> Connection:
@@ -86,17 +91,22 @@ def _load_extension(conn: Connection, path: str) -> None:
 
 
 def _pin_extension(path: str) -> None:
-    # SQLite loads mod_spatialite with LoadLibrary on every load_extension call and frees it with
-    # FreeLibrary when the connection closes. On Windows, each load/unload cycle leaks a TLS index,
-    # and the process aborts once the ~1088-slot limit is reached (~1000 connections). Holding one
-    # extra reference here keeps the DLL permanently mapped so it is never actually unloaded.
-    if is_not_windows() or path in _pinned_extensions:
+    # SQLite unloads mod_spatialite when the connection closes. Repeated load/unload cycles exhaust
+    # TLS indexes on Windows and pthread_atfork slots on macOS, and incur unnecessary loader overhead
+    # on every platform. Holding one extra reference keeps the library and its dependencies mapped,
+    # while SQLite still initialises each individual connection.
+    if path in _pinned_extensions:
         return
     try:
-        # winmode=0 gives classic LoadLibrary search semantics (incl. PATH), matching how SQLite
-        # itself resolves the extension. LoadLibrary appends ".dll" to the extension-less path,
-        # resolving to the same module SQLite loaded.
-        _pinned_extensions[path] = ctypes.CDLL(path, winmode=0)
+        if is_windows():
+            # winmode=0 gives classic LoadLibrary search semantics (incl. PATH), matching SQLite.
+            # LoadLibrary appends ".dll" to the extension-less path.
+            _pinned_extensions[path] = ctypes.CDLL(path, winmode=0)
+        else:
+            # SQLite appends the platform extension before dlopen; ctypes does not.
+            suffix = ".dylib" if is_macos() else ".so"
+            extension_path = path if path.endswith(suffix) else f"{path}{suffix}"
+            _pinned_extensions[path] = ctypes.CDLL(extension_path)
     except OSError as e:
         logger.warning(f"Could not pin mod_spatialite ({path}) in memory: {e}")
 
