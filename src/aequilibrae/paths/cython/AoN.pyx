@@ -113,7 +113,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     cdef double [:, :, :] temp_skims_mat = aux_result.temporary_skims
     cdef unsigned char [:, ::1] destinations_mat = np.zeros((cores, nodes), dtype=np.uint8)
 
-    # If result.save_path_file, then these are by threadid, otherwise they are by origin
+    # If not result.save_path_file, then these are by threadid, otherwise they are by origin
     cdef long long [:, ::1] predecessors_mat = aux_result.predecessors
     cdef long long [:, ::1] connectors_mat = aux_result.connectors
 
