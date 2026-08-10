@@ -9,7 +9,7 @@ from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from os.path import join
-from typing import List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -639,12 +639,13 @@ class GraphBase(ABC):  # noqa: B024
         self,
     ) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_], npt.NDArray[np.generic]]:
         """
-        Create three arrays providing a mapping of compressed ID to link ID.
+        Create three arrays providing a mapping of compressed ID to graph link index.
 
-        Uses sparse compression. Index 'idx' by the by compressed ID and compressed ID + 1, the
-        network IDs are then in the range ``idx[id]:idx[id + 1]``.
+        Uses sparse compression. Index 'idx' by the compressed ID and compressed ID + 1, the
+        network IDs are then at the indices ``idx[id]:idx[id + 1]``.
 
-        Links not in the compressed graph are not contained within the 'data' array.
+        Links not in the compressed graph are given the max compressed, they are in the 'data' array at that ID, but are
+        not ordered.
 
         'node_mapping' provides an easy way to check if a node index is present within the compressed graph. If the
         value is -1 then the node has been removed, either by compression of dead end link removal. If the value is
@@ -666,7 +667,7 @@ class GraphBase(ABC):  # noqa: B024
         :Returns:
             **idx** (:obj:`np.array`): index array for ``data``
 
-            **data** (:obj:`np.array`): array of link ids
+            **data** (:obj:`np.array`): array of indices into graph.graph.
 
             **node_mapping**: (:obj:`np.array`): array of node_mapping ids
         """

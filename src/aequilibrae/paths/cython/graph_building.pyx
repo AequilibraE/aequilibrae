@@ -422,29 +422,30 @@ def create_compressed_link_network_mapping(graph):
         )
 
     cdef:
-        long long i, j, a_node, x, b_node, tmp, compressed_id, non_duplicated_idx
+        long long i, j, a_node, x, b_node, tmp, compressed_id, non_duplicated_idx, supernet_id
         const long long[:] b
-        const long long[:] values
-        const signed char[:] directions
+        const long long[:] supernet_ids
         uint32_t[:] idx
         int64_t[::] data
         int32_t[:] node_mapping
         const int64_t[:, :] non_duplicated
         const long long[:] compact_a_nodes
         const long long[:] compact_b_nodes
-        signed char direction
 
-    # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
-    # bother redoing sorting it.
+    # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't bother
+    # redoing sorting it. It produces an array (mapping_data) that indexes into the ordered graph, allowing any
+    # attribute to be recovered in order.
 
-    # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`,
-    # we skip them.
-    filtered = graph.graph[graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1]
-    filtered = filtered[["__compressed_id__", "a_node", "b_node", "link_id", "direction"]]
+    # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`.
+    # They're included in the output but are un-ordered.
+    removed_id = graph.compact_graph.id.max() + 1
+    filtered = graph.graph[["__compressed_id__", "a_node", "b_node", "__supernet_id__"]]
     duplicated = filtered.__compressed_id__.duplicated(keep=False)
     gb = filtered[duplicated].groupby(by="__compressed_id__", sort=True)
 
-    idx = np.zeros(graph.compact_num_links + 1, dtype=np.uint32)
+    # +1 for the end of the array to include the range ending one-past-the-end element
+    # +1 for the "removed from the compressed graph" compressed ID.
+    idx = np.zeros(graph.compact_num_links + 1 + 1, dtype=np.uint32)
     data = np.zeros(len(filtered), dtype=np.int64)
     node_mapping = np.full(graph.num_nodes, -1, dtype=np.int32)
 
@@ -462,18 +463,27 @@ def create_compressed_link_network_mapping(graph):
     for compressed_id, count in enumerate(np.bincount(compressed_ids)):
         # We separate the easy un-compressible link path from the compressible link path
         # gb.get_group and those sorted searches are rather slow
-        if count == 1:
-            compressed_id, a_node, b_node, link_id, direction = non_duplicated[non_duplicated_idx]
+        if compressed_id == removed_id:
+            df = gb.get_group(compressed_id)
+            idx[compressed_id] = i
+            supernet_ids = df.__supernet_id__.to_numpy(copy=False)
+            a = df.a_node.to_numpy(copy=False)
+            b = df.b_node.to_numpy(copy=False)
+
+            # Still include the removed includes but they are not ordered.
+            for j in range(len(df)):
+                data[i + j] = supernet_ids[j]
+        elif count == 1:
+            compressed_id, a_node, b_node, supernet_id = non_duplicated[non_duplicated_idx]
             non_duplicated_idx += 1
             idx[compressed_id] = i
-            data[i] = link_id * direction
+            data[i] = supernet_id
             node_mapping[a_node] = compact_a_nodes[compressed_id]
             node_mapping[b_node] = compact_b_nodes[compressed_id]
         else:
             df = gb.get_group(compressed_id)
             idx[compressed_id] = i
-            values = df.link_id.to_numpy(copy=False)
-            directions = df.direction.to_numpy(copy=False)
+            supernet_ids = df.__supernet_id__.to_numpy(copy=False)
             a = df.a_node.to_numpy(copy=False)
             b = df.b_node.to_numpy(copy=False)
 
@@ -488,7 +498,7 @@ def create_compressed_link_network_mapping(graph):
                 tmp = a.searchsorted(x)
                 if tmp < len(a) and a[tmp] == x:
                     x = b[tmp]
-                    data[i + j] = values[tmp] * directions[tmp]
+                    data[i + j] = supernet_ids[tmp]
                 else:
                     break
                 j += 1
@@ -498,6 +508,13 @@ def create_compressed_link_network_mapping(graph):
             node_mapping[b_node] = compact_b_nodes[compressed_id]
         i += count
 
+    # If there are no removed links in the compressed network then the ``removed_id`` position is uninitialised, so we
+    # fill it with ``i``, just like the last value.
+    if idx[removed_id] == 0:
+        idx[removed_id] = i
+
+    # Fill sentinel end value, this makes the range idx[compressed_id]:idx[compressed_id + 1] valid for all
+    # compressed_ids.
     idx[-1] = i
 
     graph.compressed_link_network_mapping_idx = np.array(idx)
