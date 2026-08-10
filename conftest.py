@@ -1,6 +1,14 @@
+# ruff: noqa: E402
+
 import os
 import uuid
 from pathlib import Path
+
+import pyarrow as pa
+import pyarrow.compute as pc
+
+# Register Arrow's at-fork handler before the test suite loads other native libraries.
+pc.filter(pa.array([True]), pa.array([True]))
 
 import numpy as np
 import pandas as pd
