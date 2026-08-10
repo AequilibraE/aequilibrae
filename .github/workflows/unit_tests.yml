@@ -217,18 +217,30 @@ jobs:
           done
         } 2>&1 | tee macos-openmp-linkage.txt
 
-        mkdir -p "$RUNNER_TEMP/macos-cores" macos-crash-reports macos-execnet macos-lldb
+        mkdir -p "$RUNNER_TEMP/macos-cores" macos-crash-reports macos-execnet macos-lldb macos-worker-events
         chmod 777 "$RUNNER_TEMP/macos-cores"
         sudo sysctl -w kern.corefile="$RUNNER_TEMP/macos-cores/core.%P" || true
         ulimit -c unlimited || true
+        {
+          echo "Configured core dump settings:"
+          sysctl kern.corefile 2>&1 || true
+          ulimit -c 2>&1 || true
+        } | tee -a macos-openmp-linkage.txt
         touch "$RUNNER_TEMP/macos-test-start"
+        date '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/macos-test-start-time"
 
         cat > "$RUNNER_TEMP/macos_ci_debug.py" <<'PY'
         import os
         import sys
+        from pathlib import Path
 
 
         def _emit(message):
+            worker = os.environ.get("PYTEST_XDIST_WORKER", "controller")
+            event_file = Path("macos-worker-events") / f"{worker}-{os.getpid()}.log"
+            with event_file.open("a", encoding="utf-8") as stream:
+                stream.write(message + "\n")
+                stream.flush()
             print(message, file=sys.stderr, flush=True)
 
 
@@ -258,7 +270,7 @@ jobs:
 
         set +e
         python -X faulthandler -m pytest tests/ --durations=50 --dist=loadscope -n 4 \
-          --max-worker-restart 0 --random-order --verbose --capture=tee-sys -p macos_ci_debug \
+          --max-worker-restart 0 --random-order --verbose -p macos_ci_debug \
           2>&1 | tee macos-pytest-output.txt
         pytest_status=${PIPESTATUS[0]}
         set -e
@@ -276,7 +288,7 @@ jobs:
           fi
         done
 
-        /usr/bin/log show --last 30m --style compact \
+        /usr/bin/log show --start "$(cat "$RUNNER_TEMP/macos-test-start-time")" --style compact \
           --predicate '(process == "kernel" OR process == "ReportCrash" OR process == "diagnosticd" OR process == "Python" OR process == "python") AND (eventMessage CONTAINS[c] "abort" OR eventMessage CONTAINS[c] "crash" OR eventMessage CONTAINS[c] "kill" OR eventMessage CONTAINS[c] "memory" OR eventMessage CONTAINS[c] "resource")' \
           > macos-unified-log.txt 2>&1 || true
 
@@ -314,6 +326,7 @@ jobs:
           macos-crash-reports/
           macos-execnet/
           macos-lldb/
+          macos-worker-events/
         if-no-files-found: warn
 
     - name: Compile and test (sanitisers)
