@@ -169,11 +169,55 @@ jobs:
         echo CXX=/opt/homebrew/opt/llvm/bin/clang++ >> $GITHUB_ENV
         echo CC=/opt/homebrew/opt/llvm/bin/clang >> $GITHUB_ENV
 
-    - name: Compile and test
-      if: matrix.sanitisers == false
+    - name: Compile and test (Windows and Linux)
+      if: matrix.sanitisers == false && matrix.os != 'macos-latest'
       run: |
         uv pip install ".[dev]" -v -Ccompile-args=-v
         pytest tests/ --durations=50 --dist=loadscope -n 4 --max-worker-restart 0 --random-order --verbose
+
+    - name: Compile and test (macOS)
+      if: matrix.sanitisers == false && matrix.os == 'macos-latest'
+      env:
+        PYTHONFAULTHANDLER: "1"
+        PYTHONUNBUFFERED: "1"
+      run: |
+        uv pip install ".[dev]" -v -Ccompile-args=-v
+
+        {
+          echo "Python: $(python --version 2>&1)"
+          echo "Python executable: $(command -v python)"
+          echo "Clang: $("$CC" --version 2>&1)"
+          echo "C compiler: $CC"
+          echo "C++ compiler: $CXX"
+          echo "Homebrew LLVM/libomp versions:"
+          brew list --versions llvm libomp 2>&1 || true
+          echo "OpenMP runtime files:"
+          find /opt/homebrew/opt/llvm /opt/homebrew/opt/libomp /opt/homebrew/lib .venv \
+            \( -type f -o -type l \) \
+            \( -name 'libomp*.dylib' -o -name 'libiomp*.dylib' -o -name 'libgomp*.dylib' \) \
+            -print 2>/dev/null || true
+          echo "Binaries linked to an OpenMP runtime:"
+          find .venv/lib -type f \( -name '*.so' -o -name '*.dylib' \) -print0 | while IFS= read -r -d '' binary; do
+            links=$(otool -L "$binary" 2>/dev/null || true)
+            if printf '%s\n' "$links" | grep -Eqi 'lib(i|g)?omp'; then
+              printf '\n%s\n' "$links"
+            fi
+          done
+        } 2>&1 | tee macos-openmp-linkage.txt
+
+        DYLD_PRINT_LIBRARIES=1 \
+          pytest tests/ --durations=50 --dist=loadscope -n 4 --max-worker-restart 0 --random-order --verbose \
+          2>&1 | tee macos-pytest-output.txt
+
+    - name: Upload macOS OpenMP diagnostics
+      if: always() && matrix.sanitisers == false && matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-openmp-diagnostics-python-${{ matrix.python-version }}
+        path: |
+          macos-openmp-linkage.txt
+          macos-pytest-output.txt
+        if-no-files-found: warn
 
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
