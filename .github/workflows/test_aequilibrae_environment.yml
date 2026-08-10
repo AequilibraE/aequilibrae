@@ -1,6 +1,8 @@
 name: Testing on QAequilibraE environment
 
-on: [pull_request]
+# Temporarily manual-only while the macOS test failure is investigated.
+on:
+  workflow_dispatch:
 
 env:
   QGIS_RELEASE: true

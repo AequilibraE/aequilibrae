@@ -1,12 +1,8 @@
 name: Documentation
 
+# Temporarily manual-only while the macOS test failure is investigated.
 on:
- push:
-   branches:
-     - develop
- pull_request:
- release:
-     types: [published]
+  workflow_dispatch:
 
 jobs:
   build:

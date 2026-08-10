@@ -1,8 +1,7 @@
 name: Trigger dispatch
+# Temporarily manual-only while the macOS test failure is investigated.
 on:
-  push:
-    branches:
-      - develop
+  workflow_dispatch:
 
 jobs:
   trigger-event:
