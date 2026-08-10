@@ -1,8 +1,6 @@
 name: Code coverage
 
-# Temporarily manual-only while the macOS test failure is investigated.
-on:
-  workflow_dispatch:
+on: [pull_request]
 
 jobs:
   testing:

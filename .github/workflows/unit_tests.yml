@@ -6,101 +6,101 @@ env:
   AEQ_SHOW_PROGRESS: "0"
 
 jobs:
-  # linting:
-  #   runs-on: ubuntu-latest
-  #   name: Linting
-  #   concurrency:
-  #     group: ${{ github.workflow }}-${{ github.ref }}
-  #     cancel-in-progress: true
-  #   steps:
-  #     - uses: actions/checkout@v7
+  linting:
+    runs-on: ubuntu-latest
+    name: Linting
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
 
-  #     - name: Set Python environment
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.13'
+      - name: Set Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
 
-  #     - uses: astral-sh/ruff-action@v4.1.0
-  #       with:
-  #         version: 0.16.1
-  #         args: check --output-format=github
+      - uses: astral-sh/ruff-action@v4.1.0
+        with:
+          version: 0.16.1
+          args: check --output-format=github
 
-  # cython-lint:
-  #   runs-on: ubuntu-latest
-  #   name: cython-lint
-  #   concurrency:
-  #     group: ${{ github.workflow }}-${{ github.ref }}-cython-lint
-  #     cancel-in-progress: true
-  #   steps:
-  #     - uses: actions/checkout@v7
+  cython-lint:
+    runs-on: ubuntu-latest
+    name: cython-lint
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-cython-lint
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
 
-  #     - name: Set UV
-  #       uses: astral-sh/setup-uv@v9.0.0
-  #       with:
-  #         python-version: '3.13'
+      - name: Set UV
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: '3.13'
 
-  #     - name: Run cython-lint
-  #       run: |
-  #         set +e  # We want to save the exit code of cython-lint for later
-  #         uvx cython-lint==0.21.0 ./src/ > cython-lint-errors.txt
-  #         export CYTHON_LINT_EXIT=$?
-  #         # Echo cython errors in a format GitHub can understand
-  #         sed -E 's|^([^:]+):([0-9]+):([0-9]+): (.+)$|::error title=cython-lint,file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|' cython-lint-errors.txt
-  #         exit $CYTHON_LINT_EXIT
+      - name: Run cython-lint
+        run: |
+          set +e  # We want to save the exit code of cython-lint for later
+          uvx cython-lint==0.21.0 ./src/ > cython-lint-errors.txt
+          export CYTHON_LINT_EXIT=$?
+          # Echo cython errors in a format GitHub can understand
+          sed -E 's|^([^:]+):([0-9]+):([0-9]+): (.+)$|::error title=cython-lint,file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|' cython-lint-errors.txt
+          exit $CYTHON_LINT_EXIT
 
-  # clang-tidy:
-  #   runs-on: ubuntu-latest
-  #   name: clang-tidy
-  #   concurrency:
-  #     group: ${{ github.workflow }}-${{ github.ref }}-clang-tidy
-  #     cancel-in-progress: true
-  #   steps:
-  #     - uses: actions/checkout@v7
+  clang-tidy:
+    runs-on: ubuntu-latest
+    name: clang-tidy
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-clang-tidy
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
 
-  #     - name: Install clang-tidy
-  #       run: |
-  #         sudo apt update
-  #         sudo apt install -y clang-tidy
+      - name: Install clang-tidy
+        run: |
+          sudo apt update
+          sudo apt install -y clang-tidy
 
-  #     - name: Set Python environment
-  #       uses: astral-sh/setup-uv@v9.0.0
-  #       with:
-  #         python-version: '3.13'
+      - name: Set Python environment
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: '3.13'
 
-  #     - name: Install build dependencies
-  #       run: uv venv --python 3.13 --python-preference only-managed --clear && uv pip install meson ninja cython cysignals
+      - name: Install build dependencies
+        run: uv venv --python 3.13 --python-preference only-managed --clear && uv pip install meson ninja cython cysignals
 
-  #     - name: Configure build (generates compile_commands.json)
-  #       run: |
-  #         . .venv/bin/activate
-  #         meson setup build
+      - name: Configure build (generates compile_commands.json)
+        run: |
+          . .venv/bin/activate
+          meson setup build
 
-  #     - name: Run clang-tidy on src/
-  #       run: |
-  #         find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
-  #           | xargs -0 clang-tidy -p build --quiet --warnings-as-errors='*'
+      - name: Run clang-tidy on src/
+        run: |
+          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
+            | xargs -0 clang-tidy -p build --quiet --warnings-as-errors='*'
 
-  # clang-format:
-  #   runs-on: ubuntu-latest
-  #   name: clang-format
-  #   concurrency:
-  #     group: ${{ github.workflow }}-${{ github.ref }}-clang-format
-  #     cancel-in-progress: true
-  #   steps:
-  #     - uses: actions/checkout@v7
+  clang-format:
+    runs-on: ubuntu-latest
+    name: clang-format
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-clang-format
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
 
-  #     - name: Install clang-format
-  #       run: |
-  #         sudo apt update
-  #         sudo apt install -y clang-format
+      - name: Install clang-format
+        run: |
+          sudo apt update
+          sudo apt install -y clang-format
 
-  #     - name: Check formatting of src/
-  #       run: |
-  #         find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
-  #           | xargs -0 clang-format --dry-run --Werror
+      - name: Check formatting of src/
+        run: |
+          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
+            | xargs -0 clang-format --dry-run --Werror
 
   testing:
-    # needs: linting
+    needs: linting
     name: Testing on ${{ matrix.os }}, Python ${{ matrix.python-version }}${{ matrix.sanitisers && ', with sanitisers enabled' || ' '  }}
     runs-on: ${{ matrix.os }}
     concurrency:
@@ -108,10 +108,8 @@ jobs:
       cancel-in-progress: true
     strategy:
       matrix:
-        python-version: ['3.14']
-        # python-version: ['3.11', '3.12', '3.13', '3.14']
-        os: [macos-latest]
-        # os: [windows-latest, ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+        os: [windows-latest, ubuntu-latest, macos-latest]
         sanitisers: [false]
         exclude:
           - os: macos-latest
@@ -120,10 +118,10 @@ jobs:
             python-version: '3.12'
           - os: macos-latest
             python-version: '3.13'
-        # include:
-        #   - os: ubuntu-latest
-        #     python-version: '3.14'
-        #     sanitisers: true
+        include:
+          - os: ubuntu-latest
+            python-version: '3.14'
+            sanitisers: true
 
       max-parallel: 20
     steps:
@@ -171,168 +169,16 @@ jobs:
         echo CXX=/opt/homebrew/opt/llvm/bin/clang++ >> $GITHUB_ENV
         echo CC=/opt/homebrew/opt/llvm/bin/clang >> $GITHUB_ENV
 
-    - name: Compile and test (Windows and Linux)
-      if: matrix.sanitisers == false && matrix.os != 'macos-latest'
+    - name: Compile and test
+      if: matrix.sanitisers == false
       run: |
-        uv pip install ".[dev]" -v -Ccompile-args=-v
+        uv pip install ".[dev]" -Ccompile-args=-v
         pytest tests/ --durations=50 --dist=loadscope -n 4 --max-worker-restart 0 --random-order --verbose
-
-    - name: Compile and test (macOS)
-      if: matrix.sanitisers == false && matrix.os == 'macos-latest'
-      env:
-        EXECNET_DEBUG: "1"
-        KMP_SETTINGS: "1"
-        KMP_VERSION: "1"
-        OMP_DISPLAY_ENV: "VERBOSE"
-        PYTHONFAULTHANDLER: "1"
-        PYTHONUNBUFFERED: "1"
-      run: |
-        uv pip install ".[dev]" -v -Ccompile-args=-v
-
-        {
-          echo "Python: $(python --version 2>&1)"
-          echo "Python executable: $(command -v python)"
-          echo "Clang: $("$CC" --version 2>&1)"
-          echo "C compiler: $CC"
-          echo "C++ compiler: $CXX"
-          echo "CPU and memory:"
-          sysctl hw.logicalcpu hw.physicalcpu hw.memsize 2>&1 || true
-          echo "Resource limits:"
-          ulimit -a 2>&1 || true
-          echo "OpenMP environment:"
-          env | sort | grep -E '^(AEQ_CPUS|KMP_|OMP_|VECLIB_)' || true
-          echo "Homebrew LLVM/libomp versions:"
-          brew list --versions llvm libomp 2>&1 || true
-          echo "OpenMP runtime files:"
-          find /opt/homebrew/opt/llvm /opt/homebrew/opt/libomp /opt/homebrew/lib .venv \
-            \( -type f -o -type l \) \
-            \( -name 'libomp*.dylib' -o -name 'libiomp*.dylib' -o -name 'libgomp*.dylib' \) \
-            -print 2>/dev/null || true
-          echo "Binaries linked to an OpenMP runtime:"
-          find .venv/lib -type f \( -name '*.so' -o -name '*.dylib' \) -print0 | while IFS= read -r -d '' binary; do
-            links=$(otool -L "$binary" 2>/dev/null || true)
-            if printf '%s\n' "$links" | grep -Eqi 'lib(i|g)?omp'; then
-              printf '\n%s\n' "$links"
-            fi
-          done
-        } 2>&1 | tee macos-openmp-linkage.txt
-
-        mkdir -p "$RUNNER_TEMP/macos-cores" macos-crash-reports macos-execnet macos-lldb macos-worker-events
-        chmod 777 "$RUNNER_TEMP/macos-cores"
-        sudo sysctl -w kern.corefile="$RUNNER_TEMP/macos-cores/core.%P" || true
-        ulimit -c unlimited || true
-        {
-          echo "Configured core dump settings:"
-          sysctl kern.corefile 2>&1 || true
-          ulimit -c 2>&1 || true
-        } | tee -a macos-openmp-linkage.txt
-        touch "$RUNNER_TEMP/macos-test-start"
-        date '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/macos-test-start-time"
-
-        cat > "$RUNNER_TEMP/macos_ci_debug.py" <<'PY'
-        import os
-        import sys
-        from pathlib import Path
-
-
-        def _emit(message):
-            worker = os.environ.get("PYTEST_XDIST_WORKER", "controller")
-            event_file = Path("macos-worker-events") / f"{worker}-{os.getpid()}.log"
-            with event_file.open("a", encoding="utf-8") as stream:
-                stream.write(message + "\n")
-                stream.flush()
-            print(message, file=sys.stderr, flush=True)
-
-
-        def pytest_sessionstart(session):
-            worker = os.environ.get("PYTEST_XDIST_WORKER", "controller")
-            _emit(f"[macos-ci-debug] worker={worker} pid={os.getpid()} ppid={os.getppid()} session-start")
-
-
-        def pytest_runtest_setup(item):
-            worker = os.environ.get("PYTEST_XDIST_WORKER", "controller")
-            _emit(f"[macos-ci-debug] worker={worker} pid={os.getpid()} START {item.nodeid}")
-        PY
-        export PYTHONPATH="$RUNNER_TEMP${PYTHONPATH:+:$PYTHONPATH}"
-
-        monitor_resources() {
-          while true; do
-            echo "===== $(date -u '+%Y-%m-%dT%H:%M:%SZ') ====="
-            ps -axo pid,ppid,%cpu,%mem,rss,vsz,thcount,state,command 2>&1 || \
-              ps -axo pid,ppid,%cpu,%mem,rss,vsz,state,command 2>&1 || true
-            vm_stat 2>&1 || true
-            memory_pressure -Q 2>&1 || true
-            sleep 5
-          done
-        }
-        monitor_resources > macos-resource-usage.txt 2>&1 &
-        monitor_pid=$!
-
-        set +e
-        python -X faulthandler -m pytest tests/ --durations=50 --dist=loadscope -n 4 \
-          --max-worker-restart 0 --random-order --verbose -p macos_ci_debug \
-          2>&1 | tee macos-pytest-output.txt
-        pytest_status=${PIPESTATUS[0]}
-        set -e
-
-        kill "$monitor_pid" 2>/dev/null || true
-        wait "$monitor_pid" 2>/dev/null || true
-
-        # macOS writes crash reports asynchronously.
-        sleep 10
-        for report_dir in "$HOME/Library/Logs/DiagnosticReports" "/Library/Logs/DiagnosticReports"; do
-          if [[ -d "$report_dir" ]]; then
-            while IFS= read -r -d '' report; do
-              cp "$report" "macos-crash-reports/$(basename "$report")" || true
-            done < <(find "$report_dir" -type f -newer "$RUNNER_TEMP/macos-test-start" -print0 2>/dev/null)
-          fi
-        done
-
-        /usr/bin/log show --start "$(cat "$RUNNER_TEMP/macos-test-start-time")" --style compact \
-          --predicate '(process == "kernel" OR process == "ReportCrash" OR process == "diagnosticd" OR process == "Python" OR process == "python") AND (eventMessage CONTAINS[c] "abort" OR eventMessage CONTAINS[c] "crash" OR eventMessage CONTAINS[c] "kill" OR eventMessage CONTAINS[c] "memory" OR eventMessage CONTAINS[c] "resource")' \
-          > macos-unified-log.txt 2>&1 || true
-
-        execnet_temp_dir=${TMPDIR:-/tmp}
-        while IFS= read -r -d '' debug_log; do
-          cp "$debug_log" "macos-execnet/$(basename "$debug_log")" || true
-        done < <(find "$execnet_temp_dir" -maxdepth 1 -type f -name 'execnet-debug-*' \
-          -newer "$RUNNER_TEMP/macos-test-start" -print0 2>/dev/null)
-
-        shopt -s nullglob
-        for core in "$RUNNER_TEMP"/macos-cores/core.*; do
-          core_name=$(basename "$core")
-          {
-            echo "Core file: $core"
-            xcrun lldb --batch -c "$core" \
-              -o "thread backtrace all" \
-              -o "target modules list -o -f"
-          } > "macos-lldb/${core_name}.txt" 2>&1 || true
-          rm -f "$core"
-        done
-        shopt -u nullglob
-
-        exit "$pytest_status"
-
-    - name: Upload macOS OpenMP diagnostics
-      if: always() && matrix.sanitisers == false && matrix.os == 'macos-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-openmp-diagnostics-python-${{ matrix.python-version }}
-        path: |
-          macos-openmp-linkage.txt
-          macos-pytest-output.txt
-          macos-resource-usage.txt
-          macos-unified-log.txt
-          macos-crash-reports/
-          macos-execnet/
-          macos-lldb/
-          macos-worker-events/
-        if-no-files-found: warn
 
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
       run: |
-        uv pip install ".[dev]" -v -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
+        uv pip install ".[dev]" -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         export ASAN_OPTIONS=detect_leaks=1
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
         LD_PRELOAD=$(gcc -print-file-name=libasan.so) pytest tests/
