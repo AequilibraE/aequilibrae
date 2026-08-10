@@ -2,7 +2,6 @@ import logging
 import os
 import time
 from functools import partial
-from pathlib import Path
 from tempfile import gettempdir
 from typing import TYPE_CHECKING
 

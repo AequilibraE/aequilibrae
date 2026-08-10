@@ -1,7 +1,6 @@
 # cython: language_level=3
 cimport cython
 
-import os
 import numpy as np
 from cython.parallel cimport parallel, prange, threadid
 from libc.string cimport memset
@@ -19,7 +18,6 @@ from aequilibrae.paths.cython.path_finding cimport Heuristic
 from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
 
 from aequilibrae.paths.cython.basic_path_finding import HEURISTIC_MAP, HEAP_MAP
-from aequilibrae.paths.cython.path_file_saving import save_path_file
 
 
 def available_heaps() -> list:

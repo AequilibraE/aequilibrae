@@ -1,6 +1,5 @@
 import importlib.metadata
 import logging
-import sys
 
 from aequilibrae import distribution, matrix, paths, project, transit
 from aequilibrae.distribution import GravityApplication, GravityCalibration, Ipf, SyntheticGravityModel
