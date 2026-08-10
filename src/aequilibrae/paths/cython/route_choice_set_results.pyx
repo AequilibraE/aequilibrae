@@ -501,8 +501,9 @@ cdef class RouteChoiceSetResults:
             raise RuntimeError("route set table construction requires `store_results` is True")
 
         cdef:
-            size_t link, tmp, n_routes, idx_min, idx_max
+            size_t link, tmp, n_routes, idx_min, idx_max, supernet_id
             bint have_assignment_results = self.perform_assignment and self.store_results
+            const int64_t [::] supernet_ids
 
         columns = {
             "origin id": [],
@@ -575,7 +576,8 @@ cdef class RouteChoiceSetResults:
                     else:
                         # Otherwise we pull out the full range and translate that
                         supernet_ids = self.mapping_data[idx_min:idx_max]
-                        links.append(self.link_id_direction[supernet_ids])
+                        for supernet_id in supernet_ids:
+                            links.append(self.link_id_direction[supernet_id])
 
                 route_set_col.append(np.hstack(links))
 
