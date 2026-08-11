@@ -96,8 +96,10 @@ def _pin_and_load_extensions(conn: Connection, extensions: tuple[str]) -> None:
 
     if extensions not in _pinned_connections:
         pinned_conn = connect(":memory:")
+        pinned_conn.enable_load_extension(True)
         for extension in extensions:
             pinned_conn.load_extension(extension)
+        pinned_conn.enable_load_extension(False)
         _pinned_connections[extensions] = pinned_conn
 
 
