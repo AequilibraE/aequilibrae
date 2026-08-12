@@ -140,6 +140,7 @@ def test_link_direction(sioux_falls_example):
 @pytest.mark.parametrize("field", ["a_node", "b_node"])
 @pytest.mark.parametrize("bad_endpoint", ["opposite", "missing", "null"])
 def test_link_endpoint_updates_are_guarded(empty_project, field, bad_endpoint):
+    """Test that setting a_node/b_node to a node that is not the matching link endpoint is rejected."""
     with empty_project.db_connection as conn:
         a_node, b_node = _insert_link(conn, 1001, [(0, 0), (1, 0)])
         if bad_endpoint == "opposite":
@@ -159,6 +160,7 @@ def test_link_endpoint_updates_are_guarded(empty_project, field, bad_endpoint):
 
 
 def test_link_endpoint_noop_update_is_allowed(empty_project):
+    """Test that rewriting a_node/b_node with their current values passes the endpoint guards."""
     with empty_project.db_connection as conn:
         _insert_link(conn, 1001, [(0, 0), (1, 0)])
         conn.execute("UPDATE links SET a_node = a_node, b_node = b_node WHERE link_id = 1001")
@@ -166,6 +168,7 @@ def test_link_endpoint_noop_update_is_allowed(empty_project):
 
 
 def test_geometry_update_cannot_bypass_endpoint_guards(empty_project):
+    """Test that changing geometry and a_node in a single statement cannot smuggle in a mismatched endpoint."""
     with empty_project.db_connection as conn:
         _, wrong_a_node = _insert_link(conn, 1001, [(0, 0), (1, 0)])
         before = _network_snapshot(conn)
@@ -185,6 +188,7 @@ def test_geometry_update_cannot_bypass_endpoint_guards(empty_project):
 
 
 def test_link_geometry_update_rebuilds_endpoint_nodes(empty_project):
+    """Test that moving a link's end point creates the new node and drops the orphaned old one."""
     with empty_project.db_connection as conn:
         a_node, old_b_node = _insert_link(conn, 1001, [(0, 0), (1, 0)])
         conn.execute(
@@ -200,6 +204,7 @@ def test_link_geometry_update_rebuilds_endpoint_nodes(empty_project):
 
 
 def test_adjacent_node_merge_is_ordered_and_consistent(empty_project):
+    """Test that dragging a node onto its neighbour merges them into a self-loop with merged modes/link types."""
     moving_node, replaced_node, other_node = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
@@ -233,6 +238,7 @@ def test_adjacent_node_merge_is_ordered_and_consistent(empty_project):
 
 
 def test_adjacent_node_merge_is_consistent_in_reverse_direction(empty_project):
+    """Test that the same neighbour merge stays consistent when the node dragged is the downstream one."""
     first_node, replaced_node, moving_node = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
@@ -259,6 +265,7 @@ def test_adjacent_node_merge_is_consistent_in_reverse_direction(empty_project):
 
 @pytest.mark.parametrize("moving_is_centroid,replaced_is_centroid", [(0, 1), (1, 0), (1, 1)])
 def test_centroid_merge_is_atomic(empty_project, moving_is_centroid, replaced_is_centroid):
+    """Test that a merge involving a centroid on either side is aborted and leaves the network untouched."""
     moving_node, replaced_node, _ = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
@@ -281,6 +288,7 @@ def test_centroid_merge_is_atomic(empty_project, moving_is_centroid, replaced_is
 
 
 def test_centroid_demotion_cannot_bypass_merge_guard(empty_project):
+    """Test that clearing is_centroid in the same statement as the move does not unlock the centroid merge guard."""
     moving_node, replaced_node, _ = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
@@ -303,6 +311,7 @@ def test_centroid_demotion_cannot_bypass_merge_guard(empty_project):
 
 
 def test_linked_centroid_can_move_and_be_demoted(empty_project):
+    """Test that a centroid attached to links can be demoted and moved to empty space in one statement."""
     moving_node, _, _ = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
@@ -321,6 +330,7 @@ def test_linked_centroid_can_move_and_be_demoted(empty_project):
 
 
 def test_empty_centroid_must_be_demoted_separately_from_geometry(empty_project):
+    """Test that a link-less centroid rejects a combined demotion plus move, but accepts each change on its own."""
     with empty_project.db_connection as conn:
         conn.execute(
             "INSERT INTO nodes (node_id, is_centroid, geometry) VALUES (9001, 1, GeomFromWKB(?, 4326))",
@@ -354,6 +364,7 @@ def test_empty_centroid_must_be_demoted_separately_from_geometry(empty_project):
 
 
 def test_isolated_centroid_demotion_and_merge_is_atomic(empty_project):
+    """Test that demoting a link-less centroid while dragging it onto another node aborts with no side effects."""
     _, replaced_node, _ = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
@@ -379,6 +390,7 @@ def test_isolated_centroid_demotion_and_merge_is_atomic(empty_project):
 
 
 def test_node_id_and_geometry_actual_changes_must_be_separate(empty_project):
+    """Test that renumbering a node and moving it must happen in separate statements, while no-op halves are allowed."""
     moving_node, _, _ = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
@@ -415,6 +427,7 @@ def test_node_id_and_geometry_actual_changes_must_be_separate(empty_project):
 
 
 def test_linked_centroid_can_be_renumbered_and_demoted(empty_project):
+    """Test that a centroid attached to links can be renumbered and demoted in one statement."""
     moving_node, _, _ = _build_adjacent_network(empty_project)
 
     with empty_project.db_connection as conn:
