@@ -1,6 +1,5 @@
 from libcpp.algorithm cimport min_element, sort, lower_bound
 from libc.math cimport INFINITY, exp, pow, log
-from libcpp cimport nullptr
 from libcpp.memory cimport shared_ptr, make_shared
 
 from cython.operator cimport dereference as d
@@ -132,8 +131,8 @@ cdef class RouteChoiceSetResults:
                 # no visitor option
             }
             logger.warning(
-                "FastParquet back-end doesn't support writing a NumPy arrays as Parquet list types, converting to Python lists. "
-                "Watch out for memory consumption..."
+                "FastParquet back-end doesn't support writing a NumPy arrays as Parquet list types, converting to "
+                "Python lists. Watch out for memory consumption..."
             )
             # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
             # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
@@ -158,7 +157,8 @@ cdef class RouteChoiceSetResults:
             logger.warning("Found JSON encoded route sets. Parsing into a NumPy array...")
             if not is_json_encoded.all():
                 raise TypeError(
-                    f"route sets must either be encoded properly as list[int64], or json lists (by FastParquet). The two cannot be mixed"
+                    "route sets must either be encoded properly as list[int64], or json lists (by FastParquet). "
+                    "The two cannot be mixed"
                 )
 
             import json
@@ -508,8 +508,8 @@ cdef class RouteChoiceSetResults:
         }
         route_set_col = []  # We treat this one differently when constructing it
 
-        types = {"cost":"float64", "mask":"bool", "path overlap":"float64", "probability":"float64",
-                 "origin id":"uint32", "destination id":"uint32"}
+        types = {"cost": "float64", "mask": "bool", "path overlap": "float64", "probability": "float64",
+                 "origin id": "uint32", "destination id": "uint32"}
 
         if have_assignment_results:
             columns["cost"] = []
@@ -526,17 +526,23 @@ cdef class RouteChoiceSetResults:
                 # When assigning from df, the cost, mask, and path overlap vectors may be empty
                 tmp = d(self.__cost_set[i]).size()
                 columns["cost"].append(
-                    np.asarray(<double[:tmp]>d(self.__cost_set[i]).data()) if tmp else np.zeros(n_routes, dtype="float64")
+                    np.asarray(<double[:tmp]>d(self.__cost_set[i]).data())
+                    if tmp
+                    else np.zeros(n_routes, dtype="float64")
                 )
 
                 tmp = d(self.__mask_set[i]).size()
                 columns["mask"].append(
-                    np.asarray(<bint[:tmp]>d(self.__mask_set[i]).data()) if tmp else np.ones(n_routes, dtype="bool")
+                    np.asarray(<bint[:tmp]>d(self.__mask_set[i]).data())
+                    if tmp
+                    else np.ones(n_routes, dtype="bool")
                 )
 
                 tmp = d(self.__path_overlap_set[i]).size()
                 columns["path overlap"].append(
-                    np.asarray(<double[:tmp]>d(self.__path_overlap_set[i]).data()) if tmp else np.zeros(n_routes, dtype="float64")
+                    np.asarray(<double[:tmp]>d(self.__path_overlap_set[i]).data())
+                    if tmp
+                    else np.zeros(n_routes, dtype="float64")
                 )
 
                 tmp = d(self.__prob_set[i]).size()
@@ -562,7 +568,9 @@ cdef class RouteChoiceSetResults:
 
                 route_set_col.append(np.hstack(links))
 
-        columns = {k: np.hstack(v, casting="no") if len(v) else np.array([], dtype=types[k]) for k, v in columns.items()}
+        columns = {
+            k: np.hstack(v, casting="no") if len(v) else np.array([], dtype=types[k]) for k, v in columns.items()
+        }
         columns["route set"] = route_set_col
 
         self.table = pd.DataFrame(columns)

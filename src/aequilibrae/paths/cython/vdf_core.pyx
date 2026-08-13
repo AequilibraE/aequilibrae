@@ -67,6 +67,8 @@ from cython.parallel import prange
 # ------------------------------------------------------------------------------------------------
 #                             BPR FUNCTION AND DERIVATIVE
 # ------------------------------------------------------------------------------------------------
+
+
 def bpr(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
     cdef int c = cores
 
@@ -108,10 +110,10 @@ cpdef void bpr_cython(
     int cores
 ) noexcept nogil:
     cdef long long i
-    cdef long long l = congested_time.shape[0]
+    cdef long long n_links = congested_time.shape[0]
 
     # TODO: Use prange with use_threads_if when Cython 3.1 is released
-    for i in range(l):
+    for i in range(n_links):
         if link_flows[i] > 0:
             congested_time[i] = fftime[i] * (1 + alpha[i] * (pow(link_flows[i] / capacity[i], beta[i])))
         else:
@@ -131,10 +133,10 @@ cpdef void dbpr_cython(
     int cores
 ) noexcept nogil:
     cdef long long i
-    cdef long long l = deltaresult.shape[0]
+    cdef long long n_links = deltaresult.shape[0]
 
     # TODO: Use prange with use_threads_if when Cython 3.1 is released
-    for i in range(l):
+    for i in range(n_links):
         if link_flows[i] > 0:
             deltaresult[i] = fftime[i] * (
                 alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1))
@@ -187,9 +189,9 @@ cpdef void bpr2_cython(
     int cores
 ) noexcept:
     cdef long long i
-    cdef long long l = congested_time.shape[0]
+    cdef long long n_links = congested_time.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
                 congested_time[i] = fftime[i] * (1 + alpha[i] * (
@@ -214,9 +216,9 @@ cpdef void dbpr2_cython(
     int cores
 ) noexcept:
     cdef long long i
-    cdef long long l = deltaresult.shape[0]
+    cdef long long n_links = deltaresult.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
                 deltaresult[i] = fftime[i] * (alpha[i] * 2 * beta[i] * (
@@ -273,15 +275,16 @@ cpdef void conical_cython(
     int cores
 ) noexcept:
     cdef long long i
-    cdef long long l = congested_time.shape[0]
+    cdef long long n_links = congested_time.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-
             congested_time[i] = fftime[i] * (
-                sqrt(pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2)\
-                + pow(beta[i], 2)) - alpha[i] * (
-                1 - link_flows[i] / capacity[i]) - beta[i] + 2)
+                sqrt(pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2))
+                - alpha[i] * (1 - link_flows[i] / capacity[i])
+                - beta[i]
+                + 2
+            )
         else:
             congested_time[i] = fftime[i]
 
@@ -299,15 +302,20 @@ cpdef void dconical_cython(
     int cores
 ) noexcept:
     cdef long long i
-    cdef long long l = deltaresult.shape[0]
+    cdef long long n_links = deltaresult.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-            deltaresult[i] = fftime[i] * ((alpha[i] / capacity[i]) - (
-                    (pow(alpha[i], 2) * (1 - link_flows[i] / capacity[i])) / (
-                    capacity[i] * sqrt(pow(alpha[i], 2) * pow(
-                    1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2)))))
-
+            deltaresult[i] = fftime[i] * (
+                (alpha[i] / capacity[i])
+                - (
+                    (pow(alpha[i], 2) * (1 - link_flows[i] / capacity[i]))
+                    / (
+                        capacity[i]
+                        * sqrt(pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2))
+                    )
+                )
+            )
         else:
             deltaresult[i] = fftime[i]
 
@@ -352,9 +360,9 @@ cpdef void inrets_cython(
     int cores
 ) noexcept:
     cdef long long i
-    cdef long long l = congested_time.shape[0]
+    cdef long long n_links = congested_time.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
                 congested_time[i] = fftime[i] * (
@@ -380,9 +388,9 @@ cpdef void dinrets_cython(
     int cores
 ) noexcept:
     cdef long long i
-    cdef long long l = deltaresult.shape[0]
+    cdef long long n_links = deltaresult.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
                 deltaresult[i] = fftime[i] * (
@@ -396,10 +404,10 @@ cpdef void dinrets_cython(
         else:
             deltaresult[i] = fftime[i]
 
+
 # ------------------------------------------------------------------------------------------------
 #                             AKCELIK FUNCTION AND DERIVATIVE
 # ------------------------------------------------------------------------------------------------
-
 
 
 def akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores):
@@ -444,13 +452,13 @@ cpdef void akcelik_cython(
 ) noexcept:
     # tau is redefined as 8 * tau
     cdef long long i
-    cdef long long l = congested_time.shape[0]
+    cdef long long n_links = congested_time.shape[0]
 
     cdef:
         double voc = 0.0
         double z = 0.0
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             voc = link_flows[i] / capacity[i]
             z = voc - 1.0
@@ -481,9 +489,9 @@ cpdef void dakcelik_cython(
     const int cores
 ) noexcept:
     cdef long long i
-    cdef long long l = deltaresult.shape[0]
+    cdef long long n_links = deltaresult.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             deltaresult[i] = alpha[i] * (
                 0.5 * tau[i] - capacity[i] + link_flows[i]

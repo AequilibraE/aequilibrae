@@ -8,4 +8,3 @@ cpdef void save_path_file(
     str index_file,
     bint write_feather
 ) noexcept
-

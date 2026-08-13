@@ -12,14 +12,14 @@ cpdef cython.floating[::1] sum_axis1(
     Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef:
-        Py_ssize_t l = out.shape[0]
+        Py_ssize_t n = out.shape[0]
         Py_ssize_t k = multiples.shape[1]
         Py_ssize_t i, j
-        bool use_threads = l * k > threading_threshold and threading_threshold >= 0
+        bool use_threads = n * k > threading_threshold and threading_threshold >= 0
 
-    assert multiples.shape[0] == l, "mismatched shape"
+    assert multiples.shape[0] == n, "mismatched shape"
 
-    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
+    for i in prange(n, nogil=True, num_threads=cores, use_threads_if=use_threads):
         out[i] = 0
         for j in range(k):
             out[i] += multiples[i, j]
@@ -35,14 +35,14 @@ cpdef cython.floating sum_a_times_b_minus_c(
     Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef:
-        Py_ssize_t l = array1.shape[0]
+        Py_ssize_t n = array1.shape[0]
         Py_ssize_t i
         cython.floating result = 0.0
-        bool use_threads = l > threading_threshold and threading_threshold >= 0
+        bool use_threads = n > threading_threshold and threading_threshold >= 0
 
-    assert l == array2.shape[0] == array3.shape[0]
+    assert n == array2.shape[0] == array3.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
+    for i in prange(n, nogil=True, num_threads=cores, use_threads_if=use_threads):
         result += array1[i] * (array2[i] - array3[i])
 
     return result
@@ -57,13 +57,13 @@ cpdef cython.floating[::1] linear_combination_1d(
     Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef:
-        Py_ssize_t l = results.shape[0]
+        Py_ssize_t n = results.shape[0]
         Py_ssize_t i
-        bool use_threads = l > threading_threshold and threading_threshold >= 0
+        bool use_threads = n > threading_threshold and threading_threshold >= 0
 
-    assert l == array1.shape[0] == array2.shape[0]
+    assert n == array1.shape[0] == array2.shape[0]
 
-    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
+    for i in prange(n, nogil=True, num_threads=cores, use_threads_if=use_threads):
         results[i] = array1[i] * stepsize + array2[i] * (1.0 - stepsize)
 
     return results
@@ -78,14 +78,14 @@ cpdef cython.floating[:, ::1] linear_combination(
     Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j
-    cdef Py_ssize_t l = results.shape[0]
+    cdef Py_ssize_t n = results.shape[0]
     cdef Py_ssize_t k = results.shape[1]
-    cdef bool use_threads = l * k > threading_threshold and threading_threshold >= 0
+    cdef bool use_threads = n * k > threading_threshold and threading_threshold >= 0
 
-    assert array1.shape[0] == l and array2.shape[0] == l, "mismatched shape"
+    assert array1.shape[0] == n and array2.shape[0] == n, "mismatched shape"
     assert array1.shape[1] == k and array2.shape[1] == k, "mismatched shape"
 
-    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
+    for i in prange(n, nogil=True, num_threads=cores, use_threads_if=use_threads):
         for j in range(k):
             results[i, j] = array1[i, j] * stepsize + array2[i, j] * (1.0 - stepsize)
 
@@ -128,15 +128,15 @@ cpdef cython.floating[:, ::1] triple_linear_combination(
     Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j
-    cdef Py_ssize_t l = results.shape[0]
+    cdef Py_ssize_t n = results.shape[0]
     cdef Py_ssize_t k = results.shape[1]
-    cdef bool use_threads = l * k > threading_threshold and threading_threshold >= 0
+    cdef bool use_threads = n * k > threading_threshold and threading_threshold >= 0
 
     assert stepsizes.shape[0] == 3, "expected 3 stepsizes"
-    assert array1.shape[0] == l and array2.shape[0] == l and array3.shape[0] == l, "mismatched shape"
+    assert array1.shape[0] == n and array2.shape[0] == n and array3.shape[0] == n, "mismatched shape"
     assert array1.shape[1] == k and array2.shape[1] == k and array3.shape[1] == k, "mismatched shape"
 
-    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
+    for i in prange(n, nogil=True, num_threads=cores, use_threads_if=use_threads):
         for j in range(k):
             results[i, j] = array1[i, j] * stepsizes[0] + array2[i, j] * stepsizes[1] + array3[i, j] * stepsizes[2]
 
@@ -166,7 +166,7 @@ cpdef cython.floating[:, :, ::1] triple_linear_combination_skims(
     for i in prange(a, nogil=True, num_threads=cores, use_threads_if=use_threads):
         for k in range(c):
             for j in range(b):
-                results[i, j, k] = array1[i, j, k] * stepsizes[0] + array2[i, j, k] * stepsizes[1]  + \
+                results[i, j, k] = array1[i, j, k] * stepsizes[0] + array2[i, j, k] * stepsizes[1] + \
                                    array3[i, j, k] * stepsizes[2]
 
     return results
@@ -179,12 +179,12 @@ cpdef cython.floating[::1] copy_one_dimension(
     Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i
-    cdef Py_ssize_t l = target.shape[0]
-    cdef bool use_threads = l > threading_threshold and threading_threshold >= 0
+    cdef Py_ssize_t n = target.shape[0]
+    cdef bool use_threads = n > threading_threshold and threading_threshold >= 0
 
-    assert source.shape[0] == l, "mismatched shape"
+    assert source.shape[0] == n, "mismatched shape"
 
-    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
+    for i in prange(n, nogil=True, num_threads=cores, use_threads_if=use_threads):
         target[i] = source[i]
 
     return target
@@ -197,13 +197,13 @@ cpdef cython.floating[:, ::1] copy_two_dimensions(
     Py_ssize_t threading_threshold=10000,
 ) noexcept nogil:
     cdef Py_ssize_t i, j
-    cdef Py_ssize_t l = target.shape[0]
+    cdef Py_ssize_t n = target.shape[0]
     cdef Py_ssize_t k = target.shape[1]
-    cdef bool use_threads = l * k > threading_threshold and threading_threshold >= 0
+    cdef bool use_threads = n * k > threading_threshold and threading_threshold >= 0
 
-    assert source.shape[0] == l and source.shape[1] == k, "mismatched shape"
+    assert source.shape[0] == n and source.shape[1] == k, "mismatched shape"
 
-    for i in prange(l, nogil=True, num_threads=cores, use_threads_if=use_threads):
+    for i in prange(n, nogil=True, num_threads=cores, use_threads_if=use_threads):
         for j in range(k):
             target[i, j] = source[i, j]
 
