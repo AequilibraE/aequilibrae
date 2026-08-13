@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from contextlib import nullcontext
 
@@ -25,9 +26,17 @@ class AequilibraETQDMStreamHandler(logging.StreamHandler):
         **kwargs** (:obj:`**kwargs`): Arbitrary keyword arguments passed to the parent logging.StreamHandler.
     """
 
-    def __init__(self, *args, tqdm_class=tqdm, **kwargs):
+    def __init__(self, *args, tqdm_class=tqdm, show_progress: bool | None = None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__show_progress = (
+            show_progress if show_progress is not None else os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE"
+        )
         self.tqdm_class = tqdm_class
+
+        if self.__show_progress and self.tqdm_class is None:
+            raise ValueError(
+                "show_progress (or AEQ_SHOW_PROGRESS) was True but the provided tqdm is None or tqdm failed to import"
+            )
 
     def emit(self, record):
         """Emits a record.
@@ -35,6 +44,10 @@ class AequilibraETQDMStreamHandler(logging.StreamHandler):
         Args:
             record (logging.LogRecord): The log record to emit.
         """
+        if not self.__show_progress:
+            super().emit(record)
+            return
+
         try:
             msg = self.format(record)
             self.tqdm_class.write(msg, file=self.stream, end=self.terminator)

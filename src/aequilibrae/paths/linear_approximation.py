@@ -2,7 +2,6 @@ import logging
 import os
 import time
 from functools import partial
-from pathlib import Path
 from tempfile import gettempdir
 from typing import TYPE_CHECKING
 
@@ -482,17 +481,6 @@ class LinearApproximation(WorkerThread):
         self.__calculate_step_direction()
         self.calculate_stepsize()
 
-    def __maybe_create_path_file_directories(self):
-        path_base_dir = os.path.join(self.project_path, "path_files", self.procedure_id)
-        for c in self.traffic_classes:
-            if c._aon_results.save_path_file:
-                c._aon_results.path_file_dir = os.path.join(
-                    path_base_dir, f"iter{self.iter}", f"path_c{c.mode}_{c._id}"
-                )
-                Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
-                if self.iter == 1:  # save simplified graph correspondences, this could change after assignment
-                    c.graph.save_compressed_correspondence(path_base_dir, c.mode, c._id)
-
     def doWork(self):
         self.execute()
 
@@ -566,8 +554,6 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
 
-            self.__maybe_create_path_file_directories()
-
             for c in self.traffic_classes:  # type: TrafficClass
                 msg = f"All-or-Nothing - Traffic Class: {c._id}"
                 self.signal.emit(["set_text", msg])
@@ -581,6 +567,14 @@ class LinearApproximation(WorkerThread):
                 aon.signal = self.signal
 
                 aon.execute()
+
+                if aon.results.save_path_file:
+                    aon.aux_res.save_path_files(
+                        os.path.join(self.project_path, "path_files.h5"),
+                        aon.graph,
+                        self.iter,
+                    )
+
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
                 aon_flows.append(c._aon_results.total_link_loads)

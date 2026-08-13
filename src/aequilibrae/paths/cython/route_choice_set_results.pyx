@@ -29,8 +29,9 @@ cdef class RouteChoiceSetResults:
             beta: float,
             num_links: int,
             double[:] cost_view,
-            unsigned int [:] mapping_idx,
-            int64_t [::] mapping_data,
+            const unsigned int [:] mapping_idx,
+            const int64_t [::] mapping_data,
+            const int64_t [::] link_id_direction,
             store_results: bool = True,
             perform_assignment: bool = True,
     ):
@@ -69,6 +70,7 @@ cdef class RouteChoiceSetResults:
         self.cost_view = cost_view
         self.mapping_idx = mapping_idx
         self.mapping_data = mapping_data
+        self.link_id_direction = link_id_direction
         self.table = None
 
         cdef size_t size = self.demand.ods.size()
@@ -499,8 +501,9 @@ cdef class RouteChoiceSetResults:
             raise RuntimeError("route set table construction requires `store_results` is True")
 
         cdef:
-            size_t link, tmp, n_routes
+            size_t link, tmp, n_routes, idx_min, idx_max, supernet_id
             bint have_assignment_results = self.perform_assignment and self.store_results
+            const int64_t [::] supernet_ids
 
         columns = {
             "origin id": [],
@@ -557,14 +560,24 @@ cdef class RouteChoiceSetResults:
             columns["destination id"].append(np.full(d(route_set).size(), self.demand.ods[i].second, "uint32"))
 
             # Instead of constructing a "list of lists" style object for storing the route sets we instead will
-            # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
-            # (path) starts.
+            # construct one big array of link IDs (with direction as sign) with a corresponding offsets array that
+            # indicates where each new row (path) starts.
             for j in range(d(route_set).size()):
 
                 links = []
                 for link in d(d(route_set)[j]):
-                    # Translate the compressed link IDs in route to network link IDs, this is a 1:n mapping
-                    links.append(np.asarray(self.mapping_data[self.mapping_idx[link]:self.mapping_idx[link + 1]]))
+                    # Translate compressed link IDs to __supernet_id__ then to link_id * direction
+                    idx_min = self.mapping_idx[link]
+                    idx_max = self.mapping_idx[link + 1]
+
+                    # If there's just one link we can do a little better but just adding that single link ID
+                    if idx_max - idx_min == 1:
+                        links.append(self.link_id_direction[self.mapping_data[idx_min]])
+                    else:
+                        # Otherwise we pull out the full range and translate that
+                        supernet_ids = self.mapping_data[idx_min:idx_max]
+                        for supernet_id in supernet_ids:
+                            links.append(self.link_id_direction[supernet_id])
 
                 route_set_col.append(np.hstack(links))
 

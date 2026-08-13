@@ -1,6 +1,6 @@
 # cython: language_level=3
 
-import multiprocessing
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 import socket
 import logging
 import json
@@ -344,7 +344,7 @@ class HyperpathGenerating:
                 volume,
                 self.vertex_count,
                 volume.shape[0],
-                (multiprocessing.cpu_count() if threads < 1 else threads),
+                (omp_get_max_threads() if threads < 1 else threads),
                 self._skim_cols[:],
                 self.u_i_vec,
                 self.skim_matrix,

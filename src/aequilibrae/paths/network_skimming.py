@@ -1,5 +1,5 @@
 import logging
-import multiprocessing as mp
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from datetime import datetime
 from uuid import uuid4
 
@@ -50,7 +50,7 @@ class NetworkSkimming(WorkerThread):
         self.project = project
         self.origins = origins
         self.graph = graph
-        self.cores = mp.cpu_count()
+        self.cores = omp_get_max_threads()
         self.results = SkimResults()
         self.report = []
         self.procedure_id = ""

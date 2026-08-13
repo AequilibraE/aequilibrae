@@ -118,6 +118,7 @@ cdef class RouteChoiceSet:
         self.block_flows_through_centroids = graph.block_centroid_flows
 
         self.mapping_idx, self.mapping_data, _ = graph.create_compressed_link_network_mapping()
+        self.link_id_direction = (graph.graph.link_id * graph.graph.direction).to_numpy(copy=False)
 
         self.results = None
         self.ll_results = None
@@ -295,6 +296,7 @@ cdef class RouteChoiceSet:
                 self.cost_view,
                 self.mapping_idx,
                 self.mapping_data,
+                self.link_id_direction,
                 store_results=store_results,
                 perform_assignment=path_size_logit,
             )
@@ -477,6 +479,7 @@ cdef class RouteChoiceSet:
             self.cost_view,
             self.mapping_idx,
             self.mapping_data,
+            self.link_id_direction,
             store_results=store_results,
             perform_assignment=True,
         )

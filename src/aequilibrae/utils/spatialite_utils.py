@@ -1,12 +1,12 @@
-import ctypes
 import logging
 import os
 import shutil
+import sys
 import urllib
 import warnings
 from os.path import basename, join
 from pathlib import Path
-from sqlite3 import Connection, OperationalError, register_adapter
+from sqlite3 import Connection, OperationalError, connect, register_adapter
 from tempfile import gettempdir
 from zipfile import ZipFile
 
@@ -29,6 +29,10 @@ def is_windows():
 
 def is_not_windows():
     return os.name != "nt"
+
+
+def is_macos():
+    return sys.platform == "darwin"
 
 
 def connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False) -> Connection:
@@ -55,7 +59,7 @@ def load_spatialite_extension(conn: Connection):
     # Try loading from specific directory first
     if directory:
         try:
-            _load_extension(conn, os.path.join(directory, "mod_spatialite"))
+            _pin_and_load_extensions(conn, (os.path.join(directory, "mod_spatialite"),))
             return
         except OperationalError:
             logger.error(
@@ -64,41 +68,39 @@ def load_spatialite_extension(conn: Connection):
             )
 
     try:
-        _load_extension(conn, "mod_spatialite")
+        _pin_and_load_extensions(conn, ("mod_spatialite",))
     except OperationalError as e:
         if is_windows():
             ensure_spatialite_binaries()
             try:
                 # Retry after potential download
                 directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
-                _load_extension(conn, os.path.join(directory, "mod_spatialite"))
+                _pin_and_load_extensions(conn, (os.path.join(directory, "mod_spatialite"),))
                 return
             except OperationalError as e2:
                 raise e2 from e
 
 
-_pinned_extensions: dict = {}
+_pinned_connections: dict[tuple[str], Connection] = {}
 
 
-def _load_extension(conn: Connection, path: str) -> None:
-    conn.load_extension(path)
-    _pin_extension(path)
+def _pin_and_load_extensions(conn: Connection, extensions: tuple[str]) -> None:
+    # SQLite unloads mod_spatialite when the connection closes. Repeated load/unload cycles exhaust
+    # TLS indexes on Windows and pthread_atfork slots on macOS, and incur unnecessary loader overhead
+    # on every platform. Holding one extra reference keeps the library and its dependencies mapped,
+    # while SQLite still initialises each individual connection.
+    global _pinned_connections
 
+    for extension in extensions:
+        conn.load_extension(extension)
 
-def _pin_extension(path: str) -> None:
-    # SQLite loads mod_spatialite with LoadLibrary on every load_extension call and frees it with
-    # FreeLibrary when the connection closes. On Windows, each load/unload cycle leaks a TLS index,
-    # and the process aborts once the ~1088-slot limit is reached (~1000 connections). Holding one
-    # extra reference here keeps the DLL permanently mapped so it is never actually unloaded.
-    if is_not_windows() or path in _pinned_extensions:
-        return
-    try:
-        # winmode=0 gives classic LoadLibrary search semantics (incl. PATH), matching how SQLite
-        # itself resolves the extension. LoadLibrary appends ".dll" to the extension-less path,
-        # resolving to the same module SQLite loaded.
-        _pinned_extensions[path] = ctypes.CDLL(path, winmode=0)
-    except OSError as e:
-        logger.warning(f"Could not pin mod_spatialite ({path}) in memory: {e}")
+    if extensions not in _pinned_connections:
+        pinned_conn = connect(":memory:")
+        pinned_conn.enable_load_extension(True)
+        for extension in extensions:
+            pinned_conn.load_extension(extension)
+        pinned_conn.enable_load_extension(False)
+        _pinned_connections[extensions] = pinned_conn
 
 
 def is_spatialite(conn):

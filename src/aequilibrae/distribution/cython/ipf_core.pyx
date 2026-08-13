@@ -1,5 +1,5 @@
 import warnings
-import multiprocessing as mp
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 cimport cython
 import numpy as np
@@ -25,11 +25,11 @@ def ipf_core(
     cdef int cpus = 0
 
     if cores < 0:
-        cpus = max(1, mp.cpu_count() + cores)
+        cpus = max(1, omp_get_max_threads() + cores)
     if cores == 0:
-        cpus = mp.cpu_count()
+        cpus = omp_get_max_threads()
     elif cores > 0:
-        cpus = min(mp.cpu_count(), cores)
+        cpus = min(omp_get_max_threads(), cores)
 
     mat_prod_tot = np.zeros_like(target_productions, np.float64)
     factor_prod = np.zeros_like(target_productions, np.float64)
