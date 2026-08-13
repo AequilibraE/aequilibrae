@@ -310,3 +310,16 @@ The user should not change the a_node and b_node fields, as they are controlled
 by the triggers that govern the consistency between links and nodes. It is not
 possible to enforce that users do not change these two fields, as it is not
 possible to choose the trigger application sequence in SQLite.
+
+.. _is_centroid_field:
+
+Field 'is_centroid' (nodes layer)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The centroid of a zone is the node whose ``node_id`` matches that zone's ``zone_id``,
+so triggers set ``is_centroid=1`` for every node that shares its ID with an existing
+zone. That happens when such a node is created or renumbered onto the zone's ID, and
+also when a zone is created or renumbered on top of an existing node.
+
+Removing the centroid flag from one of these nodes results in an SQL exception, as
+that would leave the zone without a centroid. The zone has to be deleted first.

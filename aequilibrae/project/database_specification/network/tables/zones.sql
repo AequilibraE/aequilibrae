@@ -1,7 +1,9 @@
 --@ The *zones* table holds information on the Traffic Analysis Zones (TAZs) 
 --@ in AequilibraE's model.
 --@
---@ The **zone_id** field identifies the zone.
+--@ The **zone_id** field identifies the zone. The centroid of a zone is the node
+--@ with **node_id** equal to this zone's **zone_id**, and database triggers guarantee
+--@ that such a node is always tagged as a centroid.
 --@
 --@ The **area** field corresponds to the area of the zone in **km2**.
 --@ TAZs' area is automatically updated by triggers.

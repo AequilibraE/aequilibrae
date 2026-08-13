@@ -12,7 +12,7 @@ from shapely.geometry import Point, Polygon, LineString, MultiLineString
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.connector_creation import connector_creation, bulk_connector_creation
-from aequilibrae.project.project_creation import run_queries_from_sql_file
+from aequilibrae.project.project_creation import drop_triggers_from_sql_file, run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
@@ -71,9 +71,15 @@ class Zoning(BasicTable):
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.__has_zoning():
-            qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
+            spec_folder = Path(__file__).parent.joinpath("database_specification", "network")
+            qry_file = spec_folder.joinpath("tables", "zones.sql")
+            trigger_file = spec_folder.joinpath("triggers", "zones_triggers.sql")
             with self.network.project.db_connection as conn:
                 run_queries_from_sql_file(conn, self.project.logger, qry_file)
+                # The triggers on the nodes table survive the zones table being dropped, so we clear them
+                # before recreating the whole set
+                drop_triggers_from_sql_file(conn, self.project.logger, trigger_file)
+                run_queries_from_sql_file(conn, self.project.logger, trigger_file)
             self.__load()
         else:
             self.project.warning("zones table already exists. Nothing was done", Warning)

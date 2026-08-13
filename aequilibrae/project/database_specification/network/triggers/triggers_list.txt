@@ -3,3 +3,4 @@ modes_table_triggers
 network_triggers
 periods_triggers
 scenarios_triggers
+zones_triggers
