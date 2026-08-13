@@ -74,10 +74,10 @@ def load_spatialite_extension(conn: Connection):
                 raise e2 from e
 
 
-_pinned_connections: dict[tuple[str], Connection] = {}
+_pinned_connections: dict[tuple[str, ...], Connection] = {}
 
 
-def _pin_and_load_extensions(conn: Connection, extensions: tuple[str]) -> None:
+def _pin_and_load_extensions(conn: Connection, extensions: tuple[str, ...]) -> None:
     # SQLite unloads mod_spatialite when the connection closes. Repeated load/unload cycles exhaust
     # TLS indexes on Windows and pthread_atfork slots on macOS, and incur unnecessary loader overhead
     # on every platform. Holding one extra reference keeps the library and its dependencies mapped,
