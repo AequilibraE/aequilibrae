@@ -1,0 +1,13 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: aequilibrae-docs\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "AequilibraE Documentation"
+msgstr "Documentation AequilibraE"
+
+msgid "Comprehensive Python package for transportation modeling"
+msgstr "Paquet Python complet pour la modélisation des transports"

@@ -62,6 +62,11 @@ docs = [
   "sphinx-subfigure"
 ]
 
+i18n = [
+  "babel>=2.18",
+  "deep-translator>=1.11.4",
+]
+
 tests = [
   "setuptools",
   "codecov",
@@ -80,7 +85,7 @@ tests = [
 # Build system requirement should match
 build = ["setuptools", "cython", "wheel"]
 
-dev = ['aequilibrae[build, tests, docs]']
+dev = ['aequilibrae[build, tests, docs, i18n]']
 
 # CLIs
 [project.scripts]
@@ -101,7 +106,7 @@ aequilibrae = "aequilibrae"
     "aequilibrae.paths"= ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"]
     "aequilibrae.distribution"= ["cython/*.pyx"]
     "aequilibrae.matrix"= ["*.pyx", "*.pxd"]
-    "aequilibrae"= ["./parameters.yml"]
+    "aequilibrae"= ["./parameters.yml", "locale/*/LC_MESSAGES/*.po", "locale/*/LC_MESSAGES/*.mo"]
     "aequilibrae.project"= [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
