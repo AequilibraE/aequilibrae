@@ -53,7 +53,7 @@ def test_skim_after(project, assigclass):
     assig.add_class(assigclass)
 
     bpr = project.get_vdf("BPR")
-    assig.set_vdf(bpr, name_mapping={"alpha": 0.15, "beta": 4.0, "capacity": "capacity"})
+    # assig.set_vdf(bpr, name_mapping={"alpha": 0.15, "beta": 4.0, "capacity": "capacity"})
     assig.set_vdf(bpr, name_mapping={"alpha": "b", "beta": "power", "capacity": "capacity"})
 
     assig.set_time_field("free_flow_time")

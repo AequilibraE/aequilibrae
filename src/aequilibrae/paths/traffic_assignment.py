@@ -466,7 +466,6 @@ class TrafficAssignment(AssignmentBase):
 
         """
         vdf_link_attributes: dict[str, np.ndarray] = {}
-
         for attribute_name, settings in self.vdf.spec.items():
             if attribute_name in par:
                 value = par[attribute_name]

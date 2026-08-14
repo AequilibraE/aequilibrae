@@ -210,6 +210,7 @@ class VDF:
     def __init__(self, name: str, func: Callable, spec: dict, d_func: Callable | None = None):
         self.name = name
         self.func = func
+        assert isinstance(spec, dict)
         self.spec = spec
         self.d_func = d_func
 
