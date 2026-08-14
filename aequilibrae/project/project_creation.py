@@ -55,31 +55,38 @@ def remove_triggers(
     with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
 
-    create_drop_regex = re.compile(r"create\s+trigger\s+(\w+)", flags=re.I)
     for table in all_trigger_sets:
         qry_file = spec_folder / f"{table.rstrip()}.sql"
+        drop_triggers_from_sql_file(conn, logger, qry_file, use_aequilibrae_prefix)
 
-        with open(qry_file, "r") as sql_file:
-            query_list = sql_file.read()
 
-        for cmd in query_list.split("--#"):
-            for qry in cmd.split("\n"):
-                if qry[:2] == "--":
-                    continue
-                while "  " in qry:
-                    qry = qry.replace("  ", " ")
+def drop_triggers_from_sql_file(
+    conn: Connection, logger: logging.Logger, qry_file: Path, use_aequilibrae_prefix: bool = True
+) -> None:
+    """Drops all triggers created by a single trigger specification file"""
+    create_drop_regex = re.compile(r"create\s+trigger\s+(\w+)", flags=re.I)
 
-                m = re.search(create_drop_regex, qry)
-                if m:
-                    name = m.group(1).lower()
-                    if not use_aequilibrae_prefix:
-                        name = name.removeprefix("aequilibrae_")
+    with open(qry_file, "r") as sql_file:
+        query_list = sql_file.read()
 
-                    try:
-                        conn.execute(f"drop trigger if exists {name}")
-                    except Exception as e:
-                        logger.error(f"Failed removing triggers table - > {e.args}")
-                        logger.error(f"Point of failure - > {qry}")
+    for cmd in query_list.split("--#"):
+        for qry in cmd.split("\n"):
+            if qry[:2] == "--":
+                continue
+            while "  " in qry:
+                qry = qry.replace("  ", " ")
+
+            m = re.search(create_drop_regex, qry)
+            if m:
+                name = m.group(1).lower()
+                if not use_aequilibrae_prefix:
+                    name = name.removeprefix("aequilibrae_")
+
+                try:
+                    conn.execute(f"drop trigger if exists {name}")
+                except Exception as e:
+                    logger.error(f"Failed removing triggers table - > {e.args}")
+                    logger.error(f"Point of failure - > {qry}")
 
 
 def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file: Path) -> None:

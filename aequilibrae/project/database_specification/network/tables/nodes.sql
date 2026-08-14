@@ -5,6 +5,10 @@
 --@ The **is_centroid** field holds information if the node is a centroid
 --@ of a network or not. Assumes values 0 or 1. Defaults to **0**.
 --@
+--@ A node that shares its **node_id** with the **zone_id** of an existing zone is the
+--@ centroid of that zone, so database triggers tag it with **is_centroid** equal to 1
+--@ and block any attempt to untag it while the zone exists.
+--@
 --@ The **modes** field identifies all modes connected to the node.
 --@
 --@ The **link_types** field identifies all link types connected
