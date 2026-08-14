@@ -107,9 +107,8 @@ class DelaunayAnalysis:
         ta = TrafficAssignment(self.project)
         ta.set_classes([tc])
         ta.set_time_field("distance")
-        ta.set_capacity_field("capacity")
         bpr = VDFsManager.make_preset_vdf("bpr")
-        ta.set_vdf(bpr, {"alpha": 0, "beta": 1.0})
+        ta.set_vdf(bpr, {"alpha": 0, "beta": 1.0, "capacity": "capacity"})
         ta.set_algorithm("all-or-nothing")
         ta.execute()
 

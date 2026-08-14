@@ -23,8 +23,7 @@ def select_link_setup(sioux_falls_single_class):
     assignclass = TrafficClass("car", car_graph, matrix)
     assignment.set_classes([assignclass])
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
@@ -165,8 +164,7 @@ def test_select_link_network_loading(select_link_setup):
     new_assignclass = TrafficClass("car", car_graph, matrix)
     new_assignment.set_classes([new_assignclass])
     bpr = VDFsManager.make_preset_vdf("bpr")
-    new_assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    new_assignment.set_capacity_field("capacity")
+    new_assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
     new_assignment.set_time_field("free_flow_time")
     new_assignment.max_iter = 1
     new_assignment.set_algorithm("msa")
@@ -235,8 +233,7 @@ def test_kaitang(test_data_path, tmp_path):
     assign = TrafficAssignment()
     assign.set_classes([assign_class])
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assign.set_vdf(bpr, {"alpha": "alpha", "beta": "beta"})
-    assign.set_capacity_field("capacity")
+    assign.set_vdf(bpr, {"alpha": "alpha", "beta": "beta", "capacity": "capacity"})
     assign.set_time_field("fft")
     assign.set_algorithm("bfw")
     assign.max_iter = 100
@@ -266,8 +263,7 @@ def test_multi_iteration(select_link_setup, algorithm):
     assignclass = TrafficClass("car", car_graph, matrix)
     assignment.set_classes([assignclass])
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
     assignment.set_algorithm(algorithm)

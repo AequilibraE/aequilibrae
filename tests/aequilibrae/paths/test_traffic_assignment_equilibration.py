@@ -54,8 +54,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     proj = assignment.project
     assignment.add_class(assigclass)
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
     assignment.set_algorithm("msa")
@@ -176,8 +175,7 @@ def test_execute_no_project(project, assignment, assigclass):
     assignment = type(assignment)()
     assignment.add_class(assigclass)
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
     assignment.set_algorithm("msa")

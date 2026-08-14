@@ -102,11 +102,10 @@ assig.add_class(assigclass)
 # Setting the volume delay function and its parameters
 
 bpr = VDFsManager.make_preset_vdf("bpr")
-assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
+assig.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
 
 
-# The capacity and free flow travel times as they exist in the graph
-assig.set_capacity_field("capacity")
+# The free flow travel times as they exist in the graph
 assig.set_time_field("free_flow_time")
 
 # And the algorithm we want to use to assign

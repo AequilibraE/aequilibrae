@@ -112,7 +112,7 @@ procedure.
 .. doctest::
 
     # The VDF parameters can be either an existing field in the graph, passed as a parameter:
-    >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"}) # doctest: +SKIP
+    >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power", "capacity": "capacity"}) # doctest: +SKIP
 
     # Or as a global value:
     >>> assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
@@ -124,14 +124,6 @@ procedure.
 .. doctest::
 
     >>> assig.set_time_field("free_flow_time")
-
-* **capacity_field**: the field of the graph that corresponds to the link capacity. The procedure will collect 
-  this information from the graph associated with the first traffic class provided, but will check if all graphs
-  have the same information on capacity
-
-.. doctest::
-
-    >>> assig.set_capacity_field("capacity")
 
 * **algorithm**: the assignment algorithm to be used, being one of ``all-or-nothing``, ``bfw``, ``cfw``, ``fw``,  
   ``franke-wolfe``, or ``msa``.

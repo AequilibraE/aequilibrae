@@ -211,10 +211,9 @@ class TrafficAssignment(AssignmentBase):
 
         # Then we set the volume delay function and its parameters
         >>> bpr = VDFsManager.make_preset_vdf("bpr") # This is not case-sensitive
-        >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
+        >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
 
-        # The capacity and free flow travel times as they exist in the graph
-        >>> assig.set_capacity_field("capacity")
+        # The free flow travel times as they exist in the graph
         >>> assig.set_time_field("free_flow_time")
 
         # And the algorithm we want to use to assign
@@ -346,7 +345,6 @@ class TrafficAssignment(AssignmentBase):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
-
         # set cores from one class
         c = self.classes[0]
         self.cores = c.results.cores
@@ -365,6 +363,10 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
+        if len(self.classes) == 1:
+            c = self.classes[0]
+            self.cores = c.results.cores
+            self._config["Number of cores"] = c.results.cores
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)

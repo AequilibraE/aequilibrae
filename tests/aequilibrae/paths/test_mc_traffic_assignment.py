@@ -79,9 +79,8 @@ def test_execute_and_save_results(assignment_setup):
     for cls in assignment.classes:
         cls.graph.set_skimming(["free_flow_time", "distance"])
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
 
-    assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
 
     assignment.max_iter = 20

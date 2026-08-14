@@ -120,13 +120,12 @@ project.add_vdf(name="bpr_tyler", function=bpr, spec=bpr_spec)
 standard_vdf = project.get_vdf("bpr")
 # vdfs are stored in project
 vdf = project.get_vdf(name="bpr_tyler")
-assig.set_vdf(vdf, name_mapping = {"alpha": "b", "beta": "power"})
+assig.set_vdf(vdf, name_mapping = {"alpha": "b", "beta": "power", "capacity": "capacity"})
 # assig.set_vdf("bpr", bpr, {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}, delta_bpr)
 
 # Then we set the volume delay function and its parameters
 
 # The capacity and free flow travel times as they exist in the graph
-assig.set_capacity_field("capacity")
 assig.set_time_field("free_flow_time")
 
 # And the algorithm we want to use to assign

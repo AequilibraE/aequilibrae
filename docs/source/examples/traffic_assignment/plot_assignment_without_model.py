@@ -134,7 +134,6 @@ assig = TrafficAssignment()
 assig.set_classes([assigclass])
 bpr = VDFsManager.make_preset_vdf("bpr")
 assig.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
-# assig.set_capacity_field("capacity")
 assig.set_time_field("free_flow_time")
 assig.set_algorithm("fw")
 assig.max_iter = 100

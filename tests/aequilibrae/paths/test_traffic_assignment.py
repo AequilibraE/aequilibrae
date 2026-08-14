@@ -53,10 +53,9 @@ def test_skim_after(project, assigclass):
     assig.add_class(assigclass)
 
     bpr = project.get_vdf("BPR")
-    assig.set_vdf(bpr, name_mapping={"alpha": 0.15, "beta": 4.0})
-    assig.set_vdf(bpr, name_mapping={"alpha": "b", "beta": "power"})
+    assig.set_vdf(bpr, name_mapping={"alpha": 0.15, "beta": 4.0, "capacity": "capacity"})
+    assig.set_vdf(bpr, name_mapping={"alpha": "b", "beta": "power", "capacity": "capacity"})
 
-    assig.set_capacity_field("capacity")
     assig.set_time_field("free_flow_time")
 
     assig.max_iter = 10
@@ -87,7 +86,7 @@ def test_set_vdf(assignment, assigclass, bpr):
     with pytest.raises(ValueError):
         assignment.set_vdf("CQS")
     assignment.add_class(assigclass)
-    assignment.set_vdf(bpr)
+    assignment.set_vdf(bpr, {"capacity": "capacity"})
 
 
 def test_set_classes(assignment, assigclass):
@@ -122,8 +121,7 @@ def test_set_algorithm(assignment, assigclass, bpr):
     with pytest.raises(Exception):
         assignment.set_algorithm("msa")
 
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
     for _algo in ALGORITHMS:
@@ -145,16 +143,16 @@ def test_set_time_field(assignment, assigclass):
     assert assignment.time_field == "free_flow_time"
 
 
-def test_set_capacity_field(assignment, assigclass):
-    with pytest.raises(ValueError):
-        assignment.set_capacity_field("capacity")
-    assignment.add_class(assigclass)
-    N = random.randint(1, 50)
-    val = "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
-    with pytest.raises(ValueError):
-        assignment.set_capacity_field(val)
-    assignment.set_capacity_field("capacity")
-    assert assignment.capacity_field == "capacity"
+# def test_set_capacity_field(assignment, assigclass):
+#     with pytest.raises(ValueError):
+#         assignment.set_capacity_field("capacity")
+#     assignment.add_class(assigclass)
+#     N = random.randint(1, 50)
+#     val = "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
+#     with pytest.raises(ValueError):
+#         assignment.set_capacity_field(val)
+#     assignment.set_capacity_field("capacity")
+#     assert assignment.capacity_field == "capacity"
 
 
 def test_info(assignment, assigclass):
@@ -163,8 +161,7 @@ def test_info(assignment, assigclass):
     algo = choice(ALGORITHMS)
     assignment.add_class(assigclass)
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = iterations
     assignment.rgap_target = rgap
