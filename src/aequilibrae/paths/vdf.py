@@ -122,13 +122,13 @@ class VDFsManager:
 
     @staticmethod
     def convert_str_function_into_function(function_def: str) -> Callable:
-        def func(out: np.ndarray, link_flows, capacity, fftime, cores, **link_attributes):
+        def func(out: np.ndarray, link_flows, fftime, cores, **link_attributes):
             # def bpr(congested_times, link_flows, capacity, fftime, cores, alpha, beta):
 
             ne.evaluate(
                 function_def,
                 out=out,
-                local_dict={"link_flows": link_flows, "capacity": capacity, "fftime": fftime} | link_attributes,
+                local_dict={"link_flows": link_flows, "fftime": fftime} | link_attributes,
                 global_dict={},
                 # disable_cache=True,
             )

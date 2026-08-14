@@ -41,11 +41,11 @@ def assignment(project):
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[(k, {"alpha": "b", "beta": "power"}) for k in FUNCTION_MAP if k != "akcelik"],
-        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in FUNCTION_MAP if k != "akcelik"],
-        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
-        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
-        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
+        *[(k, {"alpha": "b", "beta": "power", "capacity": "capacity"}) for k in FUNCTION_MAP if k != "akcelik"],
+        *[(k, {"alpha": 0.15, "beta": 4.0, "capacity": "capacity"}) for k in FUNCTION_MAP if k != "akcelik"],
+        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance", "capacity": "capacity"}),
+        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
+        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
     ],
 )
 def test_set_vdf_with_parameters(
@@ -80,6 +80,8 @@ def test_vdf_as_string():
                 fillNA: 0.15
                 bounds: [0, 10]
             beta: 4
+            capacity:
+                bounds: [0, .inf]
         quadratic:
             functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
             derivative_functional_form: "fftime * (2 * a * (link_flows/capacity) + b) / capacity"
@@ -89,6 +91,8 @@ def test_vdf_as_string():
                 bounds: [0, .inf]
             b:
                 fillNA: 1.0
+                bounds: [0, .inf]
+            capacity:
                 bounds: [0, .inf]
     """
     vdfs = VDFsManager(
@@ -102,6 +106,7 @@ def test_vdf_as_string():
                         "bounds": [0, 10],
                     },
                     "beta": 4,
+                    "capacity": {"bounds": [0, float("inf")]},
                 },
             },
             "quadratic": {
@@ -116,6 +121,7 @@ def test_vdf_as_string():
                         "fill_NA": 1.0,
                         "bounds": [0, float("inf")],
                     },
+                    "capacity": {"bounds": [0, float("inf")]},
                 },
             },
         }
@@ -130,11 +136,11 @@ def test_vdf_as_string():
     quadratic_vdf.apply_vdf(
         out,
         fake_link_flows,
-        fake_capacity,
         fake_free_flow_time,
         1,
         a=a,
         b=b,
+        capacity=fake_capacity,
     )
     assert np.all(
         out
@@ -146,11 +152,11 @@ def test_vdf_as_string():
     quadratic_vdf.apply_derivative(
         derivative_out,
         fake_link_flows,
-        fake_capacity,
         fake_free_flow_time,
         1,
         a=a,
         b=b,
+        capacity=fake_capacity,
     )
     assert np.all(
         derivative_out == fake_free_flow_time * (2 * a * (fake_link_flows / fake_capacity) + b) / fake_capacity
