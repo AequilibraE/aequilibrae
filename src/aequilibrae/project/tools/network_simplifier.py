@@ -81,7 +81,8 @@ class NetworkSimplifier(WorkerThread):
             if len(link_sequence) < 2:
                 continue
 
-            link_sequence = [abs(x) for x in link_sequence]
+            # compressed_link_data now stores __supernet_id__ (graph indices); resolve to link IDs
+            link_sequence = self.graph.graph.iloc[link_sequence]["link_id"].tolist()
             self.link_sequence = np.array([x for x in link_sequence if x not in centroid_connectors])
             self.candidates = self.link_layer.query("link_id in @link_sequence").set_index("link_id")
 

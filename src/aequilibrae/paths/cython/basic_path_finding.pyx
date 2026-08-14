@@ -3,17 +3,13 @@ Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by
 <francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
 """
 
-"""
-TODO:
-LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS. ARBITRARY NUMBERING
-- Checks of weather the centroid we are computing path from is a centroid and/or exists in the graph
-- Re-write function **network_loading** on the part of loading flows to centroids
-"""
+# TODO:
+# LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS. ARBITRARY NUMBERING
+# - Checks of weather the centroid we are computing path from is a centroid and/or exists in the graph
+# - Re-write function **network_loading** on the part of loading flows to centroids
 cimport cython
-from libc.math cimport INFINITY, sin, cos, asin, sqrt, pi
-from libc.stdlib cimport malloc, free
+from libc.math cimport cos, pi
 from libc.stddef cimport size_t
-from libc.stdint cimport int64_t
 from libcpp.vector cimport vector
 
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, StdPriorityQueueAdapter
@@ -36,6 +32,7 @@ HEURISTIC_MAP = {"haversine": Heuristic.HAVERSINE, "equirectangular": Heuristic.
 cdef int[:] return_an_int_view(input) noexcept nogil:
     cdef int [:] critical_links_view = input
     return critical_links_view
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -65,6 +62,7 @@ cdef void blocking_centroid_flows(int action,
 # Path tracking arrays and skim arrays were also added to it
 ########################################################################################################################
 # ######################################################################################################################
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -101,14 +99,17 @@ cdef int path_finding(
         return <int>dijkstra[PairingHeap](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
                                           ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
     elif heap == STD_PRIORITY_QUEUE:
-        return <int>dijkstra[StdPriorityQueueAdapter](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
-                                                      ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
+        return <int>dijkstra[StdPriorityQueueAdapter](
+            origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr, ids_ptr, conn_ptr, reached_ptr, dest_ptr,
+            destination_count, closure
+        )
     else:
         return <int>dijkstra[FourAryHeap](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
                                           ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
 
 cdef int _HAVERSINE = 0
 cdef int _EQUIRECTANGULAR = 1
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -144,7 +145,6 @@ cpdef void dfs(long origin,
                 visited.push_back(head_vert_idx)
 
     visited.clear()
-
 
 
 @cython.wraparound(False)

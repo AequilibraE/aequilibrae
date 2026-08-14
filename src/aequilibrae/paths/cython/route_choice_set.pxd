@@ -28,6 +28,7 @@ cdef class RouteChoiceSet:
 
         unsigned int [:] mapping_idx
         int64_t [::] mapping_data
+        const int64_t [::] link_id_direction
 
         readonly RouteChoiceSetResults results
         readonly LinkLoadingResults ll_results

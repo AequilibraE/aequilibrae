@@ -11,12 +11,12 @@ cdef extern from "path_finding.hpp" namespace "aequilibrae::paths::cpp" nogil:
         EQUIRECTANGULAR
 
     ctypedef double (*HeuristicFn)(double lat1, double lon1, double lat2,
-                                    double lon2, void *data) noexcept nogil
+                                   double lon2, void *data) noexcept nogil
 
     double haversine_heuristic(double lat1, double lon1, double lat2,
-                                double lon2, void *data) noexcept nogil
+                               double lon2, void *data) noexcept nogil
     double equirectangular_heuristic(double lat1, double lon1, double lat2,
-                                      double lon2, void *data) noexcept nogil
+                                     double lon2, void *data) noexcept nogil
 
     size_t dijkstra[Queue](
         const size_t origin,
