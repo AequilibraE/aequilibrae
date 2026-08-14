@@ -2,7 +2,7 @@ from libc.math cimport pow
 from cython.parallel import prange
 
 
-def inrets(congested_times, link_flows, capacity, fftime, alpha, cores):
+def inrets(congested_times, link_flows, fftime, cores, alpha, capacity):
     cdef int c = cores
 
     cdef double [:] congested_view = congested_times
@@ -14,7 +14,7 @@ def inrets(congested_times, link_flows, capacity, fftime, alpha, cores):
     inrets_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, c)
 
 
-def delta_inrets(dbpr, link_flows, capacity, fftime, alpha, cores):
+def delta_inrets(dbpr, link_flows, fftime, cores, alpha, capacity):
     cdef int c = cores
 
     cdef double [:] dbpr_view = dbpr

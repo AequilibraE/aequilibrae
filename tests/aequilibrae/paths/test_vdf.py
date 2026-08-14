@@ -214,3 +214,38 @@ def test_malformed_vdf_parameters():
         ),
     ):
         VDFsManager(vdf_data_from_parameters=no_preset_function)
+
+
+def test_plot_vdf():
+    vdfs_preset = VDFsManager(add_preset_vdfs=True)
+
+    bpr = vdfs_preset.get_vdf("bpr")
+    num_points = 300
+    alphas = np.ones(num_points, dtype=np.float64) * 0.15
+    betas = np.ones(num_points, dtype=np.float64) * 4.0
+
+    capacity = np.ones(num_points, dtype=np.float64)
+
+    bpr.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": alphas, "beta": betas, "capacity": capacity})
+
+    bpr2 = vdfs_preset.get_vdf("bpr2")
+    bpr2.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": alphas, "beta": betas, "capacity": capacity})
+
+    inrets_alphas = np.ones(num_points, dtype=np.float64) * 0.9
+
+    # conical = vdfs_preset.get_vdf("conical")
+    # conical.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": new_alphas, "capacity": capacity})
+
+    inrets = vdfs_preset.get_vdf("inrets")
+    inrets.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": inrets_alphas, "capacity": capacity})
+
+    akcelik_alphas = np.ones(num_points, dtype=np.float64) * 0.25
+    taus = np.ones(num_points, dtype=np.float64) * 0.8
+    lengths = np.ones(num_points, dtype=np.float64)
+
+    akcelik = vdfs_preset.get_vdf("akcelik")
+    akcelik.plot_vdf(
+        "tests/aequilibrae/paths",
+        num_points,
+        {"alpha": akcelik_alphas, "tau": taus, "length": lengths, "capacity": capacity},
+    )

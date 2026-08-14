@@ -2,7 +2,7 @@ from libc.math cimport pow, sqrt
 from cython.parallel import prange
 
 
-def akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores):
+def akcelik(congested_times, link_flows, fftime, cores, alpha, tau, length, capacity):
     cdef int c = cores
 
     cdef double [:] congested_view = congested_times
@@ -16,7 +16,7 @@ def akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, c
     akcelik_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, length_view, c)
 
 
-def delta_akcelik(d_akcelik, link_flows, capacity, fftime, alpha, tau, _length, cores):
+def delta_akcelik(d_akcelik, link_flows, fftime, cores, alpha, tau, length, capacity):
     cdef int c = cores
 
     cdef double [:] d_akcelik_view = d_akcelik

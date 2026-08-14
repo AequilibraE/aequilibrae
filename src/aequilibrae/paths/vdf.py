@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, Any
 from aequilibrae.paths.cython.AoN import (
     bpr,
     delta_bpr,
@@ -15,6 +15,14 @@ from aequilibrae.paths.cython.AoN import (
 
 import numpy as np
 import numexpr as ne
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import os
+
+# Configure matplotlib for high-quality output
+rcParams["font.family"] = "sans-serif"
+rcParams["font.size"] = 10
+rcParams["figure.dpi"] = 150
 
 
 FUNCTION_MAP: dict[str, tuple[Callable, Callable]] = {
@@ -225,9 +233,63 @@ class VDF:
         # check parameters are within the specified bounds
         pass
 
-    def plot_vdf(self):
-        # put code from documentation of vdfs
-        pass
+    def plot_vdf(self, output_dir: str, num_points: int, link_attributes: dict[str, Any]):
+        array_size = num_points
+        from_voc, to_voc = 0, 3
+        name = self.name
+        voc_range = np.linspace(from_voc, to_voc, array_size)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+
+        size = voc_range.shape[0]
+        function_values = np.zeros(size, dtype=np.float64)
+        derivative_values = np.zeros(size, dtype=np.float64)
+        fftime = np.ones(size, dtype=np.float64)
+
+        self.apply_vdf(
+            function_values,
+            voc_range,
+            fftime,
+            1,
+            **link_attributes,
+        )
+        self.apply_derivative(
+            derivative_values,
+            voc_range,
+            fftime,
+            1,
+            **link_attributes,
+        )
+
+        # Left plot: Function values
+        ax1.plot(voc_range, function_values, linewidth=2.5, color="#1f77b4")
+        ax1.axvline(x=1.0, color="red", linestyle=":", linewidth=1.5, alpha=0.7)
+        ax1.fill_between(voc_range, 0, function_values, alpha=0.1)
+        ax1.set_xlabel("Volume / Capacity Ratio", fontsize=11, fontweight="bold")
+        ax1.set_ylabel("Travel Time Multiplier (t / t₀)", fontsize=11, fontweight="bold")
+        ax1.set_title(f"{name} VDF: Travel Time", fontsize=12, fontweight="bold")
+        ax1.grid(True, alpha=0.3, linestyle="--")
+        ax1.set_xlim(0, 3)
+        ax1.text(1.05, ax1.get_ylim()[1] * 0.665, "Capacity", fontsize=9, color="red", rotation=90)
+
+        # Right plot: Derivative (marginal cost)
+        ax2.plot(voc_range, derivative_values, linewidth=2.5, color="#ff7f0e")
+        ax2.axvline(x=1.0, color="red", linestyle=":", linewidth=1.5, alpha=0.7)
+        ax2.fill_between(voc_range, 0, derivative_values, alpha=0.1, color="#ff7f0e")
+        ax2.set_xlabel("Volume / Capacity Ratio", fontsize=11, fontweight="bold")
+        ax2.set_ylabel("Marginal Travel Time (dt/dv)", fontsize=11, fontweight="bold")
+        ax2.set_title(f"{name} VDF: Marginal Cost", fontsize=12, fontweight="bold")
+        ax2.grid(True, alpha=0.3, linestyle="--")
+        ax2.set_xlim(0, 3)
+        ax2.text(1.05, ax2.get_ylim()[1] * 0.665, "Capacity", fontsize=9, color="red", rotation=90)
+
+        # Add formula and description
+        fig.suptitle(f"{name}", fontsize=10, y=0.98)
+
+        plt.tight_layout()
+        filename = f"vdf_{name}_detail.png"
+        plt.savefig(os.path.join(output_dir, filename), dpi=150, bbox_inches="tight")
+        print(f"Saved: {os.path.join(output_dir, filename)}")
+        plt.close()
 
     def apply_vdf(self, congested_time, link_flows, fftime, cores: int, **link_attributes):
         self.func(congested_time, link_flows, fftime, cores, **link_attributes)
