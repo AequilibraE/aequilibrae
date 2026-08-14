@@ -465,6 +465,7 @@ class TrafficAssignment(AssignmentBase):
         {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
         """
+        assert self.vdf is not None
         vdf_link_attributes: dict[str, np.ndarray] = {}
         for attribute_name, settings in self.vdf.spec.items():
             if attribute_name in par:
@@ -486,6 +487,10 @@ class TrafficAssignment(AssignmentBase):
             vdf_link_attributes[attribute_name] = array
 
         self.vdf_parameters: dict[str, ndarray[tuple[Any, ...], dtype[Any]]] = vdf_link_attributes
+        # vdf parameters
+        self._config["VDF parameters"] = par
+        self._config["VDF function"] = self.vdf.name
+
         # TODO: Check bounds
 
     def set_cores(self, cores: int) -> None:

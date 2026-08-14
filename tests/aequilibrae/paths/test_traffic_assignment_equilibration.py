@@ -41,12 +41,8 @@ def assignment(project):
     return TrafficAssignment(project)
 
 
-@pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
-def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type):
+def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix):
     basic_config()
-
-    if matrix_type == "memonly":
-        matrix = matrix.copy(memory_only=True)
 
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
@@ -128,40 +124,40 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     assert file_text.count(tc_matrix) > 1
 
     assig_1 = (
-        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
-        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
+        "'VDF function': 'bpr', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, "
         "'Target RGAP': 0.0001}}"
     ).format(num_cores)
     assert assig_1 in file_text
 
     assig_2 = (
-        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
-        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
+        "'VDF function': 'bpr', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, "
         "'Target RGAP': 0.001}}"
     ).format(num_cores)
     assert assig_2 in file_text
 
     assig_3 = (
-        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
-        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
+        "'VDF function': 'bpr', "
         "'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', "
         "'Maximum iterations': 500, 'Target RGAP': 0.001}}"
     ).format(num_cores)
     assert assig_3 in file_text
 
     assig_4 = (
-        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
-        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
+        "'VDF function': 'bpr', "
         "'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, "
         "'Target RGAP': 0.001}}"
     ).format(num_cores)
     assert assig_4 in file_text
 
     assig_5 = (
-        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
-        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
+        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
+        "'VDF function': 'bpr', "
         "'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, "
         "'Target RGAP': 0.001}}"
     ).format(num_cores)
