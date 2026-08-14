@@ -48,7 +48,7 @@ def get_links_bounds_box(project):
     Returns bounding box values (xmin, ymin, xmax, ymax)
 
     """
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         cursor = conn.cursor()  # database cursor to make sql query
 
         # compute box around all coordinates in links table of project

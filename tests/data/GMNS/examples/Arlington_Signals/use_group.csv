@@ -1,0 +1,4 @@
+use_group,uses,description
+auto,"car, truck, bus",all motor vehicles
+all,"auto, walk, bike",all uses
+car,"sov, hov2, hov3+",all passenger cars

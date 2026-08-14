@@ -2,6 +2,7 @@ thisdir = 'aequilibrae/project'
 
 pyfiles = [
   '__init__.py',
+  '__main__.py',
   'about.py',
   'basic_table.py',
   'data_loader.py',

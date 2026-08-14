@@ -1,10 +1,15 @@
 import warnings
+import logging
 from copy import deepcopy
 from math import ceil
-from typing import List
+from typing import List, TYPE_CHECKING, Optional, Literal
+
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
 
 import numpy as np
 import pandas as pd
+import numpy.typing as npt
 from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge
 from shapely.ops import substring
@@ -15,14 +20,16 @@ from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
+logger = logging.getLogger(__name__)
+
 
 class NetworkSimplifier(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, project: Optional["Project"] = None) -> None:
         super().__init__(None)
 
-        self.project = project or get_active_project()
+        self.project: Project = project or get_active_project()
         self.network = self.project.network
         self.link_layer = self.network.links.data
 
@@ -74,8 +81,9 @@ class NetworkSimplifier(WorkerThread):
             if len(link_sequence) < 2:
                 continue
 
-            link_sequence = [abs(x) for x in link_sequence]
-            self.link_sequence = [x for x in link_sequence if x not in centroid_connectors]
+            # compressed_link_data now stores __supernet_id__ (graph indices); resolve to link IDs
+            link_sequence = self.graph.graph.iloc[link_sequence]["link_id"].tolist()
+            self.link_sequence = np.array([x for x in link_sequence if x not in centroid_connectors])
             self.candidates = self.link_layer.query("link_id in @link_sequence").set_index("link_id")
 
             if self.candidates.shape[0] <= 1:
@@ -102,7 +110,7 @@ class NetworkSimplifier(WorkerThread):
             break_into = ceil(new_geo.length)
 
             # Now we build the template for the links we will build
-            main_data = long_lnk.to_dict()
+            main_data = long_lnk.to_dict() if long_lnk is not None else {}
 
             # Some values we will bring from the weighted average
             for field in ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]:
@@ -133,14 +141,24 @@ class NetworkSimplifier(WorkerThread):
 
         self.signal.emit(["finished"])
 
-        self.project.logger.info(f"{len(links_to_delete):,} links will be removed")
-        self.project.logger.info(f"{len(new_links):,} links will be added")
+        logger.info(f"{len(links_to_delete):,} links will be removed")
+        logger.info(f"{len(new_links):,} links will be added")
         if new_links:
             self.__execute_link_deletion_and_addition(new_links, links_to_delete)
 
-        self.project.logger.warning("Network has been rebuilt. You should run this tool's rebuild network method")
+        logger.warning("Network has been rebuilt. You should run this tool's rebuild network method")
 
-    def __process_link_fields(self, candidates, link_sequence, max_speed_ratio):
+    def __process_link_fields(
+        self,
+        candidates: pd.DataFrame,
+        link_sequence: npt.NDArray[np.int_],
+        max_speed_ratio: float = 1.1,
+    ) -> tuple[
+        pd.DataFrame,
+        list | None,
+        Literal[1, -1] | None,
+        pd.Series | None,
+    ]:
         start_node = candidates.loc[link_sequence[0]]["a_node"]
         longest_link_id = candidates.sort_values("distance", ascending=False).index[0]
         speed_ab, speed_ba, geos, lanes_ab, lanes_ba = [], [], [], [], []
@@ -170,7 +188,7 @@ class NetworkSimplifier(WorkerThread):
 
         return candidates, geos, longest_direction, longest_link
 
-    def __execute_link_deletion_and_addition(self, new_links, links_to_delete):
+    def __execute_link_deletion_and_addition(self, new_links: list[dict], links_to_delete: pd.DataFrame | list):
         df = pd.DataFrame(new_links)
         df = df.drop(columns=["a_node", "b_node", "geometry", "ogc_fid"]).rename({"geo": "geometry"}, axis=1)
         cols = list(df.columns)
@@ -192,9 +210,7 @@ class NetworkSimplifier(WorkerThread):
         new_layer.refresh()
         new_dist = new_layer.data.geometry.length.sum()
 
-        self.project.logger.warning(
-            f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}"
-        )
+        logger.warning(f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}")
         self.link_layer = new_layer.data
 
     def collapse_links_into_nodes(self, links: List[int]):
@@ -216,7 +232,7 @@ class NetworkSimplifier(WorkerThread):
                 conn.commit()
 
         self.link_layer = self.network.links.data
-        self.project.logger.warning(f"{len(links)} links collapsed into nodes")
+        logger.warning(f"{len(links)} links collapsed into nodes")
 
     def rebuild_network(self):
         """Rebuilds the network elements that would have to be rebuilt after massive network simplification"""

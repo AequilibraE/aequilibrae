@@ -1,10 +1,15 @@
+import logging
 import re
 import string
-from typing import List
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, List, NoReturn, Optional
 
-from aequilibrae.context import get_logger
+if TYPE_CHECKING:
+    from aequilibrae.project import Project
 
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
+
+logger = logging.getLogger(__name__)
 
 
 class FieldEditor:
@@ -34,11 +39,10 @@ class FieldEditor:
     Field descriptions are kept in the table *attributes_documentation*
     """
 
-    _alowed_characters = ALLOWED_CHARACTERS
+    _allowed_characters = ALLOWED_CHARACTERS
 
-    def __init__(self, project, table_name: str) -> None:
+    def __init__(self, project: "Project", table_name: str) -> None:
         self.project = project
-        self.logger = get_logger()
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -46,7 +50,7 @@ class FieldEditor:
         self._populate()
         self._check_completeness()
 
-    def _populate(self):
+    def _populate(self) -> None:
         self._original_values.clear()
         qry = f'Select attribute, description from attributes_documentation where name_table="{self._table}"'
         dt = self.__run_query_fetch_all(qry)
@@ -70,7 +74,7 @@ class FieldEditor:
         if field_name in self.__dict__.keys():
             raise ValueError("attribute_name not allowed")
 
-        has_forbidden = [letter for letter in field_name if letter not in self._alowed_characters]
+        has_forbidden = [letter for letter in field_name if letter not in self._allowed_characters]
         if has_forbidden:
             raise ValueError('attribute_name can only contain letters, numbers and "_"')
 
@@ -83,12 +87,12 @@ class FieldEditor:
             self.__run_query_commit(f"Alter table {self._table} add column {field_name} {data_type};")
         self.__adds_to_attribute_table(field_name, description)
 
-    def __update_table_fields(self):
+    def __update_table_fields(self) -> None:
         qry = f"pragma table_info({self._table})"
         dt = self.__run_query_fetch_all(qry)
         self._table_fields = [x[1] for x in dt if x[1] != "ogc_fid"]
 
-    def remove(self, field_name: str) -> None:
+    def remove(self, field_name: str) -> NoReturn:
         raise NotImplementedError
 
     def save(self) -> None:
@@ -103,13 +107,13 @@ class FieldEditor:
             new_val = self.__dict__[key]
             if new_val != val:
                 self.__run_query_commit(qry.format(new_val, key, self._table))
-                self.logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
+                logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
-        self.logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
-        with self.project.db_connection_spatial as conn:
+        logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
+        with self.project.db_connection as conn:
             conn.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
             conn.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
-        self.logger.info(f"Updated layer statistics for {self._table}")
+        logger.info(f"Updated layer statistics for {self._table}")
 
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
@@ -135,7 +139,7 @@ class FieldEditor:
                 del self.__dict__[field]
                 del self._original_values[field]
 
-    def __adds_to_attribute_table(self, attribute_name, attribute_value):
+    def __adds_to_attribute_table(self, attribute_name: str, attribute_value: str) -> None:
         self.__dict__[attribute_name] = attribute_value
         self._original_values[attribute_name] = attribute_value
         qry = "insert into attributes_documentation VALUES(?,?,?)"
@@ -143,12 +147,12 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             dt = conn.execute(qry).fetchall()
         return dt
 
-    def __run_query_commit(self, qry: str, values=None) -> None:
-        with self.project.db_connection_spatial as conn:
+    def __run_query_commit(self, qry: str, values: Optional[dict | Sequence] = None) -> None:
+        with self.project.db_connection as conn:
             if values is None:
                 conn.execute(qry)
             else:

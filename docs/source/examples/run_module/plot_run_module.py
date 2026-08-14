@@ -43,7 +43,7 @@ project = create_example(folder)
 # in the array, and the number of non-empty pairs in the matrix.
 #
 # Notice that the matrix summary is presented for each matrix core.
-project.run.matrix_summary()
+project.run["matrix_summary"]()
 
 # %%
 # If our matrices folder is empty, instead of a nested dictionary of data,
@@ -66,7 +66,7 @@ graph.set_blocked_centroid_flows(False)
 # as well as the compact number of links and nodes used for computation. If we had more than
 # one graph, its information would be displayed within the nested dictionary.
 
-project.run.graph_summary()
+project.run["graph_summary"]()
 
 # %%
 # If no graphs have been built, an empty dictionary will be returned.
@@ -105,7 +105,7 @@ p.write_back()
 
 # %%
 # And we run the function
-project.run.create_delaunay()
+project.run["create_delaunay"]()
 
 # %%
 # .. note::
@@ -119,7 +119,7 @@ project.run.create_delaunay()
 # Creating Delaunay lines also creates a ``results_database.sqlite`` that contains the
 # result of the all-or-nothing algorithm that generated the output. We can check
 # the existing results in the results_database using the ``results_summary`` method.
-project.run.results_summary()
+project.run["results_summary"]()
 
 # %%
 # Let's check what our Delaunay lines look like!
@@ -131,7 +131,7 @@ import geopandas as gpd
 results = project.results.get_results("my_run_module_example").set_index("link_id")
 
 # %%
-with project.db_connection_spatial as conn:
+with project.db_connection as conn:
     links = gpd.read_postgis(
         "SELECT link_id, st_asBinary(geometry) geometry FROM delaunay_network", conn, geom_col="geometry", crs=4326
     )

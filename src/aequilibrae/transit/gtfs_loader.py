@@ -1,9 +1,10 @@
 import hashlib
 import zipfile
+import logging
 from copy import deepcopy
 from datetime import datetime
 from io import TextIOWrapper
-from os.path import splitext, basename
+from os.path import basename, splitext
 from typing import Any, Dict, cast
 
 import numpy as np
@@ -12,13 +13,14 @@ from pandas.errors import EmptyDataError
 from pyproj import Transformer
 from shapely.geometry import LineString
 
-from aequilibrae.context import get_logger
 from aequilibrae.transit.column_order import column_order
-from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
+from aequilibrae.transit.date_tools import create_days_between, format_date, to_seconds
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
+from aequilibrae.transit.transit_elements import Agency, Fare, FareRule, Route, Service, Stop, Trip
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+logger = logging.getLogger(__name__)
 
 
 def _clean_string_series(series: pd.Series) -> pd.Series:
@@ -81,7 +83,6 @@ class GTFSReader(WorkerThread):
         self.gtfs_tables = {}
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
-        self.logger = get_logger()
 
     def __read_gtfs_table(self, file_name: str) -> pd.DataFrame:
         schema = column_order[file_name]
@@ -142,12 +143,12 @@ class GTFSReader(WorkerThread):
             **service_date** (:obj:`str`): service date. e.g. "2020-04-01".
         """
         ag_id = self.agency.agency
-        self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
+        logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
 
         self.__load_date()
 
     def __load_date(self):
-        self.logger.debug("Starting __load_date")
+        logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
 
         self.__load_routes_table()
@@ -168,7 +169,7 @@ class GTFSReader(WorkerThread):
         self.signal = SIGNAL(object)
 
     def __deconflict_stop_times(self) -> None:
-        self.logger.info("Starting deconflict_stop_times")
+        logger.info("Starting deconflict_stop_times")
 
         msg = "De-conflicting stop times (Step: 6/12)"
         total_fast = 0
@@ -176,16 +177,14 @@ class GTFSReader(WorkerThread):
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
                 for trip in self.trips[route][pattern]:
-                    self.logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
+                    logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
                     stop_times = self.stop_times[trip.trip]
                     if stop_times.shape[0] != len(trip.stops):
-                        self.logger.error(
-                            f"Trip {trip.trip_id} has a different number of stop_times than actual stops."
-                        )
+                        logger.error(f"Trip {trip.trip_id} has a different number of stop_times than actual stops.")
 
                     if not stop_times.arrival_time.is_monotonic_increasing:
                         stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = pd.NA
-                        stop_times.loc[:, "arrival_time"] = stop_times.arrival_time.ffill()
+                        stop_times["arrival_time"] = stop_times["arrival_time"].ffill()
                     diffs = stop_times.arrival_time.diff().iloc[1:].to_numpy(dtype=int)
 
                     stop_geos = [self.stops[x].geo for x in trip.stops]
@@ -195,16 +194,16 @@ class GTFSReader(WorkerThread):
                     source_time = pd.Series(0, index=stop_times.index, dtype="int64")
 
                     if times[-1] == times[-2]:
-                        self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
-                        self.logger.info("    Had conflicting stop times in its end")
+                        logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
+                        logger.info("    Had conflicting stop times in its end")
                         times[-1] += 1
                         source_time.iloc[-1] = 1
                         diffs = pd.Series(times).diff().iloc[1:].to_numpy(dtype=int)
 
                     to_override = stop_times.index[1:][pd.Series(diffs).eq(0)].tolist()
                     if to_override:
-                        self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
-                        self.logger.info("     Had consecutive stops with the same timestamp")
+                        logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
+                        logger.info("     Had consecutive stops with the same timestamp")
                         for i in to_override:
                             position = stop_times.index.get_loc(i)
                             source_time.iloc[position] = 1
@@ -229,32 +228,34 @@ class GTFSReader(WorkerThread):
 
                         to_fix = df.index[df.max_speed < df.speed].tolist()
                         if to_fix:
-                            self.logger.debug(f"     Trip {trip.trip} had {len(to_fix)} segments too fast")
+                            logger.debug(f"     Trip {trip.trip} had {len(to_fix)} segments too fast")
                             total_fast += len(to_fix)
-                            df.loc[to_fix:, "source_time"] = 2
-                            add_time = df.elapsed_time * (df.speed / df.max_speed -1).astype(int)
-                            df.loc[to_fix:, "add_time"] += add_time[to_fix]
+                            df.loc[to_fix[0] :, "source_time"] = 2
+                            for i in to_fix:
+                                extra_time = int(
+                                    df.loc[i, "elapsed_time"] * (df.loc[i, "speed"] / df.loc[i, "max_speed"] - 1)
+                                )
+                                df.loc[i:, "add_time"] = df.loc[i:, "add_time"] + extra_time
 
                             source_time.iloc[1:] = df.source_time.to_numpy(dtype=int)
                             times[1:] += df.add_time.to_numpy(dtype=int)
 
                     assert min(times[1:] - times[:-1]) > 0
-                    stop_times.loc[:, "arrival_time"] = times[:].astype(int)
-                    stop_times.loc[:, "departure_time"] = times[:].astype(int)
-                    stop_times.loc[:, "source_time"] = source_time.to_numpy(dtype=int)
+                    stop_times["arrival_time"] = times[:].astype(int)
+                    stop_times["departure_time"] = times[:].astype(int)
+                    stop_times["source_time"] = source_time.to_numpy(dtype=int)
                     trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
                     trip.departures = stop_times.departure_time.to_numpy(copy=True)
-
         if total_fast:
-            self.logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
+            logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
 
     def __load_fare_data(self):
-        self.logger.debug("Starting __load_fare_data")
+        logger.debug("Starting __load_fare_data")
         fareatttxt = "fare_attributes.txt"
         self.fare_attributes = {}
         self.signal.emit(["set_text", "Loading fare data (Step: 7/12)"])
         if fareatttxt in self.zip_archive.namelist():
-            self.logger.debug('  Loading "fare_attributes" table')
+            logger.debug('  Loading "fare_attributes" table')
 
             fareatt = self.__read_gtfs_table(fareatttxt)
             self.gtfs_tables[fareatttxt] = fareatt
@@ -280,7 +281,7 @@ class GTFSReader(WorkerThread):
         if farerltxt not in self.zip_archive.namelist():
             return
 
-        self.logger.debug('  Loading "fare_rules" table')
+        logger.debug('  Loading "fare_rules" table')
 
         farerl = self.__read_gtfs_table(farerltxt)
         self.gtfs_tables[farerltxt] = farerl
@@ -296,9 +297,9 @@ class GTFSReader(WorkerThread):
             self.fare_rules.append(fr)
 
     def __load_shapes_table(self):
-        self.logger.debug("Starting __load_shapes_table")
+        logger.debug("Starting __load_shapes_table")
 
-        self.logger.debug("    Loading route shapes")
+        logger.debug("    Loading route shapes")
         self.shapes.clear()
         shapestxt = "shapes.txt"
         if shapestxt not in self.zip_archive.namelist():
@@ -318,11 +319,11 @@ class GTFSReader(WorkerThread):
             self.shapes[shape_id] = shape
 
     def __load_trips_table(self):
-        self.logger.debug("Starting __load_trips_table")
+        logger.debug("Starting __load_trips_table")
 
         trip_replacements = self.__load_frequencies()
 
-        self.logger.debug('    Loading "trips" table')
+        logger.debug('    Loading "trips" table')
         tripstxt = "trips.txt"
         trips_array = self.__read_gtfs_table(tripstxt)
         self.gtfs_tables[tripstxt] = trips_array
@@ -335,7 +336,7 @@ class GTFSReader(WorkerThread):
         if not diff.empty:
             diff = ",".join(diff.astype(str).tolist())
             msg = f"There are IDs in trips.txt without any stop on stop_times.txt -> {diff}"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         incal = pd.Index(self.services.keys(), dtype="string")
@@ -364,14 +365,14 @@ class GTFSReader(WorkerThread):
             for trip in all_trips:
                 stop_times = self.stop_times.get(trip.trip, pd.DataFrame())
                 if stop_times.shape[0] < 2:
-                    self.logger.warning(f"Trip {trip.trip} had less than two stops, so we skipped it.")
+                    logger.warning(f"Trip {trip.trip} had less than two stops, so we skipped it.")
                     continue
 
                 cleaner = stop_times.assign(seqkey=stop_times.stop.shift(-1).fillna("") + "#####" + stop_times.stop)
-                cleaner.drop_duplicates(["seqkey"], inplace=True, keep="first")
+                cleaner = cleaner.drop_duplicates(["seqkey"], keep="first")
                 stop_times = cleaner.drop(columns=["seqkey"])
-                stop_times.loc[:, "arrival_time"] = stop_times.arrival_time.astype(int)
-                stop_times.loc[:, "departure_time"] = stop_times.departure_time.astype(int)
+                stop_times["arrival_time"] = stop_times.arrival_time.astype(int)
+                stop_times["departure_time"] = stop_times.departure_time.astype(int)
                 self.stop_times[trip.trip] = stop_times
                 trip.stops = stop_times.stop_id.tolist()
                 m = hashlib.md5()
@@ -382,7 +383,7 @@ class GTFSReader(WorkerThread):
                 trip.arrivals = stop_times.arrival_time.tolist()
                 trip.departures = stop_times.departure_time.tolist()
                 trip.source_time = stop_times.source_time.tolist()
-                self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
+                logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip_points = [self.stops[x].geo for x in trip.stops if self.stops[x].geo is not None]
                 trip._stop_based_shape = LineString(trip_points)
                 # trip.shape = self.shapes.get(trip.shape)
@@ -394,12 +395,12 @@ class GTFSReader(WorkerThread):
                 self.trips[trip.route][trip.pattern_hash].append(trip)
 
     def __load_frequencies(self):
-        self.logger.debug("Starting __load_frequencies")
+        logger.debug("Starting __load_frequencies")
 
         trip_replacements = {}
         freqtxt = "frequencies.txt"
         if freqtxt in self.zip_archive.namelist():
-            self.logger.debug('    Loading "frequencies" table')
+            logger.debug('    Loading "frequencies" table')
 
             freqs = self.__read_gtfs_table(freqtxt)
             self.gtfs_tables[freqtxt] = freqs
@@ -426,17 +427,17 @@ class GTFSReader(WorkerThread):
                     shift = step * headway
                     new_trip = template.copy()
                     new_trip_str = f"{trip}-{int(new_trip.arrival_time.iloc[0])}"
-                    new_trip.loc[:, "arrival_time"] += shift
-                    new_trip.loc[:, "departure_time"] += shift
+                    new_trip["arrival_time"] = new_trip["arrival_time"] + shift
+                    new_trip["departure_time"] = new_trip["departure_time"] + shift
                     self.stop_times[new_trip_str] = new_trip
                     trip_replacements[trip].append(new_trip_str)
         return trip_replacements
 
     def __load_stop_times(self):
-        self.logger.debug("Starting __load_stop_times")
+        logger.debug("Starting __load_stop_times")
 
         self.stop_times.clear()
-        self.logger.debug('    Loading "stop times" table')
+        logger.debug('    Loading "stop times" table')
         stoptimestxt = "stop_times.txt"
         stoptimes = self.__read_gtfs_table(stoptimestxt)
         self.gtfs_tables[stoptimestxt] = stoptimes
@@ -448,33 +449,33 @@ class GTFSReader(WorkerThread):
             self.__fail("There are repeated stop_sequences for a single trip_id on stop_times.txt")
 
         df = stoptimes.copy()
-        df.loc[:, "arrival_time"] = df.loc[:, ["arrival_time", "departure_time"]].max(axis=1)
-        df.loc[:, "departure_time"] = df.loc[:, "arrival_time"]
+        df["arrival_time"] = df[["arrival_time", "departure_time"]].max(axis=1)
+        df["departure_time"] = df["arrival_time"]
 
         counter = df.shape[0]
         df = df.assign(other_stop=df.stop_id.shift(-1), other_trip=df.trip_id.shift(-1))
         df = df.loc[~((df.other_stop == df.stop_id) & (df.trip_id == df.other_trip)), :]
         counter -= df.shape[0]
-        df.drop(columns=["other_stop", "other_trip"], inplace=True)
+        df = df.drop(columns=["other_stop", "other_trip"])
         df.columns = ["stop" if x == "stop_id" else x for x in df.columns]
 
         stops = [s.stop for s in self.stops.values()]
         stop_ids = [s.stop_id for s in self.stops.values()]
         stop_list = pd.DataFrame({"stop": stops, "stop_id": stop_ids})
         df = df.merge(stop_list, on="stop")
-        df.sort_values(["trip_id", "stop_sequence"], inplace=True)
+        df = df.sort_values(["trip_id", "stop_sequence"])
         df = df.assign(source_time=0)
 
         msg = "Loading stop times (Step: 3/12)"
         for trip_id, data in simple_progress(list(df.groupby("trip_id", sort=False)), self.signal, msg):
             data = data.copy()
-            data.loc[:, "stop_sequence"] = range(data.shape[0])
+            data["stop_sequence"] = range(data.shape[0])
             self.stop_times[trip_id] = data
 
     def __load_stops_table(self):
-        self.logger.debug("Starting __load_stops_table")
+        logger.debug("Starting __load_stops_table")
 
-        self.logger.debug('    Loading "stops" table')
+        logger.debug('    Loading "stops" table')
         self.stops = {}
         stopstxt = "stops.txt"
         stops = self.__read_gtfs_table(stopstxt)
@@ -496,9 +497,9 @@ class GTFSReader(WorkerThread):
             self.stops[s.stop_id] = s
 
     def __load_routes_table(self):
-        self.logger.debug("Starting __load_routes_table")
+        logger.debug("Starting __load_routes_table")
 
-        self.logger.debug('    Loading "routes" table')
+        logger.debug('    Loading "routes" table')
         self.routes = {}
         routetxt = "routes.txt"
         routes = self.__read_gtfs_table(routetxt)
@@ -528,7 +529,7 @@ class GTFSReader(WorkerThread):
             self.routes[r.route] = r
 
     def __load_feed_calendar(self):
-        self.logger.debug("Starting __load_feed_calendar")
+        logger.debug("Starting __load_feed_calendar")
         self.services.clear()
 
         has_cal, has_caldate = True, True
@@ -536,7 +537,7 @@ class GTFSReader(WorkerThread):
         self.signal.emit(["set_text", "Loading feed calendar"])
         caltxt = "calendar.txt"
         if caltxt in self.zip_archive.namelist():
-            self.logger.debug('    Loading "calendar" table')
+            logger.debug('    Loading "calendar" table')
             calendar = self.__read_gtfs_table(caltxt)
 
             if calendar.shape[0] > 0:
@@ -555,15 +556,15 @@ class GTFSReader(WorkerThread):
                     service._populate(line, list(calendar.columns), True)
                     self.services[service.service_id] = service
             else:
-                self.logger.warning('"calendar.txt" file is empty')
+                logger.warning('"calendar.txt" file is empty')
                 has_cal = False
         else:
-            self.logger.warning(f"{caltxt} not available in this feed")
+            logger.warning(f"{caltxt} not available in this feed")
             has_cal = False
 
         caldatetxt = "calendar_dates.txt"
         if caldatetxt not in self.zip_archive.namelist():
-            self.logger.warning(f"{caldatetxt} not available in this feed")
+            logger.warning(f"{caldatetxt} not available in this feed")
             has_caldate = False
 
         if not has_cal and not has_caldate:
@@ -572,11 +573,11 @@ class GTFSReader(WorkerThread):
         if not has_caldate:
             return
 
-        self.logger.debug('    Loading "calendar dates" table')
+        logger.debug('    Loading "calendar dates" table')
         caldates = self.__read_gtfs_table(caldatetxt)
 
         if caldates.shape[0] == 0:
-            self.logger.warning('"calendar_dates.txt" file is empty')
+            logger.warning('"calendar_dates.txt" file is empty')
             return
 
         if caldates.shape[0] > 0 and not has_cal:
@@ -603,20 +604,20 @@ class GTFSReader(WorkerThread):
                 else:
                     exception_inconsistencies += 1
                     msg = "ignoring service ({}) addition on a day when the service is already active"
-                    self.logger.debug(msg.format(service.service_id))
+                    logger.debug(msg.format(service.service_id))
             elif exception_type == 2:
                 if sd in service.dates:
                     _ = service.dates.remove(sd)
                 else:
                     exception_inconsistencies += 1
                     msg = "ignoring service ({}) removal on a day from which the service was absent"
-                    self.logger.debug(msg.format(service.service_id))
+                    logger.debug(msg.format(service.service_id))
             else:
                 self.__fail(f"illegal service exception type. {service.service_id}")
 
         if exception_inconsistencies:
-            self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
+            logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
 
     def __fail(self, msg: str) -> None:
-        self.logger.error(msg)
+        logger.error(msg)
         raise Exception(msg)

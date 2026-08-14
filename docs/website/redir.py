@@ -1,13 +1,13 @@
 import os
 import sys
 import shutil
-import pkg_resources
+from importlib.metadata import version as distribution_version
 
 npth = os.path.abspath(".")
 if npth not in sys.path:
     sys.path.append(npth)
 
-release_version = pkg_resources.get_distribution("aequilibrae").version
+release_version = distribution_version("aequilibrae")
 
 version = f"V.{release_version}"
 

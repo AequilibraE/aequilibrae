@@ -1,5 +1,6 @@
 import gc
 import string
+import logging
 from pathlib import Path
 from typing import List, Tuple
 
@@ -17,6 +18,8 @@ from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .model_area_gridding import geometry_grid
 
+logger = logging.getLogger(__name__)
+
 
 class OSMBuilder(WorkerThread):
     signal = SIGNAL(object)
@@ -24,11 +27,10 @@ class OSMBuilder(WorkerThread):
     def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
         WorkerThread.__init__(self, None)
 
-        project.logger.info("Preparing OSM builder")
+        logger.info("Preparing OSM builder")
         self.signal.emit(["set_text", "Preparing OSM builder"])
 
         self.project = project or get_active_project()
-        self.logger = self.project.logger
         self.model_area = geometry_grid(model_area, 4326)
         self.path = self.project.path_to_file
         self.node_start = 10000
@@ -40,7 +42,7 @@ class OSMBuilder(WorkerThread):
 
         # Building shapely geometries makes the code surprisingly slower.
         self.node_df = data["nodes"]
-        self.node_df.loc[:, "node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
+        self.node_df["node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
         gc.collect()
         self.links_df = data["links"]
 
@@ -49,7 +51,7 @@ class OSMBuilder(WorkerThread):
             self.__update_table_structure(conn)
             self.importing_network(conn)
 
-            self.logger.info("Cleaning things up")
+            logger.info("Cleaning things up")
             conn.execute(
                 "DELETE FROM nodes WHERE node_id NOT IN (SELECT a_node FROM links union all SELECT b_node FROM links)"
             )
@@ -59,7 +61,7 @@ class OSMBuilder(WorkerThread):
         self.signal.emit(["finished"])
 
     def importing_network(self, conn):
-        self.logger.info("Importing the network")
+        logger.info("Importing the network")
         node_count = pd.DataFrame(self.links_df["nodes"].explode("nodes")).assign(counter=1).groupby("nodes").count()
 
         self.node_df.osm_id = self.node_df.osm_id.astype(np.int64)
@@ -67,18 +69,18 @@ class OSMBuilder(WorkerThread):
 
         self.__process_link_chunk()
 
-        self.logger.info("Geo-procesing links")
+        logger.info("Geo-procesing links")
         geometries = []
         self.links_df.set_index(["osm_id"], inplace=True)
 
         for idx, link in simple_progress(self.links_df.iterrows(), self.signal, "Adding network links"):
             # How can I link have less than two points?
             if not isinstance(link["nodes"], list):
-                self.logger.debug(f"OSM link/feature {idx} does not have a list of nodes.")
+                logger.debug(f"OSM link/feature {idx} does not have a list of nodes.")
                 continue
 
             if len(link["nodes"]) < 2:
-                self.logger.debug(f"Link {idx} has less than two nodes. {link.nodes}")
+                logger.debug(f"Link {idx} has less than two nodes. {link.nodes}")
                 continue
 
             # The link is a straight line between two points
@@ -106,7 +108,7 @@ class OSMBuilder(WorkerThread):
         geo_df = pd.DataFrame(geometries, columns=["link_id", "geometry"]).set_index("link_id")
         self.links_df = self.links_df.join(geo_df, how="inner")
 
-        self.links_df.loc[:, "link_id"] = np.arange(self.links_df.shape[0]) + 1
+        self.links_df["link_id"] = np.arange(self.links_df.shape[0]) + 1
 
         self.node_df = self.node_df.reset_index()
 
@@ -116,11 +118,11 @@ class OSMBuilder(WorkerThread):
         self.links_df.to_parquet(osm_data_path / "links.parquet")
         self.node_df.to_parquet(osm_data_path / "nodes.parquet")
 
-        self.logger.info("Adding nodes to file")
+        logger.info("Adding nodes to file")
         self.signal.emit(["set_text", "Adding nodes to file"])
 
         # Removing the triggers before adding all nodes makes things a LOT faster
-        remove_triggers(conn, self.logger, "network")
+        remove_triggers(conn, "network")
 
         cols = ["node_id", "osm_id", "is_centroid", "modes", "link_types", "lon", "lat"]
         insert_qry = f"INSERT INTO nodes ({','.join(cols[:-2])}, geometry) VALUES(?,?,?,?,?, MakePoint(?,?, 4326))"
@@ -130,7 +132,7 @@ class OSMBuilder(WorkerThread):
         gc.collect()
 
         # But we need to add them back to add the links
-        add_triggers(conn, self.logger, "network")
+        add_triggers(conn, "network")
 
         # self.links_df.to_file(self.project.path_to_file, driver="SQLite", spatialite=True, layer="links", mode="a")
 
@@ -147,7 +149,7 @@ class OSMBuilder(WorkerThread):
 
         del self.links_df
         gc.collect()
-        self.logger.info("Adding links to file")
+        logger.info("Adding links to file")
         self.signal.emit(["set_text", "Adding links to file"])
         conn.executemany(insert_qry, links_df)
 
@@ -160,7 +162,7 @@ class OSMBuilder(WorkerThread):
         if not self.clean:
             conn.execute("VACUUM;")
             return
-        self.logger.info("Cleaning up the network down to the selected area")
+        logger.info("Cleaning up the network down to the selected area")
         links = gpd.GeoDataFrame.from_postgis("SELECT link_id, asBinary(geometry) AS geom FROM links", conn, crs=4326)
         existing_link_ids = gpd.sjoin(links, self.model_area, how="left").dropna().link_id.to_numpy()
         to_delete = [[x] for x in links[~links.link_id.isin(existing_link_ids)].link_id]
@@ -169,7 +171,7 @@ class OSMBuilder(WorkerThread):
         conn.execute("VACUUM;")
 
     def __process_link_chunk(self):
-        self.logger.info("Processing link modes, types and fields")
+        logger.info("Processing link modes, types and fields")
         self.signal.emit(["set_text", "Processing link modes, types and fields"])
 
         # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
@@ -191,7 +193,7 @@ class OSMBuilder(WorkerThread):
                     df = self.__establish_modes_for_all_links(conn, df)
                     df = self.__process_link_attributes(df)
                 else:
-                    self.logger.error("OSM link data does not have tags. Skipping an entire data chunk")
+                    logger.error("OSM link data does not have tags. Skipping an entire data chunk")
                     df = pd.DataFrame([])
                 self.links_df.append(df)
         self.links_df = pd.concat(self.links_df, ignore_index=True)

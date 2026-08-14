@@ -1,15 +1,19 @@
 import json
+import logging
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import pytest
+from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.utils.cython.bridge import Bridge
 
 from aequilibrae import TrafficAssignment, TrafficClass
-from aequilibrae.paths import TransitAssignment, TransitClass
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.transit import Transit
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.transit import Transit
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
@@ -127,7 +131,8 @@ def test_route_choice_scenarios(scenario_example, scenario):
         a, b = graph.centroids[0], graph.centroids[-1]
         shape = (graph.num_zones, graph.num_zones)
 
-        results = rc.run(int(a), int(b), shape, max_routes=3, max_depth=2)
+        with Bridge(logger) as bridge:
+            results = rc.run(int(a), int(b), shape, max_routes=3, max_depth=2, bridge=bridge)
 
         assert isinstance(results, list)
         assert len(results) <= 3
@@ -409,10 +414,10 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
 
     # For the root module we should have one matrix in the summary
     if scenario == "root":
-        assert "demand_omx" in scenario_example.run.matrix_summary()
+        assert "demand_omx" in scenario_example.run["matrix_summary"]()
     else:
         # For the others we shouldn't have any matrices, and the "run" dir shouldn't exist
-        assert len(scenario_example.run.matrix_summary()) == 0
+        assert len(scenario_example.run["matrix_summary"]()) == 0
         assert not (scenario_example.project_base_path / "run").exists()
 
 

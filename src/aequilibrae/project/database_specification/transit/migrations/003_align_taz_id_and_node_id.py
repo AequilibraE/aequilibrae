@@ -1,14 +1,17 @@
-import pathlib
 import sqlite3
+import pathlib
+import logging
 from typing import Optional
 
-import numpy as np
-
-from aequilibrae.context import get_active_project
-from aequilibrae.log import logger
-from aequilibrae.project.project import Project
-from aequilibrae.project.project_creation import add_triggers, remove_triggers
+from aequilibrae import Project
 from aequilibrae.transit import Transit
+from aequilibrae.context import get_active_project
+from aequilibrae.project.project_creation import add_triggers, remove_triggers
+
+import numpy as np
+import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def migrate(
@@ -48,7 +51,7 @@ def migrate(
         ]
 
     logger.info("Removing triggers...")
-    remove_triggers(transit_conn, logger, "transit")
+    remove_triggers(transit_conn, "transit")
     try:
         logger.info("Removing/renaming tables...")
         for sql in sqls:
@@ -56,8 +59,9 @@ def migrate(
 
         for graph_builder in data.graphs.values():
             logger.info(f"Aligning graph for period {graph_builder.period_id}...")
-            graph_builder.vertices.loc[graph_builder.vertices.taz_id == "", "taz_id"] = -1
-            graph_builder.vertices.taz_id = graph_builder.vertices.taz_id.astype("int64")
+            graph_builder.vertices["taz_id"] = (
+                pd.to_numeric(graph_builder.vertices.taz_id, errors="coerce").fillna(-1).astype("int64")
+            )
 
             o_vertices = graph_builder.vertices[
                 (graph_builder.vertices.taz_id > 0) & (graph_builder.vertices.node_type.isin(["origin", "od"]))
@@ -92,6 +96,6 @@ def migrate(
 
     finally:
         logger.info("Re-adding triggers...")
-        add_triggers(transit_conn, logger, "transit")
+        add_triggers(transit_conn, "transit")
 
     logger.info("Migration successful")

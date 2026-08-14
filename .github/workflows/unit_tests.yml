@@ -13,16 +13,91 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+
       - name: Set Python environment
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
-      - uses: astral-sh/ruff-action@v3
+      - uses: astral-sh/ruff-action@v4.1.0
         with:
-          version: 0.14.8
+          version: 0.16.1
           args: check --output-format=github
+
+  cython-lint:
+    runs-on: ubuntu-latest
+    name: cython-lint
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-cython-lint
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set UV
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Run cython-lint
+        run: |
+          set +e  # We want to save the exit code of cython-lint for later
+          uvx cython-lint==0.21.0 ./src/ > cython-lint-errors.txt
+          export CYTHON_LINT_EXIT=$?
+          # Echo cython errors in a format GitHub can understand
+          sed -E 's|^([^:]+):([0-9]+):([0-9]+): (.+)$|::error title=cython-lint,file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|' cython-lint-errors.txt
+          exit $CYTHON_LINT_EXIT
+
+  clang-tidy:
+    runs-on: ubuntu-latest
+    name: clang-tidy
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-clang-tidy
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang-tidy
+        run: |
+          sudo apt update
+          sudo apt install -y clang-tidy
+
+      - name: Set Python environment
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install build dependencies
+        run: uv venv --python 3.13 --python-preference only-managed --clear && uv pip install meson ninja cython cysignals
+
+      - name: Configure build (generates compile_commands.json)
+        run: |
+          . .venv/bin/activate
+          meson setup build
+
+      - name: Run clang-tidy on src/
+        run: |
+          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
+            | xargs -0 clang-tidy -p build --quiet --warnings-as-errors='*'
+
+  clang-format:
+    runs-on: ubuntu-latest
+    name: clang-format
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-clang-format
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang-format
+        run: |
+          sudo apt update
+          sudo apt install -y clang-format
+
+      - name: Check formatting of src/
+        run: |
+          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
+            | xargs -0 clang-format --dry-run --Werror
 
   testing:
     needs: linting
@@ -33,26 +108,26 @@ jobs:
       cancel-in-progress: true
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
         os: [windows-latest, ubuntu-latest, macos-latest]
         sanitisers: [false]
         exclude:
           - os: macos-latest
-            python-version: '3.10'
-          - os: macos-latest
             python-version: '3.11'
           - os: macos-latest
             python-version: '3.12'
+          - os: macos-latest
+            python-version: '3.13'
         include:
           - os: ubuntu-latest
-            python-version: '3.13'
+            python-version: '3.14'
             sanitisers: true
 
       max-parallel: 20
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set Python environment
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v9.0.0
       with:
           python-version: ${{ matrix.python-version }}
 
@@ -97,13 +172,13 @@ jobs:
     - name: Compile and test
       if: matrix.sanitisers == false
       run: |
-        uv pip install ".[dev]" -v -Ccompile-args=-v
-        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+        uv pip install ".[dev]" -Ccompile-args=-v
+        pytest tests/ --durations=50 --dist=loadscope -n 4 --max-worker-restart 0 --random-order --verbose
 
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
       run: |
-        uv pip install ".[dev]" -v -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
+        uv pip install ".[dev]" -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         export ASAN_OPTIONS=detect_leaks=1
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
         LD_PRELOAD=$(gcc -print-file-name=libasan.so) pytest tests/

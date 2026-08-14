@@ -18,7 +18,7 @@ def read_stops(conn: sqlite3.Connection):
     """
     data = pd.read_sql(sql, conn)
 
-    data.rename(columns={"x": "stop_lon", "y": "stop_lat"}, inplace=True)
+    data = data.rename(columns={"x": "stop_lon", "y": "stop_lat"})
     for column in ["zone_id", "parent_station"]:
         if column not in data.columns:
             data[column] = pd.NA

@@ -1,20 +1,22 @@
 import csv
+import logging
 import math
 import re
 import string
 from collections import defaultdict
 from copy import deepcopy
+from typing import Any
 
 import numpy as np
 import pandas as pd
-import shapely.wkb
 import shapely.wkt
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
 
-from aequilibrae.log import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.db_utils import commit_and_close
+
+logger = logging.getLogger(__name__)
 
 
 def __dfs(graph, start):
@@ -48,7 +50,7 @@ def resolve_recusive_dict(base_dict):
 
 class GMNSBuilder:
     def __init__(
-        self, net, link_path: str, node_path: str, uses_path: str = None, geom_path: str = None, srid: int = 4326
+        self, net, link_path: str, node_path: str, uses_path: str = "", geom_path: str = "", srid: int = 4326
     ) -> None:
         self.p = Parameters()
         self.links = net.links
@@ -59,14 +61,14 @@ class GMNSBuilder:
 
         self.link_df = pd.read_csv(link_path).fillna("")
         self.node_df = pd.read_csv(node_path).fillna("")
-        self.uses_df = pd.read_csv(uses_path) if uses_path is not None else uses_path
-        self.geom_df = pd.read_csv(geom_path) if geom_path is not None else geom_path
+        self.uses_df = pd.read_csv(uses_path) if uses_path not in [""] else None
+        self.geom_df = pd.read_csv(geom_path) if geom_path not in [""] else None
         self.srid = srid
 
         self.l_equiv = self.p.parameters["network"]["gmns"]["link"]["equivalency"]
         self.n_equiv = self.p.parameters["network"]["gmns"]["node"]["equivalency"]
 
-    def doWork(self):
+    def doWork(self) -> None:
         p = self.p
         gmns_n_fields = p.parameters["network"]["gmns"]["node"]["fields"]
         gmns_l_fields = p.parameters["network"]["gmns"]["link"]["fields"]
@@ -84,9 +86,8 @@ class GMNSBuilder:
         if gmns_geom not in self.link_df.columns.to_list():
             if self.geom_df is None:
                 raise ValueError(
-                    "To create an aequilibrae links table, geometries information must be "
-                    "provided either in the GMNS link table or in a separate file "
-                    "('geometry_path' attribute)."
+                    "To create an aequilibrae links table, geometries information must be provided either in the GMNS"
+                    " link table or in a separate file ('geometry_path' attribute)."
                 )
             else:
                 self.link_df = self.link_df.merge(self.geom_df, on="geometry_id", how="left")
@@ -133,9 +134,9 @@ class GMNSBuilder:
         all_fields = list(gmns_l_fields)
         missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
         if missing_f != []:
-            print(
-                f"Fields not imported from link table: {'; '.join(missing_f)}. "
-                f"If you want them to be imported, please modify the parameters.yml file."
+            logger.error(
+                f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please "
+                "modify the parameters.yml file."
             )
 
         # Adding new fields to AequilibraE nodes table / Preparing it to receive information from GMNS table.
@@ -159,12 +160,12 @@ class GMNSBuilder:
         all_fields = list(gmns_n_fields)
         missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
         if missing_f != []:
-            print(
-                f"Fields not imported from node table: {'; '.join(missing_f)}. "
-                f"If you want them to be imported, please modify the parameters.yml file."
+            logger.error(
+                f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please "
+                "modify the parameters.yml file."
             )
 
-        # Getting information from some optional GMNS fields
+        # Getting information from some optinal GMNS fields
 
         gmns_name = self.l_equiv["name"]
         name_list = (
@@ -220,7 +221,7 @@ class GMNSBuilder:
 
         self.save_to_database(links_fields, nodes_fields)
 
-    def maybe_transform_srid(self, srid):
+    def maybe_transform_srid(self, srid: int) -> None:
         if srid == 4326:
             return
 
@@ -229,8 +230,8 @@ class GMNSBuilder:
         # For node table
         lons, lats = transformer.transform(self.node_df.loc[:, "x_coord"], self.node_df.loc[:, "y_coord"])
         self.node_df = self.node_df.astype({"x_coord": np.float64, "y_coord": np.float64})
-        self.node_df.loc[:, "x_coord"] = np.around(lons, decimals=10)
-        self.node_df.loc[:, "y_coord"] = np.around(lats, decimals=10)
+        self.node_df["x_coord"] = np.around(lons, decimals=10)
+        self.node_df["y_coord"] = np.around(lats, decimals=10)
 
         # For link table
         for idx, row in self.link_df.iterrows():
@@ -243,7 +244,7 @@ class GMNSBuilder:
 
             self.link_df.loc[idx, "geometry"] = LineString(new_points).wkt
 
-    def get_aeq_direction(self):
+    def get_aeq_direction(self) -> list:
         gmns_dir = self.l_equiv["direction"]
         gmns_cap = self.l_equiv["capacity"]
         gmns_lanes = self.l_equiv["lanes"]
@@ -287,7 +288,18 @@ class GMNSBuilder:
 
         return direction
 
-    def get_ab_lists(self, direction):
+    def get_ab_lists(
+        self, direction
+    ) -> tuple[
+        list[str],
+        list[str],
+        list[str],
+        list[str],
+        list[str],
+        list[str],
+        list[str],
+        list[str],
+    ]:
         gmns_speed = self.l_equiv["speed"]
         gmns_cap = self.l_equiv["capacity"]
         gmns_lanes = self.l_equiv["lanes"]
@@ -322,7 +334,7 @@ class GMNSBuilder:
 
         return speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba
 
-    def save_types_to_aeq(self):
+    def save_types_to_aeq(self) -> list[str]:
         gmns_ltype = self.l_equiv["link_type"]
 
         # Setting link_type = 'unclassified' if there is no information about it in the GMNS links table
@@ -335,7 +347,7 @@ class GMNSBuilder:
         else:
             link_types_list = self.link_df[gmns_ltype].to_list()
 
-        ## Adding link_types to AequilibraE model
+        # Adding link_types to AequilibraE model
 
         link_types_list = [s.replace("-", "_") for s in link_types_list]
         type_saved = ""
@@ -353,7 +365,7 @@ class GMNSBuilder:
 
         return link_types_list
 
-    def save_modes_to_aeq(self):
+    def save_modes_to_aeq(self) -> list[str]:
         gmns_modes = self.l_equiv["modes"]
 
         if gmns_modes in self.link_df.columns.to_list():
@@ -455,7 +467,7 @@ class GMNSBuilder:
 
         return modes_gathered
 
-    def correct_geometries(self):
+    def correct_geometries(self) -> None:
         p = self.p
         gmns_lid = self.l_equiv["link_id"]
         gmns_a_node = self.l_equiv["a_node"]
@@ -495,7 +507,7 @@ class GMNSBuilder:
                 self.link_df.loc[idx, "geometry"] = new_link.wkt
                 logger.info(
                     f"Geometry for link_id = {row[gmns_lid]} has just been corrected. "
-                    f"It was not connected to its start node."
+                    "It was not connected to its start node."
                 )
 
             if link_end_boundary != (to_point_x, to_point_y):
@@ -513,10 +525,10 @@ class GMNSBuilder:
                 self.link_df.loc[idx, "geometry"] = new_link.wkt
                 logger.info(
                     f"Geometry for link_id = {row[gmns_lid]} has just been corrected. "
-                    f"It was not connected to its end node."
+                    "It was not connected to its end node."
                 )
 
-    def save_to_database(self, links_fields, nodes_fields):
+    def save_to_database(self, links_fields: dict[str, Any], nodes_fields: dict[str, Any]) -> None:
         aeq_nodes_df = pd.DataFrame(nodes_fields)
         aeq_links_df = pd.DataFrame(links_fields)
 

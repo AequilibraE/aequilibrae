@@ -89,7 +89,7 @@ class Periods(BasicTable):
         for k in lst:
             del self.__items[k]
 
-    def new_period(self, period_id: int, start: int, end: int, description: str = None) -> Period:
+    def new_period(self, period_id: int, start: int, end: int, description: str | None = None) -> Period:
         """Creates a new period with a given ID
 
         :Arguments:
@@ -108,10 +108,10 @@ class Periods(BasicTable):
             raise Exception("period_id already exists. Failed to create it")
 
         data = dict.fromkeys(self.__fields)
-        data["period_id"] = period_id
         data["period_start"] = start
         data["period_end"] = end
         data["period_description"] = description if description is not None else ""
+        data["period_id"] = period_id
         period = Period(data, self.project)
         self.__items[period_id] = period
         return period

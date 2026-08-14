@@ -17,7 +17,6 @@ In this example, we show how to use AequilibraE's database connections within a 
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.project.project.Project.db_connection`
-#     * :func:`aequilibrae.project.project.Project.db_connection_spatial`
 #     * :func:`aequilibrae.project.project.Project.results_connection`
 #     * :func:`aequilibrae.project.project.Project.transit_connection`
 
@@ -40,9 +39,8 @@ fldr = Path(gettempdir()) / uuid4().hex
 project = create_example(fldr, "sioux_falls")
 
 # %%
-# All AequilibraE projects presents four types of connections in the form of properties:
+# All AequilibraE projects present three types of connections in the form of properties:
 #
-#    * General connection to the project database
 #    * Spatial connection to the project database
 #    * General connection to the results database
 #    * Spatial connection to the transit database
@@ -56,8 +54,8 @@ with project.db_connection as conn:
 matrices
 
 # %%
-# We encourage using spatial connections only when handling spatial data.
-with project.db_connection_spatial as conn:
+# As the project database connection is spatial, it can also be used to query spatial data directly.
+with project.db_connection as conn:
     nodes = gpd.read_postgis("SELECT zone_id, ST_AsBinary(geometry) geom FROM zones;", con=conn, geom_col="geom", crs=4326)
 
 # %%

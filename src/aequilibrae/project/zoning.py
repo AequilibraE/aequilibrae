@@ -1,22 +1,27 @@
+import logging
 import warnings
 from copy import deepcopy
 from pathlib import Path
-from typing import Union, Dict
+from typing import TYPE_CHECKING, Dict, Union
 
-import geopandas as gpd
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
-from shapely.geometry import Point, Polygon, LineString, MultiLineString
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
-from aequilibrae.project.network.connector_creation import connector_creation, bulk_connector_creation
+from aequilibrae.project.network.connector_creation import bulk_connector_creation, connector_creation
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.geo_index import GeoIndex
+
+if TYPE_CHECKING:
+    from aequilibrae.project.network import Network
+
+logger = logging.getLogger(__name__)
 
 
 class Zoning(BasicTable):
@@ -41,10 +46,10 @@ class Zoning(BasicTable):
         >>> project.close()
     """
 
-    def __init__(self, network):
+    def __init__(self, network: "Network"):
         super().__init__(network.project)
         self.__items: Dict[int, Zone] = {}
-        self.network = network
+        self.network: "Network" = network
         self.__table_type__ = "zones"
         self.__fields = []
         self.__geo_index = GeoIndex()
@@ -64,32 +69,32 @@ class Zoning(BasicTable):
         data = dict.fromkeys(self.__fields)
         data["zone_id"] = zone_id
 
-        self.project.logger.info(f"Zone with id {zone_id} was created")
+        logger.info(f"Zone with id {zone_id} was created")
         return self.__create_return_zone(data)
 
-    def create_zoning_layer(self):
+    def create_zoning_layer(self) -> None:
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.__has_zoning():
             qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
-            with self.network.project.db_connection_spatial as conn:
-                run_queries_from_sql_file(conn, self.project.logger, qry_file)
+            with self.network.project.db_connection as conn:
+                run_queries_from_sql_file(conn, qry_file)
             self.__load()
         else:
-            self.project.warning("zones table already exists. Nothing was done", Warning)
+            self.project.logger.warning("zones table already exists. Nothing was done", Warning)
 
-    def coverage(self) -> Polygon:
+    def coverage(self) -> MultiPolygon:
         """Returns a single polygon for the entire zoning coverage
 
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        with self.network.project.db_connection_spatial as conn:
+        with self.network.project.db_connection as conn:
             dt = conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return union_all(polygons)
 
-    def get(self, zone_id: str) -> Zone:
+    def get(self, zone_id: int) -> Zone:
         """Get a zone from the model by its ``zone_id``"""
         if zone_id not in self.__items:
             raise ValueError(f"Zone {zone_id} does not exist in the model")
@@ -99,11 +104,11 @@ class Zoning(BasicTable):
         """Returns a dictionary with all Zone objects available in the model, using ``zone_id`` as key"""
         return self.__items
 
-    def save(self):
+    def save(self) -> None:
         for item in self.__items.values():
             item.save()
 
-    def add_centroids(self, robust=True):
+    def add_centroids(self, robust: bool = True) -> None:
         """Adds automatic centroids to the network file. It adds centroids to all zones that do not have one
         Centroid is added to the geographic centroid of the zone.
 
@@ -112,7 +117,7 @@ class Zoning(BasicTable):
             Defaults to ``True``.
         """
         i = 0
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             existing_centroids = pd.read_sql("SELECT node_id from Nodes where is_centroid = 1", conn).node_id.to_numpy()
             for zone_id in simple_progress(self.__items.keys(), SIGNAL(object), "Connecting zones"):
                 if zone_id in existing_centroids:
@@ -121,11 +126,13 @@ class Zoning(BasicTable):
                 zone.add_centroid(zone.geometry.centroid, robust)
                 i += 1
         if i > 0:
-            self.project.logger.info(f"{i} new centroids added to the network")
+            logger.info(f"{i} new centroids added to the network")
         else:
-            self.project.logger.info("No new centroids added to the network")
+            logger.info("No new centroids added to the network")
 
-    def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True, bulk: bool = False):
+    def connect_mode(
+        self, mode_id: str, link_types: str = "", connectors: int = 1, limit_to_zone: bool = True, bulk: bool = False
+    ) -> None:
         """
         Adds centroid connectors for the desired mode to the network file
 
@@ -161,16 +168,14 @@ class Zoning(BasicTable):
         centroid_conn = link_data.query("a_node in @centroids and modes.str.contains(@mode_id)", engine="python")
         connected_centroids = centroid_conn.a_node.to_numpy()
 
-        with self.project.db_connection_spatial as conn, warnings.catch_warnings():
+        with self.project.db_connection as conn, warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
 
             if not bulk:
                 zones_todo = [x for x in self.__items.keys() if x not in connected_centroids]
                 for zone_id in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
                     if zone_id not in centroids:
-                        self.project.logger.warning(
-                            f"Centroid for zone {zone_id} does not exist. Please create it first."
-                        )
+                        logger.warning(f"Centroid for zone {zone_id} does not exist. Please create it first.")
                         continue
 
                     zone = self.__items[zone_id]
@@ -231,19 +236,19 @@ class Zoning(BasicTable):
             dists[geo.distance(geometry)] = zone_id
         return dists[min(dists.keys())]
 
-    def refresh_geo_index(self):
+    def refresh_geo_index(self) -> None:
         self.__geo_index.reset()
         for zone_id, zone in self.__items.items():
             self.__geo_index.insert(feature_id=zone_id, geometry=zone.geometry)
 
-    def __has_zoning(self):
+    def __has_zoning(self) -> bool:
         with self.network.project.db_connection as conn:
             dt = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
         return any("zone" in x[0].lower() for x in dt)
 
-    def __load(self):
+    def __load(self) -> None:
         tl = TableLoader()
-        with self.network.project.db_connection_spatial as conn:
+        with self.network.project.db_connection as conn:
             zones_list = tl.load_table(conn, "zones")
         self.__fields = deepcopy(tl.fields)
 
@@ -259,16 +264,16 @@ class Zoning(BasicTable):
             del self.__items[key]
         self.refresh_geo_index()
 
-    def _remove_zone(self, zone_id: int):
+    def _remove_zone(self, zone_id: int) -> None:
         del self.__items[zone_id]
 
-    def __create_return_zone(self, data):
+    def __create_return_zone(self, data) -> Zone:
         zone = Zone(data, self)
         self.__items[zone.zone_id] = zone
         return zone
 
     @property
-    def data(self) -> gpd.GeoDataFrame:
+    def data(self) -> pd.DataFrame:
         """Returns all zones data as a Pandas DataFrame
 
         :Returns:

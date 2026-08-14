@@ -1,3 +1,4 @@
+import logging
 from os.path import isfile
 from pathlib import Path
 
@@ -6,6 +7,7 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.utils.logging_utils import basic_config
 
 
 @pytest.fixture(scope="function")
@@ -39,8 +41,19 @@ def assignment(project):
     return TrafficAssignment(project)
 
 
+@pytest.fixture(scope="function")
+def file_logging():
+    logger = logging.getLogger("aequilibrae")
+    handler = basic_config(level=logging.INFO)
+    assert handler is not None
+    yield handler
+    logger.removeHandler(handler)
+    logger.setLevel(logging.NOTSET)
+    logger.propagate = True
+
+
 @pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
-def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type):
+def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type, file_logging):
     if matrix_type == "memonly":
         matrix = matrix.copy(memory_only=True)
 

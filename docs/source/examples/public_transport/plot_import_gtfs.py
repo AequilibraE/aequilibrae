@@ -57,9 +57,16 @@ data = Transit(project)
 transit = data.new_gtfs_builder(agency="Lisanco", file_path=dest_path)
 
 # %%
-# To load the data, we must choose one date. We're going to continue with 2016-04-13 but feel free
-# to experiment with any other available dates. Transit class has a function allowing you to check
-# dates for the GTFS feed. It should take approximately 2 minutes to load the data.
+# To load the data, we must choose one date. The importer reads ``calendar.txt`` and
+# ``calendar_dates.txt`` when the builder is created, so we can inspect the available
+# service dates before loading a full day.
+
+available_dates = transit.dates_available()
+available_dates[:3], available_dates[-3:]
+
+# %%
+# We're going to continue with 2016-04-13, but you can experiment with any other
+# available date. It should take approximately 2 minutes to load the data.
 
 transit.load_date("2016-04-13")
 

@@ -1,26 +1,26 @@
 import logging
 import os
 import shutil
+import sys
 import urllib
 import warnings
 from os.path import basename, join
 from pathlib import Path
-from sqlite3 import Connection, register_adapter, OperationalError
+from sqlite3 import Connection, OperationalError, connect, register_adapter
 from tempfile import gettempdir
 from zipfile import ZipFile
 
 import numpy as np
 
-from aequilibrae.log import global_logger
 from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
 # Setup adapters so that we can read/write numpy types directly to DB
-register_adapter(np.int64, int)
-register_adapter(np.int32, int)
-register_adapter(np.float32, float)
-register_adapter(np.float64, float)
-register_adapter(object, str)
+for _type, _converter in ((np.int64, int), (np.int32, int), (np.float32, float), (np.float64, float), (object, str)):
+    register_adapter(_type, _converter)
+
+
+logger = logging.getLogger(__name__)
 
 
 def is_windows():
@@ -31,7 +31,11 @@ def is_not_windows():
     return os.name != "nt"
 
 
-def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> Connection:
+def is_macos():
+    return sys.platform == "darwin"
+
+
+def connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False) -> Connection:
     if inside_qgis:
         import qgis
 
@@ -42,7 +46,7 @@ def connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False) -> C
     return _connect_spatialite(path_to_file, missing_ok)
 
 
-def _connect_spatialite(path_to_file: os.PathLike, missing_ok: bool = False):
+def _connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False):
     conn = safe_connect(path_to_file, missing_ok)
     load_spatialite_extension(conn)
     return conn
@@ -55,33 +59,55 @@ def load_spatialite_extension(conn: Connection):
     # Try loading from specific directory first
     if directory:
         try:
-            conn.load_extension(os.path.join(directory, "mod_spatialite"))
+            _pin_and_load_extensions(conn, (os.path.join(directory, "mod_spatialite"),))
             return
         except OperationalError:
-            global_logger.error(
+            logger.error(
                 f"Environment variable 'AEQ_SPATIALITE_DIR' was provided ({directory}), "
                 "but mod_spatialite could not be loaded from this directory. Trying system path"
             )
 
     try:
-        conn.load_extension("mod_spatialite")
+        _pin_and_load_extensions(conn, ("mod_spatialite",))
     except OperationalError as e:
         if is_windows():
             ensure_spatialite_binaries()
             try:
                 # Retry after potential download
                 directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
-                conn.load_extension(os.path.join(directory, "mod_spatialite"))
+                _pin_and_load_extensions(conn, (os.path.join(directory, "mod_spatialite"),))
                 return
             except OperationalError as e2:
                 raise e2 from e
+
+
+_pinned_connections: dict[tuple[str], Connection] = {}
+
+
+def _pin_and_load_extensions(conn: Connection, extensions: tuple[str]) -> None:
+    # SQLite unloads mod_spatialite when the connection closes. Repeated load/unload cycles exhaust
+    # TLS indexes on Windows and pthread_atfork slots on macOS, and incur unnecessary loader overhead
+    # on every platform. Holding one extra reference keeps the library and its dependencies mapped,
+    # while SQLite still initialises each individual connection.
+    global _pinned_connections
+
+    for extension in extensions:
+        conn.load_extension(extension)
+
+    if extensions not in _pinned_connections:
+        pinned_conn = connect(":memory:")
+        pinned_conn.enable_load_extension(True)
+        for extension in extensions:
+            pinned_conn.load_extension(extension)
+        pinned_conn.enable_load_extension(False)
+        _pinned_connections[extensions] = pinned_conn
 
 
 def is_spatialite(conn):
     return has_table(conn, "geometry_columns")
 
 
-def set_known_spatialite_folder(spatialite_folder: os.PathLike):
+def set_known_spatialite_folder(spatialite_folder: os.PathLike | str):
     directory = str(spatialite_folder)
     if directory not in os.environ["PATH"]:
         os.environ["PATH"] = directory + os.pathsep + os.environ["PATH"]
@@ -96,12 +122,12 @@ def ensure_spatialite_binaries() -> None:
     directory = os.environ.get("AEQ_SPATIALITE_DIR", gettempdir())
 
     if not _dll_already_exists(directory):
-        global_logger.info(f"mod_spatialite.dll not found in {directory} attempting to download")
+        logger.info(f"mod_spatialite.dll not found in {directory} attempting to download")
         try:
             _download_and_extract_spatialite(directory)
             os.environ["AEQ_SPATIALITE_DIR"] = directory
         except Exception as e:
-            global_logger.error(f"Failed to download Spatialite binaries: {e}")
+            logger.error(f"Failed to download Spatialite binaries: {e}")
             raise e
 
     set_known_spatialite_folder(directory)
@@ -119,14 +145,14 @@ def ensure_spatialite_binaries() -> None:
     except Exception as e:
         msg = f"Could not put the proj.db file in the expected place. {e.args}"
         warnings.warn(msg, stacklevel=2)
-        global_logger.warning(msg)
+        logger.warning(msg)
 
 
-def _dll_already_exists(d: os.PathLike) -> bool:
+def _dll_already_exists(d: os.PathLike | str) -> bool:
     return os.path.exists(join(d, "mod_spatialite.dll"))
 
 
-def _download_and_extract_spatialite(directory: os.PathLike) -> None:
+def _download_and_extract_spatialite(directory: os.PathLike | str) -> None:
     url = "https://github.com/AequilibraE/aequilibrae/releases/download/v1.4.3/mod_spatialite-5.1.0-win-amd64.zip"
     zip_file = join(directory, basename(url))
 
@@ -137,7 +163,6 @@ def _download_and_extract_spatialite(directory: os.PathLike) -> None:
 
 
 def spatialize_db(conn, logger=None):
-    logger = logger or logging.getLogger("aequilibrae")
     logger.info("Adding Spatialite infrastructure to the database")
     if not inside_qgis and not is_spatialite(conn):
         try:

@@ -1,5 +1,5 @@
 import warnings
-import multiprocessing as mp
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 cimport cython
 import numpy as np
@@ -25,11 +25,11 @@ def ipf_core(
     cdef int cpus = 0
 
     if cores < 0:
-        cpus = max(1, mp.cpu_count() + cores)
+        cpus = max(1, omp_get_max_threads() + cores)
     if cores == 0:
-        cpus = mp.cpu_count()
+        cpus = omp_get_max_threads()
     elif cores > 0:
-        cpus = min(mp.cpu_count(), cores)
+        cpus = min(omp_get_max_threads(), cores)
 
     mat_prod_tot = np.zeros_like(target_productions, np.float64)
     factor_prod = np.zeros_like(target_productions, np.float64)
@@ -74,7 +74,7 @@ def ipf_core(
         )
 
     if err > tolerance and warn:
-        warnings.warn(f"Could not reach convergence in {iter} iterations: {err}")
+        warnings.warn(f"Could not reach convergence in {iter} iterations: {err}", stacklevel=2)
     return iter, err
 
 
@@ -82,39 +82,39 @@ def ipf_core(
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef object _fratar(cython.floating[:, :] flows,
-                double[:] prod_tot,
-                const double[:] prod_tgt,
-                double[:] prod_factor,
-                double[::1] attr_tot,
-                const double[:] attr_tgt,
-                double[:] attr_factor,
-                int max_iter,
-                double toler,
-                int cpus):
+                    double[:] prod_tot,
+                    const double[:] prod_tgt,
+                    double[:] prod_factor,
+                    double[::1] attr_tot,
+                    const double[:] attr_tgt,
+                    double[:] attr_factor,
+                    int max_iter,
+                    double toler,
+                    int cpus):
 
     cdef double err = 1.0
-    cdef int iter = 0
+    cdef int _iter = 0
     cdef long long i, j
-    cdef long long I = flows.shape[0]
+    cdef long long n_rows = flows.shape[0]
     cdef long long J = flows.shape[1]
 
     # we zero everyone that needs to be zero to be able to skip them in the future
-    for i in prange(I, nogil=True):
+    for i in prange(n_rows, nogil=True):
         for j in range(J):
             if prod_tgt[i] + attr_tgt[j] == 0:
                 flows[i, j] = 0
 
-    for iter in range(max_iter):
+    for _iter in range(max_iter):
         _total_prods(flows, prod_tgt, prod_tot, cpus)
         err = _factors(prod_tgt, prod_tot, prod_factor, cpus)
-        for i in prange(I, nogil=True, num_threads=cpus):
+        for i in prange(n_rows, nogil=True, num_threads=cpus):
             if prod_tgt[i] > 0:
                 for j in range(J):
                     flows[i, j] = flows[i, j] * prod_factor[i]
 
         _total_attra(flows, prod_tgt, attr_tot, cpus)
         err = _factors(attr_tgt, attr_tot, attr_factor, cpus)
-        for i in prange(I, nogil=True, num_threads=cpus):
+        for i in prange(n_rows, nogil=True, num_threads=cpus):
             if prod_tgt[i] > 0:
                 for j in range(J):
                     flows[i, j] = flows[i, j] * attr_factor[j]
@@ -124,19 +124,19 @@ cdef object _fratar(cython.floating[:, :] flows,
         if (err - 1) < toler:
             break
 
-    return iter, err - 1
+    return _iter, err - 1
 
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void _total_attra(cython.floating[:, :] flows,
-                    const double[:] prod_tgt,
-                    double[::1] attr_tot,
-                    int cpus) noexcept:
+                        const double[:] prod_tgt,
+                        double[::1] attr_tot,
+                        int cpus) noexcept:
     cdef long i, j, jk
     cdef double *local_buf
-    cdef long I = flows.shape[0]
+    cdef long n_rows = flows.shape[0]
     cdef long J = flows.shape[1]
 
     # Zero the provided total buffer, a IEEE 64bit floating point value represents its
@@ -149,7 +149,7 @@ cpdef void _total_attra(cython.floating[:, :] flows,
         # This makes the IPF roughly 2x faster, with this function being 8x faster
         local_buf = <double *> calloc(J, sizeof(double))
 
-        for i in prange(I):
+        for i in prange(n_rows):
             if prod_tgt[i] == 0:
                 continue
 
@@ -168,16 +168,16 @@ cpdef void _total_attra(cython.floating[:, :] flows,
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void _total_prods(cython.floating[:, :] flows,
-                    const double[:] prod_tgt,
-                    double[:] prod_tot,
-                    int cpus) noexcept nogil:
+                        const double[:] prod_tgt,
+                        double[:] prod_tot,
+                        int cpus) noexcept nogil:
 
     cdef long long i, j
-    cdef long long I = flows.shape[0]
+    cdef long long n_rows = flows.shape[0]
     cdef long long J = flows.shape[1]
 
     # Calculate the row totals (prods) from the flows
-    for i in prange(I, num_threads=cpus):
+    for i in prange(n_rows, num_threads=cpus):
         prod_tot[i] = 0
         if prod_tgt[i] == 0:
             continue
@@ -191,16 +191,16 @@ cpdef void _total_prods(cython.floating[:, :] flows,
 @cython.boundscheck(False)
 @cython.cdivision(True)
 cpdef double _factors(const double[:] target,
-                  double[:] total,
-                  double[:] factor,
-                  int cpus) noexcept:
+                      double[:] total,
+                      double[:] factor,
+                      int cpus) noexcept:
 
-    cdef long long i, I = target.shape[0]
+    cdef long long i, n = target.shape[0]
     cdef double err = 1.0
 
     # Computes factors
     with nogil, parallel(num_threads=cpus):
-        for i in prange(I):
+        for i in prange(n):
             factor[i] = 0
             if target[i] > 0:
                 if total[i] == 0:
@@ -217,12 +217,12 @@ cpdef double _factors(const double[:] target,
 cpdef double _calc_err(double[:] p_factor,
                        double[:] a_factor) noexcept:
 
-    cdef long long i, I = p_factor.shape[0]
+    cdef long long i, n = p_factor.shape[0]
     cdef long long j, J = a_factor.shape[0]
     cdef double err = 1.0
 
     # Production
-    for i in range(I):
+    for i in range(n):
         if p_factor[i] > 0:
             err = err if err > 1 / p_factor[i] else 1 / p_factor[i]
         err = err if err > p_factor[i] else p_factor[i]

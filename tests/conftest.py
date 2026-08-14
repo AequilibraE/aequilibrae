@@ -3,6 +3,7 @@
 # needing to import them (pytest will automatically discover them).
 
 import faulthandler
+import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -14,12 +15,15 @@ from aequilibrae.project.project_creation import remove_triggers
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
-from tests.data.reference_files import siouxfalls_project
 
 faulthandler.enable()
 
-DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_env():
+    os.environ["AEQ_SHOW_PROGRESS"] = "0"
 
 
 @pytest.fixture(scope="session")
@@ -104,7 +108,7 @@ def cached_empty_no_triggers_project(cache_path):
 @pytest.fixture
 def empty_no_triggers_project(empty_project, tmp_path) -> Project:
     with empty_project.db_connection as conn:
-        remove_triggers(conn, empty_project.logger, db_type="network")
+        remove_triggers(conn, db_type="network")
         tables = ["nodes", "links"]
         for tbl in tables:
             conn.execute(f"DELETE FROM {tbl}")
@@ -178,5 +182,18 @@ def cached_scenario_example(cache_path):
 @pytest.fixture(scope="function")
 def scenario_example(cached_scenario_example, cache_path, tmp_path) -> Project:
     project = cached_model("scenario_project", cache_path, tmp_path)
+    yield project
+    project.close()
+
+
+@pytest.fixture(scope="session")
+def cached_st_varent(test_data_path, cache_path):
+    # Zip includes top-level "St_Varent" dir.
+    zipfile.ZipFile(test_data_path / "St_Varent_issue307.zip").extractall(cache_path)
+
+
+@pytest.fixture(scope="function")
+def st_varent(cached_st_varent, cache_path, tmp_path) -> Project:
+    project = cached_model("St_Varent", cache_path, tmp_path)
     yield project
     project.close()

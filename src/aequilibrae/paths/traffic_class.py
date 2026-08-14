@@ -1,4 +1,5 @@
 import warnings
+import logging
 from copy import deepcopy
 from typing import Union, List, Tuple, Dict
 from abc import ABC
@@ -8,6 +9,8 @@ import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
+
+logger = logging.getLogger(__name__)
 
 
 class TransportClassBase(ABC):  # noqa: B024
@@ -29,7 +32,6 @@ class TransportClassBase(ABC):  # noqa: B024
             raise TypeError("Matrix's computational view need to be of type np.float64")
         self._config = {}
         self.graph = graph
-        self.logger = graph.logger
         self.matrix = matrix
         self._id = name
 
@@ -47,14 +49,12 @@ class TransportClassBase(ABC):  # noqa: B024
             "Number of centroids": matrix.zones,
             "Matrix cores": matrix.view_names,
         }
+        # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
+        view = np.nan_to_num(matrix.matrix_view)
         if len(matrix.view_names) == 1:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :])) for nm in matrix.view_names
-            }
+            mat_config["Matrix totals"] = {nm: float(view.sum()) for nm in matrix.view_names}
         else:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i])) for i, nm in enumerate(matrix.view_names)
-            }
+            mat_config["Matrix totals"] = {nm: float(view[:, :, i].sum()) for i, nm in enumerate(matrix.view_names)}
         self._config["Matrix"] = str(mat_config)
 
     @property
@@ -123,6 +123,17 @@ class TrafficClass(TransportClassBase):
             raise ValueError("PCE needs to be either integer or float ")
         self.pce = pce
 
+    def set_heap(self, heap: str) -> None:
+        """Sets the priority queue implementation used for path finding when assigning this class.
+
+        Must be one of ``AssignmentResults.get_heaps()``. Defaults to the 4-ary heap if not set.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        self.results.set_heap(heap)
+        self._aon_results.set_heap(heap)
+
     def set_fixed_cost(self, field_name: str, multiplier=1):
         """Sets value of time
 
@@ -137,11 +148,11 @@ class TrafficClass(TransportClassBase):
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
         if np.any(np.isnan(self.graph.graph[field_name].values)):
-            self.logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
+            logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
         if self.graph.graph[field_name].min() < 0:
             msg = f"Cost field {field_name} has negative values. That is not allowed"
-            self.logger.error(msg)
+            logger.error(msg)
             raise ValueError(msg)
 
     def set_vot(self, value_of_time: float) -> None:

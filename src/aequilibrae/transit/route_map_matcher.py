@@ -1,3 +1,4 @@
+from aequilibrae.paths.results.path_results import PathResults
 import logging
 from typing import Optional, Union
 
@@ -8,13 +9,14 @@ from shapely import LineString
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import linemerge
 
-from aequilibrae.context import get_logger
 from aequilibrae.paths import Graph
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
 from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 DEAD_END_RUN = 40
+
+logger = logging.getLogger(__name__)
 
 
 class RouteMapMatcher(WorkerThread):
@@ -23,28 +25,30 @@ class RouteMapMatcher(WorkerThread):
         link_gdf: gpd.GeoDataFrame,
         nodes_gdf: gpd.GeoDataFrame,
         stops_gdf: gpd.GeoDataFrame,
-        distance_to_project=50,
+        distance_to_project: float = 50,
     ):
         super().__init__(None)
 
-        utm_zone = metre_crs_for_gdf(link_gdf)
+        utm_zone: str = metre_crs_for_gdf(link_gdf)
 
-        self.logger = get_logger()
+        self.links: gpd.GeoDataFrame = self.__rename_geo(link_gdf).to_crs(utm_zone)
+        stops_gdf: gpd.GeoDataFrame = (
+            self.__rename_geo(stops_gdf).to_crs(utm_zone).rename(columns={"stop_id": "real_stop_id"})
+        )
+        self.stops: gpd.GeoDataFrame = gpd.GeoDataFrame(
+            stops_gdf.assign(stop_id=np.arange(stops_gdf.shape[0]) + nodes_gdf.node_id.max() + 1)
+        )
+        self.nodes: gpd.GeoDataFrame = self.__rename_geo(nodes_gdf).to_crs(utm_zone)
 
-        self.links = self.__rename_geo(link_gdf).to_crs(utm_zone)
-        stops_gdf = self.__rename_geo(stops_gdf).to_crs(utm_zone).rename(columns={"stop_id": "real_stop_id"})
-        self.stops = stops_gdf.assign(stop_id=np.arange(stops_gdf.shape[0]) + nodes_gdf.node_id.max() + 1)
-        self.nodes = self.__rename_geo(nodes_gdf).to_crs(utm_zone)
-
-        self.dist_thresh = distance_to_project
+        self.dist_thresh: int | float = distance_to_project
         self.node_corresp = []
         self.__all_links = {}
 
         self.graph: Graph = Graph()
         self.reverse_graph: Graph = Graph()
-        self.crs = utm_zone
+        self.crs: str = utm_zone
 
-        self.stop_ids = self.stops[["stop_id", "real_stop_id"]]
+        self.stop_ids: gpd.GeoDataFrame = self.stops[["stop_id", "real_stop_id"]]
 
     def initialize_graph(self):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
@@ -55,7 +59,7 @@ class RouteMapMatcher(WorkerThread):
             **distance_to_project** (:obj:`float`, *Optional*): Radius search for links to break at the stops.
             Defaults to 50m
         """
-        self.logger.debug("Called build_graph_with_broken_stops")
+        logger.debug("Called build_graph_with_broken_stops")
         if not self.links.shape[0]:
             return
 
@@ -63,7 +67,7 @@ class RouteMapMatcher(WorkerThread):
 
     def map_match_route(
         self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None, pattern_id: Optional[str] = None
-    ):
+    ) -> pd.DataFrame:
         # `pattern_id` is accepted for API compatibility and reserved for future use (e.g., logging/filtering).
         _ = pattern_id
 
@@ -75,13 +79,13 @@ class RouteMapMatcher(WorkerThread):
         return self._build_path_df(path_directions, path_links)
 
     def __build_graph_from_scratch(self):
-        self.logger.debug("Creating map-matching graph")
+        logger.debug("Creating map-matching graph")
 
         broken_links, new_nodes = split_links_at_stops(self.stops, self.links, self.dist_thresh)
 
         # To build connectors, let's get all nodes together
         # and connect stops to them within the threshold distance
-        nodes = pd.concat([self.nodes[["node_id", "geometry"]], new_nodes], ignore_index=True)
+        nodes: pd.DataFrame = pd.concat([self.nodes[["node_id", "geometry"]], new_nodes], ignore_index=True)
 
         stops = self.stops[["stop_id", "geometry"]]
         buffered_points = stops.copy()
@@ -93,10 +97,12 @@ class RouteMapMatcher(WorkerThread):
         connector_geo = joined.reset_index(drop=True).geometry.shortest_line(geos.reset_index(drop=True).geometry)
 
         df = joined[["stop_id", "node_id"]].rename(columns={"stop_id": "a_node", "node_id": "b_node"})
-        connectors = gpd.GeoDataFrame(df, geometry=connector_geo).set_crs(self.links.crs)
+        connectors: gpd.GeoDataFrame = gpd.GeoDataFrame(df, geometry=connector_geo).set_crs(
+            self.links.crs, inplace=False
+        )
 
         min_speed = max(min(self.links.speed_ab.min(), self.links.speed_ba.min()), 1.0)
-        connectors = connectors.assign(
+        connectors: pd.DataFrame = connectors.assign(
             direction=0,
             link_id=0,
             is_connector=1,
@@ -105,7 +111,7 @@ class RouteMapMatcher(WorkerThread):
             distance=max(1.2 * (connectors.geometry.length**1.3)),
         )
 
-        net_data = pd.concat([broken_links, connectors], ignore_index=True)
+        net_data: pd.DataFrame = pd.concat([broken_links, connectors], ignore_index=True)
         net_data["link_id"] = np.arange(1, net_data.shape[0] + 1)
 
         # Guarantees a non-zero distance
@@ -116,8 +122,8 @@ class RouteMapMatcher(WorkerThread):
         net_gdf = gpd.GeoDataFrame(net_data, geometry="geometry", crs=self.links.crs)
         self.__graph_from_broken_net(net_gdf)
 
-    def __graph_from_broken_net(self, net_data):
-        self.graph.network = net_data
+    def __graph_from_broken_net(self, net_data: pd.DataFrame):
+        self.graph.network: pd.DataFrame = net_data
         centroids = np.array(self.stops.stop_id.values)
         all_nodes = np.unique(np.hstack([self.graph.network.a_node.to_numpy(), self.graph.network.b_node.to_numpy()]))
         centroids = centroids[np.isin(centroids, all_nodes)]
@@ -130,7 +136,9 @@ class RouteMapMatcher(WorkerThread):
 
         self.reverse_graph = self.graph.reverse()
 
-    def _build_full_path_on_broken_links(self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None):
+    def _build_full_path_on_broken_links(
+        self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None
+    ) -> tuple[list[int], list[int]]:
         # It assumes that both the graph, stops AND route shape are in the same CRS
 
         if route_stops.shape[0] <= 1:
@@ -140,11 +148,11 @@ class RouteMapMatcher(WorkerThread):
         if route_shape is None:
             route_shape = LineString(route_stops.geometry.tolist())
 
-        route_stops = route_stops.rename(columns={"stop_id": "real_stop_id"})
-        route_stops = route_stops.merge(self.stop_ids, on="real_stop_id")
+        route_stops: pd.DataFrame = route_stops.rename(columns={"stop_id": "real_stop_id"})
+        route_stops: pd.DataFrame = route_stops.merge(self.stop_ids, on="real_stop_id")
 
         if not np.all(np.isin(route_stops.real_stop_id.values, self.available_stops)):
-            self.logger.critical("Route is not completely connected.")
+            logger.critical("Route is not completely connected.")
             return [], []
 
         # We discount the likely links for this route to favor them in the map-matching
@@ -155,7 +163,9 @@ class RouteMapMatcher(WorkerThread):
 
         current_stop = int(route_stops.stop_id.iat[0])
 
-        res = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]), early_exit=True)
+        res: PathResults = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]), early_exit=True)
+        assert res.path is not None
+        assert res.path_link_directions is not None
 
         if route_stops.shape[0] == 2:
             if res.milepost is None:
@@ -190,6 +200,7 @@ class RouteMapMatcher(WorkerThread):
 
             # Let's see if we can reach the following stop while going through the next one
             # This would save us some path computation
+            assert following_stop is not None
             res.compute_path(current_stop, following_stop, early_exit=False)
             indices_in_a = np.where(np.isin(connection_candidates, res.path_nodes))[0]
             if indices_in_a.shape[0] > 0:
@@ -232,7 +243,7 @@ class RouteMapMatcher(WorkerThread):
 
         return path_directions, path_links
 
-    def _build_path_df(self, path_directions, path_links) -> pd.DataFrame:
+    def _build_path_df(self, path_directions: list[int], path_links: list[int]) -> pd.DataFrame:
         """Builds a cleaned DataFrame of link IDs and directions from raw path data.
 
         Performs post-processing to:
@@ -323,11 +334,11 @@ class RouteMapMatcher(WorkerThread):
         # Find all links that intersect this buffer
         return gdf.sjoin(geolinks, how="inner", predicate="contains").link_id.tolist()
 
-    def assemble_shape(self, df: pd.DataFrame, enforce_single_parts=True) -> Union[LineString, MultiLineString]:
+    def assemble_shape(self, df: pd.DataFrame, enforce_single_parts: bool = True) -> Union[LineString, MultiLineString]:
         """Assembles a LineString shape from the matched path links.
 
         Args:
-            df: DataFrame with 'link_id' and 'dir' columns from map_match_route()
+            df: pd.DataFrame with 'link_id' and 'dir' columns from map_match_route()
 
         Returns:
             LineString: The assembled route shape
@@ -360,7 +371,7 @@ class RouteMapMatcher(WorkerThread):
         return LineString(coords)
 
     @staticmethod
-    def __rename_geo(gdf):
+    def __rename_geo(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         if gdf.active_geometry_name != "geometry":
-            return gdf.rename_geometry("geometry")
+            return gdf.rename_geometry("geometry", inplace=False)
         return gdf

@@ -25,7 +25,7 @@ def write_shapes(patterns: pd.DataFrame, folder_path: Path):
         points = _shape_points(pat["shape"])
         lons = [pt.x for pt in points]
         lats = [pt.y for pt in points]
-        distances = [0] + [x.distance(y) for x, y in zip(points[:-1], points[1:], strict=True)]
+        distances = [0.0] + [x.distance(y) for x, y in zip(points[:-1], points[1:], strict=True)]
         dt = pd.DataFrame(
             {
                 "shape_id": pat["shape_id"],
@@ -35,9 +35,9 @@ def write_shapes(patterns: pd.DataFrame, folder_path: Path):
                 "shape_dist_traveled": distances,
             }
         )
-        dt.loc[:, "shape_dist_traveled"] = dt.shape_dist_traveled.cumsum()
+        dt["shape_dist_traveled"] = dt["shape_dist_traveled"].cumsum()
         if dt.shape_dist_traveled.max() and pat["shape"].length:
-            dt.loc[:, "shape_dist_traveled"] *= dt.shape_dist_traveled.max() * pat["shape_length"] / pat["shape"].length
+            dt["shape_dist_traveled"] = dt["shape_dist_traveled"] * (pat["shape_length"] / pat["shape"].length)
         data.append(dt)
 
     output = pd.concat(data, ignore_index=True) if data else pd.DataFrame(

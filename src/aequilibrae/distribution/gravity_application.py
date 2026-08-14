@@ -12,6 +12,8 @@ from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
 
+logger = logging.getLogger(__name__)
+
 
 class GravityApplication:
     """Applies a synthetic gravity model.
@@ -57,7 +59,7 @@ class GravityApplication:
         >>> vectors = df[["productions", "attractions"]]
 
         # Balance the vectors
-        >>> vectors.loc[:, "attractions"] *= vectors["productions"].sum() / vectors["attractions"].sum()
+        >>> vectors["attractions"] *= vectors["productions"].sum() / vectors["attractions"].sum()
 
         # Create the problem object
         >>> args = {"impedance": matrix,
@@ -126,7 +128,6 @@ class GravityApplication:
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
         self.output = None  # type: AequilibraeMatrix
         self.gap = np.inf
-        self.logger = logging.getLogger("aequilibrae")
         self.procedure_date = ""
         self.procedure_id = ""
         self.__ipf = None  # type: Ipf
@@ -256,7 +257,7 @@ class GravityApplication:
             raise ValueError("Vectors are not balanced")
         else:
             # guarantees that they are precisely balanced
-            self.vectors.loc[:, self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
+            self.vectors[self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
 
         self.__check_parameters()
 

@@ -1,7 +1,10 @@
+import logging
 from typing import Union
 
 from aequilibrae.project.network.mode import Mode
 from .safe_class import SafeClass
+
+logger = logging.getLogger(__name__)
 
 
 class Link(SafeClass):
@@ -64,7 +67,7 @@ class Link(SafeClass):
         data, sql = self._save_new_with_geometry() if self.__new else self.__save_existing_link()
 
         if data:
-            with conn or self.project.db_connection_spatial as conn:
+            with conn or self.project.db_connection as conn:
                 conn.execute(sql, data)
 
         self.__new = False
@@ -97,7 +100,7 @@ class Link(SafeClass):
         mode_id = self.__validate(mode)
 
         if mode_id in self.modes:
-            self._logger.warning("Mode already active for this link")
+            logger.warning("Mode already active for this link")
             return
 
         self.__dict__["modes"] += mode_id
@@ -114,7 +117,7 @@ class Link(SafeClass):
         mode_id = self.__validate(mode)
 
         if mode_id not in self.modes:
-            self._logger.warning("Mode already inactive for this link")
+            logger.warning("Mode already inactive for this link")
             return
 
         if len(self.modes) == 1:
@@ -163,7 +166,7 @@ class Link(SafeClass):
                     txts.append(f'"{key}"=?')
 
         if not data:
-            self._logger.warning(f"Nothing to update for link {self.link_id}")
+            logger.warning(f"Nothing to update for link {self.link_id}")
             return [], ""
 
         txts = ",".join(txts) + " where link_id=?"
