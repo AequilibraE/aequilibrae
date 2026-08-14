@@ -65,30 +65,38 @@ class LinearApproximation(WorkerThread):
 
         self.assig: TrafficAssignment = assig_spec
 
-        if None in [
-            assig_spec.classes,
-            assig_spec.vdf,
-            assig_spec.capacity_field,
-            assig_spec.time_field,
-            assig_spec.vdf_parameters,
-        ]:
-            all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
+        # if None in [
+        #     assig_spec.classes,
+        #     assig_spec.vdf,
+        #     # assig_spec.capacity_field,
+        #     # assig_spec.time_field,
+        #     assig_spec.vdf_parameters,
+        # ]:
+        #     all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
+        #     raise Exception(
+        #         "Parameter missing. Setting the algorithm is the last thing to do "
+        #         f"when assigning. Check if you have all of these: {all_par}"
+        #     )
+        if assig_spec.classes is None:
             raise Exception(
-                "Parameter missing. Setting the algorithm is the last thing to do "
-                f"when assigning. Check if you have all of these: {all_par}"
+                "Traffic classes parameter missing. Setting the algorithm is the last thing to do when assigning."
             )
+        if assig_spec.vdf is None:
+            raise Exception("vdf has not been specified. Setting the algorithm is the last thing to do when assigning.")
+        if assig_spec.vdf_parameters is None:
+            raise Exception("vdf_parameters missing. Setting the algorithm is the last thing to do when assigning.")
 
         self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
-        self.cap_field = assig_spec.capacity_field
+        # self.cap_field = assig_spec.capacity_field
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
-        self.procedure_id = assig_spec.procedure_id
+        self.procedure_id: str = assig_spec.procedure_id
 
         self.iter = 0
-        self.rgap = np.inf
+        self.rgap: int | float = np.inf
         self.stepsize = 1.0
         self.conjugate_stepsize = 0.0
         self.fw_class_flow = 0
@@ -110,7 +118,7 @@ class LinearApproximation(WorkerThread):
         self.betas = np.array([1.0, 0.0, 0.0])
 
         # Instantiates the arrays that we will use over and over
-        self.capacity = assig_spec.capacity
+        # self.capacity = assig_spec.capacity
 
         # Creates preload vector from preloads
         self.preload = None
@@ -160,7 +168,6 @@ class LinearApproximation(WorkerThread):
         self.vdf.apply_derivative(
             self.vdf_der,
             self.total_flow,
-            self.capacity,
             self.free_flow_tt,
             self.cores,
             **self.vdf_parameters,
@@ -203,7 +210,6 @@ class LinearApproximation(WorkerThread):
         self.vdf.apply_derivative(
             self.vdf_der,
             self.total_flow,
-            self.capacity,
             self.free_flow_tt,
             self.cores,
             **self.vdf_parameters,
@@ -261,10 +267,15 @@ class LinearApproximation(WorkerThread):
             self.total_flow += self.preload
 
     def _update_congested_costs(self):
+        # print(self.congested_time)
+        # print(self.total_flow)
+        # print(self.time_field)
+        # print(self.cores)
+        # print(self.vdf_parameters)
+
         self.vdf.apply_vdf(
             self.congested_time,
             self.total_flow,
-            self.capacity,
             self.free_flow_tt,
             self.cores,
             **self.vdf_parameters,
@@ -529,7 +540,7 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self._set_current_flow(np.zeros_like(self.capacity))
+        self._set_current_flow(np.zeros_like(self.congested_time))
         self._update_congested_costs()
 
         logger.info(f"{self.algorithm} Assignment stats")
@@ -688,11 +699,10 @@ class LinearApproximation(WorkerThread):
         the corresponding contribution needs to be passed in"""
         x = np.zeros_like(self.total_flow)
         linear_combination_1d(x, self.step_direction_flow, self.total_flow, stepsize, self.cores)
-        # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
+        # x = self.total_flow + stepsize * (self.step_direction_flow - self.total_flow)
         self.vdf.apply_vdf(
             self.congested_value,
             x,
-            self.capacity,
             self.free_flow_tt,
             self.cores,
             **self.vdf_parameters,
@@ -739,7 +749,6 @@ class LinearApproximation(WorkerThread):
         self.vdf.apply_vdf(
             self._trap_new_cost,
             self._trap_new_flow,
-            self.capacity,
             self.free_flow_tt,
             self.cores,
             **self.vdf_parameters,

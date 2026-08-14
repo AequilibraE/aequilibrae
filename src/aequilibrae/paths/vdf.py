@@ -29,21 +29,31 @@ DEFAULT_PRESET_SPECS = {
     "bpr": {
         "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
         "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+        # "fftime": {"bounds": (0, float("inf"))},
+        "capacity": {"bounds": (0, float("inf"))},
     },
     "bpr2": {
         "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
         "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+        # "fftime": {"bounds": (0, float("inf"))},
+        "capacity": {"bounds": (0, float("inf"))},
     },
     "conical": {
         "alpha": {"fill_NA": 1.0, "bounds": (1.0, float("inf"))},
+        # "fftime": {"bounds": (0, float("inf"))},
+        "capacity": {"bounds": (0, float("inf"))},
     },
     "inrets": {
         "alpha": {"fill_NA": 1.0, "bounds": (0.0, 1.0)},
+        # "fftime": {"bounds": (0, float("inf"))},
+        "capacity": {"bounds": (0, float("inf"))},
     },
     "akcelik": {
         "alpha": {"fill_NA": 0.25, "bounds": (0.0, 1.0)},
         "tau": {"fill_NA": 0.8, "bounds": (0.0, float("inf"))},
         "length": {"bounds": (0, float("inf"))},
+        # "fftime": {"bounds": (0, float("inf"))},
+        "capacity": {"bounds": (0, float("inf"))},
     },
 }
 
@@ -218,11 +228,11 @@ class VDF:
         # put code from documentation of vdfs
         pass
 
-    def apply_vdf(self, congested_time, link_flows, capacity, fftime, cores: int, **link_attributes):
-        self.func(congested_time, link_flows, capacity, fftime, cores, **link_attributes)
+    def apply_vdf(self, congested_time, link_flows, fftime, cores: int, **link_attributes):
+        self.func(congested_time, link_flows, fftime, cores, **link_attributes)
 
-    def apply_derivative(self, congested_time, link_flows, capacity, fftime, cores: int, **link_attributes):
-        self.d_func(congested_time, link_flows, capacity, fftime, cores, **link_attributes)
+    def apply_derivative(self, congested_time, link_flows, fftime, cores: int, **link_attributes):
+        self.d_func(congested_time, link_flows, fftime, cores, **link_attributes)
 
 
 class VDF_old:

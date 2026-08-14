@@ -347,6 +347,11 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
 
+        # set cores from one class
+        c = self.classes[0]
+        self.cores = c.results.cores
+        self._config["Number of cores"] = c.results.cores
+
     def add_class(self, traffic_class: TrafficClass) -> None:
         """
         Adds a traffic class to the assignment
@@ -497,6 +502,7 @@ class TrafficAssignment(AssignmentBase):
         for c in self.classes:
             c.results.set_cores(self.cores)
             c._aon_results.set_cores(self.cores)
+            #     super()._check_field(capacity_field)
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -542,22 +548,22 @@ class TrafficAssignment(AssignmentBase):
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self._config["Time field"] = time_field
 
-    def set_capacity_field(self, capacity_field: str) -> None:
-        """
-        Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
+    # def set_capacity_field(self, capacity_field: str) -> None:
+    #     """
+    #     Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
 
-        :Arguments:
-            **capacity_field** (:obj:`str`): Field name
-        """
-        super()._check_field(capacity_field)
-        c = self.classes[0]
+    #     :Arguments:
+    #         **capacity_field** (:obj:`str`): Field name
+    #     """
+    #     super()._check_field(capacity_field)
+    #     c = self.classes[0]
 
-        self.cores = c.results.cores
-        self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-        self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
-        self.capacity_field = capacity_field
-        self._config["Number of cores"] = c.results.cores
-        self._config["Capacity field"] = capacity_field
+    #     self.cores = c.results.cores
+    #     self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+    #     self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
+    #     self.capacity_field = capacity_field
+    #     self._config["Number of cores"] = c.results.cores
+    #     self._config["Capacity field"] = capacity_field
 
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
@@ -699,7 +705,9 @@ class TrafficAssignment(AssignmentBase):
         res1 = assig_results[0]
 
         tot_flow = self.assignment.total_flow[idx]
-        voc = tot_flow / self.capacity[idx]
+        if "capacity" in self.vdf_parameters:
+            capacity = self.vdf_parameters["capacity"]
+            voc = tot_flow / capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
         preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
