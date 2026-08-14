@@ -222,23 +222,20 @@ class VDF:
         self.spec = spec
         self.d_func = d_func
 
-        self.check_valid()
-
-    def check_valid(self):
+    def check_valid(self, num_points, link_attributes: dict[str, Any], from_voc: float = 0.0, to_voc: float = 3.0):
         # check vdf is non-negative
 
         # check monotone increasing - evaluate at some values of flow and check it is increasing
         # also derivative is positive
 
-        # check parameters are within the specified bounds
+        # at 0 v/c, it is just the free flow travel time
+
+        # check that f'(x) is strictly increasing -> convex
         pass
 
-    def plot_vdf(self, output_dir: str, num_points: int, link_attributes: dict[str, Any]):
-        array_size = num_points
-        from_voc, to_voc = 0, 3
-        name = self.name
-        voc_range = np.linspace(from_voc, to_voc, array_size)
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+    def _get_fake_vdf_values(self, num_points: int, from_voc: float, to_voc: float, link_attributes: dict[str, Any]):
+        voc_range = np.linspace(from_voc, to_voc, num_points)
+        size = voc_range.shape[0]
 
         size = voc_range.shape[0]
         function_values = np.zeros(size, dtype=np.float64)
@@ -259,6 +256,19 @@ class VDF:
             1,
             **link_attributes,
         )
+
+        return function_values, derivative_values
+
+    def plot_vdf(self, output_dir: str, num_points: int, link_attributes: dict[str, Any]):
+        """Creates a plot of the vdf using num_points for velocity/capacity in the range [0,3]. Link attributes are
+        directly passed self.apply_vdf() and self.apply_derivative, so they may need to be a numpy array the size of
+        num_points."""
+        from_voc, to_voc = 0.0, 3.0
+        name = self.name
+        voc_range = np.linspace(from_voc, to_voc, array_size)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+
+        function_values, derivative_values = self._get_fake_vdf_values(num_points, from_voc, to_voc, link_attributes)
 
         # Left plot: Function values
         ax1.plot(voc_range, function_values, linewidth=2.5, color="#1f77b4")
