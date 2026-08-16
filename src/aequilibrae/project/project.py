@@ -88,9 +88,7 @@ class Project:
         )
         self.scenario = self.root_scenario
 
-        # project_parameters is a cached_property - drop any value cached from a prior
-        # new()/open() on this same Project instance before it's reloaded below, or it
-        # would keep pointing at the previous project's parameters.yml.
+        # project_parameters is a cached_property - drop any value cached from a prior project
         self.__dict__.pop("project_parameters", None)
 
         # Log outputs could interleave if two projects were open at once, but only one open project is supported.
@@ -195,8 +193,7 @@ class Project:
         )
         self.scenario = self.root_scenario
 
-        # See the matching comment in open(): drop any parameters cached from a prior
-        # new()/open() on this same Project instance before it's reloaded below.
+        # See the matching comment in open(): drop any parameters cached from a prior project
         self.__dict__.pop("project_parameters", None)
 
         default_log_file_config(self.scenario.log_handler)
