@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
 from pathlib import Path
-from shapely.geometry import Point
+from shapely.geometry import Point, box
 from typing import Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
@@ -45,6 +45,15 @@ _RESERVED_LINK_COLS = {
 }
 _NON_TAG_COLS = {"u", "v", "key", "a_node", "b_node", "geometry", "distance", "osmid", "osm_id"}
 
+# Fallback boxes for a place name Overpass cannot serve as a whole: half-widths in degrees
+# tried largest first, then the smallest shifted off centre for responses broken by a
+# particular feature near the middle rather than by the size of the area alone.
+_BBOX_HALF_WIDTHS = (0.1, 0.05, 0.03, 0.015)
+_BBOX_OFFSETS = (
+    (0.05, 0.0), (-0.05, 0.0), (0.0, 0.05), (0.0, -0.05),
+    (0.05, 0.05), (-0.05, -0.05), (0.05, -0.05), (-0.05, 0.05),
+)
+
 
 def acquire_overpass(
     *,
@@ -60,8 +69,62 @@ def acquire_overpass(
     if (model_area is None) == (place_name is None):
         raise ImporterError("The osm-overpass source requires exactly one of `model_area` or `place_name`")
 
+    # An explicit area is the caller's choice, so it is never substituted for another one.
+    if model_area is not None:
+        return _fetch_and_stage(
+            ox, modes=modes, download_cache=download_cache, model_area=model_area, custom_filter=custom_filter
+        )
+
+    try:
+        return _fetch_and_stage(
+            ox, modes=modes, download_cache=download_cache, place_name=place_name, custom_filter=custom_filter
+        )
+    except Exception as exc:
+        if not _smaller_area_might_help(exc):
+            raise
+        return _fetch_around_centre(
+            ox, modes=modes, download_cache=download_cache, place_name=place_name,
+            custom_filter=custom_filter, exc=exc,
+        )
+
+
+def _smaller_area_might_help(exc: Exception) -> bool:
+    """Whether *exc* is a failure that a smaller query area could avoid.
+
+    osmnx splits queries larger than ``settings.max_query_area_size`` into tiles and takes
+    the convex hull of a MultiPolygon boundary; either can drop nodes that the ways it
+    returns still reference. Nominatim also fails to resolve some place names to a polygon.
+    """
+    msg = str(exc)
+    return any(s in msg for s in ("missing nodes", "clipping", "did not geocode", "distance must be > 0"))
+
+
+def _fetch_around_centre(ox, *, modes, download_cache, place_name, custom_filter, exc) -> StagedNetwork:
+    lat, lon = ox.geocode(place_name)
+    attempts = [(half, 0.0, 0.0) for half in _BBOX_HALF_WIDTHS]
+    attempts += [(_BBOX_HALF_WIDTHS[-1], dlat, dlon) for dlat, dlon in _BBOX_OFFSETS]
+
+    for half, dlat, dlon in attempts:
+        centre_lat, centre_lon = lat + dlat, lon + dlon
+        bbox = box(centre_lon - half, centre_lat - half, centre_lon + half, centre_lat + half)
+        logger.warning(
+            f"Overpass query for {place_name!r} failed ({exc}); retrying with a {2 * half:.3f} degree "
+            f"box around ({centre_lat:.4f}, {centre_lon:.4f}), which covers less than the full boundary"
+        )
+        try:
+            return _fetch_and_stage(
+                ox, modes=modes, download_cache=download_cache, model_area=bbox, custom_filter=custom_filter
+            )
+        except Exception as retry_exc:
+            if not _smaller_area_might_help(retry_exc):
+                raise
+            exc = retry_exc
+    raise exc
+
+
+def _fetch_and_stage(ox, *, modes, download_cache, custom_filter, model_area=None, place_name=None) -> StagedNetwork:
     source_url = (
-        f"overpass:place={place_name}" if place_name is not None else f"overpass:bbox={list(model_area.bounds)}"
+        f"overpass:bbox={list(model_area.bounds)}" if model_area is not None else f"overpass:place={place_name}"
     )
 
     from osmnx._errors import InsufficientResponseError
@@ -104,7 +167,11 @@ def acquire_overpass(
         "source_url": source_url,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
-    return _edges_nodes_to_staged(edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area)
+    net = _edges_nodes_to_staged(edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area)
+    # Validated here as well as in NetworkImporter.run() so that a bad response is caught
+    # while there is still another query area left to try.
+    net.validate()
+    return net
 
 
 def _collapse_reciprocal_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
