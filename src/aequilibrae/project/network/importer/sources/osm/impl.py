@@ -142,7 +142,7 @@ def _fetch_and_stage(ox, *, modes, download_cache, custom_filter, model_area=Non
 
         if isinstance(exc, RequestException):
             raise ImporterError(f"Overpass request failed: {exc}") from exc
-        raise
+        raise exc
 
     if graph is None or graph.number_of_edges() == 0:
         raise ImporterError(f"Overpass returned no edges for the requested area ({source_url})")
