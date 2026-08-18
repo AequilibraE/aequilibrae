@@ -12,7 +12,6 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
-from aequilibrae.project.path_lock import ProjectPathLock
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
@@ -52,7 +51,6 @@ class Project:
     def __init__(self):
         self.root_scenario: Scenario = None
         self.scenario: Scenario = None
-        self._path_lock = None
 
     @classmethod
     def from_path(cls, project_folder):
@@ -61,16 +59,6 @@ class Project:
         return project
 
     def open(self, project_path: str) -> None:
-        lock = ProjectPathLock(project_path)
-        lock.acquire()
-        try:
-            self._open(project_path)
-        except BaseException:
-            lock.release()
-            raise
-        self._path_lock = lock
-
-    def _open(self, project_path: str) -> None:
         """
         Loads project from disk
 
@@ -156,16 +144,6 @@ class Project:
         return self._require_scenario().connections.transaction()
 
     def new(self, project_path: str) -> None:
-        lock = ProjectPathLock(project_path)
-        lock.acquire()
-        try:
-            self._new(project_path)
-        except BaseException:
-            lock.release()
-            raise
-        self._path_lock = lock
-
-    def _new(self, project_path: str) -> None:
         """Creates a new project
 
         :Arguments:
@@ -214,9 +192,6 @@ class Project:
         root.destroy()
         self.scenario = None
         self.root_scenario = None
-        if self._path_lock is not None:
-            self._path_lock.release()
-            self._path_lock = None
 
     def __enter__(self):
         self._require_scenario()
@@ -235,15 +210,6 @@ class Project:
     @staticmethod
     def upgrade(project_path):
         """Upgrade all three databases of a closed project path."""
-        lock = ProjectPathLock(project_path)
-        lock.acquire()
-        try:
-            Project._upgrade(project_path)
-        finally:
-            lock.release()
-
-    @staticmethod
-    def _upgrade(project_path):
         base_path = Path(project_path).resolve()
         paths = {
             "project": base_path / "project_database.sqlite",

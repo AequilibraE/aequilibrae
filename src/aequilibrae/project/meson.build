@@ -5,7 +5,6 @@ pyfiles = [
   '__init__.py',
   'about.py',
   'field_editor.py',
-  'path_lock.py',
   'project.py',
   'project_cleaning.py',
   'project_creation.py',

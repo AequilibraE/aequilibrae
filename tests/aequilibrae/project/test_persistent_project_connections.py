@@ -35,21 +35,6 @@ def test_project_transaction_enters_every_manager_and_rolls_back(tmp_path):
         assert "x" not in project.network.modes
 
 
-def test_canonical_project_path_lock_rejects_second_open(tmp_path):
-    path = _new_project(tmp_path)
-    first = Project.from_path(path)
-    try:
-        alias = path.parent / "." / path.name
-        with pytest.raises(RuntimeError, match="already open"):
-            Project.from_path(alias)
-        with pytest.raises(RuntimeError, match="already open"):
-            Project.upgrade(path)
-    finally:
-        first.shutdown()
-    with Project.from_path(path):
-        pass
-
-
 def test_static_upgrade_owns_closed_connections(tmp_path):
     path = _new_project(tmp_path)
     Project.upgrade(path)
