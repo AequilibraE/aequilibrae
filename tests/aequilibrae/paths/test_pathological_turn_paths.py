@@ -1,6 +1,5 @@
 """Pathological shortest-path contracts for link directions and turn controls."""
 
-
 import networkx as nx
 import pytest
 

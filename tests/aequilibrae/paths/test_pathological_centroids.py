@@ -163,8 +163,7 @@ def test_one_connector_centroid_and_reverse_oriented_link_are_honored(
     )
 
     assert expected.nodes == tuple(
-        intermediate_centroid_network.node_id(f"intermediate_centroid:{name}")
-        for name in ("origin", "left", "single")
+        intermediate_centroid_network.node_id(f"intermediate_centroid:{name}") for name in ("origin", "left", "single")
     )
     assert expected.directed_links[-1] == (
         intermediate_centroid_network.link_id("intermediate_centroid:single_connector"),

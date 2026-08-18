@@ -206,9 +206,9 @@ class PathologicalNetwork:
 
     def link_id(self, qualified_name: str) -> int:
         """Returns the stable ID for ``component:link`` or ``bridge:name``."""
-        names = [
-            self._qualified(component, link.name) for component in self.components for link in component.links
-        ] + [f"bridge:{bridge.name}" for bridge in self.bridges]
+        names = [self._qualified(component, link.name) for component in self.components for link in component.links] + [
+            f"bridge:{bridge.name}" for bridge in self.bridges
+        ]
         try:
             return names.index(qualified_name) + 1
         except ValueError as exc:
@@ -313,9 +313,7 @@ class PathologicalNetwork:
                         "via_node": ids[via_key],
                         "to_node": ids[to_key],
                         "penalty": turn.penalty,
-                        "geometry": LineString(
-                            (coordinates[from_key], coordinates[via_key], coordinates[to_key])
-                        ),
+                        "geometry": LineString((coordinates[from_key], coordinates[via_key], coordinates[to_key])),
                     }
                 )
         columns = ["turn_id", "component", "from_node", "via_node", "to_node", "penalty", "geometry"]

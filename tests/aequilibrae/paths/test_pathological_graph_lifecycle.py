@@ -68,9 +68,7 @@ def test_excluding_detour_link_matches_component_without_that_link(
     destination = finite_turn_without_detour_network.node_id("finite_turn_without_detour:destination")
     oracle_graph = finite_turn_without_detour_network.oracle_state_graph(origin, destination)
     expected_exists = nx.has_path(oracle_graph, ("source", origin), ("sink", destination))
-    expected = (
-        finite_turn_without_detour_network.oracle_path(origin, destination) if expected_exists else None
-    )
+    expected = finite_turn_without_detour_network.oracle_path(origin, destination) if expected_exists else None
 
     graph = all_centroid_finite_turn_network.build_graph()
     excluded_link = all_centroid_finite_turn_network.link_id("finite_turn_all_centroids:detour_out")
@@ -86,9 +84,7 @@ def test_excluding_detour_link_matches_component_without_that_link(
     if expected is not None:
         assert tuple(int(node) for node in actual.path_nodes) == expected.nodes
         assert finite_turn_without_detour_network.result_directed_links(actual) == expected.directed_links
-        assert finite_turn_without_detour_network.result_generalized_cost(actual) == pytest.approx(
-            expected.cost
-        )
+        assert finite_turn_without_detour_network.result_generalized_cost(actual) == pytest.approx(expected.cost)
         assert actual.skims[destination, 0] == pytest.approx(expected.cost)
 
 
@@ -127,9 +123,7 @@ def test_reprepare_preserves_turn_controls_with_centroids(
 ) -> None:
     """Preparing again keeps one effective control while rebuilding centroid state."""
     origin = all_centroid_finite_turn_network.node_id("finite_turn_all_centroids:origin")
-    destination = all_centroid_finite_turn_network.node_id(
-        "finite_turn_all_centroids:destination"
-    )
+    destination = all_centroid_finite_turn_network.node_id("finite_turn_all_centroids:destination")
     expected = all_centroid_finite_turn_network.oracle_path(origin, destination)
 
     graph = all_centroid_finite_turn_network.build_graph(block_centroid_flows=False)
@@ -140,9 +134,7 @@ def test_reprepare_preserves_turn_controls_with_centroids(
     actual = graph.compute_path(origin, destination)
 
     assert {int(node) for node in all_centroid_finite_turn_network.centroids} == {
-        all_centroid_finite_turn_network.node_id(
-            f"finite_turn_all_centroids:{node.name}"
-        )
+        all_centroid_finite_turn_network.node_id(f"finite_turn_all_centroids:{node.name}")
         for node in all_centroid_finite_turn_network.components[0].nodes
     }
     assert graph.has_turn_restrictions
@@ -150,7 +142,5 @@ def test_reprepare_preserves_turn_controls_with_centroids(
     assert actual.path is not None
     assert tuple(int(node) for node in actual.path_nodes) == expected.nodes
     assert all_centroid_finite_turn_network.result_directed_links(actual) == expected.directed_links
-    assert all_centroid_finite_turn_network.result_generalized_cost(actual) == pytest.approx(
-        expected.cost
-    )
+    assert all_centroid_finite_turn_network.result_generalized_cost(actual) == pytest.approx(expected.cost)
     assert actual.skims[destination, 0] == pytest.approx(expected.cost)

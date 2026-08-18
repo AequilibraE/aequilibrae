@@ -89,26 +89,12 @@ def test_composition_preserves_definitions_and_assigns_unique_ids(pathological_n
     assert all(purpose.strip() for purpose in pathological_network.purposes.values())
     assert tuple(bridge.name for bridge in pathological_network.bridges) == BRIDGE_NAMES
     total_internal_link_cost = sum(
-        link.cost
-        for component in pathological_network.components
-        for link in component.links
+        link.cost for component in pathological_network.components for link in component.links
     )
-    assert all(
-        bridge.direction == 0 and bridge.cost == BRIDGE_COST
-        for bridge in pathological_network.bridges
-    )
-    assert all(
-        bridge.cost > total_internal_link_cost
-        for bridge in pathological_network.bridges
-    )
-    assert all(
-        "disconnected:destination" not in (bridge.a, bridge.b)
-        for bridge in pathological_network.bridges
-    )
-    assert any(
-        "disconnected:reachable" in (bridge.a, bridge.b)
-        for bridge in pathological_network.bridges
-    )
+    assert all(bridge.direction == 0 and bridge.cost == BRIDGE_COST for bridge in pathological_network.bridges)
+    assert all(bridge.cost > total_internal_link_cost for bridge in pathological_network.bridges)
+    assert all("disconnected:destination" not in (bridge.a, bridge.b) for bridge in pathological_network.bridges)
+    assert any("disconnected:reachable" in (bridge.a, bridge.b) for bridge in pathological_network.bridges)
 
     nodes = pathological_network.node_frame()
     links = pathological_network.link_frame()
@@ -151,19 +137,13 @@ def test_composition_materializes_fresh_derived_geometries(pathological_network)
         assert first is not second
 
     assert all(
-        "geometry" not in vars(node)
-        for component in pathological_network.components
-        for node in component.nodes
+        "geometry" not in vars(node) for component in pathological_network.components for node in component.nodes
     )
     assert all(
-        "geometry" not in vars(link)
-        for component in pathological_network.components
-        for link in component.links
+        "geometry" not in vars(link) for component in pathological_network.components for link in component.links
     )
     assert all(
-        "geometry" not in vars(turn)
-        for component in pathological_network.components
-        for turn in component.turns
+        "geometry" not in vars(turn) for component in pathological_network.components for turn in component.turns
     )
     assert all("geometry" not in vars(bridge) for bridge in pathological_network.bridges)
 

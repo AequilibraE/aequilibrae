@@ -196,6 +196,7 @@ def make_disconnected_component() -> NetworkComponent:
         ),
     )
 
+
 BRIDGE_COST = 1_000_000.0
 
 
@@ -287,9 +288,7 @@ def make_reversed_finite_turn_component() -> NetworkComponent:
         name="finite_turn_reversed",
         purpose="Provide an independent oracle for reversing physical links and movement controls.",
         links=tuple(replace(link, a=link.b, b=link.a) for link in base.links),
-        turns=tuple(
-            replace(turn, from_node=turn.to_node, to_node=turn.from_node) for turn in base.turns
-        ),
+        turns=tuple(replace(turn, from_node=turn.to_node, to_node=turn.from_node) for turn in base.turns),
     )
 
 

@@ -97,7 +97,6 @@ def test_restriction_lifecycle_preserves_compact_route(
     )
 
 
-
 def test_dead_end_removal_matches_centroid_simple_path_invariant(
     dead_end_network: PathologicalNetwork,
 ):
