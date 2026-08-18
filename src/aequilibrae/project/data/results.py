@@ -1,7 +1,6 @@
 import datetime
 import json
 import logging
-import re
 import uuid
 
 import numpy as np
@@ -184,9 +183,10 @@ def _sqlite_types(frame: pd.DataFrame, overrides: dict) -> dict:
     for column in frame.columns:
         if column in overrides:
             value = overrides[column]
-            if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_ ()]*", value):
+            normalized = value.upper() if isinstance(value, str) else None
+            if normalized not in {"INTEGER", "REAL", "TEXT", "BLOB", "NUMERIC"}:
                 raise ValueError(f"invalid SQLite dtype for {column!r}")
-            result[column] = value.upper()
+            result[column] = normalized
         elif ptypes.is_bool_dtype(frame[column].dtype) or ptypes.is_integer_dtype(frame[column].dtype):
             result[column] = "INTEGER"
         elif ptypes.is_float_dtype(frame[column].dtype):
