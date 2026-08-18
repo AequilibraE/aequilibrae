@@ -26,12 +26,12 @@ class LinkTypes(ProjectTable):
         >>> link_types.insert(link_type_id='a', link_type='Arterial', lanes=3, lane_capacity=1100)
         'a'
 
-        # Bulk changes go in one batch
-        >>> with link_types.batch() as batch:
+        # Coordinate several writes with the project transaction
+        >>> with project.transaction():
         ...     for lt in link_types:
-        ...         batch.update(lt.link_type_id, beta=1)
+        ...         link_types.update(lt.link_type_id, beta=1)
 
-        >>> project.close()
+        >>> project.shutdown()
     """
 
     name = "link_types"

@@ -27,12 +27,12 @@ class Links(ProjectTable):
         >>> links.add_mode(1, 'b')
         >>> links.drop_mode(1, 'b')
 
-        # Many changes go in one batch (a single transaction)
-        >>> with links.batch() as batch:
+        # Coordinate many changes in one project transaction
+        >>> with project.transaction():
         ...     for link_id in (2, 3, 4):
-        ...         batch.update(link_id, speed_ab=90.0)
+        ...         links.update(link_id, speed_ab=90.0)
 
-        >>> project.close()
+        >>> project.shutdown()
     """
 
     name = "links"
