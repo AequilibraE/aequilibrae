@@ -2,7 +2,10 @@ from aequilibrae.utils.db_utils import read_and_close
 
 
 def find_table_fields(table_name, conn=None, db_path=None):
-    with conn or read_and_close(db_path, spatial=True) as conn:
+    if conn is None:
+        with read_and_close(db_path, spatial=True) as connection:
+            structure = connection.execute(f"pragma table_info({table_name})").fetchall()
+    else:
         structure = conn.execute(f"pragma table_info({table_name})").fetchall()
     geotypes = ["LINESTRING", "POINT", "POLYGON", "MULTIPOLYGON"]
     fields = [x[1].lower() for x in structure]
