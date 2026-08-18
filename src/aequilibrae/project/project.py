@@ -235,15 +235,10 @@ class Project:
                 ).fetchone()
                 if root is None:
                     raise ValueError("upgrade path is not an authoritative root project")
-                managers = [
-                    MigrationManager(MigrationManager.network_migration_file, database="project"),
-                    MigrationManager(MigrationManager.transit_migration_file, database="transit"),
-                ]
-                with closure.transaction():
-                    for manager in managers:
-                        manager._initialize_status(closure)
-                        for migration in manager._find_applicable(closure[manager.database]):
-                            migration.apply(closure)
+                network = MigrationManager(MigrationManager.network_migration_file)
+                transit_mm = MigrationManager(MigrationManager.transit_migration_file)
+                network.upgrade(closure)
+                transit_mm.upgrade(closure)
             finally:
                 closure.close()
         finally:

@@ -26,8 +26,8 @@ def test_project_owns_named_persistent_connections(tmp_path):
 def test_project_transaction_enters_every_manager_and_rolls_back(tmp_path):
     with Project.from_path(_new_project(tmp_path)) as project:
         with pytest.raises(ValueError):
-            with project.transaction() as value:
-                assert value is None
+            with project.transaction() as connections:
+                assert set(connections) == {"project", "results", "transit"}
                 assert all(project.scenario.connections[name].depth == 1 for name in project.scenario.connections)
                 project.network.modes.insert(mode_id="x", mode_name="Test", description="", pce=1)
                 assert project.network.modes.get("x").mode_name == "Test"

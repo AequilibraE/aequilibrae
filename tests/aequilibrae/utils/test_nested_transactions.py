@@ -10,8 +10,8 @@ def test_nested_failure_rolls_back_only_savepoint():
     manager = closure["project"]
     manager.execute("CREATE TABLE events (name TEXT)")
     try:
-        with manager.transaction() as value:
-            assert value is None
+        with manager.transaction() as connection:
+            assert isinstance(connection, sqlite3.Connection)
             manager.execute("INSERT INTO events VALUES ('outer')")
             with pytest.raises(ValueError):
                 with manager.transaction():
@@ -30,10 +30,11 @@ def test_closure_rolls_back_every_connection_on_body_error():
         for name in closure:
             closure[name].execute("CREATE TABLE events (name TEXT)")
         with pytest.raises(RuntimeError):
-            with closure.transaction() as value:
-                assert value is None
-                for name in closure:
-                    closure[name].execute("INSERT INTO events VALUES ('discarded')")
+            with closure.transaction() as connections:
+                assert set(connections) == {"a", "b"}
+                assert all(isinstance(conn, sqlite3.Connection) for conn in connections.values())
+                for conn in connections.values():
+                    conn.execute("INSERT INTO events VALUES ('discarded')")
                 raise RuntimeError
         assert all(closure[name].execute("SELECT * FROM events").fetchall() == [] for name in closure)
     finally:

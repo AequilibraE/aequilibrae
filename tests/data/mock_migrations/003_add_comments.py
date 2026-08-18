@@ -1,6 +1,5 @@
-def migrate(*, closure):
-    manager = closure["project"]
-    manager.execute(
+def migrate(*, project_conn, transit_conn=None, results_conn=None):
+    project_conn.execute(
         """
         CREATE TABLE comments (
             id INTEGER PRIMARY KEY,
@@ -13,5 +12,5 @@ def migrate(*, closure):
         )
         """
     )
-    manager.execute("CREATE INDEX idx_comments_post_id ON comments(post_id)")
-    manager.execute("CREATE INDEX idx_comments_user_id ON comments(user_id)")
+    project_conn.execute("CREATE INDEX idx_comments_post_id ON comments(post_id)")
+    project_conn.execute("CREATE INDEX idx_comments_user_id ON comments(user_id)")

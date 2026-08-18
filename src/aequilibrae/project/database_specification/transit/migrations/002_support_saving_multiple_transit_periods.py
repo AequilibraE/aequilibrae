@@ -1,15 +1,24 @@
 import logging
 import pathlib
 import sqlite3
+from typing import Optional
+
 from aequilibrae.project.project_creation import add_triggers, recreate_columns, remove_triggers
 
 logger = logging.getLogger(__name__)
 
 
-def migrate(*, closure):
+def migrate(
+    *,
+    project_conn: sqlite3.Connection,
+    transit_conn: Optional[sqlite3.Connection],
+    results_conn: Optional[sqlite3.Connection],
+):
     logger.info("Beginning migration to support saving and loading multiple Transit graphs")
-    project_conn = closure["project"]
-    transit_conn = closure["transit"]
+
+    if not transit_conn:
+        logger.info("Migration finished, no 'public_transport.sqlite' connection provided.")
+        return
 
     links_schema = pathlib.Path(__file__).parent.parent / "tables" / "links.sql"
     if not links_schema.exists():

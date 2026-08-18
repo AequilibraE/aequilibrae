@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import re
 from pathlib import Path
@@ -17,11 +18,12 @@ logger = logging.getLogger(__name__)
 def initialize_tables(closure: ConnectionClosure, databases=("network", "transit")) -> None:
     """Initialize requested schemas in one closure-owned transaction."""
     mapping = {"network": "project", "transit": "transit"}
-    with closure.transaction():
+    with contextlib.ExitStack() as stack:
+        connections = {name: stack.enter_context(closure[name].transaction()) for name in closure}
         for db_type in databases:
-            manager = closure[mapping[db_type]]
-            create_base_tables(manager, db_type, closure)
-            add_triggers(manager, db_type)
+            conn = connections[mapping[db_type]]
+            create_base_tables(conn, db_type, closure)
+            add_triggers(conn, db_type)
 
 
 def create_base_tables(conn: Connection, db_type: str, closure: ConnectionClosure) -> None:
@@ -39,9 +41,8 @@ def create_base_tables(conn: Connection, db_type: str, closure: ConnectionClosur
 
     # For a new database construction all present migrations should have already been applied implicitly by the new
     # schema. So we mark them all as skipped.
-    database = "project" if db_type == "network" else "transit"
-    mm = MigrationManager(base_folder / "migrations" / "migrations.py", database=database)
-    mm._initialize_status(closure)
+    mm = MigrationManager(base_folder / "migrations" / "migrations.py")
+    mm.mark_all_as_seen(closure)
     for migration in mm.migrations.values():
         migration.mark_as(conn, MigrationStatus.SKIPPED)
 

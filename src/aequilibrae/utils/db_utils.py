@@ -53,8 +53,12 @@ class NestedTransactions:
         return self.__depth > 0 or (not self.__closed and self.__connection.in_transaction)
 
     def transaction(self):
-        """Return a fresh transaction context. Its context value is ``None``."""
+        """Return a fresh transaction context whose value is the owned connection."""
         return _Transaction(self)
+
+    def _connection(self):
+        """Return the owned raw SQLite connection (for transaction contexts)."""
+        return self.__connection
 
     # Deliberately limited DB-API delegation.  In particular, commit, rollback,
     # close, executescript, and a raw connection attribute are not exposed.
@@ -149,8 +153,7 @@ class _Transaction:
             raise RuntimeError("a transaction context cannot be entered twice")
         self.__savepoint = self.__manager._enter()
         self.__entered = True
-        # Never expose the owned connection through a context value.
-        return None
+        return self.__manager._connection()
 
     def __exit__(self, exc_type, exc_value, traceback):
         if not self.__entered:
@@ -207,9 +210,7 @@ class ConnectionClosure:
         if self.__closed:
             raise RuntimeError("connection closure is closed")
         with contextlib.ExitStack() as stack:
-            for manager in self.__managers.values():
-                stack.enter_context(manager.transaction())
-            yield None
+            yield {name: stack.enter_context(manager.transaction()) for name, manager in self.__managers.items()}
 
     def ensure_idle(self):
         for manager in self.__managers.values():

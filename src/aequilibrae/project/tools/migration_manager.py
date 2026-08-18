@@ -1,11 +1,11 @@
 import logging
 import pathlib
-import re
 import sqlite3
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import Optional
 
-from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactions
+from aequilibrae.utils.db_utils import ConnectionClosure
 from aequilibrae.utils.model_run_utils import import_file_as_module
 
 logger = logging.getLogger(__name__)
@@ -19,67 +19,129 @@ class MigrationStatus(IntEnum):
 
 @dataclass
 class Migration:
-    """One SQL or Python schema migration."""
+    """
+    Small utility class to wrap files used for database upgrades/migrations.
+
+    Individual migrations can report their status, be marked as 'seen' or as
+    another status, and applied. Migrations are Python modules that expose a
+    ``migrate`` function accepting ``project_conn``, ``transit_conn``, and
+    ``results_conn`` keyword arguments for the open database connections.
+
+    Marking a migration as 'seen' will add it to the ``migrations`` table as
+    ``MISSING`` if it is not already present. If it is present no change is made.
+
+    Applying a migration will update the status to 'APPLIED' with the current
+    timestamp.
+
+    A migration's status cannot be downgraded without force.
+
+    Migrations are identified based on their ``id`` attribute and the ``id``
+    field of the ``migrations`` table.
+    """
 
     id: int
     name: str
     file: pathlib.Path
-    database: str
-    type: str = None
 
     def __post_init__(self):
-        if self.file.suffix not in (".py", ".sql"):
-            raise ValueError("only '.py' and '.sql' files are supported for migrations")
-        self.type = self.file.suffix[1:]
+        if self.file.suffix != ".py":
+            raise ValueError("only '.py' files are supported for migrations")
 
-    def status(self, manager: NestedTransactions) -> MigrationStatus:
-        row = manager.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
-        return MigrationStatus.MISSING if row is None else MigrationStatus[row[0]]
+    def status(self, conn: sqlite3.Connection) -> MigrationStatus:
+        """
+        Query the database for this migration's status.
 
-    def mark_as(self, manager: NestedTransactions, status: MigrationStatus, force: bool = False):
-        row = manager.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
-        if row is None:
-            manager.execute(
+        If the ``migrations`` table is not present all migrations are considered ``MISSING``.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+
+        :Returns:
+            **status** (:obj:`MigrationStatus`): Migration status enum.
+        """
+        res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
+        return MigrationStatus.MISSING if res is None else MigrationStatus[res[0]]
+
+    def mark_as(self, conn: sqlite3.Connection, status: MigrationStatus, force: bool = False):
+        """
+        Update or insert this migration with the given status.
+
+        If the migration is not present in the table it will be inserted. If it is present and the new status is an
+        'upgrade' or ``force=True``, then it will be updated. Otherwise no change will be made.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+
+            **status** (:obj:`MigrationStatus`): Migration status enum.
+        """
+        res = conn.execute("SELECT status FROM migrations WHERE id=?", (self.id,)).fetchone()
+        if res is None:
+            conn.execute(
                 "INSERT INTO migrations (id, name, status, date) VALUES(?,?,?,CURRENT_TIMESTAMP)",
                 (self.id, self.name, status.name),
             )
             return
-        previous = MigrationStatus[row[0]]
+        previous = MigrationStatus[res[0]]
+        # Allow marking the status as APPLIED when it is MISSING or SKIPPED, and
+        # as SKIPPED when it is MISSING, or any change whenever force is True.
         if force or previous < status or previous < status < MigrationStatus.APPLIED:
-            manager.execute(
+            conn.execute(
                 "UPDATE migrations SET status=?, name=?, date=CURRENT_TIMESTAMP WHERE id=?",
                 (status.name, self.name, self.id),
             )
 
-    def mark_as_seen(self, manager: NestedTransactions):
-        self.mark_as(manager, MigrationStatus.MISSING)
+    def mark_as_seen(self, conn: sqlite3.Connection):
+        """
+        Mark this migration as 'seen'.
 
-    def apply(self, closure: ConnectionClosure):
-        manager = closure[self.database]
-        if self.type == "sql":
-            self._apply_sql(manager)
-        else:
-            self._apply_python(closure)
-        self.mark_as(manager, MigrationStatus.APPLIED)
+        Marking a migration as 'seen' will add it to the ``migrations`` table as ``MISSING`` if it is not already
+        present. If it is present no change is made.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): SQLite database connection.
+        """
+        self.mark_as(conn, MigrationStatus.MISSING, force=False)
+
+    def apply(self, conn: sqlite3.Connection, connections: dict[str, Optional[sqlite3.Connection]]):
+        """
+        Apply this migration.
+
+        Successful application will mark the migration as ``APPLIED``.
+
+        :Arguments:
+            **conn** (:obj:`sqlite3.Connection`): Main SQLite database connection. Used for the migrations table.
+
+            **connections** (:obj:`dict[str, Optional[sqlite3.Connection]]`): Named SQLite connections. Passed as
+            keyword arguments to the migration's ``migrate`` function.
+        """
+        self._apply_python(connections)
+        self.mark_as(conn, MigrationStatus.APPLIED)
         logger.info("Completed migration '%s'", self.name)
 
-    def _apply_sql(self, manager: NestedTransactions):
-        for statement in iter_sql_statements(self.file.read_text()):
-            manager.execute(statement)
-
-    def _apply_python(self, closure: ConnectionClosure):
+    def _apply_python(self, connections: dict[str, Optional[sqlite3.Connection]]):
         module = import_file_as_module(self.file, self.name, force=True)
         try:
             migrate = module.migrate
         except AttributeError as error:
             raise RuntimeError(f"'{self.name} does not expose a global 'migrate' callable") from error
+
         if not callable(migrate):
             raise RuntimeError("found 'migrate' symbol in the migration file but it is not callable")
-        migrate(closure=closure)
+
+        migrate(**connections)
 
 
 class MigrationManager:
-    """Apply a migration series through an owning named connection closure."""
+    r"""
+    Small utility class to manage, validate, and apply a set of ``Migration``\s.
+
+    :Arguments:
+        **migration_file** (:obj:`pathlib.Path`): A path to a Python file which defines a global ``migrations``
+        variable as a list of ``pathlib.Path`` objects.
+
+        **database** (:obj:`str`, optional): Name of the closure connection that owns the ``migrations`` table.
+        Defaults to ``'transit'`` when the migration file lives under a transit directory and ``'project'`` otherwise.
+    """
 
     network_migration_file = (
         pathlib.Path(__file__).parent.parent / "database_specification" / "network" / "migrations" / "migrations.py"
@@ -88,53 +150,92 @@ class MigrationManager:
         pathlib.Path(__file__).parent.parent / "database_specification" / "transit" / "migrations" / "migrations.py"
     )
 
-    def __init__(self, migration_file: pathlib.Path, database: str = None):
+    def __init__(self, migration_file: pathlib.Path, database: str | None = None):
         migration_file = pathlib.Path(migration_file)
+
         if database is None:
             parent_names = {part.name for part in migration_file.parents}
             database = "transit" if "transit" in parent_names else "project"
         self.database = database
+
         files = import_file_as_module(
             migration_file, "aequilibrae.project.database_specification.migrations", force=True
         ).migrations
+
         migrations = []
         for file in files:
             if not file.exists():
                 raise FileNotFoundError(f"migration file '{file.name}' does not exist")
+
             identifier, _, name = file.stem.partition("_")
             identifier = int(identifier)
+
             if identifier < 0:
                 raise ValueError("migration IDs must be >= 0")
-            migrations.append(Migration(identifier, name, file, database))
+            migrations.append(Migration(identifier, name, file))
+
         self.migrations = {migration.id: migration for migration in sorted(migrations, key=lambda item: item.id)}
+
         if len(self.migrations) != len(migrations):
             raise ValueError("duplicate migration IDs found. Ensure migration IDs are unique.")
 
-    def _initialize_status(self, closure: ConnectionClosure):
-        manager = closure[self.database]
-        table = manager.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='migrations'"
-        ).fetchone()
+    def _rename_connections(
+        self, raw: dict[str, Optional[sqlite3.Connection]]
+    ) -> dict[str, Optional[sqlite3.Connection]]:
+        return {
+            "project_conn": raw.get("project"),
+            "transit_conn": raw.get("transit"),
+            "results_conn": raw.get("results"),
+        }
+
+    def _ensure_initial_is_applied(
+        self, conn: sqlite3.Connection, connections: dict[str, Optional[sqlite3.Connection]]
+    ):
+        # Handle the initial migration separately: the 'migrations' table might not have been created yet. We
+        # implicitly apply this migration all the time to ensure the table exists.
+        table = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='migrations'").fetchone()
         if table is None:
             if 0 not in self.migrations:
                 raise RuntimeError("migration series has no initial migration")
-            self.migrations[0].apply(closure)
+            self.migrations[0].apply(conn, connections)
 
     def status(self, closure: ConnectionClosure) -> dict[int, MigrationStatus]:
-        with closure.transaction():
-            self._initialize_status(closure)
-            manager = closure[self.database]
-            return {key: migration.status(manager) for key, migration in self.migrations.items()}
+        """
+        Query the database for all migrations' status.
+
+        If the ``migrations`` table is not present all migrations are considered ``MISSING``.
+
+        :Arguments:
+            **closure** (:obj:`ConnectionClosure`): The scenario's connection closure.
+
+        :Returns:
+            **status** (:obj:`dict[int, MigrationStatus]`): Migration status enums by their ID.
+        """
+        with closure.transaction() as raw:
+            conn = raw[self.database]
+            connections = self._rename_connections(raw)
+            self._ensure_initial_is_applied(conn, connections)
+            return {key: migration.status(conn) for key, migration in self.migrations.items()}
 
     def mark_all_as_seen(self, closure: ConnectionClosure):
-        with closure.transaction():
-            self._initialize_status(closure)
-            manager = closure[self.database]
-            for migration in self.migrations.values():
-                migration.mark_as_seen(manager)
+        """
+        Mark all migrations as 'seen'.
 
-    def _find_applicable(self, manager: NestedTransactions):
-        statuses = [(key, migration.status(manager)) for key, migration in self.migrations.items()]
+        Marking a migration as 'seen' will add it to the ``migrations`` table as ``MISSING`` if it is not already
+        present. If it is present no change is made.
+
+        :Arguments:
+            **closure** (:obj:`ConnectionClosure`): The scenario's connection closure.
+        """
+        with closure.transaction() as raw:
+            conn = raw[self.database]
+            connections = self._rename_connections(raw)
+            self._ensure_initial_is_applied(conn, connections)
+            for migration in self.migrations.values():
+                migration.mark_as_seen(conn)
+
+    def _find_applicable(self, conn: sqlite3.Connection):
+        statuses = [(key, migration.status(conn)) for key, migration in self.migrations.items()]
         first_missing = len(statuses)
         for index, (_, status) in enumerate(statuses):
             if status == MigrationStatus.MISSING:
@@ -148,40 +249,44 @@ class MigrationManager:
         return applicable
 
     def find_applicable(self, closure: ConnectionClosure):
-        with closure.transaction():
-            self._initialize_status(closure)
-            return self._find_applicable(closure[self.database])
+        """
+        Find all applicable migrations.
 
-    def upgrade(self, closure: ConnectionClosure):
-        """Apply schema and status writes in one closure-owned transaction."""
-        with closure.transaction():
-            self._initialize_status(closure)
-            for migration in self._find_applicable(closure[self.database]):
-                migration.apply(closure)
+        A migration is applicable if all migrations before it (ordered by ID) have been applied or skipped.
 
+        If an out-of-order migration is detected a ``RuntimeError`` will be raised and manual intervention will be
+        required.
 
-def iter_sql_statements(sql: str):
-    """Yield complete SQLite statements without using ``executescript``.
+        :Arguments:
+            **closure** (:obj:`ConnectionClosure`): The scenario's connection closure.
+        """
+        with closure.transaction() as raw:
+            conn = raw[self.database]
+            connections = self._rename_connections(raw)
+            self._ensure_initial_is_applied(conn, connections)
+            return self._find_applicable(conn)
 
-    ``sqlite3.complete_statement`` understands trigger bodies containing
-    internal semicolons. Every non-comment statement must be terminated.
-    """
+    def upgrade(self, closure: ConnectionClosure, skip: set[int] | None = None):
+        """
+        Find and apply all applicable migrations in one closure-owned transaction.
 
-    pending = ""
-    # Check incrementally rather than line-by-line: migration authors may put
-    # several complete statements on one line. SQLite still keeps a CREATE
-    # TRIGGER body incomplete until its terminating END statement.
-    for character in sql:
-        pending += character
-        if sqlite3.complete_statement(pending):
-            if not _comment_only(pending):
-                yield pending.strip()
-            pending = ""
-    if pending.strip() and not _comment_only(pending):
-        raise ValueError("incomplete SQL migration statement; every statement must end with a semicolon")
+        Optionally skip some migrations. Take care when skipping migrations.
 
+        :Arguments:
+            **closure** (:obj:`ConnectionClosure`): The scenario's connection closure.
 
-def _comment_only(fragment: str) -> bool:
-    fragment = re.sub(r"/\*.*?\*/", "", fragment, flags=re.DOTALL)
-    fragment = re.sub(r"--[^\n]*(?:\n|$)", "", fragment)
-    return not fragment.strip()
+            **skip** (:obj:`set[int]`): Set of migration IDs to skip.
+        """
+        if skip is None:
+            skip = set()
+
+        with closure.transaction() as raw:
+            conn = raw[self.database]
+            connections = self._rename_connections(raw)
+            self._ensure_initial_is_applied(conn, connections)
+
+            for migration in self._find_applicable(conn):
+                if migration.id in skip:
+                    migration.mark_as(conn, MigrationStatus.SKIPPED)
+                else:
+                    migration.apply(conn, connections)

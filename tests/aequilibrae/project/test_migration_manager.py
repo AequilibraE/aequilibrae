@@ -1,10 +1,8 @@
 import sqlite3
-from pathlib import Path
 
 import pytest
 
 from aequilibrae.project.tools import MigrationManager, MigrationStatus
-from aequilibrae.project.tools.migration_manager import iter_sql_statements
 from aequilibrae.utils.db_utils import ConnectionClosure
 
 
@@ -20,35 +18,142 @@ def migrations_file(test_data_path):
     return test_data_path / "mock_migrations" / "init.py"
 
 
+@pytest.fixture
+def migrations_duplicate(test_data_path):
+    return test_data_path / "mock_migrations" / "duplicate_init.py"
+
+
+@pytest.fixture
+def migrations_negative(test_data_path):
+    return test_data_path / "mock_migrations" / "negative_init.py"
+
+
+def _apply(manager, migration_id, closure):
+    with closure["project"].transaction() as conn:
+        manager.migrations[migration_id].apply(
+            conn, {"project_conn": conn, "transit_conn": None, "results_conn": None}
+        )
+
+
 def test_migration_manager_init(migrations_file):
     manager = MigrationManager(migrations_file)
+
+    # Check migrations were loaded correctly
     assert list(manager.migrations) == [0, 1, 2, 3, 4, 5]
-    assert manager.migrations[0].type == "sql"
-    assert manager.migrations[3].type == "py"
+    assert manager.migrations[0].name == "initial_migration"
+    assert manager.migrations[1].name == "add_users"
+    assert manager.migrations[2].name == "add_posts"
+    assert manager.migrations[3].name == "add_comments"
+    assert manager.migrations[4].name == "invalid_migration"
+    assert manager.migrations[5].name == "non_callable_migrate"
+    assert manager.database == "project"
 
 
-def test_migration_manager_rejects_duplicate_and_negative_ids(test_data_path):
+def test_migration_manager_duplicate_ids(migrations_duplicate):
     with pytest.raises(ValueError):
-        MigrationManager(test_data_path / "mock_migrations" / "duplicate_init.py")
+        MigrationManager(migrations_duplicate)
+
+
+def test_migration_manager_invalid_id(migrations_negative):
     with pytest.raises(ValueError):
-        MigrationManager(test_data_path / "mock_migrations" / "negative_init.py")
+        MigrationManager(migrations_negative)
 
 
-def test_status_initializes_migration_table(migrations_file, closure):
+def test_status(migrations_file, closure):
     manager = MigrationManager(migrations_file)
+
+    # Initially all should be missing except initial which gets auto-applied
     status = manager.status(closure)
     assert status[0] == MigrationStatus.APPLIED
-    assert all(value == MigrationStatus.MISSING for key, value in status.items() if key)
+    assert status[1] == MigrationStatus.MISSING
+    assert status[2] == MigrationStatus.MISSING
+    assert status[3] == MigrationStatus.MISSING
+
+    # Check migrations table was created
+    assert closure["project"].execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
+    ).fetchone() is not None
 
 
-def test_upgrade_applies_schema_and_status_together(migrations_file, closure):
+def test_mark_all_as_seen(migrations_file, closure):
     manager = MigrationManager(migrations_file)
-    del manager.migrations[4]
+    manager.mark_all_as_seen(closure)
+
+    status = manager.status(closure)
+    for id_, stat in status.items():
+        if id_ == 0:
+            assert stat == MigrationStatus.APPLIED
+        else:
+            assert stat == MigrationStatus.MISSING
+
+    # Check entries exist in migrations table
+    rows = closure["project"].execute("SELECT id, status FROM migrations ORDER BY id").fetchall()
+    assert len(rows) == 6
+    assert rows[0][1] == "APPLIED"
+    assert rows[1][1] == "MISSING"
+    assert rows[2][1] == "MISSING"
+    assert rows[3][1] == "MISSING"
+    assert rows[4][1] == "MISSING"
+    assert rows[5][1] == "MISSING"
+
+
+def test_find_applicable(migrations_file, closure):
+    manager = MigrationManager(migrations_file)
+
+    # Should find all non-initial migrations
+    applicable = manager.find_applicable(closure)
+    assert [migration.id for migration in applicable] == [1, 2, 3, 4, 5]
+
+    # Apply the first two migrations
+    _apply(manager, 1, closure)
+    _apply(manager, 2, closure)
+
+    applicable = manager.find_applicable(closure)
+    assert [migration.id for migration in applicable] == [3, 4, 5]
+
+
+def test_invalid_migration_callable(migrations_file, closure):
+    manager = MigrationManager(migrations_file)
+
+    # Migration 4 does not expose a ``migrate`` function
+    with pytest.raises(RuntimeError, match="does not expose a global 'migrate' callable"):
+        _apply(manager, 4, closure)
+
+
+def test_non_callable_migrate(migrations_file, closure):
+    manager = MigrationManager(migrations_file)
+
+    # Migration 5 exposes a ``migrate`` symbol that is not callable
+    with pytest.raises(RuntimeError, match="not callable"):
+        _apply(manager, 5, closure)
+
+
+def test_out_of_order_migrations(migrations_file, closure):
+    manager = MigrationManager(migrations_file)
+
+    # Apply migrations 0, 1, and 3 but not 2
+    _apply(manager, 0, closure)
+    _apply(manager, 1, closure)
+    _apply(manager, 3, closure)
+
+    # Should raise error because migration 2 was skipped
+    with pytest.raises(RuntimeError):
+        manager.find_applicable(closure)
+
+
+def test_upgrade(migrations_file, closure):
+    manager = MigrationManager(migrations_file)
+    del manager.migrations[4]  # drop the duds
     del manager.migrations[5]
 
+    # Upgrade should apply all migrations
     manager.upgrade(closure)
 
-    assert set(manager.status(closure).values()) == {MigrationStatus.APPLIED}
+    # Check all migrations were applied
+    status = manager.status(closure)
+    assert all(stat == MigrationStatus.APPLIED for stat in status.values())
+
+    # Check tables were created
     tables = {
         row[0]
         for row in closure["project"].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
@@ -56,53 +161,42 @@ def test_upgrade_applies_schema_and_status_together(migrations_file, closure):
     assert {"migrations", "users", "posts", "comments"} <= tables
 
 
-def test_failing_sql_rolls_back_schema_prefix_and_status(tmp_path, closure):
-    migration_dir = tmp_path / "migrations"
-    migration_dir.mkdir()
-    (migration_dir / "000_initial.sql").write_text(
-        "CREATE TABLE migrations (id INTEGER PRIMARY KEY, name TEXT, status TEXT, date TEXT);"
-    )
-    (migration_dir / "001_failure.sql").write_text(
-        "CREATE TABLE prefix (id INTEGER); INSERT INTO table_that_does_not_exist VALUES (1);"
-    )
-    (migration_dir / "migrations.py").write_text(
-        "from pathlib import Path\n"
-        "path = Path(__file__).parent\n"
-        "migrations = [path / '000_initial.sql', path / '001_failure.sql']\n"
-    )
-    manager = MigrationManager(migration_dir / "migrations.py")
+def test_upgrade_with_skip(migrations_file, closure):
+    manager = MigrationManager(migrations_file)
+    del manager.migrations[4]
+    del manager.migrations[5]
 
-    with pytest.raises(sqlite3.OperationalError):
-        manager.upgrade(closure)
+    manager.mark_all_as_seen(closure)
 
-    assert closure["project"].execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='prefix'"
-    ).fetchone() is None
-    assert closure["project"].execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='migrations'"
-    ).fetchone() is None
+    # Skip migration 2
+    manager.upgrade(closure, skip={2})
 
+    # Check migrations 1 and 3 were applied, 2 was skipped
+    status = manager.status(closure)
+    assert status[0] == MigrationStatus.APPLIED
+    assert status[1] == MigrationStatus.APPLIED
+    assert status[2] == MigrationStatus.SKIPPED
+    assert status[3] == MigrationStatus.APPLIED
 
-def test_sql_statement_iterator_preserves_trigger_bodies():
-    sql = """
-    CREATE TABLE events (id INTEGER);
-    CREATE TABLE audit (id INTEGER);
-    CREATE TRIGGER log_event AFTER INSERT ON events BEGIN
-      INSERT INTO audit VALUES (NEW.id);
-      INSERT INTO audit VALUES (NEW.id + 1);
-    END;
-    """
-    statements = list(iter_sql_statements(sql))
-    assert len(statements) == 3
-    assert "NEW.id + 1" in statements[-1]
+    # There are no applicable upgrades now
+    assert manager.find_applicable(closure) == []
 
+    # Check tables were created (should have users and comments but not posts)
+    tables = {
+        row[0]
+        for row in closure["project"].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    }
+    assert "migrations" in tables
+    assert "users" in tables
+    assert "posts" not in tables  # Was skipped
+    assert "comments" in tables
 
-def test_sql_statement_iterator_rejects_incomplete_tail():
-    with pytest.raises(ValueError, match="incomplete"):
-        list(iter_sql_statements("CREATE TABLE incomplete (id INTEGER)"))
+    _apply(manager, 2, closure)
 
+    tables = {
+        row[0]
+        for row in closure["project"].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    }
+    assert "posts" in tables  # Was just applied
 
-def test_all_historical_sql_migrations_are_complete():
-    root = Path(__file__).parents[3] / "src" / "aequilibrae" / "project" / "database_specification"
-    for path in root.glob("*/migrations/*.sql"):
-        assert list(iter_sql_statements(path.read_text())), path
+    assert manager.status(closure)[2] == MigrationStatus.APPLIED
