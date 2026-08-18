@@ -1,99 +1,55 @@
-import sqlite3
-import pathlib
 import logging
-from typing import Optional
-
-from aequilibrae import Project
-from aequilibrae.transit import Transit
-from aequilibrae.context import get_active_project
-from aequilibrae.project.project_creation import add_triggers, remove_triggers
-
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
-def migrate(
-    *,
-    project_conn: sqlite3.Connection,
-    transit_conn: Optional[sqlite3.Connection],
-    results_conn: Optional[sqlite3.Connection],
-):
-    logger.info("Beginning migration to align taz_ids and node_ids for origins/destinations/centroids")
-
-    if not transit_conn:
-        logger.info("Migration finished, no 'public_transport.sqlite' connection provided.")
+def migrate(*, closure):
+    """Align transit origin node IDs with TAZ IDs using migration-owned SQL."""
+    transit = closure["transit"]
+    if transit.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='nodes'").fetchone() is None:
+        return
+    columns = {row[1] for row in transit.execute("PRAGMA table_info(nodes)").fetchall()}
+    if not {"node_id", "period_id", "node_type", "taz_id"} <= columns:
         return
 
-    project: Project = get_active_project(must_exist=True)
-
-    nodes_schema = pathlib.Path(__file__).parent.parent / "tables" / "nodes.sql"
-    if not nodes_schema.exists():
-        raise FileNotFoundError(str(nodes_schema))
-
-    logger.info("Loading PT graphs...")
-    data: Transit = Transit(project)
+    transit.execute("UPDATE nodes SET taz_id=NULL WHERE CAST(taz_id AS TEXT)='' OR taz_id IS NULL")
+    periods = [row[0] for row in transit.execute("SELECT DISTINCT period_id FROM nodes").fetchall()]
+    transit.execute("CREATE TEMP TABLE aeq_node_map (period_id INTEGER, old_id INTEGER, new_id INTEGER)")
     try:
-        data.load()
-    except sqlite3.OperationalError:
-        logger.info("Migration finished, no 'transit_graph_configs' table found.")
-        return
+        for period_id in periods:
+            rows = transit.execute(
+                "SELECT node_id, taz_id, node_type FROM nodes WHERE period_id=? ORDER BY node_id", (period_id,)
+            ).fetchall()
+            reserved = {
+                int(taz_id)
+                for _, taz_id, node_type in rows
+                if taz_id is not None and int(taz_id) > 0 and node_type in ("origin", "od")
+            }
+            next_id = max(reserved, default=0) + 1
+            mapping = []
+            for old_id, taz_id, node_type in rows:
+                if taz_id is not None and int(taz_id) > 0 and node_type in ("origin", "od"):
+                    new_id = int(taz_id)
+                else:
+                    while next_id in reserved:
+                        next_id += 1
+                    new_id = next_id
+                    next_id += 1
+                mapping.append((period_id, old_id, new_id))
+            transit.executemany("INSERT INTO aeq_node_map VALUES (?,?,?)", mapping)
 
-    with open(nodes_schema, "r") as nodes_sql:
-        sqls = [
-            "DELETE FROM links",
-            "DROP INDEX idx_node",
-            "DROP INDEX idx_period_nodes",
-            "DROP INDEX idx_node_is_centroid",
-            "SELECT RenameTable(NULL, 'nodes', '__old_nodes')",
-            *nodes_sql.read().split("--#"),
-        ]
-
-    logger.info("Removing triggers...")
-    remove_triggers(transit_conn, "transit")
-    try:
-        logger.info("Removing/renaming tables...")
-        for sql in sqls:
-            transit_conn.execute(sql)
-
-        for graph_builder in data.graphs.values():
-            logger.info(f"Aligning graph for period {graph_builder.period_id}...")
-            graph_builder.vertices.loc[graph_builder.vertices.taz_id == "", "taz_id"] = -1
-            graph_builder.vertices.taz_id = graph_builder.vertices.taz_id.astype("int64")
-
-            o_vertices = graph_builder.vertices[
-                (graph_builder.vertices.taz_id > 0) & (graph_builder.vertices.node_type.isin(["origin", "od"]))
-            ]
-
-            node_id_min = o_vertices.taz_id.max() + 1
-            graph_builder.vertices["__new_node_id"] = np.hstack(
-                (
-                    o_vertices.taz_id.to_numpy(),
-                    np.arange(node_id_min, node_id_min + len(graph_builder.vertices) - len(o_vertices)),
-                )
+        if transit.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='links'").fetchone():
+            transit.execute(
+                """UPDATE links SET
+                a_node=(SELECT new_id FROM aeq_node_map m WHERE m.period_id=links.period_id AND m.old_id=links.a_node),
+                b_node=(SELECT new_id FROM aeq_node_map m WHERE m.period_id=links.period_id AND m.old_id=links.b_node)
+                WHERE EXISTS (SELECT 1 FROM aeq_node_map m WHERE m.period_id=links.period_id
+                              AND (m.old_id=links.a_node OR m.old_id=links.b_node))"""
             )
-
-            vertices = graph_builder.vertices[["node_id", "__new_node_id"]]
-            graph_builder.edges = (
-                graph_builder.edges.merge(vertices, left_on="a_node", right_on="node_id", validate="m:1")
-                .drop(columns=["node_id", "a_node"])
-                .rename(columns={"__new_node_id": "a_node"})
-                .merge(vertices, left_on="b_node", right_on="node_id", validate="m:1")
-                .drop(columns=["node_id", "b_node"])
-                .rename(columns={"__new_node_id": "b_node"})
-            )
-
-            graph_builder.vertices = graph_builder.vertices.drop(columns="node_id").rename(
-                columns={"__new_node_id": "node_id"}
-            )
-
-            logger.info(f"Saving graph for period {graph_builder.period_id}...")
-            graph_builder.save(pt_conn=transit_conn)
-
-        transit_conn.execute("SELECT DropTable(NULL, '__old_nodes')")
-
+        transit.execute(
+            """UPDATE nodes SET node_id=(SELECT new_id FROM aeq_node_map m
+               WHERE m.period_id=nodes.period_id AND m.old_id=nodes.node_id)"""
+        )
     finally:
-        logger.info("Re-adding triggers...")
-        add_triggers(transit_conn, "transit")
-
-    logger.info("Migration successful")
+        transit.execute("DROP TABLE aeq_node_map")
+    logger.info("Aligned transit TAZ and node identifiers")

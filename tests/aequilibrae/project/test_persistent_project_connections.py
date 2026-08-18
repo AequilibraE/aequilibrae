@@ -50,6 +50,13 @@ def test_canonical_project_path_lock_rejects_second_open(tmp_path):
         pass
 
 
+def test_static_upgrade_owns_closed_connections(tmp_path):
+    path = _new_project(tmp_path)
+    Project.upgrade(path)
+    with Project.from_path(path) as project:
+        assert project.db_connection.execute("PRAGMA foreign_keys").fetchone() == (1,)
+
+
 def test_shutdown_is_idempotent_and_rejects_further_access(tmp_path):
     project = Project()
     project.new(tmp_path / "model")
