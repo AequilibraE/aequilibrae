@@ -40,7 +40,7 @@ class Nodes(ProjectTable):
     protected = frozenset(("link_types", "modes"))
 
     def __init__(self, net):
-        super().__init__(net.project)
+        super().__init__(net.transactions)
 
     def new_centroid(self, node_id: int, geometry) -> int:
         """Creates a new centroid with a given ID at the given position

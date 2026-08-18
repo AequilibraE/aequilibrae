@@ -2,7 +2,9 @@ import logging
 import re
 from pathlib import Path
 from sqlite3 import Connection
+
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
+from aequilibrae.utils.db_utils import ConnectionClosure
 
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
@@ -12,13 +14,17 @@ protected_fields = ["ogc_fid", "geometry"]
 logger = logging.getLogger(__name__)
 
 
-def initialize_tables(db_type: str, conn: Connection) -> None:
-    with conn as conn:
-        create_base_tables(conn, db_type)
-        add_triggers(conn, db_type)
+def initialize_tables(closure: ConnectionClosure, databases=("network", "transit")) -> None:
+    """Initialize requested schemas in one closure-owned transaction."""
+    mapping = {"network": "project", "transit": "transit"}
+    with closure.transaction():
+        for db_type in databases:
+            manager = closure[mapping[db_type]]
+            create_base_tables(manager, db_type, closure)
+            add_triggers(manager, db_type)
 
 
-def create_base_tables(conn: Connection, db_type: str) -> None:
+def create_base_tables(conn: Connection, db_type: str, closure: ConnectionClosure) -> None:
     base_folder = Path(__file__).resolve().parent / "database_specification" / db_type
     spec_folder = base_folder / "tables"
 
@@ -33,8 +39,9 @@ def create_base_tables(conn: Connection, db_type: str) -> None:
 
     # For a new database construction all present migrations should have already been applied implicitly by the new
     # schema. So we mark them all as skipped.
-    mm = MigrationManager(base_folder / "migrations" / "migrations.py")
-    mm.mark_all_as_seen(conn)
+    database = "project" if db_type == "network" else "transit"
+    mm = MigrationManager(base_folder / "migrations" / "migrations.py", database=database)
+    mm._initialize_status(closure)
     for migration in mm.migrations.values():
         migration.mark_as(conn, MigrationStatus.SKIPPED)
 

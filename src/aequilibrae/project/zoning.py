@@ -46,7 +46,7 @@ class Zoning(ProjectTable):
     multi_part = True
 
     def __init__(self, network):
-        super().__init__(network.project)
+        super().__init__(network.transactions)
         self.network = network
         self.__geo_index = None
 

@@ -44,6 +44,7 @@ class Network(WorkerThread):
 
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
+        self.transactions = project.db_connection
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
         self.links = Links(self)
@@ -58,8 +59,8 @@ class Network(WorkerThread):
             :obj:`list`: List of all fields that can be skimmed
         """
 
-        with self.project.db_connection as conn:
-            field_names = conn.execute("PRAGMA table_info(links);").fetchall()
+        conn = self.transactions
+        field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
         ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
         skimmable = [
@@ -108,8 +109,8 @@ class Network(WorkerThread):
             :obj:`list`: List of all modes
         """
 
-        with self.project.db_connection as conn:
-            all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
+        conn = self.transactions
+        all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
     def create_from_osm(
@@ -149,9 +150,9 @@ class Network(WorkerThread):
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
-        with self.project.db_connection as conn:
-            conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
-            conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
+        conn = self.transactions
+        conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
+        conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
 
         if isinstance(modes, (tuple, list)):
             modes = list(modes)
@@ -295,49 +296,49 @@ class Network(WorkerThread):
         """
         from aequilibrae.paths import Graph
 
-        with self.project.db_connection as conn:
-            if fields is None:
-                field_names = conn.execute("PRAGMA table_info(links);").fetchall()
+        conn = self.transactions
+        if fields is None:
+            field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
-                ignore_fields = ["ogc_fid", "geometry"]
-                all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+            ignore_fields = ["ogc_fid", "geometry"]
+            all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+        else:
+            fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
+            all_fields = list(set(fields))
+
+        if modes is None:
+            modes = conn.execute("select mode_id from modes;").fetchall()
+            modes = [m[0] for m in modes]
+        elif isinstance(modes, str):
+            modes = [modes]
+
+        if limit_to_area is not None:
+            load_spatialite_extension(conn)
+            spatial_add = """ WHERE links.rowid in (
+                                    select rowid from SpatialIndex where f_table_name = 'links' and
+                                   search_frame = GeomFromWKB(?, 4326))"""
+
+        sql = f"select {','.join(all_fields)} from links"
+
+        sql_centroids = "select node_id from nodes where is_centroid=1 order by node_id;"
+        centroids = np.array([i[0] for i in conn.execute(sql_centroids).fetchall()], np.uint32)
+        centroids = centroids if centroids.shape[0] else None
+
+        with pd.option_context("future.no_silent_downcasting", True):
+            if limit_to_area is None:
+                df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
             else:
-                fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
-                all_fields = list(set(fields))
+                sql += spatial_add
+                df = (
+                    pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                    .fillna(value=np.nan)
+                    .infer_objects(False)
+                )
 
-            if modes is None:
-                modes = conn.execute("select mode_id from modes;").fetchall()
-                modes = [m[0] for m in modes]
-            elif isinstance(modes, str):
-                modes = [modes]
+                # We filter to centroids existing in our filtered area
+                centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
 
-            if limit_to_area is not None:
-                load_spatialite_extension(conn)
-                spatial_add = """ WHERE links.rowid in (
-                                        select rowid from SpatialIndex where f_table_name = 'links' and
-                                       search_frame = GeomFromWKB(?, 4326))"""
-
-            sql = f"select {','.join(all_fields)} from links"
-
-            sql_centroids = "select node_id from nodes where is_centroid=1 order by node_id;"
-            centroids = np.array([i[0] for i in conn.execute(sql_centroids).fetchall()], np.uint32)
-            centroids = centroids if centroids.shape[0] else None
-
-            with pd.option_context("future.no_silent_downcasting", True):
-                if limit_to_area is None:
-                    df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
-                else:
-                    sql += spatial_add
-                    df = (
-                        pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
-                        .fillna(value=np.nan)
-                        .infer_objects(False)
-                    )
-
-                    # We filter to centroids existing in our filtered area
-                    centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
-
-            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
+        valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[valid_fields]
@@ -404,8 +405,8 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with self.project.db_connection_spatial as conn:
-            poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
+        conn = self.transactions
+        poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
     def convex_hull(self) -> Polygon:
@@ -414,12 +415,12 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with self.project.db_connection_spatial as conn:
-            sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
-            links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
+        conn = self.transactions
+        sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
+        links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        with self.project.db_connection as conn:
-            c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
+        conn = self.transactions
+        c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c

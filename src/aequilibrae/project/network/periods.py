@@ -29,7 +29,7 @@ class Periods(ProjectTable):
     record_name = "PeriodRecord"
 
     def __init__(self, net):
-        super().__init__(net.project)
+        super().__init__(net.transactions)
 
     def new_period(self, period_id: int, start: int, end: int, description: str = None) -> int:
         """Creates a new period with a given ID

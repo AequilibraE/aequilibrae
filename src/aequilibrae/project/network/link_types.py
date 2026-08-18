@@ -41,7 +41,7 @@ class LinkTypes(ProjectTable):
     __allowed_characters = string.ascii_letters + "_"
 
     def __init__(self, net):
-        super().__init__(net.project)
+        super().__init__(net.transactions)
 
     def get_by_name(self, link_type: str):
         """Get a link type record from the network by its *link_type* (i.e. name)"""

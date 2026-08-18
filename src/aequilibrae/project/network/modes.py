@@ -36,7 +36,7 @@ class Modes(ProjectTable):
     __allowed_characters = string.ascii_letters + "_"
 
     def __init__(self, net):
-        super().__init__(net.project)
+        super().__init__(net.transactions)
 
     def get_by_name(self, mode_name: str):
         """Get a mode record from the network by its *mode_name*"""

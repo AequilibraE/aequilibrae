@@ -2,20 +2,17 @@ import functools
 import logging
 import os
 import shutil
-import sqlite3
-import warnings
 from collections import namedtuple
-from contextlib import contextmanager
 from pathlib import Path
 
 import pandas as pd
 
-from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
+from aequilibrae.project.path_lock import ProjectPathLock
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
@@ -23,7 +20,7 @@ from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import commit_and_close, safe_connect
+from aequilibrae.utils.db_utils import ConnectionClosure, commit_and_close, safe_connect
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -55,6 +52,7 @@ class Project:
     def __init__(self):
         self.root_scenario: Scenario = None
         self.scenario: Scenario = None
+        self._path_lock = None
 
     @classmethod
     def from_path(cls, project_folder):
@@ -63,6 +61,16 @@ class Project:
         return project
 
     def open(self, project_path: str) -> None:
+        lock = ProjectPathLock(project_path)
+        lock.acquire()
+        try:
+            self._open(project_path)
+        except BaseException:
+            lock.release()
+            raise
+        self._path_lock = lock
+
+    def _open(self, project_path: str) -> None:
         """
         Loads project from disk
 
@@ -77,53 +85,56 @@ class Project:
         if not file_name.is_file() or not file_name.exists():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
 
-        path_to_file = file_name
+        candidate, created = Scenario.open_candidate("root", base_path)
+        try:
+            if candidate.connections["project"].execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='scenarios'"
+            ).fetchone() is None or candidate.connections["project"].execute(
+                "SELECT 1 FROM scenarios WHERE scenario_name='root'"
+            ).fetchone() is None:
+                raise ValueError("project database is not an authoritative root scenario")
+            if base_path / "public_transport.sqlite" in created:
+                initialize_tables(candidate.connections, databases=("transit",))
+            self.root_scenario = candidate
+            self.scenario = candidate
+            self.__load_objects()
+        except BaseException:
+            candidate.destroy()
+            for path in created:
+                path.unlink(missing_ok=True)
+            raise
 
-        self.root_scenario = Scenario(
-            name="root",
-            base_path=base_path,
-            path_to_file=path_to_file,
-            log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
-        )
-        self.scenario = self.root_scenario
-
-        # It's possible that if two projects are open at once this could duplicate mix the log outputs, but we don't
-        # have anything to support having more than one project open at a time so we'll assume it's fine.
         default_log_file_config(self.scenario.log_handler)
-
-        self.activate()
-
-        self.__load_objects()
         logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
 
     @property
     def project_base_path(self):
-        return self.scenario.base_path
+        return self._require_scenario().base_path
 
     @property
     def path_to_file(self):
-        return self.scenario.path_to_file
+        return self._require_scenario().path_to_file
 
     @property
     def about(self) -> About:
-        return self.scenario.about
+        return self._require_scenario().about
 
     @property
     def network(self) -> Network:
-        return self.scenario.network
+        return self._require_scenario().network
 
     @property
     def transit(self) -> Transit:
-        return self.scenario.transit
+        return self._require_scenario().transit
 
     @property
     def matrices(self) -> Matrices:
-        return self.scenario.matrices
+        return self._require_scenario().matrices
 
     @property
     def results(self) -> Results:
-        return self.scenario.results
+        return self._require_scenario().results
 
     @property
     def _project_database_path(self) -> Path:
@@ -138,30 +149,23 @@ class Project:
         return self.project_base_path / "public_transport.sqlite"
 
     @property
-    @contextmanager
     def db_connection(self):
-        with commit_and_close(self._project_database_path, spatial=False) as conn:
-            yield conn
+        return self._require_scenario().connections["project"]
 
-    @property
-    @contextmanager
-    def db_connection_spatial(self):
-        with commit_and_close(self._project_database_path, spatial=True) as conn:
-            yield conn
-
-    @property
-    @contextmanager
-    def results_connection(self):
-        with commit_and_close(self._results_database_path, spatial=False, missing_ok=True) as conn:
-            yield conn
-
-    @property
-    @contextmanager
-    def transit_connection(self):
-        with commit_and_close(self._transit_database_path, spatial=True, missing_ok=True) as conn:
-            yield conn
+    def transaction(self):
+        return self._require_scenario().connections.transaction()
 
     def new(self, project_path: str) -> None:
+        lock = ProjectPathLock(project_path)
+        lock.acquire()
+        try:
+            self._new(project_path)
+        except BaseException:
+            lock.release()
+            raise
+        self._path_lock = lock
+
+    def _new(self, project_path: str) -> None:
         """Creates a new project
 
         :Arguments:
@@ -169,7 +173,6 @@ class Project:
         """
 
         base_path = Path(project_path)
-        path_to_file = base_path / "project_database.sqlite"
 
         if os.path.isdir(project_path):
             raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
@@ -177,55 +180,51 @@ class Project:
         # We create the project folder and create the base file
         base_path.mkdir(parents=True, exist_ok=True)
 
-        self.root_scenario = Scenario(
-            name="root",
-            base_path=base_path,
-            path_to_file=path_to_file,
-            log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
-        )
-        self.scenario = self.root_scenario
+        self.__create_empty_network(base_path)
+        candidate, _ = Scenario.open_candidate("root", base_path, create_auxiliary=False)
+        try:
+            self.root_scenario = candidate
+            self.scenario = candidate
+            initialize_tables(candidate.connections)
+            self.__load_objects()
+            self.about.create()
+        except BaseException:
+            candidate.destroy()
+            self.root_scenario = None
+            self.scenario = None
+            shutil.rmtree(base_path, ignore_errors=True)
+            raise
 
         default_log_file_config(self.scenario.log_handler)
-
-        self.activate()
-
-        self.__create_empty_network()
-        self.__load_objects()
-        self.about.create()
         logger.info(f"Created project on {base_path}")
 
-    def close(self) -> None:
-        """Safely closes the project"""
-        if not self.project_base_path:
-            logger.warning("This Aequilibrae project is not opened")
+    def shutdown(self) -> None:
+        """Destroy scenario resources and make repeated shutdown harmless."""
+        if self.scenario is None:
             return
+        selected = self.scenario
+        root = self.root_scenario
+        selected.ensure_idle()
+        if root is not selected:
+            root.ensure_idle()
+        clean(self)
+        logging.getLogger("aequilibrae").removeHandler(selected.log_handler)
+        if selected is not root:
+            selected.destroy()
+        root.destroy()
+        self.scenario = None
+        self.root_scenario = None
+        if self._path_lock is not None:
+            self._path_lock.release()
+            self._path_lock = None
 
-        try:
-            with self.db_connection as conn:
-                conn.commit()
-            clean(self)
-            for obj in [self.parameters, self.network]:
-                del obj
+    def __enter__(self):
+        self._require_scenario()
+        return self
 
-            # del self.network.link_types
-            # del self.network.modes
-
-            logger.info(f"Closed project on {self.project_base_path}")
-
-            logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
-        except (sqlite3.ProgrammingError, AttributeError):
-            logger.warning(f"This project at {self.project_base_path} is already closed")
-            raise  # FIXME something goes wrong above
-
-        finally:
-            self.deactivate()
-
-    def activate(self):
-        activate_project(self)
-
-    def deactivate(self):
-        if get_active_project(must_exist=False) is self:
-            activate_project(None)
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.shutdown()
+        return False
 
     def log(self) -> Log:
         """Returns a log object
@@ -233,76 +232,68 @@ class Project:
         allows the user to read the log or clear it"""
         return Log(self.project_base_path)
 
-    def upgrade(self, ignore_project: bool = False, ignore_transit: bool = False, ignore_results: bool = False):
-        """
-        Find and apply all applicable migrations.
-
-        All database upgrades are applied within a single transaction.
-
-        Optionally ignore specific databases. This is useful when a database is known to be incompatible with some
-        migrations but you'd still like to upgrade the others. Take care when ignoring a database. For a particular
-        version of aequilibrae, it is assumed that all migrations have been applied successfully or the project was
-        created with the latest schema, skipping/ignoring migrations will likely lead to issues/broken assumptions.
-
-        If skipping a specific migration is required, use the ``aequilibrae.project.tools.MigrationManager`` object
-        directly. Consult it's documentation page for details. Take care when skipping migrations.
-
-        :Arguments:
-            **ignore_project** (:obj:`bool`, optional): Ignore the project database. No direct migrations will be
-                  applied. Defaults to False.
-            **ignore_transit** (:obj:`bool`, optional): Ignore the transit database. No direct migrations will be
-                  applied. Defaults to False.
-            **ignore_results** (:obj:`bool`, optional): Ignore the results database. No direct migrations will be
-                  applied. Defaults to False.
-        """
-        logger.info("Starting database upgrades")
-        if ignore_project or ignore_transit or ignore_results:
-            warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
-
-        connections = {
-            "project_conn": None,
-            "transit_conn": None,
-            "results_conn": None,
-        }
-        targets = []
-
-        if not ignore_project:
-            targets.append((MigrationManager(MigrationManager.network_migration_file), "project_conn"))
-            connections["project_conn"] = connect_spatialite(self._project_database_path)
-        else:
-            logger.warning("Ignoring project database during upgrade")
-
-        if not ignore_transit and (self.project_base_path / "public_transport.sqlite").exists():
-            targets.append((MigrationManager(MigrationManager.transit_migration_file), "transit_conn"))
-            connections["transit_conn"] = connect_spatialite(self._transit_database_path)
-        else:
-            logger.warning("Ignoring transit database during upgrade")
-
-        if not ignore_results and (self.project_base_path / "results_database.sqlite").exists():
-            connections["results_conn"] = safe_connect(self._results_database_path)
-        else:
-            logger.warning("Ignoring results database during upgrade")
-
+    @staticmethod
+    def upgrade(project_path):
+        """Upgrade all three databases of a closed project path."""
+        lock = ProjectPathLock(project_path)
+        lock.acquire()
         try:
-            for mm, main_conn in targets:
-                with connections[main_conn] as conn:
-                    mm.mark_all_as_seen(conn)
-
-            for mm, main_conn in targets:
-                mm.upgrade(main_conn, connections=connections)
-            logger.info("Completed database upgrades")
+            Project._upgrade(project_path)
         finally:
-            for _, main_conn in targets:
-                connections[main_conn].close()
+            lock.release()
+
+    @staticmethod
+    def _upgrade(project_path):
+        base_path = Path(project_path).resolve()
+        paths = {
+            "project": base_path / "project_database.sqlite",
+            "results": base_path / "results_database.sqlite",
+            "transit": base_path / "public_transport.sqlite",
+        }
+        missing = [str(path) for path in paths.values() if not path.is_file()]
+        if missing:
+            raise ValueError(f"upgrade requires all three scenario databases; missing: {', '.join(missing)}")
+        raw = []
+        try:
+            project = connect_spatialite(paths["project"])
+            raw.append(project)
+            results = safe_connect(paths["results"])
+            raw.append(results)
+            transit = connect_spatialite(paths["transit"])
+            raw.append(transit)
+            closure = ConnectionClosure({"project": project, "results": results, "transit": transit})
+            raw.clear()
+            try:
+                root = closure["project"].execute(
+                    "SELECT 1 FROM scenarios WHERE scenario_name='root'"
+                ).fetchone()
+                if root is None:
+                    raise ValueError("upgrade path is not an authoritative root project")
+                managers = [
+                    MigrationManager(MigrationManager.network_migration_file, database="project"),
+                    MigrationManager(MigrationManager.transit_migration_file, database="transit"),
+                ]
+                with closure.transaction():
+                    for manager in managers:
+                        manager._initialize_status(closure)
+                        for migration in manager._find_applicable(closure[manager.database]):
+                            migration.apply(closure)
+            finally:
+                closure.close()
+        finally:
+            for connection in raw:
+                connection.close()
 
     def __load_objects(self):
         matrix_folder = self.project_base_path / "matrices"
         matrix_folder.mkdir(parents=True, exist_ok=True)
 
+        project_manager = self.scenario.connections["project"]
         self.scenario.network = Network(self)
-        self.scenario.about = About(self)
-        self.scenario.matrices = Matrices(self)
-        self.scenario.results = Results(self)
+        self.scenario.about = About(project_manager)
+        self.scenario.matrices = Matrices(project_manager, matrix_folder)
+        self.scenario.results = Results(project_manager, self.scenario.connections["results"])
+        self.scenario.transit = Transit(self)
 
     @property
     def project_parameters(self) -> Parameters:
@@ -346,23 +337,26 @@ class Project:
 
     @property
     def zoning(self):
-        return Zoning(self.network)
+        if self.scenario.zoning is None:
+            self.scenario.zoning = Zoning(self.network)
+        return self.scenario.zoning
 
-    def __create_empty_network(self):
-        shutil.copyfile(spatialite_database, self.path_to_file)
-        pth = self.project_base_path / "run"
+    def _require_scenario(self):
+        if self.scenario is None:
+            raise RuntimeError("Project is not open")
+        return self.scenario
+
+    def __create_empty_network(self, base_path):
+        shutil.copyfile(spatialite_database, base_path / "project_database.sqlite")
+        shutil.copyfile(spatialite_database, base_path / "public_transport.sqlite")
+        (base_path / "results_database.sqlite").touch()
+        pth = base_path / "run"
         pth.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(demo_init_py, pth / "__init__.py")
 
-        # Write parameters to the project folder
-        p = self.project_parameters
-        p.parameters["system"]["logging_directory"] = str(self.project_base_path)
-        p.write_back()
-
-        # Create actual tables
-        with self.db_connection_spatial as conn:
-            conn.execute("PRAGMA foreign_keys = ON;")
-            initialize_tables("network", conn=conn)
+        parameters = Parameters(path=base_path)
+        parameters.parameters["system"]["logging_directory"] = str(base_path)
+        parameters.write_back()
 
     def list_scenarios(self):
         """
@@ -371,8 +365,7 @@ class Project:
         :Returns:
             **scenarios** (:obj:`pd.DataFrame`): Pandas DataFrame with existing scenarios
         """
-        with self.db_connection as conn:
-            return pd.read_sql("SELECT * FROM scenarios", conn)
+        return pd.read_sql("SELECT * FROM scenarios", self.root_scenario.connections["project"])
 
     def use_scenario(self, scenario_name: str):
         """
@@ -382,26 +375,32 @@ class Project:
             **scenario_name** (:obj:`str`): name of the scenario to be activated
 
         """
-        with commit_and_close(self.root_scenario.path_to_file, spatial=False) as conn:
-            if conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone() is None:
-                raise ValueError(f"scenario '{scenario_name}' does not exist")
+        current = self._require_scenario()
+        current.ensure_idle()
+        self.root_scenario.ensure_idle()
+        root_manager = self.root_scenario.connections["project"]
+        if root_manager.execute("SELECT 1 FROM scenarios WHERE scenario_name=?", (scenario_name,)).fetchone() is None:
+            raise ValueError(f"scenario '{scenario_name}' does not exist")
+        if scenario_name == current.name:
+            return
 
-        logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
+        candidate = self.root_scenario if scenario_name == "root" else Scenario.open_candidate(
+            scenario_name, self.root_scenario.base_path / "scenarios" / scenario_name, create_auxiliary=False
+        )[0]
+        self.scenario = candidate
+        try:
+            self.__load_objects()
+        except BaseException:
+            self.scenario = current
+            if candidate is not self.root_scenario:
+                candidate.destroy()
+            raise
 
-        if scenario_name == "root":
-            self.scenario = self.root_scenario
-        else:
-            path = self.root_scenario.base_path / "scenarios" / scenario_name
-            self.scenario = Scenario(
-                name=scenario_name,
-                base_path=path,
-                path_to_file=path / "project_database.sqlite",
-                log_handler=logging.FileHandler(path / "aequilibrae.log"),
-            )
-
-        default_log_file_config(self.scenario.log_handler)
-
-        self.__load_objects()
+        aequilibrae_logger = logging.getLogger("aequilibrae")
+        aequilibrae_logger.removeHandler(current.log_handler)
+        default_log_file_config(candidate.log_handler)
+        if current is not self.root_scenario:
+            current.destroy()
 
     def create_empty_scenario(self, scenario_name: str, description: str = ""):
         """

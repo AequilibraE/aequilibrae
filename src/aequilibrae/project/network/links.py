@@ -43,7 +43,7 @@ class Links(ProjectTable):
     defaults = {"a_node": 0, "b_node": 0, "direction": 0, "link_type": "default"}
 
     def __init__(self, net):
-        super().__init__(net.project)
+        super().__init__(net.transactions)
 
     def copy(self, link_id: int, conn=None) -> int:
         """Duplicates a link under a new id, returning that id

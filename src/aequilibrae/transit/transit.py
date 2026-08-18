@@ -1,14 +1,11 @@
 import logging
 import os
-import shutil
 import sqlite3
 from typing import Dict, List
 
 import pandas as pd
 
 from aequilibrae.paths.graph import TransitGraph
-from aequilibrae.project.project_creation import initialize_tables
-from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -45,12 +42,11 @@ class Transit(WorkerThread):
 
         self.project = project
         self.periods = project.network.periods
-
-        self.create_transit_database()
+        self._project_transactions = project.scenario.connections["project"]
+        self._transit_transactions = project.scenario.connections["transit"]
 
     def get_table(self, table_name) -> pd.DataFrame:
-        with self.project.transit_connection as conn:
-            return get_geo_table(table_name, conn)
+        return get_geo_table(table_name, self._transit_transactions)
 
     def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
         """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
@@ -82,11 +78,9 @@ class Transit(WorkerThread):
         return gtfs
 
     def create_transit_database(self):
-        """Creates the public transport database"""
+        """Transit databases are created eagerly with their Scenario."""
         if not os.path.exists(self.project._transit_database_path):
-            shutil.copyfile(spatialite_database, self.project._transit_database_path)
-            with self.project.transit_connection as conn:
-                initialize_tables("transit", conn=conn)
+            raise RuntimeError("the active scenario has no transit database")
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """
@@ -135,8 +129,8 @@ class Transit(WorkerThread):
 
         """
         for period_id in period_ids:
-            with self.project.transit_connection as pt_conn, self.project.db_connection as project_conn:
-                TransitGraphBuilder.remove(pt_conn, project_conn, period_id)
+            with self.project.transaction():
+                TransitGraphBuilder.remove(self._transit_transactions, self._project_transactions, period_id)
             if unload:
                 del self.graphs[period_id]
 
@@ -150,8 +144,7 @@ class Transit(WorkerThread):
 
         """
         if period_ids is None:
-            with self.project.db_connection as conn:
-                res = conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+            res = self._project_transactions.execute("SELECT period_id FROM transit_graph_configs").fetchall()
             period_ids = [x[0] for x in res]
 
         for period_id in period_ids:
@@ -186,8 +179,7 @@ class Transit(WorkerThread):
 
             >>> project.close()
         """
-        with self.project.transit_connection as conn:
-            return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), conn)
+        return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self._transit_transactions)
 
     def __build_pt_preload_sql(self, start, end, inclusion_cond):
         probe_point_lookup = {
