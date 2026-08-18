@@ -1,6 +1,6 @@
 import logging
 from sqlite3 import Connection
-from typing import Optional, Union
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -22,22 +22,23 @@ def connector_creation(
     proj_links,
     link_types="",
     connectors=1,
-    conn: Optional[Connection] = None,
     delimiting_area: Polygon = None,
 ):
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    with conn or network.project.db_connection as connec:
-        if sum(connec.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone()) == 0:
-            logger.warning("This centroid does not exist. Please create it first")
-            return
+    manager = network.transactions
+    if sum(manager.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone()) == 0:
+        logger.warning("This centroid does not exist. Please create it first")
+        return
 
-        sql = "select count(*) from links where a_node=? and instr(modes,?) > 0"
-        if connec.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
-            logger.warning("Mode is already connected")
-            return
+    sql = "select count(*) from links where a_node=? and instr(modes,?) > 0"
+    if manager.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
+        logger.warning("Mode is already connected")
+        return
 
+    proj_nodes = proj_nodes.reset_index()
+    proj_links = proj_links.reset_index()
     centroid = proj_nodes.query("node_id == @zone_id")  # type: gpd.GeoDataFrame
     centroid = centroid.rename(columns={"node_id": "zone_id"})[["zone_id", "geometry"]]
 
@@ -64,22 +65,21 @@ def connector_creation(
         "(a_node==@zone_id | b_node==@zone_id) & "
         "(a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"
     )
-    for _, rec in joined.iterrows():
-        link_exist = proj_links.query(query)
-        if link_exist.empty:
-            link = links.new()
-            link.geometry = LineString([centr_geo, rec.geometry])
-            link.modes = mode_id
-            link.direction = 0
-            link.link_type = "centroid_connector"
-            link.name = f"centroid connector zone {zone_id}"
-            link.capacity_ab = INFINITE_CAPACITY
-            link.capacity_ba = INFINITE_CAPACITY
-            link.save(conn)
-        else:
-            link = links.get(link_exist.link_id.values[0])
-            link.add_mode(mode_id)
-            link.save(conn)
+    with manager.transaction():
+        for _, rec in joined.iterrows():
+            link_exist = proj_links.query(query)
+            if link_exist.empty:
+                links.insert(
+                    geometry=LineString([centr_geo, rec.geometry]),
+                    modes=mode_id,
+                    direction=0,
+                    link_type="centroid_connector",
+                    name=f"centroid connector zone {zone_id}",
+                    capacity_ab=INFINITE_CAPACITY,
+                    capacity_ba=INFINITE_CAPACITY,
+                )
+            else:
+                links.add_mode(link_exist.link_id.values[0], mode_id)
 
     if not joined.empty:
         logger.info(f"{joined.shape[0]} new centroid connectors for mode {mode_id} added for centroid {zone_id}")

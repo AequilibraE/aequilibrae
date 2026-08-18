@@ -41,6 +41,7 @@ class Nodes(ProjectTable):
 
     def __init__(self, net):
         super().__init__(net.transactions)
+        self.network = net
 
     def new_centroid(self, node_id: int, geometry) -> int:
         """Creates a new centroid with a given ID at the given position
@@ -67,7 +68,7 @@ class Nodes(ProjectTable):
         self._change_key(node_id, new_id)
         logger.info(f"Node {node_id} was renumbered to {new_id}")
 
-    def connect_mode(self, node_id: int, mode_id: str, link_types="", connectors=1, conn=None, area=None):
+    def connect_mode(self, node_id: int, mode_id: str, link_types="", connectors=1, area=None):
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
@@ -94,18 +95,17 @@ class Nodes(ProjectTable):
 
             **area** (:obj:`Polygon`, *Optional*): Area limiting the search for connectors
         """
-        if self.get(node_id, conn=conn).is_centroid != 1:
+        if self.get(node_id).is_centroid != 1:
             logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
-        network = self.project.network
+        network = self.network
         connector_creation(
             zone_id=node_id,
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
             network=network,
-            conn=conn,
             delimiting_area=area,
             proj_nodes=network.nodes.data,
             proj_links=network.links.data,
@@ -123,5 +123,7 @@ class Nodes(ProjectTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
-        with self._read_ctx(None) as conn:
-            return pd.read_sql("SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", conn)
+        frame = pd.read_sql(
+            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", self._transactions
+        )
+        return frame.set_index("node_id")

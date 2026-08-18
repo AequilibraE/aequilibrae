@@ -340,7 +340,7 @@ class Network(WorkerThread):
 
         valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
 
-        lonlat = self.nodes.lonlat.set_index("node_id")
+        lonlat = self.nodes.lonlat
         data = df[valid_fields]
         for m in modes:
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when

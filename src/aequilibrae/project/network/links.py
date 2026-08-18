@@ -45,16 +45,16 @@ class Links(ProjectTable):
     def __init__(self, net):
         super().__init__(net.transactions)
 
-    def copy(self, link_id: int, conn=None) -> int:
+    def copy(self, link_id: int) -> int:
         """Duplicates a link under a new id, returning that id
 
         It raises an error if ``link_id`` does not exist
         """
-        link = self.get(link_id, conn=conn)
+        link = self.get(link_id)
         values = {k: v for k, v in vars(link).items() if k != self.key and k not in self.protected}
-        return self.insert(conn=conn, **values)
+        return self.insert(**values)
 
-    def add_mode(self, link_id: int, mode, conn=None):
+    def add_mode(self, link_id: int, mode):
         """Adds a mode to a link
 
         Logs a warning if the mode is already allowed on the link
@@ -65,13 +65,13 @@ class Links(ProjectTable):
             **mode** (:obj:`str` or mode record): mode_id or mode to be added to the link
         """
         mode_id = self.__mode_id_of(mode)
-        modes = self.get(link_id, conn=conn).modes
+        modes = self.get(link_id).modes
         if mode_id in modes:
             logger.warning("Mode already active for this link")
             return
-        self.update(link_id, conn=conn, modes=modes + mode_id)
+        self.update(link_id, modes=modes + mode_id)
 
-    def drop_mode(self, link_id: int, mode, conn=None):
+    def drop_mode(self, link_id: int, mode):
         """Removes a mode from a link
 
         Logs a warning if the mode is already NOT allowed on the link
@@ -82,11 +82,11 @@ class Links(ProjectTable):
             **mode** (:obj:`str` or mode record): mode_id or mode to be removed from the link
         """
         mode_id = self.__mode_id_of(mode)
-        modes = self.get(link_id, conn=conn).modes
+        modes = self.get(link_id).modes
         if mode_id not in modes:
             logger.warning("Mode already inactive for this link")
             return
-        self.update(link_id, conn=conn, modes=modes.replace(mode_id, ""))
+        self.update(link_id, modes=modes.replace(mode_id, ""))
 
     def _check_modes(self, modes) -> str:
         if not isinstance(modes, str):
