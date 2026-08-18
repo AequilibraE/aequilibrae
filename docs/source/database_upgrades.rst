@@ -2,22 +2,34 @@
 
 .. _database_migration:
 
-Database Upgrades
+Database upgrades
 =================
 
-Occasionally AequilibraE needs to make changes to the database schemas or provide format upgrades. These changes are
-delivered through a set of migration files shipped with AequilibraE.
+Database upgrades are closed-project operations. Apply every applicable
+network, results, and transit migration with the path-based API::
 
-``aequilibrae.Project.upgrade()``
----------------------------------
+    Project.upgrade(project_path)
 
-Database upgrades can be applied via the ``aequilibrae.Project.upgrade()`` function. All applicable upgrades will be
-applied and marked as such in the ``migrations`` table of ``project_database.sqlite``. On first upgrade this table will
-be created.
+The project path must not be open in this or another process. Upgrade owns one
+persistent named connection closure for the operation and closes it before
+returning. Schema changes and migration-status writes share each database's
+transaction. Because SQLite has no distributed transaction protocol, a failure
+while committing several database files can leave an earlier file committed.
 
-Database downgrades are not supported. Previous versions of AequilbraE are not guaranteed to work with newer databases.
+Migration authoring contract
+----------------------------
 
-If skipping a specific migration is required, use the ``aequilibrae.project.tools.MigrationManager`` object
-directly. Consult its documentation page for details. Take care when skipping migrations.
+Both Python and SQL migrations execute inside a transaction owned by the
+migration manager. They must not call ``commit()``, ``rollback()``, ``close()``,
+``transaction()``, issue transaction-control SQL, or use a native connection
+context manager. Python migrations receive the named ``ConnectionClosure`` and
+execute through its managers without finalizing them.
 
-All database upgrades are applied within a single transaction.
+``sqlite3.Connection.executescript()`` is prohibited for both Python and SQL
+migrations because it implicitly commits. SQL migration files must terminate
+every statement with a semicolon. The migration parser uses
+``sqlite3.complete_statement()``, so trigger bodies may contain internal
+semicolons, but an unterminated trailing statement is rejected.
+
+Database downgrades and selectively skipping migration databases are not
+supported.
