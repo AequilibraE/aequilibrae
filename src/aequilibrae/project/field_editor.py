@@ -37,8 +37,8 @@ class FieldEditor:
 
     _alowed_characters = ALLOWED_CHARACTERS
 
-    def __init__(self, project, table_name: str) -> None:
-        self.project = project
+    def __init__(self, transactions, table_name: str) -> None:
+        self._transactions = transactions
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -106,9 +106,9 @@ class FieldEditor:
                 logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
         logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
-        with self.project.db_connection_spatial as conn:
-            conn.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
-            conn.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
+        with self._transactions.transaction():
+            self._transactions.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
+            self._transactions.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
         logger.info(f"Updated layer statistics for {self._table}")
 
     def all_fields(self) -> List[str]:
@@ -143,13 +143,11 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        with self.project.db_connection_spatial as conn:
-            dt = conn.execute(qry).fetchall()
-        return dt
+        return self._transactions.execute(qry).fetchall()
 
     def __run_query_commit(self, qry: str, values=None) -> None:
-        with self.project.db_connection_spatial as conn:
+        with self._transactions.transaction():
             if values is None:
-                conn.execute(qry)
+                self._transactions.execute(qry)
             else:
-                conn.execute(qry, values)
+                self._transactions.execute(qry, values)
