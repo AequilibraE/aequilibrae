@@ -1,5 +1,4 @@
 import logging
-import os
 import sqlite3
 from typing import Dict, List
 
@@ -32,18 +31,24 @@ class Transit(WorkerThread):
     graphs: Dict[str, TransitGraph] = {}
     pt_con: sqlite3.Connection
 
-    def __init__(self, project):
+    def __init__(self, project, project_transactions, transit_transactions, periods):
         """
         :Arguments:
-            **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
-            active project
+            **project** (:obj:`Project`): The Project to connect to.
+
+            **project_transactions** (:obj:`NestedTransactions`): Manager for the project database.
+
+            **transit_transactions** (:obj:`NestedTransactions`, *Optional*): Manager for the transit database, or
+            ``None`` when the scenario has no transit database.
+
+            **periods** (:obj:`Periods`): The network periods gateway.
         """
         super().__init__(None)
 
         self.project = project
-        self.periods = project.network.periods
-        self._project_transactions = project.scenario.connections["project"]
-        self._transit_transactions = project.scenario.connections["transit"]
+        self.periods = periods
+        self._project_transactions = project_transactions
+        self._transit_transactions = transit_transactions
 
     def get_table(self, table_name) -> pd.DataFrame:
         return get_geo_table(table_name, self._transit_transactions)
@@ -76,11 +81,6 @@ class Transit(WorkerThread):
         gtfs.signal = self.transit
         gtfs.gtfs_data.signal = self.transit
         return gtfs
-
-    def create_transit_database(self):
-        """Transit databases are created eagerly with their Scenario."""
-        if not os.path.exists(self.project._transit_database_path):
-            raise RuntimeError("the active scenario has no transit database")
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

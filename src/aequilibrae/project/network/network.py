@@ -39,12 +39,12 @@ class Network(WorkerThread):
     link_types: LinkTypes = None
     signal = SIGNAL(object)
 
-    def __init__(self, project) -> None:
+    def __init__(self, project, transactions) -> None:
         WorkerThread.__init__(self, None)
 
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
-        self.transactions = project.db_connection
+        self.transactions = transactions
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
         self.links = Links(self)

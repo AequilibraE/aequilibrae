@@ -170,6 +170,29 @@ class ConnectionClosure:
     commit failure can leave a connection that unwound earlier committed.
     """
 
+    @classmethod
+    def open(cls, openers):
+        """Open named connections and own them, closing any on failure.
+
+        ``openers`` maps a name to a zero-argument callable returning a
+        ``sqlite3.Connection``. If any opener or closure construction fails,
+        every connection already opened is closed before the error propagates.
+        """
+        raw = []
+        opened = {}
+        try:
+            for name, open_connection in openers.items():
+                connection = open_connection()
+                raw.append(connection)
+                opened[name] = connection
+            closure = cls(opened)
+            raw.clear()  # closure now owns every connection
+            return closure
+        except BaseException:
+            for connection in raw:
+                connection.close()
+            raise
+
     def __init__(self, connections):
         connections = dict(connections)
         if not connections:

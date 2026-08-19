@@ -47,8 +47,28 @@ def test_shutdown_is_idempotent_and_rejects_further_access(tmp_path):
     project.new(tmp_path / "model")
     project.shutdown()
     project.shutdown()
-    with pytest.raises(RuntimeError, match="not open"):
+    with pytest.raises(AttributeError):
         _ = project.network
+
+
+def test_open_does_not_create_optional_databases(tmp_path):
+    path = _new_project(tmp_path)
+    results = path / "results_database.sqlite"
+    transit = path / "public_transport.sqlite"
+    results.unlink()
+    transit.unlink()
+
+    before = {p.name for p in path.iterdir()}
+    with Project.from_path(path) as project:
+        assert set(project.scenario.connections) == {"project"}
+        with pytest.raises(RuntimeError, match="no results database"):
+            _ = project.results
+        with pytest.raises(RuntimeError, match="no transit database"):
+            _ = project.transit
+
+    assert {p.name for p in path.iterdir()} == before
+    assert not results.exists()
+    assert not transit.exists()
 
 
 def _new_project(tmp_path):
