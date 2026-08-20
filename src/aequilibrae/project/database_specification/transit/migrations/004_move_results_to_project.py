@@ -42,9 +42,7 @@ def migrate(
     columns = [column for column in transit_columns if column in project_columns]
     if "table_name" in columns:
         quoted = ",".join(f'"{column}"' for column in columns)
-        updates = ",".join(
-            f'"{column}"=excluded."{column}"' for column in columns if column != "table_name"
-        )
+        updates = ",".join(f'"{column}"=excluded."{column}"' for column in columns if column != "table_name")
         sql = f"INSERT INTO results ({quoted}) VALUES ({','.join('?' for _ in columns)})"
         if updates:
             sql += f' ON CONFLICT("table_name") DO UPDATE SET {updates}'

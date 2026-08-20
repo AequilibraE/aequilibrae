@@ -1,6 +1,6 @@
 import gc
-import string
 import logging
+import string
 from pathlib import Path
 from typing import List, Tuple
 
@@ -10,10 +10,11 @@ import pandas as pd
 from pandas import json_normalize
 from shapely.geometry import Polygon
 
-from aequilibrae.project.project_creation import remove_triggers, add_triggers
-from aequilibrae.utils.db_utils import commit_and_close, list_columns
+from aequilibrae.project.project_creation import add_triggers, remove_triggers
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.db_utils import commit_and_close, list_columns
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
 from .model_area_gridding import geometry_grid
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 class OSMBuilder(WorkerThread):
     signal = SIGNAL(object)
 
+    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
         WorkerThread.__init__(self, None)
 

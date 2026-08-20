@@ -1,10 +1,11 @@
 import re
 import time
-from typing import List, Union, Tuple
+from typing import List, Tuple, Union
 
 import requests
 
 from aequilibrae.parameters import Parameters
+
 from .osm_params import default_headers
 
 

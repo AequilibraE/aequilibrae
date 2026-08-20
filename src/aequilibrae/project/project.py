@@ -1,4 +1,5 @@
 import functools
+from contextlib import AbstractContextManager
 import inspect
 import logging
 import shutil
@@ -15,6 +16,8 @@ from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.utils.db_utils import ConnectionClosure, commit_and_close, safe_connect
+from sqlite3 import Connection
+from typing import Any
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -51,7 +54,7 @@ class Project:
         self._closed = False
 
     @classmethod
-    def from_path(cls, project_folder) -> "Project":
+    def from_path(cls, project_folder: str | Path) -> "Project":
         """Open an existing project from *project_folder*.
 
         :Arguments:
@@ -71,9 +74,9 @@ class Project:
 
         scenario = Scenario.create("root", base_path)
         try:
-            root = (
-                scenario.connections["project"].execute("SELECT 1 FROM scenarios WHERE scenario_name='root'").fetchone()
-            )
+            root = scenario.connections.db_connection.connection.execute(
+                "SELECT 1 FROM scenarios WHERE scenario_name='root'"
+            ).fetchone()
             if root is None:
                 raise ValueError("project database is not an authoritative root scenario")
         except BaseException:
@@ -168,11 +171,11 @@ class Project:
         return self.project_base_path / "public_transport.sqlite"
 
     @property
-    def db_connection(self):
+    def db_connection(self) -> AbstractContextManager[Connection]:
         """Return a context manager yielding the project SQLite connection."""
-        return self.scenario.connections["project"].transaction()
+        return self.scenario.connections.db_connection.transaction()
 
-    def transaction(self):
+    def transaction(self) -> AbstractContextManager[None]:
         """Return a coordinated transaction context across all open connections."""
         return self.scenario.connections.transaction()
 
@@ -192,9 +195,6 @@ class Project:
 
         selected = self.scenario
         root = self.root_scenario
-        selected.ensure_idle()
-        if root is not selected:
-            root.ensure_idle()
         clean(self)
         logging.getLogger("aequilibrae").removeHandler(selected.log_handler)
         if selected is not root:
@@ -217,7 +217,7 @@ class Project:
         return Log(self.project_base_path)
 
     @staticmethod
-    def upgrade(project_path):
+    def upgrade(project_path: str | Path) -> None:
         """Upgrade the databases of a *closed* project path.
 
         :Arguments:
@@ -229,26 +229,22 @@ class Project:
         if not project_db.is_file():
             raise ValueError(f"project database does not exist: {project_db}")
 
-        openers = {"project": lambda: connect_spatialite(project_db)}
-        has_transit = False
-
         results_db = base_path / "results_database.sqlite"
-        if results_db.is_file():
-            openers["results"] = lambda: safe_connect(results_db)
-
         transit_db = base_path / "public_transport.sqlite"
-        if transit_db.is_file():
-            openers["transit"] = lambda: connect_spatialite(transit_db)
-            has_transit = True
-
-        closure = ConnectionClosure.open(openers)
+        closure = ConnectionClosure.open(
+            lambda: connect_spatialite(project_db),
+            (lambda: safe_connect(results_db)) if results_db.is_file() else None,
+            (lambda: connect_spatialite(transit_db)) if transit_db.is_file() else None,
+        )
         try:
-            root = closure["project"].execute("SELECT 1 FROM scenarios WHERE scenario_name='root'").fetchone()
+            root = closure.db_connection.connection.execute(
+                "SELECT 1 FROM scenarios WHERE scenario_name='root'"
+            ).fetchone()
             if root is None:
                 raise ValueError("upgrade path is not an authoritative root project")
             network = MigrationManager(MigrationManager.network_migration_file)
             network.upgrade(closure)
-            if has_transit:
+            if closure.has_transit_connection:
                 transit_mm = MigrationManager(MigrationManager.transit_migration_file)
                 transit_mm.upgrade(closure)
         finally:
@@ -263,7 +259,7 @@ class Project:
         return self.scenario.parameters.parameters
 
     @property
-    def run(self):
+    def run(self) -> Any:
         """Load configured run functions, each bound to this project as ``project``."""
         entry_points = self.parameters["run"]
         module = import_file_as_module(
@@ -306,19 +302,20 @@ class Project:
         :Returns:
             **scenarios** (:obj:`pd.DataFrame`): DataFrame with existing scenarios.
         """
-        return pd.read_sql("SELECT * FROM scenarios", self.root_scenario.connections["project"])
+        return pd.read_sql("SELECT * FROM scenarios", self.root_scenario.connections.db_connection.connection)
 
-    def use_scenario(self, scenario_name: str):
+    def use_scenario(self, scenario_name: str) -> None:
         """Switch the active scenario.
 
         :Arguments:
             **scenario_name** (:obj:`str`): Name of the scenario to activate.
         """
         current = self.scenario
-        current.ensure_idle()
-        self.root_scenario.ensure_idle()
-        root_manager = self.root_scenario.connections["project"]
-        if root_manager.execute("SELECT 1 FROM scenarios WHERE scenario_name=?", (scenario_name,)).fetchone() is None:
+        root_connection = self.root_scenario.connections.db_connection.connection
+        if (
+            root_connection.execute("SELECT 1 FROM scenarios WHERE scenario_name=?", (scenario_name,)).fetchone()
+            is None
+        ):
             raise ValueError(f"scenario '{scenario_name}' does not exist")
         if scenario_name == current.name:
             return
@@ -335,7 +332,7 @@ class Project:
         if current is not self.root_scenario:
             current.destroy()
 
-    def create_empty_scenario(self, scenario_name: str, description: str = ""):
+    def create_empty_scenario(self, scenario_name: str, description: str = "") -> None:
         """Create an empty scenario with no links, nodes, or zones.
 
         :Arguments:
@@ -368,7 +365,7 @@ class Project:
             # Create actual tables
             with commit_and_close(db, spatial=True) as conn:
                 conn.execute("PRAGMA foreign_keys = ON;")
-                initialize_tables(ConnectionClosure({"project": conn}), databases=("network",))
+                initialize_tables(ConnectionClosure(conn), databases=("network",))
                 conn.execute("DROP TABLE IF EXISTS scenarios")
 
             with self.db_connection as conn:
@@ -379,7 +376,7 @@ class Project:
         finally:
             self.use_scenario(current_scenario)
 
-    def clone_scenario(self, scenario_name: str, description: str = ""):
+    def clone_scenario(self, scenario_name: str, description: str = "") -> None:
         """Clone the active scenario.
 
         :Arguments:

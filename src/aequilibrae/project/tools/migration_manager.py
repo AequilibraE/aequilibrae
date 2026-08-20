@@ -179,14 +179,21 @@ class MigrationManager:
         if len(self.migrations) != len(migrations):
             raise ValueError("duplicate migration IDs found. Ensure migration IDs are unique.")
 
-    def _rename_connections(
-        self, raw: dict[str, Optional[sqlite3.Connection]]
-    ) -> dict[str, Optional[sqlite3.Connection]]:
+    def _connections(self, closure: ConnectionClosure) -> dict[str, Optional[sqlite3.Connection]]:
+        """Return the raw connections expected by Python migration functions."""
         return {
-            "project_conn": raw.get("project"),
-            "transit_conn": raw.get("transit"),
-            "results_conn": raw.get("results"),
+            "project_conn": closure.db_connection.connection,
+            "transit_conn": closure.transit_connection.connection if closure.has_transit_connection else None,
+            "results_conn": closure.results_connection.connection if closure.has_results_connection else None,
         }
+
+    def _database_connection(self, closure: ConnectionClosure) -> sqlite3.Connection:
+        """Return the connection which owns this migration series."""
+        if self.database == "project":
+            return closure.db_connection.connection
+        if self.database == "transit":
+            return closure.transit_connection.connection
+        raise ValueError(f"unknown migration database: {self.database}")
 
     def _ensure_initial_is_applied(
         self, conn: sqlite3.Connection, connections: dict[str, Optional[sqlite3.Connection]]
@@ -211,9 +218,9 @@ class MigrationManager:
         :Returns:
             **status** (:obj:`dict[int, MigrationStatus]`): Migration status enums by their ID.
         """
-        with closure.transaction() as raw:
-            conn = raw[self.database]
-            connections = self._rename_connections(raw)
+        with closure.transaction():
+            conn = self._database_connection(closure)
+            connections = self._connections(closure)
             self._ensure_initial_is_applied(conn, connections)
             return {key: migration.status(conn) for key, migration in self.migrations.items()}
 
@@ -227,9 +234,9 @@ class MigrationManager:
         :Arguments:
             **closure** (:obj:`ConnectionClosure`): The scenario's connection closure.
         """
-        with closure.transaction() as raw:
-            conn = raw[self.database]
-            connections = self._rename_connections(raw)
+        with closure.transaction():
+            conn = self._database_connection(closure)
+            connections = self._connections(closure)
             self._ensure_initial_is_applied(conn, connections)
             for migration in self.migrations.values():
                 migration.mark_as_seen(conn)
@@ -260,9 +267,9 @@ class MigrationManager:
         :Arguments:
             **closure** (:obj:`ConnectionClosure`): The scenario's connection closure.
         """
-        with closure.transaction() as raw:
-            conn = raw[self.database]
-            connections = self._rename_connections(raw)
+        with closure.transaction():
+            conn = self._database_connection(closure)
+            connections = self._connections(closure)
             self._ensure_initial_is_applied(conn, connections)
             return self._find_applicable(conn)
 
@@ -280,9 +287,9 @@ class MigrationManager:
         if skip is None:
             skip = set()
 
-        with closure.transaction() as raw:
-            conn = raw[self.database]
-            connections = self._rename_connections(raw)
+        with closure.transaction():
+            conn = self._database_connection(closure)
+            connections = self._connections(closure)
             self._ensure_initial_is_applied(conn, connections)
 
             for migration in self._find_applicable(conn):

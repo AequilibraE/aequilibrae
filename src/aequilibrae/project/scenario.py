@@ -1,4 +1,5 @@
 import logging
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 from aequilibrae.parameters import Parameters
@@ -7,7 +8,7 @@ from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import ConnectionClosure, safe_connect
+from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager, safe_connect
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
@@ -42,18 +43,18 @@ class Scenario:
         self._results = None
         self._transit = None
 
-        project_manager = self.connections["project"]
-        self.about = About(project_manager)
-        self.matrices = Matrices(project_manager, self.base_path / "matrices")
+        project_connection = self.connections.db_connection
+        self.about = About(project_connection)
+        self.matrices = Matrices(project_connection, self.base_path / "matrices")
         # Network and Transit receive *this* scenario as their owner reference so
         # that helpers (OSMBuilder, TransitGraphBuilder, …) can reach path/connection
         # attributes without creating a circular dependency with Project.
-        self.network = Network(self, project_manager)
-        self.zoning = Zoning(project_manager)
-        if "results" in self.connections:
-            self._results = Results(project_manager, self.connections["results"])
-        if "transit" in self.connections:
-            self._transit = Transit(self, project_manager, self.connections["transit"], self.network.periods)
+        self.network = Network(self, project_connection)
+        self.zoning = Zoning(project_connection)
+        if self.connections.has_results_connection:
+            self._results = Results(project_connection, self.connections.results_connection)
+        if self.connections.has_transit_connection:
+            self._transit = Transit(self, project_connection, self.connections.transit_connection, self.network.periods)
 
     @property
     def project_base_path(self) -> Path:
@@ -66,29 +67,26 @@ class Scenario:
         return self.project_parameters
 
     @property
-    def db_connection(self):
-        """Return the project-database :class:`~aequilibrae.utils.db_utils.NestedTransactions` manager."""
-        return self.connections["project"]
+    def db_connection(self) -> NestedTransactionManager:
+        """Return the project-database transaction manager."""
+        return self.connections.db_connection
 
     @property
-    def transit_connection(self):
-        """Return a transaction context for the transit database."""
-        if "transit" not in self.connections:
-            raise RuntimeError("this scenario has no transit database")
-        return self.connections["transit"].transaction()
+    def transit_connection(self) -> NestedTransactionManager:
+        """Return the transit-database transaction manager."""
+        return self.connections.transit_connection
 
-    def transaction(self):
+    def transaction(self) -> AbstractContextManager[None]:
         """Return a coordinated transaction context across all open connections.
 
-        .. code-block:: python
-
-            with scenario.transaction() as conns:
-                conns["project"].execute(...)
+        The context coordinates all existing databases and yields ``None``.
+        Use :attr:`db_connection` (or an optional connection property) when
+        SQL needs to be executed.
         """
         return self.connections.transaction()
 
     @classmethod
-    def create(cls, name: str, base_path) -> "Scenario":
+    def create(cls, name: str, base_path: str | Path) -> "Scenario":
         """Build a complete scenario from disk without creating any files.
 
         The project database must already exist.  The optional results and
@@ -113,17 +111,13 @@ class Scenario:
         if not project_path.is_file():
             raise FileNotFoundError(f"Project database does not exist: {project_path}")
 
-        openers = {"project": lambda: connect_spatialite(project_path)}
-
         results_path = base_path / "results_database.sqlite"
-        if results_path.is_file():
-            openers["results"] = lambda: safe_connect(results_path)
-
         transit_path = base_path / "public_transport.sqlite"
-        if transit_path.is_file():
-            openers["transit"] = lambda: connect_spatialite(transit_path)
-
-        closure = ConnectionClosure.open(openers)
+        closure = ConnectionClosure.open(
+            lambda: connect_spatialite(project_path),
+            (lambda: safe_connect(results_path)) if results_path.is_file() else None,
+            (lambda: connect_spatialite(transit_path)) if transit_path.is_file() else None,
+        )
         log_handler = None
         try:
             log_handler = logging.FileHandler(base_path / "aequilibrae.log")
@@ -135,7 +129,7 @@ class Scenario:
             raise
 
     @property
-    def results(self):
+    def results(self) -> Results:
         """The results gateway.
 
         :Raises:
@@ -146,7 +140,7 @@ class Scenario:
         return self._results
 
     @property
-    def transit(self):
+    def transit(self) -> Transit:
         """The transit gateway.
 
         :Raises:
@@ -156,11 +150,7 @@ class Scenario:
             raise RuntimeError("this scenario has no transit database")
         return self._transit
 
-    def ensure_idle(self):
-        """Assert that no transaction is active on any owned connection."""
-        self.connections.ensure_idle()
-
-    def destroy(self):
+    def destroy(self) -> None:
         """Close all connections and the log handler.  Safe to call more than once."""
         if self._destroyed:
             return

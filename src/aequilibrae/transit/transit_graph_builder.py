@@ -90,6 +90,7 @@ class TransitGraphBuilder:
         for unlimited.
     """
 
+    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(
         self,
         project,
@@ -1280,6 +1281,7 @@ class TransitGraphBuilder:
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
+    # FIXME: project dependency should be narrowed to its required domain owner.
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
         """Create line string geometry for `connector_rows` that matches the line strings in
         ``project.network.graphs[graph_key]``.
@@ -1585,6 +1587,7 @@ class TransitGraphBuilder:
         return g
 
     @classmethod
+    # FIXME: project dependency should be narrowed to its required domain owner.
     def from_db(cls, project, period_id: int, **kwargs):
         """
         Create a SF graph instance from an existing database save.

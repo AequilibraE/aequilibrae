@@ -2,13 +2,13 @@ import logging
 from sqlite3 import Connection
 from typing import TYPE_CHECKING, Union
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import geopandas as gpd
 from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon
 
-from aequilibrae.utils.db_utils import NestedTransactions
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 if TYPE_CHECKING:
     from aequilibrae.project.network.links import Links
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def connector_creation(
     zone_id: int,
     mode_id: str,
-    transactions: NestedTransactions,
+    project_connection: NestedTransactionManager,
     links: "Links",
     proj_nodes: gpd.GeoDataFrame,
     proj_links: gpd.GeoDataFrame,
@@ -33,12 +33,15 @@ def connector_creation(
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    if sum(transactions.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone()) == 0:
+    if (
+        sum(project_connection.connection.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone())
+        == 0
+    ):
         logger.warning("This centroid does not exist. Please create it first")
         return
 
     sql = "select count(*) from links where a_node=? and instr(modes,?) > 0"
-    if transactions.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
+    if project_connection.connection.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
         logger.warning("Mode is already connected")
         return
 
@@ -67,7 +70,7 @@ def connector_creation(
         "(a_node==@zone_id | b_node==@zone_id) & "
         "(a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"
     )
-    with transactions.transaction():
+    with project_connection.transaction():
         for _, rec in joined.iterrows():
             link_exist = proj_links.query(query)
             if link_exist.empty:
@@ -234,10 +237,7 @@ def bulk_connector_creation(
     conn.executemany(existing_connectors_sql, existing_connectors[["modes", "link_id"]].to_records(index=False))
     conn.executemany(
         new_connectors_sql,
-        connectors[["link_id", "a_node", "b_node", "modes", "geometry"]]
-        .to_crs(4326)
-        .to_wkb()
-        .to_records(index=False),
+        connectors[["link_id", "a_node", "b_node", "modes", "geometry"]].to_crs(4326).to_wkb().to_records(index=False),
     )
 
 

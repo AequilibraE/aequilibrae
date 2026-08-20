@@ -7,7 +7,6 @@ from sqlite3 import Connection
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
 from aequilibrae.utils.db_utils import ConnectionClosure
 
-
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ["ogc_fid", "geometry"]
@@ -17,13 +16,17 @@ logger = logging.getLogger(__name__)
 
 def initialize_tables(closure: ConnectionClosure, databases=("network", "transit")) -> None:
     """Initialize requested schemas in one closure-owned transaction."""
-    mapping = {"network": "project", "transit": "transit"}
     with contextlib.ExitStack() as stack:
-        connections = {name: stack.enter_context(closure[name].transaction()) for name in closure}
+        project_connection = stack.enter_context(closure.db_connection.transaction())
+        transit_connection = (
+            stack.enter_context(closure.transit_connection.transaction()) if "transit" in databases else None
+        )
         for db_type in databases:
-            conn = connections[mapping[db_type]]
-            create_base_tables(conn, db_type, closure)
-            add_triggers(conn, db_type)
+            connection = project_connection if db_type == "network" else transit_connection
+            if connection is None:
+                raise RuntimeError("Cannot initialize transit tables without a transit database")
+            create_base_tables(connection, db_type, closure)
+            add_triggers(connection, db_type)
 
 
 def create_base_tables(conn: Connection, db_type: str, closure: ConnectionClosure) -> None:

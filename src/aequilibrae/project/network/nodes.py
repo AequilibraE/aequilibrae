@@ -102,13 +102,13 @@ class Nodes(SpatialProjectTable):
             logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
-        links = Links(self._transactions)
+        links = Links(self._transaction_manager)
         connector_creation(
             zone_id=node_id,
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
-            transactions=self._transactions,
+            project_connection=self._transaction_manager,
             links=links,
             delimiting_area=area,
             proj_nodes=self.data,
@@ -123,6 +123,6 @@ class Nodes(SpatialProjectTable):
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
         frame = pd.read_sql(
-            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", self._transactions
+            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", self._transaction_manager
         )
         return frame.set_index("node_id")

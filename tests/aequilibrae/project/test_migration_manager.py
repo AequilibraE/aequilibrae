@@ -8,7 +8,7 @@ from aequilibrae.utils.db_utils import ConnectionClosure
 
 @pytest.fixture
 def closure():
-    owner = ConnectionClosure({"project": sqlite3.connect(":memory:")})
+    owner = ConnectionClosure(sqlite3.connect(":memory:"))
     yield owner
     owner.close()
 
@@ -29,7 +29,7 @@ def migrations_negative(test_data_path):
 
 
 def _apply(manager, migration_id, closure):
-    with closure["project"].transaction() as conn:
+    with closure.db_connection.transaction() as conn:
         manager.migrations[migration_id].apply(
             conn, {"project_conn": conn, "transit_conn": None, "results_conn": None}
         )
@@ -70,7 +70,7 @@ def test_status(migrations_file, closure):
     assert status[3] == MigrationStatus.MISSING
 
     # Check migrations table was created
-    assert closure["project"].execute(
+    assert closure.db_connection.connection.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
     ).fetchone() is not None
 
@@ -87,7 +87,7 @@ def test_mark_all_as_seen(migrations_file, closure):
             assert stat == MigrationStatus.MISSING
 
     # Check entries exist in migrations table
-    rows = closure["project"].execute("SELECT id, status FROM migrations ORDER BY id").fetchall()
+    rows = closure.db_connection.connection.execute("SELECT id, status FROM migrations ORDER BY id").fetchall()
     assert len(rows) == 6
     assert rows[0][1] == "APPLIED"
     assert rows[1][1] == "MISSING"
@@ -156,7 +156,9 @@ def test_upgrade(migrations_file, closure):
     # Check tables were created
     tables = {
         row[0]
-        for row in closure["project"].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        for row in closure.db_connection.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
     }
     assert {"migrations", "users", "posts", "comments"} <= tables
 
@@ -184,7 +186,9 @@ def test_upgrade_with_skip(migrations_file, closure):
     # Check tables were created (should have users and comments but not posts)
     tables = {
         row[0]
-        for row in closure["project"].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        for row in closure.db_connection.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
     }
     assert "migrations" in tables
     assert "users" in tables
@@ -195,7 +199,9 @@ def test_upgrade_with_skip(migrations_file, closure):
 
     tables = {
         row[0]
-        for row in closure["project"].execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        for row in closure.db_connection.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
     }
     assert "posts" in tables  # Was just applied
 

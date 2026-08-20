@@ -1,5 +1,5 @@
-import warnings
 import logging
+import warnings
 from copy import deepcopy
 from math import ceil
 from typing import List
@@ -7,8 +7,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from shapely.geometry.linestring import LineString
-from shapely.ops import linemerge
-from shapely.ops import substring
+from shapely.ops import linemerge, substring
 
 from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -20,11 +19,11 @@ logger = logging.getLogger(__name__)
 class NetworkSimplifier(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, network, connections) -> None:
+    def __init__(self, network, project_connection) -> None:
         super().__init__(None)
 
         self.network = network
-        self._connections = connections
+        self._project_connection = project_connection
         self.link_layer = self.network.links.data
 
         warnings.warn("This will alter your database in place. Make sure you have a backup.", stacklevel=2)
@@ -182,10 +181,9 @@ class NetworkSimplifier(WorkerThread):
             f"INSERT INTO links({','.join(df.columns)}) "
             f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
         )
-        with self._connections["project"].transaction() as conn:
+        with self._project_connection.transaction() as conn:
             conn.executemany(sql, data)
             conn.executemany("DELETE FROM links WHERE link_id=?", [[x] for x in links_to_delete])
-            conn.commit()
 
         # Validate that we kept distances the same
         old_dist = self.link_layer.geometry.length.sum()
@@ -205,14 +203,12 @@ class NetworkSimplifier(WorkerThread):
         """
         srid = self.link_layer.crs.to_epsg()
         target_links = self.link_layer.query("link_id in @links")
-        with self._connections["project"].transaction() as conn:
+        with self._project_connection.transaction() as conn:
             for _, link in target_links.iterrows():
                 wkb = link.geometry.interpolate(0.5, normalized=True).wkb
                 conn.execute("DELETE FROM links WHERE link_id=?", [link.link_id])
-                conn.commit()
                 conn.execute("UPDATE nodes SET geometry=GeomFromWKB(?, ?) WHERE node_id=?", [wkb, srid, link.a_node])
                 conn.execute("UPDATE nodes SET geometry=GeomFromWKB(?, ?) WHERE node_id=?", [wkb, srid, link.b_node])
-                conn.commit()
 
         self.link_layer = self.network.links.data
         logger.warning(f"{len(links)} links collapsed into nodes")
@@ -223,5 +219,5 @@ class NetworkSimplifier(WorkerThread):
         self.network.links.refresh()
         self.network.nodes.refresh()
 
-        with self._connections["project"].transaction() as conn:
+        with self._project_connection.transaction() as conn:
             conn.execute("VACUUM")

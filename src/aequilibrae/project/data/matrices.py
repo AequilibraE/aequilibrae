@@ -8,7 +8,7 @@ import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.project_table import NonSpatialProjectTable
-from aequilibrae.utils.db_utils import NestedTransactions
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 logger = logging.getLogger(__name__)
 
@@ -20,22 +20,20 @@ class Matrices(NonSpatialProjectTable):
     key = "name"
     record_name = "MatrixRecord"
 
-    def __init__(self, transactions: NestedTransactions, matrices_path: str | Path) -> None:
+    def __init__(self, connection: NestedTransactionManager, matrices_path: str | Path) -> None:
         """Create the matrix metadata gateway.
 
         :Arguments:
-            **transactions** (:obj:`NestedTransactions`): Manager for the
+            **connection** (:obj:`NestedTransactionManager`): Manager for the
             project database containing matrix metadata.
 
             **matrices_path** (:obj:`str` or :obj:`Path`): Directory containing
             matrix payload files.
         """
-        super().__init__(transactions)
+        super().__init__(connection)
         self.folder: Path = Path(matrices_path)
 
-    def create(
-        self, name: str, file_name: str, matrix: AequilibraeMatrix | None = None
-    ) -> Any:
+    def create(self, name: str, file_name: str, matrix: AequilibraeMatrix | None = None) -> Any:
         """Create matrix metadata and optionally export a matrix payload.
 
         This filesystem operation cannot participate in a project transaction.
@@ -57,7 +55,9 @@ class Matrices(NonSpatialProjectTable):
         path = self.folder / file_name
         if name in self:
             raise ValueError(f"There is already a matrix of name ({name}). It must be unique.")
-        if self._transactions.execute("SELECT 1 FROM matrices WHERE file_name=?", (file_name,)).fetchone():
+        if self._transaction_manager.connection.execute(
+            "SELECT 1 FROM matrices WHERE file_name=?", (file_name,)
+        ).fetchone():
             raise ValueError(f"There is already a matrix record for file name ({file_name}). It must be unique.")
 
         created = False
@@ -157,11 +157,11 @@ class Matrices(NonSpatialProjectTable):
 
     def clear_database(self) -> None:
         """Remove metadata records whose files are absent."""
-        with self._transactions.transaction():
-            records = self._transactions.execute("SELECT name, file_name FROM matrices").fetchall()
+        with self._transaction_manager.transaction() as conn:
+            records = conn.execute("SELECT name, file_name FROM matrices").fetchall()
             missing = [(name,) for name, file_name in records if not (self.folder / file_name).is_file()]
             if missing:
-                self._transactions.executemany("DELETE FROM matrices WHERE name=?", missing)
+                conn.executemany("DELETE FROM matrices WHERE name=?", missing)
         self._invalidate()
 
     def update_database(self) -> None:
@@ -179,14 +179,14 @@ class Matrices(NonSpatialProjectTable):
             self.register_matrix(name, path.name)
 
     def list(self) -> pd.DataFrame:
-        frame = pd.read_sql_query("SELECT * FROM matrices", self._transactions)
+        frame = pd.read_sql_query("SELECT * FROM matrices", self._transaction_manager.connection)
         frame["status"] = frame.file_name.map(
             lambda file_name: "" if (self.folder / file_name).is_file() else "file missing"
         )
         return frame
 
     def _require_resource_idle(self) -> None:
-        if self._transactions.in_transaction:
+        if self._transaction_manager.in_transaction:
             raise RuntimeError("matrix file helpers cannot run inside a database transaction")
 
     def __cores_on_disk(self, file_name: str) -> int:

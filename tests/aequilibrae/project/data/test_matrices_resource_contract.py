@@ -5,10 +5,11 @@ from aequilibrae.utils.db_utils import ConnectionClosure
 
 
 def test_generic_matrix_crud_is_metadata_only(tmp_path):
-    closure = ConnectionClosure({"project": sqlite3.connect(":memory:")})
-    manager = closure["project"]
-    manager.execute(
-        "CREATE TABLE matrices (name TEXT PRIMARY KEY, file_name TEXT UNIQUE NOT NULL, cores INTEGER, description TEXT)"
+    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    manager = closure.db_connection
+    manager.connection.execute(
+        "CREATE TABLE matrices (name TEXT PRIMARY KEY, file_name TEXT UNIQUE NOT NULL, "
+        "cores INTEGER, procedure TEXT, procedure_id TEXT, timestamp TEXT, description TEXT)"
     )
     path = tmp_path / "demand.aem"
     path.write_bytes(b"resource")
@@ -24,9 +25,12 @@ def test_generic_matrix_crud_is_metadata_only(tmp_path):
 
 
 def test_delete_matrix_removes_metadata_and_file(tmp_path):
-    closure = ConnectionClosure({"project": sqlite3.connect(":memory:")})
-    manager = closure["project"]
-    manager.execute("CREATE TABLE matrices (name TEXT PRIMARY KEY, file_name TEXT UNIQUE NOT NULL, cores INTEGER)")
+    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    manager = closure.db_connection
+    manager.connection.execute(
+        "CREATE TABLE matrices (name TEXT PRIMARY KEY, file_name TEXT UNIQUE NOT NULL, "
+        "cores INTEGER, procedure TEXT, procedure_id TEXT, timestamp TEXT, description TEXT)"
+    )
     path = tmp_path / "demand.aem"
     path.write_bytes(b"resource")
     matrices = Matrices(manager, tmp_path)

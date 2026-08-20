@@ -1,6 +1,8 @@
 import logging
 import sqlite3
-from typing import Dict, List
+from collections.abc import Iterable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict
 
 import pandas as pd
 
@@ -8,8 +10,13 @@ from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.db_utils import NestedTransactionManager
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+if TYPE_CHECKING:
+    from aequilibrae.project.network.periods import Periods
+    from aequilibrae.project.scenario import Scenario
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +38,21 @@ class Transit(WorkerThread):
     graphs: Dict[str, TransitGraph] = {}
     pt_con: sqlite3.Connection
 
-    def __init__(self, project, project_transactions, transit_transactions, periods):
+    # FIXME: project dependency should be narrowed to its required domain owner.
+    def __init__(
+        self,
+        project: "Scenario",
+        project_connection: NestedTransactionManager,
+        transit_connection: NestedTransactionManager,
+        periods: "Periods",
+    ) -> None:
         """
         :Arguments:
             **project** (:obj:`Project`): The Project to connect to.
 
-            **project_transactions** (:obj:`NestedTransactions`): Manager for the project database.
+            **project_connection** (:obj:`NestedTransactionManager`): Manager for the project database.
 
-            **transit_transactions** (:obj:`NestedTransactions`, *Optional*): Manager for the transit database, or
+            **transit_connection** (:obj:`NestedTransactionManager`, *Optional*): Manager for the transit database, or
             ``None`` when the scenario has no transit database.
 
             **periods** (:obj:`Periods`): The network periods gateway.
@@ -47,13 +61,15 @@ class Transit(WorkerThread):
 
         self.project = project
         self.periods = periods
-        self._project_transactions = project_transactions
-        self._transit_transactions = transit_transactions
+        self._project_connection = project_connection
+        self._transit_connection = transit_connection
 
-    def get_table(self, table_name) -> pd.DataFrame:
-        return get_geo_table(table_name, self._transit_transactions)
+    def get_table(self, table_name: str) -> pd.DataFrame:
+        return get_geo_table(table_name, self._transit_connection.connection)
 
-    def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
+    def new_gtfs_builder(
+        self, agency: str, file_path: str | Path, day: str = "", description: str = ""
+    ) -> GTFSRouteSystemBuilder:
         """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
 
         :Arguments:
@@ -71,7 +87,7 @@ class Transit(WorkerThread):
         gtfs = GTFSRouteSystemBuilder(
             network=self.project.network,
             zoning=self.project.zoning,
-            transit_manager=self._transit_transactions,
+            transit_manager=self._transit_connection,
             agency_identifier=agency,
             file_path=file_path,
             day=day,
@@ -84,7 +100,7 @@ class Transit(WorkerThread):
         gtfs.gtfs_data.signal = self.transit
         return gtfs
 
-    def create_graph(self, **kwargs) -> TransitGraphBuilder:
+    def create_graph(self, **kwargs: Any) -> TransitGraphBuilder:
         """
         Create a transit graph from an existing GTFS import.
 
@@ -100,7 +116,7 @@ class Transit(WorkerThread):
         self.graphs[period_id] = graph
         return graph
 
-    def save_graphs(self, period_ids: List[int] = None, force: bool = False):
+    def save_graphs(self, period_ids: Iterable[int] | None = None, force: bool = False) -> None:
         """
         Save the previously build transit graphs to the 'public_transport.sqlite' database. Saving may be filtered
         by 'period_id'.
@@ -120,7 +136,7 @@ class Transit(WorkerThread):
         for period_id in period_ids:
             self.graphs[period_id].save()
 
-    def remove_graphs(self, period_ids: List[int], unload: bool = False):
+    def remove_graphs(self, period_ids: Iterable[int], unload: bool = False) -> None:
         """
         Remove the previously saved transit graphs from the 'public_transport.sqlite' database. Removing may be filtered
         by 'period_id'.
@@ -132,11 +148,11 @@ class Transit(WorkerThread):
         """
         for period_id in period_ids:
             with self.project.transaction():
-                TransitGraphBuilder.remove(self._transit_transactions, self._project_transactions, period_id)
+                TransitGraphBuilder.remove(self._transit_connection, self._project_connection, period_id)
             if unload:
                 del self.graphs[period_id]
 
-    def load(self, period_ids: List[int] = None):
+    def load(self, period_ids: Iterable[int] | None = None) -> None:
         """
         Load the previously saved transit graphs from the 'public_transport.sqlite' database. Loading may be filtered
         by 'period_id'.
@@ -146,7 +162,7 @@ class Transit(WorkerThread):
 
         """
         if period_ids is None:
-            res = self._project_transactions.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+            res = self._project_connection.connection.execute("SELECT period_id FROM transit_graph_configs").fetchall()
             period_ids = [x[0] for x in res]
 
         for period_id in period_ids:
@@ -181,16 +197,16 @@ class Transit(WorkerThread):
 
             >>> project.close()
         """
-        return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self._transit_transactions)
+        return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self._transit_connection.connection)
 
-    def __build_pt_preload_sql(self, start, end, inclusion_cond):
+    def __build_pt_preload_sql(self, start: int, end: int, inclusion_cond: str) -> str:
         probe_point_lookup = {
             "start": "MIN(departure)",
             "end": "MAX(arrival)",
             "midpoint": "(MIN(departure) + MAX(arrival)) / 2",
         }
 
-        def select_trip_ids():
+        def select_trip_ids() -> str:
             in_period = f"BETWEEN {start} AND {end}"
             if inclusion_cond == "any":
                 return f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}"

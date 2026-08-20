@@ -58,9 +58,9 @@ def test_failed_scenario_construction_closes_connections(tmp_path, monkeypatch):
     captured_closure = None
     original_open = scenario_module.ConnectionClosure.open
 
-    def capture_closure(openers):
+    def capture_closure(*args, **kwargs):
         nonlocal captured_closure
-        captured_closure = original_open(openers)
+        captured_closure = original_open(*args, **kwargs)
         return captured_closure
 
     def fail_network(*args, **kwargs):
@@ -73,4 +73,4 @@ def test_failed_scenario_construction_closes_connections(tmp_path, monkeypatch):
         scenario_module.Scenario.create("root", path)
 
     with pytest.raises(sqlite3.ProgrammingError):
-        captured_closure["project"].execute("SELECT 1")
+        captured_closure.db_connection.connection.execute("SELECT 1")

@@ -9,7 +9,7 @@ import pandas as pd
 from pandas.api import types as ptypes
 
 from aequilibrae.project.project_table import NonSpatialProjectTable
-from aequilibrae.utils.db_utils import NestedTransactions
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,20 +24,20 @@ class Results(NonSpatialProjectTable):
 
     def __init__(
         self,
-        project_transactions: NestedTransactions,
-        results_transactions: NestedTransactions,
+        project_connection: NestedTransactionManager,
+        results_connection: NestedTransactionManager,
     ) -> None:
         """Create the result metadata and payload gateway.
 
         :Arguments:
-            **project_transactions** (:obj:`NestedTransactions`): Manager for
+            **project_connection** (:obj:`NestedTransactionManager`): Manager for
             result metadata in the project database.
 
-            **results_transactions** (:obj:`NestedTransactions`): Manager for
+            **results_connection** (:obj:`NestedTransactionManager`): Manager for
             result payload tables.
         """
-        super().__init__(project_transactions)
-        self._results_transactions = results_transactions
+        super().__init__(project_connection)
+        self._results_connection = results_connection
 
     def create(
         self,
@@ -98,19 +98,16 @@ class Results(NonSpatialProjectTable):
         types = _sqlite_types(frame, dtype or {})
         table = _quote_identifier(table_name)
         columns = list(frame.columns)
-        definitions = ", ".join(
-            f"{_quote_identifier(column)} {types[column]}" for column in columns
-        )
+        definitions = ", ".join(f"{_quote_identifier(column)} {types[column]}" for column in columns)
         placeholders = ",".join("?" for _ in columns)
         insert_sql = (
-            f"INSERT INTO {table} ({','.join(_quote_identifier(column) for column in columns)}) "
-            f"VALUES ({placeholders})"
+            f"INSERT INTO {table} ({','.join(_quote_identifier(column) for column in columns)}) VALUES ({placeholders})"
         )
 
-        with self._results_transactions.transaction():
-            self._results_transactions.execute(f"CREATE TABLE {table} ({definitions})")
+        with self._results_connection.transaction() as conn:
+            conn.execute(f"CREATE TABLE {table} ({definitions})")
             for chunk in _row_chunks(frame, chunksize):
-                self._results_transactions.executemany(insert_sql, chunk)
+                conn.executemany(insert_sql, chunk)
 
         try:
             self.insert(
@@ -126,8 +123,8 @@ class Results(NonSpatialProjectTable):
             )
         except BaseException as primary:
             try:
-                with self._results_transactions.transaction():
-                    self._results_transactions.execute(f"DROP TABLE {table}")
+                with self._results_connection.transaction() as conn:
+                    conn.execute(f"DROP TABLE {table}")
             except BaseException as cleanup:
                 _add_resource_note(primary, f"unregistered payload table {table_name!r} remains: {cleanup!r}")
             raise
@@ -143,7 +140,9 @@ class Results(NonSpatialProjectTable):
             **results** (:obj:`pandas.DataFrame`): Stored result values.
         """
         record = self.get(table_name)
-        return pd.read_sql_query(f"SELECT * FROM {_quote_identifier(record.table_name)}", self._results_transactions)
+        return pd.read_sql_query(
+            f"SELECT * FROM {_quote_identifier(record.table_name)}", self._results_connection.connection
+        )
 
     def delete_result(self, table_name: str) -> None:
         """Delete result metadata and its payload table.
@@ -157,53 +156,58 @@ class Results(NonSpatialProjectTable):
         tombstone = _quote_identifier(tombstone_name)
         moved = self._payload_exists(table_name)
         if moved:
-            with self._results_transactions.transaction():
-                self._results_transactions.execute(f"ALTER TABLE {table} RENAME TO {tombstone}")
+            with self._results_connection.transaction() as conn:
+                conn.execute(f"ALTER TABLE {table} RENAME TO {tombstone}")
         try:
             super().delete(table_name)
         except BaseException as primary:
             if moved:
                 try:
-                    with self._results_transactions.transaction():
-                        self._results_transactions.execute(f"ALTER TABLE {tombstone} RENAME TO {table}")
+                    with self._results_connection.transaction() as conn:
+                        conn.execute(f"ALTER TABLE {tombstone} RENAME TO {table}")
                 except BaseException as cleanup:
                     _add_resource_note(primary, f"payload is stranded as {tombstone_name!r}: {cleanup!r}")
             raise
         if moved:
-            with self._results_transactions.transaction():
-                self._results_transactions.execute(f"DROP TABLE {tombstone}")
+            with self._results_connection.transaction() as conn:
+                conn.execute(f"DROP TABLE {tombstone}")
 
     def clear_database(self) -> None:
         """Remove metadata for absent payloads without changing payload tables."""
-        with self._transactions.transaction():
-            names = [row[0] for row in self._transactions.execute("SELECT table_name FROM results").fetchall()]
+        with self._transaction_manager.transaction() as conn:
+            names = [row[0] for row in conn.execute("SELECT table_name FROM results").fetchall()]
             missing = [(name,) for name in names if not self._payload_exists(name)]
             if missing:
-                self._transactions.executemany("DELETE FROM results WHERE table_name=?", missing)
+                conn.executemany("DELETE FROM results WHERE table_name=?", missing)
         self._invalidate()
 
     def update_database(self) -> None:
         """Register existing, unowned payload tables as metadata only."""
         payloads = {
             row[0]
-            for row in self._results_transactions.execute(
+            for row in self._results_connection.connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
-        records = {row[0] for row in self._transactions.execute("SELECT table_name FROM results").fetchall()}
+        records = {
+            row[0] for row in self._transaction_manager.connection.execute("SELECT table_name FROM results").fetchall()
+        }
         for table_name in sorted(payloads - records):
             self.insert(table_name=table_name)
 
     def list(self) -> pd.DataFrame:
-        return pd.read_sql_query("SELECT * FROM results", self._transactions)
+        return pd.read_sql_query("SELECT * FROM results", self._transaction_manager.connection)
 
     def _payload_exists(self, table_name: str) -> bool:
-        return self._results_transactions.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
-        ).fetchone() is not None
+        return (
+            self._results_connection.connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
+            ).fetchone()
+            is not None
+        )
 
     def _require_resource_idle(self) -> None:
-        if self._transactions.in_transaction or self._results_transactions.in_transaction:
+        if self._transaction_manager.in_transaction or self._results_connection.in_transaction:
             raise RuntimeError("result payload helpers cannot run inside a database transaction")
 
 
