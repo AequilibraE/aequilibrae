@@ -43,15 +43,16 @@ transaction remains active. SQLite cannot atomically commit independent files,
 so a failure during multi-connection commit can leave an earlier file
 committed.
 
-``project.db_connection`` is the persistent project-database transaction
-manager, not a connection context factory::
+``project.db_connection`` is a transaction context that yields the persistent
+project-database connection::
 
-    rows = project.db_connection.execute("SELECT link_id FROM links").fetchall()
-    with project.db_connection.transaction():
-        project.db_connection.execute("UPDATE links SET speed_ab=? WHERE link_id=?", (80, 42))
+    with project.db_connection as conn:
+        rows = conn.execute("SELECT link_id FROM links").fetchall()
+        conn.execute("UPDATE links SET speed_ab=? WHERE link_id=?", (80, 42))
 
-It exposes no ``commit()``, ``rollback()``, ``close()``, or raw connection.
-``database_connection()``, ``db_connection_spatial``, ``results_connection``,
+Use the yielded connection only within the context; transaction finalization is
+owned by the context manager.
+``database_connection()``, ``results_connection``,
 and ``transit_connection`` were removed.
 
 Table writes and immutable records

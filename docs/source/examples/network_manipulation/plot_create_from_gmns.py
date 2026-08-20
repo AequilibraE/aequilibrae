@@ -60,8 +60,7 @@ use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/main/
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
-project = Project()
-project.new(fldr)
+project = Project.new(fldr)
 
 # %%
 # In this cell, we modify the AequilibraE parameters.yml file so it contains additional

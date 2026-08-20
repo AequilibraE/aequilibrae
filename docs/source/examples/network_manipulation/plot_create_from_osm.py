@@ -35,8 +35,7 @@ from aequilibrae import Project
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
-project = Project()
-project.new(fldr)
+project = Project.new(fldr)
 
 # %%
 # Now we can download the network from any place in the world (as long as you have memory for 

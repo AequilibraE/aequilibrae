@@ -138,8 +138,7 @@ class Network(WorkerThread):
 
         .. code-block:: python
 
-            >>> project = Project()
-            >>> project.new(project_path)
+            >>> project = Project.new(project_path)
 
             # Now we can import the network for any place we want
             >>> project.network.create_from_osm(place_name="my_beautiful_hometown") # doctest: +SKIP

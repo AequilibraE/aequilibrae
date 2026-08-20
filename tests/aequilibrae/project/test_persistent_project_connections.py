@@ -1,14 +1,14 @@
+import sqlite3
+
 import pytest
 
 from aequilibrae import Project
 
 
 def test_project_owns_named_persistent_connections(tmp_path):
-    project = Project()
-    project.new(tmp_path / "model")
+    project = Project.new(tmp_path / "model")
     try:
-        manager = project.db_connection
-        assert manager is project.scenario.connections["project"]
+        manager = project.scenario.connections["project"]
         assert manager is project.network.links._transactions
         assert set(project.scenario.connections) == {"project", "results", "transit"}
         assert all(
@@ -16,8 +16,9 @@ def test_project_owns_named_persistent_connections(tmp_path):
             for name in project.scenario.connections
         )
 
+        with project.db_connection as connection:
+            assert connection.execute("PRAGMA foreign_keys").fetchone() == (1,)
         project.network.modes.insert(mode_id="x", mode_name="Test", description="", pce=1)
-        assert project.db_connection is manager
         assert project.network.modes.get("x").mode_name == "Test"
     finally:
         project.shutdown()
@@ -39,16 +40,26 @@ def test_static_upgrade_owns_closed_connections(tmp_path):
     path = _new_project(tmp_path)
     Project.upgrade(path)
     with Project.from_path(path) as project:
-        assert project.db_connection.execute("PRAGMA foreign_keys").fetchone() == (1,)
+        with project.db_connection as connection:
+            assert connection.execute("PRAGMA foreign_keys").fetchone() == (1,)
 
 
-def test_shutdown_is_idempotent_and_rejects_further_access(tmp_path):
-    project = Project()
-    project.new(tmp_path / "model")
+def test_shutdown_is_idempotent(tmp_path):
+    """Calling shutdown / close more than once is a no-op."""
+    project = Project.new(tmp_path / "model")
     project.shutdown()
+    project.shutdown()   # no-op
+    project.close()      # alias — also no-op
+
+
+def test_shutdown_closes_sqlite_connections(tmp_path):
+    """After shutdown, SQLite operations raise ProgrammingError (closed database)."""
+    project = Project.new(tmp_path / "model2")
     project.shutdown()
-    with pytest.raises(AttributeError):
-        _ = project.network
+
+    with pytest.raises(sqlite3.ProgrammingError):
+        # The underlying connection is closed; any SQL operation must fail.
+        project.network.modes.get("c")
 
 
 def test_open_does_not_create_optional_databases(tmp_path):
@@ -73,7 +84,5 @@ def test_open_does_not_create_optional_databases(tmp_path):
 
 def _new_project(tmp_path):
     path = tmp_path / "model"
-    project = Project()
-    project.new(path)
-    project.shutdown()
+    Project.new(path).shutdown()
     return path

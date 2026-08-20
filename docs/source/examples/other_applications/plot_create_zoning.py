@@ -23,7 +23,7 @@ Create a zone system based on Hex Bins
 
 In this example, we show how to create hex bin zones covering an arbitrary area.
 
-We also add centroid connectors and a special generator zone to our network to make 
+We also add centroid connectors and a special generator zone to our network to make
 it a pretty complete example.
 
 We use the Nauru example to create roughly 100 zones covering the whole modeling
@@ -35,7 +35,7 @@ part of this notebook.
 """
 # %%
 # .. admonition:: References
-# 
+#
 #   * :ref:`Accessing project zones <project_zoning>`
 
 # %%
@@ -43,20 +43,22 @@ part of this notebook.
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.project.zoning`
-#     * :func:`aequilibrae.project.network.nodes` 
+#     * :func:`aequilibrae.project.network.nodes`
 
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
-from os.path import join
 from math import sqrt
-from shapely.geometry import Point
-import shapely.wkb
+from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
 
+import shapely.wkb
+from shapely.geometry import Point
+
+from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.create_example import create_example, list_examples
-from aequilibrae.utils.aeq_signal import simple_progress, SIGNAL
+
 s = SIGNAL(object)
 
 # sphinx_gallery_thumbnail_path = "../source/_images/plot_create_zoning.png"
@@ -103,14 +105,14 @@ zone_side = sqrt(2 * sqrt(3) * zone_area / 9)
 # %%
 # Now we can run an SQL query to compute the hexagonal grid.
 # There are many ways to create hex bins (including with a GUI on QGIS), but we find that
-# using SpatiaLite is a pretty neat solution, 
+# using SpatiaLite is a pretty neat solution,
 # for which we will use the entire network bounding box to make sure we cover everything.
 extent = network.extent()
 
 # %%
 b = extent.bounds
 sql = "select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))"
-with project.db_connection_spatial as conn:
+with project.db_connection as conn:
     grid = conn.execute(sql, [extent.wkb, zone_side, Point(b[2], b[3]).wkb]).fetchone()[0]
     grid = shapely.wkb.loads(grid)
 
@@ -160,7 +162,7 @@ for zone_id, zone in zoning.all_zones().items():
 # %%
 # Special generator zones
 # -----------------------
-# 
+#
 # Let's add a special generator zone by adding a centroid at the airport terminal.
 
 # %%

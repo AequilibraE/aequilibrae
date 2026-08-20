@@ -44,8 +44,7 @@ from aequilibrae import Project
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
-project = Project()
-project.new(fldr)
+project = Project.new(fldr)
 
 # %%
 # Now we obtain the link data for our example (in this case from a link layer

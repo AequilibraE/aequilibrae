@@ -7,8 +7,7 @@ Usage
 
     >>> from aequilibrae.project import Project
     >>> from aequilibrae.utils.simwrapper.generate_simwrapper_config import SimwrapperConfigGenerator
-    >>> prj = Project()
-    >>> prj.open('/path/to/project')
+    >>> prj = Project.from_path('/path/to/project')
     >>> gen = SimwrapperConfigGenerator(prj, output_dir='simwrapper')
     >>> gen.write_yamls()
 
@@ -598,9 +597,8 @@ def main(argv=None):
     import sys
     from aequilibrae.project import Project
 
-    prj = Project()
     try:
-        prj.open(args.project)
+        prj = Project.from_path(args.project)
     except Exception as e:
         print(f"Error opening project at '{args.project}': {e}", file=sys.stderr)
         return 2

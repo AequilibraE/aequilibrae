@@ -77,7 +77,6 @@ def test_write_back(sioux_falls_example: Project):
 
     sioux_falls_example.close()
 
-    project = Project()
-    project.open(base_path)
+    project = Project.from_path(base_path)
     assert val == project.about.good_info_field_perhaps, "failed to save data to about table"
     assert val2 == project.about.description, "failed to save data to about table"

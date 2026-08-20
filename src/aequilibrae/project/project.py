@@ -24,73 +24,110 @@ logger = logging.getLogger(__name__)
 class Project:
     """AequilibraE project class
 
+    Projects are created and opened through class-method factories:
+
     .. code-block:: python
-        :caption: Create Project
+        :caption: Create a new project
 
-        >>> new_project = Project()
-        >>> new_project.new(project_path)
-
-        # Safely closes the project
+        >>> new_project = Project.new(project_path)
         >>> new_project.close()
 
     .. code-block:: python
-        :caption: Open Project
+        :caption: Open an existing project
 
-        >>> existing_project = Project()
-        >>> existing_project.open(project_path)
-
+        >>> existing_project = Project.from_path(project_path)
         >>> existing_project.close()
+
     """
 
-    def __init__(self):
-        self.root_scenario: Scenario = None
-        self.scenario: Scenario = None
+    def __init__(self, root_scenario: Scenario):
+        """Wrap a fully constructed root scenario.
+
+        Do not call directly; use :meth:`from_path` or :meth:`new`.
+        """
+        self.root_scenario: Scenario = root_scenario
+        self.scenario: Scenario = root_scenario
+        self._closed = False
 
     @classmethod
-    def from_path(cls, project_folder):
-        project = cls()
-        project.open(project_folder)
-        return project
-
-    def open(self, project_path: str) -> None:
-        """
-        Loads project from disk
+    def from_path(cls, project_folder) -> "Project":
+        """Open an existing project from *project_folder*.
 
         :Arguments:
-            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
-            not exist, it will fail.
+            **project_folder** (:obj:`str` or :obj:`Path`): Full path to the
+            project data directory.  Must contain ``project_database.sqlite``.
+
+        :Returns:
+            **project** (:obj:`Project`): Open, fully initialised project.
+
+        :Raises:
+            **FileNotFoundError**: When the project database does not exist.
+            **ValueError**: When the database is not an authoritative root scenario.
         """
-
-        base_path = Path(project_path)
-        file_name = base_path / "project_database.sqlite"
-
-        if not file_name.is_file():
+        base_path = Path(project_folder)
+        if not (base_path / "project_database.sqlite").is_file():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
 
-        scenario = Scenario.create("root", base_path, self)
+        scenario = Scenario.create("root", base_path)
         try:
-            root = scenario.connections["project"].execute(
-                "SELECT 1 FROM scenarios WHERE scenario_name='root'"
-            ).fetchone()
+            root = (
+                scenario.connections["project"].execute("SELECT 1 FROM scenarios WHERE scenario_name='root'").fetchone()
+            )
             if root is None:
                 raise ValueError("project database is not an authoritative root scenario")
         except BaseException:
             scenario.destroy()
             raise
 
-        self.root_scenario = scenario
-        self.scenario = scenario
+        project = cls(scenario)
+        default_log_file_config(scenario.log_handler)
+        logger.info(f"Opened project on {base_path}")
+        clean(project)
+        return project
 
-        default_log_file_config(self.scenario.log_handler)
-        logger.info(f"Opened project on {self.project_base_path}")
-        clean(self)
+    @classmethod
+    def new(cls, project_path: str) -> "Project":
+        """Create a new project at *project_path*.
+
+        :Arguments:
+            **project_path** (:obj:`str` or :obj:`Path`): Full path for the new
+            project data directory.  The directory must not already exist.
+
+        :Returns:
+            **project** (:obj:`Project`): Open, fully initialised project.
+
+        :Raises:
+            **FileExistsError**: When *project_path* already exists.
+        """
+        base_path = Path(project_path)
+        if base_path.exists():
+            raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
+
+        base_path.mkdir(parents=True, exist_ok=True)
+        _create_project_files(base_path)
+
+        scenario = None
+        try:
+            scenario = Scenario.create("root", base_path)
+            initialize_tables(scenario.connections)
+            scenario.about.create()
+        except BaseException:
+            if scenario is not None:
+                scenario.destroy()
+            shutil.rmtree(base_path, ignore_errors=True)
+            raise
+
+        project = cls(scenario)
+        default_log_file_config(scenario.log_handler)
+        logger.info(f"Created project on {base_path}")
+        return project
 
     @property
-    def project_base_path(self):
+    def project_base_path(self) -> Path:
         return self.scenario.base_path
 
     @property
-    def path_to_file(self):
+    def path_to_file(self) -> Path:
         return self.scenario.path_to_file
 
     @property
@@ -131,49 +168,27 @@ class Project:
 
     @property
     def db_connection(self):
-        return self.scenario.connections["project"]
+        """Return a context manager yielding the project SQLite connection."""
+        return self.scenario.connections["project"].transaction()
 
     def transaction(self):
+        """Return a coordinated transaction context across all open connections."""
         return self.scenario.connections.transaction()
 
-    def new(self, project_path: str):
-        """Creates a new project
-
-        :Arguments:
-            **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
-        """
-
-        base_path = Path(project_path)
-
-        if base_path.exists():
-            raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
-
-        # We create the project folder and create the base file
-        base_path.mkdir(parents=True, exist_ok=True)
-
-        self.__create_empty_network(base_path)
-        try:
-            scenario = Scenario.create("root", base_path, self)
-            self.root_scenario = scenario
-            self.scenario = scenario
-            initialize_tables(scenario.connections)
-            self.about.create()
-        except BaseException:
-            if self.scenario is not None:
-                self.scenario.destroy()
-            self.root_scenario = None
-            self.scenario = None
-            shutil.rmtree(base_path, ignore_errors=True)
-            raise
-
-        default_log_file_config(self.scenario.log_handler)
-        logger.info(f"Created project on {base_path}")
-        return self
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     def shutdown(self) -> None:
-        """Destroy scenario resources and make repeated shutdown harmless."""
-        if self.scenario is None:
+        """Close all owned resources.
+
+        Safe to call more than once; subsequent calls are no-ops.  Accessing
+        project attributes after shutdown raises errors from the closed SQLite
+        connections.
+        """
+        if self._closed:
             return
+
         selected = self.scenario
         root = self.root_scenario
         selected.ensure_idle()
@@ -184,8 +199,10 @@ class Project:
         if selected is not root:
             selected.destroy()
         root.destroy()
-        self.scenario = None
-        self.root_scenario = None
+        self._closed = True
+
+    #: Alias for :meth:`shutdown` — kept for backward compatibility.
+    close = shutdown
 
     def __enter__(self):
         return self
@@ -195,18 +212,22 @@ class Project:
         return False
 
     def log(self) -> Log:
-        """Returns a log object
-
-        allows the user to read the log or clear it"""
+        """Returns a log object that allows reading or clearing the log."""
         return Log(self.project_base_path)
 
     @staticmethod
     def upgrade(project_path):
-        """Upgrade the databases of a closed project path."""
+        """Upgrade the databases of a *closed* project path.
+
+        :Arguments:
+            **project_path** (:obj:`str` or :obj:`Path`): Path to the project
+            folder containing ``project_database.sqlite``.
+        """
         base_path = Path(project_path).resolve()
         project_db = base_path / "project_database.sqlite"
         if not project_db.is_file():
             raise ValueError(f"project database does not exist: {project_db}")
+
         openers = {"project": lambda: connect_spatialite(project_db)}
         has_transit = False
 
@@ -221,9 +242,7 @@ class Project:
 
         closure = ConnectionClosure.open(openers)
         try:
-            root = closure["project"].execute(
-                "SELECT 1 FROM scenarios WHERE scenario_name='root'"
-            ).fetchone()
+            root = closure["project"].execute("SELECT 1 FROM scenarios WHERE scenario_name='root'").fetchone()
             if root is None:
                 raise ValueError("upgrade path is not an authoritative root project")
             network = MigrationManager(MigrationManager.network_migration_file)
@@ -236,20 +255,15 @@ class Project:
 
     @property
     def project_parameters(self) -> Parameters:
-        return Parameters(path=self.project_base_path)
+        return self.scenario.project_parameters
 
     @property
     def parameters(self) -> dict:
-        return self.project_parameters.parameters
+        return self.scenario.parameters
 
     @property
     def run(self):
-        """
-        Load and return the AequilibraE run module with the default arguments from
-        ``parameters.yml`` partially applied.
-
-        Refer to ``run/__init__.py`` file within the project folder for documentation.
-        """
+        """Load and return the AequilibraE run module with default arguments from ``parameters.yml``."""
         entry_points = self.parameters["run"]
         module = import_file_as_module(
             self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
@@ -274,35 +288,19 @@ class Project:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""
         raise NotImplementedError
 
-    def __create_empty_network(self, base_path):
-        shutil.copyfile(spatialite_database, base_path / "project_database.sqlite")
-        shutil.copyfile(spatialite_database, base_path / "public_transport.sqlite")
-        (base_path / "results_database.sqlite").touch()
-        (base_path / "matrices").mkdir(parents=True, exist_ok=True)
-        pth = base_path / "run"
-        pth.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(demo_init_py, pth / "__init__.py")
-
-        parameters = Parameters(path=base_path)
-        parameters.parameters["system"]["logging_directory"] = str(base_path)
-        parameters.write_back()
-
-    def list_scenarios(self):
-        """
-        Lists the existing scenarios.
+    def list_scenarios(self) -> pd.DataFrame:
+        """List existing scenarios.
 
         :Returns:
-            **scenarios** (:obj:`pd.DataFrame`): Pandas DataFrame with existing scenarios
+            **scenarios** (:obj:`pd.DataFrame`): DataFrame with existing scenarios.
         """
         return pd.read_sql("SELECT * FROM scenarios", self.root_scenario.connections["project"])
 
     def use_scenario(self, scenario_name: str):
-        """
-        Switch the active scenario.
+        """Switch the active scenario.
 
         :Arguments:
-            **scenario_name** (:obj:`str`): name of the scenario to be activated
-
+            **scenario_name** (:obj:`str`): Name of the scenario to activate.
         """
         current = self.scenario
         current.ensure_idle()
@@ -316,9 +314,7 @@ class Project:
         if scenario_name == "root":
             candidate = self.root_scenario
         else:
-            candidate = Scenario.create(
-                scenario_name, self.root_scenario.base_path / "scenarios" / scenario_name, self
-            )
+            candidate = Scenario.create(scenario_name, self.root_scenario.base_path / "scenarios" / scenario_name)
         self.scenario = candidate
 
         aequilibrae_logger = logging.getLogger("aequilibrae")
@@ -328,20 +324,19 @@ class Project:
             current.destroy()
 
     def create_empty_scenario(self, scenario_name: str, description: str = ""):
-        """
-        Creates an empty scenario, without any links, nodes, and zones.
+        """Create an empty scenario with no links, nodes, or zones.
 
         :Arguments:
-            **scenario_name** (:obj:`str`): scenario name
+            **scenario_name** (:obj:`str`): Scenario name.
 
-            **description** (:obj:`str`): useful scenario description
+            **description** (:obj:`str`, *Optional*): Human-readable description.
         """
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
 
         current_scenario = self.scenario.name
         self.use_scenario("root")
         try:
-            with self.db_connection.transaction() as conn:
+            with self.db_connection as conn:
                 if (
                     conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
                     is not None
@@ -364,21 +359,21 @@ class Project:
                 initialize_tables(ConnectionClosure({"project": conn}), databases=("network",))
                 conn.execute("DROP TABLE IF EXISTS scenarios")
 
-            with self.db_connection.transaction() as conn:
+            with self.db_connection as conn:
                 conn.execute(
-                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description)
+                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)",
+                    (scenario_name, description),
                 )
         finally:
             self.use_scenario(current_scenario)
 
     def clone_scenario(self, scenario_name: str, description: str = ""):
-        """
-        Clones the active scenario.
+        """Clone the active scenario.
 
         :Arguments:
-            **scenario_name** (:obj:`str`): scenario name
+            **scenario_name** (:obj:`str`): Scenario name.
 
-            **description** (:obj:`str`): useful scenario description
+            **description** (:obj:`str`, *Optional*): Human-readable description.
         """
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
 
@@ -391,7 +386,7 @@ class Project:
 
         self.use_scenario("root")
         try:
-            with self.db_connection.transaction() as conn:
+            with self.db_connection as conn:
                 if (
                     conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
                     is not None
@@ -418,9 +413,30 @@ class Project:
             with commit_and_close(db, spatial=True) as conn:
                 conn.execute("DROP TABLE IF EXISTS scenarios")
 
-            with self.db_connection.transaction() as conn:
+            with self.db_connection as conn:
                 conn.execute(
-                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description)
+                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)",
+                    (scenario_name, description),
                 )
         finally:
             self.use_scenario(current_scenario)
+
+
+def _create_project_files(base_path: Path) -> None:
+    """Create the initial filesystem layout for a new project.
+
+    This is the only code path permitted to create ``project_database.sqlite``,
+    ``public_transport.sqlite``, and ``results_database.sqlite``; ordinary
+    ``open``/``from_path`` operations never create these files.
+    """
+    shutil.copyfile(spatialite_database, base_path / "project_database.sqlite")
+    shutil.copyfile(spatialite_database, base_path / "public_transport.sqlite")
+    (base_path / "results_database.sqlite").touch()
+    (base_path / "matrices").mkdir(parents=True, exist_ok=True)
+    pth = base_path / "run"
+    pth.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(demo_init_py, pth / "__init__.py")
+
+    parameters = Parameters(path=base_path)
+    parameters.parameters["system"]["logging_directory"] = str(base_path)
+    parameters.write_back()

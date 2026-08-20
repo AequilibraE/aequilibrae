@@ -19,8 +19,7 @@ class CreateTablesSRC:
 
         # Create a new project
         self.proj_path = join(gettempdir(), f"aequilibrae_{uuid4().hex[:6]}")
-        self.proj = Project()
-        self.proj.new(self.proj_path)
+        self.proj = Project.new(self.proj_path)
         Transit(self.proj)
 
         self.__folder = "network" if component == "project_database" else "transit"

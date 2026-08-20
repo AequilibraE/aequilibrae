@@ -32,8 +32,7 @@ class Parameters:
 
         >>> from aequilibrae.parameters import Parameters
 
-        >>> project = Project()
-        >>> project.new(project_path)
+        >>> project = Project.new(project_path)
 
         >>> p = Parameters()
 

@@ -30,6 +30,8 @@ class About:
                 )
                 self._transactions.execute("UPDATE about SET infovalue='right' WHERE infoname='driving_side'")
                 self.__load()
+            else:
+                logger.warning("About table already exists. Nothing was done.")
 
     def list_fields(self) -> list:
         return list(self.__characteristics)

@@ -90,8 +90,7 @@ def coquimbo_example(cached_coquimbo_example, cache_path, tmp_path) -> Project:
 
 @pytest.fixture
 def empty_project(tmp_path) -> Project:
-    project = Project()
-    project.new(tmp_path / "p")
+    project = Project.new(tmp_path / "p")
     yield project
     project.close()
 
@@ -105,8 +104,7 @@ def cached_empty_no_triggers_project(cache_path):
 def empty_no_triggers_project(empty_project, tmp_path) -> Project:
     with empty_project.db_connection as conn:
         remove_triggers(conn, db_type="network")
-        tables = ["nodes", "links"]
-        for tbl in tables:
+        for tbl in ["nodes", "links"]:
             conn.execute(f"DELETE FROM {tbl}")
 
     yield empty_project

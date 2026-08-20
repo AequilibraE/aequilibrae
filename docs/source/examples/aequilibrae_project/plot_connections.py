@@ -17,16 +17,15 @@ In this example, we show how to use AequilibraE's database connections within a 
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.project.project.Project.db_connection`
-#     * :func:`aequilibrae.project.project.Project.db_connection_spatial`
 #     * :func:`aequilibrae.project.project.Project.results_connection`
 #     * :func:`aequilibrae.project.project.Project.transit_connection`
 
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
 from pathlib import Path
+from tempfile import gettempdir
+from uuid import uuid4
 
 import geopandas as gpd
 import pandas as pd
@@ -56,9 +55,11 @@ with project.db_connection as conn:
 matrices
 
 # %%
-# We encourage using spatial connections only when handling spatial data.
-with project.db_connection_spatial as conn:
-    nodes = gpd.read_postgis("SELECT zone_id, ST_AsBinary(geometry) geom FROM zones;", con=conn, geom_col="geom", crs=4326)
+# And it is spatial by default.
+with project.db_connection as conn:
+    nodes = gpd.read_postgis(
+        "SELECT zone_id, ST_AsBinary(geometry) geom FROM zones;", con=conn, geom_col="geom", crs=4326
+    )
 
 # %%
 nodes.head()

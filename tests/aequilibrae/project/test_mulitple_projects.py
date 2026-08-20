@@ -1,27 +1,62 @@
-from aequilibrae.context import get_active_project
+"""Tests that two simultaneously open Project instances do not affect each other.
+
+This replaces the old active-project global tests (``get_active_project`` /
+``activate_project``).  Two independent ``Project`` objects must be completely
+independent: writes to one must not be visible in the other, and closing one
+must not disturb the other.
+"""
+
 import pytest
 
+from aequilibrae.project.project import Project
 
-class TestMultipleProjects:
-    def test_current_project_is_active_project(self, empty_project):
-        assert empty_project is get_active_project()
 
-    def test_switch_project(self, empty_project):
-        # Create a new project instance by re-activating the fixture
-        empty_project.deactivate()
-        empty_project.activate()
-        assert empty_project is get_active_project()
+@pytest.fixture
+def two_projects(tmp_path):
+    p1 = Project.new(tmp_path / "proj1")
+    p2 = Project.new(tmp_path / "proj2")
+    yield p1, p2
+    p1.close()
+    p2.close()
 
-    def test_reactivate_project(self, empty_project):
-        empty_project.deactivate()
-        empty_project.activate()
-        assert empty_project is get_active_project()
 
-    def test_raises_when_inactive(self, empty_project):
-        empty_project.deactivate()
-        with pytest.raises(FileNotFoundError):
-            get_active_project()
+def test_two_projects_have_distinct_paths(two_projects):
+    p1, p2 = two_projects
+    assert p1.project_base_path != p2.project_base_path
 
-    def test_close_project_deactivates(self, empty_project):
-        empty_project.close()
-        assert get_active_project(must_exist=False) is None
+
+def test_write_to_one_does_not_appear_in_other(two_projects):
+    """Inserting a mode in p1 must not make it appear in p2."""
+    p1, p2 = two_projects
+
+    p1.network.modes.insert(mode_id="x", mode_name="extra_mode")
+
+    modes_p1 = {m.mode_id for m in p1.network.modes}
+    modes_p2 = {m.mode_id for m in p2.network.modes}
+
+    assert "x" in modes_p1
+    assert "x" not in modes_p2
+
+
+def test_closing_one_does_not_affect_other(two_projects):
+    """Closing p1 must not close or corrupt p2's connections."""
+    p1, p2 = two_projects
+    p1.close()
+
+    # p2 must still be usable
+    with p2.db_connection as conn:
+        count = conn.execute("SELECT count(*) FROM links").fetchone()[0]
+    assert count == 0
+
+
+def test_two_projects_context_managers(tmp_path):
+    """Both projects can be used as context managers simultaneously."""
+    with Project.new(tmp_path / "x") as p1:
+        with Project.new(tmp_path / "y") as p2:
+            # Both usable at the same time
+            with p1.db_connection as c1:
+                links1 = c1.execute("SELECT count(*) FROM links").fetchone()[0]
+            with p2.db_connection as c2:
+                links2 = c2.execute("SELECT count(*) FROM links").fetchone()[0]
+    assert links1 == 0
+    assert links2 == 0

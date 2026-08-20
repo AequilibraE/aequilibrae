@@ -22,12 +22,13 @@ In this example we demonstrate how to use AequilibraE's run module using Sioux F
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
 from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
 
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.create_example import create_example
+
 # sphinx_gallery_thumbnail_path = '../source/_images/data_pipeline.png'
 
 # %%
@@ -131,7 +132,7 @@ import geopandas as gpd
 results = project.results.get_results("my_run_module_example").set_index("link_id")
 
 # %%
-with project.db_connection_spatial as conn:
+with project.db_connection as conn:
     links = gpd.read_postgis(
         "SELECT link_id, st_asBinary(geometry) geometry FROM delaunay_network", conn, geom_col="geometry", crs=4326
     )
