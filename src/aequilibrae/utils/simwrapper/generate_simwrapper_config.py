@@ -7,9 +7,16 @@ Usage
 
     >>> from aequilibrae.project import Project
     >>> from aequilibrae.utils.simwrapper.generate_simwrapper_config import SimwrapperConfigGenerator
-    >>> prj = Project.from_path('/path/to/project')
+    >>> prj = create_example(project_path)
+    >>> from aequilibrae.utils.db_utils import safe_connect
+    >>> result_connection = safe_connect(prj.project_base_path / 'results_database.sqlite', missing_ok=True)
+    >>> result_connection.close()
+    >>> project_base_path = prj.project_base_path
+    >>> prj.shutdown()
+    >>> prj = Project.from_path(project_base_path)
     >>> gen = SimwrapperConfigGenerator(prj, output_dir='simwrapper')
     >>> gen.write_yamls()
+    >>> prj.shutdown()
 
 Notes
 -----

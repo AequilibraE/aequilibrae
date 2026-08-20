@@ -17,7 +17,7 @@ defined based on the auto-generated link types. These include:
     >>> from aequilibrae.paths import TransitAssignment, TransitClass
 
     >>> project = create_example(project_path, "coquimbo")
-    >>> data = Transit(project)
+    >>> data = project.transit
 
     >>> graph = data.create_graph(
     ...     with_outer_stop_transfers=False,
@@ -55,7 +55,7 @@ defined based on the auto-generated link types. These include:
     >>> assig.set_algorithm("os")
     >>> assigclass.set_demand_matrix_core("pt")
 
-    >>> assig.execute() # doctest: +SKIP
+    >>> assig.execute()
 
     >>> project.close()
 
@@ -70,7 +70,7 @@ One example is skimming travel time in rail only.
     >>> from aequilibrae.paths import TransitAssignment, TransitClass
 
     >>> project = create_example(f"{project_path}v2", "coquimbo")
-    >>> data = Transit(project)
+    >>> data = project.transit
 
     >>> graph = data.create_graph(
     ...     with_outer_stop_transfers=False,
@@ -87,13 +87,13 @@ One example is skimming travel time in rail only.
     >>> # We now define a new field in the graph that will be used for skimming
     >>> transit_graph.graph["rail_trav_time"] = np.where(
     ...      transit_graph.graph["link_type"].isin(["on-board", "dwell"]), 0, transit_graph.graph["trav_time"]
-    ... ) # doctest: +SKIP
+    ... )
 
-    >>> all_routes = transit.get_table("routes") # doctest: +SKIP
-    >>> rail_ids = all_routes.query("route_type in [1, 2]").route_id.to_numpy() # doctest: +SKIP
+    >>> all_routes = transit.get_table("routes")
+    >>> rail_ids = all_routes.query("route_type in [1, 2]").route_id.to_numpy()
 
     # Assign zero travel time to all non-rail links
-    >>> transit_graph.graph.loc[~transit_graph.graph.line_id.isin(rail_ids),"rail_trav_time"] =0 # doctest: +SKIP
+    >>> transit_graph.graph.loc[~transit_graph.graph.line_id.isin(rail_ids),"rail_trav_time"] = 0
 
     >>> # We mock a demand matrix
     >>> num_zones = len(transit_graph.centroids)
@@ -115,11 +115,11 @@ One example is skimming travel time in rail only.
     >>> assig.set_frequency_field("freq")
 
     >>> # Skimming must be set after a transit assignment class is added
-    >>> assig.set_skimming_fields(["rail_trav_time"])  # doctest: +SKIP
+    >>> assig.set_skimming_fields(["rail_trav_time"])
 
     >>> assig.set_algorithm("os")
     >>> assigclass.set_demand_matrix_core("pt")
 
-    >>> assig.execute() # doctest: +SKIP
+    >>> assig.execute()
 
     >>> project.close()

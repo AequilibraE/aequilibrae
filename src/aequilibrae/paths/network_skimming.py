@@ -41,7 +41,8 @@ class NetworkSkimming(WorkerThread):
         >>> matrix = skm.results.skims
 
         # Or save the results to the project
-        >>> project.matrices.create('skimming_result_omx', 'skimming_result_omx.omx', skm.results.skims)
+        >>> project.matrices.create('skimming_result_omx', 'skimming_result_omx.omx', skm.results.skims) # doctest: +ELLIPSIS
+        MatrixRecord(name='skimming_result_omx', file_name='skimming_result_omx.omx', cores=1, procedure=None, procedure_id=None, timestamp='...', description=None)
 
         >>> project.close()
     """

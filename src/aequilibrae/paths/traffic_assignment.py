@@ -1,4 +1,3 @@
-import json
 import logging
 import socket
 from abc import ABC, abstractmethod
@@ -201,7 +200,10 @@ class TrafficAssignment(AssignmentBase):
         # Creates the assignment class
         >>> assigclass = TrafficClass("car", graph, demand)
 
-        >>> assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
+        >>> assig = TrafficAssignment(
+        ...     parameters=project.project_parameters.parameters,
+        ...     path_files_path=project.project_base_path,
+        ... )
 
         # The first thing to do is to add at list of traffic classes to be assigned
         >>> assig.set_classes([assigclass])
@@ -233,8 +235,17 @@ class TrafficAssignment(AssignmentBase):
         # Information on the assignment setup can be recovered with
         >>> info = assig.info()
 
-        # Or save it directly to the results database
-        >>> results = assig.save_results(table_name='base_year_assignment')
+        # Result payload databases are optional.  Create one explicitly before
+        # asking the project to expose its results gateway.
+        >>> base_path = project.project_base_path
+        >>> from aequilibrae.utils.db_utils import safe_connect
+        >>> results_database = base_path / 'results_database.sqlite'
+        >>> result_connection = safe_connect(results_database, missing_ok=True)
+        >>> result_connection.close()
+        >>> project.shutdown()
+        >>> project = Project.from_path(base_path)
+        >>> results_gateway = project.results
+        >>> assig.save_results(table_name='base_year_assignment', results=results_gateway)
 
         # skims are here
         >>> avg_skims = assigclass.results.skims # blended ones

@@ -342,17 +342,15 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     >>> matrices = project.matrices
 
     # One can also check all the project matrices as a Pandas' DataFrame
-    >>> matrices.list() # doctest: +SKIP
+    >>> matrix_list = matrices.list()
 
-    # We can add a naw matrix
-    >>> matrices.new_record() # doctest: +SKIP
-    
-    # To delete a matrix from the 'matrices' table, we can delete the record directly
-    >>> matrices.delete_record("demand_mc")
-    
-    # or by selecting the matrix and deleting it
-    >>> mat_record = matrices.get_record("demand_mc") # doctest: +SKIP
-    >>> mat_record.delete() # doctest: +SKIP
+    # Matrix payloads are created and registered through one explicit operation.
+    # Existing files can be registered with ``register_matrix``.
+    >>> matrix_exists = matrices.check_exists("demand_mc")
+
+    # A metadata record can be removed by its key.
+    >>> if matrix_exists:
+    ...     matrices.delete_matrix("demand_mc")
 
     # If you're unsure if you have a matrix in you project, you can check if it exists
     # This function will return `True` or `False`
@@ -410,8 +408,8 @@ Each item in the 'link_types' table is a ``LinkType`` object.
     >>> link_types.save()
 
     # To check all `LinkTypes` in the project as a dictionary whose keys are the `link_type_id`'s
-    >>> link_types.all_types() # doctest: +SKIP
-    {'z': <aequilibrae.project.network.link_type.LinkType object at 0x...>} 
+    >>> list(link_types) # doctest: +ELLIPSIS
+    [LinkTypeRecord(link_type='centroid_connector', link_type_id='z', description='VIRTUAL centroid connectors only', lanes=10, lane_capacity=10000, alpha=None, beta=None, gamma=None, delta=None, epsilon=None, zeta=None, iota=None, sigma=None, phi=None, tau=None), ...]
 
     # There are two ways to get a LinkType from the 'link_types' table
     # using the `link_type_id`
@@ -457,8 +455,8 @@ Each item in 'modes' table is a ``Mode`` object.
     >>> modes.delete("k")
 
     # To check all `Modes` in the project as a dictionary whose keys are the `mode_id`'s
-    >>> modes.all_modes() # doctest: +SKIP
-    {'b': <aequilibrae.project.network.mode.Mode object at 0x...>}
+    >>> list(modes) # doctest: +ELLIPSIS
+    [ModeRecord(mode_name='car', mode_id='c', description='All motorized vehicles', alpha=None, pce=1, beta=None, gamma=None, delta=None, epsilon=None, zeta=None, iota=None, sigma=None, phi=None, tau=None, vot=None, ppv=1), ...]
 
     # There are two ways to get a Mode from the 'modes' table
     # using the ``mode_id``

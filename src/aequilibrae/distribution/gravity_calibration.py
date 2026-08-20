@@ -251,7 +251,9 @@ class GravityCalibration:
             "nan_as_zero": self.nan_as_zero,
         }
 
-        self.gravity = GravityApplication(parameters=self.parameters, **args)
+        # ``parameters`` is already part of ``args``; pass it only once so
+        # calibration follows the same explicit-dependency API as direct use.
+        self.gravity = GravityApplication(**args)
         self.gravity.apply()
         self.result_matrix = self.gravity.output
 

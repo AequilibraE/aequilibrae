@@ -1,7 +1,9 @@
 import sqlite3
 from typing import Optional
 
-from aequilibrae.log import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def migrate(

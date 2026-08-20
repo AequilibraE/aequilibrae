@@ -14,9 +14,9 @@ the *network*, the *graph*, and the *compressed_graph*.
 
     >>> g = Graph()
 
-    >>> g.network # doctest: +SKIP
-    >>> g.graph # doctest: +SKIP
-    >>> g.compressed_graph # doctest: +SKIP
+    >>> network_graph = g.network
+    >>> graph_data = g.graph
+    >>> compressed_graph = g.compressed_graph
 
 
 The network dataframe
@@ -129,7 +129,7 @@ index search, which is very fast but not accurate.
 .. code-block:: python
 
     >>> polygon = Polygon([(-71.35, -29.95), (-71.35, -29.90), (-71.30, -29.90), (-71.30, -29.95), (-71.35, -29.95)])
-    >>> project.network.build_graphs(limit_to_area=polygon) # doctest: +SKIP
+    >>> project.network.build_graphs(limit_to_area=polygon)
 
 More sophisticated graph editing is also possible, but it is recommended that
 changes to be made in the network DataFrame. For example:

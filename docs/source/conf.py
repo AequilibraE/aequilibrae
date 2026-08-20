@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from sphinx_gallery.sorting import ExplicitOrder
-import pkg_resources
+from importlib.metadata import PackageNotFoundError, version as package_version
 import sphinx
 
 project_dir = Path(__file__).parent.parent.parent
@@ -29,7 +29,12 @@ project_dir = os.path.abspath("../../")
 if str(project_dir) not in sys.path:
     sys.path.insert(0, project_dir)
 
-release_version = pkg_resources.get_distribution("aequilibrae").version
+try:
+    release_version = package_version("aequilibrae")
+except PackageNotFoundError:
+    # Source checkouts used by the documentation tests are not always
+    # installed as distributions.
+    release_version = "dev"
 
 # -- Project information -----------------------------------------------------
 
@@ -55,6 +60,21 @@ else:
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
+# Keep the doctest examples self-contained when Sphinx runs outside pytest.
+# The pytest conftest provides the same names for ``pytest --doctest-modules``.
+doctest_global_setup = """
+import os
+import tempfile
+from pathlib import Path
+import numpy as np
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.project import Project
+from aequilibrae.transit import Transit
+from aequilibrae.utils.create_example import create_example
+project_path = Path(tempfile.mkdtemp()) / "project"
+my_folder_path = Path(tempfile.mkdtemp())
+"""
+
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",

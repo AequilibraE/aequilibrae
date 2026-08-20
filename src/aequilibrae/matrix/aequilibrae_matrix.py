@@ -1125,8 +1125,8 @@ class AequilibraeMatrix(object):
             ...                  zones=zones_in_the_model,
             ...                  memory_only=False)
             >>> mat.setName('This is my example')
-            >>> mat.save() # doctest: +SKIP
-            >>> mat.close() # doctest: +SKIP
+            >>> mat.save()
+            >>> mat.close()
         """
         if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")

@@ -89,7 +89,7 @@ procedure.
 .. doctest::
 
     # You can add one or more traffic classes to the assignment instance
-    >>> assig.add_class(tc_truck) # doctest: +SKIP
+    >>> assig.add_class(tc_truck)
 
     >>> assig.set_classes([tc_car, tc_truck])
 
@@ -111,10 +111,11 @@ procedure.
 
 .. doctest::
 
-    # The VDF parameters can be either an existing field in the graph, passed as a parameter:
-    >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"}) # doctest: +SKIP
+    # The VDF parameters can be either existing fields in the graph, passed as parameters:
+    >>> field_parameters = {"alpha": "b", "beta": "power"}
+    >>> assig.set_vdf_parameters(field_parameters)
 
-    # Or as a global value:
+    # Or as global values:
     >>> assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
 
 * **time_field**: the field of the graph that corresponds to free-flow travel time. The procedure will 
@@ -156,9 +157,9 @@ for easy identification.
 
 ::
 
-  >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
-  >>> assig.execute() # doctest: +SKIP
-  >>> assig.save_skims("one_matrix_name")
+  >>> assig.set_skimming_fields(["distance"])
+  >>> assig.execute()
+  >>> assig.save_skims("one_matrix_name", project.matrices)
 
 
 Assigning sparse matrices
@@ -183,7 +184,7 @@ of zones and over 100 iterations of assignment.
 
   >>> assig.execute()
   >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
-  >>> assig.save_skims("another_matrix_name")
+  >>> assig.save_skims("another_matrix_name", project.matrices)
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment
 cost from the last iteration of the assignment by default. These matrices are named *__congested_time__*
@@ -230,11 +231,11 @@ To create a preload for public transport vehicles operating between 8 AM to 10 A
     >>> from aequilibrae.transit import Transit
 
     # Times are specified in seconds from midnight
-    >>> transit = Transit(project)
+    >>> transit = project.transit
     >>> preload = transit.build_pt_preload(start=8*3600, end=10*3600)
 
     # Add the preload to the assignment
-    >>> assig.add_preload(preload, 'PT_vehicles') # doctest: +SKIP
+    >>> assig.add_preload(preload, 'PT_vehicles')
 
 
 Executing an Assignment

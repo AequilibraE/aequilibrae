@@ -176,7 +176,7 @@ class Transit(WorkerThread):
             >>> start = int(6.5 * 60 * 60) # 6:30 am
             >>> end = int(8.5 * 60 * 60)   # 8:30 am
 
-            >>> transit = Transit(project)
+            >>> transit = project.transit
             >>> preload = transit.build_pt_preload(start, end)
 
             >>> project.close()
