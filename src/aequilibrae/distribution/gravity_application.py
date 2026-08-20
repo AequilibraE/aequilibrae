@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.parameters import Parameters
-from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
@@ -78,7 +77,7 @@ class GravityApplication:
         >>> project.close()
     """
 
-    def __init__(self, project=None, **kwargs):
+    def __init__(self, parameters=None, **kwargs):
         """
         Instantiates the IPF problem
 
@@ -94,7 +93,7 @@ class GravityApplication:
             **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
             **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
-            active project
+            project supplied at construction
 
             **core_name** (:obj:`str`, *Optional*): Name for the output matrix core. Defaults to "gravity"
 
@@ -110,11 +109,10 @@ class GravityApplication:
             **error** (:obj:`str`): Error description
         """
 
-        self.project = project
         self.__required_parameters = ["max trip length"]
         self.__required_model = ["function", "parameters"]
 
-        self.parameters = kwargs.get("parameters", self.__get_parameters())
+        self.parameters = parameters or kwargs.get("parameters", self.__get_parameters())
 
         self.vectors = kwargs.get("vectors")
         self.rows_ = kwargs.get("row_field", None)
@@ -188,29 +186,8 @@ class GravityApplication:
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
         self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
 
-    def save_to_project(self, name: str, file_name: str, project=None) -> None:
-        """Saves the matrix output to the project file
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the desired matrix record
-
-            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
-        """
-
-        project = project or get_active_project()
-        mats = project.matrices
-        record = mats.new_record(name, file_name, self.output)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Synthetic gravity trip distribution"
-        record.description = f"Synthetic gravity trip distribution. {self.model.function}"
-        record.save()
-
     def __get_parameters(self):
-        par = self.project.parameters if self.project else Parameters().parameters
+        par = Parameters().parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])
         return para

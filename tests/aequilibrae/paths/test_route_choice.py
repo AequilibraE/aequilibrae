@@ -22,7 +22,12 @@ def route_choice_setup(sioux_falls_single_class):
     mat = sioux_falls_single_class.matrices.get_matrix("demand_omx")
     mat.computational_view()
 
-    yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": RouteChoice(graph)}
+    yield {
+        "project": sioux_falls_single_class,
+        "graph": graph,
+        "mat": mat,
+        "rc": RouteChoice(graph),
+    }
 
     mat.close()
     sioux_falls_single_class.close()
@@ -176,8 +181,8 @@ def test_saving(route_choice_setup):
     lloads = rc.get_load_results()
     u_sl = rc.get_select_link_loading_results()
 
-    rc.save_link_flows("ll")
-    rc.save_select_link_flows("sl")
+    rc.save_link_flows("ll", project.results)
+    rc.save_select_link_flows("sl", project.results, project.matrices)
 
     with project.results_connection as conn:
         for table, df in [

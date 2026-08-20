@@ -47,7 +47,7 @@ demand.computational_view(["matrix"])
 
 # %%
 # Now let's perform our traffic assignment
-assig = TrafficAssignment()
+assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 
 assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 

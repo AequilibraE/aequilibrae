@@ -98,7 +98,7 @@ mat.computational_view()
 
 # Create traffic assignment with alternative parameters
 assigclass = TrafficClass("car", graph, mat)
-assignment = TrafficAssignment(project)
+assignment = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 assignment.add_class(assigclass)
 assignment.set_vdf("BPR")
 

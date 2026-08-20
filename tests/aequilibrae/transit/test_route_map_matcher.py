@@ -10,10 +10,13 @@ from aequilibrae.transit.functions.breaking_links_for_stop_access import split_l
 @pytest.fixture(scope="function")
 def route_system_builder(build_gtfs_project):
     gtfs_file = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
-    with database_connection("transit") as transit_conn:
-        yield GTFSRouteSystemBuilder(
-            network=transit_conn, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file
-        )
+    yield GTFSRouteSystemBuilder(
+        network=build_gtfs_project.project.network,
+        zoning=build_gtfs_project.project.zoning,
+        transit_manager=build_gtfs_project.project.scenario.connections["transit"],
+        agency_identifier="LISERCO, LISANCO, LINCOSUR",
+        file_path=gtfs_file,
+    )
 
 
 def test_break_links_with_stops(route_system_builder):

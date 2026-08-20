@@ -15,7 +15,6 @@ import openmatrix as omx
 import pandas as pd
 import scipy
 
-from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
@@ -46,13 +45,10 @@ class RouteChoice:
 
     demand_index_names = ["origin id", "destination id"]
 
-    def __init__(self, graph: Graph, project=None):
+    def __init__(self, graph: Graph):
         self.parameters = {}
         self.procedure_id = None
         self.procedure_date = None
-
-        proj = project or get_active_project(must_exist=False)
-        self.project = proj
 
         self.cores: int = 0
         self.graph = graph
@@ -640,32 +636,28 @@ class RouteChoice:
 
         return self.__rc.get_sl_od_matrices()
 
-    def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
+    def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, results) -> None:
         self.procedure_id = uuid4().hex
-
-        record = project.results.new_record(
-            table_name=table_name,
+        results.create(
+            table_name,
+            df,
             procedure=method_name,
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=description,
         )
-        record.set_data(df, index=True)
 
-    def save_link_flows(self, table_name: str, project=None) -> None:
+    def save_link_flows(self, table_name: str, results) -> None:
         """
         Saves the link link flows for all classes into the results database.
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to.
 
-            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
-            Defaults to the active project
+            **project** (:obj:`Project`, `Optional`): Project to save results to.
+            Defaults to the project supplied at construction.
         """
-        if not project:
-            project = self.project or get_active_project()
-
         df = self.get_load_results()
         info = self.info()
         self.__save_dataframe(
@@ -674,10 +666,10 @@ class RouteChoice:
             "Uncompressed link loading results",
             table_name + "_uncompressed",
             info,
-            project=project,
+            results=results,
         )
 
-    def save_select_link_flows(self, table_name: str, project=None) -> None:
+    def save_select_link_flows(self, table_name: str, results, matrices) -> None:
         """
         Saves the select link link flows for all classes into the results database. Additionally,
         it exports the OD matrices into OMX format.
@@ -686,12 +678,9 @@ class RouteChoice:
             **table_name** (:obj:`str`): Name of the table being inserted to and the name of the
             OpenMatrix file used for OD matrices.
 
-            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
-            Defaults to the active project
+            **project** (:obj:`Project`, `Optional`): Project to save results to.
+            Defaults to the project supplied at construction.
         """
-        if not project:
-            project = self.project or get_active_project()
-
         u = self.get_select_link_loading_results()
         info = self.info()
         self.__save_dataframe(
@@ -700,10 +689,10 @@ class RouteChoice:
             "Uncompressed select link analysis results",
             table_name + "_uncompressed",
             info,
-            project=project,
+            results=results,
         )
 
-        path = (pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx")
+        path = (pathlib.Path(matrices.fldr) / table_name).with_suffix(".omx")
         for sl_name, v in self.get_select_link_od_matrix_results().items():
             for demand_name, mat in v.items():
                 mat.to_disk(path, sl_name + "_" + demand_name)

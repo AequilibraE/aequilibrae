@@ -111,7 +111,7 @@ skims.distance[:3, :3]
 
 # %%
 # We can save it to the project if we want
-skm.save_to_project("base_skims")
+project.matrices.create("base_skims", "base_skims.omx", skm.results.skims)
 
 # %%
 # We can also retrieve this skim record to write something to its description

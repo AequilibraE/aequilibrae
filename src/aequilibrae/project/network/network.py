@@ -8,7 +8,6 @@ import shapely.wkb
 from shapely import union_all
 from shapely.geometry import Polygon, box
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.haversine import haversine
@@ -187,7 +186,7 @@ class Network(WorkerThread):
         width = haversine(east, (north + south) / 2, west, (north + south) / 2)
         area = height * width
 
-        par = Parameters().parameters["osm"]
+        par = self.project.project_parameters.parameters["osm"]
         max_query_area_size = par["max_query_area_size"]
 
         if area < max_query_area_size:
@@ -209,7 +208,7 @@ class Network(WorkerThread):
                     if subarea.intersects(model_area):
                         polygons.append(subarea)
         logger.info("Downloading data")
-        dwnloader = OSMDownloader(polygons, modes)
+        dwnloader = OSMDownloader(polygons, modes, self.project.project_parameters)
         dwnloader.signal = self.signal
         dwnloader.doWork()
 

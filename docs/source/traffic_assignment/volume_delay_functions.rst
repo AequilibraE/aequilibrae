@@ -359,7 +359,7 @@ attributes:
 
     from aequilibrae.paths import TrafficAssignment
     
-    assig = TrafficAssignment()
+    assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
     assig.set_vdf('BPR')
     assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
 
@@ -436,7 +436,7 @@ Basic Usage
     # Output: ['bpr', 'bpr2', 'conical', 'inrets', 'akcelik']
     
     # Setup traffic assignment with BPR
-    assig = TrafficAssignment()
+    assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
     assig.set_vdf('BPR')
     assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
 

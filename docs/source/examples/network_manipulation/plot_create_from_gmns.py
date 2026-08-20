@@ -75,7 +75,7 @@ new_node_fields = {
     "hospital": {"description": "hospital flag", "type": "text", "required": False},
 }
 
-par = Parameters()
+par = Parameters(project.project_base_path)
 par.parameters["network"]["gmns"]["link"]["fields"].update(new_link_fields)
 par.parameters["network"]["gmns"]["node"]["fields"].update(new_node_fields)
 par.write_back()

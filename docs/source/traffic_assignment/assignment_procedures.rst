@@ -78,7 +78,7 @@ method call:
 
     >>> from aequilibrae.paths import TrafficAssignment
 
-    >>> assig = TrafficAssignment()
+    >>> assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 
 AequilibraE's traffic assignment is organized within an object with the same name which contains a series of
 member variables that should be populated by the user, providing thus a complete specification of the assignment

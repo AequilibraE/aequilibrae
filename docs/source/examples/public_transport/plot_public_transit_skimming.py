@@ -104,7 +104,7 @@ mat.computational_view()
 # Create the assignment class
 assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
 
-assig = TransitAssignment()
+assig = TransitAssignment(parameters=project.project_parameters.parameters)
 
 assig.add_class(assigclass)
 

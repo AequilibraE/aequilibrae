@@ -10,10 +10,8 @@ from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge
 from shapely.ops import substring
 
-from aequilibrae.context import get_active_project
 from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
-from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 logger = logging.getLogger(__name__)
@@ -22,11 +20,11 @@ logger = logging.getLogger(__name__)
 class NetworkSimplifier(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, network, connections) -> None:
         super().__init__(None)
 
-        self.project = project or get_active_project()
-        self.network = self.project.network
+        self.network = network
+        self._connections = connections
         self.link_layer = self.network.links.data
 
         warnings.warn("This will alter your database in place. Make sure you have a backup.", stacklevel=2)
@@ -184,7 +182,7 @@ class NetworkSimplifier(WorkerThread):
             f"INSERT INTO links({','.join(df.columns)}) "
             f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
         )
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self._connections["project"].transaction() as conn:
             conn.executemany(sql, data)
             conn.executemany("DELETE FROM links WHERE link_id=?", [[x] for x in links_to_delete])
             conn.commit()
@@ -207,7 +205,7 @@ class NetworkSimplifier(WorkerThread):
         """
         srid = self.link_layer.crs.to_epsg()
         target_links = self.link_layer.query("link_id in @links")
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self._connections["project"].transaction() as conn:
             for _, link in target_links.iterrows():
                 wkb = link.geometry.interpolate(0.5, normalized=True).wkb
                 conn.execute("DELETE FROM links WHERE link_id=?", [link.link_id])
@@ -225,5 +223,5 @@ class NetworkSimplifier(WorkerThread):
         self.network.links.refresh()
         self.network.nodes.refresh()
 
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+        with self._connections["project"].transaction() as conn:
             conn.execute("VACUUM")

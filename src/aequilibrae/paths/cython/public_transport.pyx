@@ -9,7 +9,6 @@ import json
 import numpy as np
 import pandas as pd
 
-from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.utils.db_utils import commit_and_close
 
@@ -404,7 +403,7 @@ class HyperpathGenerating:
 
         return info
 
-    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
+    def save_results(self, table_name: str, results, keep_zero_flows=True) -> None:
         """
         Saves the assignment results to results_database.sqlite
 
@@ -417,24 +416,20 @@ class HyperpathGenerating:
             Defaults to ``True``.
 
             **project** (:obj:`Project`, optional): Project we want to save the results to. 
-            Defaults to the active project
+            Must be supplied explicitly
         """
 
         df = self._edges
         if not keep_zero_flows:
             df = df[df.volume > 0]
 
-        if not project:
-            project = project or get_active_project()
-
         rep = {"setup": self.info()}
-        record = project.results.new_record(
-            table_name=table_name,
+        results.create(
+            table_name,
+            df,
             procedure="Hyperpath assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(rep),
+            procedure_report=rep,
             timestamp=self.procedure_date,
             description=self.description,
         )
-
-        record.set_data(df)

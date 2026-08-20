@@ -397,7 +397,7 @@ understand, and then we'll perform the assignment.
         if "toll" in g.network.columns:
             assigclass.set_fixed_cost("toll")
 
-        assig = TrafficAssignment()
+        assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
         assig.set_classes([assigclass])
         assig.set_vdf("BPR")
         assig.set_vdf_parameters({"alpha": "b", "beta": "power"})

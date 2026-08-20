@@ -4,6 +4,7 @@ from random import random
 
 from shapely.geometry import box
 
+from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 
 
@@ -17,7 +18,7 @@ def test_do_work(should_do_work):
     if not should_do_work:
         pytest.skip("Skipping test based on random chance")
 
-    o = OSMDownloader([box(0.0, 0.0, 0.1, 0.1)], ["car"])
+    o = OSMDownloader([box(0.0, 0.0, 0.1, 0.1)], ["car"], Parameters())
     o.doWork()
     assert not o.json, "It found links in the middle of the ocean"
 
@@ -27,7 +28,7 @@ def test_do_work2(should_do_work):
         pytest.skip("Skipping test based on random chance")
 
     # LITTLE PLACE IN THE MIDDLE OF THE Grand Canyon North Rim
-    o = OSMDownloader([box(-112.185, 36.59, -112.179, 36.60)], ["car"])
+    o = OSMDownloader([box(-112.185, 36.59, -112.179, 36.60)], ["car"], Parameters())
     o.doWork()
 
     if len(o.json) == 0 or "elements" not in o.json[0]:

@@ -77,9 +77,8 @@ project.run.graph_summary()
 #
 # This function replicates the example in which we :ref:`create Delaunay lines <creating_delaunay_lines>`.
 func_string = """
-def create_delaunay(source: str, name: str, computational_view: str, result_name: str, overwrite: bool=False):\n
+def create_delaunay(project, source: str, name: str, computational_view: str, result_name: str, overwrite: bool=False):\n
 \tfrom aequilibrae.utils.create_delaunay_network import DelaunayAnalysis\n
-\tproject = get_active_project()\n
 \tmatrix = project.matrices\n
 \tmat = matrix.get_matrix(name)\n
 \tmat.computational_view(computational_view)\n
@@ -96,7 +95,7 @@ with open(join(folder, "run", "__init__.py"), "a") as file:
 # %%
 # Now we add new parameters to our model
 
-p = Parameters()
+p = Parameters(project.project_base_path)
 p.parameters["run"]["create_delaunay"] = {}
 p.parameters["run"]["create_delaunay"]["source"] = "zones"
 p.parameters["run"]["create_delaunay"]["name"] = "demand_omx"

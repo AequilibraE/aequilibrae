@@ -137,7 +137,7 @@ zones.head()
 # significantly larger, but more flexible matrix.
 from aequilibrae.paths import SubAreaAnalysis
 
-subarea = SubAreaAnalysis(graph, zones, mat)
+subarea = SubAreaAnalysis(graph, zones, mat, project.network)
 subarea.rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False)
 subarea.rc.execute(perform_assignment=True)
 demand = subarea.post_process()

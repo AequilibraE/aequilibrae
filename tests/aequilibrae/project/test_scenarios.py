@@ -36,7 +36,7 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     mat.computational_view()
 
     assigclass = TrafficClass("car", graph, mat)
-    assignment = TrafficAssignment(scenario_example)
+    assignment = TrafficAssignment(parameters=scenario_example.project_parameters.parameters, path_files_path=scenario_example.project_base_path)
     assignment.add_class(assigclass)
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -419,6 +419,25 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
         # For the others we shouldn't have any matrices, and the "run" dir shouldn't exist
         assert len(scenario_example.run.matrix_summary()) == 0
         assert not (scenario_example.project_base_path / "run").exists()
+
+
+def test_run_module_receives_project(scenario_example):
+    run_module = scenario_example.root_scenario.base_path / "run" / "__init__.py"
+    with open(run_module, "a") as file:
+        file.write("\n\ndef project_identity(project):\n    return project\n")
+
+    scenario_example.project_parameters.parameters["run"]["project_identity"] = {}
+    assert scenario_example.run.project_identity() is scenario_example
+
+
+def test_run_module_requires_project_as_first_positional_argument(scenario_example):
+    run_module = scenario_example.root_scenario.base_path / "run" / "__init__.py"
+    with open(run_module, "a") as file:
+        file.write("\n\ndef invalid_run_function(scenario):\n    return scenario\n")
+
+    scenario_example.project_parameters.parameters["run"]["invalid_run_function"] = {}
+    with pytest.raises(RuntimeError, match="must declare 'project' as its first positional argument"):
+        _ = scenario_example.run
 
 
 def test_scenario_use_scenario_must_exists(scenario_example):

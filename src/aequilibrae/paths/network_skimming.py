@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from aequilibrae.paths.cython.AoN import skimming_single_origin
 
-from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils.core_setter import set_cores
@@ -41,17 +40,16 @@ class NetworkSkimming(WorkerThread):
         # To access the skim matrix directly from its temporary file
         >>> matrix = skm.results.skims
 
-        # Or you can save the results to disk
-        >>> skm.save_to_project('skimming_result_omx', 'omx')
+        # Or save the results to the project
+        >>> project.matrices.create('skimming_result_omx', 'skimming_result_omx.omx', skm.results.skims)
 
         >>> project.close()
     """
 
     signal = SIGNAL(object)
 
-    def __init__(self, graph, origins=None, project=None):
+    def __init__(self, graph, origins=None):
         WorkerThread.__init__(self, None)
-        self.project = project
         self.origins = origins
         self.graph = graph
         self.cores = mp.cpu_count()
@@ -105,28 +103,6 @@ class NetworkSkimming(WorkerThread):
             **cores** (:obj:`int`): Number of cores to be used in computation
         """
         self.cores = set_cores(cores)
-
-    def save_to_project(self, name: str, format="omx", project=None) -> None:
-        """Saves skim results to the project folder and creates record in the database
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
-
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
-        """
-
-        file_name = f"{name}.{format.lower()}"
-        if not project:
-            project = self.project or get_active_project()
-        mats = project.matrices
-        record = mats.new_record(name, file_name, self.results.skims)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Network skimming"
-        record.save()
 
     def __func_skim_thread(self, origin, all_threads):
         if threading.get_ident() in all_threads:

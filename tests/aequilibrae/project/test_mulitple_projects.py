@@ -1,9 +1,8 @@
 """Tests that two simultaneously open Project instances do not affect each other.
 
-This replaces the old active-project global tests (``get_active_project`` /
-``activate_project``).  Two independent ``Project`` objects must be completely
-independent: writes to one must not be visible in the other, and closing one
-must not disturb the other.
+Two independent ``Project`` objects must be completely independent: writes to
+one must not be visible in the other, and closing one must not disturb the
+other.
 """
 
 import pytest

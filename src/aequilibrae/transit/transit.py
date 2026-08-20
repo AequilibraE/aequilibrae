@@ -69,7 +69,9 @@ class Transit(WorkerThread):
             **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
         """
         gtfs = GTFSRouteSystemBuilder(
-            network=self.project.project_base_path,
+            network=self.project.network,
+            zoning=self.project.zoning,
+            transit_manager=self._transit_transactions,
             agency_identifier=agency,
             file_path=file_path,
             day=day,

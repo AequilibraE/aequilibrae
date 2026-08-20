@@ -92,7 +92,7 @@ demand.computational_view(["matrix"])
 # Create the assignment class
 assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
-assig = TrafficAssignment()
+assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 
 # We start by adding the list of traffic classes to be assigned
 assig.add_class(assigclass)
@@ -273,7 +273,7 @@ ipf.fit()
 
 # %%
 # When saving our vector into the project, we'll get an output that it was recorded
-ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
+proj_matrices.create("demand_ipfd_omx", "demand_ipfd.omx", ipf.output)
 
 # %%
 # Impedance
@@ -307,7 +307,7 @@ for function in ["power", "expo"]:
     gravity.apply()
 
     # We get the output matrix and save it to OMX too,
-    gravity.save_to_project(name=f"demand_{function}_modeled", file_name=f"demand_{function}_modeled.omx")
+    proj_matrices.create(f"demand_{function}_modeled", f"demand_{function}_modeled.omx", gravity.output)
 
 # %%
 # We update the matrices table/records and verify that the new matrices are indeed there
@@ -333,7 +333,7 @@ demand.computational_view("matrix")
 # So, let's create the assignment class
 assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
-assig = TrafficAssignment()
+assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 
 # Add at a list of traffic classes to be assigned
 assig.add_class(assigclass)

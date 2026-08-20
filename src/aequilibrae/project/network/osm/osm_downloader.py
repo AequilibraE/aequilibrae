@@ -20,7 +20,6 @@ import pandas as pd
 import requests
 from shapely import Polygon
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from .osm_params import default_headers, memory
@@ -32,14 +31,15 @@ logger = logging.getLogger(__name__)
 class OSMDownloader(WorkerThread):
     signal = SIGNAL(object)
 
-    def __init__(self, polygons: List[Polygon], modes):
+    def __init__(self, polygons: List[Polygon], modes, parameters):
         super().__init__(None)
 
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []
         self.json = []
-        par = Parameters().parameters["osm"]
+        par = parameters.parameters["osm"]
+        self.parameters = parameters
         self.overpass_endpoint = par["overpass_endpoint"]
         self.timeout = par["timeout"]
         self.sleeptime = par["sleeptime"]
@@ -159,7 +159,7 @@ class OSMDownloader(WorkerThread):
         loosely adapted from http://www.github.com/gboeing/osmnx
         """
 
-        p = Parameters().parameters["network"]["osm"]
+        p = self.parameters.parameters["network"]["osm"]
         all_tags = p["all_link_types"]
 
         p = p["modes"]

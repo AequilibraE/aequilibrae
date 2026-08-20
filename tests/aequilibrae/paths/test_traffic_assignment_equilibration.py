@@ -37,7 +37,7 @@ def assigclass(car_graph, matrix):
 
 @pytest.fixture(scope="function")
 def assignment(project):
-    return TrafficAssignment(project)
+    return TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 
 
 @pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])

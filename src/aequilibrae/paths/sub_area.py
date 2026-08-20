@@ -5,7 +5,6 @@ from collections import defaultdict
 
 import geopandas as gpd
 import pandas as pd
-from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import RouteChoice
 from aequilibrae.paths.graph import Graph
@@ -19,7 +18,7 @@ class SubAreaAnalysis:
         graph: Graph,
         subarea: gpd.GeoDataFrame,
         demand: Union[pd.DataFrame, AequilibraeMatrix],
-        project=None,
+        network,
     ):
         """
         Construct a sub-area matrix from a provided sub-area GeoDataFrame using route choice.
@@ -39,15 +38,16 @@ class SubAreaAnalysis:
 
             **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to
             provide to the route choice assignment.
+
+            **network** (:obj:`Network`): Network gateway supplying links and nodes.
         """
-        project = project if project is not None else get_active_project()
         self.graph = graph
         self.sub_area_demand = None
 
-        links = gpd.GeoDataFrame(project.network.links.data)
+        links = gpd.GeoDataFrame(network.links.data)
         self.interior_links = links[links.crosses(subarea.union_all().boundary)].sort_index()
 
-        nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
+        nodes = gpd.GeoDataFrame(network.nodes.data).set_index("node_id")
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
 
         self.interior_graph = (

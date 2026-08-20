@@ -5,8 +5,6 @@ from copy import deepcopy
 
 import yaml
 
-from aequilibrae.context import get_active_project
-
 
 class Parameters:
     """Global parameters module.
@@ -34,7 +32,7 @@ class Parameters:
 
         >>> project = Project.new(project_path)
 
-        >>> p = Parameters()
+        >>> p = Parameters(project.project_base_path)
 
         >>> p.parameters['system']['logging_directory'] =  "/path_to/other_logging_directory"
         >>> p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
@@ -55,11 +53,7 @@ class Parameters:
         """Loads parameters from file."""
         self.file = None
         if path is not None:
-            self.file = path / "parameters.yml"
-        else:
-            proj = get_active_project(must_exist=False)
-            if proj is not None:
-                self.file = proj.project_base_path / "parameters.yml"
+            self.file = Path(path) / "parameters.yml"
 
         if self.file is not None and self.file.is_file():
             with open(self.file, "r") as yml:

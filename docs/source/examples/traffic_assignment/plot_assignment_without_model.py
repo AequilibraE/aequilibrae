@@ -128,7 +128,7 @@ aem.computational_view(["matrix"])
 # as well as change the maximum number of iterations and the gap
 assigclass = TrafficClass("car", g, aem)
 
-assig = TrafficAssignment()
+assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 
 assig.set_classes([assigclass])
 assig.set_vdf("BPR")

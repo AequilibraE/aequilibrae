@@ -45,7 +45,7 @@ defined based on the auto-generated link types. These include:
 
     >>> assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
 
-    >>> assig = TransitAssignment()
+    >>> assig = TransitAssignment(parameters=project.project_parameters.parameters)
     >>> assig.add_class(assigclass)
     >>> assig.set_time_field("trav_time")
     >>> assig.set_frequency_field("freq")
@@ -109,7 +109,7 @@ One example is skimming travel time in rail only.
 
     >>> assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
 
-    >>> assig = TransitAssignment()
+    >>> assig = TransitAssignment(parameters=project.project_parameters.parameters)
     >>> assig.add_class(assigclass)
     >>> assig.set_time_field("trav_time")
     >>> assig.set_frequency_field("freq")

@@ -22,8 +22,9 @@ By default an AequilibraE project comes with four example functions: ``matrix_su
 ``graph_summary``, ``results_summary``, and ``example_function_with_kwargs``. The summary functions
 are not named within the default ``parameters.yml`` as they take no arguments.
 
-Functions should use the ``get_active_project()`` function to obtain a reference to the current
-project.
+Run functions receive the owning :class:`~aequilibrae.project.Project` explicitly as their
+``project`` argument (for example, ``def run_model(project, ...)``). The project exposes the
+currently selected scenario through its standard gateways.
 
 State within the module should be avoided as the file may be run multiple times.
 

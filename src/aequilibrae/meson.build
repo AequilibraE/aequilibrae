@@ -2,7 +2,6 @@ thisdir = 'aequilibrae'
 
 pyfiles = [
   '__init__.py',
-  'context.py',
   'log.py',
   'parameters.py',
   'parameters.yml',

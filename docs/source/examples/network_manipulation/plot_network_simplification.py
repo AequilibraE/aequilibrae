@@ -84,7 +84,7 @@ print("This project initially has {} links and {} nodes".format(links_before.sha
 # %%
 # Let's call the ``NetworkSimplifier`` class. Any changes made to the database using this class
 # are permanent. Make sure you have a backup if necessary.
-net = NetworkSimplifier()
+net = NetworkSimplifier(project.network, project.scenario.connections)
 
 # %%
 # When we choose to simplify the network, we pass a graph object to the function,

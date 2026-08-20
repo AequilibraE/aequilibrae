@@ -38,11 +38,11 @@ class LinearApproximation(WorkerThread):
     assignment = SIGNAL(object)
     signal = SIGNAL(object)
 
-    def __init__(self, assig_spec, algorithm, project=None) -> None:
+    def __init__(self, assig_spec, algorithm, path_files_path=None) -> None:
         WorkerThread.__init__(self, None)
         self.signal.emit(["set_text", "Linear Approximation"])
 
-        self.project_path = project.project_base_path if project else gettempdir()
+        self.project_path = path_files_path or gettempdir()
 
         self.algorithm = algorithm
         self.rgap_target = assig_spec.rgap_target

@@ -70,6 +70,13 @@ class Scenario:
         """Return the project-database :class:`~aequilibrae.utils.db_utils.NestedTransactions` manager."""
         return self.connections["project"]
 
+    @property
+    def transit_connection(self):
+        """Return a transaction context for the transit database."""
+        if "transit" not in self.connections:
+            raise RuntimeError("this scenario has no transit database")
+        return self.connections["transit"].transaction()
+
     def transaction(self):
         """Return a coordinated transaction context across all open connections.
 

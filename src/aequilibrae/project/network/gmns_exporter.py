@@ -2,12 +2,10 @@ from os.path import join
 
 import pandas as pd
 
-from aequilibrae.parameters import Parameters
-
 
 class GMNSExporter:
     def __init__(self, net, path) -> None:
-        self.p = Parameters()
+        self.p = net.project.project_parameters
         self.links_df = net.links.data
         self.nodes_df = net.nodes.data
         self.source = net.project.path_to_file

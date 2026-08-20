@@ -12,7 +12,6 @@ import pandas as pd
 from numpy import nan_to_num
 
 from aequilibrae.parameters import Parameters
-from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
@@ -51,14 +50,12 @@ logger = logging.getLogger(__name__)
 
 
 class AssignmentBase(ABC):
-    def __init__(self, project=None):
+    def __init__(self, parameters=None, path_files_path=None):
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        proj = project or get_active_project(must_exist=False)
-        self.project = proj
-
-        self.parameters = proj.parameters if proj else Parameters().parameters
+        self.path_files_path = path_files_path
+        self.parameters = parameters or Parameters().parameters
 
         self.classes: List[TrafficClass] = []
         self.algorithm: str = None
@@ -99,7 +96,7 @@ class AssignmentBase(ABC):
         pass
 
     @abstractmethod
-    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
+    def save_results(self, table_name: str, results, keep_zero_flows=True) -> None:
         pass
 
     @abstractmethod
@@ -204,7 +201,7 @@ class TrafficAssignment(AssignmentBase):
         # Creates the assignment class
         >>> assigclass = TrafficClass("car", graph, demand)
 
-        >>> assig = TrafficAssignment()
+        >>> assig = TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
 
         # The first thing to do is to add at list of traffic classes to be assigned
         >>> assig.set_classes([assigclass])
@@ -249,14 +246,12 @@ class TrafficAssignment(AssignmentBase):
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, parameters=None, path_files_path=None) -> None:
         """"""
         self.__dict__["_TrafficAssignment__initalised"] = False
-        super().__init__(project=project)
+        super().__init__(parameters=parameters, path_files_path=path_files_path)
 
-        proj = project or get_active_project(must_exist=False)
-
-        par = proj.parameters if proj else Parameters().parameters
+        par = self.parameters
         parameters = par["assignment"]["equilibrium"]
 
         self.rgap_target = parameters["rgap"]
@@ -381,7 +376,7 @@ class TrafficAssignment(AssignmentBase):
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
         if algo in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
-            self.assignment = LinearApproximation(self, algo, project=self.project)
+            self.assignment = LinearApproximation(self, algo, path_files_path=self.path_files_path)
         else:
             raise ValueError("Algorithm not listed in the case selection")
 
@@ -620,7 +615,7 @@ class TrafficAssignment(AssignmentBase):
         logger.info("Traffic Assignment specification")
         logger.info(self._config)
 
-    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
+    def save_results(self, table_name: str, results, keep_zero_flows=True) -> None:
         """Saves the assignment results to results_database.sqlite
 
         Method fails if table exists
@@ -631,26 +626,23 @@ class TrafficAssignment(AssignmentBase):
             **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
+            Defaults to the project supplied at construction
         """
 
         df = self.results()
         if not keep_zero_flows:
             df = df[df.PCE_tot > 0]
 
-        if not project:
-            project = self.project or get_active_project()
-
         report = {"convergence": self.assignment.convergence_report, "setup": self.info()}
-        record = project.results.new_record(
-            table_name=table_name,
+        results.create(
+            table_name,
+            df,
             procedure="traffic assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -801,7 +793,7 @@ class TrafficAssignment(AssignmentBase):
         }
         return info
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> None:
+    def save_skims(self, matrix_name: str, matrices, which_ones="final", format="omx") -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         :Arguments:
@@ -814,17 +806,14 @@ class TrafficAssignment(AssignmentBase):
             **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-                Defaults to the active project
+                Defaults to the project supplied at construction
         """
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
             raise ImportError("OpenMatrix is not available on your system")
 
-        if not project:
-            project = self.project or get_active_project()
-
-        mats = project.matrices
+        mats = matrices
 
         for cls in self.classes:
             file_name = f"{matrix_name}_{cls._id}.{mat_format}"
@@ -855,7 +844,7 @@ class TrafficAssignment(AssignmentBase):
                 continue
             # Assembling a single final skim file can be done like this
             # We will want only the time for the last iteration and the distance averaged out for all iterations
-            working_name = export_name if mat_format == "aem" else AequilibraeMatrix().random_name()
+            working_name = AequilibraeMatrix().random_name()
 
             kwargs = {
                 "file_name": working_name,
@@ -881,19 +870,8 @@ class TrafficAssignment(AssignmentBase):
 
             out_skims.matrices.flush()  # Make sure that all data went to the disk
 
-            # If it were supposed to be an OMX, we export to one
-            if mat_format == "omx":
-                out_skims.export(export_name)
-
             out_skims.description = f"Skimming for assignment procedure. Class {cls._id}"
-            # Now we create the appropriate record
-
-            record = mats.new_record(f"{matrix_name}_{cls._id}", file_name)
-            record.procedure_id = self.procedure_id
-            record.timestamp = self.procedure_date
-            record.procedure = "Traffic Assignment"
-            record.description = out_skims.description
-            record.save()
+            mats.create(f"{matrix_name}_{cls._id}", file_name, out_skims)
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
@@ -912,7 +890,7 @@ class TrafficAssignment(AssignmentBase):
             class_flows.append(df)
         return pd.concat(class_flows, axis=1).rename_axis("link_id")
 
-    def save_select_link_flows(self, table_name: str, project=None) -> None:
+    def save_select_link_flows(self, table_name: str, results) -> None:
         """
         Saves the select link link flows for all classes into the results database.
 
@@ -920,26 +898,24 @@ class TrafficAssignment(AssignmentBase):
             **table_name** (:obj:`str`): Name of the table being inserted to. Note the traffic class
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
+            Defaults to the project supplied at construction
         """
 
-        if not project:
-            project = self.project or get_active_project()
         df = self.select_link_flows()
 
         report = {}
         description = f"Select link analysis from {self.procedure_id}"
-        record = project.results.new_record(
-            table_name=table_name,
+        results.create(
+            table_name,
+            df,
             procedure="traffic select link",
             procedure_id=f"{self.procedure_id}_sl",
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=description,
         )
-        record.set_data(df)
 
-    def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
+    def save_select_link_matrices(self, matrix_name: str, matrices) -> None:
         """
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
         into OMX format.
@@ -948,12 +924,9 @@ class TrafficAssignment(AssignmentBase):
             **name** (:obj:`str`): name of the matrices
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
+            Defaults to the project supplied at construction
         """
-        if not project:
-            project = self.project or get_active_project()
-
-        mats = project.matrices
+        mats = matrices
 
         file_name = f"{matrix_name}.omx"
 
@@ -992,24 +965,24 @@ class TrafficAssignment(AssignmentBase):
         out_skims.matrices.flush()  # Make sure that all data went to the disk
         out_skims.description = f"Select link matrix from procedure ID {self.procedure_id}_sl."
 
-        out_skims.export(export_name)
+        matrices.create(matrix_name, file_name, out_skims)
 
-    def save_select_link_results(self, name: str) -> None:
+    def save_select_link_results(self, name: str, results, matrices) -> None:
         """
         Saves both the Select Link matrices and flow results at the same time, using the same name.
 
         :Arguments:
             **name** (:obj:`str`): name of the matrices
         """
-        self.save_select_link_flows(name)
-        self.save_select_link_matrices(name)
+        self.save_select_link_flows(name, results)
+        self.save_select_link_matrices(name, matrices)
 
 
 class TransitAssignment(AssignmentBase):
     all_algorithms = ["optimal-strategies", "os"]
 
-    def __init__(self, *args, project=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, parameters=None, path_files_path=None, **kwargs):
+        super().__init__(*args, parameters=parameters, path_files_path=path_files_path, **kwargs)
 
         self._config["Skimming Fields"] = None
 
@@ -1091,7 +1064,7 @@ class TransitAssignment(AssignmentBase):
         logger.info("Transit Assignment specification")
         logger.info(self._config)
 
-    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
+    def save_results(self, table_name: str, results, keep_zero_flows=True) -> None:
         """Saves the assignment results to results_database.sqlite
 
         Method fails if table exists
@@ -1102,26 +1075,23 @@ class TransitAssignment(AssignmentBase):
             **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
+            Defaults to the project supplied at construction
         """
 
         df = self.results()
         if not keep_zero_flows:
             df = df[df.volume > 0]
 
-        if not project:
-            project = project or get_active_project()
-
         report = {"setup": self.info()}
-        record = project.results.new_record(
-            table_name=table_name,
+        results.create(
+            table_name,
+            df,
             procedure="transit assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame

@@ -48,7 +48,7 @@ class GravityCalibration:
         >>> project.close()
     """
 
-    def __init__(self, project=None, **kwargs):
+    def __init__(self, parameters=None, **kwargs):
         """
         Instantiates the Gravity calibration problem
 
@@ -60,7 +60,7 @@ class GravityCalibration:
             **function** (:obj:`str`): Function name to be calibrated. "EXPO" or "POWER"
 
             **project** (:obj:`Project`, *Optional*): The Project to connect to.
-            By default, uses the currently active project
+            Defaults to ``None`` when no project-specific settings are needed
 
             **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
 
@@ -75,9 +75,8 @@ class GravityCalibration:
 
         """
 
-        self.project = project
         self.__required_parameters = ["max trip length", "max iterations", "max error"]
-        self.parameters = kwargs.get("parameters", self.__get_parameters())
+        self.parameters = parameters or kwargs.get("parameters", self.__get_parameters())
 
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
         self.matrix = kwargs.get("matrix")  # type: AequilibraeMatrix
@@ -252,7 +251,7 @@ class GravityCalibration:
             "nan_as_zero": self.nan_as_zero,
         }
 
-        self.gravity = GravityApplication(self.project, **args)
+        self.gravity = GravityApplication(parameters=self.parameters, **args)
         self.gravity.apply()
         self.result_matrix = self.gravity.output
 

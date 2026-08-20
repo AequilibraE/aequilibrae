@@ -1,12 +1,8 @@
 import multiprocessing as mp
-import sys
 
 from aequilibrae.paths.cython.AoN import connectivity_multi_threaded
-
-from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.aeq_signal import SIGNAL
-
-sys.dont_write_bytecode = True
+from aequilibrae.utils.core_setter import set_cores
 
 
 class ConnectivityAnalysis:
@@ -36,8 +32,7 @@ class ConnectivityAnalysis:
 
     connectivity = SIGNAL(object)
 
-    def __init__(self, graph, origins=None, project=None):
-        self.project = project
+    def __init__(self, graph, origins=None):
         self.origins = origins
         self.graph = graph
         self.cores = mp.cpu_count()

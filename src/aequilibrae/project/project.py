@@ -1,4 +1,5 @@
 import functools
+import inspect
 import logging
 import shutil
 from collections import namedtuple
@@ -259,26 +260,37 @@ class Project:
 
     @property
     def parameters(self) -> dict:
-        return self.scenario.parameters
+        return self.scenario.parameters.parameters
 
     @property
     def run(self):
-        """Load and return the AequilibraE run module with default arguments from ``parameters.yml``."""
+        """Load configured run functions, each bound to this project as ``project``."""
         entry_points = self.parameters["run"]
         module = import_file_as_module(
             self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
         )
 
         res = []
-        sentinal = object()
+        sentinel = object()
         for name, kwargs in entry_points.items():
-            attr = getattr(module, name)
-            if attr is sentinal:
+            attr = getattr(module, name, sentinel)
+            if attr is sentinel:
                 raise RuntimeError(f"expected to find callable '{name}' in the run module but didn't")
-            elif not callable(attr):
+            if not callable(attr):
                 raise RuntimeError(f"found symbol '{name}' in the run module but it is not callable")
 
-            func = functools.partial(attr, **(kwargs if kwargs is not None else {}))
+            positional = next(
+                (
+                    parameter
+                    for parameter in inspect.signature(attr).parameters.values()
+                    if parameter.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                ),
+                None,
+            )
+            if positional is None or positional.name != "project":
+                raise RuntimeError(f"run function '{name}' must declare 'project' as its first positional argument")
+
+            func = functools.partial(attr, project=self, **(kwargs if kwargs is not None else {}))
             res.append((name, func))
 
         Run = namedtuple("Run", [k for k, _ in res])

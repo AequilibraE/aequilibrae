@@ -10,8 +10,6 @@ import pandas as pd
 from pandas import json_normalize
 from shapely.geometry import Polygon
 
-from aequilibrae.context import get_active_project
-from aequilibrae.parameters import Parameters
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from aequilibrae.utils.db_utils import commit_and_close, list_columns
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
@@ -30,7 +28,7 @@ class OSMBuilder(WorkerThread):
         logger.info("Preparing OSM builder")
         self.signal.emit(["set_text", "Preparing OSM builder"])
 
-        self.project = project or get_active_project()
+        self.project = project
         self.model_area = geometry_grid(model_area, 4326)
         self.path = self.project.path_to_file
         self.node_start = 10000
@@ -250,8 +248,7 @@ class OSMBuilder(WorkerThread):
         return [letter, link_type]
 
     def __establish_modes_for_all_links(self, conn, df: pd.DataFrame) -> pd.DataFrame:
-        p = Parameters()
-        modes = p.parameters["network"]["osm"]["modes"]
+        modes = self.project.project_parameters.parameters["network"]["osm"]["modes"]
 
         mode_codes = conn.execute("SELECT mode_name, mode_id from modes").fetchall()
         mode_codes = {p[0]: p[1] for p in mode_codes}
@@ -277,8 +274,7 @@ class OSMBuilder(WorkerThread):
         if "oneway" in df.columns:
             df.loc[df.oneway == "yes", "direction"] = 1
             df.loc[df.oneway == "backward", "direction"] = -1
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
+        fields = self.project.project_parameters.parameters["network"]["links"]["fields"]
 
         for x in fields["one-way"]:
             if "link_type" in x.keys():
@@ -329,10 +325,8 @@ class OSMBuilder(WorkerThread):
             conn.execute(f"Alter table Links add column {field} {ltype}")
         conn.commit()
 
-    @staticmethod
-    def get_link_fields():
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
+    def get_link_fields(self):
+        fields = self.project.project_parameters.parameters["network"]["links"]["fields"]
         owf = [list(x.keys())[0] for x in fields["one-way"]]
 
         twf1 = ["{}_ab".format(list(x.keys())[0]) for x in fields["two-way"]]
@@ -340,10 +334,8 @@ class OSMBuilder(WorkerThread):
 
         return owf + twf1 + twf2 + ["osm_id"]
 
-    @staticmethod
-    def get_link_field_type(field_name):
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
+    def get_link_field_type(self, field_name):
+        fields = self.project.project_parameters.parameters["network"]["links"]["fields"]
 
         if field_name[-3:].lower() in ["_ab", "_ba"]:
             field_name = field_name[:-3]

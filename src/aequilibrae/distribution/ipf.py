@@ -8,7 +8,6 @@ import pandas as pd
 import yaml
 from aequilibrae.distribution.cython.ipf_core import ipf_core
 
-from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 
 
@@ -47,7 +46,7 @@ class Ipf:
         >>> project.close()
     """
 
-    def __init__(self, project=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         Instantiates the IPF problem
 
@@ -201,27 +200,6 @@ class Ipf:
 
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
-
-    def save_to_project(self, name: str, file_name: str, project=None):
-        """Saves the matrix output to the project file
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the desired matrix record
-
-            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
-        """
-
-        project = project or get_active_project()
-        mats = project.matrices
-        record = mats.new_record(name, file_name, self.output)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Iterative Proportional fitting"
-        record.save()
-        return record
 
     def __tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)
