@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,11 @@ from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.db_utils import NestedTransactionManager
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+if TYPE_CHECKING:
+    from aequilibrae.project.scenario import Scenario
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 logger = logging.getLogger(__name__)
@@ -38,17 +42,18 @@ class Network(WorkerThread):
     link_types: LinkTypes = None
     signal = SIGNAL(object)
 
-    def __init__(self, project, transactions) -> None:
+    # FIXME: project dependency should be narrowed to its required domain owner.
+    def __init__(self, project: "Scenario", project_connection: NestedTransactionManager) -> None:
         WorkerThread.__init__(self, None)
 
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
-        self.transactions = transactions
-        self.modes = Modes(transactions)
-        self.link_types = LinkTypes(transactions)
-        self.links = Links(transactions)
-        self.nodes = Nodes(transactions)
-        self.periods = Periods(transactions)
+        self._project_connection = project_connection
+        self.modes = Modes(project_connection)
+        self.link_types = LinkTypes(project_connection)
+        self.links = Links(project_connection)
+        self.nodes = Nodes(project_connection)
+        self.periods = Periods(project_connection)
 
     def skimmable_fields(self):
         """
@@ -58,7 +63,7 @@ class Network(WorkerThread):
             :obj:`list`: List of all fields that can be skimmed
         """
 
-        conn = self.transactions
+        conn = self._project_connection.connection
         field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
         ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
@@ -108,7 +113,7 @@ class Network(WorkerThread):
             :obj:`list`: List of all modes
         """
 
-        conn = self.transactions
+        conn = self._project_connection.connection
         all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
@@ -148,7 +153,7 @@ class Network(WorkerThread):
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
-        conn = self.transactions
+        conn = self._project_connection.connection
         conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
         conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
 
@@ -294,7 +299,7 @@ class Network(WorkerThread):
         """
         from aequilibrae.paths import Graph
 
-        conn = self.transactions
+        conn = self._project_connection.connection
         if fields is None:
             field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
@@ -327,11 +332,7 @@ class Network(WorkerThread):
                 df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
             else:
                 sql += spatial_add
-                df = (
-                    pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
-                    .fillna(value=np.nan)
-                    .infer_objects(False)
-                )
+                df = pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,)).fillna(value=np.nan).infer_objects(False)
 
                 # We filter to centroids existing in our filtered area
                 centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
@@ -403,7 +404,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        conn = self.transactions
+        conn = self._project_connection.connection
         poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -413,12 +414,12 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        conn = self.transactions
+        conn = self._project_connection.connection
         sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
         links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        conn = self.transactions
+        conn = self._project_connection.connection
         c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c

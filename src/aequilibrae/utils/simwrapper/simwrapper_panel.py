@@ -231,6 +231,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
         - Read a metric from a results table and join it to ``links``
     """
 
+    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(
         self,
         title,
@@ -291,6 +292,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
 
         self.add_layer("links", layer)
 
+    # FIXME: project dependency should be narrowed to its required domain owner.
     def _compute_data_range(self, project, metric, lower_pct=5, upper_pct=95):
         """Compute a pretty-rounded data range from the 5th and 95th percentiles.
 

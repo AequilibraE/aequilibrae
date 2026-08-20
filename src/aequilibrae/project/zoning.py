@@ -7,9 +7,9 @@ from typing import Union
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
-from shapely.geometry import Point, Polygon, LineString, MultiLineString
+from shapely.geometry import LineString, MultiLineString, Point, Polygon
 
-from aequilibrae.project.network.connector_creation import connector_creation, bulk_connector_creation
+from aequilibrae.project.network.connector_creation import bulk_connector_creation, connector_creation
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.project_creation import run_queries_from_sql_file
@@ -52,15 +52,15 @@ class Zoning(SpatialProjectTable):
 
         if not self.has_zoning:
             qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
-            with self._transactions.transaction():
-                run_queries_from_sql_file(self._transactions, qry_file)
+            with self._transaction_manager.transaction() as conn:
+                run_queries_from_sql_file(conn, qry_file)
         else:
             logger.warning("zones table already exists. Nothing was done")
 
     @property
     def has_zoning(self) -> bool:
         """Whether the project has a 'zones' table"""
-        return has_table(self._transactions, self.name)
+        return has_table(self._transaction_manager.connection, self.name)
 
     def coverage(self) -> Polygon:
         """Returns a single polygon for the entire zoning coverage
@@ -68,13 +68,11 @@ class Zoning(SpatialProjectTable):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        dt = self._transactions.execute('SELECT ST_AsBinary("geometry") FROM zones').fetchall()
+        dt = self._transaction_manager.connection.execute('SELECT ST_AsBinary("geometry") FROM zones').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return union_all(polygons)
 
-    def add_centroid(
-        self, zone_id: int, point: Point | None = None, robust: bool = True
-    ) -> None:
+    def add_centroid(self, zone_id: int, point: Point | None = None, robust: bool = True) -> None:
         """Adds a centroid to the network file for the given zone
 
         :Arguments:
@@ -90,8 +88,7 @@ class Zoning(SpatialProjectTable):
         # This is VERY small in real-world terms (between zero and 11cm)
         shift = 0.000001
 
-        with self._transactions.transaction():
-            conn = self._transactions
+        with self._transaction_manager.transaction() as conn:
             if conn.execute("SELECT count(*) FROM nodes WHERE node_id=?", [zone_id]).fetchone()[0] > 0:
                 logger.warning("Centroid already exists. Failed to create it")
                 return
@@ -125,7 +122,7 @@ class Zoning(SpatialProjectTable):
         """
         i = 0
         existing_centroids = pd.read_sql(
-            "SELECT node_id FROM Nodes WHERE is_centroid = 1", self._transactions
+            "SELECT node_id FROM Nodes WHERE is_centroid = 1", self._transaction_manager
         ).node_id.to_numpy()
         for zone in simple_progress(list(self), SIGNAL(object), "Adding centroids"):
             if zone.zone_id in existing_centroids:
@@ -172,8 +169,8 @@ class Zoning(SpatialProjectTable):
                 considerably faster for connecting a large amount of centroids but has a high runtime overhead.
         """
 
-        nodes = Nodes(self._transactions)
-        links = Links(self._transactions)
+        nodes = Nodes(self._transaction_manager)
+        links = Links(self._transaction_manager)
         proj_nodes = nodes.data
         link_data = links.data
 
@@ -183,7 +180,7 @@ class Zoning(SpatialProjectTable):
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
-            conn = self._transactions
+            conn = self._transaction_manager
 
             if not bulk:
                 zones_todo = [zone for zone in self if zone.zone_id not in connected_centroids]
@@ -199,7 +196,7 @@ class Zoning(SpatialProjectTable):
                         connectors=connectors,
                         proj_nodes=proj_nodes,
                         proj_links=link_data,
-                        transactions=self._transactions,
+                        project_connection=self._transaction_manager,
                         links=links,
                         delimiting_area=zone.geometry if limit_to_zone else None,
                     )
@@ -236,8 +233,7 @@ class Zoning(SpatialProjectTable):
             **zone_id** (:obj:`int`, *Optional*): Zone to disconnect. Disconnects all zones if not provided
         """
 
-        with self._transactions.transaction():
-            conn = self._transactions
+        with self._transaction_manager.transaction() as conn:
             if zone_id is None:
                 zone_filter, data = "a_node IN (SELECT zone_id FROM zones)", []
             else:

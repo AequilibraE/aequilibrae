@@ -40,6 +40,7 @@ from aequilibrae.utils.simwrapper.simwrapper_utils import (
 class SimwrapperConfigGenerator:
     """Generates SimWrapper dashboard configuration for an AequilibraE project."""
 
+    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(
         self,
         project,

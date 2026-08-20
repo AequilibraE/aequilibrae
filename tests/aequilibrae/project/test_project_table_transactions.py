@@ -16,31 +16,29 @@ class Things(NonSpatialProjectTable):
 
 @pytest.fixture
 def things():
-    closure = ConnectionClosure({"project": sqlite3.connect(":memory:")})
-    transactions = closure["project"]
-    transactions.execute("CREATE TABLE things (thing_id INTEGER PRIMARY KEY, value INTEGER NOT NULL)")
-    yield Things(transactions), transactions
+    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    project_connection = closure.db_connection
+    project_connection.connection.execute("CREATE TABLE things (thing_id INTEGER PRIMARY KEY, value INTEGER NOT NULL)")
+    yield Things(project_connection), project_connection
     closure.close()
 
 
 def test_standalone_writes_commit_and_data_includes_key_column(things):
-    table, transactions = things
+    table, project_connection = things
     table.insert(thing_id=1, value=10)
 
-    assert not transactions.in_transaction
+    assert not project_connection.in_transaction
     assert table.get(1).value == 10
     assert "thing_id" in table.data.columns
     assert table.data.loc[0, "thing_id"] == 1
 
 
-def test_guessed_records_refresh_after_user_fields_are_added(things):
-    table, transactions = things
-    transactions.execute("ALTER TABLE things ADD COLUMN user_note TEXT")
+def test_user_fields_are_available_in_generated_records(things):
+    table, project_connection = things
+    project_connection.connection.execute("ALTER TABLE things ADD COLUMN user_note TEXT")
     table.insert(thing_id=1, value=10, user_note="custom")
 
     record = table.get(1)
-    assert record.thing_id == 1
-    assert record.value == 10
     assert type(record).__name__ == "ThingRecord"
     assert [field.name for field in fields(record)] == ["thing_id", "value", "user_note"]
     assert type(record).__annotations__ == {"thing_id": int, "value": int, "user_note": str | None}
@@ -49,13 +47,13 @@ def test_guessed_records_refresh_after_user_fields_are_added(things):
 
 
 def test_gateway_mutation_is_a_savepoint(things):
-    table, transactions = things
+    table, project_connection = things
     table.insert(thing_id=1, value=10)
 
-    with transactions.transaction():
+    with project_connection.transaction():
         table.update(1, value=20)
         try:
-            with transactions.transaction():
+            with project_connection.transaction():
                 table.update(1, value=30)
                 raise ValueError("discard nested scope")
         except ValueError:

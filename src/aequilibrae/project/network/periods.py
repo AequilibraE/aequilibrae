@@ -29,9 +29,7 @@ class Periods(NonSpatialProjectTable):
     key = "period_id"
     record_name = "PeriodRecord"
 
-    def new_period(
-        self, period_id: int, start: int, end: int, description: str | None = None
-    ) -> int:
+    def new_period(self, period_id: int, start: int, end: int, description: str | None = None) -> int:
         """Creates a new period with a given ID
 
         :Arguments:

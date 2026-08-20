@@ -19,7 +19,7 @@ from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
 from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.utils.db_utils import NestedTransactions
+from aequilibrae.utils.db_utils import NestedTransactionManager
 from aequilibrae.utils.get_table import get_geo_table
 
 _TABLE_INFO_SQL = 'PRAGMA table_info("{table}")'
@@ -42,6 +42,7 @@ _ASSIGNMENT = '"{column}"={placeholder}'
 _GEOMETRY_PLACEHOLDER = "GeomFromWKB(?, {srid})"
 _MULTI_GEOMETRY_PLACEHOLDER = "ST_Multi(GeomFromWKB(?, {srid}))"
 
+
 _SQLITE_TYPE_HINTS = (
     ("INT", int),
     ("CHAR", str),
@@ -49,8 +50,8 @@ _SQLITE_TYPE_HINTS = (
     ("TEXT", str),
     ("BLOB", bytes),
     ("REAL", float),
-    ("FLOA", float),
-    ("DOUB", float),
+    ("FLOA", float),  # Not typo see https://www.sqlite.org/datatype3.html
+    ("DOUB", float),  # Not typo
     ("BOOL", bool),
     ("DATE", str),
     ("TIME", str),
@@ -59,42 +60,24 @@ _SQLITE_TYPE_HINTS = (
 )
 
 
-def _python_type(column: str, declared_type: str, nullable: bool) -> type:
+def _python_type(column: str, declared_type: str, nullable: bool) -> type[Any]:
     """Return a best-effort Python annotation for one SQLite column."""
     if column == "geometry":
-        hint = BaseGeometry
+        hint: type[Any] = BaseGeometry
     else:
-        declared_type = declared_type.upper()
-        hint = next((hint for token, hint in _SQLITE_TYPE_HINTS if token in declared_type), Any)
+        hint = next((hint for token, hint in _SQLITE_TYPE_HINTS if token in declared_type.upper()), Any)
     return hint | None if nullable and hint is not Any else hint
 
 
-def guess_record_type(transactions: NestedTransactions, table: str, record_name: str) -> type:
-    """Inspect ``table`` and create a frozen dataclass matching its current fields.
-
-    SQLite uses dynamic typing, so annotations are necessarily best guesses
-    based on declared column affinity. User-defined fields are included because
-    the live table schema is inspected when its gateway is constructed.
-
-    :Arguments:
-        **transactions** (:obj:`NestedTransactions`): Manager for the database
-        containing the table.
-
-        **table** (:obj:`str`): Name of the table to inspect.
-
-        **record_name** (:obj:`str`): Name to assign to the generated dataclass.
-
-    :Returns:
-        **record type** (:obj:`type`): A frozen dataclass type for table rows.
-    """
-    schema = transactions.execute(_TABLE_INFO_SQL.format(table=table)).fetchall()
-    fields = []
+def guess_record_type(connection: NestedTransactionManager, table: str, record_name: str) -> type[Any]:
+    """Build a frozen record type from the table's current schema."""
+    schema = connection.connection.execute(_TABLE_INFO_SQL.format(table=table)).fetchall()
+    record_fields = []
     for _, column, declared_type, required, _, primary_key in schema:
         if column == "ogc_fid":
             continue
-        nullable = not required and not primary_key
-        fields.append((column, _python_type(column, declared_type, nullable)))
-    return make_dataclass(record_name, fields, frozen=True)
+        record_fields.append((column, _python_type(column, declared_type, not required and not primary_key)))
+    return make_dataclass(record_name, record_fields, frozen=True)
 
 
 @lru_cache(maxsize=None)
@@ -109,9 +92,7 @@ def _format_insert(table: str, columns: tuple[str, ...], geometry_placeholder: s
 
 
 @lru_cache(maxsize=None)
-def _format_update(
-    table: str, key: str, columns: tuple[str, ...], geometry_placeholder: str | None
-) -> str:
+def _format_update(table: str, key: str, columns: tuple[str, ...], geometry_placeholder: str | None) -> str:
     """Format one UPDATE shape, shared by every gateway instance."""
     assignments = []
     for column in columns:
@@ -124,8 +105,8 @@ class ProjectTable(ABC):
     """Common implementation for one project-database table.
 
     Subclasses declare the table name, key, and generated-record name. During
-    construction, ``record_type`` becomes a frozen dataclass whose fields and
-    annotations are inferred from the live SQLite schema. Concrete gateways
+    construction, ``record_type`` is a frozen dataclass matching the live
+    SQLite schema, including user-added fields. Concrete gateways
     must inherit either :class:`NonSpatialProjectTable` or
     :class:`SpatialProjectTable` so geometry handling is never mixed into an
     ordinary table by a boolean flag.
@@ -138,25 +119,24 @@ class ProjectTable(ABC):
     name: str = ""
     key: str = ""
     record_name: str = ""
-    record_type: type
+    record_type: type[Any]
     defaults: Mapping[str, Any] = {}
     _geometry_placeholder: str | None = None
 
-    def __init__(self, transactions: NestedTransactions) -> None:
+    def __init__(self, connection: NestedTransactionManager) -> None:
         """Configure the gateway and pre-format its stable SQL statements.
 
         :Arguments:
-            **transactions** (:obj:`NestedTransactions`): Manager owning the
+            **connection** (:obj:`NestedTransactionManager`): Manager owning the
             persistent connection used by this gateway.
         """
-        if not isinstance(transactions, NestedTransactions):
-            raise TypeError("ProjectTable requires a NestedTransactions manager")
+        if not isinstance(connection, NestedTransactionManager):
+            raise TypeError("ProjectTable requires a NestedTransactionManager manager")
         if not self.name or not self.key or not self.record_name:
             raise TypeError(f"{self.__class__.__name__} must define a table name, key, and record name")
 
-        self._transactions = transactions
+        self._transaction_manager = connection
         self._record_schema_version = -1
-
         self._table_info_sql = _TABLE_INFO_SQL.format(table=self.name)
         self._count_sql = _COUNT_SQL.format(table=self.name)
         self._contains_sql = _CONTAINS_SQL.format(table=self.name, key=self.key)
@@ -169,18 +149,18 @@ class ProjectTable(ABC):
     @property
     def columns(self) -> tuple[str, ...]:
         """Return the current writable table columns, including user fields."""
-        rows = self._transactions.execute(self._table_info_sql).fetchall()
+        rows = self._transaction_manager.connection.execute(self._table_info_sql).fetchall()
         return tuple(row[1] for row in rows if row[1] != "ogc_fid")
 
     @property
     def fields(self) -> FieldEditor:
         """Return the metadata editor for this table's fields."""
-        return FieldEditor(self._transactions, self.name)
+        return FieldEditor(self._transaction_manager, self.name)
 
     @property
     def data(self) -> pd.DataFrame:
         """Return all table data, including the record key as a column."""
-        return get_geo_table(self.name, self._transactions)
+        return get_geo_table(self.name, self._transaction_manager.connection)
 
     def get(self, key: Any) -> Any:
         """Return one immutable record snapshot identified by ``key``.
@@ -192,7 +172,7 @@ class ProjectTable(ABC):
             **record** (:obj:`Any`): Frozen dataclass snapshot of the row.
         """
         self._refresh_record_type()
-        row = self._transactions.execute(self._select_one_sql, [key]).fetchone()
+        row = self._transaction_manager.connection.execute(self._select_one_sql, [key]).fetchone()
         if row is None:
             raise self._missing_record(key)
         return self._build_record(row)
@@ -200,16 +180,16 @@ class ProjectTable(ABC):
     def __iter__(self) -> Iterator[Any]:
         """Iterate over immutable snapshots of all records."""
         self._refresh_record_type()
-        rows = self._transactions.execute(self._select_all_sql).fetchall()
+        rows = self._transaction_manager.connection.execute(self._select_all_sql).fetchall()
         return iter(self._build_record(row) for row in rows)
 
     def __len__(self) -> int:
         """Return the number of records in the table."""
-        return self._transactions.execute(self._count_sql).fetchone()[0]
+        return self._transaction_manager.connection.execute(self._count_sql).fetchone()[0]
 
     def __contains__(self, key: Any) -> bool:
         """Return whether a record with ``key`` exists."""
-        return self._transactions.execute(self._contains_sql, [key]).fetchone() is not None
+        return self._transaction_manager.connection.execute(self._contains_sql, [key]).fetchone() is not None
 
     def insert(self, **values: Any) -> Any:
         """Insert one record and return its explicit or generated key.
@@ -221,14 +201,14 @@ class ProjectTable(ABC):
         :Returns:
             **key** (:obj:`Any`): Explicit or generated record key.
         """
-        with self._transactions.transaction():
+        with self._transaction_manager.transaction() as conn:
             row = self._prepare_insert(values)
             if row.get(self.key) is None:
                 row[self.key] = self._next_key()
 
             sql = self._insert_statement(tuple(row))
             parameters = [self._database_value(value) for value in row.values()]
-            self._transactions.execute(sql, parameters)
+            conn.execute(sql, parameters)
 
         self._invalidate()
         return row[self.key]
@@ -241,12 +221,12 @@ class ProjectTable(ABC):
 
             **values** (:obj:`Any`): Column values to write.
         """
-        with self._transactions.transaction():
+        with self._transaction_manager.transaction() as conn:
             sql = self._update_statement(tuple(values))
             parameters = [self._database_value(value) for value in values.values()]
             parameters.append(key)
 
-            if self._transactions.execute(sql, parameters).rowcount == 0:
+            if conn.execute(sql, parameters).rowcount == 0:
                 raise self._missing_record(key)
 
         self._invalidate()
@@ -257,8 +237,8 @@ class ProjectTable(ABC):
         :Arguments:
             **key** (:obj:`Any`): Key of the record to delete.
         """
-        with self._transactions.transaction():
-            cursor = self._transactions.execute(self._delete_sql, [key])
+        with self._transaction_manager.transaction() as conn:
+            cursor = conn.execute(self._delete_sql, [key])
             if cursor.rowcount == 0:
                 raise self._missing_record(key)
 
@@ -275,9 +255,9 @@ class ProjectTable(ABC):
         """
         value_columns = tuple(column for column in frame.columns if column != self.key)
 
-        with self._transactions.transaction():
+        with self._transaction_manager.transaction() as conn:
             rows = self._prepare_update_rows(frame, value_columns)
-            self._transactions.executemany(self._update_statement(value_columns), rows)
+            conn.executemany(self._update_statement(value_columns), rows)
 
         self._invalidate()
         return len(rows)
@@ -294,7 +274,7 @@ class ProjectTable(ABC):
         inserted_keys = []
         next_key = None
 
-        with self._transactions.transaction():
+        with self._transaction_manager.transaction() as conn:
             for values in frame.to_dict("records"):
                 row = self._prepare_insert(values)
                 if row.get(self.key) is None:
@@ -305,24 +285,22 @@ class ProjectTable(ABC):
 
                 sql = self._insert_statement(tuple(row))
                 parameters = [self._database_value(value) for value in row.values()]
-                self._transactions.execute(sql, parameters)
+                conn.execute(sql, parameters)
                 inserted_keys.append(row[self.key])
 
         self._invalidate()
         return inserted_keys
 
     def _refresh_record_type(self) -> None:
-        """Rebuild the guessed record after the SQLite schema changes."""
-        schema_version = self._transactions.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
+        """Refresh the generated record type after a schema change."""
+        schema_version = self._transaction_manager.connection.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
         if schema_version == self._record_schema_version:
             return
-
-        self.record_type = guess_record_type(self._transactions, self.name, self.record_name)
+        self.record_type = guess_record_type(self._transaction_manager, self.name, self.record_name)
         self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
         record_columns = ",".join(self._select_column(column) for column in self._record_fields)
-        sql_values = {"table": self.name, "key": self.key, "columns": record_columns}
-        self._select_all_sql = _SELECT_SQL.format(**sql_values)
-        self._select_one_sql = _SELECT_ONE_SQL.format(**sql_values)
+        self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=record_columns)
+        self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=record_columns)
         self._record_schema_version = schema_version
 
     def _build_record(self, row: tuple[Any, ...]) -> Any:
@@ -338,9 +316,7 @@ class ProjectTable(ABC):
         row.update((column, value) for column, value in values.items() if value is not None)
         return {column: value for column, value in row.items() if value is not None}
 
-    def _prepare_update_rows(
-        self, frame: pd.DataFrame, value_columns: tuple[str, ...]
-    ) -> list[list[Any]]:
+    def _prepare_update_rows(self, frame: pd.DataFrame, value_columns: tuple[str, ...]) -> list[list[Any]]:
         """Convert DataFrame records into SQLite parameter rows."""
         rows = []
         for values in frame.to_dict("records"):
@@ -363,13 +339,13 @@ class ProjectTable(ABC):
 
     def _next_key(self) -> Any:
         """Return the next numeric key available in the table."""
-        current = self._transactions.execute(self._max_key_sql).fetchone()[0]
+        current = self._transaction_manager.connection.execute(self._max_key_sql).fetchone()[0]
         return 1 if current is None else current + 1
 
     def _change_key(self, key: Any, new_key: Any) -> None:
         """Change a record key for gateways exposing a renumber operation."""
-        with self._transactions.transaction():
-            cursor = self._transactions.execute(self._change_key_sql, [new_key, key])
+        with self._transaction_manager.transaction() as conn:
+            cursor = conn.execute(self._change_key_sql, [new_key, key])
             if cursor.rowcount == 0:
                 raise self._missing_record(key)
         self._invalidate()
@@ -417,16 +393,16 @@ class SpatialProjectTable(ProjectTable):
     multi_part = False
     srid = 4326
 
-    def __init__(self, transactions: NestedTransactions) -> None:
+    def __init__(self, connection: NestedTransactionManager) -> None:
         srid = int(self.srid)
         template = _MULTI_GEOMETRY_PLACEHOLDER if self.multi_part else _GEOMETRY_PLACEHOLDER
         self._geometry_placeholder = template.format(srid=srid)
-        super().__init__(transactions)
+        super().__init__(connection)
         self._extent_sql = _EXTENT_SQL.format(table=self.name)
 
     def extent(self) -> Polygon:
         """Return the bounding polygon for the table's geometry layer."""
-        data = self._transactions.execute(self._extent_sql).fetchone()[0]
+        data = self._transaction_manager.connection.execute(self._extent_sql).fetchone()[0]
         return shapely.wkb.loads(data)
 
     def _select_column(self, column: str) -> str:
