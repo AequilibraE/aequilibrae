@@ -1,6 +1,5 @@
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 
 
@@ -10,7 +9,7 @@ def route_system_builder(build_gtfs_project):
     yield GTFSRouteSystemBuilder(
         network=build_gtfs_project.project.network,
         zoning=build_gtfs_project.project.zoning,
-        transit_manager=build_gtfs_project.project.scenario.connections["transit"],
+        transit_manager=build_gtfs_project.project.transit_connection,
         agency_identifier="LISERCO, LISANCO, LINCOSUR",
         file_path=gtfs_file,
     )
@@ -53,7 +52,7 @@ def test_map_match(route_system_builder):
     route_system_builder.map_match([3, 1, 2])
     route_system_builder.save_to_disk()
 
-    with database_connection("transit") as transit_conn:
+    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
         assert transit_conn.execute("SELECT * FROM pattern_mapping;").fetchone()[0] > 1
 
 
@@ -98,7 +97,7 @@ def test_save_to_disk(route_system_builder):
     route_system_builder.load_date("2016-04-13")
     route_system_builder.save_to_disk()
 
-    with database_connection("transit") as transit_conn:
+    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
         assert len(transit_conn.execute("SELECT * FROM route_links").fetchall()) == 78
         assert len(transit_conn.execute("SELECT * FROM trips;").fetchall()) == 360
         assert len(transit_conn.execute("SELECT * FROM routes;").fetchall()) == 2

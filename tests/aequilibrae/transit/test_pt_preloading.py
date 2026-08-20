@@ -1,12 +1,11 @@
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
-from aequilibrae.transit import Transit
 
 
 @pytest.fixture(scope="function")
 def transit(coquimbo_example: Project):
-    return Transit(coquimbo_example)
+    return coquimbo_example.transit
 
 
 @pytest.fixture(scope="function")

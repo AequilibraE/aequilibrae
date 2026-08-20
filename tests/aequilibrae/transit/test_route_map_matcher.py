@@ -2,7 +2,6 @@ import pandas as pd
 import geopandas as gpd
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
 
@@ -13,7 +12,7 @@ def route_system_builder(build_gtfs_project):
     yield GTFSRouteSystemBuilder(
         network=build_gtfs_project.project.network,
         zoning=build_gtfs_project.project.zoning,
-        transit_manager=build_gtfs_project.project.scenario.connections["transit"],
+        transit_manager=build_gtfs_project.project.transit_connection,
         agency_identifier="LISERCO, LISANCO, LINCOSUR",
         file_path=gtfs_file,
     )

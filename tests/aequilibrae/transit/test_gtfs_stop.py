@@ -4,7 +4,6 @@ from random import randint, choice, uniform
 import pytest
 from shapely.geometry import LineString
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Stop
 from .random_word import randomword
@@ -65,12 +64,12 @@ def test_save_to_database(data, build_gtfs_project):
         "VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"
     )
 
-    with database_connection("transit") as transit_conn:
-        s.save_to_database(transit_conn, commit=True)
+    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+        s.save_to_database(transit_conn, commit=False)
         transit_conn.execute(
             sql_tl, [tlink_id, randint(1, 1000000000), randint(1, 10), s.stop_id, s.stop_id + 1, 0, line]
         )
 
-    result = list(transit_conn.execute(sql, [data["stop_id"]]).fetchone())
-    expected = [s.agency_id, link, direc, data["stop_desc"], data["stop_street"]]
-    assert result == expected, "Saving Stop to the database failed"
+        result = list(transit_conn.execute(sql, [data["stop_id"]]).fetchone())
+        expected = [s.agency_id, link, direc, data["stop_desc"], data["stop_street"]]
+        assert result == expected, "Saving Stop to the database failed"

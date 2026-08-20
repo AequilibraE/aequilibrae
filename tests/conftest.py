@@ -11,7 +11,6 @@ import pytest
 
 from aequilibrae import Project
 from aequilibrae.project.project_creation import remove_triggers
-from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
 from tests.data.reference_files import siouxfalls_project
@@ -148,8 +147,7 @@ def triangle_graph_blocking(test_data_path, tmp_path) -> Project:
 def build_gtfs_project(coquimbo_example):
     prj = coquimbo_example
 
-    (coquimbo_example.project_base_path / "public_transport.sqlite").unlink(True)
-    data = Transit(prj)
+    data = prj.transit
     yield data
     prj.close()
 

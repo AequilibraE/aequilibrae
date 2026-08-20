@@ -1,12 +1,11 @@
 import pytest
 
 from aequilibrae.project.project import Project
-from aequilibrae.transit import Transit
 
 
 @pytest.fixture(scope="function")
 def create_project(empty_project: Project):
-    yield Transit(empty_project)
+    yield empty_project.transit
 
 
 @pytest.mark.parametrize(

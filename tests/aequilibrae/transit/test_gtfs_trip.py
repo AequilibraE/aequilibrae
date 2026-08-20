@@ -3,7 +3,6 @@ from random import randint, choice
 
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.transit_elements import Trip
 from .random_word import randomword
 
@@ -51,8 +50,8 @@ def test_save_to_database(build_gtfs_project, data):
     r.pattern_id = patid
     r.source_time = [0] * len(times)
 
-    with database_connection("transit") as transit_conn:
-        r.save_to_database(transit_conn)
+    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+        r.save_to_database(transit_conn, commit=False)
         result = transit_conn.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
 
         records, counter = transit_conn.execute(

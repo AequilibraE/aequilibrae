@@ -1,6 +1,5 @@
 from os.path import isfile, join
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants
 
 
@@ -8,8 +7,8 @@ def test_new_gtfs_builder(build_gtfs_project):
     c = Constants()
     c.agencies["agencies"] = 0
 
-    conn = database_connection("transit")
-    existing = conn.execute("SELECT COALESCE(MAX(DISTINCT(agency_id)), 0) FROM agencies;").fetchone()[0]
+    with build_gtfs_project.project.transit_connection.transaction() as conn:
+        existing = conn.execute("SELECT COALESCE(MAX(DISTINCT(agency_id)), 0) FROM agencies;").fetchone()[0]
 
     transit = build_gtfs_project.new_gtfs_builder(
         agency="Agency_1",
@@ -28,7 +27,8 @@ def test_new_gtfs_builder(build_gtfs_project):
     transit.save_to_disk()
     transit2.save_to_disk()
 
-    assert conn.execute("SELECT MAX(DISTINCT(agency_id)) FROM agencies;").fetchone()[0] == existing + 2
+    with build_gtfs_project.project.transit_connection.transaction() as conn:
+        assert conn.execute("SELECT MAX(DISTINCT(agency_id)) FROM agencies;").fetchone()[0] == existing + 2
 
     transit3 = build_gtfs_project.new_gtfs_builder(
         agency="Agency_3",
@@ -37,7 +37,8 @@ def test_new_gtfs_builder(build_gtfs_project):
     )
 
     transit3.save_to_disk()
-    assert conn.execute("SELECT MAX(DISTINCT(agency_id)) FROM agencies;").fetchone()[0] == existing + 3
+    with build_gtfs_project.project.transit_connection.transaction() as conn:
+        assert conn.execute("SELECT MAX(DISTINCT(agency_id)) FROM agencies;").fetchone()[0] == existing + 3
 
 
 def test___create_transit_database(build_gtfs_project):

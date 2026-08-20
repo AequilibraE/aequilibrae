@@ -5,7 +5,6 @@ from random import randint
 import pytest
 from shapely.geometry import LineString
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link
 from .random_word import randomword
@@ -47,23 +46,24 @@ def test_save_to_database(srid, build_gtfs_project):
 
     new_link = Link(srid)
 
-    with database_connection("transit") as transit_conn:
-        with pytest.raises(AttributeError):
-            new_link.save_to_database(transit_conn)
+    transit_manager = build_gtfs_project.project.transit_connection
+    with pytest.raises(AttributeError):
+        new_link.save_to_database(transit_manager)
 
-        new_link.geo = geo
-        new_link.transit_link = 10000001
-        new_link.type = route_type
-        new_link.from_stop = fstop
-        new_link.to_stop = tstop
+    new_link.geo = geo
+    new_link.transit_link = 10000001
+    new_link.type = route_type
+    new_link.from_stop = fstop
+    new_link.to_stop = tstop
 
+    with transit_manager.transaction() as transit_conn:
         with pytest.raises(sqlite3.IntegrityError):
-            new_link.save_to_database(transit_conn)
+            new_link.save_to_database(transit_conn, commit=False)
 
         new_link.pattern_id = 10001001000
         new_link.seq = 4
 
-        new_link.save_to_database(transit_conn)
+        new_link.save_to_database(transit_conn, commit=False)
 
         from_stop, to_stop, dist = transit_conn.execute(
             "Select from_stop, to_stop, distance from route_links where from_stop=?", [fstop]

@@ -23,7 +23,7 @@ def test_pattern_complete(build_gtfs_project, pat):
     pat.map_match()
 
     # We save the pattern to the database
-    with build_gtfs_project.project.transit_connection as transit_conn:
+    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
         pat.save_to_database(transit_conn)
         routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
         pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
