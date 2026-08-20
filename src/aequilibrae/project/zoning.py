@@ -122,7 +122,7 @@ class Zoning(SpatialProjectTable):
         """
         i = 0
         existing_centroids = pd.read_sql(
-            "SELECT node_id FROM Nodes WHERE is_centroid = 1", self._transaction_manager
+            "SELECT node_id FROM Nodes WHERE is_centroid = 1", self._transaction_manager.connection
         ).node_id.to_numpy()
         for zone in simple_progress(list(self), SIGNAL(object), "Adding centroids"):
             if zone.zone_id in existing_centroids:
@@ -180,8 +180,6 @@ class Zoning(SpatialProjectTable):
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
-            conn = self._transaction_manager
-
             if not bulk:
                 zones_todo = [zone for zone in self if zone.zone_id not in connected_centroids]
                 for zone in simple_progress(zones_todo, SIGNAL(object), "Connecting zones"):
@@ -212,16 +210,17 @@ class Zoning(SpatialProjectTable):
                 if zones.empty:
                     return
 
-                bulk_connector_creation(
-                    conn,
-                    nodes,
-                    link_data,
-                    zones,
-                    modes=[mode_id],
-                    k_connectors=connectors,
-                    projected_crs=None,
-                    limit_to_zone=limit_to_zone,
-                )
+                with self._transaction_manager.transaction() as conn:
+                    bulk_connector_creation(
+                        conn,
+                        nodes,
+                        link_data,
+                        zones,
+                        modes=[mode_id],
+                        k_connectors=connectors,
+                        projected_crs=None,
+                        limit_to_zone=limit_to_zone,
+                    )
         self._invalidate()
 
     def disconnect_mode(self, mode_id: str, zone_id: int | None = None) -> None:

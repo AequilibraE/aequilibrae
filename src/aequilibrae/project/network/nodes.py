@@ -123,6 +123,7 @@ class Nodes(SpatialProjectTable):
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
         frame = pd.read_sql(
-            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", self._transaction_manager
+            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes",
+            self._transaction_manager.connection,
         )
         return frame.set_index("node_id")
