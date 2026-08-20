@@ -47,4 +47,4 @@ def test_fit(sioux_falls_test):
 
     mats.create("my_matrix_ipf", "my_matrix_ipf.aem", fratar.output)
 
-    assert os.path.isfile(os.path.join(mats.fldr, "my_matrix_ipf.aem")), "Did not save file to the appropriate place"
+    assert os.path.isfile(os.path.join(mats.folder, "my_matrix_ipf.aem")), "Did not save file to the appropriate place"

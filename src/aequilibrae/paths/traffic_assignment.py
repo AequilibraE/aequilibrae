@@ -818,7 +818,7 @@ class TrafficAssignment(AssignmentBase):
         for cls in self.classes:
             file_name = f"{matrix_name}_{cls._id}.{mat_format}"
 
-            export_name = path.join(mats.fldr, file_name)
+            export_name = mats.folder / file_name
 
             if path.isfile(export_name):
                 raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
@@ -930,7 +930,7 @@ class TrafficAssignment(AssignmentBase):
 
         file_name = f"{matrix_name}.omx"
 
-        export_name = path.join(mats.fldr, file_name)
+        export_name = mats.folder / file_name
 
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")

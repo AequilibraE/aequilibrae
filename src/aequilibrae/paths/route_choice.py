@@ -692,7 +692,7 @@ class RouteChoice:
             results=results,
         )
 
-        path = (pathlib.Path(matrices.fldr) / table_name).with_suffix(".omx")
+        path = (matrices.folder / table_name).with_suffix(".omx")
         for sl_name, v in self.get_select_link_od_matrix_results().items():
             for demand_name, mat in v.items():
                 mat.to_disk(path, sl_name + "_" + demand_name)

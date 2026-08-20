@@ -390,7 +390,7 @@ class Project:
         scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
 
         current_scenario = self.scenario.name
-        matrices_path = self.matrices.fldr
+        matrices_path = self.matrices.folder
         project_db_path = self._project_database_path
         transit_db_path = self._transit_database_path
         results_db_path = self._results_database_path

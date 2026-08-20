@@ -49,7 +49,7 @@ class Scenario:
         # that helpers (OSMBuilder, TransitGraphBuilder, …) can reach path/connection
         # attributes without creating a circular dependency with Project.
         self.network = Network(self, project_manager)
-        self.zoning = Zoning(self.network)
+        self.zoning = Zoning(project_manager)
         if "results" in self.connections:
             self._results = Results(project_manager, self.connections["results"])
         if "transit" in self.connections:

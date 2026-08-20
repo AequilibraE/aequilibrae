@@ -44,11 +44,11 @@ class Network(WorkerThread):
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
         self.transactions = transactions
-        self.modes = Modes(self)
-        self.link_types = LinkTypes(self)
-        self.links = Links(self)
-        self.nodes = Nodes(self)
-        self.periods = Periods(self)
+        self.modes = Modes(transactions)
+        self.link_types = LinkTypes(transactions)
+        self.links = Links(transactions)
+        self.nodes = Nodes(transactions)
+        self.periods = Periods(transactions)
 
     def skimmable_fields(self):
         """

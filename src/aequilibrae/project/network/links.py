@@ -1,11 +1,12 @@
 import logging
+from typing import Any
 
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import SpatialProjectTable
 
 logger = logging.getLogger(__name__)
 
 
-class Links(ProjectTable):
+class Links(SpatialProjectTable):
     """
     Access to the API resources to manipulate the links table in the network
 
@@ -38,23 +39,23 @@ class Links(ProjectTable):
     name = "links"
     key = "link_id"
     record_name = "LinkRecord"
-    spatial = True
-    protected = frozenset(("a_node", "b_node"))
     defaults = {"a_node": 0, "b_node": 0, "direction": 0, "link_type": "default"}
-
-    def __init__(self, net):
-        super().__init__(net.transactions)
+    _copy_excluded_fields = frozenset(("a_node", "b_node"))
 
     def copy(self, link_id: int) -> int:
-        """Duplicates a link under a new id, returning that id
+        """Duplicate a link under a new ID and return that ID.
 
-        It raises an error if ``link_id`` does not exist
+        :Arguments:
+            **link_id** (:obj:`int`): ID of the link to duplicate.
+
+        :Returns:
+            **link ID** (:obj:`int`): Generated ID of the duplicate.
         """
         link = self.get(link_id)
-        values = {k: v for k, v in vars(link).items() if k != self.key and k not in self.protected}
+        values = {k: v for k, v in vars(link).items() if k != self.key and k not in self._copy_excluded_fields}
         return self.insert(**values)
 
-    def add_mode(self, link_id: int, mode):
+    def add_mode(self, link_id: int, mode: Any) -> None:
         """Adds a mode to a link
 
         Logs a warning if the mode is already allowed on the link
@@ -71,7 +72,7 @@ class Links(ProjectTable):
             return
         self.update(link_id, modes=modes + mode_id)
 
-    def drop_mode(self, link_id: int, mode):
+    def drop_mode(self, link_id: int, mode: Any) -> None:
         """Removes a mode from a link
 
         Logs a warning if the mode is already NOT allowed on the link
@@ -88,15 +89,8 @@ class Links(ProjectTable):
             return
         self.update(link_id, modes=modes.replace(mode_id, ""))
 
-    def _check_modes(self, modes) -> str:
-        if not isinstance(modes, str):
-            raise ValueError("Modes field needs to be a string")
-        if modes == "":
-            raise ValueError("Modes field needs to have at least one mode")
-        return modes
-
     @staticmethod
-    def __mode_id_of(mode) -> str:
+    def __mode_id_of(mode: Any) -> str:
         mode_id = getattr(mode, "mode_id", mode)
         if not isinstance(mode_id, str):
             raise TypeError("You should provide a mode_id (string) or a mode record")

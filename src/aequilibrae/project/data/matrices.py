@@ -2,34 +2,59 @@ import logging
 import os
 import uuid
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import NonSpatialProjectTable
+from aequilibrae.utils.db_utils import NestedTransactions
 
 logger = logging.getLogger(__name__)
 
 
-class Matrices(ProjectTable):
+class Matrices(NonSpatialProjectTable):
     """Matrix metadata gateway with explicit file-managing helpers."""
 
     name = "matrices"
     key = "name"
     record_name = "MatrixRecord"
 
-    def __init__(self, transactions, matrices_path):
-        super().__init__(transactions)
-        self.fldr = str(Path(matrices_path))
+    def __init__(self, transactions: NestedTransactions, matrices_path: str | Path) -> None:
+        """Create the matrix metadata gateway.
 
-    def create(self, name: str, file_name: str, matrix: AequilibraeMatrix = None):
-        """Create matrix metadata and optionally export a new matrix file.
+        :Arguments:
+            **transactions** (:obj:`NestedTransactions`): Manager for the
+            project database containing matrix metadata.
+
+            **matrices_path** (:obj:`str` or :obj:`Path`): Directory containing
+            matrix payload files.
+        """
+        super().__init__(transactions)
+        self.folder: Path = Path(matrices_path)
+
+    def create(
+        self, name: str, file_name: str, matrix: AequilibraeMatrix | None = None
+    ) -> Any:
+        """Create matrix metadata and optionally export a matrix payload.
 
         This filesystem operation cannot participate in a project transaction.
         A file supplied for registration remains caller-owned on failure.
+
+        :Arguments:
+            **name** (:obj:`str`): Unique matrix name stored in project metadata.
+
+            **file_name** (:obj:`str`): Matrix payload file name relative to the
+            project's matrix directory.
+
+            **matrix** (:obj:`AequilibraeMatrix`, *Optional*): Matrix to export.
+            If omitted, ``file_name`` must already exist.
+
+        :Returns:
+            **matrix record** (:obj:`Any`): Generated frozen metadata record.
         """
         self._require_resource_idle()
-        path = Path(self.fldr) / file_name
+        path = self.folder / file_name
         if name in self:
             raise ValueError(f"There is already a matrix of name ({name}). It must be unique.")
         if self._transactions.execute("SELECT 1 FROM matrices WHERE file_name=?", (file_name,)).fetchone():
@@ -69,15 +94,28 @@ class Matrices(ProjectTable):
             raise
         return self.get(name)
 
-    def register_matrix(self, name: str, file_name: str):
-        """Register an existing caller-owned matrix file."""
+    def register_matrix(self, name: str, file_name: str) -> Any:
+        """Register an existing caller-owned matrix file.
+
+        :Arguments:
+            **name** (:obj:`str`): Unique matrix name.
+
+            **file_name** (:obj:`str`): Existing matrix payload file name.
+
+        :Returns:
+            **matrix record** (:obj:`Any`): Generated frozen metadata record.
+        """
         return self.create(name, file_name, matrix=None)
 
-    def delete_matrix(self, name: str):
-        """Delete both matrix metadata and its underlying file."""
+    def delete_matrix(self, name: str) -> None:
+        """Delete matrix metadata and its underlying file.
+
+        :Arguments:
+            **name** (:obj:`str`): Matrix name to delete.
+        """
         self._require_resource_idle()
         record = self.get(name)
-        path = Path(self.fldr) / record.file_name
+        path = self.folder / record.file_name
         tombstone = path.with_name(f".{path.name}.{uuid.uuid4().hex}.deleted")
         moved = False
         if path.exists():
@@ -96,19 +134,32 @@ class Matrices(ProjectTable):
             tombstone.unlink()
 
     def get_matrix(self, name: str) -> AequilibraeMatrix:
+        """Load a matrix payload by metadata name.
+
+        :Arguments:
+            **name** (:obj:`str`): Registered matrix name.
+
+        :Returns:
+            **matrix** (:obj:`AequilibraeMatrix`): Loaded matrix payload.
+        """
         record = self.get(name)
         matrix = AequilibraeMatrix()
-        matrix.load(str(Path(self.fldr) / record.file_name))
+        matrix.load(str(self.folder / record.file_name))
         return matrix
 
     def check_exists(self, name: str) -> bool:
+        """Return whether matrix metadata exists for ``name``.
+
+        :Arguments:
+            **name** (:obj:`str`): Matrix name to check.
+        """
         return name in self
 
     def clear_database(self) -> None:
         """Remove metadata records whose files are absent."""
         with self._transactions.transaction():
             records = self._transactions.execute("SELECT name, file_name FROM matrices").fetchall()
-            missing = [(name,) for name, file_name in records if not (Path(self.fldr) / file_name).is_file()]
+            missing = [(name,) for name, file_name in records if not (self.folder / file_name).is_file()]
             if missing:
                 self._transactions.executemany("DELETE FROM matrices WHERE name=?", missing)
         self._invalidate()
@@ -116,7 +167,7 @@ class Matrices(ProjectTable):
     def update_database(self) -> None:
         """Register unrecorded matrix files found in the matrix directory."""
         existing = {record.file_name for record in self}
-        for path in Path(self.fldr).iterdir():
+        for path in self.folder.iterdir():
             if path.name in existing or path.suffix.lower() not in (".omx", ".aem"):
                 continue
             candidate = path.name.replace(".", "_").replace(" ", "_")
@@ -130,17 +181,17 @@ class Matrices(ProjectTable):
     def list(self) -> pd.DataFrame:
         frame = pd.read_sql_query("SELECT * FROM matrices", self._transactions)
         frame["status"] = frame.file_name.map(
-            lambda file_name: "" if (Path(self.fldr) / file_name).is_file() else "file missing"
+            lambda file_name: "" if (self.folder / file_name).is_file() else "file missing"
         )
         return frame
 
-    def _require_resource_idle(self):
+    def _require_resource_idle(self) -> None:
         if self._transactions.in_transaction:
             raise RuntimeError("matrix file helpers cannot run inside a database transaction")
 
     def __cores_on_disk(self, file_name: str) -> int:
         matrix = AequilibraeMatrix()
-        matrix.load(str(Path(self.fldr) / file_name))
+        matrix.load(str(self.folder / file_name))
         try:
             return len(matrix.names)
         finally:

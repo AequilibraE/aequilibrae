@@ -1,14 +1,16 @@
 import logging
 
 import pandas as pd
+from shapely.geometry.base import BaseGeometry
 
 from aequilibrae.project.network.connector_creation import connector_creation
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.network.links import Links
+from aequilibrae.project.project_table import SpatialProjectTable
 
 logger = logging.getLogger(__name__)
 
 
-class Nodes(ProjectTable):
+class Nodes(SpatialProjectTable):
     """
     Access to the API resources to manipulate the nodes table in the network
 
@@ -36,14 +38,8 @@ class Nodes(ProjectTable):
     name = "nodes"
     key = "node_id"
     record_name = "NodeRecord"
-    spatial = True
-    protected = frozenset(("link_types", "modes"))
 
-    def __init__(self, net):
-        super().__init__(net.transactions)
-        self.network = net
-
-    def new_centroid(self, node_id: int, geometry) -> int:
+    def new_centroid(self, node_id: int, geometry: BaseGeometry) -> int:
         """Creates a new centroid with a given ID at the given position
 
         :Arguments:
@@ -53,7 +49,7 @@ class Nodes(ProjectTable):
         """
         return self.insert(node_id=node_id, is_centroid=1, geometry=geometry)
 
-    def renumber(self, node_id: int, new_id: int):
+    def renumber(self, node_id: int, new_id: int) -> None:
         """Renumbers a node in the network
 
         :Arguments:
@@ -68,7 +64,14 @@ class Nodes(ProjectTable):
         self._change_key(node_id, new_id)
         logger.info(f"Node {node_id} was renumbered to {new_id}")
 
-    def connect_mode(self, node_id: int, mode_id: str, link_types="", connectors=1, area=None):
+    def connect_mode(
+        self,
+        node_id: int,
+        mode_id: str,
+        link_types: str = "",
+        connectors: int = 1,
+        area: BaseGeometry | None = None,
+    ) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
@@ -99,22 +102,18 @@ class Nodes(ProjectTable):
             logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
-        network = self.network
+        links = Links(self._transactions)
         connector_creation(
             zone_id=node_id,
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
-            network=network,
+            transactions=self._transactions,
+            links=links,
             delimiting_area=area,
-            proj_nodes=network.nodes.data,
-            proj_links=network.links.data,
+            proj_nodes=self.data,
+            proj_links=links.data,
         )
-
-    def _check_is_centroid(self, value):
-        if value not in (0, 1):
-            raise ValueError("The is_centroid must be either 1 or 0")
-        return value
 
     @property
     def lonlat(self) -> pd.DataFrame:

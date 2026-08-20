@@ -2,17 +2,19 @@ import datetime
 import json
 import logging
 import uuid
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from pandas.api import types as ptypes
 
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import NonSpatialProjectTable
+from aequilibrae.utils.db_utils import NestedTransactions
 
 logger = logging.getLogger(__name__)
 
 
-class Results(ProjectTable):
+class Results(NonSpatialProjectTable):
     """Result metadata gateway with compensated payload-table helpers."""
 
     name = "results"
@@ -20,7 +22,20 @@ class Results(ProjectTable):
     record_name = "ResultRecord"
     defaults = {"procedure": "", "procedure_id": "", "procedure_report": "null"}
 
-    def __init__(self, project_transactions, results_transactions):
+    def __init__(
+        self,
+        project_transactions: NestedTransactions,
+        results_transactions: NestedTransactions,
+    ) -> None:
+        """Create the result metadata and payload gateway.
+
+        :Arguments:
+            **project_transactions** (:obj:`NestedTransactions`): Manager for
+            result metadata in the project database.
+
+            **results_transactions** (:obj:`NestedTransactions`): Manager for
+            result payload tables.
+        """
         super().__init__(project_transactions)
         self._results_transactions = results_transactions
 
@@ -29,18 +44,48 @@ class Results(ProjectTable):
         table_name: str,
         data: pd.DataFrame,
         *,
-        procedure: str = None,
-        procedure_id: str = None,
-        procedure_report: dict = None,
-        timestamp: str = None,
-        description: str = None,
-        scenario: str = None,
-        year: str = None,
+        procedure: str | None = None,
+        procedure_id: str | None = None,
+        procedure_report: dict[str, Any] | None = None,
+        timestamp: str | None = None,
+        description: str | None = None,
+        scenario: str | None = None,
+        year: str | None = None,
         reference_table: str = "links",
-        dtype: dict = None,
+        dtype: dict[str, str] | None = None,
         chunksize: int = 1000,
-    ):
-        """Create one fail-if-present payload table and its metadata record."""
+    ) -> Any:
+        """Create one payload table and its metadata record.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Unique SQLite payload-table name.
+
+            **data** (:obj:`pandas.DataFrame`): Result values to persist.
+
+            **procedure** (:obj:`str`, *Optional*): Producing procedure name.
+
+            **procedure_id** (:obj:`str`, *Optional*): Producing procedure ID.
+
+            **procedure_report** (:obj:`dict`, *Optional*): JSON-serializable
+            procedure report.
+
+            **timestamp** (:obj:`str`, *Optional*): Result timestamp.
+
+            **description** (:obj:`str`, *Optional*): Human-readable description.
+
+            **scenario** (:obj:`str`, *Optional*): Scenario label.
+
+            **year** (:obj:`str`, *Optional*): Model-year label.
+
+            **reference_table** (:obj:`str`): Referenced project table.
+
+            **dtype** (:obj:`dict`, *Optional*): SQLite type overrides by column.
+
+            **chunksize** (:obj:`int`): Number of rows inserted per batch.
+
+        :Returns:
+            **result record** (:obj:`Any`): Generated frozen metadata record.
+        """
         self._require_resource_idle()
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
@@ -89,11 +134,23 @@ class Results(ProjectTable):
         return self.get(table_name)
 
     def get_results(self, table_name: str) -> pd.DataFrame:
+        """Read a result payload table into a DataFrame.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Registered payload-table name.
+
+        :Returns:
+            **results** (:obj:`pandas.DataFrame`): Stored result values.
+        """
         record = self.get(table_name)
         return pd.read_sql_query(f"SELECT * FROM {_quote_identifier(record.table_name)}", self._results_transactions)
 
-    def delete_result(self, table_name: str):
-        """Delete both result metadata and its payload table."""
+    def delete_result(self, table_name: str) -> None:
+        """Delete result metadata and its payload table.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Registered result name to delete.
+        """
         self._require_resource_idle()
         table = _quote_identifier(table_name)
         tombstone_name = f"__aeq_deleted_{uuid.uuid4().hex}"
@@ -140,12 +197,12 @@ class Results(ProjectTable):
     def list(self) -> pd.DataFrame:
         return pd.read_sql_query("SELECT * FROM results", self._transactions)
 
-    def _payload_exists(self, table_name):
+    def _payload_exists(self, table_name: str) -> bool:
         return self._results_transactions.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
         ).fetchone() is not None
 
-    def _require_resource_idle(self):
+    def _require_resource_idle(self) -> None:
         if self._transactions.in_transaction or self._results_transactions.in_transaction:
             raise RuntimeError("result payload helpers cannot run inside a database transaction")
 
