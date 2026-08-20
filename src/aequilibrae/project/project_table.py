@@ -1,9 +1,19 @@
-"""Persistent-connection table gateways for AequilibraE projects."""
+"""Table gateways backed by a scenario's persistent SQLite connection.
 
-import logging
+The classes in this module provide fresh record reads and explicit writes. They
+are intentionally small table gateways rather than an object-relational mapper:
+records are immutable snapshots, while mutations are performed through the
+owning gateway.
+"""
+
+from abc import ABC, abstractmethod
+from collections.abc import Iterator, Mapping
+from dataclasses import fields as dataclass_fields
 from dataclasses import make_dataclass
-from itertools import count
+from functools import lru_cache
+from typing import Any
 
+import pandas as pd
 import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
@@ -12,243 +22,422 @@ from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.utils.db_utils import NestedTransactions
 from aequilibrae.utils.get_table import get_geo_table
 
-logger = logging.getLogger(__name__)
+_TABLE_INFO_SQL = 'PRAGMA table_info("{table}")'
+_SCHEMA_VERSION_SQL = "PRAGMA schema_version"
+_SELECT_SQL = 'SELECT {columns} FROM "{table}"'
+_SELECT_ONE_SQL = 'SELECT {columns} FROM "{table}" WHERE "{key}"=?'
+_COUNT_SQL = 'SELECT COUNT(*) FROM "{table}"'
+_CONTAINS_SQL = 'SELECT 1 FROM "{table}" WHERE "{key}"=? LIMIT 1'
+_DELETE_SQL = 'DELETE FROM "{table}" WHERE "{key}"=?'
+_MAX_KEY_SQL = 'SELECT MAX("{key}") FROM "{table}"'
+_CHANGE_KEY_SQL = 'UPDATE "{table}" SET "{key}"=? WHERE "{key}"=?'
+_EXTENT_SQL = 'SELECT ST_AsBinary(GetLayerExtent("{table}"))'
+_INSERT_SQL = 'INSERT INTO "{table}" ({columns}) VALUES ({placeholders})'
+_UPDATE_SQL = 'UPDATE "{table}" SET {assignments} WHERE "{key}"=?'
+
+_QUOTED_COLUMN = '"{column}"'
+_VALUE_PLACEHOLDER = "?"
+_GEOMETRY_COLUMN = 'ST_AsBinary("geometry")'
+_ASSIGNMENT = '"{column}"={placeholder}'
+_GEOMETRY_PLACEHOLDER = "GeomFromWKB(?, {srid})"
+_MULTI_GEOMETRY_PLACEHOLDER = "ST_Multi(GeomFromWKB(?, {srid}))"
+
+_SQLITE_TYPE_HINTS = (
+    ("INT", int),
+    ("CHAR", str),
+    ("CLOB", str),
+    ("TEXT", str),
+    ("BLOB", bytes),
+    ("REAL", float),
+    ("FLOA", float),
+    ("DOUB", float),
+    ("BOOL", bool),
+    ("DATE", str),
+    ("TIME", str),
+    ("NUMERIC", float),
+    ("DECIMAL", float),
+)
 
 
-class ProjectTable:
-    """Thin gateway for one database table.
+def _python_type(column: str, declared_type: str, nullable: bool) -> type:
+    """Return a best-effort Python annotation for one SQLite column."""
+    if column == "geometry":
+        hint = BaseGeometry
+    else:
+        declared_type = declared_type.upper()
+        hint = next((hint for token, hint in _SQLITE_TYPE_HINTS if token in declared_type), Any)
+    return hint | None if nullable and hint is not Any else hint
 
-    Reads use the injected persistent manager. Every mutation owns a nested
-    transaction, which is a top-level transaction for standalone calls and a
-    savepoint when enclosed by ``Project.transaction()``.
+
+def guess_record_type(transactions: NestedTransactions, table: str, record_name: str) -> type:
+    """Inspect ``table`` and create a frozen dataclass matching its current fields.
+
+    SQLite uses dynamic typing, so annotations are necessarily best guesses
+    based on declared column affinity. User-defined fields are included because
+    the live table schema is inspected when its gateway is constructed.
+
+    :Arguments:
+        **transactions** (:obj:`NestedTransactions`): Manager for the database
+        containing the table.
+
+        **table** (:obj:`str`): Name of the table to inspect.
+
+        **record_name** (:obj:`str`): Name to assign to the generated dataclass.
+
+    :Returns:
+        **record type** (:obj:`type`): A frozen dataclass type for table rows.
+    """
+    schema = transactions.execute(_TABLE_INFO_SQL.format(table=table)).fetchall()
+    fields = []
+    for _, column, declared_type, required, _, primary_key in schema:
+        if column == "ogc_fid":
+            continue
+        nullable = not required and not primary_key
+        fields.append((column, _python_type(column, declared_type, nullable)))
+    return make_dataclass(record_name, fields, frozen=True)
+
+
+@lru_cache(maxsize=None)
+def _format_insert(table: str, columns: tuple[str, ...], geometry_placeholder: str | None) -> str:
+    """Format one INSERT shape, shared by every gateway instance."""
+    names = ",".join(_QUOTED_COLUMN.format(column=column) for column in columns)
+    placeholders = ",".join(
+        geometry_placeholder if column == "geometry" and geometry_placeholder else _VALUE_PLACEHOLDER
+        for column in columns
+    )
+    return _INSERT_SQL.format(table=table, columns=names, placeholders=placeholders)
+
+
+@lru_cache(maxsize=None)
+def _format_update(
+    table: str, key: str, columns: tuple[str, ...], geometry_placeholder: str | None
+) -> str:
+    """Format one UPDATE shape, shared by every gateway instance."""
+    assignments = []
+    for column in columns:
+        placeholder = geometry_placeholder if column == "geometry" and geometry_placeholder else _VALUE_PLACEHOLDER
+        assignments.append(_ASSIGNMENT.format(column=column, placeholder=placeholder))
+    return _UPDATE_SQL.format(table=table, assignments=",".join(assignments), key=key)
+
+
+class ProjectTable(ABC):
+    """Common implementation for one project-database table.
+
+    Subclasses declare the table name, key, and generated-record name. During
+    construction, ``record_type`` becomes a frozen dataclass whose fields and
+    annotations are inferred from the live SQLite schema. Concrete gateways
+    must inherit either :class:`NonSpatialProjectTable` or
+    :class:`SpatialProjectTable` so geometry handling is never mixed into an
+    ordinary table by a boolean flag.
+
+    Reads use the injected persistent transaction manager. Each mutation opens
+    a nested transaction, becoming a top-level transaction for a standalone
+    call or a savepoint inside a project transaction.
     """
 
-    name = ""
-    key = ""
-    protected = frozenset()
-    spatial = False
-    multi_part = False
-    defaults = {}
-    record_name = ""
-    srid = 4326
+    name: str = ""
+    key: str = ""
+    record_name: str = ""
+    record_type: type
+    defaults: Mapping[str, Any] = {}
+    _geometry_placeholder: str | None = None
 
-    def __init__(self, transactions: NestedTransactions):
+    def __init__(self, transactions: NestedTransactions) -> None:
+        """Configure the gateway and pre-format its stable SQL statements.
+
+        :Arguments:
+            **transactions** (:obj:`NestedTransactions`): Manager owning the
+            persistent connection used by this gateway.
+        """
         if not isinstance(transactions, NestedTransactions):
             raise TypeError("ProjectTable requires a NestedTransactions manager")
+        if not self.name or not self.key or not self.record_name:
+            raise TypeError(f"{self.__class__.__name__} must define a table name, key, and record name")
+
         self._transactions = transactions
-        self._record_cache = (None, None)
+        self._record_schema_version = -1
+
+        self._table_info_sql = _TABLE_INFO_SQL.format(table=self.name)
+        self._count_sql = _COUNT_SQL.format(table=self.name)
+        self._contains_sql = _CONTAINS_SQL.format(table=self.name, key=self.key)
+        self._delete_sql = _DELETE_SQL.format(table=self.name, key=self.key)
+        self._max_key_sql = _MAX_KEY_SQL.format(table=self.name, key=self.key)
+        self._change_key_sql = _CHANGE_KEY_SQL.format(table=self.name, key=self.key)
+
+        self._refresh_record_type()
 
     @property
-    def columns(self) -> tuple:
-        return self._columns()
+    def columns(self) -> tuple[str, ...]:
+        """Return the current writable table columns, including user fields."""
+        rows = self._transactions.execute(self._table_info_sql).fetchall()
+        return tuple(row[1] for row in rows if row[1] != "ogc_fid")
 
     @property
     def fields(self) -> FieldEditor:
+        """Return the metadata editor for this table's fields."""
         return FieldEditor(self._transactions, self.name)
 
     @property
-    def data(self):
-        """Return the table indexed exclusively by its named record key."""
-        frame = get_geo_table(self.name, self._transactions)
-        return frame.set_index(self.key, drop=True)
+    def data(self) -> pd.DataFrame:
+        """Return all table data, including the record key as a column."""
+        return get_geo_table(self.name, self._transactions)
 
-    def get(self, key):
-        cols = self._columns()
-        sql = f'{self._select_sql(cols)} WHERE "{self.key}"=?'
-        row = self._transactions.execute(sql, [key]).fetchone()
+    def get(self, key: Any) -> Any:
+        """Return one immutable record snapshot identified by ``key``.
+
+        :Arguments:
+            **key** (:obj:`Any`): Value of the table's identifying column.
+
+        :Returns:
+            **record** (:obj:`Any`): Frozen dataclass snapshot of the row.
+        """
+        self._refresh_record_type()
+        row = self._transactions.execute(self._select_one_sql, [key]).fetchone()
         if row is None:
-            raise ValueError(f"{self.name} has no record with {self.key}={key!r}")
-        return self._build_record(cols, row)
+            raise self._missing_record(key)
+        return self._build_record(row)
 
-    def __iter__(self):
-        cols = self._columns()
-        rows = self._transactions.execute(self._select_sql(cols)).fetchall()
-        return iter([self._build_record(cols, row) for row in rows])
+    def __iter__(self) -> Iterator[Any]:
+        """Iterate over immutable snapshots of all records."""
+        self._refresh_record_type()
+        rows = self._transactions.execute(self._select_all_sql).fetchall()
+        return iter(self._build_record(row) for row in rows)
 
     def __len__(self) -> int:
-        return self._transactions.execute(f'SELECT COUNT(*) FROM "{self.name}"').fetchone()[0]
+        """Return the number of records in the table."""
+        return self._transactions.execute(self._count_sql).fetchone()[0]
 
-    def __contains__(self, key) -> bool:
-        sql = f'SELECT 1 FROM "{self.name}" WHERE "{self.key}"=? LIMIT 1'
-        return self._transactions.execute(sql, [key]).fetchone() is not None
+    def __contains__(self, key: Any) -> bool:
+        """Return whether a record with ``key`` exists."""
+        return self._transactions.execute(self._contains_sql, [key]).fetchone() is not None
 
-    def extent(self) -> Polygon:
-        if not self.spatial:
-            raise TypeError(f"{self.name} is not a spatial table")
-        data = self._transactions.execute(f'SELECT ST_AsBinary(GetLayerExtent("{self.name}"))').fetchone()[0]
-        return shapely.wkb.loads(data)
+    def insert(self, **values: Any) -> Any:
+        """Insert one record and return its explicit or generated key.
 
-    def insert(self, **values):
+        :Arguments:
+            **values** (:obj:`Any`): Column values for the new record. Omitted
+            columns are left to SQLite defaults.
+
+        :Returns:
+            **key** (:obj:`Any`): Explicit or generated record key.
+        """
         with self._transactions.transaction():
-            row = self._insert_row(values, self._columns())
+            row = self._prepare_insert(values)
             if row.get(self.key) is None:
                 row[self.key] = self._next_key()
-            self._transactions.execute(*self._insert_sql(row))
+
+            sql = self._insert_statement(tuple(row))
+            parameters = [self._database_value(value) for value in row.values()]
+            self._transactions.execute(sql, parameters)
+
         self._invalidate()
         return row[self.key]
 
-    def update(self, key, **values):
+    def update(self, key: Any, **values: Any) -> None:
+        """Update the supplied fields of one record.
+
+        :Arguments:
+            **key** (:obj:`Any`): Key of the record to update.
+
+            **values** (:obj:`Any`): Column values to write.
+        """
         with self._transactions.transaction():
-            values = self._checked(values, self._columns(), updating=True)
-            sql, params = self._update_sql(values)
-            if self._transactions.execute(sql, [*params, key]).rowcount == 0:
-                raise ValueError(f"{self.name} has no record with {self.key}={key!r}")
+            sql = self._update_statement(tuple(values))
+            parameters = [self._database_value(value) for value in values.values()]
+            parameters.append(key)
+
+            if self._transactions.execute(sql, parameters).rowcount == 0:
+                raise self._missing_record(key)
+
         self._invalidate()
 
-    def delete(self, key):
+    def delete(self, key: Any) -> None:
+        """Delete one record identified by ``key``.
+
+        :Arguments:
+            **key** (:obj:`Any`): Key of the record to delete.
+        """
         with self._transactions.transaction():
-            sql = f'DELETE FROM "{self.name}" WHERE "{self.key}"=?'
-            if self._transactions.execute(sql, [key]).rowcount == 0:
-                raise ValueError(f"{self.name} has no record with {self.key}={key!r}")
+            cursor = self._transactions.execute(self._delete_sql, [key])
+            if cursor.rowcount == 0:
+                raise self._missing_record(key)
+
         self._invalidate()
 
-    def update_from(self, df) -> int:
-        """Update rows identified only by a unique, non-missing named index."""
-        if df.index.name != self.key:
-            raise ValueError(f"The DataFrame index must be named '{self.key}' to identify records")
-        if self.key in df.columns:
-            raise ValueError(f"'{self.key}' cannot be both the update index and a value column")
-        if not df.index.is_unique:
-            raise ValueError("The update DataFrame index must be unique")
-        if df.index.hasnans:
-            raise ValueError("The update DataFrame index cannot contain missing values")
-        value_cols = list(df.columns)
-        if not value_cols:
-            raise ValueError("Nothing to update: the DataFrame only contains the key index")
+    def update_from(self, frame: pd.DataFrame) -> int:
+        """Atomically update records identified by a DataFrame key column.
+
+        :Arguments:
+            **frame** (:obj:`pandas.DataFrame`): Key and value columns to write.
+
+        :Returns:
+            **updated rows** (:obj:`int`): Number of submitted rows.
+        """
+        value_columns = tuple(column for column in frame.columns if column != self.key)
 
         with self._transactions.transaction():
-            columns = self._columns()
-            self._check_columns(value_cols, columns, updating=True)
-            rows = []
-            for key, values in df.iterrows():
-                if key not in self:
-                    raise ValueError(f"{self.name} has no record with {self.key}={key!r}")
-                checked = [self._validate_value(column, values[column]) for column in value_cols]
-                rows.append([*(_db_value(value) for value in checked), key])
-            sql = f'{self._set_sql(value_cols)} WHERE "{self.key}"=?'
-            self._transactions.executemany(sql, rows)
+            rows = self._prepare_update_rows(frame, value_columns)
+            self._transactions.executemany(self._update_statement(value_columns), rows)
+
         self._invalidate()
         return len(rows)
 
-    def insert_from(self, df) -> list:
-        """Atomically insert every DataFrame row and return their keys."""
-        frame = df.reset_index() if self.key in df.index.names else df
+    def insert_from(self, frame: pd.DataFrame) -> list[Any]:
+        """Atomically insert all DataFrame rows and return their keys.
+
+        :Arguments:
+            **frame** (:obj:`pandas.DataFrame`): Rows and columns to insert.
+
+        :Returns:
+            **keys** (:obj:`list`): Explicit or generated keys in row order.
+        """
+        inserted_keys = []
+        next_key = None
+
         with self._transactions.transaction():
-            columns = self._columns()
-            keys = count(self._next_key()) if self.key not in frame.columns else None
-            rows = []
-            inserted_keys = []
             for values in frame.to_dict("records"):
-                row = self._insert_row(values, columns)
+                row = self._prepare_insert(values)
                 if row.get(self.key) is None:
-                    if keys is None:
-                        keys = count(self._next_key())
-                    row[self.key] = next(keys)
-                inserted_keys.append(row[self.key])
-                rows.append(self._insert_sql(row))
-            for sql, parameters in rows:
+                    if next_key is None:
+                        next_key = self._next_key()
+                    row[self.key] = next_key
+                    next_key += 1
+
+                sql = self._insert_statement(tuple(row))
+                parameters = [self._database_value(value) for value in row.values()]
                 self._transactions.execute(sql, parameters)
+                inserted_keys.append(row[self.key])
+
         self._invalidate()
         return inserted_keys
 
-    def _columns(self) -> tuple:
-        dt = self._transactions.execute(f'pragma table_info("{self.name}")').fetchall()
-        return tuple(x[1] for x in dt if x[1] != "ogc_fid")
+    def _refresh_record_type(self) -> None:
+        """Rebuild the guessed record after the SQLite schema changes."""
+        schema_version = self._transactions.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
+        if schema_version == self._record_schema_version:
+            return
 
-    def _select_sql(self, cols) -> str:
-        keys = ",".join(f'ST_AsBinary("{c}")' if c == "geometry" else f'"{c}"' for c in cols)
-        return f'SELECT {keys} FROM "{self.name}"'
+        self.record_type = guess_record_type(self._transactions, self.name, self.record_name)
+        self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
+        record_columns = ",".join(self._select_column(column) for column in self._record_fields)
+        sql_values = {"table": self.name, "key": self.key, "columns": record_columns}
+        self._select_all_sql = _SELECT_SQL.format(**sql_values)
+        self._select_one_sql = _SELECT_ONE_SQL.format(**sql_values)
+        self._record_schema_version = schema_version
 
-    def _build_record(self, cols, row):
-        cached_cols, record_type = self._record_cache
-        if cached_cols != cols:
-            record_type = make_dataclass(self.record_name or f"{self.name}_record", cols, frozen=True)
-            self._record_cache = (cols, record_type)
-        values = (
-            shapely.wkb.loads(bytes(v)) if c == "geometry" and v is not None else v
-            for c, v in zip(cols, row, strict=True)
-        )
-        return record_type(*values)
+    def _build_record(self, row: tuple[Any, ...]) -> Any:
+        """Convert one SQLite row into the gateway's explicit record type."""
+        values = []
+        for column, value in zip(self._record_fields, row, strict=True):
+            values.append(self._record_value(column, value))
+        return self.record_type(*values)
 
-    def _insert_row(self, values: dict, cols) -> dict:
-        row = {k: v for k, v in self._checked(values, cols, updating=False).items() if v is not None}
-        return {**self.defaults, **row}
+    def _prepare_insert(self, values: Mapping[str, Any]) -> dict[str, Any]:
+        """Layer supplied values over defaults, omitting database-defaulted nulls."""
+        row = dict(self.defaults)
+        row.update((column, value) for column, value in values.items() if value is not None)
+        return {column: value for column, value in row.items() if value is not None}
 
-    def _check_columns(self, requested, cols, updating: bool):
-        unknown = [c for c in requested if c not in cols]
-        if unknown:
-            raise ValueError(
-                f"{', '.join(unknown)}: not fields of the {self.name} table. Fields are: {', '.join(cols)}"
-            )
-        if updating and self.key in requested:
-            raise ValueError(f'"{self.key}" identifies the record and cannot be updated. See renumber(), if available')
-        blocked = [c for c in requested if c in self.protected]
-        if blocked:
-            raise ValueError(f"{', '.join(blocked)}: maintained by AequilibraE and cannot be written directly")
+    def _prepare_update_rows(
+        self, frame: pd.DataFrame, value_columns: tuple[str, ...]
+    ) -> list[list[Any]]:
+        """Convert DataFrame records into SQLite parameter rows."""
+        rows = []
+        for values in frame.to_dict("records"):
+            key = values[self.key]
+            if key not in self:
+                raise self._missing_record(key)
 
-    def _checked(self, values: dict, cols, updating: bool) -> dict:
-        self._check_columns(values.keys(), cols, updating)
-        return {k: self._validate_value(k, v) for k, v in values.items()}
+            row = [self._database_value(values[column]) for column in value_columns]
+            row.append(key)
+            rows.append(row)
+        return rows
 
-    def _validate_value(self, column, value):
-        if column == "geometry":
-            if not isinstance(value, BaseGeometry):
-                raise TypeError("geometry must be a Shapely geometry object")
-            return value
-        check = getattr(self, f"_check_{column}", None)
-        return check(value) if check is not None else value
+    def _insert_statement(self, columns: tuple[str, ...]) -> str:
+        """Return the LRU-cached INSERT statement for a column shape."""
+        return _format_insert(self.name, columns, self._geometry_placeholder)
 
-    def _geom_expr(self) -> str:
-        expr = f"GeomFromWKB(?, {int(self.srid)})"
-        return f"ST_Multi({expr})" if self.multi_part else expr
+    def _update_statement(self, columns: tuple[str, ...]) -> str:
+        """Return the LRU-cached UPDATE statement for a column shape."""
+        return _format_update(self.name, self.key, columns, self._geometry_placeholder)
 
-    def _placeholder(self, column) -> str:
-        return self._geom_expr() if column == "geometry" else "?"
+    def _next_key(self) -> Any:
+        """Return the next numeric key available in the table."""
+        current = self._transactions.execute(self._max_key_sql).fetchone()[0]
+        return 1 if current is None else current + 1
 
-    def _insert_sql(self, row: dict):
-        row = {k: v for k, v in row.items() if v is not None}
-        cols = ",".join(f'"{k}"' for k in row)
-        marks = ",".join(self._placeholder(k) for k in row)
-        sql = f'INSERT INTO "{self.name}" ({cols}) VALUES ({marks})'
-        return sql, [_db_value(v) for v in row.values()]
-
-    def _set_sql(self, columns) -> str:
-        sets = ",".join(f'"{c}"={self._placeholder(c)}' for c in columns)
-        return f'UPDATE "{self.name}" SET {sets}'
-
-    def _update_sql(self, values: dict):
-        if not values:
-            raise ValueError("Nothing to update: no values were given")
-        sql = f'{self._set_sql(values.keys())} WHERE "{self.key}"=?'
-        return sql, [_db_value(v) for v in values.values()]
-
-    def _next_key(self):
-        current = self._transactions.execute(f'SELECT MAX("{self.key}") FROM "{self.name}"').fetchone()[0]
-        if current is None:
-            return 1
-        if not isinstance(current, int):
-            raise ValueError(f"{self.name}.{self.key} is not numeric, so the {self.key} must be given explicitly")
-        return current + 1
-
-    def _change_key(self, key, new_key):
+    def _change_key(self, key: Any, new_key: Any) -> None:
+        """Change a record key for gateways exposing a renumber operation."""
         with self._transactions.transaction():
-            sql = f'UPDATE "{self.name}" SET "{self.key}"=? WHERE "{self.key}"=?'
-            if self._transactions.execute(sql, [new_key, key]).rowcount == 0:
-                raise ValueError(f"{self.name} has no record with {self.key}={key!r}")
+            cursor = self._transactions.execute(self._change_key_sql, [new_key, key])
+            if cursor.rowcount == 0:
+                raise self._missing_record(key)
         self._invalidate()
 
-    def _invalidate(self):
+    def _missing_record(self, key: Any) -> ValueError:
+        """Build the consistent error used when a record does not exist."""
+        return ValueError(f"{self.name} has no record with {self.key}={key!r}")
+
+    def _invalidate(self) -> None:
         """Non-fallible hook for invalidating derived in-memory state."""
+        return None
 
-    def __copy__(self):
-        raise TypeError(f"{self.__class__.__name__} objects cannot be copied")
+    @abstractmethod
+    def _select_column(self, column: str) -> str:
+        """Format a record field for a SELECT list."""
 
-    def __deepcopy__(self, memodict=None):
-        raise TypeError(f"{self.__class__.__name__} objects cannot be copied")
+    @abstractmethod
+    def _record_value(self, column: str, value: Any) -> Any:
+        """Convert one SQLite value into its record representation."""
 
-    def __repr__(self):
+    @abstractmethod
+    def _database_value(self, value: Any) -> Any:
+        """Convert one Python value into its SQLite representation."""
+
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} table={self.name!r}>"
 
 
-def _db_value(value):
-    return value.wkb if isinstance(value, BaseGeometry) else value
+class NonSpatialProjectTable(ProjectTable):
+    """Base class for project tables without a geometry column."""
+
+    def _select_column(self, column: str) -> str:
+        return _QUOTED_COLUMN.format(column=column)
+
+    def _record_value(self, column: str, value: Any) -> Any:
+        return value
+
+    def _database_value(self, value: Any) -> Any:
+        return value
+
+
+class SpatialProjectTable(ProjectTable):
+    """Base class for project tables with a SpatiaLite geometry column."""
+
+    multi_part = False
+    srid = 4326
+
+    def __init__(self, transactions: NestedTransactions) -> None:
+        srid = int(self.srid)
+        template = _MULTI_GEOMETRY_PLACEHOLDER if self.multi_part else _GEOMETRY_PLACEHOLDER
+        self._geometry_placeholder = template.format(srid=srid)
+        super().__init__(transactions)
+        self._extent_sql = _EXTENT_SQL.format(table=self.name)
+
+    def extent(self) -> Polygon:
+        """Return the bounding polygon for the table's geometry layer."""
+        data = self._transactions.execute(self._extent_sql).fetchone()[0]
+        return shapely.wkb.loads(data)
+
+    def _select_column(self, column: str) -> str:
+        if column == "geometry":
+            return _GEOMETRY_COLUMN
+        return _QUOTED_COLUMN.format(column=column)
+
+    def _record_value(self, column: str, value: Any) -> Any:
+        if column == "geometry" and value is not None:
+            return shapely.wkb.loads(bytes(value))
+        return value
+
+    def _database_value(self, value: Any) -> Any:
+        return value.wkb if isinstance(value, BaseGeometry) else value

@@ -1,9 +1,9 @@
-import string
+from typing import Any
 
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import NonSpatialProjectTable
 
 
-class Modes(ProjectTable):
+class Modes(NonSpatialProjectTable):
     """
     Access to the API resources to manipulate the modes table in the network
 
@@ -33,27 +33,16 @@ class Modes(ProjectTable):
     key = "mode_id"
     record_name = "ModeRecord"
 
-    __allowed_characters = string.ascii_letters + "_"
+    def get_by_name(self, mode_name: str) -> Any:
+        """Get a mode record by its descriptive name.
 
-    def __init__(self, net):
-        super().__init__(net.project)
+        :Arguments:
+            **mode_name** (:obj:`str`): Descriptive mode name.
 
-    def get_by_name(self, mode_name: str):
-        """Get a mode record from the network by its *mode_name*"""
+        :Returns:
+            **mode** (:obj:`Any`): Generated frozen record for the mode.
+        """
         for mode in self:
             if mode.mode_name == mode_name:
                 return mode
         raise ValueError(f"Mode {mode_name} does not exist in the model")
-
-    def _check_mode_id(self, value) -> str:
-        if not isinstance(value, str) or len(value) != 1 or value not in string.ascii_letters:
-            raise ValueError("Mode IDs must be a single ascii character")
-        return value
-
-    def _check_mode_name(self, value) -> str:
-        if value is None:
-            raise ValueError("mode_name cannot be None")
-        for letter in value:
-            if letter not in self.__allowed_characters:
-                raise ValueError('mode_name can only contain letters and "_"')
-        return value

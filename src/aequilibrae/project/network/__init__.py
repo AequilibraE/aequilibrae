@@ -5,4 +5,4 @@ from .links import Links
 from .nodes import Nodes
 from .periods import Periods
 
-__all__ = ["Network", "Modes", "LinkTypes", "Links", "Nodes", "Periods"]
+__all__ = ["LinkTypes", "Links", "Modes", "Network", "Nodes", "Periods"]

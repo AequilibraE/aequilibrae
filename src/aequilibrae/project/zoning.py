@@ -10,8 +10,10 @@ from shapely import union_all
 from shapely.geometry import Point, Polygon, LineString, MultiLineString
 
 from aequilibrae.project.network.connector_creation import connector_creation, bulk_connector_creation
+from aequilibrae.project.network.links import Links
+from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.project_creation import run_queries_from_sql_file
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import SpatialProjectTable
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.db_utils import has_table
 from aequilibrae.utils.geo_index import GeoIndex
@@ -19,7 +21,7 @@ from aequilibrae.utils.geo_index import GeoIndex
 logger = logging.getLogger(__name__)
 
 
-class Zoning(ProjectTable):
+class Zoning(SpatialProjectTable):
     """
     Access to the API resources to manipulate the 'zones' table in the project
 
@@ -42,29 +44,23 @@ class Zoning(ProjectTable):
     name = "zones"
     key = "zone_id"
     record_name = "ZoneRecord"
-    spatial = True
     multi_part = True
+    __geo_index: GeoIndex | None = None
 
-    def __init__(self, network):
-        super().__init__(network.project)
-        self.network = network
-        self.__geo_index = None
-
-    def create_zoning_layer(self):
+    def create_zoning_layer(self) -> None:
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.has_zoning:
             qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
-            with self.project.db_connection_spatial as conn:
-                run_queries_from_sql_file(conn, qry_file)
+            with self._transactions.transaction():
+                run_queries_from_sql_file(self._transactions, qry_file)
         else:
-            self.project.warning("zones table already exists. Nothing was done", Warning)
+            logger.warning("zones table already exists. Nothing was done")
 
     @property
     def has_zoning(self) -> bool:
         """Whether the project has a 'zones' table"""
-        with self.project.db_connection as conn:
-            return has_table(conn, self.name)
+        return has_table(self._transactions, self.name)
 
     def coverage(self) -> Polygon:
         """Returns a single polygon for the entire zoning coverage
@@ -72,12 +68,13 @@ class Zoning(ProjectTable):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        with self.project.db_connection_spatial as conn:
-            dt = conn.execute('SELECT ST_AsBinary("geometry") FROM zones;').fetchall()
+        dt = self._transactions.execute('SELECT ST_AsBinary("geometry") FROM zones').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return union_all(polygons)
 
-    def add_centroid(self, zone_id: int, point: Point = None, robust=True) -> None:
+    def add_centroid(
+        self, zone_id: int, point: Point | None = None, robust: bool = True
+    ) -> None:
         """Adds a centroid to the network file for the given zone
 
         :Arguments:
@@ -93,13 +90,14 @@ class Zoning(ProjectTable):
         # This is VERY small in real-world terms (between zero and 11cm)
         shift = 0.000001
 
-        with self.project.db_connection_spatial as conn:
+        with self._transactions.transaction():
+            conn = self._transactions
             if conn.execute("SELECT count(*) FROM nodes WHERE node_id=?", [zone_id]).fetchone()[0] > 0:
                 logger.warning("Centroid already exists. Failed to create it")
                 return
 
             if point is None:
-                point = self.get(zone_id, conn=conn).geometry.centroid
+                point = self.get(zone_id).geometry.centroid
 
             if robust:
                 check_sql = """SELECT count(*) FROM nodes
@@ -117,7 +115,7 @@ class Zoning(ProjectTable):
             sql = "INSERT INTO nodes (node_id, is_centroid, geometry) VALUES(?,1,GeomFromWKB(?, ?));"
             conn.execute(sql, [zone_id, point.wkb, self.srid])
 
-    def add_centroids(self, robust=True):
+    def add_centroids(self, robust: bool = True) -> None:
         """Adds automatic centroids to the network file. It adds centroids to all zones that do not have one
         Centroid is added to the geographic centroid of the zone.
 
@@ -126,8 +124,9 @@ class Zoning(ProjectTable):
             Defaults to ``True``.
         """
         i = 0
-        with self.project.db_connection_spatial as conn:
-            existing_centroids = pd.read_sql("SELECT node_id FROM Nodes WHERE is_centroid = 1", conn).node_id.to_numpy()
+        existing_centroids = pd.read_sql(
+            "SELECT node_id FROM Nodes WHERE is_centroid = 1", self._transactions
+        ).node_id.to_numpy()
         for zone in simple_progress(list(self), SIGNAL(object), "Adding centroids"):
             if zone.zone_id in existing_centroids:
                 continue
@@ -138,7 +137,14 @@ class Zoning(ProjectTable):
         else:
             logger.info("No new centroids added to the network")
 
-    def connect_mode(self, mode_id: str, link_types="", connectors=1, limit_to_zone=True, bulk: bool = False):
+    def connect_mode(
+        self,
+        mode_id: str,
+        link_types: str = "",
+        connectors: int = 1,
+        limit_to_zone: bool = True,
+        bulk: bool = False,
+    ) -> None:
         """
         Adds centroid connectors for the desired mode to the network file
 
@@ -166,16 +172,18 @@ class Zoning(ProjectTable):
                 considerably faster for connecting a large amount of centroids but has a high runtime overhead.
         """
 
-        network = self.project.network
-        proj_nodes = network.nodes.data
-        link_data = network.links.data
+        nodes = Nodes(self._transactions)
+        links = Links(self._transactions)
+        proj_nodes = nodes.data
+        link_data = links.data
 
-        centroids = proj_nodes.reset_index().query("is_centroid == 1", engine="python").node_id.to_numpy()
+        centroids = proj_nodes.query("is_centroid == 1", engine="python").node_id.to_numpy()
         centroid_conn = link_data.query("a_node in @centroids and modes.str.contains(@mode_id)", engine="python")
         connected_centroids = centroid_conn.a_node.to_numpy()
 
-        with self.project.db_connection_spatial as conn, warnings.catch_warnings():
+        with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
+            conn = self._transactions
 
             if not bulk:
                 zones_todo = [zone for zone in self if zone.zone_id not in connected_centroids]
@@ -191,8 +199,8 @@ class Zoning(ProjectTable):
                         connectors=connectors,
                         proj_nodes=proj_nodes,
                         proj_links=link_data,
-                        network=network,
-                        conn=conn,
+                        transactions=self._transactions,
+                        links=links,
                         delimiting_area=zone.geometry if limit_to_zone else None,
                     )
             else:
@@ -217,9 +225,9 @@ class Zoning(ProjectTable):
                     projected_crs=None,
                     limit_to_zone=limit_to_zone,
                 )
-        self._after_write()
+        self._invalidate()
 
-    def disconnect_mode(self, mode_id: str, zone_id: int = None) -> None:
+    def disconnect_mode(self, mode_id: str, zone_id: int | None = None) -> None:
         """Removes centroid connectors for the desired mode from the network file
 
         :Arguments:
@@ -228,7 +236,8 @@ class Zoning(ProjectTable):
             **zone_id** (:obj:`int`, *Optional*): Zone to disconnect. Disconnects all zones if not provided
         """
 
-        with self.project.db_connection_spatial as conn:
+        with self._transactions.transaction():
+            conn = self._transactions
             if zone_id is None:
                 zone_filter, data = "a_node IN (SELECT zone_id FROM zones)", []
             else:
@@ -242,7 +251,7 @@ class Zoning(ProjectTable):
             if row_count:
                 logger.warning(f"Deleted {row_count} connectors for mode {mode_id}")
             else:
-                self.project.warning("No centroid connectors for this mode")
+                logger.warning("No centroid connectors for this mode")
 
     def get_closest_zone(self, geometry: Union[Point, LineString, MultiLineString]) -> int:
         """Returns the zone in which the given geometry is located.
@@ -271,5 +280,5 @@ class Zoning(ProjectTable):
             dists[geo.distance(geometry)] = zone_id
         return dists[min(dists.keys())]
 
-    def _after_write(self):
+    def _invalidate(self) -> None:
         self.__geo_index = None

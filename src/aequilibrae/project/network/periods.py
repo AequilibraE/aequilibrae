@@ -1,11 +1,12 @@
 import logging
+from typing import Any
 
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import NonSpatialProjectTable
 
 logger = logging.getLogger(__name__)
 
 
-class Periods(ProjectTable):
+class Periods(NonSpatialProjectTable):
     """Access to the API resources to manipulate the periods table in the network
 
     .. code-block:: python
@@ -28,10 +29,9 @@ class Periods(ProjectTable):
     key = "period_id"
     record_name = "PeriodRecord"
 
-    def __init__(self, net):
-        super().__init__(net.project)
-
-    def new_period(self, period_id: int, start: int, end: int, description: str = None) -> int:
+    def new_period(
+        self, period_id: int, start: int, end: int, description: str | None = None
+    ) -> int:
         """Creates a new period with a given ID
 
         :Arguments:
@@ -50,7 +50,7 @@ class Periods(ProjectTable):
             period_description=description if description is not None else "",
         )
 
-    def renumber(self, period_id: int, new_id: int):
+    def renumber(self, period_id: int, new_id: int) -> None:
         """Renumbers a period in the network
 
         :Arguments:
@@ -71,6 +71,6 @@ class Periods(ProjectTable):
         logger.info(f"Period {period_id} was renumbered to {new_id}")
 
     @property
-    def default_period(self):
+    def default_period(self) -> Any:
         """The default period (period 1), which always exists"""
         return self.get(1)

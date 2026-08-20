@@ -1,9 +1,9 @@
-import string
+from typing import Any
 
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import NonSpatialProjectTable
 
 
-class LinkTypes(ProjectTable):
+class LinkTypes(NonSpatialProjectTable):
     """
     Access to the API resources to manipulate the link_types table in the network.
 
@@ -26,36 +26,28 @@ class LinkTypes(ProjectTable):
         >>> link_types.insert(link_type_id='a', link_type='Arterial', lanes=3, lane_capacity=1100)
         'a'
 
-        # Bulk changes go in one batch
-        >>> with link_types.batch() as batch:
+        # Coordinate several writes with the project transaction
+        >>> with project.transaction():
         ...     for lt in link_types:
-        ...         batch.update(lt.link_type_id, beta=1)
+        ...         link_types.update(lt.link_type_id, beta=1)
 
-        >>> project.close()
+        >>> project.shutdown()
     """
 
     name = "link_types"
     key = "link_type_id"
     record_name = "LinkTypeRecord"
 
-    __allowed_characters = string.ascii_letters + "_"
+    def get_by_name(self, link_type: str) -> Any:
+        """Get a link-type record by its descriptive name.
 
-    def __init__(self, net):
-        super().__init__(net.project)
+        :Arguments:
+            **link_type** (:obj:`str`): Descriptive link-type name.
 
-    def get_by_name(self, link_type: str):
-        """Get a link type record from the network by its *link_type* (i.e. name)"""
+        :Returns:
+            **link type** (:obj:`Any`): Generated frozen link-type record.
+        """
         for lt in self:
             if lt.link_type == link_type:
                 return lt
         raise ValueError(f"Link type {link_type} does not exist in the model")
-
-    def _check_link_type(self, value) -> str:
-        if not isinstance(value, str):
-            raise ValueError("link_type must be string")
-        if not len(value):
-            raise ValueError("link_type cannot be zero-length")
-        for letter in value:
-            if letter not in self.__allowed_characters:
-                raise ValueError('link_type can only contain letters and "_"')
-        return value

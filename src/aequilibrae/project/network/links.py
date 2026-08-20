@@ -1,11 +1,12 @@
 import logging
+from typing import Any
 
-from aequilibrae.project.project_table import ProjectTable
+from aequilibrae.project.project_table import SpatialProjectTable
 
 logger = logging.getLogger(__name__)
 
 
-class Links(ProjectTable):
+class Links(SpatialProjectTable):
     """
     Access to the API resources to manipulate the links table in the network
 
@@ -27,34 +28,34 @@ class Links(ProjectTable):
         >>> links.add_mode(1, 'b')
         >>> links.drop_mode(1, 'b')
 
-        # Many changes go in one batch (a single transaction)
-        >>> with links.batch() as batch:
+        # Coordinate many changes in one project transaction
+        >>> with project.transaction():
         ...     for link_id in (2, 3, 4):
-        ...         batch.update(link_id, speed_ab=90.0)
+        ...         links.update(link_id, speed_ab=90.0)
 
-        >>> project.close()
+        >>> project.shutdown()
     """
 
     name = "links"
     key = "link_id"
     record_name = "LinkRecord"
-    spatial = True
-    protected = frozenset(("a_node", "b_node"))
     defaults = {"a_node": 0, "b_node": 0, "direction": 0, "link_type": "default"}
+    _copy_excluded_fields = frozenset(("a_node", "b_node"))
 
-    def __init__(self, net):
-        super().__init__(net.project)
+    def copy(self, link_id: int) -> int:
+        """Duplicate a link under a new ID and return that ID.
 
-    def copy(self, link_id: int, conn=None) -> int:
-        """Duplicates a link under a new id, returning that id
+        :Arguments:
+            **link_id** (:obj:`int`): ID of the link to duplicate.
 
-        It raises an error if ``link_id`` does not exist
+        :Returns:
+            **link ID** (:obj:`int`): Generated ID of the duplicate.
         """
-        link = self.get(link_id, conn=conn)
-        values = {k: v for k, v in vars(link).items() if k != self.key and k not in self.protected}
-        return self.insert(conn=conn, **values)
+        link = self.get(link_id)
+        values = {k: v for k, v in vars(link).items() if k != self.key and k not in self._copy_excluded_fields}
+        return self.insert(**values)
 
-    def add_mode(self, link_id: int, mode, conn=None):
+    def add_mode(self, link_id: int, mode: Any) -> None:
         """Adds a mode to a link
 
         Logs a warning if the mode is already allowed on the link
@@ -65,13 +66,13 @@ class Links(ProjectTable):
             **mode** (:obj:`str` or mode record): mode_id or mode to be added to the link
         """
         mode_id = self.__mode_id_of(mode)
-        modes = self.get(link_id, conn=conn).modes
+        modes = self.get(link_id).modes
         if mode_id in modes:
             logger.warning("Mode already active for this link")
             return
-        self.update(link_id, conn=conn, modes=modes + mode_id)
+        self.update(link_id, modes=modes + mode_id)
 
-    def drop_mode(self, link_id: int, mode, conn=None):
+    def drop_mode(self, link_id: int, mode: Any) -> None:
         """Removes a mode from a link
 
         Logs a warning if the mode is already NOT allowed on the link
@@ -82,21 +83,14 @@ class Links(ProjectTable):
             **mode** (:obj:`str` or mode record): mode_id or mode to be removed from the link
         """
         mode_id = self.__mode_id_of(mode)
-        modes = self.get(link_id, conn=conn).modes
+        modes = self.get(link_id).modes
         if mode_id not in modes:
             logger.warning("Mode already inactive for this link")
             return
-        self.update(link_id, conn=conn, modes=modes.replace(mode_id, ""))
-
-    def _check_modes(self, modes) -> str:
-        if not isinstance(modes, str):
-            raise ValueError("Modes field needs to be a string")
-        if modes == "":
-            raise ValueError("Modes field needs to have at least one mode")
-        return modes
+        self.update(link_id, modes=modes.replace(mode_id, ""))
 
     @staticmethod
-    def __mode_id_of(mode) -> str:
+    def __mode_id_of(mode: Any) -> str:
         mode_id = getattr(mode, "mode_id", mode)
         if not isinstance(mode_id, str):
             raise TypeError("You should provide a mode_id (string) or a mode record")
