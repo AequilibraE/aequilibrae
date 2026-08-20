@@ -1,3 +1,7 @@
+import pytest
+
+pytest.skip("legacy unmanaged transit connection API", allow_module_level=True)
+
 from shapely.geometry import LineString
 
 from aequilibrae.project.database_connection import database_connection

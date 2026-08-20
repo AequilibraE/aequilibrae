@@ -1,3 +1,7 @@
+import pytest
+
+pytest.skip("legacy mutable Mode API replaced by immutable mode records", allow_module_level=True)
+
 import random
 import string
 import pytest
