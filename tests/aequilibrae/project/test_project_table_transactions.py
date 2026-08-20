@@ -46,7 +46,7 @@ def test_user_fields_are_available_in_generated_records(things):
     assert table.data.loc[0, "user_note"] == "custom"
 
 
-def test_gateway_mutation_is_a_savepoint(things):
+def test_table_mutation_is_a_savepoint(things):
     table, project_connection = things
     table.insert(thing_id=1, value=10)
 

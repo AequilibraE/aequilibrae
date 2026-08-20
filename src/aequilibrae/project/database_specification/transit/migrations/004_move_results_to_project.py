@@ -12,7 +12,7 @@ def migrate(
     transit_conn: Optional[sqlite3.Connection],
     results_conn: Optional[sqlite3.Connection],
 ):
-    """Move transit result metadata without constructing project gateways."""
+    """Move transit result metadata without constructing project tables."""
     if not transit_conn:
         logger.info("Migration finished, no 'public_transport.sqlite' connection provided.")
         return
@@ -24,14 +24,14 @@ def migrate(
         logger.info("Migration finished, no table 'results' in 'public_transport.sqlite'.")
         return
 
-    payloads = {
+    data_tables = {
         row[0]
         for row in results_conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         ).fetchall()
     }
     recorded = {row[0] for row in project_conn.execute("SELECT table_name FROM results").fetchall()}
-    for table_name in payloads - recorded:
+    for table_name in data_tables - recorded:
         project_conn.execute(
             "INSERT INTO results (table_name, procedure, procedure_id, procedure_report) VALUES (?, '', '', 'null')",
             (table_name,),

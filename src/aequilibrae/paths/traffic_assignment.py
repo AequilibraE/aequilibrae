@@ -235,8 +235,8 @@ class TrafficAssignment(AssignmentBase):
         # Information on the assignment setup can be recovered with
         >>> info = assig.info()
 
-        # Result payload databases are optional.  Create one explicitly before
-        # asking the project to expose its results gateway.
+        # Result data databases are optional.  Create one explicitly before
+        # asking the project to expose its results table.
         >>> base_path = project.project_base_path
         >>> from aequilibrae.utils.db_utils import safe_connect
         >>> results_database = base_path / 'results_database.sqlite'
@@ -244,8 +244,8 @@ class TrafficAssignment(AssignmentBase):
         >>> result_connection.close()
         >>> project.shutdown()
         >>> project = Project.from_path(base_path)
-        >>> results_gateway = project.results
-        >>> assig.save_results(table_name='base_year_assignment', results=results_gateway)
+        >>> results_table = project.results
+        >>> assig.save_results(table_name='base_year_assignment', results=results_table)
 
         # skims are here
         >>> avg_skims = assigclass.results.skims # blended ones

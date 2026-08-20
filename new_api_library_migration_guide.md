@@ -9,11 +9,11 @@ explicitly path-owned, closed-project utility.
 - `Project` owns a root `Scenario` for its whole open lifetime and references
   one selected scenario. It owns the canonical-path OS lock.
 - Each `Scenario` owns paths, logging identity/handler, parameters, all
-  gateways, and one `ConnectionClosure` named `project`, `results`, `transit`.
+  tables, and one `ConnectionClosure` named `project`, `results`, `transit`.
 - `ConnectionClosure[name]` is the sole `NestedTransactions` owner for one
-  distinct SQLite connection. Project/spatial gateways share `project`.
-- A table gateway receives only its named manager. Coordinators may receive an
-  immediate domain owner, paths, or sibling gateway, never `Project` as a
+  distinct SQLite connection. Project/spatial tables share `project`.
+- A project table receives only its named manager. Coordinators may receive an
+  immediate domain owner, paths, or sibling table, never `Project` as a
   connection service locator.
 - Standalone mutations enter `manager.transaction()`. A project transaction
   enters all managers with `ExitStack`; nested scopes are savepoints. Contexts
@@ -30,9 +30,9 @@ explicitly path-owned, closed-project utility.
 2. **Migrations:** pass closures, establish one transaction owner, replace
    `executescript` with complete-statement iteration, and terminate all SQL.
 3. **Scenario lifecycle:** stage all three files, create the closure and all
-   gateways off-object, then install. Add canonical path locking, static closed
+   tables off-object, then install. Add canonical path locking, static closed
    `Project.upgrade(path)`, deterministic shutdown, and two-phase switching.
-4. **Gateway cutover:** inject managers; remove connection arguments and
+4. **Table cutover:** inject managers; remove connection arguments and
    `TableBatch`; make `.data` key-indexed; migrate every consumer.
 5. **Resource helpers:** first finalize compensated matrix/result signatures,
    then convert every Python and Cython producer in one pass.
@@ -75,9 +75,9 @@ function; record its owner and teardown boundary.
 - Routine open-project SQL: pass `scenario.connections[name]`; call delegated
   `execute`/`executemany`; enter `.transaction()` only if this operation owns a
   mutation scope.
-- Gateway: constructor accepts one manager. Reads execute directly; every
+- Table: constructor accepts one manager. Reads execute directly; every
   mutation enters that manager's transaction, even for one statement.
-- Cross-gateway domain operation: inject the domain owner/sibling gateways and
+- Cross-table domain operation: inject the domain owner/sibling tables and
   wrap each multi-statement named-database operation in a savepoint.
 - Migration: receive `ConnectionClosure`; only the manager/initializer enters
   `closure.transaction()`. Helpers never finalize or nest.
@@ -90,8 +90,8 @@ function; record its owner and teardown boundary.
 
 Pass `Project` only to a public algorithm whose contract genuinely spans
 scenario domains. Pass `Scenario` when selection-specific paths and several
-named managers are required. Pass a manager to a gateway/SQL helper, a path to
-a filesystem-only helper, and a gateway/domain object where its behavior is
+named managers are required. Pass a manager to a table/SQL helper, a path to
+a filesystem-only helper, and a table/domain object where its behavior is
 required. `Parameters` always receives a path.
 
 ### Key-indexed frames
@@ -111,7 +111,7 @@ GTFS, and transit graph builder explicitly; passing current tests is not enough.
 ### Matrix/result producers
 
 Replace mutable `new_record`/assignment/`set_data`/`save` sequences with one
-resource helper call carrying payload and complete metadata, including reports.
+resource helper call carrying data and complete metadata, including reports.
 Use a registration helper only when the caller intentionally owns an existing
 resource. Never pre-create a final path and then insert metadata. Results must
 persist all index levels, so preserve `link_id`/other identity as the DataFrame

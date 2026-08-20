@@ -16,13 +16,13 @@ class Scenario:
     """Own all persistent database resources for one project scenario.
 
     A ``Scenario`` is the single source of truth for a named slice of project
-    state.  It owns its paths, log handler, parameters, and all gateway
+    state.  It owns its paths, log handler, parameters, and all project
     objects (network, zoning, matrices, results, transit, about).  The
     optional results and transit databases are opened only when their files
     already exist on disk; they are never created as a side-effect of opening
     a scenario.
 
-    Construction is one-stage: every gateway is fully wired in ``__init__``.
+    Construction is one-stage: every project object is fully wired in ``__init__``.
     Use :meth:`create` to build a scenario from an on-disk project folder.
     """
 
@@ -130,7 +130,7 @@ class Scenario:
 
     @property
     def results(self) -> Results:
-        """The results gateway.
+        """The results table.
 
         :Raises:
             **RuntimeError**: When this scenario has no results database.

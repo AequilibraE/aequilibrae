@@ -1,9 +1,9 @@
-"""Table gateways backed by a scenario's persistent SQLite connection.
+"""Project tables backed by a scenario's persistent SQLite connection.
 
 The classes in this module provide fresh record reads and explicit writes. They
-are intentionally small table gateways rather than an object-relational mapper:
+are intentionally small tables rather than an object-relational mapper:
 records are immutable snapshots, while mutations are performed through the
-owning gateway.
+owning table.
 """
 
 from abc import ABC, abstractmethod
@@ -82,7 +82,7 @@ def guess_record_type(connection: NestedTransactionManager, table: str, record_n
 
 @lru_cache(maxsize=None)
 def _format_insert(table: str, columns: tuple[str, ...], geometry_placeholder: str | None) -> str:
-    """Format one INSERT shape, shared by every gateway instance."""
+    """Format one INSERT shape, shared by every table instance."""
     names = ",".join(_QUOTED_COLUMN.format(column=column) for column in columns)
     placeholders = ",".join(
         geometry_placeholder if column == "geometry" and geometry_placeholder else _VALUE_PLACEHOLDER
@@ -93,7 +93,7 @@ def _format_insert(table: str, columns: tuple[str, ...], geometry_placeholder: s
 
 @lru_cache(maxsize=None)
 def _format_update(table: str, key: str, columns: tuple[str, ...], geometry_placeholder: str | None) -> str:
-    """Format one UPDATE shape, shared by every gateway instance."""
+    """Format one UPDATE shape, shared by every table instance."""
     assignments = []
     for column in columns:
         placeholder = geometry_placeholder if column == "geometry" and geometry_placeholder else _VALUE_PLACEHOLDER
@@ -106,7 +106,7 @@ class ProjectTable(ABC):
 
     Subclasses declare the table name, key, and generated-record name. During
     construction, ``record_type`` is a frozen dataclass matching the live
-    SQLite schema, including user-added fields. Concrete gateways
+    SQLite schema, including user-added fields. Concrete tables
     must inherit either :class:`NonSpatialProjectTable` or
     :class:`SpatialProjectTable` so geometry handling is never mixed into an
     ordinary table by a boolean flag.
@@ -124,11 +124,11 @@ class ProjectTable(ABC):
     _geometry_placeholder: str | None = None
 
     def __init__(self, connection: NestedTransactionManager) -> None:
-        """Configure the gateway and pre-format its stable SQL statements.
+        """Configure the table and pre-format its stable SQL statements.
 
         :Arguments:
             **connection** (:obj:`NestedTransactionManager`): Manager owning the
-            persistent connection used by this gateway.
+            persistent connection used by this table.
         """
         if not isinstance(connection, NestedTransactionManager):
             raise TypeError("ProjectTable requires a NestedTransactionManager manager")
@@ -304,7 +304,7 @@ class ProjectTable(ABC):
         self._record_schema_version = schema_version
 
     def _build_record(self, row: tuple[Any, ...]) -> Any:
-        """Convert one SQLite row into the gateway's explicit record type."""
+        """Convert one SQLite row into the table's explicit record type."""
         values = []
         for column, value in zip(self._record_fields, row, strict=True):
             values.append(self._record_value(column, value))
@@ -343,7 +343,7 @@ class ProjectTable(ABC):
         return 1 if current is None else current + 1
 
     def _change_key(self, key: Any, new_key: Any) -> None:
-        """Change a record key for gateways exposing a renumber operation."""
+        """Change a record key for tables exposing a renumber operation."""
         with self._transaction_manager.transaction() as conn:
             cursor = conn.execute(self._change_key_sql, [new_key, key])
             if cursor.rowcount == 0:

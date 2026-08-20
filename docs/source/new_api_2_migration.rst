@@ -19,18 +19,18 @@ Do not depend on a process-wide active project, and do not call ``close()``::
         do_work(project)
 
 Hosts that cannot use a context manager call the idempotent
-``project.shutdown()``. A selected ``Scenario`` owns its paths, gateways, and
+``project.shutdown()``. A selected ``Scenario`` owns its paths, tables, and
 persistent project, results, and transit connections. Several projects may be
 open concurrently.
 
 Transactions and low-level SQL
 ------------------------------
 
-Standalone gateway writes commit before returning::
+Standalone table writes commit before returning::
 
     project.network.links.update(42, speed_ab=80)
 
-Coordinate gateway writes explicitly when required::
+Coordinate table writes explicitly when required::
 
     with project.transaction():
         project.network.links.update(42, speed_ab=80)
@@ -77,7 +77,7 @@ removed::
     links.update_from(changed_links)
 
 Every scalar or DataFrame mutation is automatically atomic. Inside a project
-transaction, each gateway operation uses a savepoint, so a caught bulk-write
+transaction, each table operation uses a savepoint, so a caught bulk-write
 failure cannot leave its successful prefix pending.
 
 DataFrame row identity
@@ -104,7 +104,7 @@ Inherited CRUD now changes metadata records only::
 
     project.matrices.update("demand", description="Base demand")
     project.matrices.delete("demand")       # file remains
-    project.results.delete("assignment")   # payload table remains
+    project.results.delete("assignment")   # data table remains
 
 Resource-aware operations are explicit::
 
@@ -114,9 +114,9 @@ Resource-aware operations are explicit::
     project.results.delete_result("assignment")
 
 Matrix helpers compensate file and metadata failures. Result creation always
-fails if either metadata or a payload table exists; ``if_exists`` and arbitrary
+fails if either metadata or a data table exists; ``if_exists`` and arbitrary
 ``DataFrame.to_sql`` options are not accepted. It stores every DataFrame index
-level as payload columns, writes bounded chunks in one results transaction, and
+level as data columns, writes bounded chunks in one results transaction, and
 then creates metadata with compensation. Resource helpers are rejected inside
 ``project.transaction()`` because filesystem and independent SQLite resources
 cannot participate atomically.

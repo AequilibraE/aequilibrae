@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Results(NonSpatialProjectTable):
-    """Result metadata gateway with compensated payload-table helpers."""
+    """Result metadata table with compensated data-table helpers."""
 
     name = "results"
     key = "table_name"
@@ -27,14 +27,14 @@ class Results(NonSpatialProjectTable):
         project_connection: NestedTransactionManager,
         results_connection: NestedTransactionManager,
     ) -> None:
-        """Create the result metadata and payload gateway.
+        """Create the result metadata and data table.
 
         :Arguments:
             **project_connection** (:obj:`NestedTransactionManager`): Manager for
             result metadata in the project database.
 
             **results_connection** (:obj:`NestedTransactionManager`): Manager for
-            result payload tables.
+            result data tables.
         """
         super().__init__(project_connection)
         self._results_connection = results_connection
@@ -55,10 +55,10 @@ class Results(NonSpatialProjectTable):
         dtype: dict[str, str] | None = None,
         chunksize: int = 1000,
     ) -> Any:
-        """Create one payload table and its metadata record.
+        """Create one data table and its metadata record.
 
         :Arguments:
-            **table_name** (:obj:`str`): Unique SQLite payload-table name.
+            **table_name** (:obj:`str`): Unique SQLite data-table name.
 
             **data** (:obj:`pandas.DataFrame`): Result values to persist.
 
@@ -91,10 +91,10 @@ class Results(NonSpatialProjectTable):
             raise TypeError("data must be a pandas DataFrame")
         if not isinstance(chunksize, int) or chunksize <= 0:
             raise ValueError("chunksize must be a positive integer")
-        if table_name in self or self._payload_exists(table_name):
-            raise ValueError(f"A result metadata record or payload table named {table_name!r} already exists")
+        if table_name in self or self._data_exists(table_name):
+            raise ValueError(f"A result metadata record or data table named {table_name!r} already exists")
 
-        frame = _payload_frame(data)
+        frame = _data_frame(data)
         types = _sqlite_types(frame, dtype or {})
         table = _quote_identifier(table_name)
         columns = list(frame.columns)
@@ -126,15 +126,15 @@ class Results(NonSpatialProjectTable):
                 with self._results_connection.transaction() as conn:
                     conn.execute(f"DROP TABLE {table}")
             except BaseException as cleanup:
-                _add_resource_note(primary, f"unregistered payload table {table_name!r} remains: {cleanup!r}")
+                _add_resource_note(primary, f"unregistered data table {table_name!r} remains: {cleanup!r}")
             raise
         return self.get(table_name)
 
     def get_results(self, table_name: str) -> pd.DataFrame:
-        """Read a result payload table into a DataFrame.
+        """Read a result data table into a DataFrame.
 
         :Arguments:
-            **table_name** (:obj:`str`): Registered payload-table name.
+            **table_name** (:obj:`str`): Registered data-table name.
 
         :Returns:
             **results** (:obj:`pandas.DataFrame`): Stored result values.
@@ -145,7 +145,7 @@ class Results(NonSpatialProjectTable):
         )
 
     def delete_result(self, table_name: str) -> None:
-        """Delete result metadata and its payload table.
+        """Delete result metadata and its data table.
 
         :Arguments:
             **table_name** (:obj:`str`): Registered result name to delete.
@@ -154,7 +154,7 @@ class Results(NonSpatialProjectTable):
         table = _quote_identifier(table_name)
         tombstone_name = f"__aeq_deleted_{uuid.uuid4().hex}"
         tombstone = _quote_identifier(tombstone_name)
-        moved = self._payload_exists(table_name)
+        moved = self._data_exists(table_name)
         if moved:
             with self._results_connection.transaction() as conn:
                 conn.execute(f"ALTER TABLE {table} RENAME TO {tombstone}")
@@ -166,24 +166,24 @@ class Results(NonSpatialProjectTable):
                     with self._results_connection.transaction() as conn:
                         conn.execute(f"ALTER TABLE {tombstone} RENAME TO {table}")
                 except BaseException as cleanup:
-                    _add_resource_note(primary, f"payload is stranded as {tombstone_name!r}: {cleanup!r}")
+                    _add_resource_note(primary, f"data is stranded as {tombstone_name!r}: {cleanup!r}")
             raise
         if moved:
             with self._results_connection.transaction() as conn:
                 conn.execute(f"DROP TABLE {tombstone}")
 
     def clear_database(self) -> None:
-        """Remove metadata for absent payloads without changing payload tables."""
+        """Remove metadata for absent data without changing data tables."""
         with self._transaction_manager.transaction() as conn:
             names = [row[0] for row in conn.execute("SELECT table_name FROM results").fetchall()]
-            missing = [(name,) for name in names if not self._payload_exists(name)]
+            missing = [(name,) for name in names if not self._data_exists(name)]
             if missing:
                 conn.executemany("DELETE FROM results WHERE table_name=?", missing)
         self._invalidate()
 
     def update_database(self) -> None:
-        """Register existing, unowned payload tables as metadata only."""
-        payloads = {
+        """Register existing, unowned data tables as metadata only."""
+        data_tables = {
             row[0]
             for row in self._results_connection.connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -192,13 +192,13 @@ class Results(NonSpatialProjectTable):
         records = {
             row[0] for row in self._transaction_manager.connection.execute("SELECT table_name FROM results").fetchall()
         }
-        for table_name in sorted(payloads - records):
+        for table_name in sorted(data_tables - records):
             self.insert(table_name=table_name)
 
     def list(self) -> pd.DataFrame:
         return pd.read_sql_query("SELECT * FROM results", self._transaction_manager.connection)
 
-    def _payload_exists(self, table_name: str) -> bool:
+    def _data_exists(self, table_name: str) -> bool:
         return (
             self._results_connection.connection.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
@@ -208,7 +208,7 @@ class Results(NonSpatialProjectTable):
 
     def _require_resource_idle(self) -> None:
         if self._transaction_manager.in_transaction or self._results_connection.in_transaction:
-            raise RuntimeError("result payload helpers cannot run inside a database transaction")
+            raise RuntimeError("result data helpers cannot run inside a database transaction")
 
 
 def _quote_identifier(identifier: str) -> str:
@@ -217,7 +217,7 @@ def _quote_identifier(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
-def _payload_frame(data: pd.DataFrame) -> pd.DataFrame:
+def _data_frame(data: pd.DataFrame) -> pd.DataFrame:
     if any(not isinstance(column, str) for column in data.columns):
         raise ValueError("result columns must all be strings")
     if not data.columns.is_unique:
@@ -229,7 +229,7 @@ def _payload_frame(data: pd.DataFrame) -> pd.DataFrame:
         if not isinstance(label, str):
             raise ValueError("result index names must be strings")
         if label in used or label in names:
-            raise ValueError(f"result index label {label!r} collides with another payload column")
+            raise ValueError(f"result index label {label!r} collides with another data column")
         names.append(label)
     frame = data.copy(deep=False)
     frame.index = frame.index.set_names(names)

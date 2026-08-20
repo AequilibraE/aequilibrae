@@ -20,7 +20,7 @@ There is no requirement to support an implicit or process-global active project.
    `Project.deactivate()`.
 3. Make dependencies explicit at every call site:
    - algorithms that operate on a project receive a required `Project` argument;
-   - scenario-specific code receives a `Scenario` or the narrow gateway/connection manager it needs;
+   - scenario-specific code receives a `Scenario` or the narrow table/connection manager it needs;
    - `Parameters` receives a path explicitly;
    - closed-project utilities receive a path;
    - migrations receive their connections from the migration runner.
@@ -74,7 +74,7 @@ lifecycle rather than adding guards to every property.
    `new` must remain, it should return the constructed project rather than mutate an empty shell.
 4. Install network, zoning, matrices, results, transit, about, parameters, and logging while constructing the
    `Scenario`, not later in `Project.__load_objects()`.
-5. Remove `Scenario.open_candidate`, its `(candidate, created)` protocol, placeholder gateway attributes initialized to
+5. Remove `Scenario.open_candidate`, its `(candidate, created)` protocol, placeholder project-object attributes initialized to
    `None`, `Project.__load_objects`, `_require_scenario`, and the duplicate wrapper methods.
 6. Scenario switching may still prepare a complete scenario before swapping it, but it must use the same one-stage
    scenario factory and never expose a partially populated `Scenario`.
@@ -129,9 +129,9 @@ Opening/initializing a scenario must reflect what is on disk. It must not create
 2. Always open `project_database.sqlite`.
 3. Open results/transit only when their files already exist; pass `None` to `ConnectionClosure` otherwise.
 4. Do not initialize a transit schema merely because opening discovered no transit database.
-5. Make result/transit gateway availability explicit:
-   - metadata gateways backed by the project DB may still exist;
-   - payload/transit operations that need a missing optional DB raise a clear `RuntimeError` when called;
+5. Make result/transit table availability explicit:
+   - metadata tables backed by the project DB may still exist;
+   - data/transit operations that need a missing optional DB raise a clear `RuntimeError` when called;
    - do not lazily create the file on first access.
 6. Explicit resource-creation workflows may create these files when that is their stated purpose. Ordinary project or
    scenario initialization may not.
@@ -184,7 +184,7 @@ test showing `copy.copy()` and `copy.deepcopy()` are not rejected. Do not add re
 
 `NestedTransactions` is an object, not a collection of transactions. Rename it to something that describes its role,
 preferably `NestedTransactionManager`. Rename attributes such as `_transactions` to `_transaction_manager` throughout
-gateways and helpers.
+tables and helpers.
 
 ### Context-manager contract
 
@@ -196,7 +196,7 @@ with manager.transaction() as connection:
     connection.execute(...)
 ```
 
-Use the returned connection in gateway reads and writes. Do not create a second proxy API that mirrors part of
+Use the returned connection in table reads and writes. Do not create a second proxy API that mirrors part of
 `sqlite3.Connection`. `Project.db_connection` and the three closure properties may expose the manager; callers obtain
 SQLite through `manager.transaction()`.
 
@@ -258,7 +258,7 @@ cannot yet run.
 
 1. Compare all touched modules and RST files against the branch before the table rewrite (for example
    `a54e59fc^`) and inventory removed `>>>` blocks and `.. doctest::` directives.
-2. Restore those blocks in the replacement gateway/module documentation.
+2. Restore those blocks in the replacement table/module documentation.
 3. Update examples to the final explicit-project API where straightforward.
 4. If the underlying feature is temporarily unavailable or intentionally removed, retain the example with
    `# doctest: +SKIP`; do not delete it.

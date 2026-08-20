@@ -1,6 +1,6 @@
 import pytest
 
-pytest.skip("legacy ResultRecord API replaced by the Results table gateway", allow_module_level=True)
+pytest.skip("legacy ResultRecord API replaced by the Results table", allow_module_level=True)
 
 import logging
 import sqlite3

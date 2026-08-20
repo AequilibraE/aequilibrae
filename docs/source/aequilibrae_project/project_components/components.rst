@@ -332,7 +332,7 @@ It is possible to access the log file contents, as presented in the next code bl
 ``project.matrices``
 --------------------
 
-This method is a gateway to all the matrices available in the model, which allows us to update the
+This table provides access to all the matrices available in the model, which allows us to update the
 records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord`` object.
 
 .. doctest::
@@ -344,7 +344,7 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     # One can also check all the project matrices as a Pandas' DataFrame
     >>> matrix_list = matrices.list()
 
-    # Matrix payloads are created and registered through one explicit operation.
+    # Matrix data is created and registered through one explicit operation.
     # Existing files can be registered with ``register_matrix``.
     >>> matrix_exists = matrices.check_exists("demand_mc")
 

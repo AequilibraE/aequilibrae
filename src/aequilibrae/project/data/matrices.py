@@ -14,27 +14,27 @@ logger = logging.getLogger(__name__)
 
 
 class Matrices(NonSpatialProjectTable):
-    """Matrix metadata gateway with explicit file-managing helpers."""
+    """Matrix metadata table with explicit file-managing helpers."""
 
     name = "matrices"
     key = "name"
     record_name = "MatrixRecord"
 
     def __init__(self, connection: NestedTransactionManager, matrices_path: str | Path) -> None:
-        """Create the matrix metadata gateway.
+        """Create the matrix metadata table.
 
         :Arguments:
             **connection** (:obj:`NestedTransactionManager`): Manager for the
             project database containing matrix metadata.
 
             **matrices_path** (:obj:`str` or :obj:`Path`): Directory containing
-            matrix payload files.
+            matrix data files.
         """
         super().__init__(connection)
         self.folder: Path = Path(matrices_path)
 
     def create(self, name: str, file_name: str, matrix: AequilibraeMatrix | None = None) -> Any:
-        """Create matrix metadata and optionally export a matrix payload.
+        """Create matrix metadata and optionally export matrix data.
 
         This filesystem operation cannot participate in a project transaction.
         A file supplied for registration remains caller-owned on failure.
@@ -42,7 +42,7 @@ class Matrices(NonSpatialProjectTable):
         :Arguments:
             **name** (:obj:`str`): Unique matrix name stored in project metadata.
 
-            **file_name** (:obj:`str`): Matrix payload file name relative to the
+            **file_name** (:obj:`str`): Matrix data file name relative to the
             project's matrix directory.
 
             **matrix** (:obj:`AequilibraeMatrix`, *Optional*): Matrix to export.
@@ -100,7 +100,7 @@ class Matrices(NonSpatialProjectTable):
         :Arguments:
             **name** (:obj:`str`): Unique matrix name.
 
-            **file_name** (:obj:`str`): Existing matrix payload file name.
+            **file_name** (:obj:`str`): Existing matrix data file name.
 
         :Returns:
             **matrix record** (:obj:`Any`): Generated frozen metadata record.
@@ -134,13 +134,13 @@ class Matrices(NonSpatialProjectTable):
             tombstone.unlink()
 
     def get_matrix(self, name: str) -> AequilibraeMatrix:
-        """Load a matrix payload by metadata name.
+        """Load matrix data by metadata name.
 
         :Arguments:
             **name** (:obj:`str`): Registered matrix name.
 
         :Returns:
-            **matrix** (:obj:`AequilibraeMatrix`): Loaded matrix payload.
+            **matrix** (:obj:`AequilibraeMatrix`): Loaded matrix data.
         """
         record = self.get(name)
         matrix = AequilibraeMatrix()
