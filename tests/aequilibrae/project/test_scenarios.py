@@ -54,7 +54,8 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
-def test_transit_assignment_scenarios(scenario_example, scenario):
+def test_transit_assignment_scenarios(scenario_example_with_transit, scenario):
+    scenario_example = scenario_example_with_transit
     scenario_example.use_scenario(scenario)
 
     data = scenario_example.transit

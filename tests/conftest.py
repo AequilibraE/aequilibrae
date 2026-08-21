@@ -175,6 +175,17 @@ def scenario_example(cached_scenario_example, cache_path, tmp_path) -> Project:
     project.close()
 
 
+@pytest.fixture
+def scenario_example_with_transit(scenario_example) -> Project:
+    """Provide the scenario fixture with explicit empty transit databases."""
+    original_scenario = scenario_example.scenario.name
+    for scenario_name in ("root", "nauru"):
+        scenario_example.use_scenario(scenario_name)
+        scenario_example.create_transit_database()
+    scenario_example.use_scenario(original_scenario)
+    return scenario_example
+
+
 @pytest.fixture(scope="session")
 def cached_st_varent(test_data_path, cache_path):
     # Zip includes top-level "St_Varent" dir.
