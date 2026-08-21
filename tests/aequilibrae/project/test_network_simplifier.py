@@ -16,9 +16,7 @@ def project_with_graph(nauru_example):
         # Let's create a centroid to build a graph
         arbitrary_node = conn.execute("select node_id from nodes limit 1").fetchone()[0]
         nodes = nauru_example.network.nodes
-        nd = nodes.get(arbitrary_node)
-        nd.is_centroid = 1
-        nd.save()
+        nodes.update(arbitrary_node, is_centroid=1)
 
     mode = "c"
 
@@ -29,16 +27,17 @@ def project_with_graph(nauru_example):
     graph.set_skimming("distance")
     graph.set_blocked_centroid_flows(False)
 
-    yield graph
+    yield nauru_example, graph
 
 
 def test_simplify(project_with_graph):
-    net = NetworkSimplifier()
+    project, graph = project_with_graph
+    net = NetworkSimplifier(project.network, project.scenario.db_connection)
 
     links_before = net.link_layer.shape[0]
     nodes_before = net.network.nodes.data.shape[0]
 
-    net.simplify(project_with_graph)
+    net.simplify(graph)
     net.rebuild_network()
 
     assert links_before > net.network.links.data.shape[0]
@@ -46,7 +45,8 @@ def test_simplify(project_with_graph):
 
 
 def test_collapse_links_into_nodes(project_with_graph):
-    net = NetworkSimplifier()
+    project, _ = project_with_graph
+    net = NetworkSimplifier(project.network, project.scenario.db_connection)
 
     links_before = net.link_layer.shape[0]
     nodes_before = net.network.nodes.data.shape[0]

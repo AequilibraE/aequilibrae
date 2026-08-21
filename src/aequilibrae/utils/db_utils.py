@@ -1,6 +1,7 @@
 """SQLite connection ownership and small database helpers."""
 
 import contextlib
+import shutil
 import sqlite3
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
@@ -19,14 +20,13 @@ class AequilibraEConnection(sqlite3.Connection):
 class NestedTransactionManager:
     """Own one SQLite connection and provide nested transaction contexts."""
 
-    def __init__(self, connection: Connection, *, configured: bool = False) -> None:
+    def __init__(self, connection: Connection) -> None:
         if not isinstance(connection, Connection):
             raise TypeError("NestedTransactionManager requires a sqlite3.Connection")
         if connection.in_transaction:
             raise ValueError("connections must not already be in a transaction")
-        if not configured:
-            connection.isolation_level = None
-            _enable_foreign_keys(connection)
+        connection.isolation_level = None
+        _enable_foreign_keys(connection)
         self.__connection = connection
         self.__depth = 0
         self.__savepoint_id = 0
@@ -125,16 +125,12 @@ class ConnectionClosure:
         if any(connection.in_transaction for connection in present_connections):
             raise ValueError("connections must not already be in a transaction")
 
-        for connection in present_connections:
-            connection.isolation_level = None
-            _enable_foreign_keys(connection)
-
-        self.__db_connection = NestedTransactionManager(db_connection, configured=True)
+        self.__db_connection = NestedTransactionManager(db_connection)
         self.__results_connection = (
-            NestedTransactionManager(results_connection, configured=True) if results_connection is not None else None
+            NestedTransactionManager(results_connection) if results_connection is not None else None
         )
         self.__transit_connection = (
-            NestedTransactionManager(transit_connection, configured=True) if transit_connection is not None else None
+            NestedTransactionManager(transit_connection) if transit_connection is not None else None
         )
 
     @classmethod
@@ -182,6 +178,66 @@ class ConnectionClosure:
             raise RuntimeError("This scenario has no transit database")
         return self.__transit_connection
 
+    def create_results_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:
+        """Create the empty results database at *path* and start owning it."""
+        if self.__results_connection is not None:
+            raise RuntimeError("This scenario already has a results database")
+
+        path = Path(path)
+        if path.exists():
+            raise FileExistsError(f"results database already exists: {path}")
+        connection = safe_connect(path, missing_ok=True)
+        try:
+            self.__results_connection = self._optional_manager(connection)
+        except BaseException:
+            connection.close()
+            path.unlink(missing_ok=True)
+            raise
+        return self.__results_connection
+
+    def create_transit_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:
+        """Create and initialise the transit database at *path*, then own it."""
+
+        # Lazy imports because of circular imports
+        from aequilibrae.project.project_creation import initialize_tables
+        from aequilibrae.reference_files import spatialite_database
+        from aequilibrae.utils.spatialite_utils import connect_spatialite
+
+        if self.__transit_connection is not None:
+            raise RuntimeError("This scenario already has a transit database")
+
+        path = Path(path)
+        if path.exists():
+            raise FileExistsError(f"transit database already exists: {path}")
+
+        shutil.copyfile(spatialite_database, path)
+        connection = None
+        try:
+            connection = connect_spatialite(path)
+            self.__transit_connection = self._optional_manager(connection)
+            initialize_tables(self, databases=("transit",))
+        except BaseException:
+            if self.__transit_connection is not None:
+                self.__transit_connection.close()
+                self.__transit_connection = None
+            elif connection is not None:
+                connection.close()
+            path.unlink(missing_ok=True)
+            raise
+        return self.__transit_connection
+
+    def _optional_manager(self, connection: Connection) -> NestedTransactionManager:
+        if not isinstance(connection, Connection):
+            raise TypeError("connection slots must be sqlite3.Connection instances")
+        managers = (self.__db_connection, self.__results_connection, self.__transit_connection)
+        if any(manager is not None and manager.in_transaction for manager in managers):
+            raise RuntimeError("optional databases cannot be created inside a transaction")
+        if any(manager is not None and manager.connection is connection for manager in managers):
+            raise ValueError("each connection slot must refer to a different connection")
+        if connection.in_transaction:
+            raise ValueError("connections must not already be in a transaction")
+        return NestedTransactionManager(connection)
+
     @property
     def has_results_connection(self) -> bool:
         """Whether a results database is owned."""
@@ -227,9 +283,7 @@ def list_tables_in_db(connection: Connection) -> list[str]:
 def safe_connect(filepath: PathLike[str] | str, missing_ok: bool = False) -> Connection:
     """Open a non-spatial SQLite database without silently creating it."""
     if Path(filepath).exists() or missing_ok or str(filepath) == ":memory:":
-        connection = connect(filepath, factory=AequilibraEConnection)
-        _enable_foreign_keys(connection)
-        return connection
+        return connect(filepath, factory=AequilibraEConnection)
     raise FileNotFoundError(f"Attempting to open non-existent SQLite database: {filepath}")
 
 

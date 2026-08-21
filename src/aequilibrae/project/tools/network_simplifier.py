@@ -188,7 +188,6 @@ class NetworkSimplifier(WorkerThread):
         # Validate that we kept distances the same
         old_dist = self.link_layer.geometry.length.sum()
         new_layer = self.network.links
-        new_layer.refresh()
         new_dist = new_layer.data.geometry.length.sum()
 
         logger.warning(f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}")
@@ -216,8 +215,4 @@ class NetworkSimplifier(WorkerThread):
     def rebuild_network(self):
         """Rebuilds the network elements that would have to be rebuilt after massive network simplification"""
 
-        self.network.links.refresh()
-        self.network.nodes.refresh()
-
-        with self._project_connection.transaction() as conn:
-            conn.execute("VACUUM")
+        self._project_connection.connection.execute("VACUUM")

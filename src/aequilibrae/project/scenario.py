@@ -128,16 +128,34 @@ class Scenario:
                 log_handler.close()
             raise
 
+    def create_results_database(self) -> Results:
+        """Create and open the results database on its first use."""
+        if self._results is not None:
+            return self._results
+
+        manager = self.connections.create_results_connection(self.base_path / "results_database.sqlite")
+        self._results = Results(self.connections.db_connection, manager)
+        return self._results
+
+    def create_transit_database(self) -> Transit:
+        """Create, initialise, and open the transit database when requested."""
+        if self._transit is not None:
+            return self._transit
+
+        self.connections.create_transit_connection(self.base_path / "public_transport.sqlite")
+        self._transit = Transit(self.network, self.zoning, self.network.periods, self.connections)
+        return self._transit
+
     @property
     def results(self) -> Results:
-        """The results table.
+        """The results table, creating its empty database when first requested."""
+        return self.create_results_database()
 
-        :Raises:
-            **RuntimeError**: When this scenario has no results database.
-        """
-        if self._results is None:
-            raise RuntimeError("this scenario has no results database")
-        return self._results
+    @property
+    def results_connection(self) -> NestedTransactionManager:
+        """The results manager, creating its empty database when first requested."""
+        self.create_results_database()
+        return self.connections.results_connection
 
     @property
     def transit(self) -> Transit:

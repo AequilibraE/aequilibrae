@@ -66,22 +66,12 @@ class Project:
 
         :Raises:
             **FileNotFoundError**: When the project database does not exist.
-            **ValueError**: When the database is not an authoritative root scenario.
         """
         base_path = Path(project_folder)
         if not (base_path / "project_database.sqlite").is_file():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
 
         scenario = Scenario.create("root", base_path)
-        try:
-            root = scenario.connections.db_connection.connection.execute(
-                "SELECT 1 FROM scenarios WHERE scenario_name='root'"
-            ).fetchone()
-            if root is None:
-                raise ValueError("project database is not an authoritative root scenario")
-        except BaseException:
-            scenario.destroy()
-            raise
 
         project = cls(scenario)
         default_log_file_config(scenario.log_handler)
@@ -176,9 +166,18 @@ class Project:
         return self.scenario.db_connection.transaction()
 
     @property
+    def results_connection(self) -> AbstractContextManager[Connection]:
+        """Return a context manager yielding the lazily-created results connection."""
+        return self.scenario.results_connection.transaction()
+
+    @property
     def transit_connection(self) -> AbstractContextManager[Connection]:
         """Return a context manager yielding the transit SQLite connection."""
         return self.scenario.transit_connection.transaction()
+
+    def create_transit_database(self):
+        """Create the transit database, if necessary, and return its gateway."""
+        return self.scenario.create_transit_database()
 
     def transaction(self) -> AbstractContextManager[None]:
         """Return a coordinated transaction context across all open connections."""

@@ -1,5 +1,6 @@
 import random
 import string
+from dataclasses import FrozenInstanceError
 from sqlite3 import IntegrityError
 
 import pytest
@@ -19,12 +20,12 @@ def link_types(empty_no_triggers_project):
 
 
 def test_changing_link_type_id(no_triggers_test):
-    lt = random.choice(list(no_triggers_test.network.link_types.all_types().values()))
+    lt = random.choice(list(no_triggers_test.network.link_types))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(FrozenInstanceError):
         lt.link_type_id = "test my description"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(FrozenInstanceError):
         lt.link_type_id = "K"
 
 

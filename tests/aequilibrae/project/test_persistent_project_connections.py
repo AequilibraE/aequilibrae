@@ -63,7 +63,7 @@ def test_shutdown_closes_sqlite_connections(tmp_path):
         project.network.modes.get("c")
 
 
-def test_open_does_not_create_optional_databases(tmp_path):
+def test_open_lazily_creates_results_and_explicitly_creates_transit(tmp_path):
     path = _new_project(tmp_path)
     results = path / "results_database.sqlite"
     transit = path / "public_transport.sqlite"
@@ -74,14 +74,17 @@ def test_open_does_not_create_optional_databases(tmp_path):
     with Project.from_path(path) as project:
         assert not project.scenario.connections.has_results_connection
         assert not project.scenario.connections.has_transit_connection
-        with pytest.raises(RuntimeError, match="no results database"):
-            _ = project.results
+        assert {p.name for p in path.iterdir()} == before
+
+        assert project.results is not None
+        assert project.scenario.connections.has_results_connection
+        assert results.exists()
+
         with pytest.raises(RuntimeError, match="no transit database"):
             _ = project.transit
-
-    assert {p.name for p in path.iterdir()} == before
-    assert not results.exists()
-    assert not transit.exists()
+        assert project.create_transit_database() is project.transit
+        assert project.scenario.connections.has_transit_connection
+        assert transit.exists()
 
 
 def _new_project(tmp_path):
