@@ -251,11 +251,19 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """Saves all transit elements built in memory to disk"""
 
         with self._transit_manager.transaction() as conn:
+            self.gtfs_data.agency.save_to_database(conn)
+
+            for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 10/12)"):
+                if self.__has_taz:
+                    closest_zone = self._zoning.get_closest_zone(stop.geo)
+                    if stop.geo.within(self._zoning.get(closest_zone).geometry):
+                        stop.taz = closest_zone
+                stop.save_to_database(conn, commit=False)
+            conn.commit()
+
             for pattern in simple_progress(self.select_patterns.values(), self.signal, "Saving patterns (Step: 10/12)"):
                 pattern.save_to_database(conn, commit=False)
             conn.commit()
-
-            self.gtfs_data.agency.save_to_database(conn)
 
             for trip in simple_progress(self.select_trips, self.signal, "Saving trips (Step: 11/12)"):
                 trip.save_to_database(conn, commit=False)
@@ -280,14 +288,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             for fare_rule in self.gtfs_data.fare_rules:
                 fare_rule.save_to_database(conn)
-
-            for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 12/12)"):
-                if self.__has_taz:
-                    closest_zone = self._zoning.get_closest_zone(stop.geo)
-                    if stop.geo.within(self._zoning.get(closest_zone).geometry):
-                        stop.taz = closest_zone
-                stop.save_to_database(conn, commit=False)
-            conn.commit()
 
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:

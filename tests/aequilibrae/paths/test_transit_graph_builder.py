@@ -87,8 +87,8 @@ def test_connector_method_without_missing(coquimbo_example):
     )
 
 
-def test_saving_loading_removing(coquimbo_example):
-    data = coquimbo_example.transit
+def test_saving_loading_removing(build_gtfs_project):
+    data = build_gtfs_project.transit
     # create and save
     graph1 = data.create_graph(
         with_outer_stop_transfers=False,
@@ -110,7 +110,7 @@ def test_saving_loading_removing(coquimbo_example):
     data.save_graphs(force=True)
     data.remove_graphs([1])
 
-    with coquimbo_example.transit_connection as pt_con:
+    with build_gtfs_project.transit_connection as pt_con:
         links = pt_con.execute("SELECT link_id FROM links LIMIT 1;").fetchall()
         nodes = pt_con.execute("SELECT node_id FROM nodes LIMIT 1;").fetchall()
 
@@ -127,7 +127,7 @@ def test_saving_loading_removing(coquimbo_example):
         graph.period_id = i
         graph.save()
 
-    with coquimbo_example.transit_connection as pt_con:
+    with build_gtfs_project.transit_connection as pt_con:
         for i in range(10, 13):
             links = pt_con.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (i,))
             nodes = pt_con.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (i,))

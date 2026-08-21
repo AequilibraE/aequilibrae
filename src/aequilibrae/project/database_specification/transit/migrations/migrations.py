@@ -9,4 +9,5 @@ migrations: tuple[int, pathlib.Path] = [
     path / "003_align_taz_id_and_node_id.py",
     path / "004_move_results_to_project.py",
     path / "005_repair_foreign_keys.py",
+    path / "006_normalise_route_link_stop_ids.py",
 ]
