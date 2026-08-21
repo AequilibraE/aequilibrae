@@ -122,7 +122,7 @@ print(skims["car"].names)
 
 # %%
 # We can save the skims, but we need to choose to only save the final ones, as the blended were not generated
-assig.save_skims("base_year_assignment_skims", which_ones="final", format="omx")
+project.matrices.save_skims(assig, which_ones="final", format="omx")
 
 # %%
 # Close the project

@@ -2,7 +2,6 @@ import logging
 import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
-from os import path
 from typing import Dict, List, Optional, Union
 from uuid import uuid4
 
@@ -11,7 +10,6 @@ import pandas as pd
 from numpy import nan_to_num
 
 from aequilibrae.parameters import Parameters
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
@@ -92,10 +90,6 @@ class AssignmentBase(ABC):
 
     @abstractmethod
     def log_specification(self):
-        pass
-
-    @abstractmethod
-    def save_results(self, table_name: str, results, keep_zero_flows=True) -> None:
         pass
 
     @abstractmethod
@@ -235,17 +229,8 @@ class TrafficAssignment(AssignmentBase):
         # Information on the assignment setup can be recovered with
         >>> info = assig.info()
 
-        # Result data databases are optional.  Create one explicitly before
-        # asking the project to expose its results table.
-        >>> base_path = project.project_base_path
-        >>> from aequilibrae.utils.db_utils import safe_connect
-        >>> results_database = base_path / 'results_database.sqlite'
-        >>> result_connection = safe_connect(results_database, missing_ok=True)
-        >>> result_connection.close()
-        >>> project.shutdown()
-        >>> project = Project.from_path(base_path)
-        >>> results_table = project.results
-        >>> assig.save_results(table_name='base_year_assignment', results=results_table)
+        # Saving through the project creates its results database on demand.
+        >>> project.results.save_assignment(assig)
 
         # skims are here
         >>> avg_skims = assigclass.results.skims # blended ones
@@ -626,35 +611,6 @@ class TrafficAssignment(AssignmentBase):
         logger.info("Traffic Assignment specification")
         logger.info(self._config)
 
-    def save_results(self, table_name: str, results, keep_zero_flows=True) -> None:
-        """Saves the assignment results to results_database.sqlite
-
-        Method fails if table exists
-
-        :Arguments:
-            **table_name** (:obj:`str`): Name of the table to hold this assignment result
-
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the project supplied at construction
-        """
-
-        df = self.results()
-        if not keep_zero_flows:
-            df = df[df.PCE_tot > 0]
-
-        report = {"convergence": self.assignment.convergence_report, "setup": self.info()}
-        results.create(
-            table_name,
-            df,
-            procedure="traffic assignment",
-            procedure_id=self.procedure_id,
-            procedure_report=report,
-            timestamp=self.procedure_date,
-            description=self.description,
-        )
-
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
 
@@ -804,86 +760,6 @@ class TrafficAssignment(AssignmentBase):
         }
         return info
 
-    def save_skims(self, matrix_name: str, matrices, which_ones="final", format="omx") -> None:
-        """Saves the skims (if any) to the skim folder and registers in the matrix list
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
-
-            **which_ones** (:obj:`str`, *Optional*): 'final': Results of the final iteration,
-                'blended': Averaged results for all iterations, 'all': Saves skims for both the final iteration and the
-                blended ones. Default is 'final'
-
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-                Defaults to the project supplied at construction
-        """
-        mat_format = format.lower()
-        if mat_format not in ["omx", "aem"]:
-            raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-            raise ImportError("OpenMatrix is not available on your system")
-
-        mats = matrices
-
-        for cls in self.classes:
-            file_name = f"{matrix_name}_{cls._id}.{mat_format}"
-
-            export_name = mats.folder / file_name
-
-            if path.isfile(export_name):
-                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
-
-            if mats.check_exists(matrix_name):
-                raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
-
-            avg_skims = cls.results.skims  # type: AequilibraeMatrix
-
-            # The ones for the last iteration are here
-            last_skims = cls._aon_results.skims  # type: AequilibraeMatrix
-
-            names = []
-            if which_ones in ["final", "all"]:
-                for core in last_skims.names:
-                    names.append(f"{core}_final")
-
-            if which_ones in ["blended", "all"]:
-                for core in avg_skims.names:
-                    names.append(f"{core}_blended")
-
-            if not names:
-                continue
-            # Assembling a single final skim file can be done like this
-            # We will want only the time for the last iteration and the distance averaged out for all iterations
-            working_name = AequilibraeMatrix().random_name()
-
-            kwargs = {
-                "file_name": working_name,
-                "zones": self.classes[0].graph.centroids.shape[0],
-                "matrix_names": names,
-                "memory_only": False,
-            }
-
-            # Create the matrix to manipulate
-            out_skims = AequilibraeMatrix()
-            out_skims.create_empty(**kwargs)
-
-            out_skims.index[:] = self.classes[0].graph.centroids[:]
-            out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls._id}"
-
-            if which_ones in ["final", "all"]:
-                for core in last_skims.names:
-                    out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
-
-            if which_ones in ["blended", "all"]:
-                for core in avg_skims.names:
-                    out_skims.matrix[f"{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
-
-            out_skims.matrices.flush()  # Make sure that all data went to the disk
-
-            out_skims.description = f"Skimming for assignment procedure. Class {cls._id}"
-            mats.create(f"{matrix_name}_{cls._id}", file_name, out_skims)
-
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
         Returns a dataframe of the select link flows for each class
@@ -900,93 +776,6 @@ class TrafficAssignment(AssignmentBase):
             df.rename(columns=cls_cols, inplace=True)
             class_flows.append(df)
         return pd.concat(class_flows, axis=1).rename_axis("link_id")
-
-    def save_select_link_flows(self, table_name: str, results) -> None:
-        """
-        Saves the select link link flows for all classes into the results database.
-
-        :Arguments:
-            **table_name** (:obj:`str`): Name of the table being inserted to. Note the traffic class
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the project supplied at construction
-        """
-
-        df = self.select_link_flows()
-
-        report = {}
-        description = f"Select link analysis from {self.procedure_id}"
-        results.create(
-            table_name,
-            df,
-            procedure="traffic select link",
-            procedure_id=f"{self.procedure_id}_sl",
-            procedure_report=report,
-            timestamp=self.procedure_date,
-            description=description,
-        )
-
-    def save_select_link_matrices(self, matrix_name: str, matrices) -> None:
-        """
-        Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
-        into OMX format.
-
-        :Arguments:
-            **name** (:obj:`str`): name of the matrices
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the project supplied at construction
-        """
-        mats = matrices
-
-        file_name = f"{matrix_name}.omx"
-
-        export_name = mats.folder / file_name
-
-        if path.isfile(export_name):
-            raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
-
-        if mats.check_exists(matrix_name):
-            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
-
-        names = [f"{key}_{cls._id}" for cls in self.classes for key in cls._selected_links.keys()]
-
-        kwargs = {
-            "file_name": AequilibraeMatrix().random_name(),
-            "zones": self.classes[0].graph.centroids.shape[0],
-            "matrix_names": names,
-            "memory_only": False,
-        }
-
-        # Create the matrix to manipulate
-        out_skims = AequilibraeMatrix()
-        out_skims.create_empty(**kwargs)
-
-        out_skims.index[:] = self.classes[0].graph.centroids[:]
-
-        for cls in self.classes:
-            if cls._selected_links is None:
-                continue
-
-            res = cls.results.select_link_od
-
-            for mat in res.names:
-                out_skims.matrix[f"{mat}_{cls._id}"][:, :] = res.get_matrix(mat)[:, :, 0]
-
-        out_skims.matrices.flush()  # Make sure that all data went to the disk
-        out_skims.description = f"Select link matrix from procedure ID {self.procedure_id}_sl."
-
-        matrices.create(matrix_name, file_name, out_skims)
-
-    def save_select_link_results(self, name: str, results, matrices) -> None:
-        """
-        Saves both the Select Link matrices and flow results at the same time, using the same name.
-
-        :Arguments:
-            **name** (:obj:`str`): name of the matrices
-        """
-        self.save_select_link_flows(name, results)
-        self.save_select_link_matrices(name, matrices)
 
 
 class TransitAssignment(AssignmentBase):
@@ -1074,35 +863,6 @@ class TransitAssignment(AssignmentBase):
 
         logger.info("Transit Assignment specification")
         logger.info(self._config)
-
-    def save_results(self, table_name: str, results, keep_zero_flows=True) -> None:
-        """Saves the assignment results to results_database.sqlite
-
-        Method fails if table exists
-
-        :Arguments:
-            **table_name** (:obj:`str`): Name of the table to hold this assignment result
-
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the project supplied at construction
-        """
-
-        df = self.results()
-        if not keep_zero_flows:
-            df = df[df.volume > 0]
-
-        report = {"setup": self.info()}
-        results.create(
-            table_name,
-            df,
-            procedure="transit assignment",
-            procedure_id=self.procedure_id,
-            procedure_report=report,
-            timestamp=self.procedure_date,
-            description=self.description,
-        )
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame

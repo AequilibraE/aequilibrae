@@ -8,10 +8,9 @@ owning table.
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from dataclasses import fields as dataclass_fields
 from dataclasses import make_dataclass
 from functools import lru_cache
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import pandas as pd
 import shapely.wkb
@@ -43,6 +42,9 @@ _GEOMETRY_PLACEHOLDER = "GeomFromWKB(?, {srid})"
 _MULTI_GEOMETRY_PLACEHOLDER = "ST_Multi(GeomFromWKB(?, {srid}))"
 
 
+RecordT = TypeVar("RecordT")
+
+
 _SQLITE_TYPE_HINTS = (
     ("INT", int),
     ("CHAR", str),
@@ -69,15 +71,17 @@ def _python_type(column: str, declared_type: str, nullable: bool) -> type[Any]:
     return hint | None if nullable and hint is not Any else hint
 
 
-def guess_record_type(connection: NestedTransactionManager, table: str, record_name: str) -> type[Any]:
-    """Build a frozen record type from the table's current schema."""
+def guess_record_type(
+    connection: NestedTransactionManager, table: str, record_name: str
+) -> tuple[type[Any], tuple[str, ...]]:
+    """Build a frozen record type and its field names from the current schema."""
     schema = connection.connection.execute(_TABLE_INFO_SQL.format(table=table)).fetchall()
     record_fields = []
     for _, column, declared_type, required, _, primary_key in schema:
         if column == "ogc_fid":
             continue
         record_fields.append((column, _python_type(column, declared_type, not required and not primary_key)))
-    return make_dataclass(record_name, record_fields, frozen=True)
+    return make_dataclass(record_name, record_fields, frozen=True), tuple(field[0] for field in record_fields)
 
 
 @lru_cache(maxsize=None)
@@ -101,7 +105,7 @@ def _format_update(table: str, key: str, columns: tuple[str, ...], geometry_plac
     return _UPDATE_SQL.format(table=table, assignments=",".join(assignments), key=key)
 
 
-class ProjectTable(ABC):
+class ProjectTable(ABC, Generic[RecordT]):
     """Common implementation for one project-database table.
 
     Subclasses declare the table name, key, and generated-record name. During
@@ -119,7 +123,7 @@ class ProjectTable(ABC):
     name: str = ""
     key: str = ""
     record_name: str = ""
-    record_type: type[Any]
+    record_type: type[RecordT]
     defaults: Mapping[str, Any] = {}
     _geometry_placeholder: str | None = None
 
@@ -162,7 +166,7 @@ class ProjectTable(ABC):
         """Return all table data, including the record key as a column."""
         return get_geo_table(self.name, self._transaction_manager.connection)
 
-    def get(self, key: Any) -> Any:
+    def get(self, key: Any) -> RecordT:
         """Return one immutable record snapshot identified by ``key``.
 
         :Arguments:
@@ -177,7 +181,7 @@ class ProjectTable(ABC):
             raise self._missing_record(key)
         return self._build_record(row)
 
-    def __iter__(self) -> Iterator[Any]:
+    def __iter__(self) -> Iterator[RecordT]:
         """Iterate over immutable snapshots of all records."""
         self._refresh_record_type()
         rows = self._transaction_manager.connection.execute(self._select_all_sql).fetchall()
@@ -296,14 +300,15 @@ class ProjectTable(ABC):
         schema_version = self._transaction_manager.connection.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
         if schema_version == self._record_schema_version:
             return
-        self.record_type = guess_record_type(self._transaction_manager, self.name, self.record_name)
-        self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
+        self.record_type, self._record_fields = guess_record_type(
+            self._transaction_manager, self.name, self.record_name
+        )
         record_columns = ",".join(self._select_column(column) for column in self._record_fields)
         self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=record_columns)
         self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=record_columns)
         self._record_schema_version = schema_version
 
-    def _build_record(self, row: tuple[Any, ...]) -> Any:
+    def _build_record(self, row: tuple[Any, ...]) -> RecordT:
         """Convert one SQLite row into the table's explicit record type."""
         values = []
         for column, value in zip(self._record_fields, row, strict=True):
@@ -374,7 +379,7 @@ class ProjectTable(ABC):
         return f"<{self.__class__.__name__} table={self.name!r}>"
 
 
-class NonSpatialProjectTable(ProjectTable):
+class NonSpatialProjectTable(ProjectTable[RecordT]):
     """Base class for project tables without a geometry column."""
 
     def _select_column(self, column: str) -> str:
@@ -387,7 +392,7 @@ class NonSpatialProjectTable(ProjectTable):
         return value
 
 
-class SpatialProjectTable(ProjectTable):
+class SpatialProjectTable(ProjectTable[RecordT]):
     """Base class for project tables with a SpatiaLite geometry column."""
 
     multi_part = False

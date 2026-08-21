@@ -111,7 +111,7 @@ assignment.set_algorithm("msa")
 assignment.execute()
 
 # Save results specific to this scenario
-assignment.save_results("alternative_assignment")
+project.results.save_assignment(assignment)
 
 print(f"Assignment completed. Total flow: {assigclass.results.total_link_loads.sum():.2f}")
 

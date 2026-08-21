@@ -69,14 +69,17 @@ def test_multiple_link_sets(select_link_setup):
         )
 
     # Test if files are saved in the right place
-    assignment.save_select_link_results("select_link_analysis")
+    project.save_select_link_results(
+        assignment,
+        table_name="select_link_analysis",
+        matrix_name="select_link_analysis",
+    )
 
     matrices = project.matrices
-    matrices.update_database()
     assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
 
     # Test if matrices are with the correct shape and are not empty
-    sla = matrices.get_matrix("select_link_analysis_omx")
+    sla = matrices.get_matrix("select_link_analysis")
     num_zones = assignment.classes[0].graph.num_zones
     for mat in sla.names:
         m = sla.get_matrix(mat)

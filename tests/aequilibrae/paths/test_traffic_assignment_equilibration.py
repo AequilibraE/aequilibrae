@@ -37,7 +37,10 @@ def assigclass(car_graph, matrix):
 
 @pytest.fixture(scope="function")
 def assignment(project):
-    return TrafficAssignment(parameters=project.project_parameters.parameters, path_files_path=project.project_base_path)
+    return TrafficAssignment(
+        parameters=project.project_parameters.parameters,
+        path_files_path=project.project_base_path,
+    )
 
 
 @pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
@@ -50,7 +53,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
 
-    proj = assignment.project
+    proj = project
     assignment.add_class(assigclass)
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -102,11 +105,11 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     assert bfw25_rgap < assignment.rgap_target
     assert cfw25_iters < fw25_iters
 
-    assignment.save_results("save_to_database")
-    assignment.save_skims(matrix_name="all_skims", which_ones="all")
+    project.save_assignment(assignment)
+    project.save_skims(assignment, which_ones="all")
 
-    with pytest.raises(ValueError):
-        assignment.save_results("save_to_database")
+    with pytest.raises(ValueError, match="already exists"):
+        project.save_assignment(assignment)
 
     num_cores = assignment.cores
     log_ = Path(proj.path_to_file).parent / "aequilibrae.log"
@@ -187,5 +190,5 @@ def test_execute_no_project(project, assignment, assigclass):
     correl = np.corrcoef(assigclass.results.total_link_loads, results.volume.values)[0, 1]
     assert 0.8 < correl
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(AttributeError, match="has no attribute 'save_results'"):
         assignment.save_results("anything")

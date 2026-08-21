@@ -68,6 +68,7 @@ def test_set_classes(assignment_setup):
 
 
 def test_execute_and_save_results(assignment_setup):
+    project = assignment_setup["project"]
     assignment = assignment_setup["assignment"]
     carclass = assignment_setup["carclass"]
     truckclass = assignment_setup["truckclass"]
@@ -88,11 +89,16 @@ def test_execute_and_save_results(assignment_setup):
     assignment.set_algorithm("bfw")
     assignment.execute()
 
-    assignment.save_results("save_to_database")
-    assignment.save_skims(matrix_name="my_skims", which_ones="all")
+    project.save_assignment(assignment)
+    skim_records = project.save_skims(assignment, which_ones="all")
+    assert {record.name for record in skim_records} == {
+        f"{assignment.procedure_id}_car",
+        f"{assignment.procedure_id}_motorcycle",
+        f"{assignment.procedure_id}_truck",
+    }
 
-    with pytest.raises(ValueError):
-        assignment.save_results("save_to_database")
+    with pytest.raises(ValueError, match="already exists"):
+        project.save_assignment(assignment)
 
-    with pytest.raises(FileExistsError):
-        assignment.save_skims(matrix_name="my_skims", which_ones="all")
+    with pytest.raises(ValueError, match="already a matrix of name"):
+        project.save_skims(assignment, which_ones="all")

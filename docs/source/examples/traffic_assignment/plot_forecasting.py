@@ -129,11 +129,11 @@ results.head()
 
 # %%
 # We can export our results to CSV or get a Pandas DataFrame, but let's put it directly into the results database
-assig.save_results("base_year_assignment")
+project.results.save_assignment(assig)
 
 # %%
 # And save the skims
-assig.save_skims("base_year_assignment_skims", which_ones="all", format="omx")
+project.matrices.save_skims(assig, which_ones="all", format="omx")
 
 # %%
 # Trip distribution
@@ -386,24 +386,22 @@ assig.execute()
 # %%
 # To save our select link results, all we need to do is provide it with a name.
 # In addition to exporting the select link flows, it also exports the Select Link matrices in OMX format.
-assig.save_select_link_results("select_link_analysis")
+project.save_select_link_results(assig, matrix_name="select_link_analysis")
 
 # %%
 # .. note::
 #
-#    Say we just want to save our select link flows, we can call: ``assig.save_select_link_flows("just_flows")``
-# 
-#    Or if we just want the select link matrices: ``assig.save_select_link_matrices("just_matrices")``
-# 
-#    Internally, the ``save_select_link_results`` calls both of these methods at once.
+#    The project coordinator saves both select-link flows and matrices, and
+#    supports independent output-name overrides through ``table_name`` and
+#    ``matrix_name``.
 
 # %%
 # We can export the results to CSV or AequilibraE Data, but let's put it directly into the results database
-assig.save_results("future_year_assignment")
+project.results.save_assignment(assig)
 
 # %%
 # And save the skims
-assig.save_skims("future_year_assignment_skims", which_ones="all", format="omx")
+project.matrices.save_skims(assig, which_ones="all", format="omx")
 
 # %%
 # Run convergence study

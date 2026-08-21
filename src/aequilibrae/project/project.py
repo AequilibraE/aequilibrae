@@ -6,12 +6,14 @@ from collections import namedtuple
 from contextlib import AbstractContextManager
 from pathlib import Path
 from sqlite3 import Connection
-from typing import Any
+from typing import TYPE_CHECKING, Any, Unpack
 
 import pandas as pd
 
 from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
+from aequilibrae.project.data.matrices import MatrixRecord, SaveSelectLinkMatricesKwargs, SaveSkimsKwargs
+from aequilibrae.project.data.results import ResultRecord, SaveAssignmentKwargs, SaveSelectLinkFlowsKwargs
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
@@ -23,6 +25,9 @@ from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from aequilibrae.paths.traffic_assignment import TrafficAssignment, TransitAssignment
 
 
 class Project:
@@ -178,6 +183,59 @@ class Project:
     def create_transit_database(self):
         """Create the transit database, if necessary, and return its gateway."""
         return self.scenario.create_transit_database()
+
+    def save_assignment(
+        self, assignment: "TrafficAssignment | TransitAssignment", **kwargs: Unpack[SaveAssignmentKwargs]
+    ) -> ResultRecord:
+        """Save an assignment through :attr:`results`.
+
+        Keyword arguments are forwarded to :meth:`Results.save_assignment`,
+        allowing its default table name and metadata to be overridden.
+        """
+        return self.results.save_assignment(assignment, **kwargs)
+
+    def save_skims(
+        self, assignment: "TrafficAssignment", **kwargs: Unpack[SaveSkimsKwargs]
+    ) -> list[MatrixRecord]:
+        """Save traffic-assignment skims through :attr:`matrices`.
+
+        Keyword arguments are forwarded to :meth:`Matrices.save_skims`.
+        """
+        return self.matrices.save_skims(assignment, **kwargs)
+
+    def save_select_link_results(
+        self,
+        assignment: "TrafficAssignment",
+        *,
+        table_name: str | None = None,
+        matrix_name: str | None = None,
+        format: str | None = None,
+        result_kwargs: SaveSelectLinkFlowsKwargs | None = None,
+        matrix_kwargs: SaveSelectLinkMatricesKwargs | None = None,
+    ) -> tuple[ResultRecord, MatrixRecord]:
+        """Save select-link flow and matrix outputs with compensating cleanup.
+
+        ``table_name`` is forwarded to the results gateway, while
+        ``matrix_name`` and ``format`` are forwarded to the matrices gateway.
+        Additional gateway-specific options may be supplied in
+        ``result_kwargs`` and ``matrix_kwargs`` dictionaries.
+        """
+        result_options = dict(result_kwargs or {})
+        matrix_options = dict(matrix_kwargs or {})
+        if table_name is not None:
+            result_options["table_name"] = table_name
+        if matrix_name is not None:
+            matrix_options["matrix_name"] = matrix_name
+        if format is not None:
+            matrix_options["format"] = format
+
+        result = self.results.save_select_link_flows(assignment, **result_options)
+        try:
+            matrix = self.matrices.save_select_link_matrices(assignment, **matrix_options)
+        except BaseException:
+            self.results.delete_result(result.table_name)
+            raise
+        return result, matrix
 
     def transaction(self) -> AbstractContextManager[None]:
         """Return a coordinated transaction context across all open connections."""

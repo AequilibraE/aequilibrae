@@ -94,12 +94,12 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
     results = assig.results()
     assert results is not None
 
-    assig.save_results(table_name=f"transit_test_{scenario}")
+    scenario_example.results.save_assignment(assig)
 
     # Verify the result was saved
     saved_results = scenario_example.results.list()
     table_names = saved_results["table_name"].tolist() if len(saved_results) > 0 else []
-    assert f"transit_test_{scenario}" in table_names
+    assert assig.procedure_id in table_names
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
