@@ -13,7 +13,6 @@ DELAUNAY_TABLE = "delaunay_network"
 
 
 class DelaunayAnalysis:
-    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(self, project):
         """Start a Delaunay analysis
 

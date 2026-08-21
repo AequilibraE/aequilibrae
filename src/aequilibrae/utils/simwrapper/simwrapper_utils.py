@@ -39,7 +39,6 @@ def pretty_round(value, direction="up"):
     return result
 
 
-# FIXME: project dependency should be narrowed to its required domain owner.
 def get_links_bounds_box(project):
     """
     Compute box around all coordinates in links table of project.
@@ -68,7 +67,6 @@ def get_links_bounds_box(project):
     return row
 
 
-# FIXME: project dependency should be narrowed to its required domain owner.
 def get_project_center(project):
     """Finds center coordinates of project"""
     row = get_links_bounds_box(project)
@@ -87,7 +85,6 @@ def get_project_center(project):
     return center
 
 
-# FIXME: project dependency should be narrowed to its required domain owner.
 def get_project_zoom(project):
     """Finds a reasonable zoom level based on project links' reach"""
 

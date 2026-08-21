@@ -29,11 +29,8 @@ def create_zones(project):
 
     zoning = project.zoning
     for i, zone_geo in enumerate(grid):
-        zone = zoning.new(i + 1)
-        zone.geometry = zone_geo
-        zone.save()
-        node = nodes.get(i + 1)
-        node.renumber(i + 10001)
+        zoning.insert(zone_id=i + 1, geometry=zone_geo)
+        nodes.renumber(i + 1, i + 10001)
 
     return project
 
@@ -41,35 +38,29 @@ def create_zones(project):
 def test_delete(nauru_example):
     project = create_zones(nauru_example)
     zones = project.zoning
-    zone_downtown = zones.get(3)
-    zone_downtown.delete()
+    zones.delete(3)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="zones has no record with zone_id=3"):
         _ = zones.get(3)
 
 
 def test_save(nauru_example):
     project = create_zones(nauru_example)
     zones = project.zoning
-    zn = zones.get(2)
     area = randint(0, 9999999999)
-    zn.area = area
-    zn.save()
+    zones.update(2, area=area)
 
     with read_and_close(project.path_to_file, spatial=True) as conn:
         cnt = conn.execute("Select area from Zones where zone_id=2").fetchone()[0]
         assert cnt == area, "Zone didn't save area properly"
 
         geo = Point(0, 0).buffer(1)
-        zn.geometry = geo
-        zn.save()
+        zones.update(2, geometry=geo)
         wkb = conn.execute("Select asBinary(geometry) from Zones where zone_id=2").fetchone()[0]
         assert shapely.wkb.loads(wkb) == MultiPolygon([geo]), "Zone didn't save geometry properly"
 
-        zn2 = zones.get(1)
         geo = MultiPolygon([Point(0, 0).buffer(1)])
-        zn2.geometry = geo
-        zn2.save()
+        zones.update(1, geometry=geo)
         wkb = conn.execute("Select asBinary(geometry) from Zones where zone_id=1").fetchone()[0]
         assert shapely.wkb.loads(wkb) == geo, "Zone didn't save geometry properly"
 
@@ -79,67 +70,57 @@ def test_add_centroid(nauru_example):
     zones = project.zoning
     nodes = project.network.nodes
     network = project.network
-    zone1 = zones.get(1)
     tot = network.count_centroids()
-    zone1.add_centroid(None)
+    zones.add_centroid(1)
     assert tot + 1 == network.count_centroids(), "Added less than it should've"
 
     tot = network.count_centroids()
-    zone1.add_centroid(None)
-    zone1.add_centroid(Point(0, 0))
+    zones.add_centroid(1)
+    zones.add_centroid(1, Point(0, 0))
     assert tot == network.count_centroids(), "Added more than should've"
 
     node1 = nodes.get(1)
-    assert node1.geometry == zone1.geometry.centroid
+    assert node1.geometry == zones.get(1).geometry.centroid
 
-    zone2 = zones.get(2)
-    zone2.add_centroid(Point(0, 0))
+    zones.add_centroid(2, Point(0, 0))
     node2 = nodes.get(2)
     assert node2.geometry == Point(0, 0)
 
-    point_that_should = zone1.geometry.centroid
-    nd = network.nodes.get(1000)
-    nd.geometry = point_that_should
-    nd.save()
-    zone1 = zones.get(1)
-    with pytest.raises(sqlite3.IntegrityError):
-        zone1.add_centroid(None, robust=False)
-    zone1.add_centroid(None, robust=True)
+    point_that_should = zones.get(1).geometry.centroid
+    network.nodes.update(1000, geometry=point_that_should)
+    with pytest.raises(sqlite3.IntegrityError, match="Cannot create on-top of other node"):
+        zones.add_centroid(1, robust=False)
+    zones.add_centroid(1, robust=True)
 
 
 def test_connect_mode(nauru_example):
     project = create_zones(nauru_example)
     zones = project.zoning
-    zone1 = zones.get(1)
-    zone1.add_centroid(None)
+    zones.add_centroid(1)
 
-    with project.db_connection_spatial as conn:
-        zone1.connect_mode(mode_id="c", conn=conn)
+    with project.db_connection as conn:
+        zones.connect_mode(mode_id="c")
         cnt = conn.execute("Select count(*) from links where a_node=?", [1]).fetchone()[0]
         assert cnt != 0, "failed to add connectors"
 
-        zone1.connect_mode(mode_id="t", conn=conn)
+        zones.connect_mode(mode_id="t")
         sql = """Select count(*) from links where a_node=? and instr(modes,'t')>0"""
         cnt = conn.execute(sql, [1]).fetchone()[0]
         assert cnt != 0, "failed to add connectors for mode t"
-
-        zone2 = zones.get(2)
-        zone2.connect_mode(mode_id="c", conn=conn)
 
 
 def test_disconnect_mode(nauru_example):
     project = create_zones(nauru_example)
     zones = project.zoning
-    zone1 = zones.get(1)
-    zone1.add_centroid(None)
+    zones.add_centroid(1)
 
-    with project.db_connection_spatial as conn:
-        zone1.connect_mode(mode_id="c", conn=conn)
-        zone1.connect_mode(mode_id="w", conn=conn)
+    with project.db_connection as conn:
+        zones.connect_mode(mode_id="c")
+        zones.connect_mode(mode_id="w")
         tot = conn.execute("""select COUNT(*) from links where a_node=1""").fetchone()[0]
         conn.execute("""Update links set modes = modes || 'w' where instr(modes,'w')=0""")
 
-    zone1.disconnect_mode("w")
+    zones.disconnect_mode("w", zone_id=1)
 
     with project.db_connection_spatial as conn:
         cnt = conn.execute("""select COUNT(*) from links where a_node=1""").fetchone()[0]

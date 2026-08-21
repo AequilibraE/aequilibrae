@@ -13,7 +13,6 @@ from aequilibrae.transit.route_system_reader import read_stop_times, read_stops,
 
 
 class RouteSystem:
-    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(self, project):
         self.project = project
 

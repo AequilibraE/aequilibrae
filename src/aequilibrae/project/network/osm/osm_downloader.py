@@ -14,7 +14,7 @@ import gc
 import logging
 import re
 import time
-from typing import Dict, List
+from typing import List, Dict
 
 import pandas as pd
 import requests
@@ -23,8 +23,8 @@ from shapely import Polygon
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-
 from .osm_params import default_headers, memory
+
 
 logger = logging.getLogger(__name__)
 

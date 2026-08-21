@@ -33,9 +33,7 @@ def test_count_centroids(sioux_falls_test):
     assert items == 24, "Wrong number of centroids found"
 
     nodes = sioux_falls_test.network.nodes
-    node = nodes.get(1)
-    node.is_centroid = 0
-    node.save()
+    nodes.update(1, is_centroid=0)
 
     items = sioux_falls_test.network.count_centroids()
     assert items == 23, "Wrong number of centroids found"

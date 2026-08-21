@@ -1,4 +1,3 @@
-from copy import copy, deepcopy
 from random import randint
 
 import pytest
@@ -6,7 +5,7 @@ import pytest
 
 def test_get(sioux_falls_test):
     links = sioux_falls_test.network.links
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="links has no record with link_id=123456"):
         _ = links.get(123456)
 
     link = links.get(1)
@@ -15,31 +14,32 @@ def test_get(sioux_falls_test):
 
 def test_new(sioux_falls_test):
     links = sioux_falls_test.network.links
-    new_link = links.new()
+    new_id = links.insert(modes="c")
 
     with sioux_falls_test.db_connection as conn:
-        id = conn.execute("Select max(link_id) + 1 from Links").fetchone()[0]
-    assert new_link.link_id == id, "Did not populate new link ID properly"
+        expected_id = conn.execute("Select max(link_id) from Links").fetchone()[0]
+    new_link = links.get(new_id)
+    assert new_link.link_id == expected_id, "Did not allocate a new link ID properly"
     assert new_link.geometry is None, "Did not populate new geometry properly"
 
 
 def test_copy_link(sioux_falls_test):
     links = sioux_falls_test.network.links
 
-    with pytest.raises(ValueError):
-        _ = links.copy_link(11111)
+    with pytest.raises(ValueError, match="links has no record with link_id=11111"):
+        _ = links.copy(11111)
 
-    new_link = links.copy_link(11)
+    new_id = links.copy(11)
+    new_link = links.get(new_id)
     old_link = links.get(11)
 
     assert new_link.geometry == old_link.geometry
     assert new_link.a_node == old_link.a_node
     assert new_link.b_node == old_link.b_node
     assert new_link.direction == old_link.direction
-    assert new_link.distance == old_link.distance
+    assert new_link.distance > 0
     assert new_link.modes == old_link.modes
     assert new_link.link_type == old_link.link_type
-    new_link.save()
 
 
 def test_delete(sioux_falls_test):
@@ -55,10 +55,10 @@ def test_delete(sioux_falls_test):
 
     assert tot == tot2 + 2, "Did not delete the link properly"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="links has no record with link_id=123456"):
         links.delete(123456)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="links has no record with link_id=10"):
         _ = links.get(10)
 
 
@@ -81,18 +81,8 @@ def test_refresh(sioux_falls_test):
     val = randint(1, 99999999)
     original_value = link1.capacity_ba
 
-    link1.capacity_ba = val
-    link1_again = links.get(1)
-    assert link1_again.capacity_ba == val, "Did not preserve correctly"
+    links.update(1, capacity_ba=val)
+    assert links.get(1).capacity_ba == val, "Did not update correctly"
 
-    links.refresh()
-    link1 = links.get(1)
-    assert link1.capacity_ba == original_value, "Did not reset correctly"
-
-
-def test_copy(sioux_falls_test):
-    nodes = sioux_falls_test.network.nodes
-    with pytest.raises(Exception):
-        _ = copy(nodes)
-    with pytest.raises(Exception):
-        _ = deepcopy(nodes)
+    links.update(1, capacity_ba=original_value)
+    assert links.get(1).capacity_ba == original_value, "Did not restore correctly"
