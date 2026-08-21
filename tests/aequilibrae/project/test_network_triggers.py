@@ -10,13 +10,10 @@ def test_delete_links_delete_nodes(sioux_falls_example):
     links = sioux_falls_example.network.links
     nodes = sioux_falls_example.network.nodes
 
-    node = nodes.get(1)
-    node.is_centroid = 0
-    node.save()
+    nodes.update(1, is_centroid=0)
 
     for i in [1, 2, 3, 4, 5, 14]:
-        link = links.get(i)
-        link.delete()
+        links.delete(i)
     items = sioux_falls_example.network.count_nodes()
     assert items == 23, "Wrong number of nodes found"
 
@@ -50,14 +47,14 @@ def test_link_direction(sioux_falls_example):
 
     with sioux_falls_example.db_connection as conn:
         sql = "UPDATE links SET direction=-2 WHERE link_id=1;"
-        with pytest.raises(sqlite3.IntegrityError):
+        with pytest.raises(sqlite3.IntegrityError, match="Link direction needs to be -1, 0 or 1"):
             conn.execute(sql)
 
         data = [987654, 2, "c", "default", LineString([Point(0, 0), Point(1, 0)]).wkb]
         sql_insert = (
             "insert into links (link_id, direction, modes, link_type, geometry) Values(?,?,?,?,GeomFromWKB(?, 4326));"
         )
-        with pytest.raises(sqlite3.IntegrityError):
+        with pytest.raises(sqlite3.IntegrityError, match="Link direction needs to be -1, 0 or 1"):
             conn.execute(sql_insert, data)
 
         data = [

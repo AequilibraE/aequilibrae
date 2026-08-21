@@ -1,5 +1,5 @@
-from copy import copy, deepcopy
 from random import randint
+from sqlite3 import IntegrityError
 
 import pandas as pd
 import pytest
@@ -10,14 +10,14 @@ from aequilibrae.utils.db_utils import read_and_close
 def test_get(sioux_falls_example):
     periods = sioux_falls_example.network.periods
     for num in range(2, 6):
-        sioux_falls_example.network.periods.new_period(num, num, num, "test")
+        periods.insert(period_id=num, period_start=num, period_end=num, period_description="test")
 
     nd = randint(2, 5)
     period = periods.get(nd)
     assert period.period_id == nd, "get period returned wrong object"
 
-    period.renumber(200)
-    with pytest.raises(ValueError):
+    periods.renumber(nd, 200)
+    with pytest.raises(ValueError, match=rf"periods has no record with period_id={nd}"):
         _ = periods.get(nd)
 
 
@@ -32,20 +32,20 @@ def test_fields(sioux_falls_example):
     assert fields == actual_fields, "Table editor is weird for table periods"
 
 
-def test_copy(sioux_falls_example):
+def test_update(sioux_falls_example):
     periods = sioux_falls_example.network.periods
-    with pytest.raises(Exception):
-        _ = copy(periods)
-    with pytest.raises(Exception):
-        _ = deepcopy(periods)
+    with pytest.raises(IntegrityError, match="Cannot update default period"):
+        periods.update(1, period_description="whole day")
+
+    periods.insert(period_id=2, period_start=0, period_end=3600, period_description="morning")
+    periods.update(2, period_description="morning peak")
+    assert periods.get(2).period_description == "morning peak"
 
 
 def test_save(sioux_falls_example):
     periods = sioux_falls_example.network.periods
     for num in range(2, 6):
-        sioux_falls_example.network.periods.new_period(num, num, num, "test")
-
-    periods.save()
+        periods.insert(period_id=num, period_start=num, period_end=num, period_description="test")
 
     expected = pd.DataFrame(
         {

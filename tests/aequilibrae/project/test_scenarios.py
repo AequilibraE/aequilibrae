@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime
 
@@ -35,7 +34,10 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     mat.computational_view()
 
     assigclass = TrafficClass("car", graph, mat)
-    assignment = TrafficAssignment(parameters=scenario_example.project_parameters.parameters, path_files_path=scenario_example.project_base_path)
+    assignment = TrafficAssignment(
+        parameters=scenario_example.project_parameters.parameters,
+        path_files_path=scenario_example.project_base_path,
+    )
     assignment.add_class(assigclass)
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -109,7 +111,7 @@ def test_matrices_scenarios(scenario_example, scenario):
 
     if len(df) > 0:
         first_matrix = df.iloc[0]["name"]
-        rec = matrices.get_record(first_matrix)
+        rec = matrices.get(first_matrix)
         assert rec.name is not None
         assert rec.name == first_matrix
     else:
@@ -150,34 +152,28 @@ def test_results_scenarios(scenario_example, scenario):
     results = scenario_example.results
     table_name = f"test_result_{scenario}"
 
-    # Create a new result record
-    record = results.new_record(
+    test_data = pd.DataFrame({"id": [1, 2, 3], "scenario": [scenario] * 3, "value": [10, 20, 30]})
+    record = results.create(
         table_name,
+        test_data,
         procedure="test_procedure",
         procedure_id=f"test_id_{scenario}",
-        procedure_report=json.dumps({"status": "success", "scenario": scenario}),
+        procedure_report={"status": "success", "scenario": scenario},
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         description=f"Test result for {scenario} scenario",
     )
 
-    # Verify the record was created
     assert record.table_name == table_name
     assert record.procedure == "test_procedure"
-    assert results.check_exists(table_name)
+    assert table_name in results
 
-    # Test saving data to the result
-    test_data = pd.DataFrame({"id": [1, 2, 3], "scenario": [scenario] * 3, "value": [10, 20, 30]})
-
-    record.set_data(test_data, index=False)
-
-    # Verify data retrieval
-    retrieved_data = record.get_data()
+    retrieved_data = results.get_results(table_name)
     assert len(retrieved_data) == 3
-    assert list(retrieved_data.columns) == ["id", "scenario", "value"]
+    assert list(retrieved_data.columns) == ["index_level_0", "id", "scenario", "value"]
 
     # Clean up
-    results.delete_record(table_name)
-    assert not results.check_exists(table_name)
+    results.delete_result(table_name)
+    assert table_name not in results
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
@@ -232,29 +228,25 @@ def test_scenario_result_isolation(scenario_example, scenario):
     results = scenario_example.results
     table_name = f"isolation_test_{scenario}"
 
-    # Create scenario-specific result
-    _ = results.new_record(
+    results.create(
         table_name,
+        pd.DataFrame({"value": [1]}),
         procedure="isolation_test",
         procedure_id=f"isolation_{scenario}",
         description=f"Testing isolation for {scenario}",
     )
-    assert results.check_exists(table_name)
+    assert table_name in results
 
     # Switch to different scenario and verify isolation
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
         other_scenario = other_scenarios[0]
         scenario_example.use_scenario(other_scenario)
-        results.reload()
-
-        assert not results.check_exists(table_name)
+        assert table_name not in scenario_example.results
 
         scenario_example.use_scenario(scenario)
-        results.reload()
-
-        results.delete_record(table_name)
-        assert not results.check_exists(table_name)
+        scenario_example.results.delete_result(table_name)
+        assert table_name not in scenario_example.results
 
 
 @pytest.mark.parametrize("from_scenario", ["root", "nauru", "coquimbo"])
@@ -377,7 +369,13 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Add some data to root
     results = scenario_example.results
-    results.new_record("root_specific", "test", "test_id", description="Root only data")
+    results.create(
+        "root_specific",
+        pd.DataFrame({"value": [1]}),
+        procedure="test",
+        procedure_id="test_id",
+        description="Root only data",
+    )
 
     # Create empty scenario
     scenario_example.create_empty_scenario("isolated_empty", "Isolated test")
@@ -400,7 +398,13 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Modify clone data shouldn't affect root
     results = scenario_example.results
-    results.new_record("clone_specific", "test", "test_id", description="Clone only data")
+    results.create(
+        "clone_specific",
+        pd.DataFrame({"value": [1]}),
+        procedure="test",
+        procedure_id="test_id",
+        description="Clone only data",
+    )
 
     scenario_example.use_scenario("root")
     root_results = scenario_example.results.list()

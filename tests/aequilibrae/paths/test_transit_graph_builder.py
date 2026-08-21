@@ -53,7 +53,7 @@ def test_connector_methods(coquimbo_example):
 
 def test_connector_method_exception(coquimbo_example):
     data = coquimbo_example.transit
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="method must be either 'overlapping_regions' or 'nearest_neighbour'"):
         data.create_graph(
             with_outer_stop_transfers=False,
             with_walking_edges=False,
@@ -104,7 +104,7 @@ def test_saving_loading_removing(coquimbo_example):
     pd.testing.assert_frame_equal(graph1.vertices, graph2.vertices)
     assert graph1.config == graph2.config
     # cannot override existing graph
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cannot save nodes into a database with existing nodes"):
         data.save_graphs()
     # removing transit graph
     data.save_graphs(force=True)
@@ -117,13 +117,13 @@ def test_saving_loading_removing(coquimbo_example):
     assert links == []
     assert nodes == []
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="no transit graph configuration found for 'period_id=1'"):
         data.load([1])
 
     # save multiple transit graph
     graph = data.graphs[1]
     for i in range(10, 13):
-        data.periods.new_period(i, 0, 0).save()
+        data.periods.insert(period_id=i, period_start=0, period_end=0, period_description="")
         graph.period_id = i
         graph.save()
 
