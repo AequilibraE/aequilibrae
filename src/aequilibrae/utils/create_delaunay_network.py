@@ -1,4 +1,3 @@
-import json
 import uuid
 from itertools import combinations
 
@@ -46,7 +45,6 @@ class DelaunayAnalysis:
                     raise ValueError("Delaunay network already exist. Use the overwrite flag to re-run it")
                 conn.execute(f"DROP TABLE {DELAUNAY_TABLE}")
                 conn.execute("delete from geometry_columns where f_table_name=?", [DELAUNAY_TABLE])
-                conn.commit()
 
             zone_sql = "select zone_id node_id, X(st_centroid(geometry)) x, Y(st_centroid(geometry)) y from zones"
             network_sql = "select node_id, X(geometry) x, Y(geometry) y from nodes where is_centroid=1"
@@ -66,7 +64,15 @@ class DelaunayAnalysis:
             edges.columns = ["a_node", "b_node"]
             edges = edges.assign(direction=0, distance=0, link_id=np.arange(edges.shape[0]) + 1)
             edges = edges[["link_id", "direction", "a_node", "b_node", "distance"]]
-            edges.to_sql(DELAUNAY_TABLE, conn, index=False)
+            conn.execute(
+                f"""CREATE TABLE {DELAUNAY_TABLE} (
+                    link_id INTEGER, direction INTEGER, a_node INTEGER, b_node INTEGER, distance REAL
+                )"""
+            )
+            conn.executemany(
+                f"INSERT INTO {DELAUNAY_TABLE} (link_id, direction, a_node, b_node, distance) VALUES (?, ?, ?, ?, ?)",
+                edges.itertuples(index=False, name=None),
+            )
 
             # Now we create the geometries for the delaunay triangulation
             conn.execute(f"select AddGeometryColumn( '{DELAUNAY_TABLE}', 'geometry', 4326, 'LINESTRING', 'XY', 0);")
@@ -104,7 +110,7 @@ class DelaunayAnalysis:
         g.set_blocked_centroid_flows(True)
 
         tc = TrafficClass("delaunay", g, matrix)
-        ta = TrafficAssignment(self.project)
+        ta = TrafficAssignment(parameters=self.project.parameters, path_files_path=self.project.project_base_path)
         ta.set_classes([tc])
         ta.set_time_field("distance")
         ta.set_capacity_field("capacity")
@@ -118,13 +124,12 @@ class DelaunayAnalysis:
             cols.extend([f"{x}_ab", f"{x}_ba", f"{x}_tot"])
         df = ta.results()[cols]
 
-        report = {"setup": str(ta.info())}
-        record = self.project.results.new_record(
-            table_name=result_name,
+        self.project.results.create(
+            result_name,
+            df,
             procedure="Delaunay assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report={"setup": str(ta.info())},
             timestamp=ta.procedure_date,
             description="",
         )
-        record.set_data(df)
