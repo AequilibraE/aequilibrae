@@ -144,9 +144,13 @@ def triangle_graph_blocking(test_data_path, tmp_path) -> Project:
 
 
 @pytest.fixture
-def build_gtfs_project(coquimbo_example):
-    yield coquimbo_example
-    coquimbo_example.close()
+def build_gtfs_project(cached_coquimbo_example, cache_path, tmp_path) -> Project:
+    """Provide a migrated transit project for GTFS persistence tests."""
+    shutil.copytree(cache_path / "coquimbo", tmp_path, dirs_exist_ok=True)
+    Project.upgrade(tmp_path)
+    project = Project.from_path(tmp_path)
+    yield project
+    project.close()
 
 
 @pytest.fixture(scope="session")

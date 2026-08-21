@@ -6,6 +6,7 @@ pyfiles = [
   '002_support_saving_multiple_transit_periods.py',
   '003_align_taz_id_and_node_id.py',
   '004_move_results_to_project.py',
+  '005_repair_foreign_keys.py',
   'migrations.py',
 ]
 

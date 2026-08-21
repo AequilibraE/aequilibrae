@@ -1,9 +1,10 @@
 from copy import copy
-from random import randint, choice
+from random import choice, randint
 
 import pytest
 
 from aequilibrae.transit.transit_elements import Trip
+
 from .random_word import randomword
 
 
@@ -43,7 +44,7 @@ def test_save_to_database(build_gtfs_project, data):
     r = Trip()
     r._populate(tuple(data.values()), list(data.keys()))
     times = list(range(randint(5, 15)))
-    patid = randint(15, 2500000)
+    patid = 10001001000  # Pattern ID must exist
 
     r.arrivals = copy(times)
     r.departures = copy(times)
