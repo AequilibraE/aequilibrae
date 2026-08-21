@@ -12,7 +12,7 @@ from shapely.geometry import Polygon
 
 from aequilibrae.project.project_creation import add_triggers, remove_triggers
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
-from aequilibrae.utils.db_utils import commit_and_close, list_columns
+from aequilibrae.utils.db_utils import list_columns
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 from .model_area_gridding import geometry_grid
@@ -47,7 +47,7 @@ class OSMBuilder(WorkerThread):
         self.links_df = data["links"]
 
     def doWork(self):
-        with commit_and_close(self.path, spatial=True) as conn:
+        with self.project.db_connection.transaction() as conn:
             self.__update_table_structure(conn)
             self.importing_network(conn)
 
@@ -67,7 +67,7 @@ class OSMBuilder(WorkerThread):
         self.node_df.osm_id = self.node_df.osm_id.astype(np.int64)
         self.node_df.set_index(["osm_id"], inplace=True)
 
-        self.__process_link_chunk()
+        self.__process_link_chunk(conn)
 
         logger.info("Geo-procesing links")
         geometries = []
@@ -170,7 +170,7 @@ class OSMBuilder(WorkerThread):
         conn.commit()
         conn.execute("VACUUM;")
 
-    def __process_link_chunk(self):
+    def __process_link_chunk(self, conn):
         logger.info("Processing link modes, types and fields")
         self.signal.emit(["set_text", "Processing link modes, types and fields"])
 
@@ -181,21 +181,20 @@ class OSMBuilder(WorkerThread):
         list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = []
         # Initialize link types
-        with self.project.db_connection as conn:
-            self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
-            for df in simple_progress(list_dfs, self.signal, "Processing chunks"):
-                if "tags" in df.columns:
-                    # It is critical to reset the index for the concat below to work
-                    df.reset_index(drop=True, inplace=True)
-                    df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
-                    df.columns = [x.replace(":", "_") for x in df.columns]
-                    df = self.__build_link_types(df)
-                    df = self.__establish_modes_for_all_links(conn, df)
-                    df = self.__process_link_attributes(df)
-                else:
-                    logger.error("OSM link data does not have tags. Skipping an entire data chunk")
-                    df = pd.DataFrame([])
-                self.links_df.append(df)
+        self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
+        for df in simple_progress(list_dfs, self.signal, "Processing chunks"):
+            if "tags" in df.columns:
+                # It is critical to reset the index for the concat below to work
+                df.reset_index(drop=True, inplace=True)
+                df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
+                df.columns = [x.replace(":", "_") for x in df.columns]
+                df = self.__build_link_types(df)
+                df = self.__establish_modes_for_all_links(conn, df)
+                df = self.__process_link_attributes(conn, df)
+            else:
+                logger.error("OSM link data does not have tags. Skipping an entire data chunk")
+                df = pd.DataFrame([])
+            self.links_df.append(df)
         self.links_df = pd.concat(self.links_df, ignore_index=True)
 
     def __build_link_types(self, df):
@@ -232,8 +231,7 @@ class OSMBuilder(WorkerThread):
         if link_type in self.__all_ltp.link_type.values:
             lt = proj_link_types.get_by_name(link_type)
             if original_link_type not in lt.description:
-                lt.description += f", {original_link_type}"
-                lt.save()
+                proj_link_types.update(lt.link_type_id, description=f"{lt.description}, {original_link_type}")
             return [lt.link_type_id, link_type]
 
         letter = link_type[0]
@@ -243,10 +241,11 @@ class OSMBuilder(WorkerThread):
                 for letter in string.ascii_letters:
                     if letter not in self.__all_ltp.link_type_id.values:
                         break
-        lt = proj_link_types.new(letter)
-        lt.link_type = link_type
-        lt.description = f"Link types from Open Street Maps: {original_link_type}"
-        lt.save()
+        proj_link_types.insert(
+            link_type_id=letter,
+            link_type=link_type,
+            description=f"Link types from Open Street Maps: {original_link_type}",
+        )
         return [letter, link_type]
 
     def __establish_modes_for_all_links(self, conn, df: pd.DataFrame) -> pd.DataFrame:
@@ -271,7 +270,7 @@ class OSMBuilder(WorkerThread):
         df = df.merge(df_aux, on="link_type", how="left").fillna(value={"modes": "".join(sorted(notfound))})
         return df
 
-    def __process_link_attributes(self, df: pd.DataFrame) -> pd.DataFrame:
+    def __process_link_attributes(self, conn, df: pd.DataFrame) -> pd.DataFrame:
         df = df.assign(direction=0, link_id=0)
         if "oneway" in df.columns:
             df.loc[df.oneway == "yes", "direction"] = 1
@@ -313,8 +312,7 @@ class OSMBuilder(WorkerThread):
                 if f"{field}_backward" in df:
                     fld = pd.to_numeric(df[f"{field}_backward"], errors="coerce")
                     df.loc[fld > 0, f"{field}_ba"] = fld[fld > 0]
-        with self.project.db_connection as conn:
-            cols = list_columns(conn, "links") + ["nodes"]
+        cols = list_columns(conn, "links") + ["nodes"]
         return df[[x for x in cols if x in df.columns]]
 
     ######## TABLE STRUCTURE UPDATING ########

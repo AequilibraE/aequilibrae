@@ -35,11 +35,11 @@ class OSMDownloader(WorkerThread):
         super().__init__(None)
 
         self.polygons = polygons
+        self.parameters = parameters
         self.filter = self.get_osm_filter(modes)
         self.report = []
         self.json = []
         par = parameters.parameters["osm"]
-        self.parameters = parameters
         self.overpass_endpoint = par["overpass_endpoint"]
         self.timeout = par["timeout"]
         self.sleeptime = par["sleeptime"]
