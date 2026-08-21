@@ -46,9 +46,8 @@ def test_save_to_database(srid, build_gtfs_project):
 
     new_link = Link(srid)
 
-    transit_manager = build_gtfs_project.project.transit_connection
     with pytest.raises(AttributeError):
-        new_link.save_to_database(transit_manager)
+        new_link.save_to_database(build_gtfs_project.transit_connection)
 
     new_link.geo = geo
     new_link.transit_link = 10000001
@@ -56,7 +55,7 @@ def test_save_to_database(srid, build_gtfs_project):
     new_link.from_stop = fstop
     new_link.to_stop = tstop
 
-    with transit_manager.transaction() as transit_conn:
+    with build_gtfs_project.transit_connection as transit_conn:
         with pytest.raises(sqlite3.IntegrityError):
             new_link.save_to_database(transit_conn, commit=False)
 

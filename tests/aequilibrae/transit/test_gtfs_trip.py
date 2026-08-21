@@ -50,7 +50,7 @@ def test_save_to_database(build_gtfs_project, data):
     r.pattern_id = patid
     r.source_time = [0] * len(times)
 
-    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+    with build_gtfs_project.transit_connection as transit_conn:
         r.save_to_database(transit_conn, commit=False)
         result = transit_conn.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
 

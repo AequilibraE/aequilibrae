@@ -54,7 +54,7 @@ class Scenario:
         if self.connections.has_results_connection:
             self._results = Results(project_connection, self.connections.results_connection)
         if self.connections.has_transit_connection:
-            self._transit = Transit(self, project_connection, self.connections.transit_connection, self.network.periods)
+            self._transit = Transit(self.network, self.zoning, self.network.periods, self.connections)
 
     @property
     def project_base_path(self) -> Path:

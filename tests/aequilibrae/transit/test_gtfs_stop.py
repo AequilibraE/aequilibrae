@@ -64,7 +64,7 @@ def test_save_to_database(data, build_gtfs_project):
         "VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"
     )
 
-    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+    with build_gtfs_project.transit_connection as transit_conn:
         s.save_to_database(transit_conn, commit=False)
         transit_conn.execute(
             sql_tl, [tlink_id, randint(1, 1000000000), randint(1, 10), s.stop_id, s.stop_id + 1, 0, line]

@@ -26,12 +26,27 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, zoning, transit_manager, agency_identifier, file_path, day="", description="", capacities=None, pces=None):
-        """Instantiates a transit class for the network
+    def __init__(
+        self,
+        network,
+        zoning,
+        transit_manager,
+        agency_identifier,
+        file_path,
+        day="",
+        description="",
+        capacities=None,
+        pces=None,
+    ):
+        """Build a GTFS importer from the gateways and manager it uses.
 
         :Arguments:
+            **network** (:obj:`Network`): Road-network gateway used for map matching.
 
-            **project** (:obj:`Project` or :obj:`Scenario`): Owner of the transit and network gateways
+            **zoning** (:obj:`Zoning`): Zoning gateway used to assign stop zones.
+
+            **transit_manager** (:obj:`NestedTransactionManager`): Manager for
+            the public-transport database.
 
             **agency_identifier** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
 
@@ -46,7 +61,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """
         WorkerThread.__init__(self, None)
 
-        self.__network = network
+        self._network = network
         self._zoning = zoning
         self._transit_manager = transit_manager
         self.archive_dir = None  # type: str
@@ -66,7 +81,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
-        self.__has_taz = len(self._zoning.all_zones()) > 0
+        self.__has_taz = len(self._zoning) > 0
 
         if file_path is not None:
             logger.info(f"Creating GTFS feed object for {file_path}")
@@ -80,7 +95,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_patterns = {}
         self.select_links = {}
 
-        links = self.__network.links.data
+        links = self._network.links.data
         self.geo_links = gpd.GeoDataFrame(links, geometry=links.geometry, crs="EPSG:4326")
 
     def set_capacities(self, capacities: dict):
@@ -432,8 +447,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **mode_id** (:obj:`int`): Mode ID for which we will build the graph for
         """
 
-        all_link_gdf = self.__network.links.data
-        all_nodes_gdf = self.__network.nodes.data
+        all_link_gdf = self._network.links.data
+        all_nodes_gdf = self._network.nodes.data
 
         utm_zone = metre_crs_for_gdf(all_link_gdf)
         self.mm_transformer = Transformer.from_crs(self.srid, utm_zone, always_xy=True)

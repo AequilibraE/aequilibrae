@@ -1,8 +1,6 @@
 import pandas as pd
 import pytest
 
-from aequilibrae.transit import Transit
-
 
 @pytest.mark.parametrize(
     "connector_method,method",
@@ -14,7 +12,7 @@ from aequilibrae.transit import Transit
     ],
 )
 def test_create_line_geometry(coquimbo_example, connector_method, method):
-    data = Transit(coquimbo_example)
+    data = coquimbo_example.transit
     coquimbo_example.network.build_graphs()
     graph = data.create_graph(
         with_outer_stop_transfers=False,
@@ -29,7 +27,7 @@ def test_create_line_geometry(coquimbo_example, connector_method, method):
 
 
 def test_connector_methods(coquimbo_example):
-    data = Transit(coquimbo_example)
+    data = coquimbo_example.transit
     # nearest_neighbour
     graph = data.create_graph(
         with_outer_stop_transfers=False,
@@ -54,7 +52,7 @@ def test_connector_methods(coquimbo_example):
 
 
 def test_connector_method_exception(coquimbo_example):
-    data = Transit(coquimbo_example)
+    data = coquimbo_example.transit
     with pytest.raises(ValueError):
         data.create_graph(
             with_outer_stop_transfers=False,
@@ -65,7 +63,7 @@ def test_connector_method_exception(coquimbo_example):
 
 
 def test_connector_method_without_missing(coquimbo_example):
-    data = Transit(coquimbo_example)
+    data = coquimbo_example.transit
     # nearest_neighbour
     graph = data.create_graph(
         with_outer_stop_transfers=False,
@@ -90,7 +88,7 @@ def test_connector_method_without_missing(coquimbo_example):
 
 
 def test_saving_loading_removing(coquimbo_example):
-    data = Transit(coquimbo_example)
+    data = coquimbo_example.transit
     # create and save
     graph1 = data.create_graph(
         with_outer_stop_transfers=False,
@@ -112,7 +110,7 @@ def test_saving_loading_removing(coquimbo_example):
     data.save_graphs(force=True)
     data.remove_graphs([1])
 
-    with data.project.transit_connection as pt_con:
+    with coquimbo_example.transit_connection as pt_con:
         links = pt_con.execute("SELECT link_id FROM links LIMIT 1;").fetchall()
         nodes = pt_con.execute("SELECT node_id FROM nodes LIMIT 1;").fetchall()
 
@@ -129,7 +127,7 @@ def test_saving_loading_removing(coquimbo_example):
         graph.period_id = i
         graph.save()
 
-    with data.project.transit_connection as pt_con:
+    with coquimbo_example.transit_connection as pt_con:
         for i in range(10, 13):
             links = pt_con.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (i,))
             nodes = pt_con.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (i,))

@@ -11,7 +11,6 @@ from aequilibrae.utils.cython.bridge import Bridge
 from aequilibrae import TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
-from aequilibrae.transit import Transit
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,7 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
 def test_transit_assignment_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    data = Transit(scenario_example)
+    data = scenario_example.transit
     try:
         graph = data.create_graph(
             with_outer_stop_transfers=False,

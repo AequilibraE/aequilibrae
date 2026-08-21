@@ -1,16 +1,11 @@
 import pytest
 
-from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
-
 
 @pytest.fixture(scope="function")
 def route_system_builder(build_gtfs_project):
-    gtfs_file = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
-    yield GTFSRouteSystemBuilder(
-        network=build_gtfs_project.project.network,
-        zoning=build_gtfs_project.project.zoning,
-        transit_manager=build_gtfs_project.project.transit_connection,
-        agency_identifier="LISERCO, LISANCO, LINCOSUR",
+    gtfs_file = build_gtfs_project.project_base_path / "gtfs_coquimbo.zip"
+    yield build_gtfs_project.transit.new_gtfs_builder(
+        agency="LISERCO, LISANCO, LINCOSUR",
         file_path=gtfs_file,
     )
 
@@ -46,13 +41,13 @@ def test_map_match_int_exception(route_system_builder):
         route_system_builder.map_match(route_types=[3.5])
 
 
-def test_map_match(route_system_builder):
+def test_map_match(route_system_builder, build_gtfs_project):
     route_system_builder.load_date("2016-04-13")
     route_system_builder.set_allow_map_match(True)
     route_system_builder.map_match([3, 1, 2])
     route_system_builder.save_to_disk()
 
-    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+    with build_gtfs_project.transit_connection as transit_conn:
         assert transit_conn.execute("SELECT * FROM pattern_mapping;").fetchone()[0] > 1
 
 
@@ -93,11 +88,11 @@ def test_load_date_not_available_date_exception(route_system_builder):
         route_system_builder.load_date("2020-06-01")
 
 
-def test_save_to_disk(route_system_builder):
+def test_save_to_disk(route_system_builder, build_gtfs_project):
     route_system_builder.load_date("2016-04-13")
     route_system_builder.save_to_disk()
 
-    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+    with build_gtfs_project.transit_connection as transit_conn:
         assert len(transit_conn.execute("SELECT * FROM route_links").fetchall()) == 78
         assert len(transit_conn.execute("SELECT * FROM trips;").fetchall()) == 360
         assert len(transit_conn.execute("SELECT * FROM routes;").fetchall()) == 2

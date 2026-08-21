@@ -1,10 +1,12 @@
 import functools
-from contextlib import AbstractContextManager
 import inspect
 import logging
 import shutil
 from collections import namedtuple
+from contextlib import AbstractContextManager
 from pathlib import Path
+from sqlite3 import Connection
+from typing import Any
 
 import pandas as pd
 
@@ -16,8 +18,6 @@ from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.utils.db_utils import ConnectionClosure, commit_and_close, safe_connect
-from sqlite3 import Connection
-from typing import Any
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -173,11 +173,16 @@ class Project:
     @property
     def db_connection(self) -> AbstractContextManager[Connection]:
         """Return a context manager yielding the project SQLite connection."""
-        return self.scenario.connections.db_connection.transaction()
+        return self.scenario.db_connection.transaction()
+
+    @property
+    def transit_connection(self) -> AbstractContextManager[Connection]:
+        """Return a context manager yielding the transit SQLite connection."""
+        return self.scenario.transit_connection.transaction()
 
     def transaction(self) -> AbstractContextManager[None]:
         """Return a coordinated transaction context across all open connections."""
-        return self.scenario.connections.transaction()
+        return self.scenario.transaction()
 
     # ------------------------------------------------------------------
     # Lifecycle

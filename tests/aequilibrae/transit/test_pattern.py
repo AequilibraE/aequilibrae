@@ -3,9 +3,9 @@ import pytest
 
 @pytest.fixture(scope="function")
 def pat(build_gtfs_project):
-    gtfs_fldr = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
+    gtfs_fldr = build_gtfs_project.project_base_path / "gtfs_coquimbo.zip"
 
-    transit = build_gtfs_project.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
+    transit = build_gtfs_project.transit.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
     transit.load_date("2016-04-13")
 
     patterns = transit.select_patterns
@@ -23,7 +23,7 @@ def test_pattern_complete(build_gtfs_project, pat):
     pat.map_match()
 
     # We save the pattern to the database
-    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+    with build_gtfs_project.transit_connection as transit_conn:
         pat.save_to_database(transit_conn)
         routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
         pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]

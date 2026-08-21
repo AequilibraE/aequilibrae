@@ -5,7 +5,7 @@ from aequilibrae.project.project import Project
 
 @pytest.fixture(scope="function")
 def create_project(empty_project: Project):
-    yield empty_project.transit
+    yield empty_project
 
 
 @pytest.mark.parametrize(
@@ -60,7 +60,7 @@ def create_project(empty_project: Project):
     ],
 )
 def test_create_table(table: str, exp_column: list, create_project):
-    with create_project.project.transit_connection as conn:
+    with create_project.transit_connection as conn:
         fields = [x[1] for x in conn.execute(f"PRAGMA table_info({table});").fetchall()]
 
     assert exp_column == fields, f"Table {table.upper()} was not created correctly"

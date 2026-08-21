@@ -5,7 +5,7 @@ from aequilibrae.utils.list_tables_in_db import list_tables_in_db
 
 
 def test_get_table(coquimbo_example):
-    with coquimbo_example.scenario.connections.transit_connection.transaction() as transit_conn:
+    with coquimbo_example.transit_connection as transit_conn:
         tables = get_table("routes", transit_conn)
         list_table = list_tables_in_db(transit_conn)
 

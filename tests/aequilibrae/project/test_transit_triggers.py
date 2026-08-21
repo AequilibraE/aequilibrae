@@ -5,11 +5,10 @@ pytest.skip("legacy unmanaged transit connection API", allow_module_level=True)
 from shapely.geometry import LineString
 
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit import Transit
 
 
 def test_link_insert(empty_project):
-    Transit(empty_project)
+    _ = empty_project.transit
 
     conn = database_connection(db_type="transit")
 
@@ -27,7 +26,7 @@ def test_link_insert(empty_project):
 
 
 def test_geometry_update(empty_project):
-    Transit(empty_project)
+    _ = empty_project.transit
 
     conn = database_connection(db_type="transit")
 

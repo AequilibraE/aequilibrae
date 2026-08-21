@@ -27,6 +27,7 @@ from scipy.spatial import KDTree, minkowski_distance
 
 from aequilibrae.paths import PathResults
 from aequilibrae.paths import TransitGraph
+from aequilibrae.utils.db_utils import ConnectionClosure
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
@@ -49,8 +50,13 @@ class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
     :Arguments:
-        **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the
-        ``public_transport.sqlite`` database.
+        **network** (:obj:`Network`): Road-network gateway used for line geometry
+        and project-matching connectors.
+
+        **zoning** (:obj:`Zoning`): Zoning gateway used for transit graph OD vertices.
+
+        **connections** (:obj:`ConnectionClosure`): Owner of the project and
+        transit database transaction managers.
 
         **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start
         and end.
@@ -90,10 +96,11 @@ class TransitGraphBuilder:
         for unlimited.
     """
 
-    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(
         self,
-        project,
+        network,
+        zoning,
+        connections: ConnectionClosure,
         period_id: int = 1,
         time_margin: int = 0,
         projected_crs: str = "EPSG:3857",
@@ -109,10 +116,12 @@ class TransitGraphBuilder:
         connector_method: str = "nearest_neighbour",
         max_connectors_per_zone: int = -1,
     ):
-        self.project = project
+        self.network = network
+        self.zoning = zoning
+        self._connections = connections
 
         self.period_id = period_id
-        with self.project.db_connection as conn:
+        with self._connections.db_connection.transaction() as conn:
             start, end = conn.execute(
                 "SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]
             ).fetchall()[0]
@@ -277,7 +286,7 @@ class TransitGraphBuilder:
 
         routes_sql = "SELECT pattern_id, CAST(shortname AS TEXT) shortname FROM routes"
 
-        with self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             route_links = pd.read_sql(
                 sql=route_links_sql,
                 con=conn,
@@ -334,7 +343,7 @@ class TransitGraphBuilder:
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id"""
 
-        with self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             tt = pd.read_sql(sql=sql, con=conn)
 
         # compute the travel time on the segments
@@ -391,7 +400,7 @@ class TransitGraphBuilder:
         sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
 
-        with self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             mh = pd.read_sql(sql=sql, con=conn)
             trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=conn)
 
@@ -451,7 +460,7 @@ class TransitGraphBuilder:
         """Create stop vertices."""
         # select all stops
         sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsBinary(geometry) AS geometry FROM stops"
-        with self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             stop_vertices = pd.read_sql(sql=sql, con=conn)
 
         # filter stops that are used on the given time range
@@ -496,14 +505,14 @@ class TransitGraphBuilder:
     def _create_od_vertices(self):
         """Create OD vertices from zones.
 
-        If zones have not previously been added, add zones from the project.
+        If zones have not previously been added, add zones from the zoning gateway.
         If ``self.blocking_centroid_flow`` is ``True``, a distinction is made between
         ``origin`` and ``destination`` vertices. Otherwise, they are both classified as ``od``.
         """
         if "zones" not in self.__dict__:
             self.add_zones(
                 pd.DataFrame(
-                    [(x.zone_id, x.geometry) for x in self.project.zoning.all_zones().values()],
+                    [(zone.zone_id, zone.geometry) for zone in self.zoning],
                     columns=["zone_id", "geometry"],
                 )
             )
@@ -969,7 +978,7 @@ class TransitGraphBuilder:
             "parent_station FROM stops "
             "WHERE parent_station IS NOT NULL AND parent_station <> ''"
         )
-        with self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             stops = pd.read_sql(sql=sql, con=conn)
 
         stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
@@ -1063,7 +1072,7 @@ class TransitGraphBuilder:
             "WHERE parent_station IS NOT NULL AND parent_station <> ''"
         )
 
-        with self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             station_count = conn.execute(parent_station_sql).fetchone()[0]
             if not station_count > 0:
                 return
@@ -1200,7 +1209,7 @@ class TransitGraphBuilder:
 
         all_present = True
         tables = ["stops", "routes", "route_links", "trips", "trips_schedule"]
-        with self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             for table in tables:
                 sql = f"SELECT COUNT(*) FROM {table}"
                 all_present &= conn.execute(sql).fetchone()[0] > 0
@@ -1228,7 +1237,7 @@ class TransitGraphBuilder:
            **method** (:obj:`str`): Must be either `direct` or `connector project match`.
            If method is `direct`, `graph` argument is ignored.
 
-           **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
+           **graph** (:obj:`str`): Must be a key within ``network.graphs``.
         """
         if method not in ["direct", "connector project match"]:
             raise ValueError("method must be either 'direct' or 'connector project match'")
@@ -1253,8 +1262,8 @@ class TransitGraphBuilder:
                 stacklevel=2,
             )
 
-            nodes = self.project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
-            links = self.project.network.links.data[["link_id", "geometry"]].set_index("link_id")
+            nodes = self.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
+            links = self.network.links.data[["link_id", "geometry"]].set_index("link_id")
 
             if len(nodes) == 0:
                 raise ValueError(
@@ -1277,21 +1286,18 @@ class TransitGraphBuilder:
                 for row in self.edges[other_rows].itertuples()
             ]
 
-            lines = self.__connector_project_match(connector_rows, self.project, nodes, links, graph)
+            lines = self.__connector_project_match(connector_rows, self.network, nodes, links, graph)
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
-    # FIXME: project dependency should be narrowed to its required domain owner.
-    def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
-        """Create line string geometry for `connector_rows` that matches the line strings in
-        ``project.network.graphs[graph_key]``.
+    def __connector_project_match(self, connector_rows, network, nodes, links, graph_key):
+        """Create line geometry from the road network's graph and link tables.
 
         :Arguments:
            **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges``
            to create line strings for.
 
-           **project** (:obj:`Aequilibrae.project.Project`): Reference to the project to pull
-           the graph from.
+           **network** (:obj:`Network`): Road-network gateway that owns the graph.
 
            **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes.
            Must have columns `geometry`, and an index of `node_id`\'s.
@@ -1299,7 +1305,7 @@ class TransitGraphBuilder:
            **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links.
            Must have columns `geometry`, and an index of `link_id`\'s.
 
-           **graph_key** (:obj:`str`): The key of the ``project.network.graphs`` graph to use
+           **graph_key** (:obj:`str`): The key of the ``network.graphs`` graph to use
            for path finding.
         """
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
@@ -1313,7 +1319,7 @@ class TransitGraphBuilder:
         kdtree = KDTree(nodes_geometries)
 
         # Prepare shortest path computation
-        graph = project.network.graphs[graph_key]
+        graph = network.graphs[graph_key]
         graph.set_graph("distance")
         res = PathResults()
         res.prepare(graph)
@@ -1362,17 +1368,15 @@ class TransitGraphBuilder:
             lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
         return lines
 
-    def create_additional_db_fields(self, conn: sqlite3.Connection = None):
+    def create_additional_db_fields(self):
         """
         Create the additional required entries in the tables.
 
-        :Arguments:
-            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         # This graph requires some additional tables and fields in order to store all our
         # information. Currently it mimics what we are storing in the df
 
-        with conn or self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO link_types (link_type, link_type_id, description)
@@ -1399,7 +1403,7 @@ class TransitGraphBuilder:
                 ],
             )
 
-    def save_vertices(self, robust=None, conn: sqlite3.Connection = None):
+    def save_vertices(self, robust=None):
         """
         Write the vertices DataFrame to the public transport database.
 
@@ -1408,8 +1412,6 @@ class TransitGraphBuilder:
 
         :Arguments:
             **robust** (:obj:`bool`): Deprecated. No longer in use.
-
-            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         if robust is not None:
             warnings.warn(
@@ -1419,7 +1421,7 @@ class TransitGraphBuilder:
                 stacklevel=2,
             )
 
-        with conn or self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             if conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError(
                     f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})"
@@ -1448,10 +1450,9 @@ class TransitGraphBuilder:
             **period_id** (:obj:`int`): ``period_id`` to remove.
 
         """
-        with pt_conn as conn:
-            conn.execute("DELETE FROM nodes where period_id=?", (period_id,))
+        pt_conn.execute("DELETE FROM nodes where period_id=?", (period_id,))
 
-    def save_edges(self, recreate_line_geometry=False, conn: sqlite3.Connection = None):
+    def save_edges(self, recreate_line_geometry=False):
         """
         Save the contents of self.edges to the public transport database.
 
@@ -1461,14 +1462,12 @@ class TransitGraphBuilder:
         :Arguments:
            **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for
            the edges as direct lines. Defaults to ``False``.
-
-           **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
         """
         # We need to generate the geometry for each edge, this may take a bit
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
-        with conn or self.project.transit_connection as conn:
+        with self._connections.transit_connection.transaction() as conn:
             if conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError("cannot save links into a database with existing links in the same period")
 
@@ -1495,11 +1494,10 @@ class TransitGraphBuilder:
             **period_id** (:obj:`int`): `period_id` to remove.
 
         """
-        with pt_conn as conn:
-            conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
+        pt_conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
 
-    def save_config(self, conn: sqlite3.Connection = None):
-        with conn or self.project.db_connection as conn:
+    def save_config(self):
+        with self._connections.db_connection.transaction() as conn:
             sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
             conn.execute(sql, [self.period_id, json.dumps(self.config)])
 
@@ -1510,34 +1508,26 @@ class TransitGraphBuilder:
         it's `period_id`.
 
         :Arguments:
-            **conn** (:obj:`sqlite3.Connection`): Connection to the ``project.sqlite`` database.
+            **conn** (:obj:`sqlite3.Connection`): Connection to the project database.
 
             **period_id** (:obj:`int`): `period_id` key for the `transit_graph_configs` table.
 
         """
-        with conn as conn:
-            sql = "DELETE FROM transit_graph_configs WHERE period_id = ?"
-            conn.execute(sql, [period_id])
+        sql = "DELETE FROM transit_graph_configs WHERE period_id = ?"
+        conn.execute(sql, [period_id])
 
-    def save(
-        self,
-        robust=True,
-        pt_conn: sqlite3.Connection = None,
-        project_conn: sqlite3.Connection = None,
-    ):
+    def save(self, robust=True):
         """Save the current graph to the public transport database.
 
         :Arguments:
             **robust** (:obj:`bool`): Deprecated. No longer in use.
 
-            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
-
-            **project_conn** (:obj:`sqlite.Connection`): Optional project connection to use
         """
-        self.create_additional_db_fields(conn=pt_conn)
-        self.save_vertices(robust=robust, conn=pt_conn)
-        self.save_edges(conn=pt_conn)
-        self.save_config(conn=project_conn)
+        with self._connections.transaction():
+            self.create_additional_db_fields()
+            self.save_vertices(robust=robust)
+            self.save_edges()
+            self.save_config()
 
     @classmethod
     def remove(
@@ -1587,23 +1577,16 @@ class TransitGraphBuilder:
         return g
 
     @classmethod
-    # FIXME: project dependency should be narrowed to its required domain owner.
-    def from_db(cls, project, period_id: int, **kwargs):
-        """
-        Create a SF graph instance from an existing database save.
-
-        Assumes the database was constructed with the provided save methods.
-        No checks are performed to see if the provided arguments are compatible with the saved
-        graph.
-
-        All arguments are forwarded to the constructor.
+    def from_db(cls, network, zoning, connections: ConnectionClosure, period_id: int, **kwargs):
+        """Create a transit graph from its tables and connection closure.
 
         :Arguments:
-           **project** (:obj:`Project`): AequilbraE project to use.
-
+           **network** (:obj:`Network`): Road-network gateway.
+           **zoning** (:obj:`Zoning`): Zoning gateway.
+           **connections** (:obj:`ConnectionClosure`): Project and transit managers.
            **period_id** (:obj:`int`): Period ID to use.
         """
-        with project.db_connection as project_conn:
+        with connections.db_connection.transaction() as project_conn:
             config = project_conn.execute(
                 "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;",
                 [period_id],
@@ -1615,9 +1598,9 @@ class TransitGraphBuilder:
         config = json.loads(config[0])
         config.update(kwargs)
 
-        graph = cls(project, **config)
+        graph = cls(network, zoning, connections, **config)
 
-        with project.transit_connection as public_transport_conn:
+        with connections.transit_connection.transaction() as public_transport_conn:
             graph.vertices = pd.read_sql_query(
                 sql=(
                     f"SELECT {','.join(SF_VERTEX_COLS[:-1])}, "

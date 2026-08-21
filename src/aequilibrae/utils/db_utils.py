@@ -71,7 +71,10 @@ class NestedTransactionManager:
     def _exit(self, savepoint: str | None, exc_type: type[BaseException] | None) -> bool:
         self.__depth -= 1
         if savepoint is None:
-            self.__connection.execute("COMMIT" if exc_type is None else "ROLLBACK")
+            if exc_type is None:
+                self.__connection.commit()
+            else:
+                self.__connection.rollback()
         elif exc_type is None:
             self.__connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
         else:

@@ -145,11 +145,8 @@ def triangle_graph_blocking(test_data_path, tmp_path) -> Project:
 
 @pytest.fixture
 def build_gtfs_project(coquimbo_example):
-    prj = coquimbo_example
-
-    data = prj.transit
-    yield data
-    prj.close()
+    yield coquimbo_example
+    coquimbo_example.close()
 
 
 @pytest.fixture(scope="session")

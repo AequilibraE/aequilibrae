@@ -6,7 +6,6 @@ import pytest
 
 from aequilibrae.paths import Graph
 from aequilibrae.paths.results import PathResults
-from aequilibrae.transit import Transit
 
 
 @pytest.fixture(scope="function")
@@ -134,7 +133,7 @@ def test_exclude_links(sioux_falls_example):
 
 @pytest.fixture(scope="function")
 def transit_data(coquimbo_example):
-    return Transit(coquimbo_example)
+    return coquimbo_example.transit
 
 
 @pytest.fixture(scope="function")

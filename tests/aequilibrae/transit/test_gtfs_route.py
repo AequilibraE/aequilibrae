@@ -50,7 +50,7 @@ def test_save_to_database(data_dict, build_gtfs_project):
     r.shape = MultiLineString([array(((0.0, 0.0), (1.0, 2.0)))])
 
     sql = "Select agency_id, shortname, longname, description, route_type from routes where route=?"
-    with build_gtfs_project.project.transit_connection.transaction() as transit_conn:
+    with build_gtfs_project.transit_connection as transit_conn:
         r.save_to_database(transit_conn, commit=False)
         result = list(transit_conn.execute(sql, [data["route_id"]]).fetchone())
 

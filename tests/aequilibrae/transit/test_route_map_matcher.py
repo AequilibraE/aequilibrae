@@ -2,30 +2,26 @@ import pandas as pd
 import geopandas as gpd
 import pytest
 
-from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
 
 
 @pytest.fixture(scope="function")
 def route_system_builder(build_gtfs_project):
-    gtfs_file = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
-    yield GTFSRouteSystemBuilder(
-        network=build_gtfs_project.project.network,
-        zoning=build_gtfs_project.project.zoning,
-        transit_manager=build_gtfs_project.project.transit_connection,
-        agency_identifier="LISERCO, LISANCO, LINCOSUR",
+    gtfs_file = build_gtfs_project.project_base_path / "gtfs_coquimbo.zip"
+    yield build_gtfs_project.transit.new_gtfs_builder(
+        agency="LISERCO, LISANCO, LINCOSUR",
         file_path=gtfs_file,
     )
 
 
-def test_break_links_with_stops(route_system_builder):
+def test_break_links_with_stops(route_system_builder, build_gtfs_project):
     route_system_builder.load_date("2016-04-13")
 
     s = [[i, x.geo] for i, x in enumerate(route_system_builder.select_stops.values())]
     df = pd.DataFrame(s, columns=["stop_id", "geometry"])
 
     stops = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326").to_crs(3857)
-    links = route_system_builder.project.network.links.data.to_crs(3857)
+    links = build_gtfs_project.network.links.data.to_crs(3857)
 
     broken_links, new_nodes = split_links_at_stops(stops, links, tolerance=20)
 

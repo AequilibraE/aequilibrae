@@ -10,13 +10,14 @@ from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
-from aequilibrae.utils.db_utils import NestedTransactionManager
+from aequilibrae.utils.db_utils import ConnectionClosure
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 if TYPE_CHECKING:
+    from aequilibrae.project.network import Network
     from aequilibrae.project.network.periods import Periods
-    from aequilibrae.project.scenario import Scenario
+    from aequilibrae.project.zoning import Zoning
 
 logger = logging.getLogger(__name__)
 
@@ -38,34 +39,37 @@ class Transit(WorkerThread):
     graphs: Dict[str, TransitGraph] = {}
     pt_con: sqlite3.Connection
 
-    # FIXME: project dependency should be narrowed to its required domain owner.
     def __init__(
         self,
-        project: "Scenario",
-        project_connection: NestedTransactionManager,
-        transit_connection: NestedTransactionManager,
+        network: "Network",
+        zoning: "Zoning",
         periods: "Periods",
+        connections: ConnectionClosure,
     ) -> None:
-        """
+        """Create a transit gateway from the tables and connections it uses.
+
         :Arguments:
-            **project** (:obj:`Project`): The Project to connect to.
+            **network** (:obj:`Network`): Road-network gateway used for GTFS
+            map matching and transit-graph line geometry.
 
-            **project_connection** (:obj:`NestedTransactionManager`): Manager for the project database.
+            **zoning** (:obj:`Zoning`): Zoning gateway used for GTFS stops and
+            transit graph OD vertices.
 
-            **transit_connection** (:obj:`NestedTransactionManager`, *Optional*): Manager for the transit database, or
-            ``None`` when the scenario has no transit database.
+            **periods** (:obj:`Periods`): Periods gateway used to select the
+            transit graph time window.
 
-            **periods** (:obj:`Periods`): The network periods gateway.
+            **connections** (:obj:`ConnectionClosure`): Owner of the project
+            and transit database transaction managers.
         """
         super().__init__(None)
 
-        self.project = project
+        self.network = network
+        self.zoning = zoning
         self.periods = periods
-        self._project_connection = project_connection
-        self._transit_connection = transit_connection
+        self._connections = connections
 
     def get_table(self, table_name: str) -> pd.DataFrame:
-        return get_geo_table(table_name, self._transit_connection.connection)
+        return get_geo_table(table_name, self._connections.transit_connection.connection)
 
     def new_gtfs_builder(
         self, agency: str, file_path: str | Path, day: str = "", description: str = ""
@@ -85,9 +89,9 @@ class Transit(WorkerThread):
             **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
         """
         gtfs = GTFSRouteSystemBuilder(
-            network=self.project.network,
-            zoning=self.project.zoning,
-            transit_manager=self._transit_connection,
+            network=self.network,
+            zoning=self.zoning,
+            transit_manager=self._connections.transit_connection,
             agency_identifier=agency,
             file_path=file_path,
             day=day,
@@ -111,7 +115,7 @@ class Transit(WorkerThread):
         """
         period_id = kwargs.pop("period_id", self.periods.default_period.period_id)
 
-        graph = TransitGraphBuilder(self.project, period_id, **kwargs)
+        graph = TransitGraphBuilder(self.network, self.zoning, self._connections, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
         return graph
@@ -147,8 +151,12 @@ class Transit(WorkerThread):
 
         """
         for period_id in period_ids:
-            with self.project.transaction():
-                TransitGraphBuilder.remove(self._transit_connection, self._project_connection, period_id)
+            with self._connections.transaction():
+                TransitGraphBuilder.remove(
+                    self._connections.transit_connection.connection,
+                    self._connections.db_connection.connection,
+                    period_id,
+                )
             if unload:
                 del self.graphs[period_id]
 
@@ -162,11 +170,14 @@ class Transit(WorkerThread):
 
         """
         if period_ids is None:
-            res = self._project_connection.connection.execute("SELECT period_id FROM transit_graph_configs").fetchall()
+            sql = "SELECT period_id FROM transit_graph_configs"
+            res = self._connections.db_connection.connection.execute(sql).fetchall()
             period_ids = [x[0] for x in res]
 
         for period_id in period_ids:
-            self.graphs[period_id] = TransitGraphBuilder.from_db(self.project, period_id)
+            self.graphs[period_id] = TransitGraphBuilder.from_db(
+                self.network, self.zoning, self._connections, period_id
+            )
 
     def build_pt_preload(self, start: int, end: int, inclusion_cond: str = "start") -> pd.DataFrame:
         """Builds a preload vector for the transit network over the specified time period
@@ -197,7 +208,9 @@ class Transit(WorkerThread):
 
             >>> project.close()
         """
-        return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self._transit_connection.connection)
+        return pd.read_sql(
+            self.__build_pt_preload_sql(start, end, inclusion_cond), self._connections.transit_connection.connection
+        )
 
     def __build_pt_preload_sql(self, start: int, end: int, inclusion_cond: str) -> str:
         probe_point_lookup = {

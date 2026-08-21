@@ -10,12 +10,14 @@ from aequilibrae.transit.gtfs_writer import write_routes, write_agencies, write_
 from aequilibrae.transit.gtfs_writer import write_stops, write_trips, write_stop_times, write_shapes
 from aequilibrae.transit.route_system_reader import read_agencies, read_patterns
 from aequilibrae.transit.route_system_reader import read_stop_times, read_stops, read_trips, read_routes
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
 class RouteSystem:
-    # FIXME: project dependency should be narrowed to its required domain owner.
-    def __init__(self, project):
-        self.project = project
+    """Read and export GTFS data through its transit transaction manager."""
+
+    def __init__(self, transit_manager: NestedTransactionManager):
+        self._transit_manager = transit_manager
 
         self.agencies = []
         self.stops = []
@@ -31,7 +33,7 @@ class RouteSystem:
         self.transformer = Transformer.from_crs(f"epsg:{get_srid()}", "epsg:4326", always_xy=True)
 
     def load_route_system(self):
-        with self.project.transit_connection as conn:
+        with self._transit_manager.transaction() as conn:
             self._read_agencies(conn)
             self._read_stops(conn)
             self._read_routes(conn)
@@ -58,9 +60,9 @@ class RouteSystem:
         self.stop_times = read_stop_times(conn)
 
     def write_GTFS(self, path_to_folder: str):
-        """ """
+        """Write the loaded route system to a GTFS archive."""
 
-        with self.project.transit_connection as conn:
+        with self._transit_manager.transaction() as conn:
             write_agencies(self.agencies, path_to_folder)
             write_stops(self.stops, path_to_folder)
             write_routes(self.routes, path_to_folder)
