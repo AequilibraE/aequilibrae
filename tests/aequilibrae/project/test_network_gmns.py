@@ -5,7 +5,6 @@ from warnings import warn
 import pandas as pd
 import pytest
 
-from aequilibrae.parameters import Parameters
 
 
 def test_create_from_gmns(empty_project):
@@ -23,7 +22,7 @@ def test_create_from_gmns(empty_project):
         "port": {"description": "port flag", "type": "text", "required": False},
         "hospital": {"description": "hoospital flag", "type": "text", "required": False},
     }
-    par = Parameters()
+    par = empty_project.project_parameters
     par.parameters["network"]["gmns"]["link"]["fields"].update(new_link_fields)
     par.parameters["network"]["gmns"]["node"]["fields"].update(new_node_fields)
     par.write_back()

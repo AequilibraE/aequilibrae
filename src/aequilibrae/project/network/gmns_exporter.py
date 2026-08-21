@@ -1,23 +1,26 @@
 from os.path import join
+from pathlib import Path
 
 import pandas as pd
 
+from aequilibrae.parameters import Parameters
+from aequilibrae.project.network.modes import Modes
+
 
 class GMNSExporter:
-    def __init__(self, net, path) -> None:
-        self.p = net.project.project_parameters
+    # FIXME: Move GMNS export behind a dedicated gateway instead of constructing it from Network.
+    def __init__(self, net, modes: Modes, parameters: Parameters, path: str | Path) -> None:
         self.links_df = net.links.data
         self.nodes_df = net.nodes.data
-        self.source = net.project.path_to_file
         self.output_path = path
 
-        self.gmns_parameters = self.p.parameters["network"]["gmns"]
+        self.gmns_parameters = parameters.parameters["network"]["gmns"]
         self.gmns_links = self.gmns_parameters["link"]
         self.gmns_nodes = self.gmns_parameters["node"]
-
-        with net.project.db_connection as conn:
-            cur = conn.execute("select mode_name, mode_id, description, pce, vot, ppv from modes").fetchall()
-        self.modes_df = pd.DataFrame(cur, columns=["mode_name", "mode_id", "description", "pce", "vot", "ppv"])
+        self.modes_df = pd.DataFrame(
+            [(mode.mode_name, mode.mode_id, mode.description, mode.pce, mode.vot, mode.ppv) for mode in modes],
+            columns=["mode_name", "mode_id", "description", "pce", "vot", "ppv"],
+        )
 
     def doWork(self):
         if "ogc_fid" in list(self.links_df.columns):

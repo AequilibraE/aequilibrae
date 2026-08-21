@@ -43,6 +43,7 @@ class Network(WorkerThread):
     signal = SIGNAL(object)
 
     # FIXME: project dependency should be narrowed to its required domain owner.
+    # FIXME: the "project" here is really a scenario and it shouldn't be.
     def __init__(self, project: "Scenario", project_connection: NestedTransactionManager) -> None:
         WorkerThread.__init__(self, None)
 
@@ -263,7 +264,7 @@ class Network(WorkerThread):
             **path** (:obj:`str`): Output folder path.
         """
 
-        gmns_exporter = GMNSExporter(self, path)
+        gmns_exporter = GMNSExporter(self, self.modes, self.project.project_parameters, path)
         gmns_exporter.doWork()
 
         logger.info("Network exported successfully")

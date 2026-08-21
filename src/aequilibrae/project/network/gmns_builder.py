@@ -338,16 +338,14 @@ class GMNSBuilder:
 
         link_types_list = [s.replace("-", "_") for s in link_types_list]
         type_saved = ""
-        all_types = list(self.link_types.all_types())
+        all_types = [link_type.link_type_id for link_type in self.link_types]
         for lt_name in list(dict.fromkeys(link_types_list)):
             letters = lt_name.lower() + lt_name.upper() + string.ascii_letters
             letters = "".join([lt for lt in letters if lt not in all_types + [type_saved]])
 
-            link_types = self.link_types
-            new_type = link_types.new(letters[0])
-            new_type.link_type = lt_name
-            new_type.description = "Link type from GMNS link table"
-            new_type.save()
+            self.link_types.insert(
+                link_type_id=letters[0], link_type=lt_name, description="Link type from GMNS link table"
+            )
             type_saved = letters[0]
 
         return link_types_list
@@ -426,11 +424,11 @@ class GMNSBuilder:
                 else:
                     char = unused_chars.pop()
 
-                new_mode = self.modes.new(char)
-                new_mode.mode_name = m
-                new_mode.description = f"GMNS use groups: {', '.join(resolved_use_groups[m])}"
-                self.modes.add(new_mode)
-                new_mode.save()
+                self.modes.insert(
+                    mode_id=char,
+                    mode_name=m,
+                    description=f"GMNS use groups: {', '.join(resolved_use_groups[m])}",
+                )
 
                 modes[m] = char
 
