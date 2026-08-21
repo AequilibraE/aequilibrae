@@ -13,7 +13,7 @@ def assignment_setup(sioux_falls_single_class):
     car_graph.set_blocked_centroid_flows(False)
     matrix = project.matrices.get_matrix("demand_omx")
     matrix.computational_view()
-    assignment = TrafficAssignment()
+    assignment = TrafficAssignment(parameters=project.parameters, path_files_path=project.project_base_path)
     assigclass = TrafficClass("car", car_graph, matrix)
     algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
     yield {
