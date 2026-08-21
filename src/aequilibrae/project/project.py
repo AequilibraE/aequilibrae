@@ -415,6 +415,7 @@ class Project:
                     raise ValueError("a scenario of that name already exists")
 
             scenario_path.mkdir(parents=True, exist_ok=True)
+            (scenario_path / "matrices").mkdir(exist_ok=True)
 
             db = scenario_path / "project_database.sqlite"
             shutil.copyfile(spatialite_database, db)
@@ -464,7 +465,10 @@ class Project:
                 ):
                     raise ValueError("a scenario of that name already exists")
 
-            shutil.copytree(matrices_path, scenario_path / "matrices")
+            if matrices_path.is_dir():
+                shutil.copytree(matrices_path, scenario_path / "matrices")
+            else:
+                (scenario_path / "matrices").mkdir(parents=True, exist_ok=True)
 
             db = scenario_path / "project_database.sqlite"
             shutil.copyfile(project_db_path, db)

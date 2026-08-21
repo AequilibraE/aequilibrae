@@ -192,6 +192,7 @@ def test_network_scenarios(scenario_example, scenario):
     if other_scenarios:
         other_scenario = other_scenarios[0]
         scenario_example.use_scenario(other_scenario)
+        network = scenario_example.network
 
         links2 = network.links.data
         nodes2 = network.nodes.data
