@@ -28,7 +28,7 @@ requires-python = ">=3.11" # match classifiers above and ruff version below
 
 dependencies = [
   "geopandas",
-  "numpy",
+  "numpy>=2.4.6",
   "openmatrix",
   "pandas>=3.0",
   "pyaml",
