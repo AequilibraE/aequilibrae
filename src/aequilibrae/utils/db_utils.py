@@ -1,7 +1,6 @@
 """SQLite connection ownership and small database helpers."""
 
 import contextlib
-import sqlite3
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from os import PathLike
@@ -12,7 +11,7 @@ from typing import Any
 import pandas as pd
 
 
-class AequilibraEConnection(sqlite3.Connection):
+class AequilibraEConnection(Connection):
     """SQLite connection type used by AequilibraE connection factories."""
 
 
@@ -28,11 +27,11 @@ class NestedTransactionManager:
             connection.isolation_level = None
             _enable_foreign_keys(connection)
         self.__connection = connection
-        self.__depth = 0
         self.__savepoint_id = 0
+        self.__stack: list[str | None] = []
 
     @property
-    def connection(self) -> Connection:
+    def _connection(self) -> Connection:
         """The SQLite connection owned by this manager.
 
         Gateway code should normally obtain this connection from
@@ -43,36 +42,71 @@ class NestedTransactionManager:
 
     @property
     def depth(self) -> int:
-        """Current transaction/savepoint nesting depth."""
-        return self.__depth
+        """Current transaction/savepoint nesting depth. Includes no-op transactions."""
+        return len(self.__stack)
 
     @property
     def in_transaction(self) -> bool:
         """Whether an owned transaction scope is currently active."""
-        return self.__depth > 0 or self.__connection.in_transaction
+        return self.depth > 0 or self.__connection.in_transaction
+
+    @property
+    def transaction_id(self) -> str:
+        """
+        Return the current savepoint ID.
+
+        Raises a RuntimeError is not currently in a transaction
+        """
+        if not self.in_transaction:
+            raise RuntimeError("not in a transaction")
+        return next(transaction_id for transaction_id in reversed(self.__stack) if transaction_id is not None)
 
     def transaction(self) -> "_TransactionContext":
         """Create a fresh context that yields the persistent connection."""
         return _TransactionContext(self)
 
-    def _enter(self) -> str | None:
-        savepoint: str | None = None
-        if self.__depth == 0:
-            if self.__connection.in_transaction:
-                raise RuntimeError("managed connection has an unowned transaction")
-            self.__connection.execute("BEGIN")
+    def __enter__(self):
+        """
+        When used as a context manager without a .transaction(), the enter and exit methods should no-op if there is
+        an existing transaction, otherwise one is started.
+        """
+        if self.depth > 0:
+            # There are things on the transaction stack, but .transaction() haven't been used, therefore this is a
+            # noop-context
+            self.__stack.append(None)
         else:
-            self.__savepoint_id += 1
-            savepoint = f"aeq_nested_{self.__savepoint_id}"
-            self.__connection.execute(f'SAVEPOINT "{savepoint}"')
-        self.__depth += 1
+            # There's either nothing on the stack, thus we must start a new transaction
+            self._enter_transaction()
+
+        return self.__connection
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: Any,
+    ) -> bool:
+        savepoint = self.__stack[-1]
+        if savepoint is None:
+            # Then this is a noop-context
+            self.__stack.pop()
+            return False
+        else:
+            return self._exit_transaction(savepoint, exc_type)
+
+    def _enter_transaction(self) -> str:
+        if self.depth == 0 and self.__connection.in_transaction:
+            raise RuntimeError("managed connection has an unowned transaction")
+
+        self.__savepoint_id += 1
+        savepoint = f"aeq_nested_{self.__savepoint_id}"
+        self.__connection.execute(f'SAVEPOINT "{savepoint}"')
+        self.__stack.append(savepoint)
         return savepoint
 
-    def _exit(self, savepoint: str | None, exc_type: type[BaseException] | None) -> bool:
-        self.__depth -= 1
-        if savepoint is None:
-            self.__connection.execute("COMMIT" if exc_type is None else "ROLLBACK")
-        elif exc_type is None:
+    def _exit_transaction(self, savepoint: str | None, exc_type: type[BaseException] | None) -> bool:
+        assert self.__stack.pop() == savepoint, "tried to exit a different transaction than was on top of the stack"
+        if exc_type is None:
             self.__connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
         else:
             self.__connection.execute(f'ROLLBACK TO SAVEPOINT "{savepoint}"')
@@ -92,8 +126,8 @@ class _TransactionContext:
         self.__savepoint: str | None = None
 
     def __enter__(self) -> Connection:
-        self.__savepoint = self.__manager._enter()
-        return self.__manager.connection
+        self.__savepoint = self.__manager._enter_transaction()
+        return self.__manager._connection
 
     def __exit__(
         self,
@@ -101,7 +135,7 @@ class _TransactionContext:
         exc_value: BaseException | None,
         traceback: Any,
     ) -> bool:
-        return self.__manager._exit(self.__savepoint, exc_type)
+        return self.__manager._exit_transaction(self.__savepoint, exc_type)
 
 
 class ConnectionClosure:
