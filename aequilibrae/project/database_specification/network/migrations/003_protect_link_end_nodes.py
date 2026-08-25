@@ -38,41 +38,59 @@ def migrate(
     for trigger in retired_triggers:
         project_conn.execute(f"DROP TRIGGER IF EXISTS {trigger}")
 
-    add_triggers(project_conn, logger, "network")
-
-    repaired = 0
-    for field, endpoint_function in (("a_node", "StartPoint"), ("b_node", "EndPoint")):
-        cursor = project_conn.execute(
-            f"""
-            UPDATE links
-            SET {field} = (
-                SELECT node_id
-                FROM nodes
-                WHERE nodes.geometry = {endpoint_function}(links.geometry)
-                  AND nodes.ROWID IN (
-                      SELECT ROWID
-                      FROM SpatialIndex
-                      WHERE f_table_name = 'nodes'
-                        AND search_frame = {endpoint_function}(links.geometry)))
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM nodes
-                WHERE nodes.node_id = links.{field}
-                  AND nodes.geometry = {endpoint_function}(links.geometry))
-              AND 1 = (
-                SELECT count(*)
-                FROM nodes
-                WHERE nodes.geometry = {endpoint_function}(links.geometry)
-                  AND nodes.ROWID IN (
-                      SELECT ROWID
-                      FROM SpatialIndex
-                      WHERE f_table_name = 'nodes'
-                        AND search_frame = {endpoint_function}(links.geometry)))
-            """
+    missing_endpoint_nodes = project_conn.execute(
+        """
+        SELECT link_id
+        FROM links
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM nodes
+            WHERE nodes.node_id = links.a_node)
+           OR NOT EXISTS (
+            SELECT 1
+            FROM nodes
+            WHERE nodes.node_id = links.b_node)
+        ORDER BY link_id
+        LIMIT 20
+        """
+    ).fetchall()
+    if missing_endpoint_nodes:
+        link_ids = [row[0] for row in missing_endpoint_nodes]
+        raise RuntimeError(
+            "Cannot protect link endpoint fields because some endpoints reference missing nodes. "
+            f"First affected link IDs: {link_ids}"
         )
-        repaired += cursor.rowcount
 
-    unresolved_links = project_conn.execute(
+    # Preserve the network topology: a_node and b_node are authoritative here.
+    # Only reshape the link geometry; node records and geometries remain untouched.
+    cursor = project_conn.execute(
+        """
+        UPDATE links
+        SET geometry = SetEndPoint(
+            SetStartPoint(
+                geometry,
+                (SELECT geometry FROM nodes WHERE nodes.node_id = links.a_node)),
+            (SELECT geometry FROM nodes WHERE nodes.node_id = links.b_node)),
+            distance = GeodesicLength(SetEndPoint(
+                SetStartPoint(
+                    geometry,
+                    (SELECT geometry FROM nodes WHERE nodes.node_id = links.a_node)),
+                (SELECT geometry FROM nodes WHERE nodes.node_id = links.b_node)))
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM nodes
+            WHERE nodes.node_id = links.a_node
+              AND nodes.geometry = StartPoint(links.geometry))
+           OR NOT EXISTS (
+            SELECT 1
+            FROM nodes
+            WHERE nodes.node_id = links.b_node
+              AND nodes.geometry = EndPoint(links.geometry))
+        """
+    )
+    repaired = cursor.rowcount
+
+    inconsistent_links = project_conn.execute(
         """
         SELECT link_id
         FROM links
@@ -90,14 +108,16 @@ def migrate(
         LIMIT 20
         """
     ).fetchall()
-    if unresolved_links:
-        link_ids = [row[0] for row in unresolved_links]
+    if inconsistent_links:
+        link_ids = [row[0] for row in inconsistent_links]
         raise RuntimeError(
-            "Cannot protect link endpoint fields because some endpoints have no unique matching node. "
+            "Cannot protect link endpoint fields because some link geometries could not be aligned with their nodes. "
             f"First affected link IDs: {link_ids}"
         )
 
+    add_triggers(project_conn, logger, "network")
+
     if repaired:
-        logger.warning("Repaired %s inconsistent link endpoint assignments", repaired)
+        logger.warning("Repaired the geometry of %s links with inconsistent endpoints", repaired)
 
     logger.info("Migration to protect links.a_node and links.b_node completed")

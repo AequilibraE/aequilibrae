@@ -78,7 +78,7 @@ def _assert_topology_and_spatial_indexes_are_consistent(conn):
 
 
 def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
-    """Test that migration 003 repairs broken endpoints and indexes, swaps legacy triggers for the new guards."""
+    """Test that migration 003 aligns geometry with topology and swaps legacy triggers for the new guards."""
     with sioux_falls_test.db_connection as conn:
         conn.execute(
             """
@@ -101,48 +101,53 @@ def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
             """
         )
 
-        # Select an endpoint with exactly one geometrically matching node, which
-        # makes the migration's repair deterministic.
-        link_id, original_a_node = conn.execute(
+        link_id, original_a_node, original_b_node = conn.execute(
             """
-            SELECT link.link_id, link.a_node
-            FROM links AS link
-            WHERE 1 = (
-                SELECT count(*)
-                FROM nodes AS node
-                WHERE node.geometry = StartPoint(link.geometry))
-            ORDER BY link.link_id
+            SELECT link_id, a_node, b_node
+            FROM links
+            WHERE a_node != b_node
+            ORDER BY link_id
             LIMIT 1
             """
         ).fetchone()
-        expected_a_node = conn.execute(
+        bad_a_node, bad_b_node = (
+            row[0]
+            for row in conn.execute(
+                """
+                SELECT node_id
+                FROM nodes
+                WHERE node_id NOT IN (?, ?)
+                ORDER BY node_id
+                LIMIT 2
+                """,
+                (original_a_node, original_b_node),
+            ).fetchall()
+        )
+        expected_start, expected_end = conn.execute(
             """
-            SELECT node.node_id
-            FROM nodes AS node, links AS link
-            WHERE link.link_id = ?
-              AND node.geometry = StartPoint(link.geometry)
+            SELECT
+                (SELECT AsBinary(geometry) FROM nodes WHERE node_id = ?),
+                (SELECT AsBinary(geometry) FROM nodes WHERE node_id = ?)
             """,
-            (link_id,),
-        ).fetchone()[0]
-        bad_a_node = conn.execute(
-            """
-            SELECT node_id
-            FROM nodes
-            WHERE node_id != ?
-            ORDER BY node_id
-            LIMIT 1
-            """,
-            (expected_a_node,),
-        ).fetchone()[0]
+            (bad_a_node, bad_b_node),
+        ).fetchone()
 
-        assert original_a_node == expected_a_node
-        conn.execute("UPDATE links SET a_node = ? WHERE link_id = ?", (bad_a_node, link_id))
-        assert conn.execute("SELECT a_node FROM links WHERE link_id = ?", (link_id,)).fetchone()[0] == bad_a_node
-        expected_node_rowid = conn.execute("SELECT ROWID FROM nodes WHERE node_id = ?", (expected_a_node,)).fetchone()[
-            0
-        ]
+        conn.execute(
+            "UPDATE links SET a_node = ?, b_node = ? WHERE link_id = ?",
+            (bad_a_node, bad_b_node, link_id),
+        )
+        assert conn.execute("SELECT a_node, b_node FROM links WHERE link_id = ?", (link_id,)).fetchone() == (
+            bad_a_node,
+            bad_b_node,
+        )
+        expected_node_rowid = conn.execute(
+            "SELECT ROWID FROM nodes WHERE node_id = ?", (original_a_node,)
+        ).fetchone()[0]
         conn.execute("DELETE FROM idx_nodes_geometry WHERE pkid = ?", (expected_node_rowid,))
         assert conn.execute("SELECT CheckSpatialIndex('nodes', 'geometry')").fetchone() == (0,)
+        node_geometries_before_upgrade = conn.execute(
+            "SELECT node_id, AsBinary(geometry) FROM nodes ORDER BY node_id"
+        ).fetchall()
 
     with pytest.warns(UserWarning, match="Take care when ignoring a database during an upgrade"):
         sioux_falls_test.upgrade(ignore_transit=True, ignore_results=True)
@@ -154,7 +159,24 @@ def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
         assert ENDPOINT_GUARDS <= trigger_names
         assert LEGACY_TABLE_CONSTRAINT_TRIGGERS <= trigger_names
         assert RETIRED_OR_REPLACED_LEGACY_TRIGGERS.isdisjoint(trigger_names)
-        assert conn.execute("SELECT a_node FROM links WHERE link_id = ?", (link_id,)).fetchone()[0] == expected_a_node
+        a_node, b_node, start, end, distance, geometry_distance = conn.execute(
+            """
+            SELECT a_node,
+                   b_node,
+                   AsBinary(StartPoint(geometry)),
+                   AsBinary(EndPoint(geometry)),
+                   distance,
+                   GeodesicLength(geometry)
+            FROM links
+            WHERE link_id = ?
+            """,
+            (link_id,),
+        ).fetchone()
+        assert (a_node, b_node, start, end) == (bad_a_node, bad_b_node, expected_start, expected_end)
+        assert distance == pytest.approx(geometry_distance)
+        assert conn.execute("SELECT node_id, AsBinary(geometry) FROM nodes ORDER BY node_id").fetchall() == (
+            node_geometries_before_upgrade
+        )
 
         _assert_topology_and_spatial_indexes_are_consistent(conn)
 
@@ -163,10 +185,10 @@ def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
         match="a_node does not match the start point of link geometry",
     ):
         with sioux_falls_test.db_connection as conn:
-            conn.execute("UPDATE links SET a_node = ? WHERE link_id = ?", (bad_a_node, link_id))
+            conn.execute("UPDATE links SET a_node = ? WHERE link_id = ?", (original_a_node, link_id))
 
     with sioux_falls_test.db_connection as conn:
-        assert conn.execute("SELECT a_node FROM links WHERE link_id = ?", (link_id,)).fetchone()[0] == expected_a_node
+        assert conn.execute("SELECT a_node FROM links WHERE link_id = ?", (link_id,)).fetchone()[0] == bad_a_node
 
         moving_node, replaced_node = conn.execute(
             "SELECT a_node, b_node FROM links WHERE a_node != b_node ORDER BY link_id LIMIT 1"
@@ -198,7 +220,7 @@ def test_new_project_has_protected_schema_without_running_migration(empty_projec
 
 
 def test_irreparable_legacy_endpoint_rolls_back_migration(sioux_falls_test):
-    """Test that an endpoint with no matching node aborts migration 003 and rolls the schema back untouched."""
+    """Test that an endpoint referencing a missing node aborts migration 003 and rolls the schema back untouched."""
     with sioux_falls_test.db_connection as conn:
         conn.execute("DROP TRIGGER dont_delete_node")
         missing_node = conn.execute("SELECT a_node FROM links ORDER BY link_id LIMIT 1").fetchone()[0]
@@ -206,7 +228,7 @@ def test_irreparable_legacy_endpoint_rolls_back_migration(sioux_falls_test):
         triggers_before_upgrade = _trigger_names(conn)
 
     with pytest.warns(UserWarning, match="Take care when ignoring a database during an upgrade"):
-        with pytest.raises(RuntimeError, match="some endpoints have no unique matching node"):
+        with pytest.raises(RuntimeError, match="some endpoints reference missing nodes"):
             sioux_falls_test.upgrade(ignore_transit=True, ignore_results=True)
 
     with sioux_falls_test.db_connection as conn:
