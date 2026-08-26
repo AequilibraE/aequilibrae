@@ -65,29 +65,27 @@ def _install_mock(monkeypatch):
     monkeypatch.setattr(overturemaps, "record_batch_reader", _fake_rbr)
 
 
-def test_overture_cloud_import_splits_intermediate_connectors(empty_project, monkeypatch):
+@pytest.fixture
+def overture_project(empty_project, monkeypatch):
     _install_mock(monkeypatch)
     empty_project.network.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,
     )
+    return empty_project
 
-    with sqlite3.connect(empty_project.path_to_file) as conn:
+
+def test_overture_cloud_import_splits_intermediate_connectors(overture_project):
+    with sqlite3.connect(overture_project.path_to_file) as conn:
         n_links = conn.execute("SELECT count(*) FROM links").fetchone()[0]
         n_nodes = conn.execute("SELECT count(*) FROM nodes").fetchone()[0]
     assert n_links == 3
     assert n_nodes == 4
 
 
-def test_overture_writes_raw_payload_to_download_cache(empty_project, monkeypatch):
-    _install_mock(monkeypatch)
-    empty_project.network.importer.overture(
-        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
-        modes=("car",),
-        simplify=False,
-    )
-    base = Path(empty_project.project_base_path) / "downloaded data" / "overture-cloud"
+def test_overture_writes_raw_payload_to_download_cache(overture_project):
+    base = Path(overture_project.project_base_path) / "downloaded data" / "overture-cloud"
     assert base.exists()
     cache = list(base.iterdir())[0]
     assert (cache / "segments.parquet").exists()
@@ -99,14 +97,8 @@ def test_overture_writes_raw_payload_to_download_cache(empty_project, monkeypatc
     assert manifest["connectors_rows"] == 4
 
 
-def test_overture_speed_limit_parsed(empty_project, monkeypatch):
-    _install_mock(monkeypatch)
-    empty_project.network.importer.overture(
-        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
-        modes=("car",),
-        simplify=False,
-    )
-    with sqlite3.connect(empty_project.path_to_file) as conn:
+def test_overture_speed_limit_parsed(overture_project):
+    with sqlite3.connect(overture_project.path_to_file) as conn:
         rows = list(conn.execute("SELECT speed_ab, speed_ba, link_type FROM links WHERE link_type='primary'"))
     assert rows
     for speed_ab, speed_ba, _link_type in rows:
@@ -114,28 +106,16 @@ def test_overture_speed_limit_parsed(empty_project, monkeypatch):
         assert speed_ba is None
 
 
-def test_overture_direction_inferred_from_access_restrictions(empty_project, monkeypatch):
-    _install_mock(monkeypatch)
-    empty_project.network.importer.overture(
-        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
-        modes=("car",),
-        simplify=False,
-    )
-    with sqlite3.connect(empty_project.path_to_file) as conn:
+def test_overture_direction_inferred_from_access_restrictions(overture_project):
+    with sqlite3.connect(overture_project.path_to_file) as conn:
         directions = [
             row[0] for row in conn.execute("SELECT direction FROM links WHERE link_type='primary' ORDER BY link_id")
         ]
     assert directions == [1, 1]
 
 
-def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(empty_project, monkeypatch):
-    _install_mock(monkeypatch)
-    empty_project.network.importer.overture(
-        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
-        modes=("car",),
-        simplify=False,
-    )
-    with sqlite3.connect(empty_project.path_to_file) as conn:
+def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(overture_project):
+    with sqlite3.connect(overture_project.path_to_file) as conn:
         rows = list(conn.execute("SELECT other_attributes FROM links WHERE link_type='primary'"))
     assert rows
     for (other_attributes,) in rows:
@@ -144,27 +124,15 @@ def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(empty_pr
         assert "lanes_ba" not in payload
 
 
-def test_overture_rule_arrays_land_in_other_attributes(empty_project, monkeypatch):
-    _install_mock(monkeypatch)
-    empty_project.network.importer.overture(
-        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
-        modes=("car",),
-        simplify=False,
-    )
-    with sqlite3.connect(empty_project.path_to_file) as conn:
+def test_overture_rule_arrays_land_in_other_attributes(overture_project):
+    with sqlite3.connect(overture_project.path_to_file) as conn:
         for (other_attributes,) in conn.execute("SELECT other_attributes FROM links WHERE link_type='primary'"):
             payload = json.loads(other_attributes)
             assert "speed_limits" in payload
 
 
-def test_overture_about_provenance(empty_project, monkeypatch):
-    _install_mock(monkeypatch)
-    empty_project.network.importer.overture(
-        model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
-        modes=("car",),
-        simplify=False,
-    )
-    with sqlite3.connect(empty_project.path_to_file) as conn:
+def test_overture_about_provenance(overture_project):
+    with sqlite3.connect(overture_project.path_to_file) as conn:
         about = {
             r[0]: r[1]
             for r in conn.execute("SELECT infoname, infovalue FROM about WHERE infoname LIKE 'network_source%'")

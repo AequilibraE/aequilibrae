@@ -66,15 +66,7 @@ class NetworkImporter:
 
         if simplify_fn is not None:
             logger.info(f"Simplifying with '{simplifier_name}'")
-            simplify_kwargs = {"consolidate_tolerance": consolidate_tolerance}
-            if simplifier_name == "neatnet":
-                from aequilibrae.project.network.importer.buildings import fetch_building_footprints
-
-                buildings = fetch_building_footprints(net, download_cache)
-                net.source_meta.update(buildings.as_meta())
-                if buildings.gdf is not None:
-                    simplify_kwargs["exclusion_mask"] = buildings.gdf
-            net = simplify_fn(net, **simplify_kwargs)
+            net = simplify_fn(net, consolidate_tolerance=consolidate_tolerance)
             net.validate()
             logger.info(f"After simplification: {len(net.nodes)} nodes, {len(net.links)} links")
 
@@ -109,4 +101,3 @@ def _normalize_source_meta(net: StagedNetwork) -> None:
         raise ImporterError(f"StagedNetwork.source_meta missing required keys: {missing}")
 
     net.source_meta = {key: net.source_meta.get(key, "") for key in _SOURCE_META_KEYS}
-

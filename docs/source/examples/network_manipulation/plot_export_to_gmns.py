@@ -18,7 +18,7 @@ in the GMNS repository on GitHub: https://github.com/zephyr-data-specs/GMNS
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.exporters.Exporter.gmns`
+#     * :func:`aequilibrae.project.network.network.Network.export_to_gmns`
 
 # %%
 
@@ -46,7 +46,7 @@ output_fldr = os.path.join(gettempdir(), uuid4().hex)
 if not os.path.exists(output_fldr):
     os.mkdir(output_fldr)
 
-project.network.exporter.gmns(path=output_fldr)
+project.network.export_to_gmns(path=output_fldr)
 
 # %%
 # Now, let's plot a map. This map can be compared with the images of the README.md

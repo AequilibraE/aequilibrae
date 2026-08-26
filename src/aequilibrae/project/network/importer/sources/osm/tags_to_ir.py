@@ -3,7 +3,7 @@
 import re
 from typing import Mapping
 
-from aequilibrae.project.network.importer.schema.modes import MODE_CODE, ModeRule
+from aequilibrae.project.network.importer.schema.modes import MODE_CODE
 
 
 def _has(tags: Mapping, key: str, *values: str) -> bool:
@@ -117,12 +117,16 @@ def _allow_transit(tags: Mapping) -> bool:
     return True
 
 
-MODE_RULES: list[ModeRule] = [
-    ModeRule("car", MODE_CODE["car"], _allow_car),
-    ModeRule("transit", MODE_CODE["transit"], _allow_transit),
-    ModeRule("bicycle", MODE_CODE["bicycle"], _allow_bicycle),
-    ModeRule("walk", MODE_CODE["walk"], _allow_walk),
-]
+MODE_RULES = {
+    MODE_CODE["car"]: _allow_car,
+    MODE_CODE["transit"]: _allow_transit,
+    MODE_CODE["bicycle"]: _allow_bicycle,
+    MODE_CODE["walk"]: _allow_walk,
+}
+
+
+def modes_for_tags(tags: Mapping) -> str:
+    return "".join(sorted(code for code, predicate in MODE_RULES.items() if predicate(tags)))
 
 
 # --- Tag normalisation ---

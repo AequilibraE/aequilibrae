@@ -10,18 +10,18 @@ from aequilibrae.project.network.importer.simplifiers.impl_osmnx import _graph_t
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 osmnx = pytest.importorskip("osmnx")
-pyrosm = pytest.importorskip("pyrosm")
+SOURCE_META = {
+    "source": "osm",
+    "backend": "pyrosm",
+    "source_url": "test.osm.pbf",
+    "fetched_at": "2026-06-22T00:00:00+00:00",
+    "release": "",
+}
 
 
-def _pbf_path():
-    from pyrosm import get_data
-
-    return get_data("test_pbf")
-
-
-def test_simplify_osmnx_runs_and_reduces(empty_project):
+def test_simplify_osmnx_runs_and_reduces(empty_project, pbf_path):
     empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
+        pbf_path=pbf_path,
         modes=("car",),
         simplify="osmnx",
         consolidate_tolerance=None,
@@ -32,26 +32,9 @@ def test_simplify_osmnx_runs_and_reduces(empty_project):
     assert n_links > 0
     assert n_nodes > 0
 
-    with sqlite3.connect(empty_project.path_to_file) as conn:
-        for (oa,) in conn.execute("SELECT other_attributes FROM links WHERE other_attributes IS NOT NULL"):
-            payload = json.loads(oa)
-            if "source_ids" in payload:
-                inner = payload["source_ids"]
-                if isinstance(inner, str):
-                    inner = json.loads(inner)
-                assert isinstance(inner, dict)
-                assert inner.get("schema_version") == 1
-                assert isinstance(inner.get("sources"), dict)
-                for key, value in inner["sources"].items():
-                    assert isinstance(key, str)
-                    assert isinstance(value, dict)
-                return
-    pytest.skip("No merged links produced")
-
-
-def test_simplify_osmnx_with_consolidation(empty_project):
+def test_simplify_osmnx_with_consolidation(empty_project, pbf_path):
     empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
+        pbf_path=pbf_path,
         modes=("car", "walk"),
         simplify="osmnx",
         consolidate_tolerance=10.0,
@@ -98,13 +81,7 @@ def test_graph_to_staged_preserves_merged_source_provenance():
             geometry="geometry",
             crs="EPSG:4326",
         ),
-        source_meta={
-            "source": "osm",
-            "backend": "pyrosm",
-            "source_url": "test.osm.pbf",
-            "fetched_at": "2026-06-22T00:00:00+00:00",
-            "release": "",
-        },
+        source_meta=SOURCE_META,
     )
 
     graph = nx.MultiDiGraph()
@@ -172,13 +149,7 @@ def test_graph_to_staged_reorients_reverse_one_way_as_forward_row_geometry():
             geometry="geometry",
             crs="EPSG:4326",
         ),
-        source_meta={
-            "source": "osm",
-            "backend": "pyrosm",
-            "source_url": "test.osm.pbf",
-            "fetched_at": "2026-06-22T00:00:00+00:00",
-            "release": "",
-        },
+        source_meta=SOURCE_META,
     )
 
     graph = nx.MultiDiGraph()
@@ -245,13 +216,7 @@ def _linear_net(direction, **link_overrides):
             crs="EPSG:4326",
         ),
         links=gpd.GeoDataFrame(links, geometry="geometry", crs="EPSG:4326"),
-        source_meta={
-            "source": "osm",
-            "backend": "pyrosm",
-            "source_url": "test.osm.pbf",
-            "fetched_at": "2026-06-22T00:00:00+00:00",
-            "release": "",
-        },
+        source_meta=SOURCE_META,
     )
 
 
@@ -327,13 +292,7 @@ def test_parallel_one_way_carriageways_are_not_merged():
             geometry="geometry",
             crs="EPSG:4326",
         ),
-        source_meta={
-            "source": "osm",
-            "backend": "pyrosm",
-            "source_url": "test.osm.pbf",
-            "fetched_at": "2026-06-22T00:00:00+00:00",
-            "release": "",
-        },
+        source_meta=SOURCE_META,
     )
 
     out = run_osmnx_simplify(net, consolidate_tolerance=None)

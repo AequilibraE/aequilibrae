@@ -3,18 +3,10 @@ import sqlite3
 
 import pytest
 
-pyrosm = pytest.importorskip("pyrosm")
 
-
-def _pbf_path():
-    from pyrosm import get_data
-
-    return get_data("test_pbf")
-
-
-def test_basic_pbf_import_no_simplify(empty_project):
+def test_basic_pbf_import_no_simplify(empty_project, pbf_path):
     empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
+        pbf_path=pbf_path,
         modes=("car",),
         simplify=False,
     )
@@ -27,11 +19,11 @@ def test_basic_pbf_import_no_simplify(empty_project):
     assert n_nodes > 10
 
 
-def test_pbf_writes_no_download_cache(empty_project, tmp_path):
+def test_pbf_writes_no_download_cache(empty_project, pbf_path):
     from pathlib import Path
 
     empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
+        pbf_path=pbf_path,
         modes=("car",),
         simplify=False,
     )
@@ -39,9 +31,9 @@ def test_pbf_writes_no_download_cache(empty_project, tmp_path):
     assert not cache.exists()
 
 
-def test_pbf_mode_filter_only_keeps_walk_links(empty_project):
+def test_pbf_mode_filter_only_keeps_walk_links(empty_project, pbf_path):
     empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
+        pbf_path=pbf_path,
         modes=("walk",),
         simplify=False,
     )
@@ -54,9 +46,9 @@ def test_pbf_mode_filter_only_keeps_walk_links(empty_project):
         assert "c" not in modes
 
 
-def test_pbf_unknown_tags_land_in_other_attributes(empty_project):
+def test_pbf_unknown_tags_land_in_other_attributes(empty_project, pbf_path):
     empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
+        pbf_path=pbf_path,
         modes=("car",),
         simplify=False,
     )
@@ -72,9 +64,9 @@ def test_pbf_unknown_tags_land_in_other_attributes(empty_project):
     pytest.fail("No link had a non-empty other_attributes JSON payload")
 
 
-def test_pbf_contract_fields_are_valid(empty_project):
+def test_pbf_contract_fields_are_valid(empty_project, pbf_path):
     empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
+        pbf_path=pbf_path,
         modes=("car", "walk"),
         simplify=False,
     )
@@ -86,18 +78,3 @@ def test_pbf_contract_fields_are_valid(empty_project):
         assert all(row[1] > 0 for row in rows)
         assert all(row[2] for row in rows)
         assert any(row[0] != 0 for row in rows)
-
-
-def test_pbf_about_provenance_records_source_url(empty_project):
-    # Provenance keys/timestamps are covered in test_about_provenance.py; here we
-    # only assert the PBF-specific source_url makes it into the about table.
-    empty_project.network.importer.osm(
-        pbf_path=_pbf_path(),
-        modes=("car",),
-        simplify=False,
-    )
-    with sqlite3.connect(empty_project.path_to_file) as conn:
-        url = conn.execute(
-            "SELECT infovalue FROM about WHERE infoname = 'network_source_url'"
-        ).fetchone()[0]
-    assert "test.osm.pbf" in url

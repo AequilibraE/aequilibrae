@@ -21,14 +21,13 @@ class StagedNetwork:
     source_meta: dict = field(default_factory=dict)
 
     def validate(self) -> None:
-        missing_nodes = [c for c in _REQUIRED_NODE_COLS if c not in self.nodes.columns]
-        if missing_nodes:
-            raise StagedNetworkValidationError(f"nodes GeoDataFrame missing required columns: {missing_nodes}")
-        missing_links = [c for c in _REQUIRED_LINK_COLS if c not in self.links.columns]
-        if missing_links:
-            raise StagedNetworkValidationError(f"links GeoDataFrame missing required columns: {missing_links}")
-
-        for label, gdf in (("nodes", self.nodes), ("links", self.links)):
+        for label, gdf, required in (
+            ("nodes", self.nodes, _REQUIRED_NODE_COLS),
+            ("links", self.links, _REQUIRED_LINK_COLS),
+        ):
+            missing = [c for c in required if c not in gdf.columns]
+            if missing:
+                raise StagedNetworkValidationError(f"{label} GeoDataFrame missing required columns: {missing}")
             if gdf.crs is None or str(gdf.crs).upper() != "EPSG:4326":
                 raise StagedNetworkValidationError(f"{label} CRS must be EPSG:4326, got {gdf.crs}")
 
@@ -41,12 +40,12 @@ class StagedNetwork:
             raise StagedNetworkValidationError(f"nodes.node_id values must be >= {NODE_ID_START}")
 
         node_ids = set(self.nodes["node_id"].tolist())
-        a_missing = ~self.links["a_node"].isin(node_ids)
-        b_missing = ~self.links["b_node"].isin(node_ids)
-        if a_missing.any():
-            raise StagedNetworkValidationError(f"{int(a_missing.sum())} links.a_node values are not in nodes.node_id")
-        if b_missing.any():
-            raise StagedNetworkValidationError(f"{int(b_missing.sum())} links.b_node values are not in nodes.node_id")
+        for endpoint in ("a_node", "b_node"):
+            missing = ~self.links[endpoint].isin(node_ids)
+            if missing.any():
+                raise StagedNetworkValidationError(
+                    f"{int(missing.sum())} links.{endpoint} values are not in nodes.node_id"
+                )
 
         if (self.links["distance"] <= 0).any():
             raise StagedNetworkValidationError("links.distance must be > 0 (metres)")

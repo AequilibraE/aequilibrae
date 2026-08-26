@@ -3,7 +3,6 @@ thisdir = 'aequilibrae/project/network/importer'
 pyfiles = [
   '__init__.py',
   'about_writer.py',
-  'buildings.py',
   'db_writer.py',
   'download_cache.py',
   'exceptions.py',

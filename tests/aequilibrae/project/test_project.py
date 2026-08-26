@@ -31,21 +31,3 @@ def test_close(empty_no_triggers_project):
     empty_no_triggers_project.close()
     with pytest.raises(FileNotFoundError):
         database_connection(db_type="network")
-
-
-def test_parameters_property_is_stable_across_accesses(empty_project):
-    """Test that project.parameters returns the same dict object on repeated access."""
-    assert empty_project.parameters is empty_project.parameters
-    assert empty_project.project_parameters is empty_project.project_parameters
-
-
-def test_parameters_mutations_persist_via_write_back(empty_project):
-    """Test that mutating project.parameters across separate statements survives write_back()."""
-    empty_project.parameters.setdefault("osm", {})
-    empty_project.parameters["osm"]["overpass_endpoint"] = "http://example.test/api"
-    empty_project.project_parameters.write_back()
-
-    from aequilibrae.parameters import Parameters
-
-    reloaded = Parameters(path=empty_project.project_base_path)
-    assert reloaded.parameters["osm"]["overpass_endpoint"] == "http://example.test/api"

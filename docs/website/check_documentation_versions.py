@@ -10,6 +10,8 @@ if npth not in sys.path:
 
 release_version = version("aequilibrae")
 
+# We check if the reference to all existing versions were added by checking
+# that the current version is referenced
 with open(os.path.join(npth, "docs/source/useful_links/version_history.rst"), mode="r") as f:
     txt = f.read()
 

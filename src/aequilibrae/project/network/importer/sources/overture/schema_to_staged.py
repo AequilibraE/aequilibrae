@@ -49,7 +49,7 @@ _HIGHWAY_LIKE_CLASSES = frozenset({"trunk", "motorway", "trunk_link", "motorway_
 _PEDESTRIAN_CLASSES = frozenset({"footway", "pedestrian", "path", "sidewalk", "steps", "crosswalk"})
 _BICYCLE_FRIENDLY_PED_CLASSES = frozenset({"path", "crosswalk"})
 _BICYCLE_CLASSES = frozenset({"cycleway", "bicycle_path"})
-_PASS_THROUGH_KEYS = (
+_OTHER_ATTRIBUTE_KEYS = (
     "subtype",
     "class",
     "subclass",
@@ -61,8 +61,12 @@ _PASS_THROUGH_KEYS = (
     "width_rules",
     "names",
     "primary_name",
+    "access_restrictions",
+    "prohibited_transitions",
+    "subclass_rules",
+    "speed_limits",
 )
-_RULE_ARRAY_KEYS = ("access_restrictions", "prohibited_transitions", "subclass_rules", "speed_limits")
+_RULE_ARRAY_KEYS = frozenset(_OTHER_ATTRIBUTE_KEYS[-4:])
 
 
 def build_staged_from_overture(
@@ -327,18 +331,14 @@ def _speeds_for_segment(seg: dict, direction: int) -> tuple:
 
 def _free_attrs(seg: dict) -> dict:
     out = {}
-    for key in _PASS_THROUGH_KEYS:
+    for key in _OTHER_ATTRIBUTE_KEYS:
         value = seg.get(key)
         if value is None:
             continue
         value = value.tolist() if isinstance(value, np.ndarray) else value
-        out[key] = value if isinstance(value, (str, int, float, bool)) else json.dumps(to_jsonable(value), default=str)
-    for key in _RULE_ARRAY_KEYS:
-        value = seg.get(key)
-        if value is None:
-            continue
-        value = value.tolist() if isinstance(value, np.ndarray) else value
-        out[key] = json.dumps(to_jsonable(value), default=str)
+        if key in _RULE_ARRAY_KEYS or not isinstance(value, (str, int, float, bool)):
+            value = json.dumps(to_jsonable(value), default=str)
+        out[key] = value
     return out
 
 

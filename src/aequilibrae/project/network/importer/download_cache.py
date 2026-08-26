@@ -1,22 +1,4 @@
-"""Raw-download cache under ``<project>/downloaded data/``.
-
-Every source that retrieves data over the network writes the raw payload to a
-project-local folder **before any parsing/transformation runs**. Local-file
-sources do not write anything.
-
-Layout:
-
-    <project_path>/
-      downloaded data/
-        <source_name>/
-          <ISO timestamp>__<short tag>/
-            <payload files>            # .parquet (Parquet) or .json
-            manifest.json
-
-Only two on-disk payload formats are supported: GeoParquet (``write_geoparquet``
-for ``gpd.GeoDataFrame``) and JSON (``write_json`` for the manifest and small
-metadata documents).
-"""
+"""Project-local cache for raw network downloads and their manifests."""
 
 import hashlib
 import json
@@ -52,12 +34,7 @@ def _sha256_of_file(path: Path) -> str:
 
 
 class DownloadCache:
-    """Per-import handle for writing raw payloads under ``<project>/downloaded data/``.
-
-    The folder is created lazily on first write. Local-file sources may
-    construct a cache and never write anything; in that case no folder is
-    created and ``relative_path`` returns ``None``.
-    """
+    """Write one import's raw payload under ``<project>/downloaded data/``."""
 
     def __init__(self, project_base_path, source_name: str, tag: str):
         self._project_base_path = Path(project_base_path)
@@ -89,12 +66,7 @@ class DownloadCache:
             logger.info(f"Download cache folder: {self._folder}")
 
     def write_geoparquet(self, name: str, gdf) -> Path:
-        """Write a GeoDataFrame as GeoParquet.
-
-        :Arguments:
-            **name**: File name (the ``.parquet`` extension is added if missing).
-            **gdf**: A ``geopandas.GeoDataFrame``.
-        """
+        """Write a GeoDataFrame, adding the ``.parquet`` suffix if needed."""
         self._ensure_folder()
         if not name.endswith(".parquet"):
             name = name + ".parquet"
@@ -104,12 +76,7 @@ class DownloadCache:
         return target
 
     def write_json(self, name: str, payload) -> Path:
-        """Write a JSON document.
-
-        :Arguments:
-            **name**: File name (the ``.json`` extension is added if missing).
-            **payload**: A dict or list serialisable via ``json.dumps(..., default=str)``.
-        """
+        """Write JSON, adding the ``.json`` suffix if needed."""
         self._ensure_folder()
         if not name.endswith(".json"):
             name = name + ".json"

@@ -88,10 +88,8 @@ class Project:
         )
         self.scenario = self.root_scenario
 
-        # project_parameters is a cached_property - drop any value cached from a prior project
-        self.__dict__.pop("project_parameters", None)
-
-        # Log outputs could interleave if two projects were open at once, but only one open project is supported.
+        # It's possible that if two projects are open at once this could duplicate mix the log outputs, but we don't
+        # have anything to support having more than one project open at a time so we'll assume it's fine.
         default_log_file_config(self.scenario.log_handler)
 
         self.activate()
@@ -193,15 +191,13 @@ class Project:
         )
         self.scenario = self.root_scenario
 
-        # See the matching comment in open(): drop any parameters cached from a prior project
-        self.__dict__.pop("project_parameters", None)
-
         default_log_file_config(self.scenario.log_handler)
 
         self.activate()
 
         self.__create_empty_network()
         self.__load_objects()
+        self.about.create()
         logger.info(f"Created project on {base_path}")
 
     def close(self) -> None:
@@ -214,14 +210,18 @@ class Project:
             with self.db_connection as conn:
                 conn.commit()
             clean(self)
-            self.__dict__.pop("project_parameters", None)
+            for obj in [self.parameters, self.network]:
+                del obj
+
+            # del self.network.link_types
+            # del self.network.modes
 
             logger.info(f"Closed project on {self.project_base_path}")
 
             logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
-            self.scenario.log_handler.close()
         except (sqlite3.ProgrammingError, AttributeError):
             logger.warning(f"This project at {self.project_base_path} is already closed")
+            raise  # FIXME something goes wrong above
 
         finally:
             self.deactivate()
@@ -309,7 +309,7 @@ class Project:
         self.scenario.transit = Transit(self)
         self.scenario.zoning = Zoning(self.scenario.network)
 
-    @functools.cached_property
+    @property
     def project_parameters(self) -> Parameters:
         return Parameters(path=self.project_base_path)
 

@@ -4,20 +4,17 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
 from pathlib import Path
-from shapely.geometry import Point, box
+from shapely.geometry import Point
 from typing import Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
-from aequilibrae.project.network.importer.schema.modes import (
-    compute_modes_string,
-    filter_by_modes,
-    requested_mode_codes,
-)
+from aequilibrae.project.network.importer.schema.attributes import is_missing
+from aequilibrae.project.network.importer.schema.modes import filter_by_modes, requested_mode_codes
 from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
-    MODE_RULES,
     directional_lanes,
     directional_speeds,
+    modes_for_tags,
     normalise_tag_key,
     parse_direction,
 )
@@ -45,16 +42,6 @@ _RESERVED_LINK_COLS = {
 }
 _NON_TAG_COLS = {"u", "v", "key", "a_node", "b_node", "geometry", "distance", "osmid", "osm_id"}
 
-# Fallback boxes for a place name Overpass cannot serve as a whole: half-widths in degrees
-# tried largest first, then the smallest shifted off centre for responses broken by a
-# particular feature near the middle rather than by the size of the area alone.
-_BBOX_HALF_WIDTHS = (0.1, 0.05, 0.03, 0.015)
-_BBOX_OFFSETS = (
-    (0.05, 0.0), (-0.05, 0.0), (0.0, 0.05), (0.0, -0.05),
-    (0.05, 0.05), (-0.05, -0.05), (0.05, -0.05), (-0.05, 0.05),
-)
-
-
 def acquire_overpass(
     *,
     modes: Sequence[str],
@@ -75,51 +62,9 @@ def acquire_overpass(
             ox, modes=modes, download_cache=download_cache, model_area=model_area, custom_filter=custom_filter
         )
 
-    try:
-        return _fetch_and_stage(
-            ox, modes=modes, download_cache=download_cache, place_name=place_name, custom_filter=custom_filter
-        )
-    except Exception as exc:
-        if not _smaller_area_might_help(exc):
-            raise
-        return _fetch_around_centre(
-            ox, modes=modes, download_cache=download_cache, place_name=place_name,
-            custom_filter=custom_filter, exc=exc,
-        )
-
-
-def _smaller_area_might_help(exc: Exception) -> bool:
-    """Whether *exc* is a failure that a smaller query area could avoid.
-
-    osmnx splits queries larger than ``settings.max_query_area_size`` into tiles and takes
-    the convex hull of a MultiPolygon boundary; either can drop nodes that the ways it
-    returns still reference. Nominatim also fails to resolve some place names to a polygon.
-    """
-    msg = str(exc)
-    return any(s in msg for s in ("missing nodes", "clipping", "did not geocode", "distance must be > 0"))
-
-
-def _fetch_around_centre(ox, *, modes, download_cache, place_name, custom_filter, exc) -> StagedNetwork:
-    lat, lon = ox.geocode(place_name)
-    attempts = [(half, 0.0, 0.0) for half in _BBOX_HALF_WIDTHS]
-    attempts += [(_BBOX_HALF_WIDTHS[-1], dlat, dlon) for dlat, dlon in _BBOX_OFFSETS]
-
-    for half, dlat, dlon in attempts:
-        centre_lat, centre_lon = lat + dlat, lon + dlon
-        bbox = box(centre_lon - half, centre_lat - half, centre_lon + half, centre_lat + half)
-        logger.warning(
-            f"Overpass query for {place_name!r} failed ({exc}); retrying with a {2 * half:.3f} degree "
-            f"box around ({centre_lat:.4f}, {centre_lon:.4f}), which covers less than the full boundary"
-        )
-        try:
-            return _fetch_and_stage(
-                ox, modes=modes, download_cache=download_cache, model_area=bbox, custom_filter=custom_filter
-            )
-        except Exception as retry_exc:
-            if not _smaller_area_might_help(retry_exc):
-                raise
-            exc = retry_exc
-    raise exc
+    return _fetch_and_stage(
+        ox, modes=modes, download_cache=download_cache, place_name=place_name, custom_filter=custom_filter
+    )
 
 
 def _fetch_and_stage(ox, *, modes, download_cache, custom_filter, model_area=None, place_name=None) -> StagedNetwork:
@@ -412,11 +357,11 @@ def _add_osm_attributes(edges: gpd.GeoDataFrame, requested_codes: set) -> gpd.Ge
     link_types, names = [], []
 
     for tags in records:
-        tags = {k: v for k, v in tags.items() if v is not None and not _is_nan(v)}
+        tags = {k: v for k, v in tags.items() if not is_missing(v)}
         highway = tags.get("highway")
         if isinstance(highway, list) and highway:
             tags["highway"] = highway[0]
-        modes_strs.append(filter_by_modes(compute_modes_string(tags, MODE_RULES), requested_codes))
+        modes_strs.append(filter_by_modes(modes_for_tags(tags), requested_codes))
         directions.append(parse_direction(tags))
         speed_ab, speed_ba = directional_speeds(tags)
         speed_abs.append(speed_ab)
@@ -486,7 +431,3 @@ def _staged_nodes(nodes_gdf: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) -> gpd.G
         crs="EPSG:4326",
     )
     return nodes_out[nodes_out["node_id"].isin(used_nodes)].reset_index(drop=True)
-
-
-def _is_nan(value) -> bool:
-    return isinstance(value, float) and value != value

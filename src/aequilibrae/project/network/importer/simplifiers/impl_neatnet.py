@@ -45,7 +45,6 @@ _DEFAULT_CONSOLIDATE_TOLERANCE = 10.0
 def run_neatnet_simplify(
     net: StagedNetwork,
     *,
-    exclusion_mask=None,
     consolidate_tolerance: float | None = _DEFAULT_CONSOLIDATE_TOLERANCE,
     simplification_factor: float = 2.0,
     min_dangle_length: float = 20.0,
@@ -73,9 +72,6 @@ def run_neatnet_simplify(
         "simplification_factor": float(simplification_factor),
         "min_dangle_length": float(min_dangle_length),
     }
-    if exclusion_mask is not None:
-        neatify_kwargs["exclusion_mask"] = exclusion_mask.to_crs(utm).geometry
-
     if not _has_enclosed_faces(geom_only):
         logger.warning(
             "neatnet needs enclosed street blocks to detect face artifacts, and this network has none "
@@ -123,7 +119,7 @@ def _gdf_to_staged(
     _transfer_attributes(edges, original_links)
     edges["geometry"] = [_dekink_endpoints_local(geom) for geom in edges.geometry]
 
-    endpoints, a_nodes, b_nodes, _next_id = _build_endpoint_index(edges.geometry)
+    endpoints, a_nodes, b_nodes = _build_endpoint_index(edges.geometry)
     edges["a_node"] = a_nodes
     edges["b_node"] = b_nodes
     edges["distance"] = compute_lengths(edges.geometry).to_numpy()
@@ -165,7 +161,7 @@ def _build_endpoint_index(geoms):
                 next_id += 1
             target[i] = nid
     endpoints = {nid: key for key, nid in node_lookup.items()}
-    return endpoints, a_nodes, b_nodes, next_id
+    return endpoints, a_nodes, b_nodes
 
 
 def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFrame) -> None:
@@ -462,5 +458,4 @@ def _ordered_source_ids(candidates: list[tuple[str, float]]) -> list[str]:
         if source_id and source_id not in source_ids:
             source_ids.append(source_id)
     return source_ids
-
 

@@ -14,6 +14,14 @@ from aequilibrae.project.network.importer.simplifiers.impl_neatnet import (
 )
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
+SOURCE_META = {
+    "source": "osm",
+    "backend": "pyrosm",
+    "source_url": "test.osm.pbf",
+    "fetched_at": "2026-06-22T00:00:00+00:00",
+    "release": "",
+}
+
 
 def test_transfer_attributes_collapses_opposing_carriageways_to_coarse_bidirectional_values():
     simplified = gpd.GeoDataFrame(
@@ -155,13 +163,7 @@ def _single_link_net():
             geometry="geometry",
             crs="EPSG:4326",
         ),
-        source_meta={
-            "source": "osm",
-            "backend": "pyrosm",
-            "source_url": "test.osm.pbf",
-            "fetched_at": "2026-06-22T00:00:00+00:00",
-            "release": "",
-        },
+        source_meta=SOURCE_META,
     )
 
 
@@ -242,13 +244,7 @@ def _net_from(coords, edges, link_type="residential"):
             geometry="geometry",
             crs="EPSG:4326",
         ),
-        source_meta={
-            "source": "osm",
-            "backend": "pyrosm",
-            "source_url": "test.osm.pbf",
-            "fetched_at": "2026-06-22T00:00:00+00:00",
-            "release": "",
-        },
+        source_meta=SOURCE_META,
     )
 
 

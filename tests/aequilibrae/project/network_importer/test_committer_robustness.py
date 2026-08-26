@@ -54,11 +54,6 @@ def test_excess_link_types_fold_into_other_link_types(empty_project):
     # The schema only allows ~50 single-char link_type_ids; importing far more
     # must fold the least-frequent into a catch-all rather than raising.
     net = _staged(n_link_types=100)
-    # Make type_0 the most frequent so it is retained, not folded.
-    links = net.links.copy()
-    links.loc[links["link_type"] != "type_0", "link_type"] = links.loc[
-        links["link_type"] != "type_0", "link_type"
-    ]
     SpatialiteWriter(empty_project).write(net)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:

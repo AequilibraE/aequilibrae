@@ -1,14 +1,9 @@
 import sqlite3
 
-import pytest
 
-
-def test_osm_import_preserves_all_link_types_for_active_modes(empty_project):
-    pytest.importorskip("pyrosm")
-    from pyrosm import get_data
-
+def test_osm_import_preserves_all_link_types_for_active_modes(empty_project, pbf_path):
     empty_project.network.importer.osm(
-        pbf_path=get_data("test_pbf"),
+        pbf_path=pbf_path,
         modes=("walk",),
         simplify=False,
     )

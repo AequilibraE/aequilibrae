@@ -6,20 +6,12 @@ from pyproj import Geod
 
 NODE_ID_START = 100000
 
-# Above this bounding-box span (in degrees, max of width/height) a single UTM
-# zone introduces unacceptable scale distortion, so we switch to geodesic
-# (ellipsoidal) length computation instead of projecting to one local UTM CRS.
+# Use geodesic lengths when the extent is too wide for one UTM zone.
 _MAX_UTM_SPAN_DEGREES = 3.0
 
 
 def compute_lengths(geoms) -> pd.Series:
-    """Length in metres for a GeoSeries of EPSG:4326 LineStrings.
-
-    For small extents the geometries are projected to the estimated local UTM
-    zone (fast, accurate). For large extents (state/national/continental) a
-    single UTM zone would badly distort distances near its edges, so an
-    ellipsoidal geodesic length is computed instead.
-    """
+    """Lengths in metres, using local UTM or geodesic distance for wide extents."""
     if not isinstance(geoms, gpd.GeoSeries):
         geoms = gpd.GeoSeries(geoms, crs="EPSG:4326")
     if geoms.crs is None:
@@ -65,16 +57,7 @@ def line_straightness(geom) -> float:
 
 
 def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES) -> bool:
-    """Whether ``geom_b`` traces roughly the same directed path as ``geom_a``.
-
-    Samples each line at matching fractional distances and measures how well
-    ``geom_b`` follows ``geom_a`` versus its reverse: for every sample point of
-    ``geom_a`` we accumulate its distance to the same-fraction point of
-    ``geom_b`` (forward) and to the mirror-fraction point (reverse). The smaller
-    total wins. This is robust for near-coincident candidate geometries of
-    arbitrary curvature, including curves, loops and roundabout segments where a
-    global start-to-end vector is meaningless.
-    """
+    """Return whether sampled points align better forward than in reverse."""
     fractions = [i / samples for i in range(samples + 1)]
     pts_a = [geom_a.interpolate(f, normalized=True) for f in fractions]
     pts_b = [geom_b.interpolate(f, normalized=True) for f in fractions]

@@ -16,7 +16,7 @@ def create_example(path: os.PathLike | str, from_model="sioux_falls") -> Project
         Defaults to *sioux_falls*
 
     :Returns:
-        **project** (:obj:`Project`): AequilibraE Project handle (open)
+        **project** (:obj:`Project`): Aequilibrae Project handle (open)
 
     """
     pth = Path(path)

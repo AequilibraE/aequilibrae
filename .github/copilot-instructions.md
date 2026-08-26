@@ -77,7 +77,7 @@ Always run `ruff check` before committing Python changes.
 
 ### Python
 
-- **Python 3.11+** syntax only; use type hints where they match existing style.
+- **Python 3.10+** syntax only; use type hints where they match existing style.
 - **Imports**:
   - Use `from aequilibrae.log import logger` (not from `aequilibrae` top-level) to avoid circular imports.
   - Use `from aequilibrae.parameters import Parameters` in internal modules.

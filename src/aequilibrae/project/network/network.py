@@ -7,7 +7,6 @@ import shapely.wkb
 from shapely import union_all
 from shapely.geometry import Polygon
 
-from aequilibrae.project.network.exporters import Exporter
 from aequilibrae.project.network.importers import Importer
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
@@ -47,7 +46,6 @@ class Network(WorkerThread):
         self.nodes = Nodes(self)
         self.periods = Periods(self)
         self.importer = Importer(self)
-        self.exporter = Exporter(self)
 
     def skimmable_fields(self) -> list:
         """
@@ -111,9 +109,12 @@ class Network(WorkerThread):
             all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
-    def create_from_osm(self, *args, **kwargs) -> None:
-        """Removed in favour of ``project.network.importer.osm(...)``."""
-        raise AttributeError("Network.create_from_osm was removed. Use project.network.importer.osm(...).")
+    def export_to_gmns(self, path: str) -> None:
+        """Export the network to GMNS CSV files in ``path``."""
+        from aequilibrae.project.network.gmns_exporter import GMNSExporter
+
+        GMNSExporter(self, path).doWork()
+        logger.info("Network exported successfully")
 
     def build_graphs(
         self, fields: Optional[list] = None, modes: Optional[list] = None, limit_to_area: Optional[Polygon] = None

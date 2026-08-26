@@ -14,14 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class Importer:
-    """Network import entry points, reached as ``project.network.importer``.
-
-    .. code-block:: python
-
-        >>> project.network.importer.overture(model_area=area)      # doctest: +SKIP
-        >>> project.network.importer.osm(place_name="Nauru")        # doctest: +SKIP
-        >>> project.network.importer.gmns(link_file_path=links_csv, node_file_path=nodes_csv)  # doctest: +SKIP
-    """
+    """Network import entry points, reached as ``project.network.importer``."""
 
     def __init__(self, network: "Network"):
         self._network = network
@@ -37,25 +30,7 @@ class Importer:
         cache_tag: str = "",
         **source_kwargs,
     ) -> None:
-        """Import by explicit source name: ``osm-overpass``, ``osm-pbf`` or ``overture-cloud``.
-
-        Prefer :meth:`osm` / :meth:`overture` unless you need to name the backend
-        directly or pass source-specific keywords.
-
-        :Arguments:
-            **source** (:obj:`str`): Source name, or an object exposing ``name`` and ``acquire``
-
-            **modes** (:obj:`tuple`, *Optional*): AequilibraE mode names to keep. Defaults to all
-
-            **simplify** (:obj:`str`/:obj:`bool`, *Optional*): ``False`` (default, no simplification),
-            ``"osmnx"``, ``"neatnet"``, or ``True`` (shorthand for ``"osmnx"``)
-
-            **consolidate_tolerance** (:obj:`float`, *Optional*): Intersection consolidation radius in
-            metres. ``None`` skips the consolidation pass for ``"osmnx"``; ``"neatnet"``, where
-            consolidation is integral, falls back to its default
-
-            **cache_tag** (:obj:`str`, *Optional*): Label for the raw-download cache folder
-        """
+        """Import from ``osm-overpass``, ``osm-pbf``, ``overture-cloud``, or a source object."""
         from aequilibrae.project.network.importer.importer import NetworkImporter
 
         NetworkImporter(self._project).run(
@@ -80,25 +55,9 @@ class Importer:
     ) -> None:
         """Import a network from OpenStreetMap.
 
-        Exactly one of ``model_area``, ``place_name`` or ``pbf_path`` must be given.
-        XML (``.osm``, ``.osm.bz2``) is not supported; convert it first with
-        ``osmium cat in.osm -o out.osm.pbf``.
-
-        :Arguments:
-            **model_area** (:obj:`Polygon`, *Optional*): EPSG:4326 polygon fetched through Overpass
-
-            **place_name** (:obj:`str`, *Optional*): Place looked up through Nominatim/Overpass
-
-            **pbf_path** (:obj:`str`, *Optional*): Path to a local ``.osm.pbf`` extract
-
-            **modes** (:obj:`tuple`, *Optional*): AequilibraE mode names to keep. Defaults to all
-
-            **custom_filter** (:obj:`str`, *Optional*): Raw Overpass way filter
-
-            **simplify** (:obj:`str`/:obj:`bool`, *Optional*): ``False`` (default), ``"osmnx"``, ``"neatnet"``,
-                                                               or ``True`` (shorthand for ``"osmnx"``)
-
-            **consolidate_tolerance** (:obj:`float`, *Optional*): Intersection consolidation radius in metres
+        Provide exactly one of an EPSG:4326 ``model_area``, a ``place_name``, or
+        a local ``pbf_path``. ``simplify`` accepts ``False``, ``"osmnx"``,
+        ``"neatnet"``, or ``True`` as shorthand for ``"osmnx"``.
         """
         provided = sum(x is not None for x in (model_area, place_name, pbf_path))
         if provided != 1:
@@ -133,21 +92,7 @@ class Importer:
         simplify=False,
         consolidate_tolerance: Optional[float] = 10.0,
     ) -> None:
-        """Import a network from Overture Maps for an EPSG:4326 polygon.
-
-        The latest release advertised by Overture's STAC catalog is always used, and
-        recorded in the project's ``about`` table.
-
-        :Arguments:
-            **model_area** (:obj:`Polygon`): EPSG:4326 polygon to import
-
-            **modes** (:obj:`tuple`, *Optional*): AequilibraE mode names to keep. Defaults to all
-
-            **simplify** (:obj:`str`/:obj:`bool`, *Optional*): ``False`` (default), ``"osmnx"``, ``"neatnet"``,
-                                                               or ``True`` (shorthand for ``"osmnx"``)
-
-            **consolidate_tolerance** (:obj:`float`, *Optional*): Intersection consolidation radius in metres
-        """
+        """Import the latest Overture Maps network for an EPSG:4326 polygon."""
         if model_area is None:
             raise ValueError("network.importer.overture requires a `model_area` Polygon")
         bounds = model_area.bounds
