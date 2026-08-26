@@ -34,7 +34,7 @@ class NestedTransactionManager:
     def _connection(self) -> Connection:
         """The SQLite connection owned by this manager.
 
-        Gateway code should normally obtain this connection from
+        Table code should normally obtain this connection from
         :meth:`transaction`; this property is for read-only integrations such
         as pandas that cannot consume a transaction context.
         """

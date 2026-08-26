@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Results(NonSpatialProjectTable):
-    """Result metadata gateway with compensated payload-table helpers."""
+    """Result metadata table."""
 
     name = "results"
     key = "table_name"
@@ -27,7 +27,7 @@ class Results(NonSpatialProjectTable):
         project_connection: NestedTransactionManager,
         results_connection: NestedTransactionManager,
     ) -> None:
-        """Create the result metadata and payload gateway.
+        """Create the result table.
 
         :Arguments:
             **project_connection** (:obj:`NestedTransactionManager`): Manager for
