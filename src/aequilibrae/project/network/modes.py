@@ -1,11 +1,11 @@
 from typing import Any
 
-from aequilibrae.project.project_table import NonSpatialProjectTable
+from aequilibrae.project.project_table import _SELECT_ONE_SQL, NonSpatialProjectTable
 
 
 class Modes(NonSpatialProjectTable):
     """
-    Access to the API resources to manipulate the modes table in the network
+    Object to manipulate the modes table in the database.
 
     .. code-block:: python
 
@@ -22,7 +22,7 @@ class Modes(NonSpatialProjectTable):
         # and write changes explicitly
         >>> modes.update('c', description='personal autos only', alpha=0.95)
 
-        # Adding a new mode to the model is a single insert
+        # Adding a new mode to the model is an insert
         >>> modes.insert(mode_id='k', mode_name='flying_car')
         'k'
 
@@ -33,6 +33,10 @@ class Modes(NonSpatialProjectTable):
     key = "mode_id"
     record_name = "ModeRecord"
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._select_by_name_sql = _SELECT_ONE_SQL.format(table=self.name, key="mode_name", columns="*")
+
     def get_by_name(self, mode_name: str) -> Any:
         """Get a mode record by its descriptive name.
 
@@ -42,7 +46,8 @@ class Modes(NonSpatialProjectTable):
         :Returns:
             **mode** (:obj:`Any`): Generated frozen record for the mode.
         """
-        for mode in self:
-            if mode.mode_name == mode_name:
-                return mode
-        raise ValueError(f"Mode {mode_name} does not exist in the model")
+        self._refresh_record_type()
+        row = self._connection._connection.execute(self._select_by_name_sql, [mode_name]).fetchone()
+        if row is None:
+            raise ValueError(f"Mode {mode_name} does not exist in the model")
+        return self._build_record(row)

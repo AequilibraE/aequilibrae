@@ -19,7 +19,7 @@ from aequilibrae.utils.get_table import get_geo_table
 _TABLE_INFO_SQL = 'PRAGMA table_info("{table}")'
 _SCHEMA_VERSION_SQL = "PRAGMA schema_version"
 _SELECT_SQL = 'SELECT {columns} FROM "{table}"'
-_SELECT_ONE_SQL = 'SELECT {columns} FROM "{table}" WHERE "{key}"=?'
+_SELECT_ONE_SQL = 'SELECT {columns} FROM "{table}" WHERE "{key}"=? LIMIT 1'
 _COUNT_SQL = 'SELECT COUNT(*) FROM "{table}"'
 _CONTAINS_SQL = 'SELECT 1 FROM "{table}" WHERE "{key}"=? LIMIT 1'
 _DELETE_SQL = 'DELETE FROM "{table}" WHERE "{key}"=?'
