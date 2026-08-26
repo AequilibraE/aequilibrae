@@ -1,10 +1,4 @@
-"""Table gateways backed by a scenario's persistent SQLite connection.
-
-The classes in this module provide fresh record reads and explicit writes. They
-are intentionally small table gateways rather than an object-relational mapper:
-records are immutable snapshots, while mutations are performed through the
-owning gateway.
-"""
+"""Table objects backed by a scenario's persistent SQLite connection."""
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
@@ -71,7 +65,7 @@ def _python_type(column: str, declared_type: str, nullable: bool) -> type[Any]:
 
 def guess_record_type(connection: NestedTransactionManager, table: str, record_name: str) -> type[Any]:
     """Build a frozen record type from the table's current schema."""
-    schema = connection.connection.execute(_TABLE_INFO_SQL.format(table=table)).fetchall()
+    schema = connection._connection.execute(_TABLE_INFO_SQL.format(table=table)).fetchall()
     record_fields = []
     for _, column, declared_type, required, _, primary_key in schema:
         if column == "ogc_fid":
@@ -80,9 +74,9 @@ def guess_record_type(connection: NestedTransactionManager, table: str, record_n
     return make_dataclass(record_name, record_fields, frozen=True)
 
 
-@lru_cache(maxsize=None)
+@lru_cache
 def _format_insert(table: str, columns: tuple[str, ...], geometry_placeholder: str | None) -> str:
-    """Format one INSERT shape, shared by every gateway instance."""
+    """Format one INSERT shape, shared by every table instance."""
     names = ",".join(_QUOTED_COLUMN.format(column=column) for column in columns)
     placeholders = ",".join(
         geometry_placeholder if column == "geometry" and geometry_placeholder else _VALUE_PLACEHOLDER
@@ -91,9 +85,9 @@ def _format_insert(table: str, columns: tuple[str, ...], geometry_placeholder: s
     return _INSERT_SQL.format(table=table, columns=names, placeholders=placeholders)
 
 
-@lru_cache(maxsize=None)
+@lru_cache
 def _format_update(table: str, key: str, columns: tuple[str, ...], geometry_placeholder: str | None) -> str:
-    """Format one UPDATE shape, shared by every gateway instance."""
+    """Format one UPDATE shape, shared by every table instance."""
     assignments = []
     for column in columns:
         placeholder = geometry_placeholder if column == "geometry" and geometry_placeholder else _VALUE_PLACEHOLDER
@@ -102,18 +96,15 @@ def _format_update(table: str, key: str, columns: tuple[str, ...], geometry_plac
 
 
 class ProjectTable(ABC):
-    """Common implementation for one project-database table.
+    """
+    Common implementation for a database table.
 
-    Subclasses declare the table name, key, and generated-record name. During
-    construction, ``record_type`` is a frozen dataclass matching the live
-    SQLite schema, including user-added fields. Concrete gateways
-    must inherit either :class:`NonSpatialProjectTable` or
-    :class:`SpatialProjectTable` so geometry handling is never mixed into an
-    ordinary table by a boolean flag.
+    Subclasses declare the table name, key, and generated-record name. During construction, ``record_type`` a frozen
+    dataclass matching the SQLite schema, including user-added fields, is created. Children must inherit from either
+    :class:`NonSpatialProjectTable` or :class:`SpatialProjectTable`.
 
-    Reads use the injected persistent transaction manager. Each mutation opens
-    a nested transaction, becoming a top-level transaction for a standalone
-    call or a savepoint inside a project transaction.
+    Bulk operations create a new transaction, single inserts or updates use a no-op transaction if one is already open,
+    other they create one.
     """
 
     name: str = ""
@@ -124,18 +115,21 @@ class ProjectTable(ABC):
     _geometry_placeholder: str | None = None
 
     def __init__(self, connection: NestedTransactionManager) -> None:
-        """Configure the gateway and pre-format its stable SQL statements.
+        """Configure the table and pre-format its SQL statements.
 
         :Arguments:
             **connection** (:obj:`NestedTransactionManager`): Manager owning the
-            persistent connection used by this gateway.
+            persistent connection used by this table.
         """
         if not isinstance(connection, NestedTransactionManager):
             raise TypeError("ProjectTable requires a NestedTransactionManager manager")
         if not self.name or not self.key or not self.record_name:
             raise TypeError(f"{self.__class__.__name__} must define a table name, key, and record name")
+        for key, value in self.defaults.items():
+            if value is None:
+                raise ValueError(f"defualt value of None found for {key=}")
 
-        self._transaction_manager = connection
+        self._connection = connection
         self._record_schema_version = -1
         self._table_info_sql = _TABLE_INFO_SQL.format(table=self.name)
         self._count_sql = _COUNT_SQL.format(table=self.name)
@@ -149,47 +143,47 @@ class ProjectTable(ABC):
     @property
     def columns(self) -> tuple[str, ...]:
         """Return the current writable table columns, including user fields."""
-        rows = self._transaction_manager.connection.execute(self._table_info_sql).fetchall()
+        rows = self._connection._connection.execute(self._table_info_sql).fetchall()
         return tuple(row[1] for row in rows if row[1] != "ogc_fid")
 
     @property
     def fields(self) -> FieldEditor:
         """Return the metadata editor for this table's fields."""
-        return FieldEditor(self._transaction_manager, self.name)
+        return FieldEditor(self._connection, self.name)
 
     @property
     def data(self) -> pd.DataFrame:
-        """Return all table data, including the record key as a column."""
-        return get_geo_table(self.name, self._transaction_manager.connection)
+        """Return all table data."""
+        return get_geo_table(self.name, self._connection._connection)
 
     def get(self, key: Any) -> Any:
-        """Return one immutable record snapshot identified by ``key``.
+        """Return one record identified by ``key``.
 
         :Arguments:
             **key** (:obj:`Any`): Value of the table's identifying column.
 
         :Returns:
-            **record** (:obj:`Any`): Frozen dataclass snapshot of the row.
+            **record** (:obj:`Any`): Record for the row.
         """
         self._refresh_record_type()
-        row = self._transaction_manager.connection.execute(self._select_one_sql, [key]).fetchone()
+        row = self._connection._connection.execute(self._select_one_sql, [key]).fetchone()
         if row is None:
             raise self._missing_record(key)
         return self._build_record(row)
 
     def __iter__(self) -> Iterator[Any]:
-        """Iterate over immutable snapshots of all records."""
+        """Iterate over all records."""
         self._refresh_record_type()
-        rows = self._transaction_manager.connection.execute(self._select_all_sql).fetchall()
+        rows = self._connection._connection.execute(self._select_all_sql).fetchall()
         return iter(self._build_record(row) for row in rows)
 
     def __len__(self) -> int:
-        """Return the number of records in the table."""
-        return self._transaction_manager.connection.execute(self._count_sql).fetchone()[0]
+        """Return the number of rows in the table."""
+        return self._connection._connection.execute(self._count_sql).fetchone()[0]
 
     def __contains__(self, key: Any) -> bool:
-        """Return whether a record with ``key`` exists."""
-        return self._transaction_manager.connection.execute(self._contains_sql, [key]).fetchone() is not None
+        """Return whether a row with ``key`` exists."""
+        return self._connection._connection.execute(self._contains_sql, [key]).fetchone() is not None
 
     def insert(self, **values: Any) -> Any:
         """Insert one record and return its explicit or generated key.
@@ -201,7 +195,7 @@ class ProjectTable(ABC):
         :Returns:
             **key** (:obj:`Any`): Explicit or generated record key.
         """
-        with self._transaction_manager.transaction() as conn:
+        with self._connection as conn:
             row = self._prepare_insert(values)
             if row.get(self.key) is None:
                 row[self.key] = self._next_key()
@@ -221,7 +215,7 @@ class ProjectTable(ABC):
 
             **values** (:obj:`Any`): Column values to write.
         """
-        with self._transaction_manager.transaction() as conn:
+        with self._connection as conn:
             sql = self._update_statement(tuple(values))
             parameters = [self._database_value(value) for value in values.values()]
             parameters.append(key)
@@ -237,7 +231,7 @@ class ProjectTable(ABC):
         :Arguments:
             **key** (:obj:`Any`): Key of the record to delete.
         """
-        with self._transaction_manager.transaction() as conn:
+        with self._connection as conn:
             cursor = conn.execute(self._delete_sql, [key])
             if cursor.rowcount == 0:
                 raise self._missing_record(key)
@@ -247,56 +241,55 @@ class ProjectTable(ABC):
     def update_from(self, frame: pd.DataFrame) -> int:
         """Atomically update records identified by a DataFrame key column.
 
+        Keys which do not match existing entries will have no affect.
+
         :Arguments:
             **frame** (:obj:`pandas.DataFrame`): Key and value columns to write.
 
         :Returns:
             **updated rows** (:obj:`int`): Number of submitted rows.
         """
-        value_columns = tuple(column for column in frame.columns if column != self.key)
 
-        with self._transaction_manager.transaction() as conn:
-            rows = self._prepare_update_rows(frame, value_columns)
-            conn.executemany(self._update_statement(value_columns), rows)
+        with self._connection.transaction() as conn:
+            # No key here, needs to be specially handled
+            columns = tuple(col for col in frame.columns if col != self.key)
+            rows = self._prepare_rows(frame, columns + (self.key,))  # But we still need it in the rows
+            conn.executemany(self._update_statement(columns), rows)
 
         self._invalidate()
         return len(rows)
 
     def insert_from(self, frame: pd.DataFrame) -> list[Any]:
-        """Atomically insert all DataFrame rows and return their keys.
+        """Atomically insert records identified by a DataFrame key column.
+
+        If the key column is not provided, sequential keys starting from self._next() key is used.
 
         :Arguments:
-            **frame** (:obj:`pandas.DataFrame`): Rows and columns to insert.
+            **frame** (:obj:`pandas.DataFrame`): Key and value columns to write.
 
         :Returns:
-            **keys** (:obj:`list`): Explicit or generated keys in row order.
+            **inserted rows keys** (:obj:`list[Any]`): The keys of the insert rows, explicit or generated.
         """
-        inserted_keys = []
-        next_key = None
 
-        with self._transaction_manager.transaction() as conn:
-            for values in frame.to_dict("records"):
-                row = self._prepare_insert(values)
-                if row.get(self.key) is None:
-                    if next_key is None:
-                        next_key = self._next_key()
-                    row[self.key] = next_key
-                    next_key += 1
+        with self._connection.transaction() as conn:
+            if self.key not in frame.columns:
+                next_key = self._next_key()
+                frame = frame.assign(**{self.key: range(next_key, next_key + len(frame))})
 
-                sql = self._insert_statement(tuple(row))
-                parameters = [self._database_value(value) for value in row.values()]
-                conn.execute(sql, parameters)
-                inserted_keys.append(row[self.key])
+            # Both functions can have the key in the columns
+            columns = tuple(col for col in frame.columns if col != self.key) + (self.key,)
+            rows = self._prepare_rows(frame, columns)
+            conn.executemany(self._insert_statement(columns), rows)
 
         self._invalidate()
-        return inserted_keys
+        return frame[self.key].to_list()
 
     def _refresh_record_type(self) -> None:
         """Refresh the generated record type after a schema change."""
-        schema_version = self._transaction_manager.connection.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
+        schema_version = self._connection._connection.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
         if schema_version == self._record_schema_version:
             return
-        self.record_type = guess_record_type(self._transaction_manager, self.name, self.record_name)
+        self.record_type = guess_record_type(self._connection, self.name, self.record_name)
         self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
         record_columns = ",".join(self._select_column(column) for column in self._record_fields)
         self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=record_columns)
@@ -304,47 +297,44 @@ class ProjectTable(ABC):
         self._record_schema_version = schema_version
 
     def _build_record(self, row: tuple[Any, ...]) -> Any:
-        """Convert one SQLite row into the gateway's explicit record type."""
+        """Convert one SQLite row into the table's record type."""
         values = []
         for column, value in zip(self._record_fields, row, strict=True):
             values.append(self._record_value(column, value))
         return self.record_type(*values)
 
     def _prepare_insert(self, values: Mapping[str, Any]) -> dict[str, Any]:
-        """Layer supplied values over defaults, omitting database-defaulted nulls."""
+        """Layer supplied values over defaults."""
         row = dict(self.defaults)
         row.update((column, value) for column, value in values.items() if value is not None)
-        return {column: value for column, value in row.items() if value is not None}
+        return row
 
-    def _prepare_update_rows(self, frame: pd.DataFrame, value_columns: tuple[str, ...]) -> list[list[Any]]:
+    def _prepare_rows(self, frame: pd.DataFrame, value_columns: tuple[str, ...]) -> list[tuple[Any, ...]]:
         """Convert DataFrame records into SQLite parameter rows."""
+        if self.key not in frame.columns:
+            raise ValueError(f"table key ({self.key}) not found in dataframe columns ({frame.columns})")
+
         rows = []
         for values in frame.to_dict("records"):
-            key = values[self.key]
-            if key not in self:
-                raise self._missing_record(key)
-
-            row = [self._database_value(values[column]) for column in value_columns]
-            row.append(key)
-            rows.append(row)
+            rows.append(tuple(self._database_value(values[column]) for column in value_columns))
         return rows
 
     def _insert_statement(self, columns: tuple[str, ...]) -> str:
-        """Return the LRU-cached INSERT statement for a column shape."""
+        """Return the INSERT statement for a column shape."""
         return _format_insert(self.name, columns, self._geometry_placeholder)
 
     def _update_statement(self, columns: tuple[str, ...]) -> str:
-        """Return the LRU-cached UPDATE statement for a column shape."""
+        """Return the UPDATE statement for a column shape."""
         return _format_update(self.name, self.key, columns, self._geometry_placeholder)
 
     def _next_key(self) -> Any:
         """Return the next numeric key available in the table."""
-        current = self._transaction_manager.connection.execute(self._max_key_sql).fetchone()[0]
+        current = self._connection._connection.execute(self._max_key_sql).fetchone()[0]
         return 1 if current is None else current + 1
 
     def _change_key(self, key: Any, new_key: Any) -> None:
-        """Change a record key for gateways exposing a renumber operation."""
-        with self._transaction_manager.transaction() as conn:
+        """Change a record key for tables exposing a renumber operation."""
+        with self._connection.transaction() as conn:
             cursor = conn.execute(self._change_key_sql, [new_key, key])
             if cursor.rowcount == 0:
                 raise self._missing_record(key)
@@ -402,7 +392,7 @@ class SpatialProjectTable(ProjectTable):
 
     def extent(self) -> Polygon:
         """Return the bounding polygon for the table's geometry layer."""
-        data = self._transaction_manager.connection.execute(self._extent_sql).fetchone()[0]
+        data = self._connection._connection.execute(self._extent_sql).fetchone()[0]
         return shapely.wkb.loads(data)
 
     def _select_column(self, column: str) -> str:

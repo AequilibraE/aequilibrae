@@ -18,7 +18,7 @@ class Things(NonSpatialProjectTable):
 def things():
     closure = ConnectionClosure(sqlite3.connect(":memory:"))
     project_connection = closure.db_connection
-    project_connection.connection.execute("CREATE TABLE things (thing_id INTEGER PRIMARY KEY, value INTEGER NOT NULL)")
+    project_connection._connection.execute("CREATE TABLE things (thing_id INTEGER PRIMARY KEY, value INTEGER NOT NULL)")
     yield Things(project_connection), project_connection
     closure.close()
 
@@ -35,7 +35,7 @@ def test_standalone_writes_commit_and_data_includes_key_column(things):
 
 def test_user_fields_are_available_in_generated_records(things):
     table, project_connection = things
-    project_connection.connection.execute("ALTER TABLE things ADD COLUMN user_note TEXT")
+    project_connection._connection.execute("ALTER TABLE things ADD COLUMN user_note TEXT")
     table.insert(thing_id=1, value=10, user_note="custom")
 
     record = table.get(1)
@@ -75,12 +75,13 @@ def test_update_from_uses_the_key_column(things):
     assert [table.get(key).value for key in updates.thing_id] == [11, 21]
 
 
-def test_failing_bulk_update_is_atomic(things):
+def test_bulk_update(things):
     table, _ = things
     table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
     updates = pd.DataFrame({"thing_id": [1, 999], "value": [11, 21]})
 
-    with pytest.raises(ValueError, match="999"):
-        table.update_from(updates)
+    table.update_from(updates)
 
-    assert table.get(1).value == 10
+    assert table.get(1).value == 11
+    with pytest.raises(ValueError, match="things has no record with thing_id=999"):
+        table.get(999)  # the update matched no rows
