@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class Links(SpatialProjectTable):
     """
-    Access to the API resources to manipulate the links table in the network
+    Object to manipulate the links table in the database.
 
     .. code-block:: python
 
@@ -21,7 +21,7 @@ class Links(SpatialProjectTable):
         >>> link.modes
         'cMT'
 
-        # and write any changes explicitly
+        # and write any changes
         >>> links.update(1, lanes_ab=2, name="First Avenue")
 
         # Manipulating modes has its own helpers
@@ -33,7 +33,7 @@ class Links(SpatialProjectTable):
         ...     for link_id in (2, 3, 4):
         ...         links.update(link_id, speed_ab=90.0)
 
-        >>> project.shutdown()
+        >>> project.close()
     """
 
     name = "links"
