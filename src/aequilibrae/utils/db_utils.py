@@ -9,6 +9,7 @@ from sqlite3 import Connection, connect
 from typing import Any
 
 import pandas as pd
+from pandas.api import types as pd_types
 
 
 class AequilibraEConnection(Connection):
@@ -372,3 +373,42 @@ def add_column(
 ) -> None:
     """Add a SQLite column."""
     connection.execute(f"ALTER TABLE {table_name} ADD {column_name} {column_type} {constraints or ''};")
+
+
+def escape_identifier(name) -> str:
+    # See https://stackoverflow.com/a/6701665
+    name = str(name).encode("utf-8", "strict").decode("utf-8")
+
+    if not len(name):
+        raise ValueError("identifier cannot be empty")
+
+    if name.find("\x00") >= 0:
+        raise ValueError("identifier cannot contain NULLs")
+
+    return '"' + name.replace('"', '""') + '"'
+
+
+def df_sqlite_types(frame: pd.DataFrame, overrides: dict) -> dict:
+    unknown = set(overrides) - set(frame.columns)
+    if unknown:
+        raise ValueError(f"dtype overrides refer to unknown columns: {sorted(unknown)}")
+    result = {}
+    for column in frame.columns:
+        if column in overrides:
+            value = overrides[column]
+            normalized = value.upper() if isinstance(value, str) else None
+            if normalized not in {"INTEGER", "REAL", "TEXT", "BLOB", "NUMERIC"}:
+                raise ValueError(f"invalid SQLite dtype for {column!r}")
+            result[column] = normalized
+
+        elif pd_types.is_bool_dtype(frame[column].dtype) or pd_types.is_integer_dtype(frame[column].dtype):
+            result[column] = "INTEGER"
+        elif pd_types.is_float_dtype(frame[column].dtype):
+            result[column] = "REAL"
+        elif pd_types.is_object_dtype(frame[column].dtype) and all(
+            isinstance(value, bytes) for value in frame[column].dropna()
+        ):
+            result[column] = "BLOB"
+        else:
+            result[column] = "TEXT"
+    return result
