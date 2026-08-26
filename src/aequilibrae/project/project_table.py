@@ -7,6 +7,7 @@ from dataclasses import make_dataclass
 from functools import lru_cache
 from typing import Any
 
+import geopandas as gpd
 import pandas as pd
 import shapely.wkb
 from shapely.geometry import Polygon
@@ -14,7 +15,6 @@ from shapely.geometry.base import BaseGeometry
 
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.utils.db_utils import NestedTransactionManager
-from aequilibrae.utils.get_table import get_geo_table
 
 _TABLE_INFO_SQL = 'PRAGMA table_info("{table}")'
 _SCHEMA_VERSION_SQL = "PRAGMA schema_version"
@@ -154,7 +154,7 @@ class ProjectTable(ABC):
     @property
     def data(self) -> pd.DataFrame:
         """Return all table data."""
-        return get_geo_table(self.name, self._connection._connection)
+        return pd.read_sql(self._select_all_sql, self._connection._connection)
 
     def get(self, key: Any) -> Any:
         """Return one record identified by ``key``.
@@ -334,7 +334,7 @@ class ProjectTable(ABC):
 
     def _change_key(self, key: Any, new_key: Any) -> None:
         """Change a record key for tables exposing a renumber operation."""
-        with self._connection.transaction() as conn:
+        with self._connection as conn:
             cursor = conn.execute(self._change_key_sql, [new_key, key])
             if cursor.rowcount == 0:
                 raise self._missing_record(key)
@@ -394,6 +394,13 @@ class SpatialProjectTable(ProjectTable):
         """Return the bounding polygon for the table's geometry layer."""
         data = self._connection._connection.execute(self._extent_sql).fetchone()[0]
         return shapely.wkb.loads(data)
+
+    @property
+    def data(self) -> gpd.GeoDataFrame:
+        """Return all table data."""
+        return gpd.GeoDataFrame.from_postgis(
+            self._select_all_sql, self._connection._connection, geom_col="geometry", crs=self.srid
+        )
 
     def _select_column(self, column: str) -> str:
         if column == "geometry":

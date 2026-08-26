@@ -1,7 +1,7 @@
 import logging
 
 import pandas as pd
-from shapely.geometry.base import BaseGeometry
+from shapely.geometry import Point
 
 from aequilibrae.project.network.connector_creation import connector_creation
 from aequilibrae.project.network.links import Links
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class Nodes(SpatialProjectTable):
     """
-    Access to the API resources to manipulate the nodes table in the network
+    Object to manipulate the nodes table in the database.
 
     .. code-block:: python
 
@@ -39,7 +39,7 @@ class Nodes(SpatialProjectTable):
     key = "node_id"
     record_name = "NodeRecord"
 
-    def new_centroid(self, node_id: int, geometry: BaseGeometry) -> int:
+    def new_centroid(self, node_id: int, geometry: Point) -> int:
         """Creates a new centroid with a given ID at the given position
 
         :Arguments:
@@ -70,7 +70,7 @@ class Nodes(SpatialProjectTable):
         mode_id: str,
         link_types: str = "",
         connectors: int = 1,
-        area: BaseGeometry | None = None,
+        area: Point | None = None,
     ) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
@@ -102,13 +102,13 @@ class Nodes(SpatialProjectTable):
             logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
-        links = Links(self._transaction_manager)
+        links = Links(self._connection)
         connector_creation(
             zone_id=node_id,
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
-            project_connection=self._transaction_manager,
+            project_connection=self._connection,
             links=links,
             delimiting_area=area,
             proj_nodes=self.data,
@@ -123,6 +123,7 @@ class Nodes(SpatialProjectTable):
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
         frame = pd.read_sql(
-            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", self._transaction_manager
+            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes",
+            self._connection._connection,
         )
         return frame.set_index("node_id")
