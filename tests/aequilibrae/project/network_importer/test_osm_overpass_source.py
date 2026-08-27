@@ -49,6 +49,23 @@ def _fake_graph():
     return g
 
 
+def _graph_with_zero_length_edge():
+    g = _fake_graph()
+    g.add_node(4, x=0.0005, y=0.0005)
+    g.add_node(5, x=0.0005, y=0.0005)
+    g.add_edge(
+        4,
+        5,
+        key=0,
+        osmid=200,
+        highway="residential",
+        oneway=False,
+        length=0.0,
+        geometry=LineString([(0.0005, 0.0005), (0.0005, 0.0005)]),
+    )
+    return g
+
+
 @pytest.fixture
 def cache(tmp_path):
     return DownloadCache(project_base_path=tmp_path, source_name="osm-overpass", tag="test")
@@ -128,6 +145,17 @@ def test_acquire_overpass_empty_graph_raises(monkeypatch, cache):
     monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: nx.MultiDiGraph(crs="EPSG:4326"))
     with pytest.raises(ImporterError, match="no edges"):
         acquire_overpass(modes=("car",), download_cache=cache, place_name="Empty")
+
+
+def test_acquire_overpass_drops_zero_length_edge(monkeypatch, cache, caplog):
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _graph_with_zero_length_edge())
+
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(-0.001, -0.001, 0.002, 0.002))
+
+    net.validate()
+    assert len(net.links) == 2
+    assert (net.links["distance"] > 0).all()
+    assert "osmid': 200" in caplog.text
 
 
 def test_large_model_area_is_tiled_and_deduplicated(monkeypatch, cache):

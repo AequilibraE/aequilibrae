@@ -460,7 +460,24 @@ def _prepare_edges(edges_gdf: gpd.GeoDataFrame, osm_to_node: dict) -> gpd.GeoDat
     if len(edges) == 0:
         raise ImporterError("OSM acquisition produced zero usable edges after node mapping")
     edges["distance"] = compute_lengths(edges.geometry).to_numpy()
+    zero_length = edges["distance"] <= 0
+    if zero_length.any():
+        bad_edges = edges.loc[zero_length]
+        details = _edge_diagnostics(bad_edges)
+        logger.warning(f"Dropped {len(bad_edges)} zero-length OSM edges: {details}")
+        edges = edges.loc[~zero_length].reset_index(drop=True)
+        if len(edges) == 0:
+            raise ImporterError(f"OSM acquisition produced only zero-length edges: {details}")
     return edges
+
+
+def _edge_diagnostics(edges: gpd.GeoDataFrame, limit: int = 10) -> str:
+    sample = edges.head(limit)
+    columns = [column for column in ("osmid", "id", "u", "v") if column in sample.columns]
+    details = sample[columns].copy()
+    details["geometry"] = sample.geometry.to_wkt(rounding_precision=7).to_numpy()
+    suffix = f" (+{len(edges) - limit} more)" if len(edges) > limit else ""
+    return f"{details.to_dict(orient='records')}{suffix}"
 
 
 def _add_osm_attributes(edges: gpd.GeoDataFrame, requested_codes: set) -> gpd.GeoDataFrame:

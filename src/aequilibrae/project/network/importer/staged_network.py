@@ -47,8 +47,19 @@ class StagedNetwork:
                     f"{int(missing.sum())} links.{endpoint} values are not in nodes.node_id"
                 )
 
-        if (self.links["distance"] <= 0).any():
-            raise StagedNetworkValidationError("links.distance must be > 0 (metres)")
+        bad_distance = self.links["distance"] <= 0
+        if bad_distance.any():
+            columns = [
+                column
+                for column in ("link_id", "source_id", "a_node", "b_node", "distance")
+                if column in self.links.columns
+            ]
+            bad_links = self.links.loc[bad_distance, columns]
+            sample = bad_links.head(10).to_dict(orient="records")
+            suffix = f" (+{len(bad_links) - 10} more)" if len(bad_links) > 10 else ""
+            raise StagedNetworkValidationError(
+                f"links.distance must be > 0 (metres); offending links: {sample}{suffix}"
+            )
         if not self.links["direction"].isin([-1, 0, 1]).all():
             raise StagedNetworkValidationError("links.direction values must be in {-1, 0, 1}")
         if (self.links["modes"].fillna("").str.len() == 0).any():

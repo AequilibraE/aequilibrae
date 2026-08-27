@@ -62,7 +62,8 @@ def test_dangling_a_node_raises():
 def test_negative_distance_raises():
     net = _make_minimal_staged()
     net.links.loc[0, "distance"] = -1.0
-    with pytest.raises(StagedNetworkValidationError, match="distance"):
+    net.links["source_id"] = ["osm-123", "osm-456"]
+    with pytest.raises(StagedNetworkValidationError, match="link_id.*1.*source_id.*osm-123"):
         net.validate()
 
 
