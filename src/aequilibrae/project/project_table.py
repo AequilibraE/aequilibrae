@@ -119,6 +119,7 @@ class ProjectTable(ABC):
     record_type: type[Any]
     defaults: Mapping[str, Any] = {}
     _geometry_placeholder: str | None = None
+    has_numeric_key = False
 
     def __init__(self, connection: NestedTransactionManager) -> None:
         """Configure the table and pre-format its SQL statements.
@@ -294,9 +295,14 @@ class ProjectTable(ABC):
         :Returns:
             **inserted rows keys** (:obj:`list[Any]`): The keys of the insert rows, explicit or generated.
         """
+        generate_key = False
+        if self.key not in frame.columns and self.has_numeric_key:
+            generate_key = True
+        else:
+            raise ValueError("for non-numeric key tables, the key must be provided")
 
         with self._connection.transaction() as conn:
-            if self.key not in frame.columns:
+            if generate_key:
                 next_key = self._next_key()
                 frame = frame.assign(**{self.key: range(next_key, next_key + len(frame))})
 

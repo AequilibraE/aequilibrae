@@ -46,6 +46,7 @@ class Zoning(SpatialProjectTable):
     record_name = "ZoneRecord"
     multi_part = True
     __geo_index: GeoIndex | None = None
+    has_numeric_key = True
 
     def create_zoning_layer(self) -> None:
         """Creates the 'zones' table for project files that did not previously contain it"""

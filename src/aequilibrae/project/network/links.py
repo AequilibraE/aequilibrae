@@ -41,6 +41,7 @@ class Links(SpatialProjectTable):
     record_name = "LinkRecord"
     defaults = {"a_node": 0, "b_node": 0, "direction": 0, "link_type": "default"}
     _copy_excluded_fields = frozenset(("a_node", "b_node"))
+    has_numeric_key = True
 
     def copy(self, link_id: int) -> int:
         """Duplicate a link under a new ID and return that ID.

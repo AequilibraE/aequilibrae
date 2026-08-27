@@ -38,6 +38,7 @@ class Nodes(SpatialProjectTable):
     name = "nodes"
     key = "node_id"
     record_name = "NodeRecord"
+    has_numeric_key = True
 
     def new_centroid(self, node_id: int, geometry: Point) -> int:
         """Creates a new centroid with a given ID at the given position
