@@ -30,10 +30,15 @@ def test_connect_mode(coquimbo_example, bulk):
     assert links_after > links_before, "Centroid connectors should've been added."
 
 
-def test_coverage(coquimbo_example):
+def test_coverage_and_spatial_table_interfaces(coquimbo_example):
     proj, _ = zoning_setup(coquimbo_example)
-    cov = proj.zoning.coverage()
+    zoning = proj.zoning
+    cov = zoning.coverage()
     assert isinstance(cov, Polygon), "Coverage geometry type is incorrect"
+    assert isinstance(zoning.extent(), Polygon)
+    assert zoning.has_zoning
+    assert len(zoning) == len(zoning.data)
+    assert {zone.zone_id for zone in zoning} == set(zoning.data.zone_id)
 
 
 def test_create_zoning_layer(coquimbo_example):

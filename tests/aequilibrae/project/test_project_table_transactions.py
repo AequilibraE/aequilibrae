@@ -12,6 +12,7 @@ class Things(NonSpatialProjectTable):
     name = "things"
     key = "thing_id"
     record_name = "ThingRecord"
+    has_numeric_key = True
 
 
 @pytest.fixture
@@ -61,6 +62,16 @@ def test_table_mutation_is_a_savepoint(things):
         assert table.get(1).value == 20
 
     assert table.get(1).value == 20
+
+
+def test_bulk_insert_generates_numeric_keys_without_mutating_the_frame(things):
+    table, _ = things
+    additions = pd.DataFrame({"value": [10, 20]})
+    original = additions.copy()
+
+    assert table.insert_from(additions) == [1, 2]
+    pd.testing.assert_frame_equal(additions, original)
+    assert table.data.to_dict("list") == {"thing_id": [1, 2], "value": [10, 20]}
 
 
 def test_update_from_uses_the_key_column(things):

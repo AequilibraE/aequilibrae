@@ -1,3 +1,4 @@
+import sqlite3
 import string
 from math import floor
 from os.path import join
@@ -5,6 +6,10 @@ from random import choice, randint
 from shutil import copyfile
 
 import pytest
+
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.project.data.matrices import Matrices
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
 def randomword(length):
@@ -102,3 +107,72 @@ def test_list(sioux_falls_example):
         cnt = conn.execute("select count(*) from Matrices").fetchone()[0]
     assert df.shape[0] == cnt, "Returned the wrong number of matrices in the database"
     assert df[df.status == "file missing"].shape[0] == 0, "Wrong # of records for missing matrix files"
+
+
+@pytest.fixture
+def matrix_table(tmp_path):
+    manager = NestedTransactionManager(sqlite3.connect(":memory:"))
+    manager._connection.execute(
+        """CREATE TABLE matrices (
+            name TEXT NOT NULL PRIMARY KEY,
+            file_name TEXT NOT NULL UNIQUE,
+            cores INTEGER NOT NULL DEFAULT 1,
+            procedure TEXT,
+            procedure_id TEXT,
+            timestamp DATETIME DEFAULT current_timestamp,
+            description TEXT
+        )"""
+    )
+    table = Matrices(manager, tmp_path)
+    yield table
+    manager.close()
+
+
+def test_create_exports_and_registers_an_in_memory_matrix(matrix_table):
+    matrix = AequilibraeMatrix()
+    matrix.create_empty(zones=2, matrix_names=["demand"], memory_only=True)
+    matrix.matrices[:, :, 0] = [[0, 1], [2, 0]]
+
+    try:
+        record = matrix_table.create("future_demand", "future_demand.omx", matrix)
+    finally:
+        matrix.close()
+
+    assert record == matrix_table.get("future_demand")
+    assert record.cores == 1
+    assert (matrix_table.folder / record.file_name).is_file()
+    loaded = matrix_table.get_matrix(record.name)
+    try:
+        assert loaded.names == ["demand"]
+    finally:
+        loaded.close()
+
+
+def test_generic_and_resource_deletes_are_distinct(matrix_table, omx_example):
+    target = matrix_table.folder / "existing.omx"
+    copyfile(omx_example, target)
+    record = matrix_table.register_matrix("existing", target.name)
+
+    matrix_table.delete(record.name)
+    assert record.name not in matrix_table
+    assert target.is_file()
+
+    matrix_table.register_matrix(record.name, target.name)
+    matrix_table.delete_matrix(record.name)
+    assert record.name not in matrix_table
+    assert not target.exists()
+
+
+def test_sync_reconciles_matrix_files_and_metadata(matrix_table, omx_example):
+    missing = matrix_table.folder / "missing.omx"
+    copyfile(omx_example, missing)
+    matrix_table.register_matrix("missing", missing.name)
+    missing.unlink()
+
+    orphan = matrix_table.folder / "orphan.omx"
+    copyfile(omx_example, orphan)
+    matrix_table.sync()
+
+    assert "missing" not in matrix_table
+    assert any(record.file_name == orphan.name for record in matrix_table)
+    assert matrix_table.list().status.eq("").all()

@@ -1,6 +1,8 @@
 from random import randint
 
+import geopandas as gpd
 import pytest
+from shapely.geometry import Polygon
 
 
 def test_get(sioux_falls_test):
@@ -60,6 +62,14 @@ def test_delete(sioux_falls_test):
 
     with pytest.raises(ValueError, match="links has no record with link_id=10"):
         _ = links.get(10)
+
+
+def test_spatial_table_interfaces(sioux_falls_test):
+    links = sioux_falls_test.network.links
+    assert isinstance(links.data, gpd.GeoDataFrame)
+    assert isinstance(links.extent(), Polygon)
+    assert 1 in links
+    assert len(links) == len(links.data)
 
 
 def test_fields(sioux_falls_test):

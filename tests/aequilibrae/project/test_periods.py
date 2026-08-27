@@ -32,6 +32,17 @@ def test_fields(sioux_falls_example):
     assert fields == actual_fields, "Table editor is weird for table periods"
 
 
+def test_new_period_and_default_period(sioux_falls_example):
+    periods = sioux_falls_example.network.periods
+    assert periods.default_period.period_id == 1
+
+    period_id = periods.new_period(2, start=7 * 3600, end=9 * 3600, description="Morning peak")
+    period = periods.get(period_id)
+    assert period.period_start == 7 * 3600
+    assert period.period_end == 9 * 3600
+    assert period.period_description == "Morning peak"
+
+
 def test_update(sioux_falls_example):
     periods = sioux_falls_example.network.periods
     with pytest.raises(IntegrityError, match="Cannot update default period"):

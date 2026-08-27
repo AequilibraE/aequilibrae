@@ -50,6 +50,24 @@ def test_fields(sioux_falls_example):
     assert fields == actual_fields, "Table editor is weird for table nodes"
 
 
+def test_lonlat(sioux_falls_example):
+    nodes = sioux_falls_example.network.nodes
+    coordinates = nodes.lonlat
+    node = nodes.get(coordinates.index[0])
+    assert coordinates.loc[node.node_id, "lon"] == pytest.approx(node.geometry.x)
+    assert coordinates.loc[node.node_id, "lat"] == pytest.approx(node.geometry.y)
+
+
+def test_connect_mode_rejects_regular_nodes(sioux_falls_example, caplog):
+    nodes = sioux_falls_example.network.nodes
+    node_id = next(iter(nodes)).node_id
+    nodes.update(node_id, is_centroid=0)
+
+    nodes.connect_mode(node_id, "c")
+
+    assert "only makes sense for centroids" in caplog.text
+
+
 def test_new_centroid(sioux_falls_example):
     nodes = sioux_falls_example.network.nodes
     with pytest.raises(TypeError, match="missing 1 required positional argument: 'geometry'"):
