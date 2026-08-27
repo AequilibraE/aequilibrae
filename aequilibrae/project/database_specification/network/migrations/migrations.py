@@ -7,4 +7,5 @@ migrations: tuple[int, pathlib.Path] = [
     path / "001_add_cols_to_results.sql",
     path / "002_add_scenario_table.py",
     path / "003_protect_link_end_nodes.py",
+    path / "004_fix_default_period_delete_trigger.sql",
 ]
