@@ -49,7 +49,10 @@ using 8 threads for the parallelization (this CPU's *performance cores*).
 API Changes
 --------------------
 
-XXX
+.. toctree::
+   :maxdepth: 1
+
+   table_api_migration
 
 
 Changes in Behaviour
