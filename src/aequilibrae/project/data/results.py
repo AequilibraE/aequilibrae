@@ -98,11 +98,12 @@ class Results(NonSpatialProjectTable):
         placeholders = ",".join("?" for _ in columns_to_types)
         insert_sql = f"INSERT INTO {table} ({','.join(columns_to_escaped.values())}) VALUES ({placeholders})"
         index_columns = ", ".join(escape_identifier(col) for col in index_names)
+        index_name = escape_identifier(f"aeq_{table_name}_idx")
 
         with self._results_connection.transaction() as conn:
             conn.execute(f"CREATE TABLE {table} ({definitions})")
             conn.executemany(insert_sql, frame.itertuples(index=False, name=None))
-            conn.execute(_CREATE_INDEX_SQL.format(table=table, columns=index_columns))
+            conn.execute(_CREATE_INDEX_SQL.format(index=index_name, table=table, columns=index_columns))
 
         try:
             self.insert(
@@ -121,7 +122,7 @@ class Results(NonSpatialProjectTable):
                 with self._results_connection.transaction() as conn:
                     conn.execute(f"DROP TABLE {table}")
             except BaseException as cleanup:
-                primary.add_note(f"unregistered payload table {table_name!r} remains: {cleanup!r}")
+                primary.add_note(f"unregistered result table {table_name!r} remains: {cleanup!r}")
             raise
 
         return self.get(table_name)
@@ -162,7 +163,7 @@ class Results(NonSpatialProjectTable):
                     with self._results_connection.transaction() as conn:
                         conn.execute(f"ALTER TABLE {tombstone} RENAME TO {table}")
                 except BaseException as cleanup:
-                    primary.add_note(f"payload is stranded as {tombstone!r}: {cleanup!r}")
+                    primary.add_note(f"result table is stranded as {tombstone!r}: {cleanup!r}")
             raise
 
         if move:
@@ -182,14 +183,14 @@ class Results(NonSpatialProjectTable):
 
     def update_database(self) -> None:
         """Register existing, unrecorded tables."""
-        payloads = {
+        result_tables = {
             row[0]
             for row in self._results_connection._connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
         records = {row[0] for row in self._connection._connection.execute("SELECT table_name FROM results").fetchall()}
-        for table_name in sorted(payloads - records):
+        for table_name in sorted(result_tables - records):
             self.insert(table_name=table_name)
 
     def sync(self) -> None:
@@ -221,7 +222,7 @@ def format_dataframe(data: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
         if not isinstance(label, str):
             raise ValueError("result index names must be strings")
         if label in used or label in names:
-            raise ValueError(f"result index label {label!r} collides with another payload column")
+            raise ValueError(f"result index label {label!r} collides with another data column")
         names.append(label)
     frame = data.copy(deep=False)
     frame.index = frame.index.set_names(names)
