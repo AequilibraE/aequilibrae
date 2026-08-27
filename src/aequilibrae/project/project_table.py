@@ -28,6 +28,12 @@ _CHANGE_KEY_SQL = 'UPDATE "{table}" SET "{key}"=? WHERE "{key}"=?'
 _EXTENT_SQL = 'SELECT ST_AsBinary(GetLayerExtent("{table}"))'
 _INSERT_SQL = 'INSERT INTO "{table}" ({columns}) VALUES ({placeholders})'
 _UPDATE_SQL = 'UPDATE "{table}" SET {assignments} WHERE "{key}"=?'
+_NON_EXISTANT_ID_SQL = (
+    "WITH _temp_subset(id) AS (VALUES {{values}}) "  # double braces so we can format twice
+    "SELECT _temp_subset.id FROM _temp_subset "
+    'WHERE _temp_subset.id NOT IN (SELECT "{key}" FROM "{table}")'
+)
+
 
 _QUOTED_COLUMN = '"{column}"'
 _VALUE_PLACEHOLDER = "?"
@@ -137,6 +143,7 @@ class ProjectTable(ABC):
         self._delete_sql = _DELETE_SQL.format(table=self.name, key=self.key)
         self._max_key_sql = _MAX_KEY_SQL.format(table=self.name, key=self.key)
         self._change_key_sql = _CHANGE_KEY_SQL.format(table=self.name, key=self.key)
+        self._non_existant_id_sql = _NON_EXISTANT_ID_SQL.format(table=self.name, key=self.key)
 
         self._refresh_record_type()
 
@@ -241,7 +248,7 @@ class ProjectTable(ABC):
     def update_from(self, frame: pd.DataFrame) -> int:
         """Atomically update records identified by a DataFrame key column.
 
-        Keys which do not match existing entries will have no affect.
+        Keys which do not match existing entries will raise a ValueError.
 
         :Arguments:
             **frame** (:obj:`pandas.DataFrame`): Key and value columns to write.
@@ -249,6 +256,23 @@ class ProjectTable(ABC):
         :Returns:
             **updated rows** (:obj:`int`): Number of submitted rows.
         """
+        non_existant_id_sql = self._non_existant_id_sql.format(values=",".join(f"({key})" for key in frame[self.key]))
+
+        missing_rows = self._connection._connection.execute(non_existant_id_sql).fetchmany(size=10)
+        if missing_rows:
+            if len(missing_rows) >= 10:
+                shorten = True
+            else:
+                shorten = False
+
+            missing_rows = missing_rows[:10]
+            missing_rows = [x[0] for x in missing_rows]
+
+            if shorten:
+                sample = str(missing_rows)[:-1] + ", ...]"
+            else:
+                sample = str(missing_rows)
+            raise ValueError(f"update contained keys which do not exist: {sample}")
 
         with self._connection.transaction() as conn:
             # No key here, needs to be specially handled

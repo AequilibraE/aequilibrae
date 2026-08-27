@@ -75,13 +75,24 @@ def test_update_from_uses_the_key_column(things):
     assert [table.get(key).value for key in updates.thing_id] == [11, 21]
 
 
+def test_update_with_missing_id_raises(things):
+    table, _ = things
+    table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
+    updates = pd.DataFrame({"thing_id": range(15), "value": range(15)})
+
+    original = table.data
+
+    with pytest.raises(ValueError, match=r"update contained keys which do not exist: \[(?:\d+, )+?\.\.\.\]"):
+        table.update_from(updates)
+
+    pd.testing.assert_frame_equal(original, table.data)
+
+
 def test_bulk_update(things):
     table, _ = things
     table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
-    updates = pd.DataFrame({"thing_id": [1, 999], "value": [11, 21]})
+    updates = pd.DataFrame({"thing_id": [1, 2], "value": [11, 21]})
 
     table.update_from(updates)
 
-    assert table.get(1).value == 11
-    with pytest.raises(ValueError, match="things has no record with thing_id=999"):
-        table.get(999)  # the update matched no rows
+    assert table.get(1).value == 11 and table.get(2).value == 21
