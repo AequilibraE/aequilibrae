@@ -149,3 +149,4 @@ Python
    public_transport
    route_choice
    other_applications
+   table_api_migration
