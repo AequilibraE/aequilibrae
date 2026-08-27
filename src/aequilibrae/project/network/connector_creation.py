@@ -34,14 +34,14 @@ def connector_creation(
         raise Exception("We can only add centroid connectors for one mode at a time")
 
     if (
-        sum(project_connection.connection.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone())
+        sum(project_connection._connection.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone())
         == 0
     ):
         logger.warning("This centroid does not exist. Please create it first")
         return
 
     sql = "select count(*) from links where a_node=? and instr(modes,?) > 0"
-    if project_connection.connection.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
+    if project_connection._connection.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
         logger.warning("Mode is already connected")
         return
 

@@ -143,7 +143,7 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        return self._transaction_manager.connection.execute(qry).fetchall()
+        return self._transaction_manager._connection.execute(qry).fetchall()
 
     def __run_query_commit(self, qry: str, values=None) -> None:
         with self._transaction_manager.transaction() as conn:

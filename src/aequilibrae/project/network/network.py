@@ -63,7 +63,7 @@ class Network(WorkerThread):
             :obj:`list`: List of all fields that can be skimmed
         """
 
-        conn = self._project_connection.connection
+        conn = self._project_connection._connection
         field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
         ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
@@ -113,7 +113,7 @@ class Network(WorkerThread):
             :obj:`list`: List of all modes
         """
 
-        conn = self._project_connection.connection
+        conn = self._project_connection._connection
         all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
@@ -153,7 +153,7 @@ class Network(WorkerThread):
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
-        conn = self._project_connection.connection
+        conn = self._project_connection._connection
         conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
         conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
 
@@ -299,7 +299,7 @@ class Network(WorkerThread):
         """
         from aequilibrae.paths import Graph
 
-        conn = self._project_connection.connection
+        conn = self._project_connection._connection
         if fields is None:
             field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
@@ -404,7 +404,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        conn = self._project_connection.connection
+        conn = self._project_connection._connection
         poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -414,12 +414,12 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        conn = self._project_connection.connection
+        conn = self._project_connection._connection
         sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
         links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        conn = self._project_connection.connection
+        conn = self._project_connection._connection
         c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c
