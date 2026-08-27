@@ -408,6 +408,7 @@ class Project:
                 log_handler=logging.FileHandler(path / "aequilibrae.log"),
             )
 
+        self.__dict__.pop("project_parameters", None)
         default_log_file_config(self.scenario.log_handler)
 
         self.__load_objects()

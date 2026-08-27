@@ -424,3 +424,21 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
 def test_scenario_use_scenario_must_exists(scenario_example):
     with pytest.raises(ValueError, match="scenario 'a scenario that doesn't exist' does not exist"):
         scenario_example.use_scenario("a scenario that doesn't exist")
+
+
+@pytest.mark.parametrize("child", ["nauru", "coquimbo"])
+def test_use_scenario_invalidates_project_parameters(scenario_example, child):
+    """Test that project_parameters tracks the active scenario through root -> child -> root."""
+    scenario_example.use_scenario("root")
+    root_path = scenario_example.project_parameters.file
+
+    scenario_example.use_scenario(child)
+    child_path = scenario_example.project_parameters.file
+
+    assert child_path != root_path
+    assert child in str(child_path)
+
+    scenario_example.use_scenario("root")
+    back_to_root_path = scenario_example.project_parameters.file
+
+    assert back_to_root_path == root_path
