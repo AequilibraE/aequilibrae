@@ -33,9 +33,7 @@ _NON_EXISTANT_ID_SQL = (
     "SELECT _temp_subset.id FROM _temp_subset "
     'WHERE _temp_subset.id NOT IN (SELECT "{key}" FROM "{table}")'
 )
-_CREATE_INDEX_SQL = 'CREATE INDEX IF NOT EXISTS ON "{table}" ({columns})'
-
-
+_CREATE_INDEX_SQL = "CREATE INDEX IF NOT EXISTS {index} ON {table} ({columns})"
 _QUOTED_COLUMN = '"{column}"'
 _VALUE_PLACEHOLDER = "?"
 _GEOMETRY_COLUMN = 'ST_AsBinary("geometry")'
@@ -258,23 +256,21 @@ class ProjectTable(ABC):
         :Returns:
             **updated rows** (:obj:`int`): Number of submitted rows.
         """
-        non_existant_id_sql = self._non_existant_id_sql.format(values=",".join(f"({key})" for key in frame[self.key]))
+        missing_key_fetch_limit = 10
+        keys = frame[self.key]
+        if not keys.empty:
+            values = ",".join("(?)" for _ in keys)
+            sql = self._non_existant_id_sql.format(values=values)
+            missing_rows = self._connection._connection.execute(sql, keys).fetchmany(size=missing_key_fetch_limit + 1)
+        else:
+            missing_rows = []
 
-        missing_rows = self._connection._connection.execute(non_existant_id_sql).fetchmany(size=10)
         if missing_rows:
+            sample = [row[0] for row in missing_rows[:missing_key_fetch_limit]]
+            sample_text = str(sample)
             if len(missing_rows) >= 10:
-                shorten = True
-            else:
-                shorten = False
-
-            missing_rows = missing_rows[:10]
-            missing_rows = [x[0] for x in missing_rows]
-
-            if shorten:
-                sample = str(missing_rows)[:-1] + ", ...]"
-            else:
-                sample = str(missing_rows)
-            raise ValueError(f"update contained keys which do not exist: {sample}")
+                sample_text = sample_text[:-1] + ", ...]"
+            raise ValueError(f"update contained keys which do not exist: {sample_text}")
 
         with self._connection.transaction() as conn:
             # No key here, needs to be specially handled
@@ -296,10 +292,8 @@ class ProjectTable(ABC):
         :Returns:
             **inserted rows keys** (:obj:`list[Any]`): The keys of the insert rows, explicit or generated.
         """
-        generate_key = False
-        if self.key not in frame.columns and self.has_numeric_key:
-            generate_key = True
-        else:
+        generate_key = self.key not in frame.columns
+        if generate_key and not self.has_numeric_key:
             raise ValueError("for non-numeric key tables, the key must be provided")
 
         with self._connection.transaction() as conn:
@@ -345,8 +339,8 @@ class ProjectTable(ABC):
         if self.key not in frame.columns:
             raise ValueError(f"table key ({self.key}) not found in dataframe columns ({frame.columns})")
 
-        frame = frame[value_columns].fillna(self.defaults)
-        return frame.itertuples(index=False, name=None)
+        frame = frame[list(value_columns)].fillna(self.defaults)
+        return list(frame.itertuples(index=False, name=None))
 
     def _insert_statement(self, columns: tuple[str, ...]) -> str:
         """Return the INSERT statement for a column shape."""
