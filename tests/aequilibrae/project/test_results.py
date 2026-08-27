@@ -62,9 +62,8 @@ def test_create_get_update_and_container_interfaces(results):
     stored = table.get_results(record.table_name)
     pd.testing.assert_frame_equal(stored, data.reset_index())
 
-    snapshot = record
     table.update(record.table_name, description="Updated")
-    assert snapshot.description == "Base assignment"
+    assert record.description == "Base assignment"
     assert table.get(record.table_name).description == "Updated"
     assert table.list().loc[0, "table_name"] == record.table_name
 

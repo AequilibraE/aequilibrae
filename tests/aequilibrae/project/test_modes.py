@@ -47,17 +47,17 @@ def test_container_and_lookup_interfaces(modes):
         modes.get_by_name("hovercraft")
 
 
-def test_insert_update_delete_and_snapshot_immutability(modes):
+def test_insert_update_delete_and_record_immutability(modes):
     key = modes.insert(mode_id="b", mode_name="bicycle", description="Human powered")
     assert key == "b"
     assert modes.get(key).pce == 1
 
-    snapshot = modes.get(key)
+    record = modes.get(key)
     modes.update(key, description="Bikes")
-    assert snapshot.description == "Human powered"
+    assert record.description == "Human powered"
     assert modes.get(key).description == "Bikes"
     with pytest.raises(FrozenInstanceError, match="cannot assign to field 'description'"):
-        snapshot.description = "mutable"
+        record.description = "mutable"
 
     modes.delete(key)
     assert key not in modes

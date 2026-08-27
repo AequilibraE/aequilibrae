@@ -50,20 +50,20 @@ def test_container_and_name_lookup_interfaces(link_types):
         link_types.get_by_name("motorway")
 
 
-def test_crud_and_immutable_snapshot(link_types):
+def test_crud_and_immutable_record(link_types):
     assert (
         link_types.insert(
             link_type_id="a", link_type="arterial", description="Arterial", lanes=3, lane_capacity=1200
         )
         == "a"
     )
-    snapshot = link_types.get("a")
+    record = link_types.get("a")
 
     link_types.update("a", speed=60, description="Major arterial")
-    assert snapshot.speed is None
+    assert record.speed is None
     assert link_types.get("a").speed == 60
     with pytest.raises(FrozenInstanceError, match="cannot assign to field 'speed'"):
-        snapshot.speed = 30
+        record.speed = 30
 
     link_types.delete("a")
     assert "a" not in link_types
