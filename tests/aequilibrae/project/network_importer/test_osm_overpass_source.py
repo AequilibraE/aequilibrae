@@ -5,7 +5,7 @@ import json
 import geopandas as gpd
 import networkx as nx
 import pytest
-from shapely.geometry import LineString, MultiPolygon, box
+from shapely.geometry import LineString, MultiPolygon, Point, box
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
@@ -66,6 +66,12 @@ def _graph_with_zero_length_edge():
     return g
 
 
+def _graph_with_missing_node():
+    g = _fake_graph()
+    g.add_edge(2, 999, key=0, osmid=300, highway="primary", oneway=True)
+    return g
+
+
 @pytest.fixture
 def cache(tmp_path):
     return DownloadCache(project_base_path=tmp_path, source_name="osm-overpass", tag="test")
@@ -107,6 +113,41 @@ def test_acquire_overpass_by_place_name(monkeypatch, cache):
     net = acquire_overpass(modes=("car",), download_cache=cache, place_name="Testville")
     assert captured["place"] == "Testville"
     assert net.source_meta["source_url"] == "overpass:place=Testville"
+
+
+def test_place_without_polygon_uses_nominatim_bbox(monkeypatch, cache, caplog):
+    calls = []
+
+    def fake_geocode(place, **kwargs):
+        calls.append(kwargs)
+        if not kwargs:
+            raise TypeError(f"Nominatim did not geocode query {place!r} to a geometry of type (Multi)Polygon.")
+        return gpd.GeoDataFrame(
+            {"bbox_west": [-0.01], "bbox_south": [-0.01], "bbox_east": [0.01], "bbox_north": [0.01]},
+            geometry=[Point(0, 0)],
+            crs="EPSG:4326",
+        )
+
+    fetched = []
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", fake_geocode)
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: fetched.append(area) or _fake_graph())
+
+    net = acquire_overpass(modes=("car",), download_cache=cache, place_name="Pointville")
+
+    assert calls == [{}, {"which_result": 1}]
+    assert fetched[0].bounds == pytest.approx((-0.01, -0.01, 0.01, 0.01))
+    assert len(net.links) == 2
+    assert "returned no polygon" in caplog.text
+
+
+def test_place_geocode_unrelated_type_error_propagates(monkeypatch, cache):
+    def fail(place, **kwargs):
+        raise TypeError("bug")
+
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", fail)
+
+    with pytest.raises(TypeError, match="bug"):
+        acquire_overpass(modes=("car",), download_cache=cache, place_name="Broken")
 
 
 def test_acquire_overpass_requires_exactly_one_selector(cache):
@@ -156,6 +197,20 @@ def test_acquire_overpass_drops_zero_length_edge(monkeypatch, cache, caplog):
     assert len(net.links) == 2
     assert (net.links["distance"] > 0).all()
     assert "osmid': 200" in caplog.text
+
+
+def test_acquire_overpass_drops_edges_with_nodes_missing_from_response(monkeypatch, cache, caplog):
+    def fake_polygon(area, **kw):
+        return osmnx.distance.add_edge_lengths(_graph_with_missing_node())
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", fake_polygon)
+
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(-0.001, -0.001, 0.002, 0.002))
+
+    net.validate()
+    assert len(net.links) == 2
+    assert "osmid': 300" in caplog.text
+    assert "nodes absent from the Overpass response" in caplog.text
 
 
 def test_large_model_area_is_tiled_and_deduplicated(monkeypatch, cache):

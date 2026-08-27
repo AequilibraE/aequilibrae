@@ -68,6 +68,10 @@ Overpass imports write the downloaded payload and a manifest under
 ``<project>/downloaded data/osm-overpass/``. Local PBF imports do not create a
 download cache because the source file is already local.
 
+If Nominatim resolves a ``place_name`` only to a point rather than an
+administrative polygon, the importer uses the bounding box supplied with that
+top result and logs a warning describing the substituted area.
+
 .. _importing_from_overture:
 
 Importing from Overture Maps

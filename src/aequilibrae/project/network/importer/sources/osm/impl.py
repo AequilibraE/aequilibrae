@@ -4,6 +4,7 @@ import math
 import networkx as nx
 import numpy as np
 import pandas as pd
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from shapely.geometry import MultiPolygon, Point, Polygon, box
@@ -27,15 +28,15 @@ from aequilibrae.utils.optional_dependency import require
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_QUERY_AREA_SIZE = 100_000_000.0
+_DEFAULT_PLACE_BBOX_HALF_WIDTH = 0.15
 _QUERY_AREA_CRS = "EPSG:6933"
+_OSMNX_GRAPH_LOCK = threading.Lock()
 
-# osmnx reports an empty query area through the exception *text*: both exception
-# types below are also raised for genuine failures (a malformed Overpass
-# response), so the message is what separates "nothing here" from "something
-# broke". Characterization tests in test_osm_overpass_source.py fail if a future
-# osmnx rewords either one.
+# osmnx reports several recoverable data conditions through exception text, so
+# characterization tests fail if a future osmnx version rewords these messages.
 _OSMNX_EMPTY_RESPONSE = "No data elements in server response"
 _OSMNX_NO_NODES_IN_POLYGON = "Found no graph nodes within the requested polygon"
+_OSMNX_NO_POLYGON = "to a geometry of type (Multi)Polygon"
 
 _RESERVED_LINK_COLS = {
     "a_node",
@@ -138,7 +139,7 @@ def _fetch_graph(ox, area, fetch_kwargs, source_url: str, part: int, total: int)
     from osmnx._errors import InsufficientResponseError
 
     try:
-        graph = ox.graph_from_polygon(area, **fetch_kwargs)
+        graph = _graph_from_polygon_without_missing_nodes(ox, area, fetch_kwargs)
     except InsufficientResponseError as exc:
         if _OSMNX_EMPTY_RESPONSE in str(exc):
             logger.info(f"No OSM data in {source_url}, part {part}/{total}; skipping it")
@@ -164,19 +165,51 @@ def _fetch_graph(ox, area, fetch_kwargs, source_url: str, part: int, total: int)
     return graph
 
 
-def _geocode_place(ox, place_name):
-    from osmnx._errors import InsufficientResponseError
+def _graph_from_polygon_without_missing_nodes(ox, area, fetch_kwargs):
+    with _OSMNX_GRAPH_LOCK:
+        original = ox.distance.add_edge_lengths
 
+        def add_edge_lengths(graph, **kwargs):
+            missing = {
+                node
+                for node, data in graph.nodes(data=True)
+                if not _finite_coordinate(data.get("x")) or not _finite_coordinate(data.get("y"))
+            }
+            if missing:
+                affected = [
+                    {"u": u, "v": v, "osmid": data.get("osmid")}
+                    for u, v, data in graph.edges(data=True)
+                    if u in missing or v in missing
+                ]
+                suffix = f" (+{len(affected) - 10} more)" if len(affected) > 10 else ""
+                logger.warning(
+                    f"Dropped {len(affected)} OSM edges referencing {len(missing)} nodes absent from the "
+                    f"Overpass response: {affected[:10]}{suffix}"
+                )
+                graph.remove_nodes_from(missing)
+            return original(graph, **kwargs) if graph.number_of_edges() else graph
+
+        ox.distance.add_edge_lengths = add_edge_lengths
+        try:
+            return ox.graph_from_polygon(area, **fetch_kwargs)
+        finally:
+            ox.distance.add_edge_lengths = original
+
+
+def _finite_coordinate(value) -> bool:
     try:
-        result = ox.geocode_to_gdf(place_name)
-    except InsufficientResponseError as exc:
-        raise ImporterError(f"Nominatim could not resolve {place_name!r} to a boundary: {exc}") from exc
-    except Exception as exc:
-        from requests.exceptions import RequestException
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
 
-        if isinstance(exc, RequestException):
-            raise ImporterError(f"Nominatim request failed for {place_name!r}: {exc}") from exc
-        raise
+
+def _geocode_place(ox, place_name):
+    try:
+        result = _geocode_to_gdf(ox, place_name)
+    except TypeError as exc:
+        if _OSMNX_NO_POLYGON not in str(exc):
+            raise
+        return _geocode_place_bbox(ox, place_name)
     geometry = result.geometry.dropna()
     if geometry.empty:
         raise ImporterError(f"Nominatim returned no boundary for {place_name!r}")
@@ -184,6 +217,38 @@ def _geocode_place(ox, place_name):
     if not isinstance(model_area, (Polygon, MultiPolygon)):
         raise ImporterError(f"Nominatim did not return a polygon boundary for {place_name!r}")
     return model_area
+
+
+def _geocode_to_gdf(ox, place_name, **kwargs):
+    from osmnx._errors import InsufficientResponseError
+
+    try:
+        return ox.geocode_to_gdf(place_name, **kwargs)
+    except InsufficientResponseError as exc:
+        raise ImporterError(f"Nominatim could not resolve {place_name!r}: {exc}") from exc
+    except Exception as exc:
+        from requests.exceptions import RequestException
+
+        if isinstance(exc, RequestException):
+            raise ImporterError(f"Nominatim request failed for {place_name!r}: {exc}") from exc
+        raise
+
+
+def _geocode_place_bbox(ox, place_name):
+    result = _geocode_to_gdf(ox, place_name, which_result=1)
+    geometry = result.geometry.dropna()
+    if geometry.empty:
+        raise ImporterError(f"Nominatim returned no location for {place_name!r}")
+
+    row = result.iloc[0]
+    bbox_columns = ("bbox_west", "bbox_south", "bbox_east", "bbox_north")
+    bounds = tuple(float(row.get(column, math.nan)) for column in bbox_columns)
+    if not all(math.isfinite(value) for value in bounds) or bounds[0] >= bounds[2] or bounds[1] >= bounds[3]:
+        centre = geometry.union_all().representative_point()
+        half = _DEFAULT_PLACE_BBOX_HALF_WIDTH
+        bounds = (centre.x - half, centre.y - half, centre.x + half, centre.y + half)
+    logger.warning(f"Nominatim returned no polygon for {place_name!r}; using its bounding box {bounds}")
+    return box(*bounds)
 
 
 def _max_query_area_size(params: dict) -> float:
