@@ -4,7 +4,6 @@ import pathlib
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
-from aequilibrae.project.zoning import Zoning
 from aequilibrae.transit.transit import Transit
 
 
@@ -32,7 +31,6 @@ class Scenario:
     matrices: Matrices
     results: Results
     transit: Transit
-    zoning: Zoning
 
     log_handler: logging.StreamHandler
 

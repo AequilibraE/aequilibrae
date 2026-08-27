@@ -66,7 +66,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
-        self.__has_taz = len(self.project.zoning.all_zones()) > 0
+        self.__has_taz = len(self.project.network.zones) > 0
 
         if file_path is not None:
             logger.info(f"Creating GTFS feed object for {file_path}")
@@ -268,8 +268,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 12/12)"):
                 if self.__has_taz:
-                    closest_zone = self.project.zoning.get_closest_zone(stop.geo)
-                    if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
+                    closest_zone = self.project.network.zones.get_closest_zone(stop.geo)
+                    if stop.geo.within(self.project.network.zones.get(closest_zone).geometry):
                         stop.taz = closest_zone
                 stop.save_to_database(conn, commit=False)
             conn.commit()

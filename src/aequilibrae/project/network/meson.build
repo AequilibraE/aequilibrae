@@ -13,6 +13,7 @@ pyfiles = [
   'network.yml',
   'nodes.py',
   'periods.py',
+  'zones.py',
 ]
 
 pkgs = [

@@ -2,7 +2,7 @@ Components
 ===========
 
 An AequilibraE project helds geometric information that can be accessed by the user in 
-three different classes: ``Links``, ``Nodes``, and ``Zoning``. We'll first cover these classes, and
+three different classes: ``Links``, ``Nodes``, and ``Zones``. We'll first cover these classes, and
 then we'll go over the project components without geo-spatial information.
 
 ``project.network.links``
@@ -135,10 +135,10 @@ Each item in the 'nodes' table is a ``Node`` object.
         Usage example
 
 
-.. _project_zoning:
+.. _project_zones:
 
-``project.zoning``
-------------------
+``project.network.zones``
+-------------------------
 
 This method allows you to access the API resources to manipulate the 'zones' table.
 Each item in the 'zones' table is a ``Zone`` object.
@@ -147,7 +147,7 @@ Each item in the 'zones' table is a ``Zone`` object.
 
     >>> from shapely.geometry import Polygon
 
-    >>> project_zones = project.zoning
+    >>> project_zones = project.network.zones
 
     # Let's start this example by adding a new field to the 'zones' table
     >>> project_zones.fields.add("parking_spots", "Number of public parking spots", "INTEGER")
@@ -212,7 +212,7 @@ Each item in the 'zones' table is a ``Zone`` object.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.zoning.Zoning`
+    * :func:`aequilibrae.project.network.zones.Zones`
         Class documentation
     * :ref:`create_zones`
         Usage example
@@ -335,7 +335,7 @@ It is possible to access the log file contents, as presented in the next code bl
 ``project.matrices``
 --------------------
 
-This method is a gateway to all the matrices available in the model, which allows us to update the
+This table provides access to all the matrices available in the model, which allows us to update the
 records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord`` object.
 
 .. doctest::

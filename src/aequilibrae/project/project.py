@@ -20,7 +20,6 @@ from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
-from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import commit_and_close, safe_connect
@@ -343,10 +342,6 @@ class Project:
     def check_file_indices(self) -> None:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""
         raise NotImplementedError
-
-    @property
-    def zoning(self):
-        return Zoning(self.network)
 
     def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)

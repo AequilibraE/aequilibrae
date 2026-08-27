@@ -21,7 +21,7 @@ from aequilibrae.utils.geo_index import GeoIndex
 logger = logging.getLogger(__name__)
 
 
-class Zoning(SpatialProjectTable):
+class Zones(SpatialProjectTable):
     """
     Access to the API resources to manipulate the 'zones' table in the project
 
@@ -29,13 +29,13 @@ class Zoning(SpatialProjectTable):
 
         >>> project = create_example(project_path)
 
-        >>> zoning = project.zoning
+        >>> zones = project.network.zones
 
-        >>> zone_downtown = zoning.get(1)
-        >>> zoning.update(1, population=637, employment=10039)
+        >>> zone_downtown = zones.get(1)
+        >>> zones.update(1, population=637, employment=10039)
 
         # We can also add one more field to the table
-        >>> fields = zoning.fields
+        >>> fields = zones.fields
         >>> fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
 
         >>> project.close()
@@ -48,18 +48,18 @@ class Zoning(SpatialProjectTable):
     __geo_index: GeoIndex | None = None
     has_numeric_key = True
 
-    def create_zoning_layer(self) -> None:
+    def create_zones_table(self) -> None:
         """Creates the 'zones' table for project files that did not previously contain it"""
 
-        if not self.has_zoning:
-            qry_file = Path(__file__).parent.joinpath("database_specification", "network", "tables", "zones.sql")
+        if not self.has_zones:
+            qry_file = Path(__file__).parents[1] / "database_specification" / "network" / "tables" / "zones.sql"
             with self._connection.transaction() as conn:
                 run_queries_from_sql_file(conn, qry_file)
         else:
             logger.warning("zones table already exists. Nothing was done")
 
     @property
-    def has_zoning(self) -> bool:
+    def has_zones(self) -> bool:
         """Whether the project has a 'zones' table"""
         return has_table(self._connection._connection, self.name)
 

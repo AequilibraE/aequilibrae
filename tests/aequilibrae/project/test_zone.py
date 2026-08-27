@@ -27,9 +27,9 @@ def create_zones(project):
     grid = shapely.wkb.loads(grid)
     grid = [p for p in grid.geoms if p.intersects(geo)]
 
-    zoning = project.zoning
+    zones = project.network.zones
     for i, zone_geo in enumerate(grid):
-        zoning.insert(zone_id=i + 1, geometry=zone_geo)
+        zones.insert(zone_id=i + 1, geometry=zone_geo)
         nodes.renumber(i + 1, i + 10001)
 
     return project
@@ -37,7 +37,7 @@ def create_zones(project):
 
 def test_delete(nauru_example):
     project = create_zones(nauru_example)
-    zones = project.zoning
+    zones = project.network.zones
     zones.delete(3)
 
     with pytest.raises(ValueError, match="zones has no record with zone_id=3"):
@@ -46,7 +46,7 @@ def test_delete(nauru_example):
 
 def test_save(nauru_example):
     project = create_zones(nauru_example)
-    zones = project.zoning
+    zones = project.network.zones
     area = randint(0, 9999999999)
     zones.update(2, area=area)
 
@@ -67,7 +67,7 @@ def test_save(nauru_example):
 
 def test_add_centroid(nauru_example):
     project = create_zones(nauru_example)
-    zones = project.zoning
+    zones = project.network.zones
     nodes = project.network.nodes
     network = project.network
     tot = network.count_centroids()
@@ -95,7 +95,7 @@ def test_add_centroid(nauru_example):
 
 def test_connect_mode(nauru_example):
     project = create_zones(nauru_example)
-    zones = project.zoning
+    zones = project.network.zones
     zones.add_centroid(1)
 
     with project.db_connection as conn:
@@ -111,7 +111,7 @@ def test_connect_mode(nauru_example):
 
 def test_disconnect_mode(nauru_example):
     project = create_zones(nauru_example)
-    zones = project.zoning
+    zones = project.network.zones
     zones.add_centroid(1)
 
     with project.db_connection as conn:
@@ -133,14 +133,14 @@ def test_get_closest_zone(sioux_falls_example):
     pt_in = Point(-96.7716, 43.6069)
     pt_out = Point(-96.7754, 43.5664)
 
-    assert sioux_falls_example.zoning.get_closest_zone(pt_in) == 1
-    assert sioux_falls_example.zoning.get_closest_zone(pt_out) == 3
+    assert sioux_falls_example.network.zones.get_closest_zone(pt_in) == 1
+    assert sioux_falls_example.network.zones.get_closest_zone(pt_out) == 3
 
     line_in = LineString([(-96.7473, 43.6046), (-96.7341, 43.6046)])
     line_out = LineString([(-96.7209, 43.6132), (-96.7033, 43.61316)])
 
-    assert sioux_falls_example.zoning.get_closest_zone(line_in) == 1
-    assert sioux_falls_example.zoning.get_closest_zone(line_out) == 2
+    assert sioux_falls_example.network.zones.get_closest_zone(line_in) == 1
+    assert sioux_falls_example.network.zones.get_closest_zone(line_out) == 2
 
     multi_line_in = MultiLineString(
         [((-96.7589, 43.5692), (-96.7531, 43.5807)), ((-96.7531, 43.5807), (-96.7504, 43.5704))]
@@ -149,5 +149,5 @@ def test_get_closest_zone(sioux_falls_example):
         [((-96.7716, 43.5769), (-96.7683, 43.5801)), ((-96.7683, 43.5801), (-96.7574, 43.5784))]
     )
 
-    assert sioux_falls_example.zoning.get_closest_zone(multi_line_in) == 4
-    assert sioux_falls_example.zoning.get_closest_zone(multi_line_out) == 3
+    assert sioux_falls_example.network.zones.get_closest_zone(multi_line_in) == 4
+    assert sioux_falls_example.network.zones.get_closest_zone(multi_line_out) == 3

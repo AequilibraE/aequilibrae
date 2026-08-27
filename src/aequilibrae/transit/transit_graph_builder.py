@@ -502,7 +502,7 @@ class TransitGraphBuilder:
         if "zones" not in self.__dict__:
             self.add_zones(
                 pd.DataFrame(
-                    [(x.zone_id, x.geometry) for x in self.project.zoning.all_zones().values()],
+                    [(zone.zone_id, zone.geometry) for zone in self.project.network.zones],
                     columns=["zone_id", "geometry"],
                 )
             )

@@ -19,6 +19,7 @@ from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
+from aequilibrae.project.network.zones import Zones
 from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import NestedTransactionManager
@@ -54,6 +55,7 @@ class Network(WorkerThread):
         self.links = Links(project_connection)
         self.nodes = Nodes(project_connection)
         self.periods = Periods(project_connection)
+        self.zones = Zones(project_connection)
 
     def skimmable_fields(self):
         """

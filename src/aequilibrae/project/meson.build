@@ -10,7 +10,6 @@ pyfiles = [
   'project_cleaning.py',
   'project_creation.py',
   'scenario.py',
-  'zoning.py',
 ]
 
 pkgs = [
