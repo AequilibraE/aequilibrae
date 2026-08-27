@@ -29,6 +29,14 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_QUERY_AREA_SIZE = 100_000_000.0
 _QUERY_AREA_CRS = "EPSG:6933"
 
+# osmnx reports an empty query area through the exception *text*: both exception
+# types below are also raised for genuine failures (a malformed Overpass
+# response), so the message is what separates "nothing here" from "something
+# broke". Characterization tests in test_osm_overpass_source.py fail if a future
+# osmnx rewords either one.
+_OSMNX_EMPTY_RESPONSE = "No data elements in server response"
+_OSMNX_NO_NODES_IN_POLYGON = "Found no graph nodes within the requested polygon"
+
 _RESERVED_LINK_COLS = {
     "a_node",
     "b_node",
@@ -132,14 +140,14 @@ def _fetch_graph(ox, area, fetch_kwargs, source_url: str, part: int, total: int)
     try:
         graph = ox.graph_from_polygon(area, **fetch_kwargs)
     except InsufficientResponseError as exc:
-        if "No data elements in server response" in str(exc):
+        if _OSMNX_EMPTY_RESPONSE in str(exc):
             logger.info(f"No OSM data in {source_url}, part {part}/{total}; skipping it")
             return None
         raise ImporterError(
             f"Overpass returned an empty or partial response for {source_url}, part {part}/{total}: {exc}"
         ) from exc
     except ValueError as exc:
-        if "Found no graph nodes within the requested polygon" in str(exc):
+        if _OSMNX_NO_NODES_IN_POLYGON in str(exc):
             logger.info(f"No OSM nodes in {source_url}, part {part}/{total}; skipping it")
             return None
         raise

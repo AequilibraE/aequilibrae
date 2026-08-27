@@ -10,6 +10,8 @@ from shapely.geometry import LineString, MultiPolygon, box
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.sources.osm.impl import (
+    _OSMNX_EMPTY_RESPONSE,
+    _OSMNX_NO_NODES_IN_POLYGON,
     _configure_osmnx,
     _subdivide_model_area,
     acquire_overpass,
@@ -180,6 +182,20 @@ def test_tiled_import_skips_a_part_without_nodes(monkeypatch, cache):
     assert attempts > 2
     assert len(net.links) == 2
     assert cache.relative_path is not None
+
+
+def test_osmnx_still_reports_an_empty_polygon_the_way_we_match_on():
+    """Test that osmnx's no-nodes message still contains the text _fetch_graph skips an empty tile on."""
+    with pytest.raises(ValueError, match=_OSMNX_NO_NODES_IN_POLYGON):
+        osmnx.truncate.truncate_graph_polygon(_fake_graph(), box(50.0, 50.0, 51.0, 51.0))
+
+
+def test_osmnx_still_reports_an_empty_response_the_way_we_match_on():
+    """Test that osmnx's empty-response message still contains the text _fetch_graph skips an empty tile on."""
+    from osmnx._errors import InsufficientResponseError
+
+    with pytest.raises(InsufficientResponseError, match=_OSMNX_EMPTY_RESPONSE):
+        osmnx.graph._create_graph([{"elements": []}], bidirectional=False)
 
 
 def test_subdivision_preserves_disconnected_coverage():
