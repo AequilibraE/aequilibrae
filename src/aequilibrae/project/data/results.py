@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from aequilibrae.project.project_table import NonSpatialProjectTable
+from aequilibrae.project.project_table import _CREATE_INDEX_SQL, NonSpatialProjectTable
 from aequilibrae.utils.db_utils import NestedTransactionManager, df_sqlite_types, escape_identifier
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ class Results(NonSpatialProjectTable):
         if table_name in self or self._table_exists(table_name):
             raise ValueError(f"A result record or table named {table_name!r} already exists")
 
-        frame = format_dataframe(data)
+        frame, index_names = format_dataframe(data)
         table = escape_identifier(table_name)
 
         columns_to_types = df_sqlite_types(frame, dtype or {})
@@ -97,10 +97,12 @@ class Results(NonSpatialProjectTable):
         definitions = ", ".join(f"{columns_to_escaped[column]} {dtype}" for column, dtype in columns_to_types.items())
         placeholders = ",".join("?" for _ in columns_to_types)
         insert_sql = f"INSERT INTO {table} ({','.join(columns_to_escaped.values())}) VALUES ({placeholders})"
+        index_columns = ", ".join(escape_identifier(col) for col in index_names)
 
         with self._results_connection.transaction() as conn:
             conn.execute(f"CREATE TABLE {table} ({definitions})")
             conn.executemany(insert_sql, frame.itertuples(index=False, name=None))
+            conn.execute(_CREATE_INDEX_SQL.format(table=table, columns=index_columns))
 
         try:
             self.insert(
@@ -207,7 +209,7 @@ class Results(NonSpatialProjectTable):
         )
 
 
-def format_dataframe(data: pd.DataFrame) -> pd.DataFrame:
+def format_dataframe(data: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     if any(not isinstance(column, str) for column in data.columns):
         raise ValueError("result columns must all be strings")
     if not data.columns.is_unique:
@@ -223,4 +225,4 @@ def format_dataframe(data: pd.DataFrame) -> pd.DataFrame:
         names.append(label)
     frame = data.copy(deep=False)
     frame.index = frame.index.set_names(names)
-    return frame.reset_index()
+    return frame.reset_index(), names

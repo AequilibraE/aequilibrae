@@ -33,6 +33,7 @@ _NON_EXISTANT_ID_SQL = (
     "SELECT _temp_subset.id FROM _temp_subset "
     'WHERE _temp_subset.id NOT IN (SELECT "{key}" FROM "{table}")'
 )
+_CREATE_INDEX_SQL = 'CREATE INDEX IF NOT EXISTS ON "{table}" ({columns})'
 
 
 _QUOTED_COLUMN = '"{column}"'
