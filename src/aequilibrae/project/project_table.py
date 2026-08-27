@@ -344,10 +344,8 @@ class ProjectTable(ABC):
         if self.key not in frame.columns:
             raise ValueError(f"table key ({self.key}) not found in dataframe columns ({frame.columns})")
 
-        rows = []
-        for values in frame.to_dict("records"):
-            rows.append(tuple(self._database_value(values[column]) for column in value_columns))
-        return rows
+        frame = frame[value_columns].fillna(self.defaults)
+        return frame.itertuples(index=False, name=None)
 
     def _insert_statement(self, columns: tuple[str, ...]) -> str:
         """Return the INSERT statement for a column shape."""
