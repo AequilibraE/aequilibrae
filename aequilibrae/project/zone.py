@@ -77,13 +77,16 @@ class Zone(SafeClass):
                 check_sql = """SELECT count(*) FROM nodes
                                  WHERE  nodes.geometry = GeomFromWKB(?, 4326) AND
                               nodes.ROWID IN (
-                               SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-                               search_frame = GeomFromWKB(?, 4326))
+                               SELECT pkid FROM idx_nodes_geometry
+                               WHERE xmin <= ? AND xmax >= ? AND ymin <= ? AND ymax >= ?)
                            """
 
-                test_list = conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
+                def check_args(pt):
+                    return [pt.wkb, pt.x, pt.x, pt.y, pt.y]
+
+                test_list = conn.execute(check_sql, check_args(point)).fetchone()
                 while sum(test_list):
-                    test_list = conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
+                    test_list = conn.execute(check_sql, check_args(point)).fetchone()
                     point = Point(point.x + random.random() * shift, point.y + random.random() * shift)
 
             data = [self.zone_id, point.wkb, self.__srid__]

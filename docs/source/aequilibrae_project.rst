@@ -20,10 +20,10 @@ The performance, portability, self containment, and open-source character
 of these pieces of software, along with their large user base and wide
 industry support make them solid options to be AequilibraE's data backend.
 
-Since working with SpatiaLite is not just a matter of a ``pip install``,
-please refer to :ref:`dependencies`. For QGIS users this is not a concern, while
-for Windows users this dependency is automatically handled under the hood, but
-the details are also discussed in the aforementioned dependencies section.
+AequilibraE reads and writes the SpatiaLite format with a bundled pure-Python
+engine, so a plain ``pip install aequilibrae`` is all that is needed on every
+platform — no separate SpatiaLite installation. The details are discussed in
+:ref:`dependencies`.
 
 Package components: A conceptual view
 -------------------------------------

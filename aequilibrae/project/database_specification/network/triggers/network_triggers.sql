@@ -65,8 +65,7 @@ create trigger aequilibrae_new_link_a_node before insert on links
     FROM nodes
     WHERE nodes.geometry = StartPoint(new.geometry) AND
     (nodes.ROWID IN (
-        SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-        search_frame = StartPoint(new.geometry)) OR
+        SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(StartPoint(new.geometry)) AND xmax >= MbrMinX(StartPoint(new.geometry)) AND ymin <= MbrMaxY(StartPoint(new.geometry)) AND ymax >= MbrMinY(StartPoint(new.geometry))) OR
       nodes.node_id = new.a_node)) = 0
   BEGIN
     INSERT INTO nodes (node_id, geometry)
@@ -80,8 +79,7 @@ create trigger aequilibrae_new_link_b_node before insert on links
     FROM nodes
     WHERE nodes.geometry = EndPoint(new.geometry) AND
     (nodes.ROWID IN (
-        SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-        search_frame = EndPoint(new.geometry)) OR
+        SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(EndPoint(new.geometry)) AND xmax >= MbrMinX(EndPoint(new.geometry)) AND ymin <= MbrMaxY(EndPoint(new.geometry)) AND ymax >= MbrMinY(EndPoint(new.geometry))) OR
       nodes.node_id = new.b_node)) = 0
   BEGIN
     INSERT INTO nodes (node_id, geometry)
@@ -97,8 +95,7 @@ create trigger aequilibrae_update_link_a_node before update of geometry on links
     FROM nodes
     WHERE nodes.geometry = StartPoint(new.geometry) AND
     (nodes.ROWID IN (
-        SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-        search_frame = StartPoint(new.geometry)) OR
+        SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(StartPoint(new.geometry)) AND xmax >= MbrMinX(StartPoint(new.geometry)) AND ymin <= MbrMaxY(StartPoint(new.geometry)) AND ymax >= MbrMinY(StartPoint(new.geometry))) OR
       nodes.node_id = new.a_node)) = 0
   BEGIN
     INSERT INTO nodes (node_id, geometry)
@@ -112,8 +109,7 @@ create trigger aequilibrae_update_link_b_node before update of geometry on links
     FROM nodes
     WHERE nodes.geometry = EndPoint(new.geometry) AND
     (nodes.ROWID IN (
-        SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-        search_frame = EndPoint(new.geometry)) OR
+        SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(EndPoint(new.geometry)) AND xmax >= MbrMinX(EndPoint(new.geometry)) AND ymin <= MbrMaxY(EndPoint(new.geometry)) AND ymax >= MbrMinY(EndPoint(new.geometry))) OR
       nodes.node_id = new.b_node)) = 0
   BEGIN
     INSERT INTO nodes (node_id, geometry)
@@ -131,8 +127,7 @@ create trigger aequilibrae_new_link after insert on links
       from nodes
       where nodes.geometry = StartPoint(new.geometry) and
       (nodes.rowid in (
-          select rowid from SpatialIndex where f_table_name = 'nodes' and
-          search_frame = StartPoint(new.geometry)) or
+          SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(StartPoint(new.geometry)) AND xmax >= MbrMinX(StartPoint(new.geometry)) AND ymin <= MbrMaxY(StartPoint(new.geometry)) AND ymax >= MbrMinY(StartPoint(new.geometry))) or
         nodes.node_id = new.a_node))
     where links.rowid = new.rowid;
     update links
@@ -141,8 +136,7 @@ create trigger aequilibrae_new_link after insert on links
       from nodes
       where nodes.geometry = EndPoint(new.geometry) and
       (nodes.rowid in (
-          select rowid from SpatialIndex where f_table_name = 'nodes' and
-          search_frame = EndPoint(new.geometry)) or
+          SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(EndPoint(new.geometry)) AND xmax >= MbrMinX(EndPoint(new.geometry)) AND ymin <= MbrMaxY(EndPoint(new.geometry)) AND ymax >= MbrMinY(EndPoint(new.geometry))) or
         nodes.node_id = new.b_node))
     where links.rowid = new.rowid;
     update links
@@ -179,8 +173,7 @@ create trigger aequilibrae_updated_link_geometry after update of geometry on lin
       from nodes
       where nodes.geometry = StartPoint(new.geometry) and
       (nodes.rowid in (
-          select rowid from SpatialIndex where f_table_name = 'nodes' and
-          search_frame = StartPoint(new.geometry)) or
+          SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(StartPoint(new.geometry)) AND xmax >= MbrMinX(StartPoint(new.geometry)) AND ymin <= MbrMaxY(StartPoint(new.geometry)) AND ymax >= MbrMinY(StartPoint(new.geometry))) or
         nodes.node_id = new.a_node))
     where links.rowid = new.rowid;
     update links
@@ -189,8 +182,7 @@ create trigger aequilibrae_updated_link_geometry after update of geometry on lin
       from nodes
       where nodes.geometry = EndPoint(new.geometry) and
       (nodes.rowid in (
-          select rowid from SpatialIndex where f_table_name = 'nodes' and
-          search_frame = EndPoint(new.geometry)) or
+          SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(EndPoint(new.geometry)) AND xmax >= MbrMinX(EndPoint(new.geometry)) AND ymin <= MbrMaxY(EndPoint(new.geometry)) AND ymax >= MbrMinY(EndPoint(new.geometry))) or
         nodes.node_id = new.b_node))
     where links.rowid = new.rowid;
     update links
@@ -285,10 +277,7 @@ create trigger aequilibrae_cannibalize_node_abort_when_centroid before update of
     and collision.geometry = new.geometry
     and (collision.is_centroid = 1 or old.is_centroid = 1 or new.is_centroid = 1)
     and collision.ROWID in (
-      select ROWID
-      from SpatialIndex
-      where f_table_name = 'nodes'
-      and search_frame = new.geometry))
+      SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(new.geometry) AND xmax >= MbrMinX(new.geometry) AND ymin <= MbrMaxY(new.geometry) AND ymax >= MbrMinY(new.geometry)))
   BEGIN
        SELECT RAISE(ABORT,'Cannot cannibalize centroids');
   END;
@@ -307,10 +296,7 @@ create trigger aequilibrae_update_node_geometry after update of geometry on node
                      WHERE collision.ROWID != new.ROWID
                      AND collision.geometry = new.geometry
                      AND collision.ROWID IN (
-                       SELECT ROWID
-                       FROM SpatialIndex
-                       WHERE f_table_name = 'nodes'
-                       AND search_frame = new.geometry));
+                       SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(new.geometry) AND xmax >= MbrMinX(new.geometry) AND ymin <= MbrMaxY(new.geometry) AND ymax >= MbrMinY(new.geometry)));
 
     UPDATE links
     SET b_node = new.node_id
@@ -319,17 +305,13 @@ create trigger aequilibrae_update_node_geometry after update of geometry on node
                      WHERE collision.ROWID != new.ROWID
                      AND collision.geometry = new.geometry
                      AND collision.ROWID IN (
-                       SELECT ROWID
-                       FROM SpatialIndex
-                       WHERE f_table_name = 'nodes'
-                       AND search_frame = new.geometry));
+                       SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(new.geometry) AND xmax >= MbrMinX(new.geometry) AND ymin <= MbrMaxY(new.geometry) AND ymax >= MbrMinY(new.geometry)));
 
     DELETE FROM nodes
     WHERE ROWID != new.ROWID
     AND geometry = new.geometry AND
     ROWID IN (
-      SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-      search_frame = new.geometry);
+      SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(new.geometry) AND xmax >= MbrMinX(new.geometry) AND ymin <= MbrMaxY(new.geometry) AND ymax >= MbrMinY(new.geometry));
 
     UPDATE links
     SET geometry = SetStartPoint(geometry,new.geometry)
@@ -350,8 +332,7 @@ create trigger aequilibrae_no_duplicate_node before insert on nodes
     WHERE nodes.node_id != new.node_id
     AND nodes.geometry = new.geometry AND
     nodes.ROWID IN (
-      SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-      search_frame = new.geometry)) > 0
+      SELECT pkid FROM "idx_nodes_geometry" WHERE xmin <= MbrMaxX(new.geometry) AND xmax >= MbrMinX(new.geometry) AND ymin <= MbrMaxY(new.geometry) AND ymax >= MbrMinY(new.geometry))) > 0
   BEGIN
     -- todo: change this to perform a cannibalisation instead.
     SELECT raise(ABORT, 'Cannot create on-top of other node');

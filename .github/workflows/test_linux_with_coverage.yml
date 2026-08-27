@@ -19,12 +19,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Download spatialite on Linux
-        run: |
-          sudo apt update
-          sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
-          sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-
       - name: Install Python and create virtual environment
         run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed
 

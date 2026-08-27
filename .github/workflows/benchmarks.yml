@@ -54,12 +54,6 @@ jobs:
       - name: Install Python and create virtual environment
         run: uv venv .venv --python ${{ env.PYTHON_VERSION }} --python-preference only-managed --clear
 
-      - name: Install spatialite
-        run: |
-          sudo apt update
-          sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
-          sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-
       # clean: false skips the `git clean -ffdx && git reset --hard` that
       # actions/checkout runs by default, so untracked files (.venv,
       # .benchmarks, TransportationNetworks) survive the ref switches.

@@ -314,8 +314,8 @@ class Network(WorkerThread):
             if limit_to_area is not None:
                 load_spatialite_extension(conn)
                 spatial_add = """ WHERE links.rowid in (
-                                        select rowid from SpatialIndex where f_table_name = 'links' and
-                                       search_frame = GeomFromWKB(?, 4326))"""
+                                        select pkid from idx_links_geometry
+                                        where xmin <= ? and xmax >= ? and ymin <= ? and ymax >= ?)"""
 
             sql = f"select {','.join(all_fields)} from links"
 
@@ -327,8 +327,9 @@ class Network(WorkerThread):
                 df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(copy=False)
             else:
                 sql += spatial_add
+                minx, miny, maxx, maxy = limit_to_area.bounds
                 df = (
-                    pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                    pd.read_sql_query(sql, conn, params=(maxx, minx, maxy, miny))
                     .fillna(value=np.nan)
                     .infer_objects(copy=False)
                 )

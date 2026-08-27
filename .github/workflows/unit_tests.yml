@@ -49,22 +49,10 @@ jobs:
       with:
           python-version: ${{ matrix.python-version }}
 
-    - name: Download llvm and spatialite tools on macOS
+    - name: Download llvm on macOS
       if: matrix.os == 'macos-latest'
       run: |
-        brew install llvm libspatialite
-
-    - name: Download spatialite on Linux
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt update
-        sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
-        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-
-    - name: Download spatialite on Windows
-      if: matrix.os == 'windows-latest'
-      run: |
-        uv run tests/setup_windows_spatialite.py
+        brew install llvm
 
     - name: Install Python and create virtual environment
       run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed  --clear

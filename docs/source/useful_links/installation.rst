@@ -5,8 +5,7 @@
 Installation
 ============
 
-In this section we describe how to install AequilibraE. The recommendations on this page are current 
-as of September 2024.
+In this section we describe how to install AequilibraE.
 
 .. important::
    Although AequilibraE is under intense development, we try to avoid making
@@ -25,9 +24,11 @@ Installation
 
   pip install aequilibrae
 
-.. admonition:: Python installations from the Windows store are NOT SUPPORTED
-
-  The Windows App Store ships a version of Python that contains an sqlite dll that does not support the loading of extensions. This means that Spatialite will not be loaded, and therefore AequilibraE will not work properly.
+That is all: AequilibraE's spatial database engine is implemented in pure Python on
+top of shapely, pyproj and SQLite's built-in R*Tree module, so no native SpatiaLite
+library (``mod_spatialite``), system package or runtime download is required on any
+platform. The project databases AequilibraE creates remain standard SpatiaLite
+files, fully compatible with QGIS and other SpatiaLite-aware tools.
 
 macOS
 ^^^^^
@@ -36,19 +37,15 @@ AequilibraE does not provide pre-built wheel files for macOS. When installing fr
 
 #. Install `homebrew <https://brew.sh/>`_, a package manager for macOS, if you do not have it already.
 #. Install LLVM or another C/C++ compiler with OpenMP support: ``brew install llvm``
-#. Install libspatialite: ``brew install libspatialite`` as per `this answer on Stack Overflow <https://stackoverflow.com/a/48370444/1480643>`_
 #. Set the C and C++ compilers: ``export CXX=/opt/homebrew/opt/llvm/bin/clang++`` and ``export CC=/opt/homebrew/opt/llvm/bin/clang``
-#. Set the ``AEQ_SPATIALITE_DIR`` environment variable to the directory containing ``mod_spatialite``: ``export AEQ_SPATIALITE_DIR="$(brew --prefix)/lib"``
 
 Alternatively, run all steps at once:
 
 ::
 
   brew install llvm
-  brew install libspatialite
   export CXX=/opt/homebrew/opt/llvm/bin/clang++
   export CC=/opt/homebrew/opt/llvm/bin/clang
-  export AEQ_SPATIALITE_DIR="/opt/homebrew/lib"
 
 AequilibraE may also require raising the "open files" limit, this can be achieved with ``ulimit -n 10240``. This should be placed in ``.zshrc`` or similar user shell configuration file.
 
@@ -57,7 +54,7 @@ AequilibraE may also require raising the "open files" limit, this can be achieve
 Dependencies
 ------------
 
-All of AequilibraE's dependencies are readily available from `PyPI <https://www.pypi.org/>`_ 
+All of AequilibraE's dependencies are readily available from `PyPI <https://www.pypi.org/>`_
 for all currently supported Python versions and major platforms.
 
 .. _installing_spatialite:
@@ -65,62 +62,15 @@ for all currently supported Python versions and major platforms.
 SpatiaLite
 ++++++++++
 
-Although the presence of SpatiaLite is rather ubiquitous in the GIS ecosystem,
-it has to be installed separately from Python or AequilibraE in any platform.
+Older versions of AequilibraE (up to 1.7) required the native SpatiaLite extension
+(``mod_spatialite``) to be present: a Debian/Homebrew package on Linux/macOS, or a
+binary download on Windows. This is **no longer necessary**: the subset of
+SpatiaLite that AequilibraE uses is provided by a bundled, pure-Python
+implementation, and projects created either way are interchangeable.
 
-This `blog post <https://xl-optim.com/spatialite-and-python-in-2020/>`_ has a more
-comprehensive explanation of what is the setup you need to get SpatiaLite working,
-but that is superfluous if all you want is to get it working.
-
-Windows
-^^^^^^^
-
-.. note::
-   On Windows ONLY, AequilibraE automatically verifies if you have SpatiaLite
-   installed in your system and downloads it to your temporary folder if you do
-   not.
-
-SpatiaLite does not have great support on Python for Windows. For this reason,
-it is necessary to download SpatiaLite for Windows and inform and load it
-to the Python SQLite driver every time you connect to the database.
-
-One can download the appropriate version of the latest SpatiaLite release
-directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ , or the
-cached versions on AequilibraE's website for
-`64-Bit Python <https://github.com/AequilibraE/aequilibrae/releases/tag/V.0.7.5>`_
-
-After unpacking the zip file into its own folder (say ``D:/spatialite``), one can
-*temporarily* add the SpatiaLite folder to system path environment variable,
-as follows:
-
-::
-
-  import os
-  os.environ['PATH'] = 'D:/spatialite' + ';' + os.environ['PATH']
-
-For a permanent recording of the SpatiaLite location on your system, please refer
-to the blog post referenced above or Windows-specific documentation.
-
-Ubuntu Linux
-^^^^^^^^^^^^
-
-On Ubuntu it is possible to install SpatiaLite by simply using apt-get
-
-::
-
-  sudo apt update -y
-  sudo apt install -y libsqlite3-mod-spatialite
-  sudo apt install -y libspatialite-dev
-
-MacOS
-^^^^^
-
-On MacOS one can use brew as per
-`this answer on Stack Overflow <https://stackoverflow.com/a/48370444/1480643>`_.
-
-::
-
-  brew install libspatialite
+The ``AEQ_SPATIALITE_DIR`` environment variable and the automatic Windows download
+have been removed. If you maintain scripts that referenced them, they can simply be
+deleted.
 
 Hardware requirements
 ---------------------

@@ -24,20 +24,12 @@ You can check more specifications on OSM download on the :ref:`parameters_file`.
 Python limitations
 ~~~~~~~~~~~~~~~~~~
 
-As it happens in other cases, Python's usual implementation of SQLite is
-incomplete, and does not include R-Tree, a key extension used by SpatiaLite for
-GIS operations.
+AequilibraE's spatial indices are standard SQLite `R-Tree
+<https://www.sqlite.org/rtree.html>`_ tables, and the R-Tree module is compiled
+into every current CPython build, so no additional installation is needed.
 
-If you want to learn a little more about this topic, you can access this
-`blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
-or check out the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
-
-This limitation issue is solved when installing SpatiaLite, as shown
-in :ref:`the dependencies page <installing_spatialite>`.
-
-Please also note that AequilibraE's network consistency triggers **will NOT work** 
-before spatial indices have been created and/or if the editing is being done on a
-platform that does not support both R-Tree and SpatiaLite.
+Please note that AequilibraE's network consistency triggers **will NOT work**
+before spatial indices have been created.
 
 .. seealso::
 

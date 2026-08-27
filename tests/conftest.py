@@ -13,13 +13,11 @@ from aequilibrae import Project
 from aequilibrae.project.project_creation import remove_triggers
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
 from tests.data.reference_files import siouxfalls_project
 
 faulthandler.enable()
 
 DEFAULT_PROJECT = siouxfalls_project
-ensure_spatialite_binaries()
 
 
 @pytest.fixture(scope="session")
