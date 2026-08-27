@@ -6,10 +6,11 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 import yaml
-from aequilibrae.distribution.cython.ipf_core import ipf_core
 
 from aequilibrae.context import get_active_project
+from aequilibrae.distribution.cython.ipf_core import ipf_core
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.utils.core_setter import resolve_cores
 
 
 class Ipf:
@@ -239,5 +240,5 @@ class Ipf:
         with open(path + "/parameters.yml", "r") as yml:
             path = yaml.safe_load(yml)
 
-        self.cpus = int(path["system"]["cpus"])
+        self.cpus = resolve_cores(path["system"])
         return path["distribution"][model]

@@ -18,7 +18,7 @@ as of September 2024.
 Installation
 ------------
 
-1. Install `Python 3.10, 3.11, 3.12, 3.13 & 3.14 <https://www.python.org/downloads/>`_. We recommend Python 3.11 or 3.12
+1. Install `Python 3.11, 3.12, 3.13 & 3.14 <https://www.python.org/downloads/>`_. We recommend Python 3.12 or 3.13
 2. Install AequilibraE
 
 ::
@@ -127,8 +127,8 @@ On MacOS one can use brew as per
 Hardware requirements
 ---------------------
 
-AequilibraE's requirements depend heavily on the size of the model you are using
-for computation. The most important things to keep an eye on are:
+How much hardware AequilibraE needs is driven mostly by the size of the model
+being used. The most important things to keep an eye on are:
 
 * Number of zones on your model (size of the matrices you are dealing with)
 * Number of matrices (vehicles classes (and user classes) you are dealing with)

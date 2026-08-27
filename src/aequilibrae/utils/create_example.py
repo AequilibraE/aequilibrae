@@ -6,7 +6,7 @@ from typing import List
 from aequilibrae.project.project import Project
 
 
-def create_example(path: os.PathLike, from_model="sioux_falls") -> Project:
+def create_example(path: os.PathLike | str, from_model="sioux_falls") -> Project:
     """Copies an example model to a new project project and returns the project handle
 
     :Arguments:

@@ -1,12 +1,13 @@
-from io import TextIOWrapper
-import numpy as np
-import csv
 import copy
+import csv
+from io import TextIOWrapper
+
+import numpy as np
 from numpy.lib.recfunctions import append_fields
 
 
-def parse_csv(file_name: str, column_order=[]):  # noqa B006
-    tot = []
+def parse_csv(file_name: str, column_order={}):  # noqa B006
+    tot: list[list[str]] = []
     if isinstance(file_name, str):
         csvfile = open(file_name, encoding="utf-8-sig")
     else:
@@ -17,7 +18,7 @@ def parse_csv(file_name: str, column_order=[]):  # noqa B006
     for row in contents:
         if not len("".join(row).strip()):
             continue
-        broken = [x.encode("ascii", errors="ignore").decode().strip() for x in row]
+        broken: list[str] = [x.encode("ascii", errors="ignore").decode().strip() for x in row]
 
         if not numcols:
             numcols = len(broken)
@@ -26,10 +27,11 @@ def parse_csv(file_name: str, column_order=[]):  # noqa B006
                 broken.extend([""] * (numcols - len(broken)))
 
         tot.append(broken)
-    titles = tot.pop(0)
+    titles: list[str] = tot.pop(0)
     csvfile.close()
     if tot:
-        data = np.rec.fromrecords(tot, names=[x.lower() for x in titles])
+        lowercase_titles = [title.lower() for title in titles]
+        data = np.rec.fromrecords(tot, names=lowercase_titles)
     else:
         return empty()
 
@@ -48,8 +50,7 @@ def parse_csv(file_name: str, column_order=[]):  # noqa B006
                 column_order[c] = object
             else:
                 if data[c].dtype.char.upper() in ["U", "S"]:
-                    mask = data[c] == ""
-                    data[c] = np.where(mask, "0", data[c])
+                    data[c] = np.where(data[c] == "", "0", data[c])
 
         new_data_dt = [(f, column_order[f]) for f in col_names]
 

@@ -1,33 +1,4 @@
 # cython: language_level=3str
-from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
-from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.utils.cython.bridge cimport Bridge, log, f, DEBUG, msleep
-from aequilibrae.utils.cython.bar cimport Bar
-
-
-from cython.operator cimport dereference as d
-from cython.parallel cimport parallel, prange, threadid
-from libc.limits cimport UINT_MAX
-from libc.string cimport memcpy
-from libcpp cimport nullptr
-from libcpp.algorithm cimport reverse, copy
-from libcpp.unordered_set cimport unordered_set
-from libcpp.utility cimport pair
-from libcpp.vector cimport vector
-from libcpp cimport bool
-from openmp cimport omp_get_max_threads
-
-from libcpp.memory cimport shared_ptr
-
-from typing import Tuple
-import itertools
-import warnings
-
-import numpy as np
-import pandas as pd
-
-
 """This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen, 'Route
 Choice Sets for Very High-Resolution Data'.  https://doi.org/10.1080/18128602.2012.671383
 
@@ -80,9 +51,41 @@ routes aren't required small-ish things like the memcpy and banned link set copy
 
 """
 
-# It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation
-# times
-include 'basic_path_finding.pyx'
+import cython
+from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.cython.basic_path_finding cimport (
+    blocking_centroid_flows,
+    path_finding,
+    path_finding_a_star,
+    Heuristic,
+)
+from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
+from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG
+from aequilibrae.utils.cython.bar cimport Bar
+
+
+from cython.operator cimport dereference as d
+from cython.parallel cimport parallel, prange, threadid
+from libc.limits cimport UINT_MAX
+from libc.math cimport INFINITY
+from libc.string cimport memcpy
+from libcpp cimport nullptr
+from libcpp.algorithm cimport reverse, copy
+from libcpp.unordered_set cimport unordered_set
+from libcpp.utility cimport pair
+from libcpp.vector cimport vector
+from libcpp cimport bool
+from openmp cimport omp_get_max_threads
+
+from libcpp.memory cimport shared_ptr
+
+from typing import Tuple
+import itertools
+import warnings
+
+import numpy as np
+import pandas as pd
 
 
 @cython.embedsignature(True)
@@ -115,6 +118,7 @@ cdef class RouteChoiceSet:
         self.block_flows_through_centroids = graph.block_centroid_flows
 
         self.mapping_idx, self.mapping_data, _ = graph.create_compressed_link_network_mapping()
+        self.link_id_direction = (graph.graph.link_id * graph.graph.direction).to_numpy(copy=False)
 
         self.results = None
         self.ll_results = None
@@ -173,6 +177,7 @@ cdef class RouteChoiceSet:
         bfsle: bool = True,
         penalty: float = 1.0,
         where: Optional[str] = None,
+        to_parquet_kwargs: dict | None = None,
         store_results: bool = True,
         path_size_logit: bool = False,
         beta: float = 1.0,
@@ -201,6 +206,7 @@ cdef class RouteChoiceSet:
                 penalisation. Default ``True``.
             **penalty** (:obj:`float`): Penalty to use for Link Penalisation and BFSLE with LP.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
         cdef:
             long long origin, dest
@@ -242,19 +248,19 @@ cdef class RouteChoiceSet:
 
             # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this
             # memory
-            double [:, :] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
-            long long [:, :] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] b_nodes_matrix = np.broadcast_to(
+            double [:, ::1] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
+            long long [:, ::1] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, ::1] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, ::1] b_nodes_matrix = np.broadcast_to(
                 self.b_nodes_view,
                 (c_cores, self.b_nodes_view.shape[0])
             ).copy()
 
             # This matrix is never read from, it exists to allow using the Dijkstra's method without changing the
             # interface.
-            long long [:, :] _reached_first_matrix
+            long long [:, ::1] _reached_first_matrix
 
-            unsigned char [:, :] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
+            unsigned char [:, ::1] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
 
             # self.a_star = a_star
 
@@ -290,6 +296,7 @@ cdef class RouteChoiceSet:
                 self.cost_view,
                 self.mapping_idx,
                 self.mapping_data,
+                self.link_id_direction,
                 store_results=store_results,
                 perform_assignment=path_size_logit,
             )
@@ -304,7 +311,7 @@ cdef class RouteChoiceSet:
 
                     origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                     dest_index = self.nodes_to_indices_view[demand.ods[i].second]
-                    log(bridge, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
+                    log(bridge.c, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
 
                     if origin_index == dest_index:
                         bar.inc()
@@ -373,7 +380,6 @@ cdef class RouteChoiceSet:
                             thread_id
                         )
 
-
                     if d(route_vec).size() == 0 or found_zero_cost:
                         with gil:
                             if found_zero_cost:
@@ -398,7 +404,7 @@ cdef class RouteChoiceSet:
             if store_results:
                 self.get_results()
                 if where is not None:
-                    self.results.write(where)
+                    self.results.write(where, to_parquet_kwargs if to_parquet_kwargs is not None else {})
 
         if path_size_logit:
             self.ll_results.reduce_link_loading()
@@ -443,13 +449,16 @@ cdef class RouteChoiceSet:
             if not isinstance(route_list, (list, np.ndarray)):
                 raise TypeError(f"route sets must be a list or Numpy array, found {type(route_list)}")
 
-        # We want to enforce that if the demand matrix cell is non-cell for an OD pair, then at least one route exists to assign to it
+        # We want to enforce that if the demand matrix cell is non-cell for an OD pair, then at least one route exists
+        # to assign to it
         demand_df = demand.df.assign(idx=np.arange(len(demand.df)))
         demand_df = demand_df[demand_df.index.get_level_values(0) != demand_df.index.get_level_values(1)]
 
         df = df.set_index(demand_df.index.names)
         if not demand_df.index.drop_duplicates().isin(df.index).all():
-            raise KeyError("not all origin and destinations IDs from the demand matrix are present within the path files")
+            raise KeyError(
+                "not all origin and destinations IDs from the demand matrix are present within the path files"
+            )
 
         # We also store those indices along side the route sets themselves so it's easier to keep track
         df = demand_df[["idx"]].merge(df, how="left", left_index=True, right_index=True).reset_index()
@@ -470,6 +479,7 @@ cdef class RouteChoiceSet:
             self.cost_view,
             self.mapping_idx,
             self.mapping_data,
+            self.link_id_direction,
             store_results=store_results,
             perform_assignment=True,
         )
@@ -541,12 +551,12 @@ cdef class RouteChoiceSet:
         RouteChoiceSet self,
         long origin_index,
         long dest_index,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        unsigned char [:] thread_destinations
+        double [::1] thread_cost,
+        long long [::1] thread_predecessors,
+        long long [::1] thread_conn,
+        long long [::1] thread_b_nodes,
+        long long [::1] _thread_reached_first,
+        unsigned char [::1] thread_destinations
     ) noexcept nogil:
         """Small wrapper around path finding, thread locals should be passes as arguments."""
         if self.a_star:
@@ -562,7 +572,7 @@ cdef class RouteChoiceSet:
                 thread_predecessors,
                 self.ids_graph_view,
                 thread_conn,
-                EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
+                Heuristic.EQUIRECTANGULAR
             )
         else:
             thread_destinations[dest_index] = True
@@ -592,12 +602,12 @@ cdef class RouteChoiceSet:
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        unsigned char [:] thread_destinations,
+        double [::1] thread_cost,
+        long long [::1] thread_predecessors,
+        long long [::1] thread_conn,
+        long long [::1] thread_b_nodes,
+        long long [::1] _thread_reached_first,
+        unsigned char [::1] thread_destinations,
         double penalty,
         unsigned int seed
     ) noexcept nogil:
@@ -646,7 +656,7 @@ cdef class RouteChoiceSet:
 
         # We'll go at most `max_depth` iterations down, at each depth we maintain a queue of the next set of banned
         # edges to consider
-        for depth in range(max_depth):
+        for _depth in range(max_depth):
             if miss_count > max_misses or route_set.size() >= max_routes or queue.size() == 0:
                 break
 
@@ -734,8 +744,9 @@ cdef class RouteChoiceSet:
 
                     if miss_count > max_misses or route_set.size() >= max_routes:
                         free_remaining = True
-                        continue  # This condition will be hit again at the start of the loop, we just don't want to
-                                  # iterate over the rest of the things in queue when we know there is not more space.
+                        # This condition will be hit again at the start of the loop, we just don't want to
+                        # iterate over the rest of the things in queue when we know there is not more space.
+                        continue
                 else:
                     pass
 
@@ -775,12 +786,12 @@ cdef class RouteChoiceSet:
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        unsigned char [:] thread_destinations,
+        double [::1] thread_cost,
+        long long [::1] thread_predecessors,
+        long long [::1] thread_conn,
+        long long [::1] thread_b_nodes,
+        long long [::1] _thread_reached_first,
+        unsigned char [::1] thread_destinations,
         double penalty,
         unsigned int seed
     ) noexcept nogil:
@@ -796,7 +807,7 @@ cdef class RouteChoiceSet:
         max_depth = max_depth if max_depth != 0 else UINT_MAX
         memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
-        for depth in range(max_depth):
+        for _depth in range(max_depth):
             if route_set.size() >= max_routes:
                 break
 
@@ -888,7 +899,7 @@ cdef class RouteChoiceSet:
 
         return self.ll_results.sl_od_matrices_structs_to_objects()
 
-    def write_path_files(RouteChoiceSet self, where):
+    def write_path_files(RouteChoiceSet self, where, to_parquet_kwargs):
         """
         Write the path-files to the directory specified
 
@@ -898,4 +909,4 @@ cdef class RouteChoiceSet:
         if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
-        self.results.write(where)
+        self.results.write(where, to_parquet_kwargs)

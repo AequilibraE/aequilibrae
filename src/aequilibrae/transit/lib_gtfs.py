@@ -109,7 +109,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
             Modes not covered in the data will not be touched and distance brackets not covered will receive
             the maximum speed, with a warning
         """
-        dict_speeds = dict(max_speeds.groupby(["mode"]))
+        # Grouping by a scalar (rather than a single-element list) keeps the dict keys scalar mode ids,
+        # which is what GTFSReader looks them up by
+        dict_speeds = dict(iter(max_speeds.groupby("mode")))
         self.gtfs_data._set_maximum_speeds(dict_speeds)
 
     def dates_available(self) -> list:

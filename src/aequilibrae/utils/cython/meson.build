@@ -7,6 +7,7 @@ pyfiles = [
 exts = [
   'bar',
   'bridge',
+  'openmp_helper',
 ]
 
 py.install_sources(

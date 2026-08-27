@@ -1,15 +1,12 @@
-import os
 from warnings import warn
 
 import pytest
-from shapely.geometry import box, Polygon
+from shapely.geometry import Polygon, box
 
 
-def test_create_from_osm(empty_project):
-    if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
-        pytest.skip("Skipped check to not load OSM servers")
-
-    empty_project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
+def test_create_from_osm(empty_project, mock_overpass_grid):
+    _ = mock_overpass_grid
+    empty_project.network.create_from_osm(place=box(-112.185, 36.59, -112.179, 36.60))
 
     with empty_project.db_connection as conn:
         lks = conn.execute("""select count(*) from links""").fetchone()[0]

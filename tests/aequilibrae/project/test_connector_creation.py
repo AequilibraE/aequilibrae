@@ -20,7 +20,7 @@ def test_bulk_connector_creation_single_mode(coquimbo_example, initial_state):
     """Test basic connector creation with a single mode."""
     project = coquimbo_example
 
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -58,7 +58,7 @@ def test_bulk_connector_creation_multiple_modes(coquimbo_example, initial_state,
     """Test connector creation with different mode combinations."""
     project = coquimbo_example
 
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -89,7 +89,7 @@ def test_bulk_connector_creation_k_connectors(coquimbo_example, initial_state, k
     """Test creating multiple connectors per centroid."""
     project = coquimbo_example
 
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -121,7 +121,7 @@ def test_bulk_connector_creation_zone_limitation(coquimbo_example, initial_state
     """Test connector creation with and without zone limitation."""
     project = coquimbo_example
 
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -152,7 +152,7 @@ def test_bulk_connector_creation_geometry_validation(coquimbo_example, initial_s
     """Test that connector geometries are properly formed."""
     project = coquimbo_example
 
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -188,7 +188,7 @@ def test_bulk_connector_creation_distance_upper_bound(coquimbo_example, initial_
     project = coquimbo_example
 
     # Test with very small distance bound - should create fewer connectors
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -204,7 +204,7 @@ def test_bulk_connector_creation_distance_upper_bound(coquimbo_example, initial_
     connectors_small = updated_links_small[updated_links_small.link_type == "centroid_connector"]
 
     # Reset and test with large distance bound
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -229,7 +229,7 @@ def test_bulk_connector_creation_no_changes_when_no_work(coquimbo_example, initi
     project = coquimbo_example
 
     # First, create some connectors
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
@@ -243,7 +243,7 @@ def test_bulk_connector_creation_no_changes_when_no_work(coquimbo_example, initi
     intermediate_links = project.network.links.data.copy()
 
     # Run again with same parameters - should not create duplicate connectors
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
             project_nodes=project.network.nodes.data,

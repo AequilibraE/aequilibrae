@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import logging
 import pickle
@@ -7,22 +9,27 @@ from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from os.path import join
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
+from aequilibrae.paths.connectivity_analysis import disconnected_analysis
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+
+if TYPE_CHECKING:
+    from aequilibrae.paths import PathResults
 
 logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
 class NetworkGraphIndices:
-    network_ab_idx: np.array
-    network_ba_idx: np.array
-    graph_ab_idx: np.array
-    graph_ba_idx: np.array
+    network_ab_idx: np.ndarray
+    network_ba_idx: np.ndarray
+    graph_ab_idx: np.ndarray
+    graph_ba_idx: np.ndarray
 
 
 def _get_graph_to_network_mapping(lids, direcs):
@@ -172,7 +179,6 @@ class GraphBase(ABC):  # noqa: B024
         self.__network_error_checking__()
 
         # Creates the centroids
-
         if centroids is not None:
             if not np.issubdtype(centroids.dtype, np.integer):
                 raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
@@ -239,10 +245,10 @@ class GraphBase(ABC):  # noqa: B024
 
         # Swap the a and b nodes of these edges. Direction is used for mapping the graph.graph back
         # to the network. It does not indicate the direction of the link.
-        not_pos.loc[:, "direction"] = -1
+        not_pos["direction"] = -1
         aux = np.array(not_pos.a_node.values, copy=True)
-        not_pos.loc[:, "a_node"] = not_pos.loc[:, "b_node"]
-        not_pos.loc[:, "b_node"] = aux[:]
+        not_pos["a_node"] = not_pos["b_node"]
+        not_pos["b_node"] = aux[:]
         del aux
 
         pos_names = []
@@ -253,7 +259,7 @@ class GraphBase(ABC):  # noqa: B024
                 pos_names.append(name + "_ab")
         not_negs = pd.DataFrame(not_negs, copy=True)[pos_names]
         not_negs.columns = names
-        not_negs.loc[:, "direction"] = 1
+        not_negs["direction"] = 1
 
         df = pd.concat([not_negs, not_pos])
 
@@ -305,7 +311,7 @@ class GraphBase(ABC):  # noqa: B024
         early_exit: bool = False,
         a_star: bool = False,
         heuristic: Union[str, None] = None,
-    ):
+    ) -> PathResults:
         """
         Returns the results from path computation result holder.
 
@@ -324,9 +330,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         from aequilibrae.paths import PathResults
 
-        res = PathResults()
-        res.prepare(self)
-        res.compute_path(origin, destination, early_exit, a_star, heuristic)
+        res = PathResults(self, origin, destination, early_exit, a_star, heuristic)
 
         return res
 
@@ -364,6 +368,15 @@ class GraphBase(ABC):  # noqa: B024
             self.prepare_graph(self.centroids)
             self.set_blocked_centroid_flows(self.block_centroid_flows)
         self._id = uuid.uuid4().hex
+
+    def disconnected_nodes(self) -> np.ndarray:
+        """
+        Executes strongly connected components analysis on the directed graph
+
+        :Returns:
+            **array** (:obj:`np.ndarray`): All nodes disconnected from the main portion of the network
+        """
+        return disconnected_analysis(self)
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = list(self.required_default_fields)
@@ -460,11 +473,11 @@ class GraphBase(ABC):  # noqa: B024
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
-        if self.centroids.shape[0]:
+        if self.centroids is not None and self.centroids.shape[0]:
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
             gpb = self.__graph_groupby
-            if any(x not in self.__graph_groupby for x in skim_fields):
+            if any(x not in gpb.obj.columns for x in skim_fields):
                 gpb = self.graph.groupby(["__compressed_id__"])
 
             df = gpb.sum(numeric_only=True)[skim_fields].reset_index()
@@ -622,14 +635,17 @@ class GraphBase(ABC):  # noqa: B024
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
 
-    def create_compressed_link_network_mapping(self):
+    def create_compressed_link_network_mapping(
+        self,
+    ) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_], npt.NDArray[np.generic]]:
         """
-        Create three arrays providing a mapping of compressed ID to link ID.
+        Create three arrays providing a mapping of compressed ID to graph link index.
 
-        Uses sparse compression. Index 'idx' by the by compressed ID and compressed ID + 1, the
-        network IDs are then in the range ``idx[id]:idx[id + 1]``.
+        Uses sparse compression. Index 'idx' by the compressed ID and compressed ID + 1, the
+        network IDs are then at the indices ``idx[id]:idx[id + 1]``.
 
-        Links not in the compressed graph are not contained within the 'data' array.
+        Links not in the compressed graph are given the max compressed, they are in the 'data' array at that ID, but are
+        not ordered.
 
         'node_mapping' provides an easy way to check if a node index is present within the compressed graph. If the
         value is -1 then the node has been removed, either by compression of dead end link removal. If the value is
@@ -651,7 +667,7 @@ class GraphBase(ABC):  # noqa: B024
         :Returns:
             **idx** (:obj:`np.array`): index array for ``data``
 
-            **data** (:obj:`np.array`): array of link ids
+            **data** (:obj:`np.array`): array of indices into graph.graph.
 
             **node_mapping**: (:obj:`np.array`): array of node_mapping ids
         """
@@ -670,7 +686,7 @@ class Graph(GraphBase):
 
 
 class TransitGraph(GraphBase):
-    def __init__(self, config: dict = None, od_node_mapping: pd.DataFrame = None, *args, **kwargs):
+    def __init__(self, config: Optional[dict] = None, od_node_mapping: Optional[pd.DataFrame] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._config = config
         self.od_node_mapping = od_node_mapping

@@ -13,7 +13,6 @@ from aequilibrae.utils.db_utils import NestedTransactionManager
 if TYPE_CHECKING:
     from aequilibrae.project.network.links import Links
 
-
 INFINITE_CAPACITY = 99999
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,7 @@ def connector_creation(
         logger.warning("Mode is already connected")
         return
 
-    centroid = proj_nodes.query("node_id == @zone_id")  # type: gpd.GeoDataFrame
+    centroid: pd.DataFrame = proj_nodes.query("node_id == @zone_id")
     centroid = centroid.rename(columns={"node_id": "zone_id"})[["zone_id", "geometry"]]
 
     nodes = proj_nodes.query("is_centroid != 1 and modes.str.contains(@mode_id)", engine="python")
@@ -100,7 +99,7 @@ def bulk_connector_creation(
     limit_to_zone: bool = True,
     distance_upper_bound: float = float("inf"),
     projected_crs: Union[str, int, None] = None,
-):
+) -> None:
     """
     Creates or updates centroid connectors between zone centroids and network nodes.
 
@@ -247,7 +246,7 @@ def k_nearest(
     nodes: gpd.GeoDataFrame,
     distance_upper_bound: float,
     crs: Union[int, str],
-):
+) -> pd.DataFrame:
     """
     Finds the k nearest nodes to each centroid using a KDTree spatial index.
 
@@ -302,7 +301,7 @@ def k_nearest_in_zone(
     nodes: gpd.GeoDataFrame,
     distance_upper_bound: float,
     crs: Union[int, str],
-):
+) -> pd.DataFrame:
     """
     Finds the k nearest nodes within each zone to the corresponding centroid.
 
@@ -368,7 +367,7 @@ def k_nearest_in_zone(
     return df.groupby(by="a_node").head(k)
 
 
-def normalise_mode_strings(x):
+def normalise_mode_strings(x) -> str:
     """
     Normalises a collection of mode strings by sorting unique characters.
 

@@ -1,72 +1,60 @@
-import multiprocessing as mp
 import sys
 
-from aequilibrae.paths.cython.AoN import connectivity_multi_threaded
-
-from aequilibrae.utils.core_setter import set_cores
-from aequilibrae.utils.aeq_signal import SIGNAL
+import numpy as np
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
 
 sys.dont_write_bytecode = True
 
 
-class ConnectivityAnalysis:
-    """
+def _analysis(anodes: np.ndarray, bnodes: np.ndarray) -> np.ndarray:
+    if anodes.size == 0 or bnodes.size == 0:
+        return np.array([], dtype=np.int64)
 
-    .. code-block:: python
+    n = np.max([np.max(anodes), np.max(bnodes)]) + 1
+    csr = coo_matrix((np.ones(anodes.shape[0]), (anodes, bnodes)), shape=(n, n)).tocsr()
+    n_components, labels = connected_components(csgraph=csr, directed=True, return_labels=True, connection="strong")
 
-        >>> from aequilibrae.paths.connectivity_analysis import ConnectivityAnalysis
+    # We then identify all the link/directions that have the highest connectivity degree (i.e. the biggest island)
+    bc = np.bincount(labels)
+    max_label = np.where(bc == bc.max())[0][0]
+    return np.where(labels != max_label)[0]
 
-        >>> project = create_example(project_path)
 
-        >>> network = project.network
-        >>> network.build_graphs()
+def non_blocking_through_centroids(graph) -> np.ndarray:
+    anodes = graph.graph.a_node.to_numpy()
+    bnodes = graph.graph.b_node.to_numpy()
+    disconnected = _analysis(anodes, bnodes)
+    return graph.all_nodes[disconnected]
 
-        >>> graph = network.graphs['c']
-        >>> graph.set_graph(cost_field="distance")
-        >>> graph.set_blocked_centroid_flows(False)
 
-        >>> conn_test = ConnectivityAnalysis(graph)
-        >>> conn_test.execute()
+def blocking_through_centroids(graph) -> np.ndarray:
+    edges = graph.graph
 
-        # The connectivity tester report as a Pandas DataFrame
-        >>> disconnected = conn_test.disconnected_pairs
+    turns = (
+        edges[["id", "b_node"]]
+        .rename(columns={"id": "in_link", "b_node": "node"})
+        .merge(
+            edges[["id", "a_node"]].rename(columns={"id": "out_link", "a_node": "node"}),
+            on="node",
+            how="inner",
+        )
+    )
 
-        >>> project.close()
-    """
+    turns = turns[turns["in_link"] != turns["out_link"]]
+    turns = turns[turns["node"] >= graph.centroids.shape[0]]
 
-    connectivity = SIGNAL(object)
+    anodes = turns.in_link.to_numpy()
+    bnodes = turns.out_link.to_numpy()
 
-    def __init__(self, graph, origins=None, project=None):
-        self.project = project
-        self.origins = origins
-        self.graph = graph
-        self.cores = mp.cpu_count()
-        self.report = []
-        self.procedure_id = ""
-        self.procedure_date = ""
-        self.cumulative = 0
+    disconnected = _analysis(anodes, bnodes)
+    if disconnected.shape[0] == 0:
+        return disconnected
+    disconnected = graph.graph[graph.graph["id"].isin(disconnected)]["a_node"].to_numpy()
+    return graph.all_nodes[disconnected]
 
-    def doWork(self):
-        self.execute()
 
-    def execute(self):
-        """Runs the skimming process as specified in the graph"""
-
-        self.disconnected_pairs = connectivity_multi_threaded(self)
-        self.disconnected_pairs = self.disconnected_pairs.sort_values(["origin", "destination"])
-
-    def set_cores(self, cores: int) -> None:
-        """
-        Sets number of cores (threads) to be used in computation
-
-        Value of zero sets number of threads to all available in the system, while negative values indicate the number
-        of threads to be left out of the computational effort.
-
-        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
-        inputs result in values outside those limits
-
-        :Arguments:
-            **cores** (:obj:`int`): Number of cores to be used in computation
-        """
-
-        self.cores = set_cores(cores)
+def disconnected_analysis(graph) -> np.ndarray:
+    if graph.block_centroid_flows:
+        return blocking_through_centroids(graph)
+    return non_blocking_through_centroids(graph)

@@ -3,6 +3,7 @@ thisdir = 'aequilibrae/project'
 pyfiles = [
   'project_table.py',
   '__init__.py',
+  '__main__.py',
   'about.py',
   'database_connection.py',
   'field_editor.py',

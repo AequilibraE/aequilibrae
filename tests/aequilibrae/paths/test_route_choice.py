@@ -5,11 +5,11 @@ from os.path import join
 import numpy as np
 import pandas as pd
 import pytest
+from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.utils.cython.bridge import Bridge
 
 from aequilibrae.matrix import AequilibraeMatrix, GeneralisedCOODemand
 from aequilibrae.paths.route_choice import RouteChoice
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.utils.cython.bridge import Bridge
 
 
 @pytest.fixture(scope="function")
@@ -226,6 +226,55 @@ def test_round_trip(route_choice_setup):
     table2 = table2[table.columns].sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
 
     pd.testing.assert_frame_equal(table, table2)
+
+
+def test_to_parquet_kwargs(route_choice_setup):
+    pq = pytest.importorskip("pyarrow.parquet")
+    project = route_choice_setup["project"]
+    mat = route_choice_setup["mat"]
+    rc = route_choice_setup["rc"]
+
+    rc.add_demand(mat)
+    rc.set_choice_set_generation("link-penalization", max_routes=5, penalty=1.1)
+    rc.prepare()
+
+    def compressions(where):
+        files = list(pathlib.Path(where).rglob("*.parquet"))
+        assert files, f"no parquet files written to `{where}`"
+        codecs = set()
+        for f in files:
+            metadata = pq.ParquetFile(f).metadata
+            for i in range(metadata.num_row_groups):
+                for j in range(metadata.num_columns):
+                    codecs.add(metadata.row_group(i).column(j).compression)
+        return codecs
+
+    # Without to_parquet_kwargs the default compression applies
+    default_path = pathlib.Path(project.project_base_path) / "default kwargs"
+    default_path.mkdir()
+    rc.set_save_routes(default_path)
+    rc.execute(perform_assignment=True)
+    assert compressions(default_path) == {"ZSTD"}
+
+    # to_parquet_kwargs provided to set_save_routes override the defaults of the underlying to_parquet call
+    snappy_path = pathlib.Path(project.project_base_path) / "snappy kwargs"
+    snappy_path.mkdir()
+    rc.set_save_routes(snappy_path, to_parquet_kwargs={"compression": "snappy"})
+    rc.execute(perform_assignment=True)
+    assert compressions(snappy_path) == {"SNAPPY"}
+
+    # Non-overridden defaults still apply, the dataset remains hive partitioned by origin
+    assert all(d.name.startswith("origin id=") for d in snappy_path.iterdir())
+    pd.testing.assert_frame_equal(
+        pd.read_parquet(default_path).sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True),
+        pd.read_parquet(snappy_path).sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True),
+    )
+
+    # save_path_files forwards to_parquet_kwargs in the same manner
+    path_files = pathlib.Path(project.project_base_path) / "path files kwargs"
+    path_files.mkdir()
+    rc.save_path_files(path_files, compression="gzip")
+    assert compressions(path_files) == {"GZIP"}
 
 
 def test_assign_from_df(route_choice_setup):

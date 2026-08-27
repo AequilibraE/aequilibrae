@@ -1,5 +1,7 @@
 import logging
+import os
 import sys
+from contextlib import nullcontext
 
 from aequilibrae.utils.qgis_utils import inside_qgis
 
@@ -24,9 +26,17 @@ class AequilibraETQDMStreamHandler(logging.StreamHandler):
         **kwargs** (:obj:`**kwargs`): Arbitrary keyword arguments passed to the parent logging.StreamHandler.
     """
 
-    def __init__(self, *args, tqdm_class=tqdm, **kwargs):
+    def __init__(self, *args, tqdm_class=tqdm, show_progress: bool | None = None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__show_progress = (
+            show_progress if show_progress is not None else os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE"
+        )
         self.tqdm_class = tqdm_class
+
+        if self.__show_progress and self.tqdm_class is None:
+            raise ValueError(
+                "show_progress (or AEQ_SHOW_PROGRESS) was True but the provided tqdm is None or tqdm failed to import"
+            )
 
     def emit(self, record):
         """Emits a record.
@@ -34,6 +44,10 @@ class AequilibraETQDMStreamHandler(logging.StreamHandler):
         Args:
             record (logging.LogRecord): The log record to emit.
         """
+        if not self.__show_progress:
+            super().emit(record)
+            return
+
         try:
             msg = self.format(record)
             self.tqdm_class.write(msg, file=self.stream, end=self.terminator)
@@ -49,7 +63,7 @@ AequilibraEStreamHandler = (
 )
 
 
-def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEFAULT_FORMAT) -> logging.Handler:
+def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEFAULT_FORMAT) -> logging.Handler | None:
     """
     Configures the root logger for AequilibraE.
 
@@ -70,11 +84,11 @@ def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEF
     """
     logger = logging.getLogger("aequilibrae")
 
-    if any(
-        isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr or handler.stream == sys.stdout
-        for handler in logger.handlers
-    ):
-        return
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler) and (
+            handler.stream == sys.stderr or handler.stream == sys.stdout
+        ):
+            return  # if something else has already been configured then we don't want to do anything
 
     # We disable log propagation up the chain because we don't want the handlers installed on the root logger messing
     # with our progress bars.
@@ -87,6 +101,25 @@ def basic_config(level: int = logging.INFO, stream=sys.stdout, format: str = DEF
     logger.addHandler(handler)
 
     return handler
+
+
+def debug_bridge(logger: logging.Logger):
+    """
+    Context manager yielding a :obj:`Bridge` when ``logger`` is enabled for DEBUG, or ``None`` otherwise.
+
+    The Bridge surfaces DEBUG-level messages emitted from C++/Cython (e.g. which priority queue the
+    path finding is using). Since a Bridge runs a monitoring thread whose teardown can take up to its
+    polling interval, it is only spun up when those messages would actually be logged.
+
+    :Arguments:
+        **logger** (:obj:`logging.Logger`): The logger the Bridge should dispatch to.
+
+    :Returns:
+        **context manager**: yields a :obj:`Bridge` or ``None``.
+    """
+    from aequilibrae.utils.cython.bridge import Bridge
+
+    return Bridge(logger) if logger.isEnabledFor(logging.DEBUG) else nullcontext()
 
 
 def default_log_file_config(handler: logging.Handler, format: str = DEFAULT_FORMAT):

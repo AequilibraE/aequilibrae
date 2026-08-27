@@ -1,10 +1,10 @@
-from aequilibrae.paths.cython.AoN import conical, delta_conical
-from multiprocessing import cpu_count
+from aequilibrae.paths.cython.vdf_core import conical, delta_conical
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 import numpy as np
 
 
 def test_conical_function():
-    cores = cpu_count()
+    cores = omp_get_max_threads()
 
     alpha = np.zeros(11)
     beta = np.zeros(11)
