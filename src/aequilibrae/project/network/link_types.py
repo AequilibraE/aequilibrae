@@ -1,6 +1,6 @@
 from typing import Any
 
-from aequilibrae.project.project_table import NonSpatialProjectTable
+from aequilibrae.project.project_table import _SELECT_ONE_SQL, NonSpatialProjectTable
 
 
 class LinkTypes(NonSpatialProjectTable):
@@ -31,12 +31,16 @@ class LinkTypes(NonSpatialProjectTable):
         ...     for lt in link_types:
         ...         link_types.update(lt.link_type_id, beta=1)
 
-        >>> project.shutdown()
+        >>> project.close()
     """
 
     name = "link_types"
     key = "link_type_id"
     record_name = "LinkTypeRecord"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._select_by_name_sql = _SELECT_ONE_SQL.format(table=self.name, key="link_type", columns="*")
 
     def get_by_name(self, link_type: str) -> Any:
         """Get a link-type record by its descriptive name.
@@ -47,7 +51,8 @@ class LinkTypes(NonSpatialProjectTable):
         :Returns:
             **link type** (:obj:`Any`): Generated frozen link-type record.
         """
-        for lt in self:
-            if lt.link_type == link_type:
-                return lt
-        raise ValueError(f"Link type {link_type} does not exist in the model")
+        self._refresh_record_type()
+        row = self._connection._connection.execute(self._select_by_name_sql, [link_type]).fetchone()
+        if row is None:
+            raise ValueError(f"Link type {link_type} does not exist in the model")
+        return self._build_record(row)
