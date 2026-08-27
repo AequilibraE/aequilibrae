@@ -7,7 +7,8 @@ logger = logging.getLogger(__name__)
 
 
 class Periods(NonSpatialProjectTable):
-    """Access to the API resources to manipulate the periods table in the network
+    """
+    Object to manipulate the periods table in the database.
 
     .. code-block:: python
 
