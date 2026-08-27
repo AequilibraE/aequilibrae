@@ -1,10 +1,12 @@
 import geopandas as gpd
 import logging
+import math
+import networkx as nx
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
 from pathlib import Path
-from shapely.geometry import Point
+from shapely.geometry import MultiPolygon, Point, Polygon, box
 from typing import Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
@@ -23,6 +25,9 @@ from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_le
 from aequilibrae.utils.optional_dependency import require
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_MAX_QUERY_AREA_SIZE = 100_000_000.0
+_QUERY_AREA_CRS = "EPSG:6933"
 
 _RESERVED_LINK_COLS = {
     "a_node",
@@ -51,46 +56,50 @@ def acquire_overpass(
     custom_filter=None,
 ) -> StagedNetwork:
     ox = require("osmnx", feature="OSM Overpass download")
-    _configure_osmnx(ox)
+    params = _configure_osmnx(ox)
 
     if (model_area is None) == (place_name is None):
         raise ImporterError("The osm-overpass source requires exactly one of `model_area` or `place_name`")
 
-    # An explicit area is the caller's choice, so it is never substituted for another one.
-    if model_area is not None:
-        return _fetch_and_stage(
-            ox, modes=modes, download_cache=download_cache, model_area=model_area, custom_filter=custom_filter
-        )
+    if place_name is not None:
+        model_area = _geocode_place(ox, place_name)
 
     return _fetch_and_stage(
-        ox, modes=modes, download_cache=download_cache, place_name=place_name, custom_filter=custom_filter
+        ox,
+        modes=modes,
+        download_cache=download_cache,
+        model_area=model_area,
+        place_name=place_name,
+        custom_filter=custom_filter,
+        max_query_area_size=_max_query_area_size(params),
     )
 
 
-def _fetch_and_stage(ox, *, modes, download_cache, custom_filter, model_area=None, place_name=None) -> StagedNetwork:
+def _fetch_and_stage(
+    ox, *, modes, download_cache, model_area, custom_filter, max_query_area_size, place_name=None
+) -> StagedNetwork:
     source_url = (
-        f"overpass:bbox={list(model_area.bounds)}" if model_area is not None else f"overpass:place={place_name}"
+        f"overpass:place={place_name}" if place_name is not None else f"overpass:bbox={list(model_area.bounds)}"
     )
-
-    from osmnx._errors import InsufficientResponseError
-
-    fetch_kwargs = {"network_type": "all", "simplify": False, "retain_all": True, "custom_filter": custom_filter}
-    try:
-        if model_area is not None:
-            graph = ox.graph_from_polygon(model_area, **fetch_kwargs)
-        else:
-            graph = ox.graph_from_place(place_name, **fetch_kwargs)
-    except InsufficientResponseError as exc:
-        raise ImporterError(f"Overpass returned an empty or partial response for {source_url}: {exc}") from exc
-    except Exception as exc:
-        from requests.exceptions import RequestException
-
-        if isinstance(exc, RequestException):
-            raise ImporterError(f"Overpass request failed: {exc}") from exc
-        raise exc
-
-    if graph is None or graph.number_of_edges() == 0:
+    query_areas = _subdivide_model_area(model_area, max_query_area_size)
+    has_query_seams = len(query_areas) > 1
+    fetch_kwargs = {
+        "network_type": "all",
+        "simplify": False,
+        "retain_all": True,
+        "truncate_by_edge": has_query_seams,
+        "custom_filter": custom_filter,
+    }
+    graphs = []
+    for part, area in enumerate(query_areas, start=1):
+        graph = _fetch_graph(ox, area, fetch_kwargs, source_url, part, len(query_areas))
+        if graph is not None:
+            graphs.append(graph)
+    if not graphs:
         raise ImporterError(f"Overpass returned no edges for the requested area ({source_url})")
+    graph = nx.compose_all(graphs)
+    if has_query_seams:
+        graph = ox.truncate.truncate_graph_polygon(graph, model_area)
 
     nodes_gdf, edges_gdf = ox.convert.graph_to_gdfs(graph, nodes=True, edges=True)
     nodes_gdf = nodes_gdf.reset_index()
@@ -113,10 +122,106 @@ def _fetch_and_stage(ox, *, modes, download_cache, custom_filter, model_area=Non
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
     net = _edges_nodes_to_staged(edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area)
-    # Validated here as well as in NetworkImporter.run() so that a bad response is caught
-    # while there is still another query area left to try.
     net.validate()
     return net
+
+
+def _fetch_graph(ox, area, fetch_kwargs, source_url: str, part: int, total: int):
+    from osmnx._errors import InsufficientResponseError
+
+    try:
+        graph = ox.graph_from_polygon(area, **fetch_kwargs)
+    except InsufficientResponseError as exc:
+        if "No data elements in server response" in str(exc):
+            logger.info(f"No OSM data in {source_url}, part {part}/{total}; skipping it")
+            return None
+        raise ImporterError(
+            f"Overpass returned an empty or partial response for {source_url}, part {part}/{total}: {exc}"
+        ) from exc
+    except ValueError as exc:
+        if "Found no graph nodes within the requested polygon" in str(exc):
+            logger.info(f"No OSM nodes in {source_url}, part {part}/{total}; skipping it")
+            return None
+        raise
+    except Exception as exc:
+        from requests.exceptions import RequestException
+
+        if isinstance(exc, RequestException):
+            raise ImporterError(f"Overpass request failed for {source_url}, part {part}/{total}: {exc}") from exc
+        raise
+
+    if graph is None or graph.number_of_edges() == 0:
+        logger.info(f"No OSM edges in {source_url}, part {part}/{total}; skipping it")
+        return None
+    return graph
+
+
+def _geocode_place(ox, place_name):
+    from osmnx._errors import InsufficientResponseError
+
+    try:
+        result = ox.geocode_to_gdf(place_name)
+    except InsufficientResponseError as exc:
+        raise ImporterError(f"Nominatim could not resolve {place_name!r} to a boundary: {exc}") from exc
+    except Exception as exc:
+        from requests.exceptions import RequestException
+
+        if isinstance(exc, RequestException):
+            raise ImporterError(f"Nominatim request failed for {place_name!r}: {exc}") from exc
+        raise
+    geometry = result.geometry.dropna()
+    if geometry.empty:
+        raise ImporterError(f"Nominatim returned no boundary for {place_name!r}")
+    model_area = geometry.union_all()
+    if not isinstance(model_area, (Polygon, MultiPolygon)):
+        raise ImporterError(f"Nominatim did not return a polygon boundary for {place_name!r}")
+    return model_area
+
+
+def _max_query_area_size(params: dict) -> float:
+    try:
+        size = float(params.get("max_query_area_size", _DEFAULT_MAX_QUERY_AREA_SIZE))
+    except (TypeError, ValueError) as exc:
+        raise ImporterError("osm.max_query_area_size must be a positive number in square metres") from exc
+    if not math.isfinite(size) or size <= 0:
+        raise ImporterError("osm.max_query_area_size must be a positive number in square metres")
+    return size
+
+
+def _subdivide_model_area(model_area, max_area: float) -> list:
+    projected = gpd.GeoSeries([model_area], crs="EPSG:4326").to_crs(_QUERY_AREA_CRS).iloc[0]
+    side = math.sqrt(max_area)
+    pieces = []
+    for component in _polygon_parts(projected):
+        if component.area <= max_area:
+            pieces.append(component)
+            continue
+        minx, miny, maxx, maxy = component.bounds
+        columns = math.ceil((maxx - minx) / side)
+        rows = math.ceil((maxy - miny) / side)
+        for column in range(columns):
+            for row in range(rows):
+                cell = box(
+                    minx + column * side,
+                    miny + row * side,
+                    minx + (column + 1) * side,
+                    miny + (row + 1) * side,
+                )
+                pieces.extend(_polygon_parts(component.intersection(cell)))
+    if not pieces:
+        raise ImporterError("The requested OSM model area contains no polygon geometry")
+    if len(pieces) > 1:
+        logger.info(f"Split OSM model area into {len(pieces)} Overpass query parts")
+    return gpd.GeoSeries(pieces, crs=_QUERY_AREA_CRS).to_crs("EPSG:4326").tolist()
+
+
+def _polygon_parts(geometry):
+    if isinstance(geometry, Polygon):
+        if not geometry.is_empty and geometry.area > 0:
+            yield geometry
+    elif hasattr(geometry, "geoms"):
+        for part in geometry.geoms:
+            yield from _polygon_parts(part)
 
 
 def _collapse_reciprocal_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -155,7 +260,7 @@ def _collapse_reciprocal_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return edges[keep].reset_index(drop=True)
 
 
-def _configure_osmnx(ox) -> None:
+def _configure_osmnx(ox) -> dict:
     from aequilibrae.parameters import Parameters
 
     params = Parameters().parameters.get("osm", {}) or {}
@@ -174,6 +279,7 @@ def _configure_osmnx(ox) -> None:
         ox.settings.overpass_rate_limit = bool(params["overpass_rate_limit"])
     if "accept_language" in params:
         ox.settings.http_accept_language = params["accept_language"]
+    return params
 
 
 def _persist_overpass_payload(

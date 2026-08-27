@@ -2,13 +2,18 @@
 
 import json
 
+import geopandas as gpd
 import networkx as nx
 import pytest
-from shapely.geometry import LineString, box
+from shapely.geometry import LineString, MultiPolygon, box
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
-from aequilibrae.project.network.importer.sources.osm.impl import _configure_osmnx, acquire_overpass
+from aequilibrae.project.network.importer.sources.osm.impl import (
+    _configure_osmnx,
+    _subdivide_model_area,
+    acquire_overpass,
+)
 
 osmnx = pytest.importorskip("osmnx")
 
@@ -47,6 +52,10 @@ def cache(tmp_path):
     return DownloadCache(project_base_path=tmp_path, source_name="osm-overpass", tag="test")
 
 
+def _place_boundary(place="Testville"):
+    return gpd.GeoDataFrame({"display_name": [place]}, geometry=[box(-0.01, -0.01, 0.01, 0.01)], crs="EPSG:4326")
+
+
 def test_acquire_overpass_builds_staged_network_and_cache(monkeypatch, cache):
     monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _fake_graph())
 
@@ -70,11 +79,12 @@ def test_acquire_overpass_builds_staged_network_and_cache(monkeypatch, cache):
 def test_acquire_overpass_by_place_name(monkeypatch, cache):
     captured = {}
 
-    def fake_place(place, **kw):
+    def fake_geocode(place):
         captured["place"] = place
-        return _fake_graph()
+        return _place_boundary(place)
 
-    monkeypatch.setattr(osmnx, "graph_from_place", fake_place)
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", fake_geocode)
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _fake_graph())
     net = acquire_overpass(modes=("car",), download_cache=cache, place_name="Testville")
     assert captured["place"] == "Testville"
     assert net.source_meta["source_url"] == "overpass:place=Testville"
@@ -90,10 +100,11 @@ def test_acquire_overpass_requires_exactly_one_selector(cache):
 def test_acquire_overpass_wraps_insufficient_response(monkeypatch, cache):
     from osmnx._errors import InsufficientResponseError
 
-    def boom(place, **kw):
+    def boom(area, **kw):
         raise InsufficientResponseError("nothing here")
 
-    monkeypatch.setattr(osmnx, "graph_from_place", boom)
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", lambda place: _place_boundary(place))
+    monkeypatch.setattr(osmnx, "graph_from_polygon", boom)
     with pytest.raises(ImporterError, match="empty or partial response"):
         acquire_overpass(modes=("car",), download_cache=cache, place_name="Nowhere")
 
@@ -101,18 +112,86 @@ def test_acquire_overpass_wraps_insufficient_response(monkeypatch, cache):
 def test_acquire_overpass_wraps_request_failure(monkeypatch, cache):
     from requests.exceptions import ConnectionError as RequestsConnectionError
 
-    def boom(place, **kw):
+    def boom(area, **kw):
         raise RequestsConnectionError("no route to host")
 
-    monkeypatch.setattr(osmnx, "graph_from_place", boom)
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", lambda place: _place_boundary(place))
+    monkeypatch.setattr(osmnx, "graph_from_polygon", boom)
     with pytest.raises(ImporterError, match="request failed"):
         acquire_overpass(modes=("car",), download_cache=cache, place_name="Nowhere")
 
 
 def test_acquire_overpass_empty_graph_raises(monkeypatch, cache):
-    monkeypatch.setattr(osmnx, "graph_from_place", lambda place, **kw: nx.MultiDiGraph(crs="EPSG:4326"))
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", lambda place: _place_boundary(place))
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: nx.MultiDiGraph(crs="EPSG:4326"))
     with pytest.raises(ImporterError, match="no edges"):
         acquire_overpass(modes=("car",), download_cache=cache, place_name="Empty")
+
+
+def test_large_model_area_is_tiled_and_deduplicated(monkeypatch, cache):
+    query_areas = []
+    fetch_options = []
+
+    def fake_polygon(area, **kw):
+        query_areas.append(area)
+        fetch_options.append(kw)
+        return _fake_graph()
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", fake_polygon)
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(0, 0, 0.2, 0.2))
+
+    assert len(query_areas) > 1
+    assert all(options["truncate_by_edge"] for options in fetch_options)
+    assert len(net.links) == 2
+
+
+def test_tiled_import_does_not_cache_a_partial_result(monkeypatch, cache):
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+
+    attempts = 0
+
+    def fail_second_part(area, **kw):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RequestsConnectionError("tile failed")
+        return _fake_graph()
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", fail_second_part)
+    with pytest.raises(ImporterError, match="part 2/"):
+        acquire_overpass(modes=("car",), download_cache=cache, model_area=box(0, 0, 0.2, 0.2))
+
+    assert cache.relative_path is None
+
+
+def test_tiled_import_skips_a_part_without_nodes(monkeypatch, cache):
+    attempts = 0
+
+    def empty_second_part(area, **kw):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise ValueError("Found no graph nodes within the requested polygon.")
+        return _fake_graph()
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", empty_second_part)
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(0, 0, 0.2, 0.2))
+
+    assert attempts > 2
+    assert len(net.links) == 2
+    assert cache.relative_path is not None
+
+
+def test_subdivision_preserves_disconnected_coverage():
+    model_area = MultiPolygon([box(0, 0, 0.2, 0.2), box(1, 1, 1.02, 1.02)])
+    max_area = 100_000_000
+    parts = _subdivide_model_area(model_area, max_area)
+    projected_parts = gpd.GeoSeries(parts, crs="EPSG:4326").to_crs("EPSG:6933")
+    projected_model = gpd.GeoSeries([model_area], crs="EPSG:4326").to_crs("EPSG:6933").iloc[0]
+
+    assert len(parts) > 2
+    assert projected_parts.area.max() <= max_area * 1.001
+    assert projected_parts.union_all().area == pytest.approx(projected_model.area, rel=1e-6)
 
 
 def _pin_settings(monkeypatch):

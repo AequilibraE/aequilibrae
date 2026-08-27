@@ -277,7 +277,8 @@ network:
         mode_name: use
 osm:
   # Used by project.network.importer.osm to configure osmnx via osmnx.settings.
-  # Tiling of large queries and request retries are handled by osmnx internally.
+  # AequilibraE splits larger boundaries before querying Overpass.
+  max_query_area_size: 100000000
   overpass_endpoint: https://overpass-api.de/api
   nominatim_endpoint: https://nominatim.openstreetmap.org/
   accept_language: "en"

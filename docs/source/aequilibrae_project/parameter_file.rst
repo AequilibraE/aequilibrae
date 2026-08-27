@@ -165,6 +165,9 @@ and point ``overpass_endpoint`` at it.
 
 The available settings are:
 
+* ``max_query_area_size``: largest Overpass query part in square metres
+  (default 100,000,000, or 100 km²). Larger and disconnected boundaries are
+  split without changing their requested coverage;
 * ``overpass_endpoint``: base URL of the Overpass API to query;
 * ``nominatim_endpoint``: base URL of the Nominatim server used to resolve
   ``place_name`` lookups;
@@ -176,9 +179,9 @@ The available settings are:
   those report an unlimited rate limit in a format that makes osmnx wait forever
   for a slot that is already free.
 
-These values are applied to ``osmnx`` through ``osmnx.settings`` at import time.
-Tiling of large queries and request retries are handled by ``osmnx`` internally,
-so there is no separate maximum-query-area or sleep-time setting.
+Endpoint, language, timeout and rate-limit values are applied through
+``osmnx.settings`` at import time. AequilibraE subdivides large query areas
+before passing them to ``osmnx`` and merges the resulting graphs before import.
 
 .. seealso::
 
