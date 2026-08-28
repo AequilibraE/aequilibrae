@@ -2,7 +2,7 @@ from libc.math cimport pow, sqrt
 from cython.parallel import prange
 
 
-def conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
+def conical(congested_times, link_flows, fftime, cores, alpha, beta, capacity):
     cdef int c = cores
 
     cdef double [:] congested_view = congested_times
@@ -15,7 +15,7 @@ def conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
     conical_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 
-def delta_conical(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
+def delta_conical(dbpr, link_flows, fftime, cores, alpha, beta, capacity):
     cdef int c = cores
 
     cdef double [:] dbpr_view = dbpr
@@ -77,4 +77,5 @@ cpdef void dconical_cython(
                     1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2)))))
 
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = fftime[i] * ((alpha[i] / capacity[i]) - (
+                    (pow(alpha[i], 2)) / (capacity[i] * sqrt(pow(alpha[i], 2) + pow(beta[i], 2)))))

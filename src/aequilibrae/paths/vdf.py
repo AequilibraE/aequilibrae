@@ -341,7 +341,7 @@ class VDF:
         ax2.text(1.05, ax2.get_ylim()[1] * 0.665, "Capacity", fontsize=9, color="red", rotation=90)
 
         # Add formula and description
-        fig.suptitle(f"{name}", fontsize=10, y=0.98)
+        fig.suptitle(f"{name}")
 
         plt.tight_layout()
         filename = f"vdf_{name}_detail.png"

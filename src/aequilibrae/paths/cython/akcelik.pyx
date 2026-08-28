@@ -92,4 +92,4 @@ cpdef void dakcelik_cython(
             ) + (alpha[i] / capacity[i])
 
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = (alpha[i] / capacity[i]) * ((0.5 * tau[i] - capacity[i]) / (capacity[i]) + 1)

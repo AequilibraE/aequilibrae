@@ -80,4 +80,6 @@ cpdef void dinrets_cython(
                     pow((11*capacity[i])-(10*link_flows[i]), 2))
 
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = fftime[i] * (
+                    (-10)*(alpha[i]-1)) / (
+                    11 * capacity[i])
