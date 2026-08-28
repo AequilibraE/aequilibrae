@@ -172,6 +172,17 @@ selection, join, or aggregation. ``get_by_name()`` remains available for modes
 and link types. Create rows with ``insert()``, change them with ``update()``,
 and remove them with ``delete()``.
 
+Use ``available_ids()`` on the modes and link types tables to find unused IDs.
+It checks ``string.ascii_letters`` by default; pass ``full_list`` to provide a
+custom set of candidate IDs:
+
+.. code-block:: python
+
+    available_mode_ids = project.network.modes.available_ids()
+    available_link_type_ids = project.network.link_types.available_ids(
+        full_list=list(string.ascii_uppercase)
+    )
+
 Operations formerly performed by a row now belong to its table:
 
 .. list-table::
