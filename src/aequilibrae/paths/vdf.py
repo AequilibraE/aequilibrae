@@ -223,18 +223,56 @@ class VDF:
         self.d_func = d_func
 
     def check_valid(self, num_points, link_attributes: dict[str, Any], from_voc: float = 0.0, to_voc: float = 3.0):
-        # check vdf is non-negative
+        """Checks if the VDF starts at 1 for 0 volume, is increasing, its derivative is positive, and if it is convex
+        via checking that the derivative is increasing. Returns a tuple of bools that are true if it is satisfied, and
+        false if these are violated respectively.
+
+        """
+        voc_range = np.linspace(from_voc, to_voc, num_points)
+
+        function_values, derivative_values = self._get_fake_vdf_values(voc_range, link_attributes)
 
         # check monotone increasing - evaluate at some values of flow and check it is increasing
         # also derivative is positive
-
-        # at 0 v/c, it is just the free flow travel time
-
         # check that f'(x) is strictly increasing -> convex
-        pass
+        decreasing_points = []
+        negative_derivative_points = []
+        derivative_non_convex_points = []
+        for i, voc in enumerate(voc_range):
+            if i != 0 and function_values[i] < function_values[i - 1]:
+                decreasing_points.append(voc)
+            if derivative_values[i] < 0:
+                negative_derivative_points.append(voc)
+            if i != 0 and derivative_values[i] < derivative_values[i - 1]:
+                # non-convex
+                derivative_non_convex_points.append(voc)
 
-    def _get_fake_vdf_values(self, num_points: int, from_voc: float, to_voc: float, link_attributes: dict[str, Any]):
-        voc_range = np.linspace(from_voc, to_voc, num_points)
+        # at 0 v/c, it is just the free flow travel time, ie 1
+        value_at_0 = function_values[0]
+
+        # should this be a logger instead?
+        EPSILON = 1e-4
+        vdf_valid_0_value: bool = abs(value_at_0 - 1.0) <= EPSILON
+        vdf_increasing_f_vals: bool = not decreasing_points
+        vdf_nonnegative_derivative: bool = not negative_derivative_points
+        vdf_convex: bool = not derivative_non_convex_points
+
+        if abs(value_at_0 - 1.0) > EPSILON:
+            print(f"The value of the VDF for 0 volume was not 1, it was {value_at_0}")
+        if decreasing_points:
+            print(f"The VDF decreased for these values of volume/capacity: {decreasing_points}")
+        if negative_derivative_points:
+            print(
+                f"The VDF had a negative derivative for these values of volume/capacity: {negative_derivative_points}"
+            )
+        if derivative_non_convex_points:
+            print(
+                "The VDF is non-convex due to its derivative decreasing at these values of volume/capacity: "
+                f"{derivative_non_convex_points}"
+            )
+        return vdf_valid_0_value, vdf_increasing_f_vals, vdf_nonnegative_derivative, vdf_convex
+
+    def _get_fake_vdf_values(self, voc_range: np.ndarray, link_attributes: dict[str, Any]):
         size = voc_range.shape[0]
 
         size = voc_range.shape[0]
@@ -265,10 +303,10 @@ class VDF:
         num_points."""
         from_voc, to_voc = 0.0, 3.0
         name = self.name
-        voc_range = np.linspace(from_voc, to_voc, array_size)
+        voc_range = np.linspace(from_voc, to_voc, num_points)
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
 
-        function_values, derivative_values = self._get_fake_vdf_values(num_points, from_voc, to_voc, link_attributes)
+        function_values, derivative_values = self._get_fake_vdf_values(voc_range, link_attributes)
 
         # Left plot: Function values
         ax1.plot(voc_range, function_values, linewidth=2.5, color="#1f77b4")

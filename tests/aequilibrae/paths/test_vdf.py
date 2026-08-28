@@ -69,7 +69,7 @@ def test_make_preset_vdfs():
         vdfs_preset.get_vdf("fake_vdf")
 
 
-def test_vdf_as_string():
+def test_vdf_as_parsed_string():
     """
     vdfs:
         default: "bpr_tyler"
@@ -216,7 +216,7 @@ def test_malformed_vdf_parameters():
         VDFsManager(vdf_data_from_parameters=no_preset_function)
 
 
-def test_plot_vdf():
+def test_plot_vdf_and_check_valid_vdf():
     vdfs_preset = VDFsManager(add_preset_vdfs=True)
 
     bpr = vdfs_preset.get_vdf("bpr")
@@ -225,10 +225,18 @@ def test_plot_vdf():
     betas = np.ones(num_points, dtype=np.float64) * 4.0
 
     capacity = np.ones(num_points, dtype=np.float64)
+    bpr_link_attributes = {"alpha": alphas, "beta": betas, "capacity": capacity}
 
-    bpr.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": alphas, "beta": betas, "capacity": capacity})
+    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = bpr.check_valid(num_points, bpr_link_attributes)
+
+    # still a error with the vdfs that the convex part is wrong - derivatives are set to 1 for 0 volume
+    assert valid_0_value and increasing_f_vals and nonnegative_derivative
+    bpr.plot_vdf("tests/aequilibrae/paths", num_points, bpr_link_attributes)
 
     bpr2 = vdfs_preset.get_vdf("bpr2")
+
+    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = bpr2.check_valid(num_points, bpr_link_attributes)
+    assert valid_0_value and increasing_f_vals and nonnegative_derivative
     bpr2.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": alphas, "beta": betas, "capacity": capacity})
 
     inrets_alphas = np.ones(num_points, dtype=np.float64) * 0.9
@@ -237,6 +245,10 @@ def test_plot_vdf():
     # conical.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": new_alphas, "capacity": capacity})
 
     inrets = vdfs_preset.get_vdf("inrets")
+    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = inrets.check_valid(
+        num_points, {"alpha": inrets_alphas, "capacity": capacity}
+    )
+    assert valid_0_value and increasing_f_vals and nonnegative_derivative and not convex
     inrets.plot_vdf("tests/aequilibrae/paths", num_points, {"alpha": inrets_alphas, "capacity": capacity})
 
     akcelik_alphas = np.ones(num_points, dtype=np.float64) * 0.25
@@ -244,6 +256,10 @@ def test_plot_vdf():
     lengths = np.ones(num_points, dtype=np.float64)
 
     akcelik = vdfs_preset.get_vdf("akcelik")
+    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = akcelik.check_valid(
+        num_points, {"alpha": akcelik_alphas, "tau": taus, "length": lengths, "capacity": capacity}
+    )
+    assert valid_0_value and increasing_f_vals and nonnegative_derivative
     akcelik.plot_vdf(
         "tests/aequilibrae/paths",
         num_points,
