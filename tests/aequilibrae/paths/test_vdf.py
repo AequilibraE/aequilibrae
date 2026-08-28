@@ -41,8 +41,16 @@ def assignment(project):
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[(k, {"alpha": "b", "beta": "power", "capacity": "capacity"}) for k in FUNCTION_MAP if k != "akcelik"],
-        *[(k, {"alpha": 0.15, "beta": 4.0, "capacity": "capacity"}) for k in FUNCTION_MAP if k != "akcelik"],
+        *[
+            (k, {"alpha": "b", "beta": "power", "capacity": "capacity"})
+            for k in FUNCTION_MAP
+            if (k != "akcelik" and k != "conical")
+        ],
+        *[
+            (k, {"alpha": 0.15, "beta": 4.0, "capacity": "capacity"})
+            for k in FUNCTION_MAP
+            if (k != "akcelik" and k != "conical")
+        ],
         ("akcelik", {"alpha": "b", "tau": "power", "length": "distance", "capacity": "capacity"}),
         ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
         ("akcelik", {"tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
@@ -58,6 +66,36 @@ def test_set_vdf_with_parameters(
     f, f_dash = FUNCTION_MAP[vdf_name]
     vdf = VDF(vdf_name, f, DEFAULT_PRESET_SPECS[vdf_name], f_dash)
     assignment.set_vdf(vdf, name_mapping=name_mapping)
+
+
+@pytest.mark.parametrize(
+    "vdf_name,name_mapping",
+    [
+        *[
+            (k, {"alpha": -1, "beta": "power", "capacity": "capacity"})
+            for k in FUNCTION_MAP
+            if (k != "akcelik" and k != "conical")
+        ],
+        *[
+            (k, {"alpha": -1, "beta": 4.0, "capacity": "capacity"})
+            for k in FUNCTION_MAP
+            if (k != "akcelik" and k != "conical")
+        ],
+        ("akcelik", {"alpha": -1, "tau": "power", "length": "distance", "capacity": "capacity"}),
+        ("akcelik", {"alpha": -1, "tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
+    ],
+)
+def test_check_bounds_of_vdfs(
+    assignment: TrafficAssignment,
+    assigclass: TrafficClass,
+    vdf_name: str,
+    name_mapping: dict,
+):
+    assignment.add_class(assigclass)
+    f, f_dash = FUNCTION_MAP[vdf_name]
+    vdf = VDF(vdf_name, f, DEFAULT_PRESET_SPECS[vdf_name], f_dash)
+    with pytest.raises(ValueError, match="At least one alpha is less than 0.0"):
+        assignment.set_vdf(vdf, name_mapping=name_mapping)
 
 
 def test_make_preset_vdfs():

@@ -491,7 +491,20 @@ class TrafficAssignment(AssignmentBase):
         self._config["VDF parameters"] = par
         self._config["VDF function"] = self.vdf.name
 
-        # TODO: Check bounds
+        # check bounds
+        for parameter_name, parameter_data in self.vdf.spec.items():
+            if "bounds" not in parameter_data:
+                continue
+
+            minimum, maximum = parameter_data["bounds"]
+            array = vdf_link_attributes[parameter_name]
+
+            if np.any(np.isnan(array)):
+                raise ValueError(f"At least one {parameter_name} is NaN")
+            elif array.min() < minimum:
+                raise ValueError(f"At least one {parameter_name} is less than {minimum}")
+            elif array.max() > maximum:
+                raise ValueError(f"At least one {parameter_name} is greater than {maximum}")
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
