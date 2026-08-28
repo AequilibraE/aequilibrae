@@ -501,10 +501,20 @@ class TrafficAssignment(AssignmentBase):
 
             if np.any(np.isnan(array)):
                 raise ValueError(f"At least one {parameter_name} is NaN")
-            elif array.min() < minimum:
-                raise ValueError(f"At least one {parameter_name} is less than {minimum}")
-            elif array.max() > maximum:
-                raise ValueError(f"At least one {parameter_name} is greater than {maximum}")
+
+            if parameter_data.get("inclusive_lower", True):
+                if array.min() < minimum:
+                    raise ValueError(f"At least one {parameter_name} is less than {minimum}")
+            else:
+                if array.min() <= minimum:
+                    raise ValueError(f"At least one {parameter_name} is less than or equal to {minimum}")
+
+            if parameter_data.get("inclusive_upper", True):
+                if array.max() > maximum:
+                    raise ValueError(f"At least one {parameter_name} is greater than {maximum}")
+            else:
+                if array.max() >= maximum:
+                    raise ValueError(f"At least one {parameter_name} is greater than or equal to {maximum}")
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added

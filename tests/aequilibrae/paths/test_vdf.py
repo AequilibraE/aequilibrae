@@ -85,7 +85,7 @@ def test_set_vdf_with_parameters(
         ("akcelik", {"alpha": -1, "tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
     ],
 )
-def test_check_bounds_of_vdfs(
+def test_check_bounds_of_vdfs_inclusive(
     assignment: TrafficAssignment,
     assigclass: TrafficClass,
     vdf_name: str,
@@ -96,6 +96,24 @@ def test_check_bounds_of_vdfs(
     vdf = VDF(vdf_name, f, DEFAULT_PRESET_SPECS[vdf_name], f_dash)
     with pytest.raises(ValueError, match="At least one alpha is less than 0.0"):
         assignment.set_vdf(vdf, name_mapping=name_mapping)
+
+
+def test_check_bounds_of_vdfs_exclusive(
+    assignment: TrafficAssignment,
+    assigclass: TrafficClass,
+    # vdf_name: str,
+    # name_mapping: dict,
+):
+    assignment.add_class(assigclass)
+
+    exclusive_bound_vdf = VDF(
+        "ebv", lambda x: x, {"param": {"bounds": (0.0, 1.0), "inclusive_lower": False, "inclusive_upper": False}}
+    )
+    with pytest.raises(ValueError, match="At least one param is less than or equal to 0.0"):
+        assignment.set_vdf(exclusive_bound_vdf, name_mapping={"param": -1})
+
+    with pytest.raises(ValueError, match="At least one param is greater than or equal to 1.0"):
+        assignment.set_vdf(exclusive_bound_vdf, name_mapping={"param": 2})
 
 
 def test_make_preset_vdfs():
@@ -200,16 +218,70 @@ def test_vdf_as_parsed_string():
         derivative_out == fake_free_flow_time * (2 * a * (fake_link_flows / fake_capacity) + b) / fake_capacity
     )
 
-    # out = np.zeros(3)
-    #     quadratic_vdf.apply_vdf(
-    #         out,
-    #         np.array([0.5, 0.5, 0.5]),
-    #         np.array([1.0, 1.0, 1.0]),
-    #         np.array([1.0, 2.0, 3.0]),
-    #         1,
-    #         a=1,
-    #         b=2,
-    #     )
+
+def test_finite_difference():
+    """
+    vdfs:
+        default: "bpr_tyler"
+        bpr_tyler:
+            function: bpr
+            spec:
+            alpha:
+                fillNA: 0.15
+                bounds: [0, 10]
+            beta: 4
+            capacity:
+                bounds: [0, .inf]
+        quadratic:
+            functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
+            derivative_functional_form: "fftime * (2 * a * (link_flows/capacity) + b) / capacity"
+            spec:
+            a:
+                fillNA: 0.15
+                bounds: [0, .inf]
+            b:
+                fillNA: 1.0
+                bounds: [0, .inf]
+            capacity:
+                bounds: [0, .inf]
+    """
+    vdfs = VDFsManager(
+        vdf_data_from_parameters={
+            "quadratic": {
+                "functional_form": "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)",
+                "spec": {
+                    "a": {
+                        "fill_NA": 0.15,
+                        "bounds": [0, float("inf")],
+                    },
+                    "b": {
+                        "fill_NA": 1.0,
+                        "bounds": [0, float("inf")],
+                    },
+                    "capacity": {"bounds": [0, float("inf")]},
+                },
+            },
+        }
+    )
+    quadratic_vdf: VDF = vdfs.get_vdf("quadratic")
+    fake_link_flows = np.array([0.5, 0.5, 0.5])
+    fake_capacity = np.array([1.0, 1.0, 1.0])
+    fake_free_flow_time = np.array([1.0, 2.0, 3.0])
+    a = 1
+    b = 2
+
+    derivative_out = np.zeros(3)
+    quadratic_vdf.apply_derivative(
+        derivative_out,
+        fake_link_flows,
+        fake_free_flow_time,
+        1,
+        a=a,
+        b=b,
+        capacity=fake_capacity,
+    )
+    actual = fake_free_flow_time * (2 * a * (fake_link_flows / fake_capacity) + b) / fake_capacity
+    np.testing.assert_allclose(actual, derivative_out)
 
 
 def test_malformed_vdf_parameters():

@@ -37,30 +37,26 @@ DEFAULT_PRESET_SPECS = {
     "bpr": {
         "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
         "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
-        # "fftime": {"bounds": (0, float("inf"))},
         "capacity": {"bounds": (0, float("inf"))},
     },
     "bpr2": {
         "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
         "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
-        # "fftime": {"bounds": (0, float("inf"))},
         "capacity": {"bounds": (0, float("inf"))},
     },
     "conical": {
-        "alpha": {"fill_NA": 1.0, "bounds": (1.0, float("inf"))},
-        # "fftime": {"bounds": (0, float("inf"))},
+        "alpha": {"fill_NA": 2.0, "bounds": (1.0, float("inf")), "inclusive_lower": False},
+        "beta": {"fill_NA": 1.5, "bounds": (1.0, float("inf")), "inclusive_lower": False},
         "capacity": {"bounds": (0, float("inf"))},
     },
     "inrets": {
         "alpha": {"fill_NA": 1.0, "bounds": (0.0, 1.0)},
-        # "fftime": {"bounds": (0, float("inf"))},
         "capacity": {"bounds": (0, float("inf"))},
     },
     "akcelik": {
         "alpha": {"fill_NA": 0.25, "bounds": (0.0, 1.0)},
         "tau": {"fill_NA": 0.8, "bounds": (0.0, float("inf"))},
         "length": {"bounds": (0, float("inf"))},
-        # "fftime": {"bounds": (0, float("inf"))},
         "capacity": {"bounds": (0, float("inf"))},
     },
 }
@@ -220,7 +216,21 @@ class VDF:
         self.func = func
         assert isinstance(spec, dict)
         self.spec = spec
+        if d_func is None:
+            d_func = self.make_finite_difference_derivative()
         self.d_func = d_func
+
+    def make_finite_difference_derivative(self, eps: float = 1e-4):
+        def finite_diff(delta, link_flows, fftime, cores, **link_attributes):
+            minus_epsilon_congested_time = np.zeros_like(link_flows)
+            plus_epsilon_congested_time = np.zeros_like(link_flows)
+
+            self.apply_vdf(minus_epsilon_congested_time, link_flows - eps, fftime, cores, **link_attributes)
+            self.apply_vdf(plus_epsilon_congested_time, link_flows + eps, fftime, cores, **link_attributes)
+            np.subtract(plus_epsilon_congested_time, minus_epsilon_congested_time, out=delta)
+            np.divide(delta, 2 * eps, out=delta)
+
+        return finite_diff
 
     def check_valid(self, num_points, link_attributes: dict[str, Any], from_voc: float = 0.0, to_voc: float = 3.0):
         """Checks if the VDF starts at 1 for 0 volume, is increasing, its derivative is positive, and if it is convex
@@ -342,8 +352,8 @@ class VDF:
     def apply_vdf(self, congested_time, link_flows, fftime, cores: int, **link_attributes):
         self.func(congested_time, link_flows, fftime, cores, **link_attributes)
 
-    def apply_derivative(self, congested_time, link_flows, fftime, cores: int, **link_attributes):
-        self.d_func(congested_time, link_flows, fftime, cores, **link_attributes)
+    def apply_derivative(self, delta, link_flows, fftime, cores: int, **link_attributes):
+        self.d_func(delta, link_flows, fftime, cores, **link_attributes)
 
 
 class VDF_old:
