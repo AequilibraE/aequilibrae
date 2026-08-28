@@ -5,7 +5,6 @@ from shapely.geometry import Point
 
 from aequilibrae.project.project_table import SpatialProjectTable
 from aequilibrae.utils.db_utils import ConnectionClosure
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Places(SpatialProjectTable):
@@ -17,13 +16,13 @@ class Places(SpatialProjectTable):
 
 @pytest.fixture
 def places():
-    connection = connect_spatialite(":memory:")
+    closure = ConnectionClosure(":memory:")
+    connection = closure.db_connection._connection
     connection.execute("SELECT InitSpatialMetadata(1)")
     connection.execute("CREATE TABLE places (place_id INTEGER PRIMARY KEY, name TEXT)")
     connection.execute("SELECT AddGeometryColumn('places', 'geometry', 4326, 'POINT', 'XY')")
     connection.commit()
 
-    closure = ConnectionClosure(connection)
     yield Places(closure.db_connection)
     closure.close()
 

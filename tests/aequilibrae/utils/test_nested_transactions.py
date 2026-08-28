@@ -1,13 +1,12 @@
 import sqlite3
-import traceback
 
 import pytest
 
-from aequilibrae.utils.db_utils import ConnectionClosure
+from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager
 
 
 def test_nested_failure_rolls_back_only_savepoint():
-    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    closure = ConnectionClosure(":memory:")
     manager = closure.db_connection
     manager._connection.execute("CREATE TABLE events (name TEXT)")
     try:
@@ -26,7 +25,7 @@ def test_nested_failure_rolls_back_only_savepoint():
 
 
 def test_closure_rolls_back_every_connection_on_body_error():
-    closure = ConnectionClosure(sqlite3.connect(":memory:"), sqlite3.connect(":memory:"), sqlite3.connect(":memory:"))
+    closure = ConnectionClosure(":memory:", ":memory:", ":memory:")
     managers = (closure.db_connection, closure.results_connection, closure.transit_connection)
     try:
         for manager in managers:
@@ -42,7 +41,7 @@ def test_closure_rolls_back_every_connection_on_body_error():
 
 
 def test_deferred_constraint_commit_failure_leaves_sqlite_to_recover():
-    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    closure = ConnectionClosure(":memory:")
     manager = closure.db_connection
     connection = manager._connection
     connection.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
@@ -59,17 +58,13 @@ def test_deferred_constraint_commit_failure_leaves_sqlite_to_recover():
         closure.close()
 
 
-def test_closure_rejects_duplicate_connections():
-    connection = sqlite3.connect(":memory:")
-    try:
-        with pytest.raises(ValueError):
-            ConnectionClosure(connection, connection)
-    finally:
-        connection.close()
+def test_closure_rejects_non_path_slots():
+    with pytest.raises(TypeError, match="must be paths"):
+        ConnectionClosure(object())
 
 
 def test_optional_connection_properties_are_descriptive():
-    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    closure = ConnectionClosure(":memory:")
     try:
         with pytest.raises(RuntimeError, match="no results database"):
             _ = closure.results_connection
@@ -80,7 +75,7 @@ def test_optional_connection_properties_are_descriptive():
 
 
 def test_context_manager_without_nested_transactions_stays_in_original_transaction():
-    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    closure = ConnectionClosure(":memory:")
     assert closure.db_connection.depth == 0
 
     with closure.db_connection.transaction() as connection:
@@ -104,8 +99,54 @@ def test_context_manager_without_nested_transactions_stays_in_original_transacti
         closure.close()
 
 
+def test_open_close_manager_only_holds_connection_during_transactions(tmp_path):
+    database = tmp_path / "open-close.sqlite"
+    database.touch()
+    used_connections = []
+    manager = NestedTransactionManager(database, open_close=True)
+    with pytest.raises(RuntimeError, match="closed outside a transaction"):
+        _ = manager._connection
+
+    with manager.transaction() as connection:
+        used_connections.append(connection)
+        connection.execute("CREATE TABLE events (name TEXT)")
+        with manager as nested_connection:
+            assert nested_connection is connection
+            nested_connection.execute("INSERT INTO events VALUES ('kept')")
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        used_connections[-1].execute("SELECT 1")
+
+    with manager as connection:
+        used_connections.append(connection)
+        assert connection.execute("SELECT name FROM events").fetchall() == [("kept",)]
+
+    with pytest.raises(ValueError, match="discard transaction"):
+        with manager as connection:
+            used_connections.append(connection)
+            connection.execute("INSERT INTO events VALUES ('discarded')")
+            raise ValueError("discard transaction")
+
+    with manager as connection:
+        used_connections.append(connection)
+        assert connection.execute("SELECT name FROM events").fetchall() == [("kept",)]
+
+    assert len({id(connection) for connection in used_connections}) == 4
+    manager.close()
+
+
+def test_spatial_flag_uses_spatialite_connection(tmp_path):
+    database = tmp_path / "spatial.sqlite"
+    database.touch()
+    manager = NestedTransactionManager(database, spatial=True)
+    try:
+        assert manager._connection.execute("SELECT spatialite_version()").fetchone()[0]
+    finally:
+        manager.close()
+
+
 def test_empty_stack_contect_manager_without_transaction_starts_one():
-    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    closure = ConnectionClosure(":memory:")
 
     try:
         assert not closure.db_connection.in_transaction

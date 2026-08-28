@@ -10,7 +10,7 @@ from aequilibrae.utils.db_utils import NestedTransactionManager
 
 @pytest.fixture
 def modes():
-    manager = NestedTransactionManager(sqlite3.connect(":memory:"))
+    manager = NestedTransactionManager(":memory:")
     manager._connection.executescript(
         """
         CREATE TABLE modes (

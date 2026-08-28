@@ -1,5 +1,3 @@
-import sqlite3
-
 import pandas as pd
 import pytest
 
@@ -9,7 +7,7 @@ from aequilibrae.utils.db_utils import NestedTransactionManager
 
 @pytest.fixture
 def modes():
-    manager = NestedTransactionManager(sqlite3.connect(":memory:"))
+    manager = NestedTransactionManager(":memory:")
     manager._connection.execute(
         """CREATE TABLE modes (
             mode_name TEXT UNIQUE NOT NULL,

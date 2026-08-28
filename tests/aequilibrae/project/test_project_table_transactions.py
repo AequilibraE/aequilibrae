@@ -1,4 +1,3 @@
-import sqlite3
 from dataclasses import fields
 
 import pandas as pd
@@ -17,7 +16,7 @@ class Things(NonSpatialProjectTable):
 
 @pytest.fixture
 def things():
-    closure = ConnectionClosure(sqlite3.connect(":memory:"))
+    closure = ConnectionClosure(":memory:")
     project_connection = closure.db_connection
     project_connection._connection.execute("CREATE TABLE things (thing_id INTEGER PRIMARY KEY, value INTEGER NOT NULL)")
     yield Things(project_connection), project_connection

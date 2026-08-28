@@ -1,7 +1,7 @@
 """SQLite connection ownership and small database helpers."""
 
 import contextlib
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -17,19 +17,67 @@ class AequilibraEConnection(Connection):
 
 
 class NestedTransactionManager:
-    """Own one SQLite connection and provide nested transaction contexts."""
+    """Manage a SQLite connection and provide nested transaction contexts."""
 
-    def __init__(self, connection: Connection, *, configured: bool = False) -> None:
-        if not isinstance(connection, Connection):
-            raise TypeError("NestedTransactionManager requires a sqlite3.Connection")
-        if connection.in_transaction:
-            raise ValueError("connections must not already be in a transaction")
-        if not configured:
-            connection.isolation_level = None
-            _enable_foreign_keys(connection)
-        self.__connection = connection
+    def __init__(
+        self,
+        path: PathLike[str] | str,
+        *,
+        spatial: bool = False,
+        open_close: bool = False,
+    ) -> None:
+        if not isinstance(path, (str, PathLike)):
+            raise TypeError("NestedTransactionManager requires a database path")
+        elif path == ":memory:" and open_close:
+            raise ValueError(
+                "a memory only database with open_close enabled will be wiped each transaction, this is not allowed"
+            )
+
+        self.__path = path
+        self.__spatial = spatial
+        self.__open_close = open_close
+        self.__connection: Connection | None = None
         self.__savepoint_id = 0
         self.__stack: list[str | None] = []
+
+        if not self.__open_close:
+            self.__connection = self.__open()
+
+    @staticmethod
+    def __configure(connection: Connection) -> None:
+        """Configure a newly managed connection."""
+        if not isinstance(connection, Connection):
+            raise TypeError("expected a sqlite3.Connection")
+        if connection.in_transaction:
+            raise ValueError("connections must not already be in a transaction")
+        connection.isolation_level = None
+        _enable_foreign_keys(connection)
+
+    def __open(self) -> Connection:
+        """Open and configure a connection owned by this manager."""
+        if self.__spatial:
+            from aequilibrae.utils.spatialite_utils import connect_spatialite
+
+            connection = connect_spatialite(self.__path)
+        else:
+            connection = safe_connect(self.__path)
+
+        try:
+            self.__configure(connection)
+        except BaseException:
+            connection.close()
+            raise
+        return connection
+
+    def __close(self) -> None:
+        """Close and discard the current connection, if any."""
+        connection = self.__connection
+        if connection is None:
+            return
+        try:
+            connection.close()
+        finally:
+            self.__connection = None
 
     @property
     def _connection(self) -> Connection:
@@ -39,6 +87,8 @@ class NestedTransactionManager:
         :meth:`transaction`; this property is for read-only integrations such
         as pandas that cannot consume a transaction context.
         """
+        if self.__connection is None:
+            raise RuntimeError("managed connection is closed outside a transaction")
         return self.__connection
 
     @property
@@ -49,7 +99,7 @@ class NestedTransactionManager:
     @property
     def in_transaction(self) -> bool:
         """Whether an owned transaction scope is currently active."""
-        return self.depth > 0 or self.__connection.in_transaction
+        return self.depth > 0 or (self.__connection is not None and self.__connection.in_transaction)
 
     @property
     def transaction_id(self) -> str:
@@ -63,10 +113,10 @@ class NestedTransactionManager:
         return next(transaction_id for transaction_id in reversed(self.__stack) if transaction_id is not None)
 
     def transaction(self) -> "_TransactionContext":
-        """Create a fresh context that yields the persistent connection."""
+        """Create a fresh context that yields the managed connection."""
         return _TransactionContext(self)
 
-    def __enter__(self):
+    def __enter__(self) -> Connection:
         """
         When used as a context manager without a .transaction(), the enter and exit methods should no-op if there is
         an existing transaction, otherwise one is started.
@@ -79,7 +129,7 @@ class NestedTransactionManager:
             # There's either nothing on the stack, thus we must start a new transaction
             self._enter_transaction()
 
-        return self.__connection
+        return self._connection
 
     def __exit__(
         self,
@@ -92,31 +142,49 @@ class NestedTransactionManager:
             # Then this is a noop-context
             self.__stack.pop()
             return False
-        else:
-            return self._exit_transaction(savepoint, exc_type)
+        return self._exit_transaction(savepoint, exc_type)
 
     def _enter_transaction(self) -> str:
-        if self.depth == 0 and self.__connection.in_transaction:
-            raise RuntimeError("managed connection has an unowned transaction")
+        opened_here = self.depth == 0 and self.__open_close
+        if opened_here:
+            self.__connection = self.__open()
 
-        self.__savepoint_id += 1
-        savepoint = f"aeq_nested_{self.__savepoint_id}"
-        self.__connection.execute(f'SAVEPOINT "{savepoint}"')
-        self.__stack.append(savepoint)
-        return savepoint
+        connection = self._connection
+        try:
+            if self.depth == 0 and connection.in_transaction:
+                raise RuntimeError("managed connection has an unowned transaction")
+
+            self.__savepoint_id += 1
+            savepoint = f"aeq_nested_{self.__savepoint_id}"
+            connection.execute(f'SAVEPOINT "{savepoint}"')
+            self.__stack.append(savepoint)
+            return savepoint
+        except BaseException:
+            if opened_here:
+                self.__close()
+            raise
 
     def _exit_transaction(self, savepoint: str | None, exc_type: type[BaseException] | None) -> bool:
         assert self.__stack.pop() == savepoint, "tried to exit a different transaction than was on top of the stack"
-        if exc_type is None:
-            self.__connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
-        else:
-            self.__connection.execute(f'ROLLBACK TO SAVEPOINT "{savepoint}"')
-            self.__connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
+        connection = self._connection
+
+        try:
+            if exc_type is None:
+                connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
+            else:
+                connection.execute(f'ROLLBACK TO SAVEPOINT "{savepoint}"')
+                connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
+        finally:
+            if self.depth == 0 and self.__open_close:
+                self.__close()
+
         return False
 
     def close(self) -> None:
         """Close the owned SQLite connection."""
-        self.__connection.close()
+        if self.in_transaction:
+            raise RuntimeError("cannot close while a transaction is active")
+        self.__close()
 
 
 class _TransactionContext:
@@ -144,55 +212,41 @@ class ConnectionClosure:
 
     def __init__(
         self,
-        db_connection: Connection,
-        results_connection: Connection | None = None,
-        transit_connection: Connection | None = None,
+        db_path: PathLike[str] | str,
+        results_path: PathLike[str] | str | None = None,
+        transit_path: PathLike[str] | str | None = None,
+        *,
+        open_close: bool = False,
     ) -> None:
-        connections = (db_connection, results_connection, transit_connection)
-        present_connections = tuple(connection for connection in connections if connection is not None)
-        if not all(isinstance(connection, Connection) for connection in present_connections):
-            raise TypeError("connection slots must be sqlite3.Connection instances or None")
-        if len({id(connection) for connection in present_connections}) != len(present_connections):
-            raise ValueError("each connection slot must refer to a different connection")
-        if any(connection.in_transaction for connection in present_connections):
-            raise ValueError("connections must not already be in a transaction")
+        paths = (db_path, results_path, transit_path)
+        present_paths = tuple(path for path in paths if path is not None)
+        if not all(isinstance(path, (str, PathLike)) for path in present_paths):
+            raise TypeError("database slots must be paths or None")
 
-        for connection in present_connections:
-            connection.isolation_level = None
-            _enable_foreign_keys(connection)
-
-        self.__db_connection = NestedTransactionManager(db_connection, configured=True)
-        self.__results_connection = (
-            NestedTransactionManager(results_connection, configured=True) if results_connection is not None else None
-        )
-        self.__transit_connection = (
-            NestedTransactionManager(transit_connection, configured=True) if transit_connection is not None else None
-        )
-
-    @classmethod
-    def open(
-        cls,
-        db_opener: Callable[[], Connection],
-        results_opener: Callable[[], Connection] | None = None,
-        transit_opener: Callable[[], Connection] | None = None,
-    ) -> "ConnectionClosure":
-        """Open the known database slots, closing already-opened values on error."""
-        opened_connections: list[Connection] = []
+        managers: list[NestedTransactionManager] = []
         try:
-            db_connection = db_opener()
-            opened_connections.append(db_connection)
-            results_connection = results_opener() if results_opener is not None else None
-            if results_connection is not None:
-                opened_connections.append(results_connection)
-            transit_connection = transit_opener() if transit_opener is not None else None
-            if transit_connection is not None:
-                opened_connections.append(transit_connection)
-            closure = cls(db_connection, results_connection, transit_connection)
-            opened_connections.clear()
-            return closure
+            self.__db_connection = NestedTransactionManager(db_path, spatial=True, open_close=open_close)
+            managers.append(self.__db_connection)
+
+            self.__results_connection = (
+                NestedTransactionManager(results_path, spatial=False, open_close=open_close)
+                if results_path is not None
+                else None
+            )
+            if self.__results_connection is not None:
+                managers.append(self.__results_connection)
+
+            self.__transit_connection = (
+                NestedTransactionManager(transit_path, spatial=True, open_close=open_close)
+                if transit_path is not None
+                else None
+            )
+            if self.__transit_connection is not None:
+                managers.append(self.__transit_connection)
+
         except BaseException:
-            for connection in opened_connections:
-                connection.close()
+            for manager in reversed(managers):
+                manager.close()
             raise
 
     @property

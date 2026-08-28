@@ -1,4 +1,3 @@
-import sqlite3
 from dataclasses import FrozenInstanceError
 from string import ascii_letters, ascii_lowercase, ascii_uppercase
 
@@ -11,7 +10,7 @@ from aequilibrae.utils.db_utils import NestedTransactionManager
 
 @pytest.fixture
 def link_types():
-    manager = NestedTransactionManager(sqlite3.connect(":memory:"))
+    manager = NestedTransactionManager(":memory:")
     manager._connection.executescript(
         """
         CREATE TABLE link_types (

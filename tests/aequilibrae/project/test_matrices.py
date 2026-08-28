@@ -1,4 +1,3 @@
-import sqlite3
 import string
 from math import floor
 from os.path import join
@@ -111,7 +110,7 @@ def test_list(sioux_falls_example):
 
 @pytest.fixture
 def matrix_table(tmp_path):
-    manager = NestedTransactionManager(sqlite3.connect(":memory:"))
+    manager = NestedTransactionManager(":memory:")
     manager._connection.execute(
         """CREATE TABLE matrices (
             name TEXT NOT NULL PRIMARY KEY,

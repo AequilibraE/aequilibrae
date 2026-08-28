@@ -1,5 +1,4 @@
 import json
-import sqlite3
 
 import pandas as pd
 import pytest
@@ -10,9 +9,8 @@ from aequilibrae.utils.db_utils import ConnectionClosure
 
 @pytest.fixture
 def results():
-    project_connection = sqlite3.connect(":memory:")
-    results_connection = sqlite3.connect(":memory:")
-    project_connection.execute(
+    closure = ConnectionClosure(":memory:", ":memory:")
+    closure.db_connection._connection.execute(
         """CREATE TABLE results (
             scenario TEXT,
             year TEXT,
@@ -25,7 +23,6 @@ def results():
             description TEXT
         )"""
     )
-    closure = ConnectionClosure(project_connection, results_connection)
     table = Results(closure.db_connection, closure.results_connection)
     yield table, closure.results_connection._connection
     closure.close()
@@ -98,9 +95,7 @@ def test_delete_and_delete_result_have_distinct_resource_semantics(results):
     table.delete_result("metadata_only")
     assert "metadata_only" not in table
     assert (
-        results_connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata_only'"
-        ).fetchone()
+        results_connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata_only'").fetchone()
         is None
     )
 
