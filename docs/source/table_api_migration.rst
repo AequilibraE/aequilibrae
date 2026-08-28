@@ -17,7 +17,9 @@ Read and inspect records
 
 Use ``get()`` to retrieve one record, iterate over a table to retrieve all
 records, and use normal container operations to test existence or obtain the
-row count::
+row count:
+
+.. code-block:: python
 
     links = project.network.links
 
@@ -30,7 +32,9 @@ row count::
         print(link.link_id, link.name)
 
 Records are frozen dataclasses. Updating a table does not alter a record that
-was read earlier. Call ``get()`` again when the latest values are needed::
+was read earlier. Call ``get()`` again when the latest values are needed:
+
+.. code-block:: python
 
     link = links.get(42)
     previous_speed = link.speed_ab
@@ -48,7 +52,9 @@ DataFrame or GeoDataFrame is more appropriate.
 Replace mutable-record saves
 ----------------------------
 
-Previously, a record was changed in memory and then persisted with ``save()``::
+Previously, a record was changed in memory and then persisted with ``save()``:
+
+.. code-block:: python
 
     # Previous API
     link = project.network.links.get(42)
@@ -56,14 +62,18 @@ Previously, a record was changed in memory and then persisted with ``save()``::
     link.name = "Main Street"
     link.save()
 
-Pass the key and changed values to ``update()`` instead::
+Pass the key and changed values to ``update()`` instead:
+
+.. code-block:: python
 
     # Table API
     links.update(42, speed_ab=80, name="Main Street")
 
 ``update()`` changes only the supplied columns and raises ``ValueError`` if the
 key does not exist. To remove a row, replace ``record.delete()`` with
-``table.delete(key)``::
+``table.delete(key)``:
+
+.. code-block:: python
 
     project.network.nodes.delete(17)
     project.network.zones.delete(5)
@@ -74,7 +84,9 @@ Create rows
 -----------
 
 Replace the staged ``new()`` and ``save()`` workflow with one ``insert()``
-call. It returns the explicit or generated key::
+call. It returns the explicit or generated key:
+
+.. code-block:: python
 
     # Previous API
     mode = project.network.modes.new("k")
@@ -92,7 +104,9 @@ call. It returns the explicit or generated key::
     assert mode_id == "k"
 
 For spatial tables, pass Shapely geometry directly. Geometry is returned as a
-Shapely object when the row is read::
+Shapely object when the row is read:
+
+.. code-block:: python
 
     from shapely.geometry import LineString, Point, Polygon
 
@@ -125,7 +139,9 @@ remain ``NULL`` when the schema permits it.
 
 ``links.copy(link_id)`` replaces ``copy_link()``. The old method returned an
 unsaved mutable record. The new method inserts the copy immediately and returns
-its new ID::
+its new ID:
+
+.. code-block:: python
 
     copied_link_id = project.network.links.copy(link_id)
     copied_link = project.network.links.get(copied_link_id)
@@ -134,7 +150,9 @@ Work with modes, link types, periods, and connectors
 ----------------------------------------------------
 
 Collection methods that returned dictionaries are gone. Replace
-``all_modes()``, ``all_types()``, and ``all_zones()`` with iteration::
+``all_modes()``, ``all_types()``, and ``all_zones()`` with iteration:
+
+.. code-block:: python
 
     modes_by_id = {
         mode.mode_id: mode
@@ -183,7 +201,9 @@ Operations formerly performed by a row now belong to its table:
      - ``zones.has_zones``
 
 Connecting one zone requires its geometry to limit the node search, just as
-the previous row method did::
+the previous row method did:
+
+.. code-block:: python
 
     zone_id = 1001
     zone = project.network.zones.get(zone_id)
@@ -194,12 +214,16 @@ the previous row method did::
         area=zone.geometry,
     )
 
-To connect every zone that has a centroid, use the table-wide operation::
+To connect every zone that has a centroid, use the table-wide operation:
+
+.. code-block:: python
 
     project.network.zones.connect_mode("c", connectors=2, limit_to_zone=True)
 
 ``nodes.new_centroid(node_id, geometry)`` remains as a convenience method, but
-it now requires the geometry and inserts the centroid immediately::
+it now requires the geometry and inserts the centroid immediately:
+
+.. code-block:: python
 
     # Previous API
     centroid = project.network.nodes.new_centroid(1001)
@@ -210,7 +234,9 @@ it now requires the geometry and inserts the centroid immediately::
     project.network.nodes.new_centroid(1001, Point(-43.195, -22.900))
 
 ``periods.new_period(...)`` likewise inserts immediately and returns the period
-ID::
+ID:
+
+.. code-block:: python
 
     project.network.periods.new_period(
         2,
@@ -226,7 +252,9 @@ Use ``insert_from()`` and ``update_from()`` for DataFrame workflows. Both
 operations are atomic. ``insert_from()`` accepts a DataFrame with an explicit
 key column and returns the inserted keys. For numeric-key tables, omitting the
 key column allocates sequential IDs. For non-numeric-keys, the keys must be
-provided::
+provided:
+
+.. code-block:: python
 
     import pandas as pd
 
@@ -250,7 +278,9 @@ rather than Shapely objects.
 ``update_from()`` requires the table key as a DataFrame column. Other columns
 are the values to write. If any key does not exist, the operation raises
 ``ValueError`` before changing the table. The error reports at most the first
-10 missing keys. The return value is the number of submitted rows::
+10 missing keys. The return value is the number of submitted rows:
+
+.. code-block:: python
 
     changes = pd.DataFrame(
         {
@@ -283,7 +313,9 @@ and metadata ``delete()`` operations. Use their file- and table-aware helpers
 when the associated matrix file or result table must change too.
 
 For matrices, replace ``new_record()`` with ``create()`` to export an in-memory
-matrix and register it. Exporting through this method supports OMX files::
+matrix and register it. Exporting through this method supports OMX files:
+
+.. code-block:: python
 
     matrix_record = project.matrices.create(
         "demand_2030",
@@ -293,7 +325,9 @@ matrix and register it. Exporting through this method supports OMX files::
     print(matrix_record.file_name, matrix_record.cores)
 
 Use ``register_matrix()`` when the file already exists in the project's matrix
-directory::
+directory:
+
+.. code-block:: python
 
     skim_record = project.matrices.register_matrix(
         "base_skims",
@@ -301,7 +335,9 @@ directory::
     )
     base_skims = project.matrices.get_matrix(skim_record.name)
 
-Metadata changes remain table operations::
+Metadata changes remain table operations:
+
+.. code-block:: python
 
     project.matrices.update("demand_2030", description="2030 demand")
     project.matrices.delete_matrix("demand_2030")
@@ -312,7 +348,9 @@ place.
 
 For results, replace ``new_record()`` followed by ``set_data()`` with one
 ``create()`` call. Named DataFrame index levels are stored as regular columns,
-which makes a link-indexed result straightforward to retrieve::
+which makes a link-indexed result straightforward to retrieve:
+
+.. code-block:: python
 
     assignment_data = pd.DataFrame(
         {
