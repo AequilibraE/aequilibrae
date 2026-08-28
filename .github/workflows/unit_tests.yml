@@ -120,7 +120,7 @@ jobs:
             python-version: '3.13'
         include:
           - os: ubuntu-latest
-            python-version: '3.14'
+            python-version: '3.13'
             sanitisers: true
 
       max-parallel: 20
@@ -181,4 +181,5 @@ jobs:
         uv pip install ".[dev]" -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         export ASAN_OPTIONS=detect_leaks=1
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
-        LD_PRELOAD=$(gcc -print-file-name=libasan.so) pytest tests/
+        # https://github.com/google/sanitizers/issues/934#issuecomment-1800125367
+        LD_PRELOAD="$(realpath "$(gcc -print-file-name=libasan.so)") $(realpath "$(gcc -print-file-name=libstdc++.so)")" pytest -s tests/
