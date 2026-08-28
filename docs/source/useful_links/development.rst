@@ -23,7 +23,7 @@ Software Design and requirements
 The most important piece of AequilibraE's backend is, without a doubt, `NumPy <http://numpy.org>`__.
 
 Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
-accelerate computation. All compiled code is written in `Cython <https://cython.org/>`_.
+accelerate computation. We use `Cython <https://cython.org/>`_ to integrate compiled code written in Cython and C/C++.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
 found in `this article <https://doi.org/10.1371/journal.pbio.1001745>`_.
@@ -33,7 +33,7 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.10, 3.11, 3.12, 3.13 & 3.14, but we recommend using Python 3.11 or 3.12 for
+AequilibraE is currently tested for Python 3.11, 3.12, 3.13 & 3.14, but we recommend using Python 3.12 or 3.13 for
 development.
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or 
@@ -181,10 +181,17 @@ which ``assert`` is failing, you can work your way back through the code that cr
 order to update it. After updating the test targets, re-run the tests to confirm the new code passes all 
 the tests.
 
+Profiling
+^^^^^^^^^
+
+As AequilibraE is performance-critical software, changes to its compute-heavy code should be profiled to ensure they
+do not degrade performance. Our internal profiling workflows, including how to profile the Cython and C++ extensions
+that Python profilers cannot see into, are documented :ref:`in this page <profiling>`.
+
 Documentation
 ^^^^^^^^^^^^^
 
-All the AequilibraE documentation is (unfortunately) written in 
+All the AequilibraE documentation is (unfortunately) written in
 `reStructuredText <http://docutils.sourceforge.net/rst.html>`_  and built with 
 `Sphinx <http://www.sphinx-doc.org/en/stable/>`_.
 Although reStructuredText is often unnecessarily convoluted to write, Sphinx is capable of converting it to standard-

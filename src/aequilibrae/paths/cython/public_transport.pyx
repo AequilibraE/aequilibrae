@@ -1,9 +1,8 @@
 # cython: language_level=3
 
-import multiprocessing
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 import socket
 import logging
-from pathlib import Path
 import json
 
 import numpy as np
@@ -11,7 +10,6 @@ import pandas as pd
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.utils.db_utils import commit_and_close
 
 from aequilibrae.utils.cython.bridge cimport Bridge
 
@@ -94,8 +92,8 @@ class HyperpathGenerating:
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
 
-        self._o_vert_ids = o_vert_ids.astype(np.int64) # node_id for origin in the above taz_id
-        self._d_vert_ids = d_vert_ids.astype(np.int64) # node_id for destination in the above taz_id
+        self._o_vert_ids = o_vert_ids.astype(np.int64)  # node_id for origin in the above taz_id
+        self._d_vert_ids = d_vert_ids.astype(np.int64)  # node_id for destination in the above taz_id
 
         self._nodes_to_indices = nodes_to_indices
 
@@ -168,12 +166,14 @@ class HyperpathGenerating:
         ) and "link_type" not in edges_cols:
             raise ValueError("predefined skimming type requested but 'link_type' column not present on the graph")
 
+        # Build derived skim columns first and assign once: pandas 3's chained-assignment check
+        derived_cols = {}
         for name, col in discerete_link_types.items():
             if name in skim_cols and name not in edges_cols:
                 if isinstance(col, list):
-                    edges[name] = np.where(edges["link_type"].isin(col), 1, 0)
+                    derived_cols[name] = np.where(edges["link_type"].isin(col), 1, 0)
                 else:
-                    edges[name] = np.where(edges["link_type"] == col, 1, 0)
+                    derived_cols[name] = np.where(edges["link_type"] == col, 1, 0)
 
         if "waiting_time" in skim_cols and "waiting_time" not in edges_cols:
             skim_cols.remove("waiting_time")
@@ -183,9 +183,12 @@ class HyperpathGenerating:
         for name, col in contig_link_types.items():
             if name in skim_cols and name not in edges_cols:
                 if isinstance(col, list):
-                    edges[name] = np.where(edges["link_type"].isin(col), edges[trav_time], 0)
+                    derived_cols[name] = np.where(edges["link_type"].isin(col), edges[trav_time], 0)
                 else:
-                    edges[name] = np.where(edges["link_type"] == col, edges[trav_time], 0)
+                    derived_cols[name] = np.where(edges["link_type"] == col, edges[trav_time], 0)
+
+        if derived_cols:
+            edges = edges.assign(**derived_cols)
 
         return edges, list(skim_cols)
 
@@ -262,10 +265,10 @@ class HyperpathGenerating:
         Assumes the `*_column` arguments are provided as numpy arrays that form a COO sprase matrix.
 
         :Arguments:
-            **origin_column** (:obj:`np.ndarray`, optional): The column for the origin vertices. 
+            **origin_column** (:obj:`np.ndarray`, optional): The column for the origin vertices.
             Default is "orig_vert_idx".
 
-            **destination_column** (:obj:`np.ndarray`, optional): The column or the destination vertices. 
+            **destination_column** (:obj:`np.ndarray`, optional): The column or the destination vertices.
             Default is "dest_vert_idx".
 
             **demand_column** (:obj:`np.ndarray`, optional): The column for the demand values.
@@ -274,7 +277,7 @@ class HyperpathGenerating:
             **check_demand** (:obj:`bool`, optional): If ``True``, check the validity of the demand data.
             Default is ``False``.
 
-            **threads** (:obj:`int`, optional): The number of threads to use for computation. 
+            **threads** (:obj:`int`, optional): The number of threads to use for computation.
             Default is ``0`` (using all available threads).
 
         """
@@ -341,7 +344,7 @@ class HyperpathGenerating:
                 volume,
                 self.vertex_count,
                 volume.shape[0],
-                (multiprocessing.cpu_count() if threads < 1 else threads),
+                (omp_get_max_threads() if threads < 1 else threads),
                 self._skim_cols[:],
                 self.u_i_vec,
                 self.skim_matrix,
@@ -428,7 +431,7 @@ class HyperpathGenerating:
             **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows.
             Defaults to ``True``.
 
-            **project** (:obj:`Project`, optional): Project we want to save the results to. 
+            **project** (:obj:`Project`, optional): Project we want to save the results to.
             Defaults to the active project
         """
 

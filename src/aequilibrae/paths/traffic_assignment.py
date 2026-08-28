@@ -18,7 +18,7 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF
-from aequilibrae.utils.core_setter import set_cores
+from aequilibrae.utils.core_setter import clamp_cores
 
 
 def _assign_aggregation_fields(
@@ -67,6 +67,8 @@ class AssignmentBase(ABC):
         self.free_flow_tt: np.ndarray = None
         self.total_flow: np.ndarray = None
         self.cores: int = None
+        self.elementwise_cores: int = None
+        self.threading_threshold: int = None
         self._config = {}
 
         self.description: str = ""
@@ -85,7 +87,9 @@ class AssignmentBase(ABC):
         pass
 
     @abstractmethod
-    def set_cores(self, cores: int) -> None:
+    def set_cores(
+        self, cores: int, threading_threshold: int | None = None, elementwise_cores: int | None = None
+    ) -> None:
         pass
 
     def execute(self, log_specification=True) -> None:
@@ -309,7 +313,7 @@ class TrafficAssignment(AssignmentBase):
                 return False, value, f"Parameter set is not valid: {value} "
         elif instance in ["time_field", "capacity_field"] and not isinstance(value, str):
             return False, value, f"Value for {instance} is not string"
-        elif instance == "cores" and not isinstance(value, int):
+        elif instance in ("cores", "elementwise_cores") and not isinstance(value, int):
             return False, value, f"Value for {instance} is not integer"
         elif instance == "save_path_files" and not isinstance(value, bool):
             return False, value, f"Value for {instance} is not boolean"
@@ -347,6 +351,8 @@ class TrafficAssignment(AssignmentBase):
         self.classes = classes  # type: List[TrafficClass]
         # set cores from one class
         c = self.classes[0]
+        self.elementwise_cores = c.results.elementwise_cores
+        self.threading_threshold = c.results.threading_threshold
         self.cores = c.results.cores
         self._config["Number of cores"] = c.results.cores
 
@@ -365,6 +371,8 @@ class TrafficAssignment(AssignmentBase):
         self.classes.append(traffic_class)
         if len(self.classes) == 1:
             c = self.classes[0]
+            self.elementwise_cores = c.results.elementwise_cores
+            self.threading_threshold = c.results.threading_threshold
             self.cores = c.results.cores
             self._config["Number of cores"] = c.results.cores
 
@@ -516,22 +524,34 @@ class TrafficAssignment(AssignmentBase):
                 if array.max() >= maximum:
                     raise ValueError(f"At least one {parameter_name} is greater than or equal to {maximum}")
 
-    def set_cores(self, cores: int) -> None:
+    def set_cores(
+        self, cores: int, threading_threshold: int | None = None, elementwise_cores: int | None = None
+    ) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
 
         Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
+
+            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
+            operations to be threaded. Negative values disable threading for those operations. When not provided,
+            the current value is kept
+
+            **elementwise_cores** (:obj:`int`, `Optional`): Number of CPU cores for elementwise
+            (``parallel_numpy``/VDF) operations. When not provided, it is resolved from the
+            ``AEQ_ELEMENTWISE_CPUS`` environment variable or ``parameters.yml``, defaulting to at most
+            8 threads
         """
         if not self.classes:
             raise RuntimeError("You need load traffic classes before overwriting the number of cores")
 
-        self.cores = set_cores(cores)
+        self.cores = clamp_cores(cores)
         for c in self.classes:
-            c.results.set_cores(self.cores)
-            c._aon_results.set_cores(self.cores)
-            #     super()._check_field(capacity_field)
+            c.results.set_cores(self.cores, threading_threshold, elementwise_cores)
+            c._aon_results.set_cores(self.cores, threading_threshold, elementwise_cores)
+        self.threading_threshold = self.classes[0].results.threading_threshold
+        self.elementwise_cores = self.classes[0].results.elementwise_cores
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -577,17 +597,20 @@ class TrafficAssignment(AssignmentBase):
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self._config["Time field"] = time_field
 
-    # def set_capacity_field(self, capacity_field: str) -> None:
-    #     """
-    #     Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
+        # def set_capacity_field(self, capacity_field: str) -> None:
+        #     """
+        #     Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
 
-    #     :Arguments:
-    #         **capacity_field** (:obj:`str`): Field name
-    #     """
-    #     super()._check_field(capacity_field)
-    #     c = self.classes[0]
+        #     :Arguments:
+        #         **capacity_field** (:obj:`str`): Field name
+        #     """
+        #     super()._check_field(capacity_field)
+        #     c = self.classes[0]
 
-    #     self.cores = c.results.cores
+        # self.cores = c.results.cores
+        # self.elementwise_cores = c.results.elementwise_cores
+        # self.threading_threshold = c.results.threading_threshold
+
     #     self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
     #     self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
     #     self.capacity_field = capacity_field
@@ -775,7 +798,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
+        agg["Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
@@ -786,7 +809,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
+        agg["Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
         delay_factor_ab = _safe_delay_factor(congested_time[graph_ab_idx], free_flow_tt[graph_ab_idx])
         delay_factor_ba = _safe_delay_factor(congested_time[graph_ba_idx], free_flow_tt[graph_ba_idx])
@@ -799,7 +822,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
+        agg["Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
@@ -810,7 +833,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
+        agg["VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
@@ -821,7 +844,7 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
+        agg["PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
         return pd.concat(assig_results, axis=1).rename_axis("link_id")
@@ -1103,20 +1126,31 @@ class TransitAssignment(AssignmentBase):
         self._config["Algorithm"] = algo
         self.assignment = OptimalStrategies(self)
 
-    def set_cores(self, cores: int) -> None:
+    def set_cores(
+        self, cores: int, threading_threshold: int | None = None, elementwise_cores: int | None = None
+    ) -> None:
         """Allows one to set the number of cores to be used AFTER transit classes have been added
 
         Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
+
+            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
+            operations to be threaded. Negative values disable threading for those operations. When not provided,
+            the current value is kept
+
+            **elementwise_cores** (:obj:`int`, `Optional`): Number of CPU cores for elementwise
+            (``parallel_numpy``/VDF) operations. When not provided, it is resolved from the
+            ``AEQ_ELEMENTWISE_CPUS`` environment variable or ``parameters.yml``, defaulting to at most
+            8 threads
         """
         if not self.classes:
             raise RuntimeError("You need load transit classes before overwriting the number of cores")
 
-        self.cores = set_cores(cores)
+        self.cores = clamp_cores(cores)
         for c in self.classes:
-            c.results.set_cores(self.cores)
+            c.results.set_cores(self.cores, threading_threshold, elementwise_cores)
 
     def info(self) -> dict:
         """Returns information for the transit assignment procedure

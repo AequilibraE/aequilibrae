@@ -19,9 +19,9 @@ jobs:
     env:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python 3.11
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         architecture: x64
@@ -44,12 +44,12 @@ jobs:
 
     - name: Test docstrings
       run: |
-        python -m pytest --doctest-modules --pyargs aequilibrae.distribution --ignore-glob='*setup_ipf.py'
-        python -m pytest --doctest-modules --pyargs aequilibrae.matrix
-        python -m pytest --doctest-modules --pyargs aequilibrae.paths --ignore-glob='*setup_assignment.py'
-        python -m pytest --doctest-modules --pyargs aequilibrae.project --ignore-glob='*database_specification*'
-        python -m pytest --doctest-modules --pyargs aequilibrae.log aequilibrae.parameters
-        python -m pytest --doctest-modules --pyargs aequilibrae.transit
+        python -m pytest --doctest-modules src/aequilibrae/distribution --ignore-glob='*setup_ipf.py'
+        python -m pytest --doctest-modules src/aequilibrae/matrix
+        python -m pytest --doctest-modules src/aequilibrae/paths --ignore-glob='*setup_assignment.py'
+        python -m pytest --doctest-modules src/aequilibrae/project --ignore-glob='*database_specification*'
+        python -m pytest --doctest-modules src/aequilibrae/log.py src/aequilibrae/parameters.py
+        python -m pytest --doctest-modules src/aequilibrae/transit
         python -m pytest --doctest-glob=*.rst docs/source/aequilibrae_project/project_components
         python -m pytest --doctest-glob=*.rst docs/source/traffic_assignment
         python -m pytest --doctest-glob=*.rst docs/source/public_transport

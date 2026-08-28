@@ -30,8 +30,6 @@ if not missing_tqdm:
     else:
         from tqdm import tqdm  # type: ignore
 
-show_status = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") == "TRUE" and not missing_tqdm
-
 
 class PythonSignal:  # type: ignore
     """
@@ -60,7 +58,9 @@ class PythonSignal:  # type: ignore
         self.pbar = None  # type: tqdm
         self.keydata = {}
         self.position = 0
-        self.deactivate = not show_status  # by default don't use progress bars in tests
+
+        # by default don't use progress bars in tests
+        self.deactivate = os.environ.get("AEQ_SHOW_PROGRESS", "TRUE") != "TRUE"
 
     def emit(self, val):
         if self.deactivate:

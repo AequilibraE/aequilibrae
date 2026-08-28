@@ -4,10 +4,10 @@ import os
 import shutil
 import sqlite3
 import warnings
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, Callable
 
 import pandas as pd
 
@@ -142,14 +142,19 @@ class Project:
     @property
     @contextmanager
     def db_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
-        with commit_and_close(self._project_database_path, spatial=False) as conn:
+        with commit_and_close(self._project_database_path, spatial=True) as conn:
             yield conn
 
     @property
-    @contextmanager
     def db_connection_spatial(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
-        with commit_and_close(self._project_database_path, spatial=True) as conn:
-            yield conn
+        """Deprecated alias for ``db_connection``, which is now a spatial connection."""
+        warnings.warn(
+            "'db_connection_spatial' is deprecated and will be removed in version 2.1. "
+            "Use 'db_connection' instead, which is now a spatial connection.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.db_connection
 
     @property
     @contextmanager
@@ -337,7 +342,7 @@ class Project:
         return self.project_parameters.parameters
 
     @property
-    def run(self) -> dict[str, Callable]:
+    def run(self) -> dict[str, functools.partial]:
         """
         Load and return the AequilibraE run module with the default arguments from
         ``parameters.yml`` partially applied.
@@ -349,7 +354,7 @@ class Project:
             self.root_scenario.base_path / "run" / "__init__.py", "aequilibrae.run", force=True
         )
 
-        res: dict[str, Callable] = {}
+        res: dict[str, functools.partial] = {}
         sentinal = object()
         for name, kwargs in entry_points.items():
             attr = getattr(module, name)
@@ -383,7 +388,7 @@ class Project:
         p.write_back()
 
         # Create actual tables
-        with self.db_connection_spatial as conn:
+        with self.db_connection as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables("network", conn=conn)
 

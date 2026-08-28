@@ -27,6 +27,28 @@ project.
 
 State within the module should be avoided as the file may be run multiple times.
 
+Command line interface
+----------------------
+
+Functions in the run module can also be invoked from the command line via the ``aeq`` entry
+point. ``aeq run --help`` lists the available functions, and each function accepts arguments
+derived from its signature, with the defaults from ``parameters.yml`` pre-applied
+(``--no-defaults`` disables this).
+
+.. code-block:: bash
+
+    aeq -p /path/to/project run --help
+    aeq -p /path/to/project run example_function_with_kwargs --help
+    aeq -p /path/to/project run example_function_with_kwargs --arg1 hello iterations=50
+
+Required parameters become positional arguments and parameters with defaults become
+``--options``. Parameters whose default value is a boolean become ``--flag``/``--no-flag``
+pairs, and functions accepting ``**kwargs`` take trailing ``key=value`` pairs. All values are
+parsed as Python literals where possible and kept as strings otherwise, mirroring how
+``parameters.yml`` values are typed; quote a value (e.g. ``'"101"'``) to force a string. Type
+annotations are shown in the help text but not enforced. If ``-p/--project`` is omitted the
+current directory is used.
+
 .. toctree::
     :maxdepth: 1
     :caption: Run module

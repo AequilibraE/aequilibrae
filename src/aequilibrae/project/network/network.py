@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -298,7 +298,7 @@ class Network(WorkerThread):
                 ignore_fields = ["ogc_fid", "geometry"]
                 all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
             else:
-                fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
+                fields.extend(["link_id", "a_node", "b_node", "direction", "modes", "link_type"])
                 all_fields = list(set(fields))
 
             if modes is None:
@@ -319,34 +319,21 @@ class Network(WorkerThread):
             centroids = np.array([i[0] for i in conn.execute(sql_centroids).fetchall()], np.uint32)
             centroids = centroids if centroids.shape[0] else None
 
-            with pd.option_context("future.no_silent_downcasting", True):
-                if limit_to_area is None:
-                    df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
-                else:
-                    sql += spatial_add
-                    df = (
-                        pd.read_sql_query(
-                            sql,
-                            conn,
-                            params=[
-                                limit_to_area.wkb,
-                            ],
-                        )
-                        .fillna(value=np.nan)
-                        .infer_objects(False)
-                    )
+            if limit_to_area is None:
+                df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(copy=False)
+            else:
+                sql += spatial_add
+                df = (
+                    pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,))
+                    .fillna(value=np.nan)
+                    .infer_objects(copy=False)
+                )
 
-                    # We filter to centroids existing in our filtered area
-                    centroids = (
-                        centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
-                        if centroids is not None
-                        else None
-                    )
-
-            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
+                # We filter to centroids existing in our filtered area
+                centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
 
         lonlat = self.nodes.lonlat.set_index("node_id")
-        data = df[valid_fields]
+        data = df[all_fields]
         for m in modes:
             # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
             # the compressed graph representation is created)
@@ -410,7 +397,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -420,7 +407,7 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Callable, Any
-from aequilibrae.paths.cython.AoN import (
+from aequilibrae.paths.cython.vdf_core import (
     bpr,
     delta_bpr,
     bpr2,
@@ -354,50 +354,3 @@ class VDF:
 
     def apply_derivative(self, delta, link_flows, fftime, cores: int, **link_attributes):
         self.d_func(delta, link_flows, fftime, cores, **link_attributes)
-
-
-class VDF_old:
-    """Volume-Delay function old
-
-    .. code-block:: python
-
-        >>> from aequilibrae.paths import VDF
-
-        >>> vdf = VDF_old()
-        >>> vdf.functions_available()
-        ['bpr', 'bpr2', 'conical', 'inrets', 'akcelik']
-
-    """
-
-    def __init__(self):
-        self.__dict__["function"] = ""
-        self.__dict__["apply_vdf"] = None
-        self.__dict__["apply_derivative"] = None
-
-    def __setattr__(self, instance, value) -> None:
-        if instance == "function":
-            value = value.lower()
-            self.__dict__[instance] = value
-            if value == "BPR":
-                self.__dict__["apply_vdf"] = bpr
-                self.__dict__["apply_derivative"] = delta_bpr
-            elif value == "BPR2":
-                self.__dict__["apply_vdf"] = bpr2
-                self.__dict__["apply_derivative"] = delta_bpr2
-            elif value == "CONICAL":
-                self.__dict__["apply_vdf"] = conical
-                self.__dict__["apply_derivative"] = delta_conical
-            elif value == "INRETS":
-                self.__dict__["apply_vdf"] = inrets
-                self.__dict__["apply_derivative"] = delta_inrets
-            elif value == "AKCELIK":
-                self.__dict__["apply_vdf"] = akcelik
-                self.__dict__["apply_derivative"] = delta_akcelik
-            else:
-                raise ValueError("VDF function not available")
-        else:
-            raise AttributeError("This class only allows you to set the VDF to use")
-
-    def functions_available(self) -> list:
-        """returns a list of all functions available"""
-        return all_vdf_functions

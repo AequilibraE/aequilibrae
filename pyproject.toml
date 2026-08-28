@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python>=0.15.0", "ninja", "cython", "cysignals"]
+requires = ["meson-python>=0.15.0", "ninja", "cython>=3.1", "cysignals"]
 
 [tool.meson-python.args]
 setup = ['--vsenv']
@@ -17,7 +17,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -29,22 +28,22 @@ description = "A package for transportation modeling"
 maintainers = [{ name = "AequilibraE contributors" }]
 name = "aequilibrae"
 readme = "README.md"
-requires-python = ">=3.10" # match classifiers above and ruff version below
+requires-python = ">=3.11" # match classifiers above and ruff version below
 
 dependencies = [
-  "numpy>=2.0",
-  "scipy>=1.4",
-  "pyaml",
-  "requests",
-  "pandas>=2.2",
-  "shapely>=2.0",
-  "pyproj",
-  "rtree",
-  "pyarrow",
-  "openmatrix",
-  "geopandas",
-  "tqdm",
   "cysignals",
+  "geopandas",
+  "numpy>=2.0",
+  "openmatrix",
+  "pandas>=3.0",
+  "pyaml",
+  "pyarrow",
+  "pyproj",
+  "requests",
+  "rtree",
+  "scipy>=1.4",
+  "shapely>=2.0",
+  "tqdm",
 ]
 
 [project.optional-dependencies]
@@ -72,15 +71,22 @@ tests = [
   "pytest-cov",
   "pytest-subtests",
   "pytest-random-order",
+  "pytest-benchmark",
+  "seaborn",
   "coveralls",
-  "ruff==0.14.8",
+  "ruff==0.16.1",
+  "cython-lint==0.21.0",
   "wheel",
 ]
 
 dev = ['aequilibrae[tests, docs]']
 
-# simwrapper CLI
+[tool.uv.extra-build-dependencies]
+sphinx-autodoc-annotation = ["setuptools"]
+
+# CLIs
 [project.scripts]
+aeq = "aequilibrae.project.tools.cli:cli"
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
 
 [tool.ruff]
@@ -123,7 +129,7 @@ exclude = [
     ".venv312",
 ]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint.mccabe]
 max-complexity = 20
@@ -160,6 +166,4 @@ repair-wheel-command = "delocate-wheel -vv --require-archs {delocate_archs} -w {
 max-line-length = 120
 
 [tool.pytest.ini_options]
-addopts = [
-    "--import-mode=importlib",
-]
+addopts = "--import-mode=importlib --benchmark-skip"

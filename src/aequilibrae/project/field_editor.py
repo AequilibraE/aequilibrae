@@ -1,8 +1,8 @@
-from collections.abc import Sequence
+import logging
 import re
 import string
-import logging
-from typing import List, NoReturn, Optional, TYPE_CHECKING
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, List, NoReturn, Optional
 
 if TYPE_CHECKING:
     from aequilibrae.project import Project
@@ -110,7 +110,7 @@ class FieldEditor:
                 logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
         logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             conn.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
             conn.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
         logger.info(f"Updated layer statistics for {self._table}")
@@ -147,12 +147,12 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             dt = conn.execute(qry).fetchall()
         return dt
 
     def __run_query_commit(self, qry: str, values: Optional[dict | Sequence] = None) -> None:
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             if values is None:
                 conn.execute(qry)
             else:

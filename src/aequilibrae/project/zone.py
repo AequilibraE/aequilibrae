@@ -41,7 +41,7 @@ class Zone(SafeClass):
         if self.zone_id != self.__original__["zone_id"]:
             raise ValueError("One cannot change the zone_id")
 
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             if conn.execute(f'select count(*) from zones where zone_id="{self.zone_id}"').fetchone()[0] == 0:
                 data = [self.zone_id, self.geometry.wkb]
                 conn.execute("Insert into zones (zone_id, geometry) values(?, ST_Multi(GeomFromWKB(?, 4326)))", data)
@@ -71,7 +71,7 @@ class Zone(SafeClass):
         # This is VERY small in real-world terms (between zero and 11cm)
         shift = 0.000001
 
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             if conn.execute("select count(*) from nodes where node_id=?", [self.zone_id]).fetchone()[0] > 0:
                 logger.warning("Centroid already exists. Failed to create it")
                 return
@@ -148,7 +148,7 @@ class Zone(SafeClass):
             **mode_id** (:obj:`str`): Mode ID we are trying to disconnect from this zone
         """
 
-        with self.project.db_connection_spatial as conn:
+        with self.project.db_connection as conn:
             data = [self.zone_id, mode_id]
             row_count = conn.execute("Delete from links where a_node=? and modes=?", data).rowcount
 

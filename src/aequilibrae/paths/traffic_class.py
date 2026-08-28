@@ -49,14 +49,12 @@ class TransportClassBase(ABC):  # noqa: B024
             "Number of centroids": matrix.zones,
             "Matrix cores": matrix.view_names,
         }
+        # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
+        view = np.nan_to_num(matrix.matrix_view)
         if len(matrix.view_names) == 1:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :])) for nm in matrix.view_names
-            }
+            mat_config["Matrix totals"] = {nm: float(view.sum()) for nm in matrix.view_names}
         else:
-            mat_config["Matrix totals"] = {
-                nm: float(np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i])) for i, nm in enumerate(matrix.view_names)
-            }
+            mat_config["Matrix totals"] = {nm: float(view[:, :, i].sum()) for i, nm in enumerate(matrix.view_names)}
         self._config["Matrix"] = str(mat_config)
 
     @property
@@ -124,6 +122,17 @@ class TrafficClass(TransportClassBase):
         if not isinstance(pce, (float, int)):
             raise ValueError("PCE needs to be either integer or float ")
         self.pce = pce
+
+    def set_heap(self, heap: str) -> None:
+        """Sets the priority queue implementation used for path finding when assigning this class.
+
+        Must be one of ``AssignmentResults.get_heaps()``. Defaults to the 4-ary heap if not set.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        self.results.set_heap(heap)
+        self._aon_results.set_heap(heap)
 
     def set_fixed_cost(self, field_name: str, multiplier=1):
         """Sets value of time

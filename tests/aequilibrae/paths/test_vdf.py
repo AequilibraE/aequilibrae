@@ -377,7 +377,7 @@ def test_plot_vdf_and_check_valid_vdf(tmp_path):
     valid_0_value, increasing_f_vals, nonnegative_derivative, convex = akcelik.check_valid(
         num_points, {"alpha": akcelik_alphas, "tau": taus, "length": lengths, "capacity": capacity}
     )
-    assert valid_0_value and increasing_f_vals and nonnegative_derivative and convex
+    assert valid_0_value and increasing_f_vals and nonnegative_derivative and convex, "akelik failed"
     akcelik.plot_vdf(
         tmp_path,
         num_points,

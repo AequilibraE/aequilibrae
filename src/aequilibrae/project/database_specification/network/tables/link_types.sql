@@ -41,4 +41,4 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('link_types','lane_capacity', 'Default vehicle capacity per lane. E.g.  900');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('link_types','speed', 'Free flow velocity in m/s');
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('link_types','speed', 'Default uncongested speed for this link type, in m/s');
