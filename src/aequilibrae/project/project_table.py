@@ -36,7 +36,7 @@ _NON_EXISTANT_ID_SQL = (
 _CREATE_INDEX_SQL = "CREATE INDEX IF NOT EXISTS {index} ON {table} ({columns})"
 _QUOTED_COLUMN = '"{column}"'
 _VALUE_PLACEHOLDER = "?"
-_GEOMETRY_COLUMN = 'ST_AsBinary("geometry")'
+_GEOMETRY_COLUMN = 'ST_AsBinary("geometry") AS "geometry"'
 _ASSIGNMENT = '"{column}"={placeholder}'
 _GEOMETRY_PLACEHOLDER = "GeomFromWKB(?, {srid})"
 _MULTI_GEOMETRY_PLACEHOLDER = "ST_Multi(GeomFromWKB(?, {srid}))"
@@ -437,3 +437,9 @@ class SpatialProjectTable(ProjectTable):
 
     def _database_value(self, value: Any) -> Any:
         return value.wkb if isinstance(value, BaseGeometry) else value
+
+    def _prepare_rows(self, frame: pd.DataFrame, value_columns: tuple[str, ...]) -> list[tuple[Any, ...]]:
+        """Convert bulk geometry values to WKB for SQLite bindings."""
+        if "geometry" in value_columns:
+            frame = frame.to_wkb()
+        return super()._prepare_rows(frame, value_columns)
