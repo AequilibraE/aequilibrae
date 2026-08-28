@@ -1,5 +1,6 @@
-from dataclasses import FrozenInstanceError
 import sqlite3
+from dataclasses import FrozenInstanceError
+from string import ascii_letters, ascii_lowercase, ascii_uppercase
 
 import pandas as pd
 import pytest
@@ -52,9 +53,7 @@ def test_container_and_name_lookup_interfaces(link_types):
 
 def test_crud_and_immutable_record(link_types):
     assert (
-        link_types.insert(
-            link_type_id="a", link_type="arterial", description="Arterial", lanes=3, lane_capacity=1200
-        )
+        link_types.insert(link_type_id="a", link_type="arterial", description="Arterial", lanes=3, lane_capacity=1200)
         == "a"
     )
     record = link_types.get("a")
@@ -83,3 +82,10 @@ def test_bulk_and_fields_interfaces(link_types):
 
     editor = link_types.fields
     assert set(editor.all_fields()) == set(link_types.columns)
+
+
+def test_available_ids(link_types):
+    assert set(link_types.available_ids()) == set(ascii_letters) - {"y", "z"}
+    assert set(link_types.available_ids(full_list=ascii_lowercase)) == set(ascii_lowercase) - {"y", "z"}
+    assert set(link_types.available_ids(full_list=ascii_uppercase)) == set(ascii_uppercase)
+    assert set(link_types.available_ids(full_list=[])) == set()

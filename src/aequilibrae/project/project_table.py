@@ -133,7 +133,7 @@ class ProjectTable(ABC):
             raise TypeError(f"{self.__class__.__name__} must define a table name, key, and record name")
         for key, value in self.defaults.items():
             if value is None:
-                raise ValueError(f"defualt value of None found for {key=}")
+                raise ValueError(f"default value of None found for {key=}")
 
         self._connection = connection
         self._record_schema_version = -1

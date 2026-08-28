@@ -1,3 +1,4 @@
+from string import ascii_letters
 from typing import Any
 
 from aequilibrae.project.project_table import _SELECT_ONE_SQL, NonSpatialProjectTable
@@ -51,3 +52,29 @@ class Modes(NonSpatialProjectTable):
         if row is None:
             raise ValueError(f"Mode {mode_name} does not exist in the model")
         return self._build_record(row)
+
+    def available_ids(self, full_list: list[str] | None = None) -> list[str]:
+        """
+        Get a list of IDs that are not used in the provided list.
+
+        :Arguments: **full_list** (:obj:`list[str]`, *Optional*): Full list of IDs, defaults to
+        ``string.ascii_letters```
+
+        :Returns:
+            **unused** (:obj:`list[str]`): Sub set of IDs that are not used..
+        """
+
+        if full_list is None:
+            full_list = list(ascii_letters)
+
+        if len(full_list) == 0:
+            return []
+
+        values = ",".join("(?)" for _ in full_list)
+
+        return [
+            row[0]
+            for row in self._connection._connection.execute(
+                self._non_existant_id_sql.format(values=values), full_list
+            ).fetchall()
+        ]

@@ -1,5 +1,6 @@
-from dataclasses import FrozenInstanceError
 import sqlite3
+from dataclasses import FrozenInstanceError
+from string import ascii_letters, ascii_lowercase, ascii_uppercase
 
 import pytest
 
@@ -78,3 +79,10 @@ def test_mode_constraints_and_fields_interface(modes):
     editor.add("fare", "Typical fare", "NUMERIC")
     modes.update("c", fare=2.5)
     assert modes.get("c").fare == 2.5
+
+
+def test_available_ids(modes):
+    assert set(modes.available_ids()) == set(ascii_letters) - {"c", "w"}
+    assert set(modes.available_ids(full_list=ascii_lowercase)) == set(ascii_lowercase) - {"c", "w"}
+    assert set(modes.available_ids(full_list=ascii_uppercase)) == set(ascii_uppercase)
+    assert set(modes.available_ids(full_list=[])) == set()
