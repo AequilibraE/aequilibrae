@@ -407,65 +407,6 @@ class TrafficAssignment(AssignmentBase):
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
 
-    # def set_vdf_parameters_old(self, par: dict) -> None:
-    #     """
-    #     Sets the parameters for the Volume-delay function.
-
-    #     Parameter values can be scalars (same values for the entire network) or network field names
-    #     (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
-
-    #     The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it.
-    #     Users should supply ``8 * tau`` to match other common usages. Additionally the standard
-    #     ``0.25`` factor can be overridden by supplying the 'alpha' parameter.
-
-    #     :Arguments:
-    #         **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
-    #     """
-    #     if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-    #         raise RuntimeError(
-    #             "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
-    #         )
-
-    #     # In literature 0.25 is not provided as a parameter. We allow it but default to 0.25 if it wasn't provided.
-    #     if self.vdf.function == "AKCELIK":
-    #         par["alpha"] = par.get("alpha", 0.25)
-
-    #     self.__dict__["vdf_parameters"] = par
-    #     self._config["VDF parameters"] = par
-    #     pars = []
-
-    #     if self.vdf.function in ["BPR", "BPR2", "CONICAL"]:
-    #         parameter_bounds = {"alpha": (0.0, float("inf")), "beta": (1.0, float("inf"))}
-    #     elif self.vdf.function == "INRETS":
-    #         parameter_bounds = {"alpha": (0.0, 1.0)}
-    #     elif self.vdf.function == "AKCELIK":
-    #         parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf")), "length": (0.0, float("inf"))}
-    #     else:
-    #         raise ValueError(f"unknown vdf function {self.vdf.function}")
-
-    #     for p1, (minimum, maximum) in parameter_bounds.items():
-    #         if p1 not in par:
-    #             raise ValueError(f"{p1} should exist in the set of parameters provided")
-    #         p = par[p1]
-    #         if isinstance(self.vdf_parameters[p1], str):
-    #             c = self.classes[0]
-    #             array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-    #             array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
-    #         else:
-    #             array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
-    #             array.fill(self.vdf_parameters[p1])
-    #         pars.append(array)
-
-    #         if np.any(np.isnan(array)):
-    #             raise ValueError(f"At least one {p1} is NaN")
-    #         elif array.min() < minimum:
-    #             raise ValueError(f"At least one {p1} is less than {minimum}")
-    #         elif array.max() > maximum:
-    #             raise ValueError(f"At least one {p1} is greater than {maximum}")
-
-    #     self.__dict__["vdf_parameters"] = pars
-    #     self._config["VDF function"] = self.vdf.function.lower()
-
     def _set_vdf_link_attributes(self, par: dict[str, str | float]):
         """
         Sets vdf_link_attributes as a dict of {name: value}
@@ -697,10 +638,6 @@ class TrafficAssignment(AssignmentBase):
         if self.vdf == "":
             raise ValueError("First you need to set the Volume-Delay Function to use")
 
-        # par = list(kwargs.keys())
-        # q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
-        # if len(q) > 0:
-        #     raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
     def log_specification(self):
@@ -762,7 +699,10 @@ class TrafficAssignment(AssignmentBase):
             voc = tot_flow / capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
-        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
+        if self.assignment.preload is None:
+            preload = np.full(len(tot_flow), np.nan)
+        else:
+            preload = self.assignment.preload
 
         fields = [
             "Preload_AB",

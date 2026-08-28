@@ -1,7 +1,7 @@
 import pytest
 
 from aequilibrae.paths.vdf import FUNCTION_MAP, VDFsManager, DEFAULT_PRESET_SPECS
-from aequilibrae import TrafficAssignment, TrafficClass, VDF
+from aequilibrae import TrafficAssignment, TrafficClass, VDF, Graph
 
 import numpy as np
 import re
