@@ -33,6 +33,7 @@ class Trip(BasicPTElement):
     """
 
     def __init__(self):
+        self.route = ""
         self.route_id = ""
         self.service_id = ""
         self.trip = ""

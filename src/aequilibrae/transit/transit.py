@@ -2,6 +2,8 @@ import logging
 import os
 import shutil
 import sqlite3
+from os import PathLike
+from pathlib import Path
 from typing import Dict, List, TYPE_CHECKING
 
 import pandas as pd
@@ -13,6 +15,7 @@ from aequilibrae.utils.python_signal import PythonSignal
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
+from aequilibrae.transit.gtfs_writer.file_writer import export_gtfs
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -59,19 +62,24 @@ class Transit(WorkerThread):
     def new_gtfs_builder(
         self, agency: str, file_path: str, day: str = "", description: str = ""
     ) -> GTFSRouteSystemBuilder:
-        """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
+        """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project.
+
+        The builder reads a GTFS Schedule ZIP archive, exposes the feed's available service dates,
+        and can load one service date into memory before saving it to the project's public transport
+        database.
 
         :Arguments:
             **agency** (:obj:`str`): Name for the agency this feed refers to (e.g. 'CTA')
 
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
 
-            **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
+            **day** (:obj:`str`, *Optional*): Service date to import when the builder is executed
+            (e.g. '2019-10-04')
 
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
 
         :Returns:
-            **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
+            **gtfs_feed** (:obj:`GTFSRouteSystemBuilder`): A GTFS feed builder that can be added to this project
         """
         gtfs = GTFSRouteSystemBuilder(
             network=self.project.project_base_path,
@@ -93,6 +101,16 @@ class Transit(WorkerThread):
             shutil.copyfile(spatialite_database, self.project._transit_database_path)
             with self.project.transit_connection as conn:
                 initialize_tables("transit", conn=conn)
+
+    def export_gtfs(self, path_to_folder: PathLike) -> None:
+        """Exports the current transit database contents to a GTFS ZIP archive.
+
+        :Arguments:
+            **path_to_folder** (:obj:`Path`): Folder where ``aequilibrae_gtfs.zip`` is written.
+        """
+
+        with self.project.transit_connection as conn:
+            export_gtfs(conn, Path(path_to_folder))
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

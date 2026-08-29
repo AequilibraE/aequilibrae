@@ -15,6 +15,34 @@ The GTFS protocol is being constantly updated and so are AequilibraE's capabilit
 these changes. We strongly encourage you to take a look at the documentation provided
 by `Mobility Data <https://gtfs.org/documentation/schedule/reference/>`_.
 
+GTFS Schedule Import
+--------------------
+
+AequilibraE imports GTFS Schedule feeds from a ZIP archive into the project's
+``public_transport.sqlite`` database. GTFS Realtime feeds are not imported.
+The importer is available through :meth:`aequilibrae.transit.transit.Transit.new_gtfs_builder`.
+
+The feed must contain the core schedule tables ``agency.txt``, ``routes.txt``,
+``stops.txt``, ``trips.txt``, and ``stop_times.txt``. It must also contain at least one
+service calendar table: ``calendar.txt`` or ``calendar_dates.txt``. Optional GTFS tables
+such as ``shapes.txt``, ``frequencies.txt``, ``fare_attributes.txt``, and ``fare_rules.txt``
+are used when present.
+
+When reading GTFS text files, AequilibraE normalizes column names to lower case, strips
+extra whitespace, handles UTF-8 byte-order marks, ignores blank rows, and fills missing
+optional columns with empty or null values as appropriate. Numeric GTFS columns are coerced
+to numeric types and malformed required values raise an error early in the import. GTFS
+times are converted to seconds from midnight and may exceed 24 hours, as allowed by the
+specification.
+
+The importer validates the most important GTFS identifiers before building the public
+transport database. Duplicate ``stop_id`` values in ``stops.txt``, duplicate ``route_id``
+values in ``routes.txt``, duplicate ``trip_id`` values in ``trips.txt``, and duplicate
+``trip_id``/``stop_sequence`` pairs in ``stop_times.txt`` are rejected. Trips without
+at least two stops are skipped. During loading, stop times are de-conflicted so that each
+loaded trip has strictly increasing stop times; optional maximum-speed rules can be supplied
+with :meth:`aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder.set_maximum_speeds`.
+
 In this section we also present the transit assignment models, which are mathematical tools that
 predict how passengers behave and travel in a transit network, given some assumptions and inputs.
 

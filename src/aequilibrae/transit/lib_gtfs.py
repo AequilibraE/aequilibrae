@@ -106,8 +106,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         :Arguments:
             **max_speeds** (:obj:`pd.DataFrame`): Requires 4 fields: mode, min_distance, max_distance, speed.
-            Modes not covered in the data will not be touched and distance brackets not covered will receive
-            the maximum speed, with a warning
+            ``mode`` values must be GTFS route types. Modes not covered in the data will not be touched and
+            distance brackets not covered will receive the maximum speed, with a warning.
         """
         # Grouping by a scalar (rather than a single-element list) keeps the dict keys scalar mode ids,
         # which is what GTFSReader looks them up by
@@ -196,14 +196,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__target_date__ = service_date
 
     def load_date(self, service_date: str) -> None:
-        """Loads the transit services available for *service_date*
+        """Loads the transit services available for *service_date*.
 
         :Arguments:
-            **service_date** (:obj:`str`): Service data contained in this field to be imported (e.g. '2019-10-04')
+            **service_date** (:obj:`str`): Service date to import (e.g. '2019-10-04'). The date must be
+            present in :meth:`dates_available`.
         """
         if self.srid is None:
             raise ValueError("We cannot load data without an SRID")
-        if service_date == self.day:
+        if service_date == self.day and self.select_routes:
             return
         if service_date not in self.gtfs_data.feed_dates:
             raise ValueError("The date chosen is not available in this GTFS feed")

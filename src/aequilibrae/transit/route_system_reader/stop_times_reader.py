@@ -7,24 +7,22 @@ from aequilibrae.utils.get_table import get_table
 
 
 def read_stop_times(conn: sqlite3.Connection):
-    tpm = get_table("Transit_Pattern_Links", conn)
-    tts = get_table("Transit_Trips_Schedule", conn).reset_index()
-    tl = get_table("Transit_Links", conn).reset_index()
-    trps = pd.read_sql("select pattern_id, trip_id from Transit_Trips", conn)
-    tl.drop(columns=["pattern_id", "length", "geo", "type"], inplace=True)
+    tts = get_table("trips_schedule", conn)
+    links = get_table("route_links", conn)
+    trps = pd.read_sql("SELECT pattern_id, trip_id FROM trips", conn)
+    links = links.drop(columns=["distance", "geometry"])
 
     trip_stops = tts.merge(trps, on="trip_id")
-    links = tpm.merge(tl, on="transit_link")
 
-    first_nodes = links[["pattern_id", "from_node", "index"]].rename(columns={"from_node": "stop_id"})
-    last_nodes = links.sort_values("index", ascending=False).drop_duplicates(subset=["pattern_id"], keep="first")
-    last_nodes = last_nodes[["pattern_id", "to_node", "index"]].rename(columns={"to_node": "stop_id"})
-    last_nodes["index"] += 1
+    first_nodes = links[["pattern_id", "from_stop", "seq"]].rename(columns={"from_stop": "stop_id"})
+    last_nodes = links.sort_values("seq", ascending=False).drop_duplicates(subset=["pattern_id"], keep="first")
+    last_nodes = last_nodes[["pattern_id", "to_stop", "seq"]].rename(columns={"to_stop": "stop_id"})
+    last_nodes["seq"] = last_nodes["seq"] + 1
 
-    links = pd.concat([first_nodes, last_nodes], ignore_index=True).set_index(["pattern_id", "index"])
-    stop_times = trip_stops.set_index(["pattern_id", "index"]).join(links).reset_index()
-    renames = {"index": "stop_sequence", "departure": "departure_time", "arrival": "arrival_time"}
-    stop_times.rename(columns=renames, inplace=True)
+    links = pd.concat([first_nodes, last_nodes], ignore_index=True).set_index(["pattern_id", "seq"])
+    stop_times = trip_stops.set_index(["pattern_id", "seq"]).join(links).reset_index()
+    renames = {"seq": "stop_sequence", "departure": "departure_time", "arrival": "arrival_time"}
+    stop_times = stop_times.rename(columns=renames)
 
     # Conversion must be convoluted to support
     def pad(k: pd.Series) -> pd.Series:
@@ -37,8 +35,8 @@ def read_stop_times(conn: sqlite3.Connection):
         s = pad(s % 60)
         stop_times[field] = h + ":" + m + ":" + s
 
-    stop_times["stop_sequence"] += 1
+    stop_times["stop_sequence"] = stop_times["stop_sequence"] + 1
 
-    stop_times.stop_id = stop_times.stop_id.astype(str)
+    stop_times["stop_id"] = stop_times["stop_id"].astype(str)
 
     return stop_times.sort_values(["trip_id", "stop_sequence"], ascending=True)

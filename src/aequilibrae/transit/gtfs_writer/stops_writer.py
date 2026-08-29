@@ -1,34 +1,13 @@
 import csv
-from os.path import join
-from typing import List
+from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
-from aequilibrae.transit.transit_elements import Stop
 
-
-def write_stops(stops: List[Stop], folder_path: str):
-    data = [
-        [
-            stp.stop_id,
-            stp.stop,
-            stp.stop_name,
-            stp.stop_desc,
-            stp.stop_lat,
-            stp.stop_lon,
-            stp.zone_id,
-            stp.parent_station,
-        ]
-        for stp in stops
-    ]
-
+def write_stops(stops: pd.DataFrame, folder_path: Path):
     headers = ["stop_id", "stop_code", "stop_name", "stop_desc", "stop_lat", "stop_lon", "zone_id", "parent_station"]
-    df = pd.DataFrame(data, columns=headers)
+    df = stops.reindex(columns=headers).copy()
+    for fld in ["stop_id", "zone_id", "parent_station"]:
+        df[fld] = df[fld].astype("string").str.replace(r"\.0$", "", regex=True).fillna("")
 
-    df["parent_station"] = np.nan
-    for fld in ["zone_id", "stop_id"]:
-        df[fld] = df[fld].astype(float).fillna(-99999).astype(int).astype(str)
-        df.loc[df[fld] == "-99999", fld] = ""
-
-    df.to_csv(join(folder_path, "stops.txt"), quoting=csv.QUOTE_NONNUMERIC, index=False)
+    df.to_csv(folder_path / "stops.txt", quoting=csv.QUOTE_NONNUMERIC, index=False)

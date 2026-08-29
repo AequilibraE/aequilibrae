@@ -1,32 +1,27 @@
 import sqlite3
 
-import shapely.wkb
-from aequilibrae.utils.get_table import get_table
-
-# from polarislib.network.data import DataTableStorage
-from aequilibrae.transit.transit_elements import Stop
+import pandas as pd
 
 
-def read_stops(conn: sqlite3.Connection, transformer):
-    data = get_table("transit_stops", conn).reset_index()
-    data = data[data.agency_id > 1]
-    data.geo = data.geo.apply(shapely.wkb.loads)
-    if transformer:
-        lons, lats = transformer.transform(data.X.values, data.Y.values)
-        data["X"] = lons[:]
-        data["Y"] = lats[:]
+def read_stops(conn: sqlite3.Connection):
+    sql = """
+        SELECT stop_id,
+               stop AS stop_code,
+               name AS stop_name,
+               description AS stop_desc,
+               transit_fare_zone AS zone_id,
+               parent_station,
+               street AS stop_street,
+               ST_X(geometry) AS x,
+               ST_Y(geometry) AS y
+        FROM stops
+    """
+    data = pd.read_sql(sql, conn)
 
-    data.drop(columns=["moved_by_matching", "Z"], inplace=True)
-    data.rename(
-        columns={
-            "description": "stop_desc",
-            "name": "stop_name",
-            "street": "stop_street",
-            "transit_zone_id": "zone_id",
-            "Y": "stop_lat",
-            "X": "stop_lon",
-        },
-        inplace=True,
-    )
+    data = data.rename(columns={"x": "stop_lon", "y": "stop_lat"})
+    for column in ["zone_id", "parent_station"]:
+        if column not in data.columns:
+            data[column] = pd.NA
 
-    return [Stop(-1).from_row(dt) for _, dt in data.iterrows()]
+    headers = ["stop_id", "stop_code", "stop_name", "stop_desc", "stop_lat", "stop_lon", "zone_id", "parent_station"]
+    return data[headers].copy()
