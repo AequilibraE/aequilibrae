@@ -1,24 +1,17 @@
 import logging
-import math
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
 from shapely import union_all
-from shapely.geometry import Polygon, box
+from shapely.geometry import Polygon
 
-from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.gmns_builder import GMNSBuilder
-from aequilibrae.project.network.gmns_exporter import GMNSExporter
-from aequilibrae.project.network.haversine import haversine
+from aequilibrae.project.network.importers import Importer
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
-from aequilibrae.project.network.osm.osm_builder import OSMBuilder
-from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
-from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -52,6 +45,7 @@ class Network(WorkerThread):
         self.links = Links(self)
         self.nodes = Nodes(self)
         self.periods = Periods(self)
+        self.importer = Importer(self)
 
     def skimmable_fields(self) -> list:
         """
@@ -115,147 +109,11 @@ class Network(WorkerThread):
             all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
-    def create_from_osm(
-        self,
-        place: Polygon | str,
-        modes: List[str] | tuple[str, ...] | str = ("car", "transit", "bicycle", "walk"),
-        clean: bool = True,
-    ) -> None:
-        """
-        Downloads the network from OpenStreetMap (OSM)
+    def export_to_gmns(self, path: str) -> None:
+        """Export the network to GMNS CSV files in ``path``."""
+        from aequilibrae.project.network.gmns_exporter import GMNSExporter
 
-        :Arguments:
-            **place** (:obj:`Polygon | str`): Either a Polygon for which the network will be downloaded, or a place name
-
-            **modes** (:obj:`tuple`, *Optional*): List of all modes to be downloaded. Defaults to the modes in the
-            parameter file
-
-            **clean** (:obj:`bool`, *Optional*): Keeps only the links that intersects the model area polygon.
-            Defaults to ``True``. Does not apply to networks downloaded with a place name
-
-        .. code-block:: python
-
-            >>> project = Project()
-            >>> project.new(project_path)
-
-            # Now we can import the network for any place we want
-            >>> project.network.create_from_osm(place="my_beautiful_hometown") # doctest: +SKIP
-
-            >>> project.close()
-        """
-
-        if self.count_links() > 0:
-            raise FileExistsError("You can only import an OSM network into a brand new model file")
-
-        with self.project.db_connection as conn:
-            conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
-            conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
-
-        if isinstance(modes, (tuple, list)):
-            modes = list(modes)
-        elif isinstance(modes, str):
-            modes = [modes]
-        else:
-            raise ValueError("'modes' needs to be string or list/tuple of string")
-
-        if place is Polygon:
-            if place.bounds[0] < -180 or place.bounds[2] > 180 or place.bounds[1] < -90 or place.bounds[3] > 90:
-                raise ValueError("Coordinates out of bounds. Polygon must be in WGS84")
-            west, south, east, north = place.bounds
-            model_area = place
-        else:
-            clean = False
-            bbox, report = placegetter(place)
-            if bbox is None:
-                msg = f'We could not find a reference for place name "{place}"'
-                logger.warning(msg)
-                return
-            for i in report:
-                if "PLACE FOUND" in i:
-                    logger.info(i)
-            model_area = box(*bbox)
-            west, south, east, north = bbox
-
-        # Need to compute the size of the bounding box to not exceed it too much
-        height = haversine((east + west) / 2, south, (east + west) / 2, north)
-        width = haversine(east, (north + south) / 2, west, (north + south) / 2)
-        area = height * width
-
-        par = Parameters().parameters["osm"]
-        max_query_area_size = par["max_query_area_size"]
-
-        if area < max_query_area_size:
-            polygons = [model_area]
-        else:
-            polygons = []
-            parts = math.ceil(area / max_query_area_size)
-            horizontal = math.ceil(math.sqrt(parts))
-            vertical = math.ceil(parts / horizontal)
-            dx = (east - west) / horizontal
-            dy = (north - south) / vertical
-            for i in range(horizontal):
-                xmin = max(-180, west + i * dx)
-                xmax = min(180, west + (i + 1) * dx)
-                for j in range(vertical):
-                    ymin = max(-90, south + j * dy)
-                    ymax = min(90, south + (j + 1) * dy)
-                    subarea = box(xmin, ymin, xmax, ymax)
-                    if subarea.intersects(model_area):
-                        polygons.append(subarea)
-        logger.info("Downloading data")
-        dwnloader = OSMDownloader(polygons, modes)
-        dwnloader.signal = self.signal
-        dwnloader.doWork()
-
-        logger.info("Building Network")
-        self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
-
-        self.builder.signal = self.signal
-        self.builder.doWork()
-
-        logger.info("Network built successfully")
-
-    def create_from_gmns(
-        self,
-        link_file_path: str,
-        node_file_path: str,
-        use_group_path: str = "",
-        geometry_path: str = "",
-        srid: int = 4326,
-    ) -> None:
-        """
-        Creates AequilibraE model from links and nodes in GMNS format.
-
-        :Arguments:
-            **link_file_path** (:obj:`str`): Path to a links csv file in GMNS format
-
-            **node_file_path** (:obj:`str`): Path to a nodes csv file in GMNS format
-
-            **use_group_path** (:obj:`str`, *Optional*): Path to a csv table containing groupings of uses.
-            This helps AequilibraE know when a GMNS use is actually a group of other GMNS uses
-
-            **geometry_path** (:obj:`str`, *Optional*): Path to a csv file containing geometry information for a line
-            object, if not specified in the link table
-
-            **srid** (:obj:`int`, *Optional*): Spatial Reference ID in which the GMNS geometries were created
-        """
-
-        gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
-        gmns_builder.doWork()
-
-        logger.info("Network built successfully")
-
-    def export_to_gmns(self, path: str):
-        """
-        Exports AequilibraE network to csv files in GMNS format.
-
-        :Arguments:
-            **path** (:obj:`str`): Output folder path.
-        """
-
-        gmns_exporter = GMNSExporter(self, path)
-        gmns_exporter.doWork()
-
+        GMNSExporter(self, path).doWork()
         logger.info("Network exported successfully")
 
     def build_graphs(

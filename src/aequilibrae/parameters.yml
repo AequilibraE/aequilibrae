@@ -42,49 +42,37 @@ network:
       - link_type:
           description: Classification of link (local, arterial, etc). THIS FIELD CANNOT
             BE CHANGED
-          osm_source: highway
           type: varchar
       - name:
           description: name
-          osm_source: name
           type: text
       - cycleway:
           description: cycleway, both way
-          osm_source: cycleway
           type: text
       - cycleway_right:
           description: cycleway, right
-          osm_source: cycleway:right
           type: text
       - cycleway_left:
           description: cycleway, left
-          osm_source: cycleway:left
           type: text
       - busway:
           description: busway
-          osm_source: busway
           type: text
       - busway_right:
           description: busway, right
-          osm_source: busway:right
           type: text
       - busway_left:
           description: busway, left
-          osm_source: busway:left
-          type: text            
+          type: text
       two-way:
       - lanes:
           description: lanes
-          osm_behaviour: divide
-          osm_source: lanes
           type: integer
       - capacity:
           description: capacity
           type: numeric
       - speed:
           description: speed
-          osm_behaviour: copy
-          osm_source: maxspeed
           type: numeric
     link_types:
     - centroid_connector:
@@ -118,155 +106,6 @@ network:
     - is_centroid:
         description: is_centroid
         type: integer
-  osm:
-    all_link_types:
-    - secondary_link
-    - escalator
-    - trail
-    - cycleway
-    - path
-    - trunk_link
-    - secondary
-    - escape
-    - track
-    - road
-    - motorway_link
-    - primary
-    - corridor
-    - residential
-    - footway
-    - motorway
-    - primary_link
-    - unclassified
-    - bus_guideway
-    - tertiary_link
-    - living_street
-    - pedestrian
-    - bridleway
-    - elevator
-    - trunk
-    - tertiary
-    - service
-    - steps
-    - proposed
-    - raceway
-    - construction
-    - abandoned
-    - platform
-    - unclassified
-    - via_ferrata
-    - busway
-    modes:
-      bicycle:
-        link_types:
-        - secondary_link
-        - trail
-        - cycleway
-        - trunk_link
-        - secondary
-        - escape
-        - track
-        - road
-        - primary
-        - residential
-        - footway
-        - primary_link
-        - unclassified
-        - tertiary_link
-        - living_street
-        - pedestrian
-        - elevator
-        - tertiary
-        - service
-        - proposed
-        - construction
-        - unclassified
-        mode_filter:
-          bicycle: 'no'
-        unknown_tags: true
-      car:
-        link_types:
-        - secondary_link
-        - trunk_link
-        - secondary
-        - escape
-        - road
-        - motorway_link
-        - primary
-        - residential
-        - motorway
-        - primary_link
-        - unclassified
-        - tertiary_link
-        - living_street
-        - pedestrian
-        - bridleway
-        - trunk
-        - tertiary
-        - service
-        - construction
-        - unclassified
-        mode_filter:
-          motor_vehicle: 'no'
-        unknown_tags: true
-      transit:
-        link_types:
-        - secondary_link
-        - trunk_link
-        - secondary
-        - escape
-        - road
-        - motorway_link
-        - primary
-        - residential
-        - motorway
-        - primary_link
-        - unclassified
-        - tertiary_link
-        - living_street
-        - pedestrian
-        - bridleway
-        - trunk
-        - tertiary
-        - service
-        - construction
-        - unclassified
-        - bus_guideway
-        - busway
-        unknown_tags: true
-      walk:
-        link_types:
-        - secondary_link
-        - escalator
-        - trail
-        - cycleway
-        - path
-        - trunk_link
-        - secondary
-        - escape
-        - track
-        - road
-        - primary
-        - corridor
-        - residential
-        - footway
-        - primary_link
-        - unclassified
-        - tertiary_link
-        - living_street
-        - pedestrian
-        - bridleway
-        - elevator
-        - tertiary
-        - service
-        - steps
-        - proposed
-        - construction
-        - unclassified
-        - via_ferrata
-        mode_filter:
-          pedestrian: 'no'
-        unknown_tags: true
   gmns:
     critical_dist: 2
     node:
@@ -437,13 +276,18 @@ network:
       equivalency:
         mode_name: use
 osm:
-  overpass_endpoint: http://overpass-api.de/api
+  # Used by project.network.importer.osm to configure osmnx via osmnx.settings.
+  # AequilibraE splits larger boundaries before querying Overpass.
+  max_query_area_size: 100000000
+  overpass_endpoint: https://overpass-api.de/api
   nominatim_endpoint: https://nominatim.openstreetmap.org/
   accept_language: "en"
-  max_attempts: 50
   timeout: 540
-  max_query_area_size: 2500000000
-  sleeptime: 5
+  # Client-side rate limiting against the Overpass status endpoint. Required for
+  # shared public servers. Set to false for a self-hosted server: instances with
+  # an unlimited rate limit report a status layout that makes the client wait
+  # forever for a slot that is already free.
+  overpass_rate_limit: true
 
 system:
   cpus: 0

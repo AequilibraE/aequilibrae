@@ -40,8 +40,7 @@ class Parameters:
 
         >>> p.parameters['system']['logging_directory'] =  "/path_to/other_logging_directory"
         >>> p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
-        >>> p.parameters['osm']['max_query_area_size'] = 10000000000
-        >>> p.parameters['osm']['sleeptime'] = 0
+        >>> p.parameters['osm']['timeout'] = 180
         >>> p.write_back()
 
         >>> # You can also restore the software default values

@@ -5,7 +5,7 @@ pyfiles = [
   'connector_creation.py',
   'gmns_builder.py',
   'gmns_exporter.py',
-  'haversine.py',
+  'importers.py',
   'link.py',
   'link_type.py',
   'link_types.py',
@@ -13,7 +13,6 @@ pyfiles = [
   'mode.py',
   'modes.py',
   'network.py',
-  'network.yml',
   'node.py',
   'nodes.py',
   'period.py',
@@ -22,7 +21,7 @@ pyfiles = [
 ]
 
 pkgs = [
-  'osm',
+  'importer',
 ]
 
 py.install_sources(
