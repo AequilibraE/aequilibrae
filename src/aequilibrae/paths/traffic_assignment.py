@@ -4,16 +4,16 @@ import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import Dict, List, Optional, Union, Any
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
-from numpy import nan_to_num, ndarray, dtype
+from numpy import dtype, nan_to_num, ndarray
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
@@ -188,7 +188,7 @@ class TrafficAssignment(AssignmentBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
+        >>> from aequilibrae.paths import TrafficAssignment, TrafficClass, VDFsManager
 
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()

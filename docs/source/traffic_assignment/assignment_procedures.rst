@@ -76,7 +76,7 @@ method call:
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TrafficAssignment
+    >>> from aequilibrae.paths import TrafficAssignment, VDFsManager
 
     >>> assig = TrafficAssignment()
 
@@ -97,25 +97,22 @@ procedure.
 
 .. doctest::
 
-    >>> assig.set_vdf('BPR')
+    >>> bpr = VDFsManager.make_preset_vdf("bpr")
 
-* **vdf_parameters**: the parameters to be used in the volume-delay function, other than volume, capacity and 
+* **name_mapping**: the parameters to be used in the volume-delay function, other than volume, and 
   free-flow time. VDF parameters must be consistent across all graphs.
 
   Because AequilibraE supports different parameters for each link, its implementation is the most general possible 
   while still preserving the desired properties for multi-class assignment, but the user needs to provide individual
   values for each link *OR* a single value for the entire network.
 
-  Setting the VDF parameters should be done *AFTER* setting the VDF function of choice and adding traffic classes 
-  to the assignment, or it will *fail*.
-
 .. doctest::
 
     # The VDF parameters can be either an existing field in the graph, passed as a parameter:
-    >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power", "capacity": "capacity"}) # doctest: +SKIP
+    >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"}) # doctest: +SKIP
 
     # Or as a global value:
-    >>> assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
+    >>> assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0, "capacity": "capacity"})
 
 * **time_field**: the field of the graph that corresponds to free-flow travel time. The procedure will 
   collect this information from the graph associated with the first traffic class provided, but will check 

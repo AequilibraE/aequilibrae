@@ -11,7 +11,7 @@ from aequilibrae.paths.route_choice import RouteChoice
 from aequilibrae.paths.sub_area import SubAreaAnalysis
 from aequilibrae.paths.traffic_assignment import TrafficAssignment, TransitAssignment
 from aequilibrae.paths.traffic_class import TrafficClass, TransitClass
-from aequilibrae.paths.vdf import VDF
+from aequilibrae.paths.vdf import VDF, VDFsManager
 
 __all__ = [
     "path_computation",
@@ -36,4 +36,5 @@ __all__ = [
     "TrafficClass",
     "TransitClass",
     "VDF",
+    "VDFsManager",
 ]
