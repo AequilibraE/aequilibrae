@@ -7,13 +7,13 @@ from aequilibrae import VDF, Graph, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import DEFAULT_PRESET_SPECS, FUNCTION_MAP, VDFsManager
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def project(sioux_falls_example):
     sioux_falls_example.network.build_graphs()
     return sioux_falls_example
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def car_graph(project):
     graph: Graph = project.network.graphs["c"]
     graph.set_graph("free_flow_time")
@@ -21,19 +21,19 @@ def car_graph(project):
     return graph
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def matrix(project):
     mat = project.matrices.get_matrix("demand_omx")
     mat.computational_view()
     return mat
 
 
-@pytest.fixture(scope="function")
-def assigclass(car_graph, matrix):
+@pytest.fixture
+def traffic_class(car_graph, matrix):
     return TrafficClass("car", car_graph, matrix)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assignment(project):
     return TrafficAssignment(project)
 
@@ -58,13 +58,13 @@ def assignment(project):
 )
 def test_set_vdf_with_parameters(
     assignment: TrafficAssignment,
-    assigclass: TrafficClass,
+    traffic_class: TrafficClass,
     vdf_name: str,
-    name_mapping: dict,
+    name_mapping: dict[str, str | float],
 ):
-    assignment.add_class(assigclass)
-    f, f_dash = FUNCTION_MAP[vdf_name]
-    vdf = VDF(vdf_name, f, DEFAULT_PRESET_SPECS[vdf_name], f_dash)
+    assignment.add_class(traffic_class)
+    function, derivative = FUNCTION_MAP[vdf_name]
+    vdf = VDF(vdf_name, function, DEFAULT_PRESET_SPECS[vdf_name], derivative)
     assignment.set_vdf(vdf, name_mapping=name_mapping)
 
 
@@ -87,22 +87,22 @@ def test_set_vdf_with_parameters(
 )
 def test_check_bounds_of_vdfs_inclusive(
     assignment: TrafficAssignment,
-    assigclass: TrafficClass,
+    traffic_class: TrafficClass,
     vdf_name: str,
-    name_mapping: dict,
+    name_mapping: dict[str, str | float],
 ):
-    assignment.add_class(assigclass)
-    f, f_dash = FUNCTION_MAP[vdf_name]
-    vdf = VDF(vdf_name, f, DEFAULT_PRESET_SPECS[vdf_name], f_dash)
+    assignment.add_class(traffic_class)
+    function, derivative = FUNCTION_MAP[vdf_name]
+    vdf = VDF(vdf_name, function, DEFAULT_PRESET_SPECS[vdf_name], derivative)
     with pytest.raises(ValueError, match="At least one alpha is less than 0.0"):
         assignment.set_vdf(vdf, name_mapping=name_mapping)
 
 
 def test_check_bounds_of_vdfs_exclusive(
     assignment: TrafficAssignment,
-    assigclass: TrafficClass,
+    traffic_class: TrafficClass,
 ):
-    assignment.add_class(assigclass)
+    assignment.add_class(traffic_class)
 
     exclusive_bound_vdf = VDF(
         "ebv", lambda x: x, {"param": {"bounds": (0.0, 1.0), "inclusive_lower": False, "inclusive_upper": False}}
@@ -115,50 +115,22 @@ def test_check_bounds_of_vdfs_exclusive(
 
 
 def test_make_preset_vdfs():
-    vdfs_preset = VDFsManager(add_preset_vdfs=True)
-    for f in FUNCTION_MAP:
-        vdf = vdfs_preset.get_vdf(f)
-        assert isinstance(vdf, VDF)
+    vdfs = VDFsManager(add_preset_vdfs=True)
+    for vdf_name in FUNCTION_MAP:
+        assert isinstance(vdfs.get_vdf(vdf_name), VDF)
+
     with pytest.raises(ValueError):
-        vdfs_preset.get_vdf("fake_vdf")
+        vdfs.get_vdf("fake_vdf")
 
 
 def test_vdf_as_parsed_string():
-    """
-    vdfs:
-        default: "bpr_tyler"
-        bpr_tyler:
-            function: bpr
-            spec:
-            alpha:
-                fillNA: 0.15
-                bounds: [0, 10]
-            beta: 4
-            capacity:
-                bounds: [0, .inf]
-        quadratic:
-            functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
-            derivative_functional_form: "fftime * (2 * a * (link_flows/capacity) + b) / capacity"
-            spec:
-            a:
-                fillNA: 0.15
-                bounds: [0, .inf]
-            b:
-                fillNA: 1.0
-                bounds: [0, .inf]
-            capacity:
-                bounds: [0, .inf]
-    """
     vdfs = VDFsManager(
         vdf_data_from_parameters={
             "default": "bpr_tyler",
             "bpr_tyler": {
                 "function": "bpr",
                 "spec": {
-                    "alpha": {
-                        "fill_NA": 0.15,
-                        "bounds": [0, 10],
-                    },
+                    "alpha": {"fill_NA": 0.15, "bounds": [0, 10]},
                     "beta": 4,
                     "capacity": {"bounds": [0, float("inf")]},
                 },
@@ -167,119 +139,79 @@ def test_vdf_as_parsed_string():
                 "functional_form": "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)",
                 "derivative_functional_form": "fftime * (2 * a * (link_flows/capacity) + b) / capacity",
                 "spec": {
-                    "a": {
-                        "fill_NA": 0.15,
-                        "bounds": [0, float("inf")],
-                    },
-                    "b": {
-                        "fill_NA": 1.0,
-                        "bounds": [0, float("inf")],
-                    },
+                    "a": {"fill_NA": 0.15, "bounds": [0, float("inf")]},
+                    "b": {"fill_NA": 1.0, "bounds": [0, float("inf")]},
                     "capacity": {"bounds": [0, float("inf")]},
                 },
             },
         }
     )
     quadratic_vdf: VDF = vdfs.get_vdf("quadratic")
-    out = np.zeros(3)
-    fake_link_flows = np.array([0.5, 0.5, 0.5])
-    fake_capacity = np.array([1.0, 1.0, 1.0])
-    fake_free_flow_time = np.array([1.0, 2.0, 3.0])
-    a = 1
-    b = 2
-    quadratic_vdf.apply_vdf(
-        out,
-        fake_link_flows,
-        fake_free_flow_time,
-        1,
-        a=a,
-        b=b,
-        capacity=fake_capacity,
-    )
-    np.testing.assert_array_equal(
-        fake_free_flow_time * (a * (fake_link_flows / fake_capacity) ** 2 + b * (fake_link_flows / fake_capacity) + 1),
-        out,
-    )
 
-    derivative_out = np.zeros(3)
-    quadratic_vdf.apply_derivative(
-        derivative_out,
-        fake_link_flows,
-        fake_free_flow_time,
+    link_flows = np.full(3, 0.5)
+    capacity = np.ones(3)
+    free_flow_time = np.array([1.0, 2.0, 3.0])
+    a, b = 1, 2
+
+    output = np.zeros(3)
+    quadratic_vdf.apply_vdf(
+        output,
+        link_flows,
+        free_flow_time,
         1,
         a=a,
         b=b,
-        capacity=fake_capacity,
+        capacity=capacity,
     )
-    np.testing.assert_array_equal(
-        fake_free_flow_time * (2 * a * (fake_link_flows / fake_capacity) + b) / fake_capacity,
-        derivative_out,
+    expected = free_flow_time * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
+    np.testing.assert_array_equal(expected, output)
+
+    derivative_output = np.zeros(3)
+    quadratic_vdf.apply_derivative(
+        derivative_output,
+        link_flows,
+        free_flow_time,
+        1,
+        a=a,
+        b=b,
+        capacity=capacity,
     )
+    expected_derivative = free_flow_time * (2 * a * (link_flows / capacity) + b) / capacity
+    np.testing.assert_array_equal(expected_derivative, derivative_output)
 
 
 def test_finite_difference():
-    """
-    vdfs:
-        default: "bpr_tyler"
-        bpr_tyler:
-            function: bpr
-            spec:
-            alpha:
-                fillNA: 0.15
-                bounds: [0, 10]
-            beta: 4
-            capacity:
-                bounds: [0, .inf]
-        quadratic:
-            functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
-            derivative_functional_form: "fftime * (2 * a * (link_flows/capacity) + b) / capacity"
-            spec:
-            a:
-                fillNA: 0.15
-                bounds: [0, .inf]
-            b:
-                fillNA: 1.0
-                bounds: [0, .inf]
-            capacity:
-                bounds: [0, .inf]
-    """
     vdfs = VDFsManager(
         vdf_data_from_parameters={
             "quadratic": {
                 "functional_form": "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)",
                 "spec": {
-                    "a": {
-                        "fill_NA": 0.15,
-                        "bounds": [0, float("inf")],
-                    },
-                    "b": {
-                        "fill_NA": 1.0,
-                        "bounds": [0, float("inf")],
-                    },
+                    "a": {"fill_NA": 0.15, "bounds": [0, float("inf")]},
+                    "b": {"fill_NA": 1.0, "bounds": [0, float("inf")]},
                     "capacity": {"bounds": [0, float("inf")]},
                 },
             },
         }
     )
     quadratic_vdf: VDF = vdfs.get_vdf("quadratic")
-    fake_link_flows = np.array([0.5, 0.5, 0.5])
-    fake_capacity = np.array([1.0, 1.0, 1.0])
-    fake_free_flow_time = np.array([1.0, 2.0, 3.0])
-    a = 1
-    b = 2
 
-    derivative_out = np.zeros(3)
+    link_flows = np.full(3, 0.5)
+    capacity = np.ones(3)
+    free_flow_time = np.array([1.0, 2.0, 3.0])
+    a, b = 1, 2
+    derivative_output = np.zeros(3)
+
     quadratic_vdf.apply_derivative(
-        derivative_out,
-        fake_link_flows,
-        fake_free_flow_time,
+        derivative_output,
+        link_flows,
+        free_flow_time,
         1,
         a=a,
         b=b,
-        capacity=fake_capacity,
+        capacity=capacity,
     )
-    actual = fake_free_flow_time * (2 * a * (fake_link_flows / fake_capacity) + b) / fake_capacity
-    np.testing.assert_allclose(actual, derivative_out)
+    expected = free_flow_time * (2 * a * (link_flows / capacity) + b) / capacity
+    np.testing.assert_allclose(expected, derivative_output)
 
 
 def test_malformed_vdf_parameters():
@@ -339,9 +271,7 @@ def test_plot_vdf_and_check_valid_vdf(tmp_path, vdf_name, parameter_values, expe
     vdf = vdfs_preset.get_vdf(vdf_name)
 
     num_points = 300
-    link_attributes = {
-        name: np.full(num_points, value, dtype=np.float64) for name, value in parameter_values.items()
-    }
+    link_attributes = {name: np.full(num_points, value, dtype=np.float64) for name, value in parameter_values.items()}
 
     valid_0_value, increasing_f_vals, nonnegative_derivative, convex = vdf.check_valid(num_points, link_attributes)
     assert valid_0_value and increasing_f_vals and nonnegative_derivative
