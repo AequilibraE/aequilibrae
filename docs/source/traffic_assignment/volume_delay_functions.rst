@@ -164,7 +164,7 @@ Conical (Spiess)
 With :math:`\beta = \frac{2 \alpha-1}{2 \alpha-2}`
 
 **Standard Parameters:**
-  * :math:`\alpha = 2.0` (must be :math:`\alpha \gt 1`)
+  * :math:`\alpha = 2.0` (must be :math:`\alpha > 1`)
   * :math:`\beta = 1.5`, according to the above relation
 
 **Origin and Background:**
