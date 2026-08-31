@@ -1,4 +1,3 @@
-from aequilibrae.paths.vdf import VDFsManager
 import logging
 from os.path import isfile
 from pathlib import Path
@@ -8,16 +7,17 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import VDFsManager
 from aequilibrae.utils.logging_utils import basic_config
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def project(sioux_falls_test):
     sioux_falls_test.network.build_graphs()
     return sioux_falls_test
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def car_graph(project):
     graph = project.network.graphs["c"]
     graph.set_blocked_centroid_flows(False)
@@ -25,24 +25,24 @@ def car_graph(project):
     return graph
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def matrix(project):
     mat = project.matrices.get_matrix("omx2")
     mat.computational_view()
     return mat
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assigclass(car_graph, matrix):
     return TrafficClass("car", car_graph, matrix)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assignment(project):
     return TrafficAssignment(project)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def file_logging():
     logger = logging.getLogger("aequilibrae")
     handler = basic_config(level=logging.INFO)
@@ -53,9 +53,7 @@ def file_logging():
     logger.propagate = True
 
 
-def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix):
-    basic_config()
-
+def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, file_logging):
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
 
