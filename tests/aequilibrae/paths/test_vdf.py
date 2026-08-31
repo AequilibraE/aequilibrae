@@ -324,60 +324,27 @@ def test_malformed_vdf_parameters():
         VDFsManager(vdf_data_from_parameters=no_preset_function)
 
 
-def test_plot_vdf_and_check_valid_vdf(tmp_path):
+@pytest.mark.parametrize(
+    "vdf_name, parameter_values, expected_convex",
+    [
+        ("bpr", {"alpha": 0.15, "beta": 4.0, "capacity": 1.0}, True),
+        ("bpr2", {"alpha": 0.15, "beta": 4.0, "capacity": 1.0}, True),
+        ("conical", {"alpha": 2.0, "beta": 1.5, "capacity": 1.0}, True),
+        ("inrets", {"alpha": 0.9, "capacity": 1.0}, False),
+        ("akcelik", {"alpha": 0.25, "tau": 0.8, "length": 1.0, "capacity": 1.0}, True),
+    ],
+)
+def test_plot_vdf_and_check_valid_vdf(tmp_path, vdf_name, parameter_values, expected_convex):
     vdfs_preset = VDFsManager(add_preset_vdfs=True)
+    vdf = vdfs_preset.get_vdf(vdf_name)
 
-    bpr = vdfs_preset.get_vdf("bpr")
     num_points = 300
-    alphas = np.ones(num_points, dtype=np.float64) * 0.15
-    betas = np.ones(num_points, dtype=np.float64) * 4.0
+    link_attributes = {
+        name: np.full(num_points, value, dtype=np.float64) for name, value in parameter_values.items()
+    }
 
-    capacity = np.ones(num_points, dtype=np.float64)
-    bpr_link_attributes = {"alpha": alphas, "beta": betas, "capacity": capacity}
+    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = vdf.check_valid(num_points, link_attributes)
+    assert valid_0_value and increasing_f_vals and nonnegative_derivative
+    assert convex == expected_convex
 
-    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = bpr.check_valid(num_points, bpr_link_attributes)
-
-    # still a error with the vdfs that the convex part is wrong - derivatives are set to 1 for 0 volume
-    assert valid_0_value and increasing_f_vals and nonnegative_derivative and convex
-    bpr.plot_vdf(tmp_path, num_points, bpr_link_attributes)
-
-    bpr2 = vdfs_preset.get_vdf("bpr2")
-
-    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = bpr2.check_valid(num_points, bpr_link_attributes)
-    assert valid_0_value and increasing_f_vals and nonnegative_derivative and convex
-    bpr2.plot_vdf(tmp_path, num_points, {"alpha": alphas, "beta": betas, "capacity": capacity})
-
-    conical_alphas = np.ones(num_points, dtype=np.float64) * 2.0
-    conical_betas = np.ones(num_points, dtype=np.float64) * 1.5
-
-    conical = vdfs_preset.get_vdf("conical")
-
-    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = bpr2.check_valid(
-        num_points, {"alpha": conical_alphas, "beta": conical_betas, "capacity": capacity}
-    )
-    assert valid_0_value and increasing_f_vals and nonnegative_derivative and convex
-    conical.plot_vdf(tmp_path, num_points, {"alpha": conical_alphas, "beta": conical_betas, "capacity": capacity})
-
-    inrets_alphas = np.ones(num_points, dtype=np.float64) * 0.9
-
-    inrets = vdfs_preset.get_vdf("inrets")
-    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = inrets.check_valid(
-        num_points, {"alpha": inrets_alphas, "capacity": capacity}
-    )
-    assert valid_0_value and increasing_f_vals and nonnegative_derivative and not convex
-    inrets.plot_vdf(tmp_path, num_points, {"alpha": inrets_alphas, "capacity": capacity})
-
-    akcelik_alphas = np.ones(num_points, dtype=np.float64) * 0.25
-    taus = np.ones(num_points, dtype=np.float64) * 0.8
-    lengths = np.ones(num_points, dtype=np.float64)
-
-    akcelik = vdfs_preset.get_vdf("akcelik")
-    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = akcelik.check_valid(
-        num_points, {"alpha": akcelik_alphas, "tau": taus, "length": lengths, "capacity": capacity}
-    )
-    assert valid_0_value and increasing_f_vals and nonnegative_derivative and convex, "akelik failed"
-    akcelik.plot_vdf(
-        tmp_path,
-        num_points,
-        {"alpha": akcelik_alphas, "tau": taus, "length": lengths, "capacity": capacity},
-    )
+    vdf.plot_vdf(tmp_path, num_points, link_attributes)
