@@ -1,8 +1,10 @@
+import logging
 import sqlite3
 from typing import Optional
 
-from aequilibrae.log import logger
 from aequilibrae.project.project_creation import add_triggers, remove_triggers
+
+logger = logging.getLogger(__name__)
 
 
 def migrate(
@@ -23,8 +25,8 @@ def migrate(
     # Remove both the current prefixed names and their legacy unprefixed forms
     # before installing the current trigger set. Retired topology names are no
     # longer discoverable from the specification and must be removed explicitly.
-    remove_triggers(project_conn, logger, "network", use_aequilibrae_prefix=True)
-    remove_triggers(project_conn, logger, "network", use_aequilibrae_prefix=False)
+    remove_triggers(project_conn, "network", use_aequilibrae_prefix=True)
+    remove_triggers(project_conn, "network", use_aequilibrae_prefix=False)
 
     retired_triggers = (
         "aequilibrae_cannibalize_node",
@@ -115,7 +117,7 @@ def migrate(
             f"First affected link IDs: {link_ids}"
         )
 
-    add_triggers(project_conn, logger, "network")
+    add_triggers(project_conn, "network")
 
     if repaired:
         logger.warning("Repaired the geometry of %s links with inconsistent endpoints", repaired)
