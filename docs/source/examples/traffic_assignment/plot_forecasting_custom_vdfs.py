@@ -366,31 +366,28 @@ assig = TrafficAssignment()
 assig.add_class(assigclass)
 
 
-def quadratic(congested_times, link_flows, capacity, fftime, cores, a, b):
-    congested_times[:] = fftime * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
+def quadratic(congested_time, link_flows, fftime, cores, a, b, capacity):
+    congested_time[:] = fftime * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
 
 
-def quadratic_derivative(result, link_flows, capacity, fftime, cores, a, b):
-    result[:] = fftime * (2 * a * (link_flows / capacity) + b) / capacity
+def quadratic_derivative(delta, link_flows, fftime, cores, a, b, capacity):
+    delta[:] = fftime * (2 * a * (link_flows / capacity) + b) / capacity
 
 
-assig.add_vdf(
+project.add_vdf(
     "quadratic",
     quadratic,
-    {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}},
+    {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}, "capacity": {"fill_NA": 100}},
     quadratic_derivative,
 )
-assig.set_vdf("quadratic")
-# fill_NA is filled value
+vdf = project.get_vdf("quadratic")
 
 # Then we set the volume delay function and its parameters
-assig.set_vdf_link_attributes({"a": "b"})  # {"capacity": "this_capacity", }
-# set_vdf_column_mapping
+assig.set_vdf(vdf, {"a": 0.15, "b": 1.0, "capacity": "capacity"})
 
 # when specifying this, if it is a constant, it is used over all else
 
-# Set the capacity and free flow travel times as they exist in the graph
-assig.set_capacity_field("capacity")
+# Set the free flow travel times as they exist in the graph
 assig.set_time_field("free_flow_time")
 
 # And the algorithm we want to use to assign
