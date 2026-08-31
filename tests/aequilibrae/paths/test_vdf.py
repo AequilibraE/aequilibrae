@@ -1,10 +1,10 @@
-import pytest
-
-from aequilibrae.paths.vdf import FUNCTION_MAP, VDFsManager, DEFAULT_PRESET_SPECS
-from aequilibrae import TrafficAssignment, TrafficClass, VDF, Graph
+import re
 
 import numpy as np
-import re
+import pytest
+
+from aequilibrae import VDF, Graph, TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import DEFAULT_PRESET_SPECS, FUNCTION_MAP, VDFsManager
 
 
 @pytest.fixture(scope="function")
@@ -101,8 +101,6 @@ def test_check_bounds_of_vdfs_inclusive(
 def test_check_bounds_of_vdfs_exclusive(
     assignment: TrafficAssignment,
     assigclass: TrafficClass,
-    # vdf_name: str,
-    # name_mapping: dict,
 ):
     assignment.add_class(assigclass)
 
@@ -198,10 +196,9 @@ def test_vdf_as_parsed_string():
         b=b,
         capacity=fake_capacity,
     )
-    assert np.all(
-        out
-        == fake_free_flow_time
-        * (a * (fake_link_flows / fake_capacity) ** 2 + b * (fake_link_flows / fake_capacity) + 1)
+    np.testing.assert_array_equal(
+        fake_free_flow_time * (a * (fake_link_flows / fake_capacity) ** 2 + b * (fake_link_flows / fake_capacity) + 1),
+        out,
     )
 
     derivative_out = np.zeros(3)
@@ -214,8 +211,9 @@ def test_vdf_as_parsed_string():
         b=b,
         capacity=fake_capacity,
     )
-    assert np.all(
-        derivative_out == fake_free_flow_time * (2 * a * (fake_link_flows / fake_capacity) + b) / fake_capacity
+    np.testing.assert_array_equal(
+        fake_free_flow_time * (2 * a * (fake_link_flows / fake_capacity) + b) / fake_capacity,
+        derivative_out,
     )
 
 
