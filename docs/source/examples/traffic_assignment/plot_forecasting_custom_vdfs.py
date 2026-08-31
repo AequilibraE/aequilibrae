@@ -114,14 +114,16 @@ from aequilibrae.paths.cython.vdf_core import (
     inrets,
 )
 
-bpr_spec = {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}
-project.add_vdf(name="bpr_tyler", function=bpr, spec=bpr_spec)
+bpr_spec = {
+    "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
+    "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+    "capacity": {"bounds": (0, float("inf"))},
+}
+project.add_vdf(name="bpr_tyler", function=bpr, derivative=delta_bpr, spec=bpr_spec)
 
-standard_vdf = project.get_vdf("bpr")
-# vdfs are stored in project
+# VDFs are stored in project
 vdf = project.get_vdf(name="bpr_tyler")
 assig.set_vdf(vdf, name_mapping={"alpha": "b", "beta": "power", "capacity": "capacity"})
-# assig.set_vdf("bpr", bpr, {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}, delta_bpr)
 
 # Then we set the volume delay function and its parameters
 
