@@ -25,9 +25,9 @@ which are going to be the input of a future year assignment with select link ana
 # %%
 
 # Imports
-from uuid import uuid4
 from os.path import join
 from tempfile import gettempdir
+from uuid import uuid4
 
 import pandas as pd
 
@@ -63,7 +63,7 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 # We build all graphs
 project.network.build_graphs()
-# We get warnings that several fields in the project are filled with NaNs. 
+# We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # We grab the graph for cars
@@ -101,17 +101,17 @@ assig = TrafficAssignment()
 assig.add_class(assigclass)
 
 # Then we set these parameters, which an only be configured after adding one class to the assignment
-from aequilibrae.paths.cython.AoN import (
-    bpr,
-    delta_bpr,
-    bpr2,
-    delta_bpr2,
-    conical,
-    delta_conical,
-    inrets,
-    delta_inrets,
+from aequilibrae.paths.cython.vdf_core import (
     akcelik,
+    bpr,
+    bpr2,
+    conical,
     delta_akcelik,
+    delta_bpr,
+    delta_bpr2,
+    delta_conical,
+    delta_inrets,
+    inrets,
 )
 
 bpr_spec = {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}
@@ -120,7 +120,7 @@ project.add_vdf(name="bpr_tyler", function=bpr, spec=bpr_spec)
 standard_vdf = project.get_vdf("bpr")
 # vdfs are stored in project
 vdf = project.get_vdf(name="bpr_tyler")
-assig.set_vdf(vdf, name_mapping = {"alpha": "b", "beta": "power", "capacity": "capacity"})
+assig.set_vdf(vdf, name_mapping={"alpha": "b", "beta": "power", "capacity": "capacity"})
 # assig.set_vdf("bpr", bpr, {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}, delta_bpr)
 
 # Then we set the volume delay function and its parameters
@@ -160,8 +160,10 @@ assig.save_skims("base_year_assignment_skims", which_ones="all", format="omx")
 # Trip distribution
 # -----------------
 # First, let's have a function to plot the Trip Length Frequency Distribution.
-from math import log10, floor
+from math import floor, log10
+
 import matplotlib.pyplot as plt
+
 
 # %%
 def plot_tlfd(demand, skim, name):
@@ -188,6 +190,7 @@ def plot_tlfd(demand, skim, name):
 # We will calibrate synthetic gravity models using the skims for ``free_flow_time`` that we just generated
 
 import numpy as np
+
 from aequilibrae.distribution import GravityCalibration
 
 # %%
@@ -222,7 +225,7 @@ intrazonals *= 0.75
 np.fill_diagonal(imped.matrix_view, intrazonals)
 
 # %%
-# Since we are working with an OMX file, we cannot overwrite a matrix on disk. 
+# Since we are working with an OMX file, we cannot overwrite a matrix on disk.
 # So let's give it a new name to save.
 imped.save(names=["final_time_with_intrazonals"])
 
@@ -260,12 +263,12 @@ plt.show()
 # (TFLD) seems to be a better fit for the actual one.
 
 # %%
-from aequilibrae.distribution import Ipf, GravityApplication, SyntheticGravityModel
+from aequilibrae.distribution import GravityApplication, Ipf, SyntheticGravityModel
 
 # %%
 # Compute future vectors
 # ~~~~~~~~~~~~~~~~~~~~~~
-# 
+#
 # First thing to do is to compute the future vectors from our matrix.
 origins = np.sum(demand.matrix_view, axis=1)
 destinations = np.sum(demand.matrix_view, axis=0)
@@ -275,7 +278,7 @@ orig = origins * (1 + np.random.rand(origins.shape[0]) / 10)
 dest = destinations * (1 + np.random.rand(origins.shape[0]) / 10)
 dest *= orig.sum() / dest.sum()
 
-vectors = pd.DataFrame({"origins":orig, "destinations":dest}, index=demand.index[:])
+vectors = pd.DataFrame({"origins": orig, "destinations": dest}, index=demand.index[:])
 # %%
 # IPF for the future vectors
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,7 +303,7 @@ ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
 # %%
 # Impedance
 # ~~~~~~~~~
-# 
+#
 # Let's get the base-year assignment skim for car we created before and prepare it for computation
 imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 imped.computational_view(["final_time_with_intrazonals"])
@@ -362,17 +365,24 @@ assig.add_class(assigclass)
 
 
 def quadratic(congested_times, link_flows, capacity, fftime, cores, a, b):
-    congested_times[:] = fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)
+    congested_times[:] = fftime * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
+
 
 def quadratic_derivative(result, link_flows, capacity, fftime, cores, a, b):
-    result[:] = fftime * (2*a * (link_flows/capacity) + b) / capacity
+    result[:] = fftime * (2 * a * (link_flows / capacity) + b) / capacity
 
-assig.add_vdf("quadratic", quadratic, {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}}, quadratic_derivative)
+
+assig.add_vdf(
+    "quadratic",
+    quadratic,
+    {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}},
+    quadratic_derivative,
+)
 assig.set_vdf("quadratic")
 # fill_NA is filled value
 
 # Then we set the volume delay function and its parameters
-assig.set_vdf_link_attributes({"a": "b"}) # {"capacity": "this_capacity", }
+assig.set_vdf_link_attributes({"a": "b"})  # {"capacity": "this_capacity", }
 # set_vdf_column_mapping
 
 # when specifying this, if it is a constant, it is used over all else
@@ -397,11 +407,11 @@ select_links = {
 
 # %%
 # .. note::
-# 
+#
 #    As we are executing the select link analysis on a particular ``TrafficClass``, we should set the
 #    links we want to analyze. The input is a dictionary with string as keys and a list of tuples as
-#    values, so that each entry represents a separate set of selected links to compute. 
-#    
+#    values, so that each entry represents a separate set of selected links to compute.
+#
 #    ``select_link_dict = {"set_name": [(link_id1, direction1), ..., (link_id, direction)]}``
 #
 #    The string name will name the set of links, and the list of tuples is the list of selected links
@@ -426,9 +436,9 @@ assig.save_select_link_results("select_link_analysis")
 # .. note::
 #
 #    Say we just want to save our select link flows, we can call: ``assig.save_select_link_flows("just_flows")``
-# 
+#
 #    Or if we just want the select link matrices: ``assig.save_select_link_matrices("just_matrices")``
-# 
+#
 #    Internally, the ``save_select_link_results`` calls both of these methods at once.
 
 # %%
