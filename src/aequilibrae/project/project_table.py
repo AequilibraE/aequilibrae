@@ -245,42 +245,6 @@ class ProjectTable(ABC):
 
         self._invalidate()
 
-    def update_from(self, frame: pd.DataFrame) -> int:
-        """Atomically update records identified by a DataFrame key column.
-
-        Keys which do not match existing entries will raise a ValueError.
-
-        :Arguments:
-            **frame** (:obj:`pandas.DataFrame`): Key and value columns to write.
-
-        :Returns:
-            **updated rows** (:obj:`int`): Number of submitted rows.
-        """
-        missing_key_fetch_limit = 10
-        keys = frame[self.key]
-        if not keys.empty:
-            values = ",".join("(?)" for _ in keys)
-            sql = self._non_existant_id_sql.format(values=values)
-            missing_rows = self._connection._connection.execute(sql, keys).fetchmany(size=missing_key_fetch_limit + 1)
-        else:
-            missing_rows = []
-
-        if missing_rows:
-            sample = [row[0] for row in missing_rows[:missing_key_fetch_limit]]
-            sample_text = str(sample)
-            if len(missing_rows) >= 10:
-                sample_text = sample_text[:-1] + ", ...]"
-            raise ValueError(f"update contained keys which do not exist: {sample_text}")
-
-        with self._connection.transaction() as conn:
-            # No key here, needs to be specially handled
-            columns = tuple(col for col in frame.columns if col != self.key)
-            rows = self._prepare_rows(frame, columns + (self.key,))  # But we still need it in the rows
-            conn.executemany(self._update_statement(columns), rows)
-
-        self._invalidate()
-        return len(rows)
-
     def insert_from(self, frame: pd.DataFrame) -> list[Any]:
         """Atomically insert records identified by a DataFrame key column.
 
@@ -308,6 +272,66 @@ class ProjectTable(ABC):
 
         self._invalidate()
         return frame[self.key].to_list()
+
+    def update_from(self, frame: pd.DataFrame, allow_missing: bool = False) -> int:
+        """
+        Atomically update records identified by a DataFrame key column.
+
+        Keys which do not match existing entries will raise a ValueError unless ``allow_missing`` is True.
+
+        :Arguments:
+            **frame** (:obj:`pandas.DataFrame`): Key and value columns to write.
+
+            **allow_missing** (:obj:`bool`, *Optional*): Allow missing keys.
+
+        :Returns:
+            **updated rows** (:obj:`int`): Number of submitted rows.
+        """
+        if not allow_missing:
+            missing_rows = self.find_missing(frame[self.key], fetch_limit=10 + 1)
+
+            if missing_rows:
+                raise ValueError(
+                    f"update contained keys which do not exist: {_truncate_list_to_str(missing_rows, limit=10)}"
+                )
+
+        with self._connection.transaction() as conn:
+            # No key here, needs to be specially handled
+            columns = tuple(col for col in frame.columns if col != self.key)
+            rows = self._prepare_rows(frame, columns + (self.key,))  # But we still need it in the rows
+            conn.executemany(self._update_statement(columns), rows)
+
+        self._invalidate()
+        return len(rows)
+
+    def delete_from(self, keys: list[Any], allow_missing: bool = False) -> int:
+        """
+        Atomically delete records identified by a list of keys.
+
+        Keys which do not match existing entries will raise a ValueError unless ``allow_missing`` is True.
+
+        :Arguments:
+            **frame** (:obj:`list[Any]`): Keys to delete.
+
+            **allow_missing** (:obj:`bool`, *Optional*): Allow missing keys.
+
+        :Returns:
+            **deleted rows** (:obj:`int`): Number of submitted rows.
+        """
+
+        if not allow_missing:
+            missing_rows = self.find_missing(keys, fetch_limit=10 + 1)
+
+            if missing_rows:
+                raise ValueError(
+                    f"delete contained keys which do not exist: {_truncate_list_to_str(missing_rows, limit=10)}"
+                )
+
+        with self._connection.transaction() as conn:
+            conn.executemany(self._delete_sql, keys)
+
+        self._invalidate()
+        return len(keys)
 
     def _refresh_record_type(self) -> None:
         """Refresh the generated record type after a schema change."""
@@ -362,6 +386,32 @@ class ProjectTable(ABC):
             if cursor.rowcount == 0:
                 raise self._missing_record(key)
         self._invalidate()
+
+    def find_missing(self, keys: list[Any], fetch_limit: int = -1) -> list[Any]:
+        """
+        Find which keys are not used. Returns a subset of unused keys.
+
+        :Arguments:
+            **keys** (:obj:`list[Any]`): Keys to check usage of.
+
+            **fetch_limit** (:obj:`int`, *Optional*): Limit returned keys to this number. Defaults to all.
+
+        :Returns:
+            **missing keys** (:obj:`list[Any]`): Return a subset of the input **keys** which are not used.
+        """
+        if not keys:
+            return []
+
+        values = ",".join("(?)" for _ in keys)
+        sql = self._non_existant_id_sql.format(values=values)
+        cursor = self._connection._connection.execute(sql, keys)
+
+        if fetch_limit >= 0:
+            missing_rows = cursor.fetchmany(size=fetch_limit)
+        else:
+            missing_rows = cursor.fetchall()
+
+        return [row[0] for row in missing_rows]
 
     def _missing_record(self, key: Any) -> ValueError:
         """Build the consistent error used when a record does not exist."""
@@ -443,3 +493,12 @@ class SpatialProjectTable(ProjectTable):
         if "geometry" in value_columns:
             frame = frame.to_wkb()
         return super()._prepare_rows(frame, value_columns)
+
+
+def _truncate_list_to_str(list: list[Any], limit: int):
+    sample = list[:limit]
+    sample_text = str(sample)
+    if len(list) >= limit:
+        sample_text = sample_text[:-1] + ", ...]"
+
+    return sample_text

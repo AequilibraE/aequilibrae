@@ -61,20 +61,10 @@ class Modes(NonSpatialProjectTable):
         ``string.ascii_letters```
 
         :Returns:
-            **unused** (:obj:`list[str]`): Sub set of IDs that are not used..
+            **unused** (:obj:`list[str]`): Sub set of IDs that are not used.
         """
 
         if full_list is None:
             full_list = list(ascii_letters)
 
-        if len(full_list) == 0:
-            return []
-
-        values = ",".join("(?)" for _ in full_list)
-
-        return [
-            row[0]
-            for row in self._connection._connection.execute(
-                self._non_existant_id_sql.format(values=values), full_list
-            ).fetchall()
-        ]
+        return self.find_missing(full_list)

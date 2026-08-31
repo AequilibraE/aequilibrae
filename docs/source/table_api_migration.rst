@@ -12,6 +12,10 @@ The same table workflow is used by ``links``, ``nodes``, ``modes``,
 zones table has moved from ``project.zoning`` to ``project.network.zones``.
 The table class is now ``Zones`` in ``aequilibrae.project.network.zones``.
 
+In general, create rows with ``insert()``, change them with ``update()``,
+and remove them with ``delete()``. Similarly, issue bulk operations
+through ``insert_from()``, ``update_from()``, and ``delete_from()``.
+
 Read and inspect records
 ------------------------
 
@@ -48,6 +52,11 @@ Generated records include fields added through the table's ``fields`` editor.
 The table refreshes its generated record type after a schema change. Use
 ``table.columns`` to inspect writable columns and ``table.data`` when a
 DataFrame or GeoDataFrame is more appropriate.
+
+.. code-block:: python
+
+    df = links.data
+    print(df.head().to_string())
 
 Replace mutable-record saves
 ----------------------------
@@ -135,7 +144,7 @@ Shapely object when the row is read:
 
 For scalar insertion, ``links`` supplies defaults for omitted endpoints,
 direction, and link type. Other omitted columns use their SQLite defaults or
-remain ``NULL`` when the schema permits it.
+remain ``NULL`` when the schema allows it.
 
 ``links.copy(link_id)`` replaces ``copy_link()``. The old method returned an
 unsaved mutable record. The new method inserts the copy immediately and returns
@@ -145,6 +154,70 @@ its new ID:
 
     copied_link_id = project.network.links.copy(link_id)
     copied_link = project.network.links.get(copied_link_id)
+
+Insert, update, or delete many rows
+-----------------------------------
+
+Use ``insert_from()``, ``update_from()``, and ``delete_from()`` for bulk
+operations. All operations are atomic. ``insert_from()`` accepts a
+DataFrame with an explicit key column and returns the inserted keys. For
+numeric-key tables, omitting the key column allocates sequential IDs. For
+non-numeric-keys, the keys must be provided:
+
+.. code-block:: python
+
+    import pandas as pd
+
+    new_links = pd.DataFrame(
+        {
+            "a_node": [1001, 1002],
+            "b_node": [1002, 1003],
+            "direction": [0, 0],
+            "modes": ["c", "cb"],
+            "link_type": ["default", "default"],
+            "geometry": [first_geometry.wkb, second_geometry.wkb],
+        }
+    )
+    new_ids = project.network.links.insert_from(new_links)
+
+Bulk insertion uses the columns in the DataFrame and any defaults. It does
+not apply the scalar ``insert()`` conversions. Values must therefore
+already be serialised for SQLite, except geometry which is handled
+internally.
+
+``update_from()`` requires the table key as a DataFrame column. Other
+columns are the values to write. If any key does not exist, the operation
+raises ``ValueError`` before changing the table unless ``allow_missing`` is
+set to ``True``. The error reports at most the first 10 missing keys. The
+return value is the number of submitted rows:
+
+.. code-block:: python
+
+    changes = pd.DataFrame(
+        {
+            "link_id": [new_ids[0], new_ids[1]],
+            "speed_ab": [50.0, 40.0],
+            "capacity_ab": [1800.0, 1200.0],
+        }
+    )
+    submitted = project.network.links.update_from(changes)
+    assert submitted == 2
+
+Neither method mutates the caller's DataFrame. Use scalar ``insert()`` or
+``update()`` when each row needs separate error handling.
+
+
+``delete_from()`` requires a list of keys to remove. Similarly to
+``update_from()`` the keys must exist, and, the return value is the number
+of submitted rows, but it accepts a list of keys instead:
+
+.. code-block:: python
+
+    removals = [new_ids[0], new_ids[1]]
+    submitted = project.network.links.delete_from(removals)
+    assert submitted == 2
+
+None of these methods mutate the caller's DataFrame or List.
 
 Work with modes, link types, periods, and connectors
 ----------------------------------------------------
@@ -167,14 +240,14 @@ Collection methods that returned dictionaries are gone. Replace
         for zone in project.network.zones
     }
 
-Use ``data`` instead when the next operation is naturally a DataFrame
-selection, join, or aggregation. ``get_by_name()`` remains available for modes
-and link types. Create rows with ``insert()``, change them with ``update()``,
-and remove them with ``delete()``.
+Use ``data`` instead of iteration when you know you need all the
+items. ``get_by_name()`` remains available for modes and link types.
 
-Use ``available_ids()`` on the modes and link types tables to find unused IDs.
-It checks ``string.ascii_letters`` by default; pass ``full_list`` to provide a
-custom set of candidate IDs:
+Use ``find_missing()`` with a list of keys to obtain a subset which are unused.
+
+Use ``available_ids()`` on the modes and link types tables to find unused
+IDs with reasonable defaults.  It assumes ``string.ascii_letters`` by
+default, pass ``full_list`` to provide a custom set of candidate IDs:
 
 .. code-block:: python
 
@@ -256,62 +329,13 @@ ID:
         description="Morning peak",
     )
 
-Load or update many rows
-------------------------
-
-Use ``insert_from()`` and ``update_from()`` for DataFrame workflows. Both
-operations are atomic. ``insert_from()`` accepts a DataFrame with an explicit
-key column and returns the inserted keys. For numeric-key tables, omitting the
-key column allocates sequential IDs. For non-numeric-keys, the keys must be
-provided:
-
-.. code-block:: python
-
-    import pandas as pd
-
-    new_links = pd.DataFrame(
-        {
-            "a_node": [1001, 1002],
-            "b_node": [1002, 1003],
-            "direction": [0, 0],
-            "modes": ["c", "cb"],
-            "link_type": ["default", "default"],
-            "geometry": [first_geometry.wkb, second_geometry.wkb],
-        }
-    )
-    new_ids = project.network.links.insert_from(new_links)
-
-Bulk insertion uses the columns in the DataFrame and any defaults. It does
-not apply the scalar ``insert()`` conversions. Values must therefore already
-be serialised for SQLite. In particular, spatial geometry values must be WKB
-rather than Shapely objects.
-
-``update_from()`` requires the table key as a DataFrame column. Other columns
-are the values to write. If any key does not exist, the operation raises
-``ValueError`` before changing the table. The error reports at most the first
-10 missing keys. The return value is the number of submitted rows:
-
-.. code-block:: python
-
-    changes = pd.DataFrame(
-        {
-            "link_id": [new_ids[0], new_ids[1]],
-            "speed_ab": [50.0, 40.0],
-            "capacity_ab": [1800.0, 1200.0],
-        }
-    )
-    submitted = project.network.links.update_from(changes)
-    assert submitted == 2
-
-Neither method mutates the caller's DataFrame. Use scalar ``insert()`` or
-``update()`` when each row needs separate error handling.
-
 Transactions and custom table integrations
 -------------------------------------------
 
-A standalone scalar operation opens and finalises a transaction automatically.
-Inside an existing transaction, scalar mutations join that transaction. Bulk
-operations always open their own nested transaction scope.
+A standalone scalar operation opens and finalises a transaction
+automatically if one is not already open, otherwise the scalar mutation
+joins that transaction. Bulk operations always open their own nested
+transaction scope.
 
 Nested transaction scopes use SQLite savepoints. If an exception from an inner
 scope is caught by an outer scope, only the inner scope is rolled back.
@@ -323,8 +347,8 @@ Matrix and result records support the same ``get()``, metadata ``update()``,
 and metadata ``delete()`` operations. Use their file- and table-aware helpers
 when the associated matrix file or result table must change too.
 
-For matrices, replace ``new_record()`` with ``create()`` to export an in-memory
-matrix and register it. Exporting through this method supports OMX files:
+For matrices, replace ``new_record()`` with ``create()`` to save an in-memory
+matrix and register it. Saving through this method supports OMX files:
 
 .. code-block:: python
 
