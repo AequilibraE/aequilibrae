@@ -143,18 +143,6 @@ def test_set_time_field(assignment, assigclass):
     assert assignment.time_field == "free_flow_time"
 
 
-# def test_set_capacity_field(assignment, assigclass):
-#     with pytest.raises(ValueError):
-#         assignment.set_capacity_field("capacity")
-#     assignment.add_class(assigclass)
-#     N = random.randint(1, 50)
-#     val = "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
-#     with pytest.raises(ValueError):
-#         assignment.set_capacity_field(val)
-#     assignment.set_capacity_field("capacity")
-#     assert assignment.capacity_field == "capacity"
-
-
 def test_info(assignment, assigclass):
     iterations = random.randint(1, 10000)
     rgap = random.random() / 10000

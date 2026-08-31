@@ -66,31 +66,20 @@ class LinearApproximation(WorkerThread):
 
         self.assig: TrafficAssignment = assig_spec
 
-        # if None in [
-        #     assig_spec.classes,
-        #     assig_spec.vdf,
-        #     # assig_spec.capacity_field,
-        #     # assig_spec.time_field,
-        #     assig_spec.vdf_parameters,
-        # ]:
-        #     all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
-        #     raise Exception(
-        #         "Parameter missing. Setting the algorithm is the last thing to do "
-        #         f"when assigning. Check if you have all of these: {all_par}"
-        #     )
         if assig_spec.classes is None:
-            raise Exception(
+            raise ValueError(
                 "Traffic classes parameter missing. Setting the algorithm is the last thing to do when assigning."
             )
-        if assig_spec.vdf is None:
-            raise Exception("vdf has not been specified. Setting the algorithm is the last thing to do when assigning.")
-        if assig_spec.vdf_parameters is None:
-            raise Exception("vdf_parameters missing. Setting the algorithm is the last thing to do when assigning.")
+        elif assig_spec.vdf is None:
+            raise ValueError(
+                "vdf has not been specified. Setting the algorithm is the last thing to do when assigning."
+            )
+        elif assig_spec.vdf_parameters is None:
+            raise ValueError("vdf_parameters missing. Setting the algorithm is the last thing to do when assigning.")
 
         self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
-        # self.cap_field = assig_spec.capacity_field
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
@@ -116,9 +105,6 @@ class LinearApproximation(WorkerThread):
 
         # BFW specific stuff
         self.betas = np.array([1.0, 0.0, 0.0])
-
-        # Instantiates the arrays that we will use over and over
-        # self.capacity = assig_spec.capacity
 
         # Creates preload vector from preloads
         self.preload = None

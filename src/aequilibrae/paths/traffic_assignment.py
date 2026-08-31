@@ -538,26 +538,6 @@ class TrafficAssignment(AssignmentBase):
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self._config["Time field"] = time_field
 
-        # def set_capacity_field(self, capacity_field: str) -> None:
-        #     """
-        #     Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
-
-        #     :Arguments:
-        #         **capacity_field** (:obj:`str`): Field name
-        #     """
-        #     super()._check_field(capacity_field)
-        #     c = self.classes[0]
-
-        # self.cores = c.results.cores
-        # self.elementwise_cores = c.results.elementwise_cores
-        # self.threading_threshold = c.results.threading_threshold
-
-    #     self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-    #     self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
-    #     self.capacity_field = capacity_field
-    #     self._config["Number of cores"] = c.results.cores
-    #     self._config["Capacity field"] = capacity_field
-
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
         Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
