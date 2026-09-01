@@ -2,6 +2,7 @@ from string import ascii_letters
 from typing import Any
 
 from aequilibrae.project.project_table import _SELECT_ONE_SQL, NonSpatialProjectTable
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
 class Modes(NonSpatialProjectTable):
@@ -34,8 +35,8 @@ class Modes(NonSpatialProjectTable):
     key = "mode_id"
     record_name = "ModeRecord"
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, connection: NestedTransactionManager) -> None:
+        super().__init__(connection)
         self._select_by_name_sql = _SELECT_ONE_SQL.format(table=self.name, key="mode_name", columns="*")
 
     def get_by_name(self, mode_name: str) -> Any:

@@ -1,14 +1,15 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aequilibrae.project import Project
     import sqlite3
 
+    from aequilibrae.project import Project
+
+import logging
 import string
 import uuid
-import logging
+from os.path import dirname, join, realpath
 from pathlib import Path
-from os.path import join, dirname, realpath
 
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.utils.db_utils import commit_and_close

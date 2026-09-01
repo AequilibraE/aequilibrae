@@ -2,6 +2,7 @@ from string import ascii_letters
 from typing import Any
 
 from aequilibrae.project.project_table import _SELECT_ONE_SQL, NonSpatialProjectTable
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
 class LinkTypes(NonSpatialProjectTable):
@@ -39,8 +40,8 @@ class LinkTypes(NonSpatialProjectTable):
     key = "link_type_id"
     record_name = "LinkTypeRecord"
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, connection: NestedTransactionManager) -> None:
+        super().__init__(connection)
         self._select_by_name_sql = _SELECT_ONE_SQL.format(table=self.name, key="link_type", columns="*")
 
     def get_by_name(self, link_type: str) -> Any:

@@ -4,8 +4,6 @@ import os
 import shutil
 import sqlite3
 import warnings
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from typing import NoReturn
 
@@ -23,7 +21,7 @@ from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
-from aequilibrae.utils.db_utils import AequilibraEConnection, ConnectionClosure, commit_and_close
+from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager, commit_and_close
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 
@@ -92,7 +90,6 @@ class Project:
 
         self.activate()
 
-        self.__load_objects()
         logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
 
@@ -137,13 +134,11 @@ class Project:
         return self.project_base_path / "public_transport.sqlite"
 
     @property
-    @contextmanager
-    def db_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
-        with commit_and_close(self._project_database_path, spatial=True) as conn:
-            yield conn
+    def db_connection(self) -> NestedTransactionManager:
+        return self.scenario.db_connection
 
     @property
-    def db_connection_spatial(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
+    def db_connection_spatial(self) -> NestedTransactionManager:
         """Deprecated alias for ``db_connection``, which is now a spatial connection."""
         warnings.warn(
             "'db_connection_spatial' is deprecated and will be removed in version 2.1. "
@@ -154,16 +149,12 @@ class Project:
         return self.db_connection
 
     @property
-    @contextmanager
-    def results_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
-        with commit_and_close(self._results_database_path, spatial=False, missing_ok=True) as conn:
-            yield conn
+    def results_connection(self) -> NestedTransactionManager:
+        return self.scenario.results_connection
 
     @property
-    @contextmanager
-    def transit_connection(self) -> Iterator[sqlite3.Connection | AequilibraEConnection]:
-        with commit_and_close(self._transit_database_path, spatial=True, missing_ok=True) as conn:
-            yield conn
+    def transit_connection(self) -> NestedTransactionManager:
+        return self.scenario.transit_connection
 
     def new(self, project_path: os.PathLike | str) -> None:
         """Creates a new project
@@ -178,8 +169,9 @@ class Project:
         if os.path.isdir(project_path):
             raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
 
-        # We create the project folder and create the base file
+        # Create the project database before constructing the connections.
         base_path.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(spatialite_database, path_to_file)
 
         self.root_scenario = Scenario(
             name="root",
@@ -194,7 +186,6 @@ class Project:
         self.activate()
 
         self.__create_empty_network()
-        self.__load_objects()
         self.about.create()
         logger.info(f"Created project on {base_path}")
 
@@ -222,6 +213,7 @@ class Project:
             raise  # FIXME something goes wrong above
 
         finally:
+            self.scenario.close()
             self.deactivate()
 
     def activate(self) -> None:
@@ -284,17 +276,6 @@ class Project:
         finally:
             closure.close()
 
-    def __load_objects(self) -> None:
-        matrix_folder = self.project_base_path / "matrices"
-        matrix_folder.mkdir(parents=True, exist_ok=True)
-
-        self.scenario.network = Network(self)
-        self.scenario.about = About(self)
-        self.scenario.matrices = Matrices(self)
-        self.scenario.results = Results(self)
-        self.scenario.transit = Transit(self)
-        self.scenario.zoning = Zoning(self.scenario.network)
-
     @property
     def project_parameters(self) -> Parameters:
         return Parameters(path=self.project_base_path)
@@ -335,7 +316,6 @@ class Project:
         raise NotImplementedError
 
     def __create_empty_network(self):
-        shutil.copyfile(spatialite_database, self.path_to_file)
         pth = self.project_base_path / "run"
         pth.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(demo_init_py, pth / "__init__.py")
@@ -374,6 +354,7 @@ class Project:
 
         logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
 
+        previous_scenario = self.scenario
         if scenario_name == "root":
             self.scenario = self.root_scenario
         else:
@@ -386,8 +367,8 @@ class Project:
             )
 
         default_log_file_config(self.scenario.log_handler)
-
-        self.__load_objects()
+        if previous_scenario is not self.root_scenario and previous_scenario is not self.scenario:
+            previous_scenario.close()
 
     def create_empty_scenario(self, scenario_name: str, description: str = "") -> None:
         """

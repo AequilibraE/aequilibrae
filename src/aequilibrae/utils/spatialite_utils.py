@@ -12,7 +12,7 @@ from zipfile import ZipFile
 
 import numpy as np
 
-from aequilibrae.utils.db_utils import AequilibraEConnection, has_table, safe_connect
+from aequilibrae.utils.db_utils import _AequilibraEConnection, has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
 # Setup adapters so that we can read/write numpy types directly to DB
@@ -39,7 +39,7 @@ def connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False
     if inside_qgis:
         import qgis
 
-        return qgis.utils.spatialite_connect(str(path_to_file), factory=AequilibraEConnection)
+        return qgis.utils.spatialite_connect(str(path_to_file), factory=_AequilibraEConnection)
 
     ensure_spatialite_binaries()
 

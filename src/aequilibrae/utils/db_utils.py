@@ -1,6 +1,8 @@
 """SQLite connection ownership and small database helpers."""
 
 import contextlib
+import logging
+import shutil
 from collections.abc import Generator
 from dataclasses import dataclass
 from os import PathLike
@@ -11,9 +13,42 @@ from typing import Any
 import pandas as pd
 from pandas.api import types as pd_types
 
+logger = logging.getLogger(__name__)
 
-class AequilibraEConnection(Connection):
+
+class _AequilibraEConnection(Connection):
     """SQLite connection type used by AequilibraE connection factories."""
+
+    # FIXME: This is a big hack, in order to still allow the NestedTransactionManager to work with pandas we yield the
+    # raw connection in the context manager, however, we can't stop pandas or anyone else from calling .commit and
+    # breaking our transaction control, so we make those operations no-ops. I really don't like this but I can't think
+    # of a better way without bringing in something like SQLAlchemy which pandas supports explicitly.
+
+    def commit(self, *_args, **_kwargs):
+        logger.debug(
+            f"commit was called an {self.__class__.__name__}, however this function is disabled in favour "
+            "of the NestedTransactionManager. Call _commit if you truly must commit manually."
+        )
+
+    def rollback(self, *_args, **_kwargs):
+        logger.debug(
+            f"rollback was called an {self.__class__.__name__}, however this function is disabled in favour "
+            "of the NestedTransactionManager. Call _rollback if you truly must rollback manually."
+        )
+
+    def __enter__(self):
+        logger.debug(
+            f"__enter__ was called an {self.__class__.__name__}, however the context manager on the connection "
+            "is disabled in favour of the NestedTransactionManager."
+        )
+        return self
+
+    def __exit__(self, *_args, **_kwargs):
+        pass
+
+    _commit = Connection.commit
+
+    _rollback = Connection.rollback
 
 
 class NestedTransactionManager:
@@ -268,6 +303,45 @@ class ConnectionClosure:
             raise RuntimeError("This scenario has no transit database")
         return self.__transit_connection
 
+    def create_results_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:
+        """Create and begin owning an empty results database."""
+        if self.__results_connection is not None:
+            raise RuntimeError("This scenario already has a results database")
+
+        path = Path(path)
+        if path.exists():
+            raise FileExistsError(f"results database already exists: {path}")
+        try:
+            path.touch()
+            self.__results_connection = NestedTransactionManager(path)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+        return self.__results_connection
+
+    def create_transit_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:
+        """Create, initialise, and begin owning a transit database."""
+        if self.__transit_connection is not None:
+            raise RuntimeError("This scenario already has a transit database")
+
+        from aequilibrae.project.project_creation import initialize_tables
+        from aequilibrae.reference_files import spatialite_database
+
+        path = Path(path)
+        if path.exists():
+            raise FileExistsError(f"transit database already exists: {path}")
+        try:
+            shutil.copyfile(spatialite_database, path)
+            self.__transit_connection = NestedTransactionManager(path, spatial=True)
+            initialize_tables("transit", conn=self.__transit_connection._connection)
+        except BaseException:
+            if self.__transit_connection is not None:
+                self.__transit_connection.close()
+                self.__transit_connection = None
+            path.unlink(missing_ok=True)
+            raise
+        return self.__transit_connection
+
     @property
     def has_results_connection(self) -> bool:
         """Whether a results database is owned."""
@@ -313,7 +387,7 @@ def list_tables_in_db(connection: Connection) -> list[str]:
 def safe_connect(filepath: PathLike[str] | str, missing_ok: bool = False) -> Connection:
     """Open a non-spatial SQLite database without silently creating it."""
     if Path(filepath).exists() or missing_ok or str(filepath) == ":memory:":
-        connection = connect(filepath, factory=AequilibraEConnection)
+        connection = connect(filepath, factory=_AequilibraEConnection)
         _enable_foreign_keys(connection)
         return connection
     raise FileNotFoundError(f"Attempting to open non-existent SQLite database: {filepath}")
