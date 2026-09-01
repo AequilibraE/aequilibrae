@@ -1,6 +1,7 @@
-from os.path import join, isfile
+from os.path import isfile, join
 
 import numpy as np
+
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import SkimResults
 
@@ -53,7 +54,6 @@ def test_network_skimming_no_project(sioux_falls_example):
     graph.set_skimming("distance")
     graph.set_blocked_centroid_flows(False)
 
-    project.close()
     # skimming results
     skm = NetworkSkimming(graph)
     skm.execute()

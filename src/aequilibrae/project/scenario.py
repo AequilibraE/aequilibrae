@@ -49,7 +49,7 @@ class Scenario:
 
         (self.base_path / "matrices").mkdir(parents=True, exist_ok=True)
         self.about = About(self.connections.db_connection)
-        self.network = Network(self)
+        self.network = Network(self.connections)
         self.matrices = Matrices(self.connections.db_connection, self.base_path / "matrices")
 
         if results_path is not None:
@@ -58,7 +58,7 @@ class Scenario:
             self._results = None
 
         if transit_path is not None:
-            self._transit = Transit(self.connections.transit_connection)
+            self._transit = Transit(self)
         else:
             self._transit = None
 

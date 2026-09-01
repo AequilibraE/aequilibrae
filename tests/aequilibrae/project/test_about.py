@@ -60,7 +60,6 @@ def test_add_info_field(sioux_falls_example: Project):
         sioux_falls_example.about.insert(infoname="description")
 
 
-
 def test_write_back(sioux_falls_example: Project):
     base_path = sioux_falls_example.project_base_path
     sioux_falls_example.about.create()
@@ -76,8 +75,6 @@ def test_write_back(sioux_falls_example: Project):
             }
         )
     )
-
-    sioux_falls_example.close()
 
     project = Project()
     project.open(base_path)

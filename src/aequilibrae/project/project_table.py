@@ -155,12 +155,7 @@ class ProjectTable(ABC):
             return
         self.record_type = guess_record_type(self._connection, self.name, self.record_name)
         self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
-
-        # FIXME: Can't use self._select_column(column) because sqlite allows double quoted identifiers to be string
-        # literals when the identifier doesn't exist and a string literal is allowed. In >=3.12 we can use
-        # connection.setconfig to disallow this.
-        # https://sqlite.org/quirks.html#double_quoted_string_literals_are_accepted
-        record_columns = ",".join(column for column in self._record_fields)
+        record_columns = ",".join(self._select_column(column) for column in self._record_fields)
         self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=record_columns)
         self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=record_columns)
         self._record_schema_version = schema_version
@@ -465,7 +460,11 @@ class NonSpatialProjectTable(ProjectTable):
     """Base class for project tables without a geometry column."""
 
     def _select_column(self, column: str) -> str:
-        return escape_identifier(column)
+        # FIXME: Can't use escape_identifier because sqlite allows double quoted identifiers to be string
+        # literals when the identifier doesn't exist and a string literal is allowed. In >=3.12 we can use
+        # connection.setconfig to disallow this.
+        # https://sqlite.org/quirks.html#double_quoted_string_literals_are_accepted
+        return column
 
     def _record_value(self, column: str, value: Any) -> Any:
         return value
@@ -502,11 +501,11 @@ class SpatialProjectTable(ProjectTable):
     def _select_column(self, column: str) -> str:
         if column == "geometry":
             return _GEOMETRY_COLUMN
-        return escape_identifier(column)
+        return column
 
     def _record_value(self, column: str, value: Any) -> Any:
         if column == "geometry" and value is not None:
-            return shapely.wkb.loads(bytes(value))
+            return shapely.from_wkb(value)
         return value
 
     def _database_value(self, value: Any) -> Any:

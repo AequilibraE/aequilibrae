@@ -182,7 +182,6 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
 def test_execute_no_project(project, assignment, assigclass):
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
-    project.close()
     assignment = type(assignment)()
     assignment.add_class(assigclass)
     assignment.set_vdf("BPR")

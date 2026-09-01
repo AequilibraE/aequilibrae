@@ -26,7 +26,6 @@ def assignment_setup(sioux_falls_single_class):
         "algorithms": algorithms,
     }
     matrix.close()
-    project.close()
 
 
 def test_set_save_path_files(assignment_setup):

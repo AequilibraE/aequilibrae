@@ -113,8 +113,7 @@ def empty_no_triggers_project(empty_project, tmp_path) -> Project:
         for tbl in tables:
             conn.execute(f"DELETE FROM {tbl}")
 
-    yield empty_project
-    empty_project.close()
+    return empty_project
 
 
 @pytest.fixture(scope="function")

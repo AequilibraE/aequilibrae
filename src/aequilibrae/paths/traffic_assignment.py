@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 from numpy import nan_to_num
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
@@ -661,15 +661,16 @@ class TrafficAssignment(AssignmentBase):
             project = self.project or get_active_project()
 
         report = {"convergence": self.assignment.convergence_report, "setup": self.info()}
-        record = project.results.new_record(
+        record = project.results.create(
             table_name=table_name,
+            data=df,
             procedure="traffic assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
+        return record
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -853,7 +854,7 @@ class TrafficAssignment(AssignmentBase):
             if path.isfile(export_name):
                 raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-            if mats.check_exists(matrix_name):
+            if mats.get(matrix_name, default=None) is not None:
                 raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
             avg_skims = cls.results.skims  # type: AequilibraeMatrix
