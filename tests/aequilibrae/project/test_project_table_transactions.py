@@ -1,8 +1,10 @@
+import sqlite3
 from dataclasses import fields
 
 import pandas as pd
 import pytest
 
+from aequilibrae.project.network.osm.osm_params import default_headers
 from aequilibrae.project.project_table import NonSpatialProjectTable
 from aequilibrae.utils.db_utils import ConnectionClosure
 
@@ -106,3 +108,22 @@ def test_bulk_update(things):
     table.update_from(updates)
 
     assert table.get(1).value == 11 and table.get(2).value == 21
+
+
+def test_get(things):
+    table, _ = things
+    table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
+
+    assert table.get(1) == table.record_type(thing_id=1, value=10)
+    assert table.get(2) == table.record_type(thing_id=2, value=20)
+
+    sentinal = object()
+    assert table.get(123, default=sentinal) is sentinal
+    assert table.get(1, column="value") == 10 and table.get(2, column="value") == 20
+    assert table.get(123, column="value", default=sentinal) is sentinal
+
+    with pytest.raises(sqlite3.OperationalError, match="no such column: bad"):
+        table.get(123, column="bad")
+
+    with pytest.raises(sqlite3.OperationalError, match="no such column: bad"):
+        table.get(123, column="bad column", default=sentinal)

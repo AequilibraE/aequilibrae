@@ -221,28 +221,24 @@ Each item in the 'zones' table is a ``Zone`` object.
 ``project.about``
 -----------------
 
-This class provides an interface for editing the 'about' table of a project. We can add new fields or
-edit the existing ones as necessary, but every time you add or modify a field, you have to write back
-this information, otherwise it will be lost.
+This table object provides access to project metadata. Use the standard table API to add metadata
+records or update existing values.
 
 .. doctest::
 
     >>> project = Project()
     >>> project.open("/tmp/accessing_sfalls_data")
 
-    >>> project.about.add_info_field("my_new_field")
-    >>> project.about.my_new_field = "add some useful information about the field"
-    
-    # We can add data to an existing field
-    >>> project.about.author = "Your Name" 
+    >>> project.about.insert(infoname="my_new_field")
+    'my_new_field'
+    >>> project.about.update("my_new_field", infovalue="add some useful information about the field")
 
-    # And save our modifications
-    >>> project.about.write_back()
+    # We can update data in an existing field
+    >>> project.about.update("author", infovalue="Your Name")
 
-    # To assert if 'my_new_field' was added to the 'about' table, we can check the characteristics 
-    # stored in the table by returning a list with all characteristics in the 'about' table
-    >>> project.about.list_fields() # doctest: +ELLIPSIS
-    ['model_name', ..., 'my_new_field']
+    # Metadata is available as table data
+    >>> "my_new_field" in project.about.data.infoname.values
+    True
 
     # The 'about' table is created automatically when a project is created, but if you're 
     # loading a project created with an older AequilibraE version that didn't contain it, 

@@ -14,7 +14,7 @@ from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
 from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.utils.db_utils import NestedTransactionManager
+from aequilibrae.utils.db_utils import NestedTransactionManager, escape_identifier
 
 _TABLE_INFO_SQL = 'PRAGMA table_info("{table}")'
 _SCHEMA_VERSION_SQL = "PRAGMA schema_version"
@@ -34,7 +34,6 @@ _NON_EXISTANT_ID_SQL = (
     'WHERE _temp_subset.id NOT IN (SELECT "{key}" FROM "{table}")'
 )
 _CREATE_INDEX_SQL = "CREATE INDEX IF NOT EXISTS {index} ON {table} ({columns})"
-_QUOTED_COLUMN = '"{column}"'
 _VALUE_PLACEHOLDER = "?"
 _GEOMETRY_COLUMN = 'ST_AsBinary("geometry") AS "geometry"'
 _ASSIGNMENT = '"{column}"={placeholder}'
@@ -57,6 +56,8 @@ _SQLITE_TYPE_HINTS = (
     ("NUMERIC", float),
     ("DECIMAL", float),
 )
+
+MISSING = object()
 
 
 def _python_type(column: str, declared_type: str, nullable: bool) -> type[Any]:
@@ -82,7 +83,7 @@ def guess_record_type(connection: NestedTransactionManager, table: str, record_n
 @lru_cache
 def _format_insert(table: str, columns: tuple[str, ...], geometry_placeholder: str | None) -> str:
     """Format one INSERT shape, shared by every table instance."""
-    names = ",".join(_QUOTED_COLUMN.format(column=column) for column in columns)
+    names = ",".join(escape_identifier(column) for column in columns)
     placeholders = ",".join(
         geometry_placeholder if column == "geometry" and geometry_placeholder else _VALUE_PLACEHOLDER
         for column in columns
@@ -147,6 +148,23 @@ class ProjectTable(ABC):
 
         self._refresh_record_type()
 
+    def _refresh_record_type(self) -> None:
+        """Refresh the generated record type after a schema change."""
+        schema_version = self._connection._connection.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
+        if schema_version == self._record_schema_version:
+            return
+        self.record_type = guess_record_type(self._connection, self.name, self.record_name)
+        self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
+
+        # FIXME: Can't use self._select_column(column) because sqlite allows double quoted identifiers to be string
+        # literals when the identifier doesn't exist and a string literal is allowed. In >=3.12 we can use
+        # connection.setconfig to disallow this.
+        # https://sqlite.org/quirks.html#double_quoted_string_literals_are_accepted
+        record_columns = ",".join(column for column in self._record_fields)
+        self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=record_columns)
+        self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=record_columns)
+        self._record_schema_version = schema_version
+
     @property
     def columns(self) -> tuple[str, ...]:
         """Return the current writable table columns, including user fields."""
@@ -163,20 +181,38 @@ class ProjectTable(ABC):
         """Return all table data."""
         return pd.read_sql(self._select_all_sql, self._connection._connection)
 
-    def get(self, key: Any) -> Any:
+    def get(self, key: Any, column: str | None = None, default: Any = MISSING) -> Any:
         """Return one record identified by ``key``.
 
         :Arguments:
             **key** (:obj:`Any`): Value of the table's identifying column.
 
+            **column**
+
+            **default** (:obj:`Any`): Return value if no record matches the key.
+
         :Returns:
             **record** (:obj:`Any`): Record for the row.
         """
-        self._refresh_record_type()
-        row = self._connection._connection.execute(self._select_one_sql, [key]).fetchone()
+        if column is None:
+            self._refresh_record_type()
+            row = self._connection._connection.execute(self._select_one_sql, [key]).fetchone()
+        else:
+            # FIXME: See note at top for as to why we don't use self._select_column(column) here
+            row = self._connection._connection.execute(
+                _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=column),
+                [key],
+            ).fetchone()
+
         if row is None:
-            raise self._missing_record(key)
-        return self._build_record(row)
+            if default is MISSING:
+                raise self._missing_record(key)
+            else:
+                return default
+        elif column is not None:
+            return self._record_value(column=column, value=row[0])
+        else:
+            return self._build_record(row)
 
     def __iter__(self) -> Iterator[Any]:
         """Iterate over all records."""
@@ -333,18 +369,6 @@ class ProjectTable(ABC):
         self._invalidate()
         return len(keys)
 
-    def _refresh_record_type(self) -> None:
-        """Refresh the generated record type after a schema change."""
-        schema_version = self._connection._connection.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
-        if schema_version == self._record_schema_version:
-            return
-        self.record_type = guess_record_type(self._connection, self.name, self.record_name)
-        self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
-        record_columns = ",".join(self._select_column(column) for column in self._record_fields)
-        self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=record_columns)
-        self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=record_columns)
-        self._record_schema_version = schema_version
-
     def _build_record(self, row: tuple[Any, ...]) -> Any:
         """Convert one SQLite row into the table's record type."""
         values = []
@@ -441,7 +465,7 @@ class NonSpatialProjectTable(ProjectTable):
     """Base class for project tables without a geometry column."""
 
     def _select_column(self, column: str) -> str:
-        return _QUOTED_COLUMN.format(column=column)
+        return escape_identifier(column)
 
     def _record_value(self, column: str, value: Any) -> Any:
         return value
@@ -478,7 +502,7 @@ class SpatialProjectTable(ProjectTable):
     def _select_column(self, column: str) -> str:
         if column == "geometry":
             return _GEOMETRY_COLUMN
-        return _QUOTED_COLUMN.format(column=column)
+        return escape_identifier(column)
 
     def _record_value(self, column: str, value: Any) -> Any:
         if column == "geometry" and value is not None:

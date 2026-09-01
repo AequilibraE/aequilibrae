@@ -17,23 +17,23 @@ Notes
 - `output_dir` must be inside the project directory
 """
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pandas as pd
 import yaml
 
 from aequilibrae.utils.simwrapper.simwrapper_panel import (
-    ConvergencePanel,
-    TilePanel,
-    TextPanel,
     AequilibraEMapPanel,
     AequilibraEResultsMapPanel,
+    ConvergencePanel,
+    TextPanel,
+    TilePanel,
 )
 from aequilibrae.utils.simwrapper.simwrapper_utils import (
+    export_convergence_csv,
     get_project_center,
     get_project_zoom,
-    export_convergence_csv,
 )
 
 
@@ -110,7 +110,7 @@ class SimwrapperConfigGenerator:
         otherwise derive a readable title from the project folder name. Guaranteed
         to return a non-empty string.
         """
-        model_name = getattr(self.project.about, "model_name", None)
+        model_name = self.project.about.get("model_name", column="infovalue", default=None)
         if model_name:
             return model_name
 
@@ -596,6 +596,7 @@ def main(argv=None):
 
     # lazy import to avoid side-effects at module import time
     import sys
+
     from aequilibrae.project import Project
 
     prj = Project()

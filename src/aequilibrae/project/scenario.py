@@ -48,7 +48,7 @@ class Scenario:
         self.connections = ConnectionClosure(self.path_to_file, results_path=results_path, transit_path=transit_path)
 
         (self.base_path / "matrices").mkdir(parents=True, exist_ok=True)
-        self.about = About(self)
+        self.about = About(self.connections.db_connection)
         self.network = Network(self)
         self.matrices = Matrices(self.connections.db_connection, self.base_path / "matrices")
 
