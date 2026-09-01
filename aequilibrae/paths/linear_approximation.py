@@ -176,7 +176,32 @@ class LinearApproximation(WorkerThread):
         numerator = np.sum(numerator * self.vdf_der)
         denominator = np.sum(denominator * self.vdf_der)
 
+        denominator_scale = 0.0
+        for c_0 in self.traffic_classes:
+            for c_1 in self.traffic_classes:
+                denominator_scale += np.sum(
+                    np.abs(
+                        self.vdf_der
+                        * prev_dir_minus_current_sol[c_0._id]
+                        * aon_minus_prev_dir[c_1._id]
+                    )
+                )
+
+        tolerance = np.finfo(np.float64).eps * float(denominator_scale)
+        if (
+            not np.isfinite(numerator)
+            or not np.isfinite(denominator)
+            or not np.isfinite(denominator_scale)
+            or denominator_scale == 0.0
+            or abs(denominator) <= tolerance
+        ):
+            self._reset_conjugate_direction("Invalid CFW coefficient; using the Frank-Wolfe direction.")
+            return False
+
         alpha = numerator / denominator
+        if not np.isfinite(alpha):
+            self._reset_conjugate_direction("Non-finite CFW coefficient; using the Frank-Wolfe direction.")
+            return False
         if alpha < 0.0:
             self.conjugate_stepsize = 0.0
         elif alpha > self.conjugate_direction_max:
@@ -189,6 +214,7 @@ class LinearApproximation(WorkerThread):
         self.betas[0] = 1.0 - self.conjugate_stepsize
         self.betas[1] = self.conjugate_stepsize
         self.betas[2] = 0.0
+        return True
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
@@ -223,23 +249,69 @@ class LinearApproximation(WorkerThread):
 
         mu_numerator = np.sum(mu_numerator * self.vdf_der)
         mu_denominator = np.sum(mu_denominator * self.vdf_der)
-        if mu_denominator == 0.0:
-            mu = 0.0
-        else:
-            mu = -mu_numerator / mu_denominator
-            mu = max(0.0, mu)
+        mu_denominator_scale = 0.0
+        for c_0 in self.traffic_classes:
+            for c_1 in self.traffic_classes:
+                mu_denominator_scale += np.sum(
+                    np.abs(self.vdf_der * x_[c_0._id] * w_[c_1._id])
+                )
+        mu_tolerance = np.finfo(np.float64).eps * float(mu_denominator_scale)
+        if (
+            not np.isfinite(mu_numerator)
+            or not np.isfinite(mu_denominator)
+            or not np.isfinite(mu_denominator_scale)
+            or mu_denominator_scale == 0.0
+            or abs(mu_denominator) <= mu_tolerance
+        ):
+            self._reset_conjugate_direction("Invalid BFW mu coefficient; using the Frank-Wolfe direction.")
+            return False
+
+        mu = max(0.0, -mu_numerator / mu_denominator)
 
         nu_nom = np.sum(nu_nom * self.vdf_der)
         nu_denom = np.sum(nu_denom * self.vdf_der)
-        if nu_denom == 0.0:
-            nu = 0.0
-        else:
-            nu = -(nu_nom / nu_denom) + mu * self.stepsize / (1.0 - self.stepsize)
-            nu = max(0.0, nu)
+        nu_denominator_scale = 0.0
+        for c_0 in self.traffic_classes:
+            for c_1 in self.traffic_classes:
+                nu_denominator_scale += np.sum(
+                    np.abs(self.vdf_der * z_[c_0._id] * z_[c_1._id])
+                )
+        nu_tolerance = np.finfo(np.float64).eps * float(nu_denominator_scale)
+        remaining_step = 1.0 - self.stepsize
+        if (
+            not np.isfinite(nu_nom)
+            or not np.isfinite(nu_denom)
+            or not np.isfinite(nu_denominator_scale)
+            or not np.isfinite(mu)
+            or not np.isfinite(remaining_step)
+            or nu_denominator_scale == 0.0
+            or abs(nu_denom) <= nu_tolerance
+            or remaining_step <= np.finfo(np.float64).eps
+        ):
+            self._reset_conjugate_direction("Invalid BFW nu coefficient; using the Frank-Wolfe direction.")
+            return False
+
+        nu = max(0.0, -(nu_nom / nu_denom) + mu * self.stepsize / remaining_step)
+        if not np.isfinite(nu):
+            self._reset_conjugate_direction("Non-finite BFW coefficient; using the Frank-Wolfe direction.")
+            return False
 
         self.betas[0] = 1.0 / (1.0 + nu + mu)
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
+        if not np.all(np.isfinite(self.betas)) or np.any(self.betas < 0.0):
+            self._reset_conjugate_direction("Invalid BFW weights; using the Frank-Wolfe direction.")
+            return False
+        return True
+
+    def _reset_conjugate_direction(self, message: str):
+        self.conjugate_stepsize = 0.0
+        self.betas[:] = (1.0, 0.0, 0.0)
+        self.current_direction = "fw"
+        if self.algorithm == "bfw":
+            self.next_direction = "cfw"
+        self.logger.debug(message)
+        self.iteration_issue.append(message)
 
     def _apply_assigned_flow(self, link_flows):
         """Records the flows just assigned, stacking any preload on top of them."""
@@ -263,7 +335,7 @@ class LinearApproximation(WorkerThread):
                 k = c.graph.skim_fields.index(self.time_field)
                 aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
 
-    def __calculate_step_direction(self):
+    def __calculate_step_direction(self):  # noqa: C901
         """Calculates step direction depending on the method"""
         sd_flows = []
         direction = self.next_direction
@@ -302,7 +374,10 @@ class LinearApproximation(WorkerThread):
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
         elif (self.iter == 3) or (direction == "cfw") or (self.algorithm == "cfw"):
             self.current_direction = "cfw"
-            self.calculate_conjugate_stepsize()
+            if not self.calculate_conjugate_stepsize():
+                self.next_direction = "fw"
+                self.__calculate_step_direction()
+                return
             for c in self.traffic_classes:
                 sdr = self.step_direction[c._id]
                 previous = self.previous_step_direction[c._id]
@@ -363,7 +438,10 @@ class LinearApproximation(WorkerThread):
         # biconjugate
         else:
             self.current_direction = "bfw"
-            self.calculate_biconjugate_direction()
+            if not self.calculate_biconjugate_direction():
+                self.next_direction = "fw"
+                self.__calculate_step_direction()
+                return
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
                 ppst: AssignmentResults = self.temp_step_direction_for_copy[c._id]
@@ -448,13 +526,11 @@ class LinearApproximation(WorkerThread):
                     copy_three_dimensions(prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view, self.cores)
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
+        if self.preload is not None:
+            self.step_direction_flow += self.preload
 
     def __retry_with_fw_direction(self, msg: str):
-        if self.algorithm == "bfw":
-            self.betas.fill(-1)
-
-        self.logger.debug(msg)
-        self.iteration_issue.append(msg)
+        self._reset_conjugate_direction(msg)
         self.next_direction = "fw"
         self.__calculate_step_direction()
         self.calculate_stepsize()
@@ -564,6 +640,24 @@ class LinearApproximation(WorkerThread):
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
+            converged = self.check_convergence() if self.iter > 1 else False
+            if converged:
+                self.steps_below += 1
+                if self.steps_below >= self.steps_below_needed_to_terminate:
+                    self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
+                    self.convergence_report["iteration"].append(self.iter)
+                    self.convergence_report["rgap"].append(self.rgap)
+                    self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
+                    self.convergence_report["alpha"].append(np.nan)
+                    if self.algorithm in ["cfw", "bfw"]:
+                        self.convergence_report["beta0"].append(self.betas[0])
+                        self.convergence_report["beta1"].append(self.betas[1])
+                        self.convergence_report["beta2"].append(self.betas[2])
+                    self.logger.info(f"{self.iter},{self.rgap},nan")
+                    break
+            else:
+                self.steps_below = 0
+
             flows = []
             if self.iter == 1:
                 for c in self.traffic_classes:
@@ -639,9 +733,6 @@ class LinearApproximation(WorkerThread):
             if self.algorithm == "all-or-nothing":
                 break
 
-            # Check convergence
-            # This needs to be done with the current costs, and not the future ones
-            converged = self.check_convergence() if self.iter > 1 else False
             self._refresh_congested_costs()
 
             self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
@@ -656,13 +747,6 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta2"].append(self.betas[2])
 
             self.logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
-            if converged:
-                self.steps_below += 1
-                if self.steps_below >= self.steps_below_needed_to_terminate:
-                    break
-            else:
-                self.steps_below = 0
-
             if self.iter < self.max_iter:
                 for c in self.traffic_classes:
                     c._aon_results.reset()
@@ -712,10 +796,12 @@ class LinearApproximation(WorkerThread):
     def __objective_change_at_stepsize(
         self, derivative_of_objective_stepsize_independent: np.ndarray, stepsize: float
     ) -> float:
-        """Trapezoidal approximation of the Beckmann objective change
+        """Heuristic trapezoidal approximation of the Beckmann objective change
         ``Z(x + α·d) − Z(x)`` for a given line-search step ``α = stepsize``.
 
-        On large congested networks (e.g. Chicago, BPR β=4), this trapezoidal line search picks smaller,
+        This one-panel approximation is not the exact Beckmann integral except for affine link costs.
+        However, experiments suggest that
+        on large congested networks (e.g. Chicago, BPR β=4), this trapezoidal line search picks smaller,
         more conservative α values than the analytic-derivative line search and yields materially better
         BFW convergence because the smaller α reduces the magnitude of the ``μ·α/(1-α)`` bias term in
         the next iteration's BFW formula.
@@ -770,15 +856,13 @@ class LinearApproximation(WorkerThread):
             self.stepsize = self.__clip_stepsize(1.0 / self.iter)
             return
 
-        # For BFW use trapezoidal Beckmann minimiser on
-        # [0, α_max] instead of root-finding the analytic derivative.
+        # CFW and BFW use a heuristic bounded minimization of a one-panel trapezoidal approximation to the
+        # Beckmann objective change instead of root-finding the exact directional derivative.
         #
         # Two cooperating mechanisms vs. the analytic root_scalar approach:
         #
-        # (1) Trapezoidal objective. The analytic and trapezoidal lines
-        #     agree when c(x) is approximately quadratic between x and
-        #     x + d, but diverge significantly when the BPR exponent is
-        #     large (β=4 on Chicago).
+        # (1) The trapezoidal objective is exact for affine link costs and approximate otherwise.
+        #     it diverge significantly when the BPR exponent is large (β=4 on Chicago test network).
         # (2) For BFW only: a cap α_max = 1/sqrt(iter) prevents the line search from
         #     returning α = 1.0, which would collapse the BFW history (s^{k-1} onto x^k)
         #     and cause the μ·α/(1-α) bias term in calculate_biconjugate_direction to blow up.
@@ -908,18 +992,9 @@ class LinearApproximation(WorkerThread):
     def check_convergence(self):
         """Calculate relative gap and return ``True`` if it is smaller than desired precision.
 
-        Two relative gaps are computed and stored on the instance:
-
-        * ``self.rgap`` - the AequilibraE convention,
-          ``|Σ flow·cost − Σ AON·cost| / Σ flow·cost``. **This is the only
-          quantity used for the stopping criterion** (compared against
-          ``self.rgap_target``).
-          ``(Σ flow·cost − Σ direction·cost) / Σ flow·cost``, where
-          ``direction`` is the BFW combined step direction
+        ``self.rgap`` uses the AequilibraE convention,
+        ``|Σ flow·cost − Σ AON·cost| / Σ flow·cost``.
         """
-        if self.stepsize == 1.0:
-            return False
-
         aon_cost = 0.0
         current_cost = 0.0
         for c in self.traffic_classes:

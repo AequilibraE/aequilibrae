@@ -117,9 +117,12 @@ class TrafficClass(TransportClassBase):
         :Arguments:
             **pce** (:obj:`Union[float, int]`): PCE. Defaults to 1 if not set
         """
-        if not isinstance(pce, (float, int)):
-            raise ValueError("PCE needs to be either integer or float ")
-        self.pce = pce
+        if isinstance(pce, bool) or not isinstance(pce, (float, int)):
+            raise ValueError("PCE must be a positive finite number")
+        value = float(pce)
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("PCE must be a positive finite number")
+        self.pce = value
 
     def set_fixed_cost(self, field_name: str, multiplier=1):
         """Sets value of time
@@ -149,7 +152,15 @@ class TrafficClass(TransportClassBase):
             **value_of_time** (:obj:`Union[float, int]`): Value of time. Defaults to 1 if not set
         """
 
-        self.vot = float(value_of_time)
+        if isinstance(value_of_time, bool):
+            raise ValueError("Value of time must be a positive finite number")
+        try:
+            value = float(value_of_time)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Value of time must be a positive finite number") from exc
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("Value of time must be a positive finite number")
+        self.vot = value
 
     def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
         """Set the selected links. Checks if the links and directions are valid. Translates link_id and

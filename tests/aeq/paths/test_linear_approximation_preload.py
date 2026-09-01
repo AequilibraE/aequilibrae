@@ -30,6 +30,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 from types import SimpleNamespace
 
 import aequilibrae.paths.linear_approximation as linear_approximation
@@ -37,9 +38,21 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 
 
 class DummyVDF:
+    def __init__(self):
+        self.last_link_flows = None
+
     def apply_vdf(self, congested_time, link_flows, capacity, fftime, scale, offset, cores):
         del capacity, cores
+        self.last_link_flows = link_flows.copy()
         congested_time[:] = fftime + scale * link_flows + offset
+
+
+class DummyDerivativeVDF:
+    def __init__(self, derivative):
+        self.derivative = derivative
+
+    def apply_derivative(self, output, *_args):
+        output[:] = self.derivative
 
 
 def test_stepsize_derivative_uses_fw_total_flow_state():
@@ -48,7 +61,8 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
     assignment.preload = np.array([10.0, 20.0])
     assignment.current_assigned_flow = np.array([3.0, 4.0])
     assignment.fw_total_flow = assignment.current_assigned_flow + assignment.preload
-    assignment.step_direction_flow = np.array([7.0, 8.0])
+    assigned_direction = np.array([7.0, 8.0])
+    assignment.step_direction_flow = assigned_direction + assignment.preload
     assignment.congested_value = np.zeros(2)
     assignment.capacity = np.ones(2)
     assignment.free_flow_tt = np.zeros(2)
@@ -58,12 +72,39 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
     stepsize = 0.25
     derivative = assignment._LinearApproximation__derivative_of_objective_stepsize_dependent(stepsize, 0.0)
 
-    candidate_total_flow = assignment.fw_total_flow + stepsize * (
-        assignment.step_direction_flow - assignment.fw_total_flow
+    candidate_total_flow = assignment.preload + assignment.current_assigned_flow + stepsize * (
+        assigned_direction - assignment.current_assigned_flow
     )
     expected = np.sum(candidate_total_flow * (assignment.step_direction_flow - assignment.fw_total_flow))
 
     assert np.isclose(derivative, expected)
+    np.testing.assert_array_equal(assignment.vdf.last_link_flows, candidate_total_flow)
+
+
+@pytest.mark.parametrize("stepsize", [0.0, 0.25, 1.0])
+def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
+    assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.cores = 1
+    assignment.preload = np.array([10.0, 20.0])
+    current_assigned_flow = np.array([3.0, 4.0])
+    assigned_direction = np.array([7.0, 8.0])
+    assignment.fw_total_flow = current_assigned_flow + assignment.preload
+    assignment.step_direction_flow = assigned_direction + assignment.preload
+    assignment.congested_time = np.zeros(2)
+    assignment._trap_new_flow = np.zeros(2)
+    assignment._trap_new_cost = np.zeros(2)
+    assignment._trap_avg_cost = np.zeros(2)
+    assignment.capacity = np.ones(2)
+    assignment.free_flow_tt = np.zeros(2)
+    assignment.vdf_parameters = [1.0, 0.0]
+    assignment.vdf = DummyVDF()
+
+    assignment._LinearApproximation__objective_change_at_stepsize(0.0, stepsize)
+
+    expected = assignment.preload + current_assigned_flow + stepsize * (
+        assigned_direction - current_assigned_flow
+    )
+    np.testing.assert_array_equal(assignment.vdf.last_link_flows, expected)
 
 
 def test_relative_gap_ignores_constant_preload():
@@ -157,7 +198,7 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assert assignment.next_direction == "cfw"
     assert assignment.stepsize == 0.25
     assert assignment.iteration_issue == ["BFW/CFW direction yielded no improvement; falling back to FW."]
-    np.testing.assert_array_equal(assignment.betas, np.array([-1.0, -1.0, -1.0]))
+    np.testing.assert_array_equal(assignment.betas, np.array([1.0, 0.0, 0.0]))
 
 
 def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
@@ -279,3 +320,78 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
     assert assignment.stepsize == 1e-2 / assignment.iter
     assert assignment.stepsize > 0.0
     assert any("invalid stepsize" in msg for msg in assignment.iteration_issue)
+
+
+def test_cfw_zero_denominator_falls_back_to_fw():
+    assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.cores = 1
+    assignment.vdf = DummyDerivativeVDF(np.ones(2))
+    assignment.vdf_der = np.zeros(2)
+    assignment.fw_total_flow = np.ones(2)
+    assignment.capacity = np.ones(2)
+    assignment.free_flow_tt = np.ones(2)
+    assignment.vdf_parameters = []
+    assignment.conjugate_direction_max = 0.99999
+    assignment.conjugate_stepsize = 0.5
+    assignment.betas = np.array([0.5, 0.5, 0.0])
+    assignment.algorithm = "cfw"
+    assignment.current_direction = "cfw"
+    assignment.next_direction = None
+    assignment.iteration_issue = []
+    assignment.logger = SimpleNamespace(debug=lambda *_args, **_kwargs: None)
+
+    cls = SimpleNamespace(
+        _id="car",
+        results=SimpleNamespace(link_loads=np.array([[1.0], [2.0]])),
+        _aon_results=SimpleNamespace(link_loads=np.array([[2.0], [3.0]])),
+    )
+    assignment.traffic_classes = [cls]
+    assignment.step_direction = {
+        "car": SimpleNamespace(link_loads=np.array([[1.0], [2.0]])),
+    }
+
+    assignment.calculate_conjugate_stepsize()
+
+    assert assignment.current_direction == "fw"
+    assert assignment.conjugate_stepsize == 0.0
+    np.testing.assert_array_equal(assignment.betas, np.array([1.0, 0.0, 0.0]))
+    assert assignment.iteration_issue == ["Invalid CFW coefficient; using the Frank-Wolfe direction."]
+
+
+def test_bfw_nonfinite_coefficient_falls_back_to_fw():
+    assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.cores = 1
+    assignment.vdf = DummyDerivativeVDF(np.array([np.nan, 1.0]))
+    assignment.vdf_der = np.zeros(2)
+    assignment.fw_total_flow = np.ones(2)
+    assignment.capacity = np.ones(2)
+    assignment.free_flow_tt = np.ones(2)
+    assignment.vdf_parameters = []
+    assignment.stepsize = 0.5
+    assignment.conjugate_stepsize = 0.5
+    assignment.betas = np.array([0.2, 0.3, 0.5])
+    assignment.algorithm = "bfw"
+    assignment.current_direction = "bfw"
+    assignment.next_direction = None
+    assignment.iteration_issue = []
+    assignment.logger = SimpleNamespace(debug=lambda *_args, **_kwargs: None)
+
+    cls = SimpleNamespace(
+        _id="car",
+        results=SimpleNamespace(link_loads=np.array([[1.0], [2.0]])),
+        _aon_results=SimpleNamespace(link_loads=np.array([[2.0], [3.0]])),
+    )
+    assignment.traffic_classes = [cls]
+    assignment.step_direction = {
+        "car": SimpleNamespace(link_loads=np.array([[3.0], [5.0]])),
+    }
+    assignment.previous_step_direction = {
+        "car": SimpleNamespace(link_loads=np.array([[4.0], [7.0]])),
+    }
+
+    assignment.calculate_biconjugate_direction()
+
+    assert assignment.current_direction == "fw"
+    assert assignment.next_direction == "cfw"
+    np.testing.assert_array_equal(assignment.betas, np.array([1.0, 0.0, 0.0]))
+    assert assignment.iteration_issue == ["Invalid BFW mu coefficient; using the Frank-Wolfe direction."]
