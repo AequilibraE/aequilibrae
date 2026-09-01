@@ -288,7 +288,7 @@ class ProjectTable(ABC):
             **updated rows** (:obj:`int`): Number of submitted rows.
         """
         if not allow_missing:
-            missing_rows = self.find_missing(frame[self.key], fetch_limit=10 + 1)
+            missing_rows = self.find_missing(frame[self.key].to_list(), fetch_limit=10 + 1)
 
             if missing_rows:
                 raise ValueError(
