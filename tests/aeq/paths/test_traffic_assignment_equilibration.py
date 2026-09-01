@@ -39,7 +39,9 @@ def assignment(project):
     return TrafficAssignment(project)
 
 
-def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigclass):
+@pytest.mark.parametrize("pce", [1.0, 2.5])
+def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigclass, pce):
+    assigclass.set_pce(pce)
     assignment.add_class(assigclass)
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -52,12 +54,12 @@ def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigc
 
     algorithm = assignment.assignment
     report = algorithm.convergence_report
-    expected_current_cost = np.sum(
-        (algorithm.congested_time + assigclass.fixed_cost) * assigclass.results.total_link_loads
-    )
-    expected_aon_cost = np.sum(
-        (algorithm.congested_time + assigclass.fixed_cost) * assigclass._aon_results.total_link_loads
-    )
+    # The gap is evaluated inside the loop, where class flows are still in PCE units. ``execute`` divides the
+    # class results by PCE on the way out, so scale them back to reconstruct the quantity that was reported.
+    # The AON results are never rescaled.
+    unit_cost = algorithm.congested_time + assigclass.fixed_cost
+    expected_current_cost = np.sum(unit_cost * assigclass.results.total_link_loads * pce)
+    expected_aon_cost = np.sum(unit_cost * assigclass._aon_results.total_link_loads)
     expected_rgap = abs(expected_current_cost - expected_aon_cost) / expected_current_cost
 
     assert np.isclose(algorithm.rgap, expected_rgap)

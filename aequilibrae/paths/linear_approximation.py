@@ -156,31 +156,33 @@ class LinearApproximation(WorkerThread):
         self.vdf.apply_derivative(
             self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
-        numerator = 0.0
-        denominator = 0.0
-        prev_dir_minus_current_sol = {}
-        aon_minus_current_sol = {}
-        aon_minus_prev_dir = {}
+        # The PCE transformation makes the volume-dependent cost identical across classes, so each link's Hessian
+        # block is rank one, H_a = t'_a * ones(M, M). Every contraction therefore separates over the class indices,
+        #     u^T H v = sum_a t'_a (sum_m u_a^m) (sum_m v_a^m),
+        # so we only need the class-aggregated vectors, never the M^2 class pairs. The same identity holds with
+        # absolute values inside (|t'_a u_a^m v_a^m'| factors too), which gives the cancellation scale below.
+        # This would no longer be valid if the volume-dependent term regained a class-dependent weight.
+        u = np.zeros_like(self.vdf_der)  # sum_m (s_{k-1} - x_k)^m
+        v = np.zeros_like(self.vdf_der)  # sum_m (y_k - x_k)^m
+        w = np.zeros_like(self.vdf_der)  # sum_m (y_k - s_{k-1})^m
+        abs_u = np.zeros_like(self.vdf_der)
+        abs_w = np.zeros_like(self.vdf_der)
 
         for c in self.traffic_classes:
             stp_dir = self.step_direction[c._id]
-            prev_dir_minus_current_sol[c._id] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_current_sol[c._id] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_prev_dir[c._id] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
+            prev_dir_minus_current_sol = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_current_sol = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_prev_dir = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
 
-        for c_0 in self.traffic_classes:
-            for c_1 in self.traffic_classes:
-                numerator += prev_dir_minus_current_sol[c_0._id] * aon_minus_current_sol[c_1._id]
-                denominator += prev_dir_minus_current_sol[c_0._id] * aon_minus_prev_dir[c_1._id]
+            u += prev_dir_minus_current_sol
+            v += aon_minus_current_sol
+            w += aon_minus_prev_dir
+            abs_u += np.abs(prev_dir_minus_current_sol)
+            abs_w += np.abs(aon_minus_prev_dir)
 
-        numerator = np.sum(numerator * self.vdf_der)
-        denominator = np.sum(denominator * self.vdf_der)
-
-        # Factor the class-pair absolute sum link by link:
-        # sum_i,j |h * u_i * v_j| = |h| * sum_i |u_i| * sum_j |v_j|.
-        previous_scale = np.sum([np.abs(v) for v in prev_dir_minus_current_sol.values()], axis=0)
-        aon_scale = np.sum([np.abs(v) for v in aon_minus_prev_dir.values()], axis=0)
-        denominator_scale = np.sum(np.abs(self.vdf_der) * previous_scale * aon_scale)
+        numerator = np.sum(self.vdf_der * u * v)
+        denominator = np.sum(self.vdf_der * u * w)
+        denominator_scale = np.sum(np.abs(self.vdf_der) * abs_u * abs_w)
 
         tolerance = np.finfo(np.float64).eps * float(denominator_scale)
         if (
@@ -215,40 +217,37 @@ class LinearApproximation(WorkerThread):
         self.vdf.apply_derivative(
             self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
-        mu_numerator = 0.0
-        mu_denominator = 0.0
-        nu_nom = 0.0
-        nu_denom = 0.0
-
-        w_ = {}
-        x_ = {}
-        y_ = {}
-        z_ = {}
+        # Class-aggregated vectors; see calculate_conjugate_stepsize for why the class pairs factor out. Following
+        # appendix A of Mitradjieva & Lindberg, x_ is the residual direction d_{k-2}, z_ is d_{k-1}, y_ is the
+        # Frank-Wolfe direction and w_ is s_{k-2} - s_{k-1}.
+        x_ = np.zeros_like(self.vdf_der)
+        y_ = np.zeros_like(self.vdf_der)
+        z_ = np.zeros_like(self.vdf_der)
+        w_ = np.zeros_like(self.vdf_der)
+        abs_x = np.zeros_like(self.vdf_der)
+        abs_z = np.zeros_like(self.vdf_der)
+        abs_w = np.zeros_like(self.vdf_der)
 
         for c in self.traffic_classes:
             sd = self.step_direction[c._id].link_loads[:, :]
             psd = self.previous_step_direction[c._id].link_loads[:, :]
             ll = c.results.link_loads[:, :]
 
-            x_[c._id] = np.sum(sd * self.stepsize + psd * (1.0 - self.stepsize) - ll, axis=1)
-            y_[c._id] = np.sum(c._aon_results.link_loads[:, :] - ll, axis=1)
-            z_[c._id] = np.sum(sd - ll, axis=1)
-            w_[c._id] = np.sum(psd - sd, axis=1)
+            class_x = np.sum(sd * self.stepsize + psd * (1.0 - self.stepsize) - ll, axis=1)
+            class_z = np.sum(sd - ll, axis=1)
+            class_w = np.sum(psd - sd, axis=1)
 
-        for c_0 in self.traffic_classes:
-            for c_1 in self.traffic_classes:
-                mu_numerator += x_[c_0._id] * y_[c_1._id]
-                mu_denominator += x_[c_0._id] * w_[c_1._id]
-                nu_nom += z_[c_0._id] * y_[c_1._id]
-                nu_denom += z_[c_0._id] * z_[c_1._id]
+            x_ += class_x
+            y_ += np.sum(c._aon_results.link_loads[:, :] - ll, axis=1)
+            z_ += class_z
+            w_ += class_w
+            abs_x += np.abs(class_x)
+            abs_z += np.abs(class_z)
+            abs_w += np.abs(class_w)
 
-        mu_numerator = np.sum(mu_numerator * self.vdf_der)
-        mu_denominator = np.sum(mu_denominator * self.vdf_der)
-        # Factorization avoids constructing one full link array for every class pair:
-        # Σ_{c0,c1} Σ_a |t'_a u_{c0,a} v_{c1,a}| = Σ_a |t'_a| (Σ_m|u_{m,a}|)(Σ_m|v_{m,a}|)
-        x_scale = np.sum([np.abs(v) for v in x_.values()], axis=0)
-        w_scale = np.sum([np.abs(v) for v in w_.values()], axis=0)
-        mu_denominator_scale = np.sum(np.abs(self.vdf_der) * x_scale * w_scale)
+        mu_numerator = np.sum(self.vdf_der * x_ * y_)
+        mu_denominator = np.sum(self.vdf_der * x_ * w_)
+        mu_denominator_scale = np.sum(np.abs(self.vdf_der) * abs_x * abs_w)
         mu_tolerance = np.finfo(np.float64).eps * float(mu_denominator_scale)
         if (
             not np.isfinite(mu_numerator)
@@ -262,11 +261,10 @@ class LinearApproximation(WorkerThread):
 
         mu = max(0.0, -mu_numerator / mu_denominator)
 
-        nu_nom = np.sum(nu_nom * self.vdf_der)
-        nu_denom = np.sum(nu_denom * self.vdf_der)
-        # Here both factors are z, so the factored class sums are squared link by link.
-        z_scale = np.sum([np.abs(v) for v in z_.values()], axis=0)
-        nu_denominator_scale = np.sum(np.abs(self.vdf_der) * z_scale * z_scale)
+        nu_nom = np.sum(self.vdf_der * z_ * y_)
+        # Here both factors are z, so the class aggregate is squared link by link.
+        nu_denom = np.sum(self.vdf_der * z_ * z_)
+        nu_denominator_scale = np.sum(np.abs(self.vdf_der) * abs_z * abs_z)
         nu_tolerance = np.finfo(np.float64).eps * float(nu_denominator_scale)
         remaining_step = 1.0 - self.stepsize
         if (

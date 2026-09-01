@@ -72,8 +72,10 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
     stepsize = 0.25
     derivative = assignment._LinearApproximation__derivative_of_objective_stepsize_dependent(stepsize, 0.0)
 
-    candidate_total_flow = assignment.preload + assignment.current_assigned_flow + stepsize * (
-        assigned_direction - assignment.current_assigned_flow
+    candidate_total_flow = (
+        assignment.preload
+        + assignment.current_assigned_flow
+        + stepsize * (assigned_direction - assignment.current_assigned_flow)
     )
     expected = np.sum(candidate_total_flow * (assignment.step_direction_flow - assignment.fw_total_flow))
 
@@ -101,9 +103,7 @@ def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
 
     assignment._LinearApproximation__objective_change_at_stepsize(0.0, stepsize)
 
-    expected = assignment.preload + current_assigned_flow + stepsize * (
-        assigned_direction - current_assigned_flow
-    )
+    expected = assignment.preload + current_assigned_flow + stepsize * (assigned_direction - current_assigned_flow)
     np.testing.assert_array_equal(assignment.vdf.last_link_flows, expected)
 
 
@@ -424,3 +424,136 @@ def test_append_terminal_convergence_report_uses_nan_direction_coefficients():
     assert assignment.convergence_report["rgap"] == [0.001]
     assert np.isnan(assignment.convergence_report["alpha"][0])
     assert all(np.isnan(assignment.convergence_report[key][0]) for key in ("beta0", "beta1", "beta2"))
+
+
+# Seeds chosen so the resulting coefficients land strictly inside their clamps; a clamped coefficient would
+# make the comparison against the explicit Hessian vacuous. Keyed by class count.
+_INTERIOR_SEEDS = {1: 4, 2: 8, 3: 24, 5: 1}
+
+
+def _multiclass_fixture(num_links=4, num_classes=3, num_cores=2, seed=None):
+    """Random multi-class state plus the explicitly assembled block Hessian it implies.
+
+    Each link's Hessian block is ``H_a = t'_a * ones(M, M)``, so the full Hessian is block diagonal over links.
+    Vectors are flattened link-major/class-minor to match that layout.
+    """
+    seed = _INTERIOR_SEEDS[num_classes] if seed is None else seed
+    rng = np.random.default_rng(seed)
+    vdf_der = rng.uniform(0.5, 2.0, size=num_links)
+    loads = {
+        name: rng.uniform(1.0, 10.0, size=(num_classes, num_links, num_cores))
+        for name in ("results", "aon", "step_dir", "prev_step_dir")
+    }
+
+    hessian = np.zeros((num_links * num_classes, num_links * num_classes))
+    for a in range(num_links):
+        block = slice(a * num_classes, (a + 1) * num_classes)
+        hessian[block, block] = vdf_der[a] * np.ones((num_classes, num_classes))
+
+    def flatten(per_class_per_link):
+        """(M, L) class/link array -> length L*M vector ordered link-major, matching ``hessian``."""
+        return per_class_per_link.T.ravel()
+
+    # Sum over matrix cores, as the implementation does before contracting.
+    aggregated = {name: value.sum(axis=2) for name, value in loads.items()}
+
+    classes = []
+    step_direction = {}
+    previous_step_direction = {}
+    for m in range(num_classes):
+        cid = f"class_{m}"
+        classes.append(
+            SimpleNamespace(
+                _id=cid,
+                results=SimpleNamespace(link_loads=loads["results"][m]),
+                _aon_results=SimpleNamespace(link_loads=loads["aon"][m]),
+            )
+        )
+        step_direction[cid] = SimpleNamespace(link_loads=loads["step_dir"][m])
+        previous_step_direction[cid] = SimpleNamespace(link_loads=loads["prev_step_dir"][m])
+
+    assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.cores = 1
+    assignment.vdf = DummyDerivativeVDF(vdf_der)
+    assignment.vdf_der = np.zeros(num_links)
+    assignment.fw_total_flow = np.ones(num_links)
+    assignment.capacity = np.ones(num_links)
+    assignment.free_flow_tt = np.ones(num_links)
+    assignment.vdf_parameters = []
+    assignment.conjugate_direction_max = 0.99999
+    assignment.conjugate_stepsize = 0.0
+    assignment.betas = np.array([1.0, 0.0, 0.0])
+    assignment.iteration_issue = []
+    assignment.logger = SimpleNamespace(debug=lambda *_args, **_kwargs: None)
+    assignment.traffic_classes = classes
+    assignment.step_direction = step_direction
+    assignment.previous_step_direction = previous_step_direction
+
+    return assignment, hessian, aggregated, flatten
+
+
+def test_cfw_coefficient_matches_explicit_block_hessian():
+    assignment, hessian, agg, flatten = _multiclass_fixture()
+    assignment.algorithm = "cfw"
+    assignment.current_direction = "cfw"
+    assignment.next_direction = None
+
+    # u = s_{k-1} - x_k, v = y_k - x_k, w = y_k - s_{k-1}
+    u = flatten(agg["step_dir"] - agg["results"])
+    v = flatten(agg["aon"] - agg["results"])
+    w = flatten(agg["aon"] - agg["step_dir"])
+    expected_alpha = (u @ hessian @ v) / (u @ hessian @ w)
+
+    assert assignment.calculate_conjugate_stepsize()
+
+    # Guard against the assertion passing only because the coefficient was clamped at a bound.
+    assert 0.0 < expected_alpha < assignment.conjugate_direction_max
+    assert np.isclose(assignment.conjugate_stepsize, expected_alpha, rtol=1e-12, atol=0.0)
+    assert np.isclose(assignment.betas[1], expected_alpha, rtol=1e-12, atol=0.0)
+    assert assignment.iteration_issue == []
+
+
+def test_bfw_coefficients_match_explicit_block_hessian():
+    assignment, hessian, agg, flatten = _multiclass_fixture()
+    assignment.algorithm = "bfw"
+    assignment.current_direction = "bfw"
+    assignment.next_direction = None
+    assignment.stepsize = 0.4
+
+    tau = assignment.stepsize
+    # Appendix A notation: x_ is the residual direction d_{k-2}, z_ is d_{k-1}, y_ is the FW direction.
+    x_ = flatten(agg["step_dir"] * tau + agg["prev_step_dir"] * (1.0 - tau) - agg["results"])
+    y_ = flatten(agg["aon"] - agg["results"])
+    z_ = flatten(agg["step_dir"] - agg["results"])
+    w_ = flatten(agg["prev_step_dir"] - agg["step_dir"])
+
+    expected_mu = max(0.0, -(x_ @ hessian @ y_) / (x_ @ hessian @ w_))
+    expected_nu = max(0.0, -(z_ @ hessian @ y_) / (z_ @ hessian @ z_) + expected_mu * tau / (1.0 - tau))
+    expected_beta0 = 1.0 / (1.0 + expected_nu + expected_mu)
+    expected = np.array([expected_beta0, expected_nu * expected_beta0, expected_mu * expected_beta0])
+
+    assert assignment.calculate_biconjugate_direction()
+
+    # Guard against the assertion passing only because both coefficients were clamped to zero.
+    assert expected_mu > 0.0 and expected_nu > 0.0
+    np.testing.assert_allclose(assignment.betas, expected, rtol=1e-12, atol=0.0)
+    assert np.isclose(assignment.betas.sum(), 1.0)
+    assert assignment.iteration_issue == []
+
+
+@pytest.mark.parametrize("num_classes", [1, 2, 5])
+def test_contractions_match_block_hessian_for_any_class_count(num_classes):
+    """The class-pair factorization must hold for any number of classes, not just the default fixture."""
+    assignment, hessian, agg, flatten = _multiclass_fixture(num_classes=num_classes)
+    assignment.algorithm = "cfw"
+    assignment.current_direction = "cfw"
+    assignment.next_direction = None
+
+    u = flatten(agg["step_dir"] - agg["results"])
+    v = flatten(agg["aon"] - agg["results"])
+    w = flatten(agg["aon"] - agg["step_dir"])
+    expected_alpha = (u @ hessian @ v) / (u @ hessian @ w)
+
+    assert assignment.calculate_conjugate_stepsize()
+    assert 0.0 < expected_alpha < assignment.conjugate_direction_max
+    assert np.isclose(assignment.conjugate_stepsize, expected_alpha, rtol=1e-12, atol=0.0)
