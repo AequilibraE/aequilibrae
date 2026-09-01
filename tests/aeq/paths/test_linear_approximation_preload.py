@@ -395,3 +395,32 @@ def test_bfw_nonfinite_coefficient_falls_back_to_fw():
     assert assignment.next_direction == "cfw"
     np.testing.assert_array_equal(assignment.betas, np.array([1.0, 0.0, 0.0]))
     assert assignment.iteration_issue == ["Invalid BFW mu coefficient; using the Frank-Wolfe direction."]
+
+
+def test_append_terminal_convergence_report_uses_nan_direction_coefficients():
+    assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment._LinearApproximation__start_time = 0.0
+    assignment.iter = 4
+    assignment.rgap = 0.001
+    assignment.stepsize = 0.25
+    assignment.betas = np.array([0.2, 0.3, 0.5])
+    assignment.algorithm = "bfw"
+    assignment.iteration_issue = []
+    assignment.convergence_report = {
+        "time": [],
+        "iteration": [],
+        "rgap": [],
+        "warnings": [],
+        "alpha": [],
+        "beta0": [],
+        "beta1": [],
+        "beta2": [],
+    }
+    assignment.logger = SimpleNamespace(info=lambda *_args, **_kwargs: None)
+
+    assignment._append_convergence_report(terminal=True)
+
+    assert assignment.convergence_report["iteration"] == [4]
+    assert assignment.convergence_report["rgap"] == [0.001]
+    assert np.isnan(assignment.convergence_report["alpha"][0])
+    assert all(np.isnan(assignment.convergence_report[key][0]) for key in ("beta0", "beta1", "beta2"))

@@ -39,6 +39,34 @@ def assignment(project):
     return TrafficAssignment(project)
 
 
+def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigclass):
+    assignment.add_class(assigclass)
+    assignment.set_vdf("BPR")
+    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assignment.set_capacity_field("capacity")
+    assignment.set_time_field("free_flow_time")
+    assignment.max_iter = 2
+    assignment.set_algorithm("bfw")
+
+    assignment.execute()
+
+    algorithm = assignment.assignment
+    report = algorithm.convergence_report
+    expected_current_cost = np.sum(
+        (algorithm.congested_time + assigclass.fixed_cost) * assigclass.results.total_link_loads
+    )
+    expected_aon_cost = np.sum(
+        (algorithm.congested_time + assigclass.fixed_cost) * assigclass._aon_results.total_link_loads
+    )
+    expected_rgap = abs(expected_current_cost - expected_aon_cost) / expected_current_cost
+
+    assert np.isclose(algorithm.rgap, expected_rgap)
+    assert np.isclose(report["rgap"][-1], expected_rgap)
+    assert np.isnan(report["alpha"][-1])
+    assert all(np.isnan(report[key][-1]) for key in ("beta0", "beta1", "beta2"))
+    assert len({len(values) for values in report.values()}) == 1
+
+
 @pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
 def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type):
     if matrix_type == "memonly":

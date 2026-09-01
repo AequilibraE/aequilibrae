@@ -176,16 +176,11 @@ class LinearApproximation(WorkerThread):
         numerator = np.sum(numerator * self.vdf_der)
         denominator = np.sum(denominator * self.vdf_der)
 
-        denominator_scale = 0.0
-        for c_0 in self.traffic_classes:
-            for c_1 in self.traffic_classes:
-                denominator_scale += np.sum(
-                    np.abs(
-                        self.vdf_der
-                        * prev_dir_minus_current_sol[c_0._id]
-                        * aon_minus_prev_dir[c_1._id]
-                    )
-                )
+        # Factor the class-pair absolute sum link by link:
+        # sum_i,j |h * u_i * v_j| = |h| * sum_i |u_i| * sum_j |v_j|.
+        previous_scale = np.sum([np.abs(v) for v in prev_dir_minus_current_sol.values()], axis=0)
+        aon_scale = np.sum([np.abs(v) for v in aon_minus_prev_dir.values()], axis=0)
+        denominator_scale = np.sum(np.abs(self.vdf_der) * previous_scale * aon_scale)
 
         tolerance = np.finfo(np.float64).eps * float(denominator_scale)
         if (
@@ -249,12 +244,11 @@ class LinearApproximation(WorkerThread):
 
         mu_numerator = np.sum(mu_numerator * self.vdf_der)
         mu_denominator = np.sum(mu_denominator * self.vdf_der)
-        mu_denominator_scale = 0.0
-        for c_0 in self.traffic_classes:
-            for c_1 in self.traffic_classes:
-                mu_denominator_scale += np.sum(
-                    np.abs(self.vdf_der * x_[c_0._id] * w_[c_1._id])
-                )
+        # Factorization avoids constructing one full link array for every class pair:
+        # Σ_{c0,c1} Σ_a |t'_a u_{c0,a} v_{c1,a}| = Σ_a |t'_a| (Σ_m|u_{m,a}|)(Σ_m|v_{m,a}|)
+        x_scale = np.sum([np.abs(v) for v in x_.values()], axis=0)
+        w_scale = np.sum([np.abs(v) for v in w_.values()], axis=0)
+        mu_denominator_scale = np.sum(np.abs(self.vdf_der) * x_scale * w_scale)
         mu_tolerance = np.finfo(np.float64).eps * float(mu_denominator_scale)
         if (
             not np.isfinite(mu_numerator)
@@ -270,12 +264,9 @@ class LinearApproximation(WorkerThread):
 
         nu_nom = np.sum(nu_nom * self.vdf_der)
         nu_denom = np.sum(nu_denom * self.vdf_der)
-        nu_denominator_scale = 0.0
-        for c_0 in self.traffic_classes:
-            for c_1 in self.traffic_classes:
-                nu_denominator_scale += np.sum(
-                    np.abs(self.vdf_der * z_[c_0._id] * z_[c_1._id])
-                )
+        # Here both factors are z, so the factored class sums are squared link by link.
+        z_scale = np.sum([np.abs(v) for v in z_.values()], axis=0)
+        nu_denominator_scale = np.sum(np.abs(self.vdf_der) * z_scale * z_scale)
         nu_tolerance = np.finfo(np.float64).eps * float(nu_denominator_scale)
         remaining_step = 1.0 - self.stepsize
         if (
@@ -286,7 +277,9 @@ class LinearApproximation(WorkerThread):
             or not np.isfinite(remaining_step)
             or nu_denominator_scale == 0.0
             or abs(nu_denom) <= nu_tolerance
-            or remaining_step <= np.finfo(np.float64).eps
+            # Any positive representable 1 - stepsize is a valid denominator. Comparing with machine epsilon would
+            # reject valid steps immediately below one; subsequent finiteness checks catch numerical overflow instead.
+            or remaining_step <= 0.0
         ):
             self._reset_conjugate_direction("Invalid BFW nu coefficient; using the Frank-Wolfe direction.")
             return False
@@ -334,6 +327,17 @@ class LinearApproximation(WorkerThread):
             if self.time_field in c.graph.skim_fields:
                 k = c.graph.skim_fields.index(self.time_field)
                 aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
+
+    def _append_convergence_report(self, terminal: bool = False):
+        self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
+        self.convergence_report["iteration"].append(self.iter)
+        self.convergence_report["rgap"].append(self.rgap)
+        self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
+        self.convergence_report["alpha"].append(np.nan if terminal else self.stepsize)
+        if self.algorithm in ["cfw", "bfw"]:
+            for key, beta in zip(("beta0", "beta1", "beta2"), self.betas, strict=True):
+                self.convergence_report[key].append(np.nan if terminal else beta)
+        self.logger.info(f"{self.iter},{self.rgap},{'nan' if terminal else self.stepsize}")
 
     def __calculate_step_direction(self):  # noqa: C901
         """Calculates step direction depending on the method"""
@@ -644,19 +648,14 @@ class LinearApproximation(WorkerThread):
             if converged:
                 self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
-                    self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
-                    self.convergence_report["iteration"].append(self.iter)
-                    self.convergence_report["rgap"].append(self.rgap)
-                    self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
-                    self.convergence_report["alpha"].append(np.nan)
-                    if self.algorithm in ["cfw", "bfw"]:
-                        self.convergence_report["beta0"].append(self.betas[0])
-                        self.convergence_report["beta1"].append(self.betas[1])
-                        self.convergence_report["beta2"].append(self.betas[2])
-                    self.logger.info(f"{self.iter},{self.rgap},nan")
+                    self._append_convergence_report(terminal=True)
                     break
             else:
                 self.steps_below = 0
+
+            if self.iter == self.max_iter and self.iter > 1:
+                self._append_convergence_report(terminal=True)
+                break
 
             flows = []
             if self.iter == 1:
@@ -735,18 +734,7 @@ class LinearApproximation(WorkerThread):
 
             self._refresh_congested_costs()
 
-            self.convergence_report["time"].append(time.perf_counter() - self.__start_time)
-            self.convergence_report["iteration"].append(self.iter)
-            self.convergence_report["rgap"].append(self.rgap)
-            self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
-            self.convergence_report["alpha"].append(self.stepsize)
-
-            if self.algorithm in ["cfw", "bfw"]:
-                self.convergence_report["beta0"].append(self.betas[0])
-                self.convergence_report["beta1"].append(self.betas[1])
-                self.convergence_report["beta2"].append(self.betas[2])
-
-            self.logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
+            self._append_convergence_report()
             if self.iter < self.max_iter:
                 for c in self.traffic_classes:
                     c._aon_results.reset()
