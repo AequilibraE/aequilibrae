@@ -375,6 +375,7 @@ def test_bfw_nonfinite_coefficient_falls_back_to_fw():
     assignment.conjugate_stepsize = 0.5
     assignment.betas = np.array([0.2, 0.3, 0.5])
     assignment.algorithm = "bfw"
+    assignment.bfw_conjugacy = "approximate"
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
@@ -410,6 +411,10 @@ def test_append_terminal_convergence_report_uses_nan_direction_coefficients():
     assignment.betas = np.array([0.2, 0.3, 0.5])
     assignment.algorithm = "bfw"
     assignment.iteration_issue = []
+    assignment.conjugacy_prev = 0.1
+    assignment.conjugacy_prev2 = 0.2
+    assignment.hessian_drift = 0.3
+    assignment.bfw_clamped = True
     assignment.convergence_report = {
         "time": [],
         "iteration": [],
@@ -419,6 +424,10 @@ def test_append_terminal_convergence_report_uses_nan_direction_coefficients():
         "beta0": [],
         "beta1": [],
         "beta2": [],
+        "conjugacy_prev": [],
+        "conjugacy_prev2": [],
+        "hessian_drift": [],
+        "bfw_clamped": [],
     }
     assignment.logger = SimpleNamespace(info=lambda *_args, **_kwargs: None)
 
@@ -428,11 +437,13 @@ def test_append_terminal_convergence_report_uses_nan_direction_coefficients():
     assert assignment.convergence_report["rgap"] == [0.001]
     assert np.isnan(assignment.convergence_report["alpha"][0])
     assert all(np.isnan(assignment.convergence_report[key][0]) for key in ("beta0", "beta1", "beta2"))
+    diagnostics = ("conjugacy_prev", "conjugacy_prev2", "hessian_drift", "bfw_clamped")
+    assert all(np.isnan(assignment.convergence_report[key][0]) for key in diagnostics)
 
 
 # Seeds chosen so the resulting coefficients land strictly inside their clamps; a clamped coefficient would
 # make the comparison against the explicit Hessian vacuous. Keyed by class count.
-_INTERIOR_SEEDS = {1: 4, 2: 8, 3: 24, 5: 1}
+_INTERIOR_SEEDS = {1: 4, 2: 8, 3: 43, 5: 1}
 
 
 def _multiclass_fixture(num_links=4, num_classes=3, num_cores=2, seed=None):
@@ -488,6 +499,12 @@ def _multiclass_fixture(num_links=4, num_classes=3, num_cores=2, seed=None):
     assignment.conjugate_stepsize = 0.0
     assignment.betas = np.array([1.0, 0.0, 0.0])
     assignment.iteration_issue = []
+    assignment.iter = 4
+    assignment.bfw_conjugacy = "approximate"
+    assignment.conjugacy_prev = np.nan
+    assignment.conjugacy_prev2 = np.nan
+    assignment.hessian_drift = np.nan
+    assignment.bfw_clamped = np.nan
     assignment.logger = SimpleNamespace(debug=lambda *_args, **_kwargs: None)
     assignment.traffic_classes = classes
     assignment.step_direction = step_direction
@@ -561,3 +578,129 @@ def test_contractions_match_block_hessian_for_any_class_count(num_classes):
     assert assignment.calculate_conjugate_stepsize()
     assert 0.0 < expected_alpha < assignment.conjugate_direction_max
     assert np.isclose(assignment.conjugate_stepsize, expected_alpha, rtol=1e-12, atol=0.0)
+
+
+def _bfw_setup(bfw_conjugacy, tau=0.4, seed=None):
+    assignment, hessian, agg, flatten = _multiclass_fixture(seed=seed)
+    assignment.algorithm = "bfw"
+    assignment.bfw_conjugacy = bfw_conjugacy
+    assignment.current_direction = "bfw"
+    assignment.next_direction = None
+    assignment.stepsize = tau
+    # A = d_{k-1}, B = d_{k-2}, W = s_{k-2} - s_{k-1}, g = the Frank-Wolfe direction.
+    vectors = {
+        "A": flatten(agg["step_dir"] - agg["results"]),
+        "B": flatten(agg["step_dir"] * tau + agg["prev_step_dir"] * (1.0 - tau) - agg["results"]),
+        "W": flatten(agg["prev_step_dir"] - agg["step_dir"]),
+        "g": flatten(agg["aon"] - agg["results"]),
+    }
+    return assignment, hessian, vectors
+
+
+def _direction(vectors, mu, nu):
+    """d_k / beta_0 = g + (nu + mu) A + mu W."""
+    return vectors["g"] + (nu + mu) * vectors["A"] + mu * vectors["W"]
+
+
+def test_exact_bfw_direction_is_conjugate_to_both_previous_directions():
+    assignment, hessian, vectors = _bfw_setup("exact")
+
+    assert assignment.calculate_biconjugate_direction()
+
+    mu = assignment.betas[2] / assignment.betas[0]
+    nu = assignment.betas[1] / assignment.betas[0]
+    # Both coefficients must be interior, otherwise the clamp - not the solve - produced this direction.
+    assert mu > 0.0 and nu > 0.0
+
+    d = _direction(vectors, mu, nu)
+    norm = np.sqrt((d @ hessian @ d))
+    for name in ("A", "B"):
+        v = vectors[name]
+        residual = abs(v @ hessian @ d) / (np.sqrt(v @ hessian @ v) * norm)
+        assert residual < 1e-12, f"exact BFW direction is not conjugate to {name}: {residual:.3e}"
+
+
+def test_approximate_bfw_direction_is_conjugate_to_neither_previous_direction():
+    """Appendix A drops the cross term from *both* conditions, so both residuals stay non-zero."""
+    assignment, hessian, vectors = _bfw_setup("approximate")
+
+    assert assignment.calculate_biconjugate_direction()
+
+    mu = assignment.betas[2] / assignment.betas[0]
+    nu = assignment.betas[1] / assignment.betas[0]
+    assert mu > 0.0 and nu > 0.0  # the clamp did not fire, so this is the approximation talking
+    assert assignment.bfw_clamped is False
+
+    d = _direction(vectors, mu, nu)
+    norm = np.sqrt(d @ hessian @ d)
+    for name in ("A", "B"):
+        v = vectors[name]
+        residual = abs(v @ hessian @ d) / (np.sqrt(v @ hessian @ v) * norm)
+        assert residual > 1e-6, f"approximation should leave a measurable residual against {name}"
+
+
+def test_exact_and_approximate_bfw_disagree_when_the_dropped_term_is_non_zero():
+    """The paths differ only by the dropped cross term, so a non-zero drift must change the weights."""
+    approximate, hessian, vectors = _bfw_setup("approximate")
+    a, b = vectors["A"], vectors["B"]
+    drift = abs(b @ hessian @ a) / np.sqrt((a @ hessian @ a) * (b @ hessian @ b))
+    assert drift > 1e-3, "fixture must have a genuinely non-conjugate history for this to mean anything"
+
+    exact, _, _ = _bfw_setup("exact")
+    assert exact.calculate_biconjugate_direction()
+    assert approximate.calculate_biconjugate_direction()
+
+    assert not np.allclose(exact.betas, approximate.betas)
+    assert np.isclose(exact.betas.sum(), 1.0) and np.isclose(approximate.betas.sum(), 1.0)
+
+
+def test_exact_bfw_records_conjugacy_diagnostics():
+    assignment, _, _ = _bfw_setup("exact")
+
+    assert assignment.calculate_biconjugate_direction()
+
+    assert assignment.bfw_clamped is False
+    assert abs(assignment.conjugacy_prev) < 1e-12
+    assert abs(assignment.conjugacy_prev2) < 1e-12
+    # hessian_drift is the term the approximation drops; it must be non-trivial for this fixture.
+    assert np.isfinite(assignment.hessian_drift)
+    assert abs(assignment.hessian_drift) > 1e-6
+
+
+def test_approximate_bfw_records_nonzero_conjugacy_residuals():
+    assignment, _, _ = _bfw_setup("approximate")
+
+    assert assignment.calculate_biconjugate_direction()
+
+    assert abs(assignment.conjugacy_prev) > 1e-6
+    assert abs(assignment.conjugacy_prev2) > 1e-6
+
+
+def test_exact_bfw_falls_back_to_the_simplex_face_when_a_coefficient_goes_negative():
+    """Seed 24 drives mu negative; the face fallback must stay conjugate to the direction it keeps."""
+    assignment, hessian, vectors = _bfw_setup("exact", seed=24)
+
+    assert assignment.calculate_biconjugate_direction()
+
+    assert assignment.bfw_clamped is True
+    assert assignment.betas[2] == 0.0  # weight on d_{k-2} dropped entirely
+    mu = assignment.betas[2] / assignment.betas[0]
+    nu = assignment.betas[1] / assignment.betas[0]
+    d = _direction(vectors, mu, nu)
+    a = vectors["A"]
+    residual = abs(a @ hessian @ d) / (np.sqrt(a @ hessian @ a) * np.sqrt(d @ hessian @ d))
+    assert residual < 1e-12, "the retained direction must still be conjugate after dropping the other"
+
+
+def test_singular_exact_bfw_system_falls_back_to_fw():
+    """When d_{k-1} and d_{k-2} coincide there is no direction conjugate to both."""
+    assignment, _, _ = _bfw_setup("exact")
+    # stepsize == 0 makes x_ (d_{k-2}) equal psd - ll while z_ stays sd - ll; force them equal instead by
+    # pointing the previous step direction at the current one.
+    for cid, sdr in assignment.step_direction.items():
+        assignment.previous_step_direction[cid] = SimpleNamespace(link_loads=sdr.link_loads)
+
+    assert not assignment.calculate_biconjugate_direction()
+    assert assignment.current_direction == "fw"
+    np.testing.assert_array_equal(assignment.betas, np.array([1.0, 0.0, 0.0]))
+    assert assignment.iteration_issue == ["Singular exact BFW system; using the Frank-Wolfe direction."]

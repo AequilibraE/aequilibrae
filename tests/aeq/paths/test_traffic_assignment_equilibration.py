@@ -159,7 +159,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, "
-        "'Target RGAP': 0.0001, 'Line search': 'trapezoidal'}}"
+        "'Target RGAP': 0.0001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_1 in file_text
 
@@ -167,7 +168,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'Line search': 'trapezoidal'}}"
+        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_2 in file_text
 
@@ -175,7 +177,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', "
-        "'Maximum iterations': 500, 'Target RGAP': 0.001, 'Line search': 'trapezoidal'}}"
+        "'Maximum iterations': 500, 'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_3 in file_text
 
@@ -183,7 +186,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'Line search': 'trapezoidal'}}"
+        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_4 in file_text
 
@@ -191,7 +195,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'Line search': 'trapezoidal'}}"
+        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_5 in file_text
 
@@ -280,3 +285,69 @@ def test_exact_line_search_is_not_capped_and_changes_the_steps(assignment, assig
         cap = np.array([1.0 / np.sqrt(i) for i in assignment.assignment.convergence_report["iteration"]])
         assert np.any(exact_alphas[:-1] > cap[:-1]), "exact line search should be able to exceed the BFW cap"
     assert np.isfinite(exact_rgap)
+
+
+def test_bfw_conjugacy_defaults_to_approximate(assignment, assigclass):
+    _configure(assignment, assigclass)
+
+    assert assignment.bfw_conjugacy == "approximate"
+    assert assignment.assignment.bfw_conjugacy == "approximate"
+    assert assignment._config["BFW conjugacy"] == "approximate"
+
+
+@pytest.mark.parametrize("conjugacy", ["exact", "approximate", "EXACT"])
+def test_set_bfw_conjugacy_propagates_to_the_running_algorithm(assignment, assigclass, conjugacy):
+    _configure(assignment, assigclass)
+
+    assignment.set_bfw_conjugacy(conjugacy)
+
+    assert assignment.assignment.bfw_conjugacy == conjugacy.lower()
+    assert assignment._config["BFW conjugacy"] == conjugacy.lower()
+
+
+def test_set_bfw_conjugacy_before_set_algorithm_is_honoured(assignment, assigclass):
+    assignment.set_bfw_conjugacy("exact")
+    _configure(assignment, assigclass)
+
+    assert assignment.assignment.bfw_conjugacy == "exact"
+
+
+@pytest.mark.parametrize("bad", ["biconjugate", "", 2, None])
+def test_set_bfw_conjugacy_rejects_unknown_methods(assignment, bad):
+    with pytest.raises(ValueError, match="BFW conjugacy must be one of"):
+        assignment.set_bfw_conjugacy(bad)
+
+
+@pytest.mark.parametrize("conjugacy", ["approximate", "exact"])
+def test_bfw_reports_conjugacy_diagnostics(assignment, assigclass, conjugacy):
+    _configure(assignment, assigclass, algorithm="bfw", max_iter=25)
+    assignment.set_bfw_conjugacy(conjugacy)
+    assignment.execute()
+
+    report = assignment.assignment.convergence_report
+    columns = ("conjugacy_prev", "conjugacy_prev2", "hessian_drift", "bfw_clamped")
+    assert all(column in report for column in columns)
+    assert len({len(values) for values in report.values()}) == 1
+
+    drift = np.array([v for v in report["hessian_drift"] if v is not None], dtype=float)
+    measured = drift[np.isfinite(drift)]
+    assert measured.size > 0, "at least one iteration should have taken a BFW step"
+    # The dropped term is a cosine, so it is bounded even though it need not be small.
+    assert np.all(np.abs(measured) <= 1.0 + 1e-9)
+
+    residual = np.array([v for v in report["conjugacy_prev2"] if v is not None], dtype=float)
+    residual = np.abs(residual[np.isfinite(residual)])
+    assert residual.size > 0
+    if conjugacy == "exact":
+        # Only iterations where the clamp did not fire are required to be biconjugate.
+        clamped = np.array([v for v in report["bfw_clamped"] if v is not None], dtype=float)
+        interior = np.isfinite(clamped) & (clamped == 0.0)
+        if interior.any():
+            all_residual = np.array(report["conjugacy_prev2"], dtype=float)
+            assert np.all(np.abs(all_residual[interior]) < 1e-8)
+
+
+def test_cfw_does_not_get_conjugacy_columns(assignment, assigclass):
+    _configure(assignment, assigclass, algorithm="cfw")
+
+    assert "conjugacy_prev" not in assignment.assignment.convergence_report

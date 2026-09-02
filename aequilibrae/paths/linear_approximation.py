@@ -44,6 +44,13 @@ class LinearApproximation(WorkerThread):
         self.project_path = project.project_base_path if project else gettempdir()
 
         self.algorithm = algorithm
+        self.line_search = getattr(assig_spec, "line_search", "trapezoidal")  # CFW, BFW only
+        self.bfw_conjugacy = getattr(assig_spec, "bfw_conjugacy", "approximate")  # BFW only
+        # Conjugacy diagnostics for the iteration in progress; see _record_conjugacy_diagnostics.
+        self.conjugacy_prev = np.nan
+        self.conjugacy_prev2 = np.nan
+        self.hessian_drift = np.nan
+        self.bfw_clamped = np.nan
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
@@ -59,6 +66,13 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["beta0"] = []
             self.convergence_report["beta1"] = []
             self.convergence_report["beta2"] = []
+        if algorithm == "bfw":
+            # Per-iteration conjugacy diagnostics, for comparing the approximate and exact BFW variants.
+            # NaN on iterations that did not take a BFW step.
+            self.convergence_report["conjugacy_prev"] = []
+            self.convergence_report["conjugacy_prev2"] = []
+            self.convergence_report["hessian_drift"] = []
+            self.convergence_report["bfw_clamped"] = []
 
         self.assig: TrafficAssignment = assig_spec
 
@@ -162,11 +176,13 @@ class LinearApproximation(WorkerThread):
         # so we only need the class-aggregated vectors, never the M^2 class pairs. The same identity holds with
         # absolute values inside (|t'_a u_a^m v_a^m'| factors too), which gives the cancellation scale below.
         # This would no longer be valid if the volume-dependent term regained a class-dependent weight.
-        u = np.zeros_like(self.vdf_der)  # sum_m (s_{k-1} - x_k)^m
-        v = np.zeros_like(self.vdf_der)  # sum_m (y_k - x_k)^m
-        w = np.zeros_like(self.vdf_der)  # sum_m (y_k - s_{k-1})^m
-        abs_u = np.zeros_like(self.vdf_der)
-        abs_w = np.zeros_like(self.vdf_der)
+        # Accumulate in float64 explicitly: an in-place ``+=`` onto a
+        # narrower accumulator would silently downcast every class contribution.
+        u = np.zeros(self.vdf_der.shape, dtype=np.float64)  # sum_m (s_{k-1} - x_k)^m
+        v = np.zeros(self.vdf_der.shape, dtype=np.float64)  # sum_m (y_k - x_k)^m
+        w = np.zeros(self.vdf_der.shape, dtype=np.float64)  # sum_m (y_k - s_{k-1})^m
+        abs_u = np.zeros(self.vdf_der.shape, dtype=np.float64)
+        abs_w = np.zeros(self.vdf_der.shape, dtype=np.float64)
 
         for c in self.traffic_classes:
             stp_dir = self.step_direction[c._id]
@@ -220,13 +236,14 @@ class LinearApproximation(WorkerThread):
         # Class-aggregated vectors; see calculate_conjugate_stepsize for why the class pairs factor out. Following
         # appendix A of Mitradjieva & Lindberg, x_ is the residual direction d_{k-2}, z_ is d_{k-1}, y_ is the
         # Frank-Wolfe direction and w_ is s_{k-2} - s_{k-1}.
-        x_ = np.zeros_like(self.vdf_der)
-        y_ = np.zeros_like(self.vdf_der)
-        z_ = np.zeros_like(self.vdf_der)
-        w_ = np.zeros_like(self.vdf_der)
-        abs_x = np.zeros_like(self.vdf_der)
-        abs_z = np.zeros_like(self.vdf_der)
-        abs_w = np.zeros_like(self.vdf_der)
+        # float64 accumulators for the same reason as in calculate_conjugate_stepsize.
+        x_ = np.zeros(self.vdf_der.shape, dtype=np.float64)
+        y_ = np.zeros(self.vdf_der.shape, dtype=np.float64)
+        z_ = np.zeros(self.vdf_der.shape, dtype=np.float64)
+        w_ = np.zeros(self.vdf_der.shape, dtype=np.float64)
+        abs_x = np.zeros(self.vdf_der.shape, dtype=np.float64)
+        abs_z = np.zeros(self.vdf_der.shape, dtype=np.float64)
+        abs_w = np.zeros(self.vdf_der.shape, dtype=np.float64)
 
         for c in self.traffic_classes:
             sd = self.step_direction[c._id].link_loads[:, :]
@@ -245,6 +262,29 @@ class LinearApproximation(WorkerThread):
             abs_z += np.abs(class_z)
             abs_w += np.abs(class_w)
 
+        if self.bfw_conjugacy == "exact":
+            coefficients = self.__exact_biconjugate_coefficients(x_, y_, z_, w_, abs_x, abs_z, abs_w)
+        else:
+            coefficients = self.__approximate_biconjugate_coefficients(x_, y_, z_, w_, abs_x, abs_z, abs_w)
+        if coefficients is None:
+            return False  # the helper has already reset the direction and recorded why
+        mu, nu = coefficients
+
+        self.betas[0] = 1.0 / (1.0 + nu + mu)
+        self.betas[1] = nu * self.betas[0]
+        self.betas[2] = mu * self.betas[0]
+        if not np.all(np.isfinite(self.betas)) or np.any(self.betas < 0.0):
+            self._reset_conjugate_direction("Invalid BFW weights; using the Frank-Wolfe direction.")
+            return False
+        self._record_conjugacy_diagnostics(x_, y_, z_, w_, mu, nu)
+        return True
+
+    def __approximate_biconjugate_coefficients(self, x_, y_, z_, w_, abs_x, abs_z, abs_w):
+        """Appendix A of Mitradjieva & Lindberg, which assumes ``d_{k-1}^T H_k d_{k-2} = 0``.
+
+        That assumption holds only in the limit: the two directions were made conjugate with respect to
+        ``H_{k-1}``, not ``H_k``. Returns ``(mu, nu)``, or ``None`` after resetting the direction.
+        """
         mu_numerator = np.sum(self.vdf_der * x_ * y_)
         mu_denominator = np.sum(self.vdf_der * x_ * w_)
         mu_denominator_scale = np.sum(np.abs(self.vdf_der) * abs_x * abs_w)
@@ -257,9 +297,10 @@ class LinearApproximation(WorkerThread):
             or abs(mu_denominator) <= mu_tolerance
         ):
             self._reset_conjugate_direction("Invalid BFW mu coefficient; using the Frank-Wolfe direction.")
-            return False
+            return None
 
-        mu = max(0.0, -mu_numerator / mu_denominator)
+        mu_unclamped = -mu_numerator / mu_denominator
+        mu = max(0.0, mu_unclamped)
 
         nu_nom = np.sum(self.vdf_der * z_ * y_)
         # Here both factors are z, so the class aggregate is squared link by link.
@@ -280,20 +321,112 @@ class LinearApproximation(WorkerThread):
             or remaining_step <= 0.0
         ):
             self._reset_conjugate_direction("Invalid BFW nu coefficient; using the Frank-Wolfe direction.")
-            return False
+            return None
 
-        nu = max(0.0, -(nu_nom / nu_denom) + mu * self.stepsize / remaining_step)
+        nu_unclamped = -(nu_nom / nu_denom) + mu * self.stepsize / remaining_step
+        nu = max(0.0, nu_unclamped)
         if not np.isfinite(nu):
             self._reset_conjugate_direction("Non-finite BFW coefficient; using the Frank-Wolfe direction.")
-            return False
+            return None
+        self.bfw_clamped = bool(mu_unclamped < 0.0 or nu_unclamped < 0.0)
+        return mu, nu
 
-        self.betas[0] = 1.0 / (1.0 + nu + mu)
-        self.betas[1] = nu * self.betas[0]
-        self.betas[2] = mu * self.betas[0]
-        if not np.all(np.isfinite(self.betas)) or np.any(self.betas < 0.0):
-            self._reset_conjugate_direction("Invalid BFW weights; using the Frank-Wolfe direction.")
-            return False
-        return True
+    def __exact_biconjugate_coefficients(self, x_, y_, z_, w_, abs_x, abs_z, abs_w):
+        """Solve both conjugacy conditions jointly, without appendix A's ``d_{k-1}^T H_k d_{k-2} = 0`` assumption.
+
+        Writing ``d_k / beta_0 = g + (nu + mu) A + mu W`` with ``A = d_{k-1}``, ``B = d_{k-2}``,
+        ``W = s_{k-2} - s_{k-1}`` and ``g`` the Frank-Wolfe direction, conditions (9a) and (9b) become the
+        2x2 system in ``s = nu + mu`` and ``m = mu``::
+
+            [ A'HA   A'HW ] [s]     [ -A'Hg ]
+            [ B'HA   B'HW ] [m]  =  [ -B'Hg ]
+
+        Dropping the off-diagonal ``B'HA`` and substituting ``A'HW = (A'HB - A'HA) / (1 - tau)`` with
+        ``A'HB = 0`` recovers the appendix formulas exactly, so the two paths differ only in that one term.
+        Returns ``(mu, nu)``, or ``None`` after resetting the direction.
+        """
+        a = np.sum(self.vdf_der * z_ * z_)  # A'HA
+        b = np.sum(self.vdf_der * z_ * w_)  # A'HW
+        c = np.sum(self.vdf_der * x_ * z_)  # B'HA, the term the approximation drops
+        d = np.sum(self.vdf_der * x_ * w_)  # B'HW
+        e = -np.sum(self.vdf_der * z_ * y_)  # -A'Hg
+        f = -np.sum(self.vdf_der * x_ * y_)  # -B'Hg
+
+        determinant = a * d - b * c
+        # Cancellation scale for the determinant, built from the same class aggregates.
+        scale_a = np.sum(np.abs(self.vdf_der) * abs_z * abs_z)
+        scale_b = np.sum(np.abs(self.vdf_der) * abs_z * abs_w)
+        scale_c = np.sum(np.abs(self.vdf_der) * abs_x * abs_z)
+        scale_d = np.sum(np.abs(self.vdf_der) * abs_x * abs_w)
+        determinant_scale = scale_a * scale_d + scale_b * scale_c
+        tolerance = np.finfo(np.float64).eps * float(determinant_scale)
+
+        if (
+            not np.all(np.isfinite([a, b, c, d, e, f, determinant, determinant_scale]))
+            or determinant_scale == 0.0
+            or abs(determinant) <= tolerance
+        ):
+            # Singular here means A and B are H-parallel, so there is no direction conjugate to both.
+            self._reset_conjugate_direction("Singular exact BFW system; using the Frank-Wolfe direction.")
+            return None
+
+        s = (e * d - b * f) / determinant
+        m = (a * f - e * c) / determinant
+        if not np.isfinite(s) or not np.isfinite(m):
+            self._reset_conjugate_direction("Non-finite exact BFW coefficients; using the Frank-Wolfe direction.")
+            return None
+
+        if m >= 0.0 and s - m >= 0.0:
+            self.bfw_clamped = False
+            return m, s - m
+
+        # The unconstrained optimum lies outside the simplex. Clamping one coefficient while keeping its
+        # jointly-solved partner would leave a direction conjugate to neither previous direction, so instead
+        # drop the offending direction and re-conjugate against the one that remains.
+        # This is a deliberate difference from the approximate path, which clamps in place.
+        self.bfw_clamped = True
+        if m < 0.0:
+            # Zero weight on d_{k-2}: solve (9a) alone, which is exactly the CFW conjugacy condition.
+            if abs(a) <= np.finfo(np.float64).eps * float(scale_a):
+                return 0.0, 0.0  # degenerate; falls back to the plain Frank-Wolfe direction
+            return 0.0, max(0.0, e / a)
+        # Zero weight on d_{k-1}, i.e. nu = 0 and hence s = m: solve (9b) alone.
+        denominator, denominator_scale = c + d, scale_c + scale_d
+        if abs(denominator) <= np.finfo(np.float64).eps * float(denominator_scale):
+            return 0.0, 0.0
+        return max(0.0, f / denominator), 0.0
+
+    def _record_conjugacy_diagnostics(self, x_, y_, z_, w_, mu, nu):
+        """Measure how conjugate the accepted direction actually is, for comparing the two BFW variants.
+
+        Stores three cosines in ``[-1, 1]`` on the instance and in the convergence report:
+
+        * ``conjugacy_prev``  - cos angle in the H inner product between ``d_k`` and ``d_{k-1}``; the exact
+          solve should drive this to zero, the approximation only approximately.
+        * ``conjugacy_prev2`` - the same against ``d_{k-2}``.
+        * ``hessian_drift``   - cos between ``d_{k-1}`` and ``d_{k-2}``. This is exactly the term appendix A
+          assumes is zero, so it bounds how much the two variants can possibly differ.
+        """
+        direction = y_ + (nu + mu) * z_ + mu * w_  # d_k / beta_0
+        dd = np.sum(self.vdf_der * direction * direction)
+        zz = np.sum(self.vdf_der * z_ * z_)
+        xx = np.sum(self.vdf_der * x_ * x_)
+
+        def cosine(numerator, left, right):
+            denominator = np.sqrt(left * right)
+            if not np.isfinite(denominator) or denominator <= 0.0 or not np.isfinite(numerator):
+                return np.nan
+            return float(numerator / denominator)
+
+        self.conjugacy_prev = cosine(np.sum(self.vdf_der * z_ * direction), zz, dd)
+        self.conjugacy_prev2 = cosine(np.sum(self.vdf_der * x_ * direction), xx, dd)
+        self.hessian_drift = cosine(np.sum(self.vdf_der * x_ * z_), xx, zz)
+        self.logger.debug(
+            f"BFW[{self.bfw_conjugacy}] iter={self.iter} mu={mu:.6e} nu={nu:.6e} "
+            f"betas=({self.betas[0]:.6e},{self.betas[1]:.6e},{self.betas[2]:.6e}) "
+            f"conjugacy_prev={self.conjugacy_prev:.3e} conjugacy_prev2={self.conjugacy_prev2:.3e} "
+            f"hessian_drift={self.hessian_drift:.3e} clamped={self.bfw_clamped}"
+        )
 
     def _reset_conjugate_direction(self, message: str):
         self.conjugate_stepsize = 0.0
@@ -335,6 +468,11 @@ class LinearApproximation(WorkerThread):
         if self.algorithm in ["cfw", "bfw"]:
             for key, beta in zip(("beta0", "beta1", "beta2"), self.betas, strict=True):
                 self.convergence_report[key].append(np.nan if terminal else beta)
+        if self.algorithm == "bfw":
+            diagnostics = (self.conjugacy_prev, self.conjugacy_prev2, self.hessian_drift, self.bfw_clamped)
+            keys = ("conjugacy_prev", "conjugacy_prev2", "hessian_drift", "bfw_clamped")
+            for key, value in zip(keys, diagnostics, strict=True):
+                self.convergence_report[key].append(np.nan if terminal else value)
         self.logger.info(f"{self.iter},{self.rgap},{'nan' if terminal else self.stepsize}")
 
     def __calculate_step_direction(self):  # noqa: C901
@@ -618,6 +756,11 @@ class LinearApproximation(WorkerThread):
         msg = "Equilibrium Assignment"
         for self.iter in simple_progress(range(1, self.max_iter + 1), self.signal, msg):  # noqa: B020
             self.iteration_issue = []
+            # Stale diagnostics must not be reported on an iteration that ends up taking an FW or CFW step.
+            self.conjugacy_prev = np.nan
+            self.conjugacy_prev2 = np.nan
+            self.hessian_drift = np.nan
+            self.bfw_clamped = np.nan
 
             aon_flows = []
 
@@ -842,20 +985,22 @@ class LinearApproximation(WorkerThread):
             self.stepsize = self.__clip_stepsize(1.0 / self.iter)
             return
 
-        # CFW and BFW use a heuristic bounded minimization of a one-panel trapezoidal approximation to the
-        # Beckmann objective change instead of root-finding the exact directional derivative.
+        # With line_search == "trapezoidal", CFW and BFW use a heuristic bounded minimization of a one-panel
+        # trapezoidal approximation to the Beckmann objective change instead of root-finding the exact
+        # directional derivative. Selected via TrafficAssignment.set_line_search; "exact" falls through to the
+        # root_scalar branch below, which is the line search the conjugate-direction theory assumes.
         #
         # Two cooperating mechanisms vs. the analytic root_scalar approach:
         #
-        # (1) The trapezoidal objective is exact for affine link costs and approximate otherwise.
-        #     it diverge significantly when the BPR exponent is large (β=4 on Chicago test network).
+        # (1) The trapezoidal objective is exact for affine link costs and approximate otherwise;
+        #     the two diverge significantly when the BPR exponent is large (β=4 on Chicago test network).
         # (2) For BFW only: a cap α_max = 1/sqrt(iter) prevents the line search from
         #     returning α = 1.0, which would collapse the BFW history (s^{k-1} onto x^k)
         #     and cause the μ·α/(1-α) bias term in calculate_biconjugate_direction to blow up.
         #     CFW has neither concern and uses α_max = 1.0 (uncapped).
         #
         # BFW Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
-        if self.algorithm in ("bfw", "cfw"):
+        if self.algorithm in ("bfw", "cfw") and self.line_search == "trapezoidal":
             # The 1/sqrt(iter) cap is only needed for BFW: it bounds the mu*alpha/(1-alpha) bias
             # term in calculate_biconjugate_direction and prevents alpha=1.0 from collapsing the
             # BFW history. CFW has no such term and no restart state sensitive to large steps, so
@@ -928,6 +1073,8 @@ class LinearApproximation(WorkerThread):
             assert 0 <= self.stepsize <= alpha_max + 1e-12
             return
 
+        # Exact line search: root-find the directional derivative of the Beckmann objective over [0, 1]. Used by
+        # Frank-Wolfe always, and by CFW/BFW when line_search == "exact". No step cap is applied here.
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
         derivative_of_objective = partial(
             self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term
