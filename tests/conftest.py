@@ -92,6 +92,19 @@ def coquimbo_example(cached_coquimbo_example, cache_path, tmp_path) -> Project:
     project.close()
 
 
+@pytest.fixture(scope="function")
+def build_gtfs_project(cached_coquimbo_example, cache_path, tmp_path) -> Project:
+    project = cached_model("coquimbo", cache_path, tmp_path)
+    project.close()
+
+    (tmp_path / "public_transport.sqlite").unlink(True)
+
+    project = Project.from_path(tmp_path)
+    project.scenario.create_transit_database()
+    yield Transit(project)
+    project.close()
+
+
 @pytest.fixture
 def empty_project(tmp_path) -> Project:
     project = Project()
@@ -147,16 +160,6 @@ def triangle_graph_blocking(test_data_path, tmp_path) -> Project:
     project = cached_model("blocking_triangle_graph_project", test_data_path, tmp_path)
     yield project
     project.close()
-
-
-@pytest.fixture
-def build_gtfs_project(coquimbo_example):
-    prj = coquimbo_example
-
-    (coquimbo_example.project_base_path / "public_transport.sqlite").unlink(True)
-    data = Transit(prj)
-    yield data
-    prj.close()
 
 
 @pytest.fixture(scope="session")

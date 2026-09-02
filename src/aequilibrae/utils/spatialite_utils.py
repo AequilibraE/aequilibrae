@@ -12,7 +12,7 @@ from zipfile import ZipFile
 
 import numpy as np
 
-from aequilibrae.utils.db_utils import _AequilibraEConnection, has_table, safe_connect
+from aequilibrae.utils.db_utils import has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
 
 # Setup adapters so that we can read/write numpy types directly to DB
@@ -35,19 +35,23 @@ def is_macos():
     return sys.platform == "darwin"
 
 
-def connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False) -> Connection:
+def connect_spatialite(
+    path_to_file: os.PathLike | str,
+    missing_ok: bool = False,
+    factory=Connection,
+) -> Connection:
     if inside_qgis:
         import qgis
 
-        return qgis.utils.spatialite_connect(str(path_to_file), factory=_AequilibraEConnection)
+        return qgis.utils.spatialite_connect(str(path_to_file), factory=factory)
 
     ensure_spatialite_binaries()
 
-    return _connect_spatialite(path_to_file, missing_ok)
+    return _connect_spatialite(path_to_file, missing_ok=missing_ok, factory=factory)
 
 
-def _connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False):
-    conn = safe_connect(path_to_file, missing_ok)
+def _connect_spatialite(path_to_file: os.PathLike | str, missing_ok: bool = False, factory=Connection):
+    conn = safe_connect(path_to_file, missing_ok=missing_ok, factory=factory)
     load_spatialite_extension(conn)
     return conn
 

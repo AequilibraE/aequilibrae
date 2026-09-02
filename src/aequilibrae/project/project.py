@@ -79,10 +79,11 @@ class Project:
         self.root_scenario = Scenario(
             name="root",
             base_path=base_path,
-            path_to_file=path_to_file,
             log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
+            project=self,  # HACK: Remove once transit is sorted
         )
         self.scenario = self.root_scenario
+        self.__transit = None
 
         # It's possible that if two projects are open at once this could duplicate mix the log outputs, but we don't
         # have anything to support having more than one project open at a time so we'll assume it's fine.
@@ -164,20 +165,17 @@ class Project:
         """
 
         base_path = Path(project_path)
-        path_to_file = base_path / "project_database.sqlite"
 
-        if os.path.isdir(project_path):
+        if base_path.exists():
             raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
 
-        # Create the project database before constructing the connections.
-        base_path.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(spatialite_database, path_to_file)
+        self.__create_empty_network(base_path)
 
         self.root_scenario = Scenario(
             name="root",
             base_path=base_path,
-            path_to_file=path_to_file,
             log_handler=logging.FileHandler(base_path / "aequilibrae.log"),
+            project=self,  # HACK
         )
         self.scenario = self.root_scenario
 
@@ -185,7 +183,6 @@ class Project:
 
         self.activate()
 
-        self.__create_empty_network()
         self.about.create()
         logger.info(f"Created project on {base_path}")
 
@@ -257,11 +254,7 @@ class Project:
 
         transit_path = self._transit_database_path if self._transit_database_path.exists() else None
         results_path = self._results_database_path if self._results_database_path.exists() else None
-        closure = ConnectionClosure(
-            self._project_database_path,
-            results_path=None if ignore_results else results_path,
-            transit_path=None if ignore_transit else transit_path,
-        )
+        closure = ConnectionClosure(self._project_database_path, results_path=results_path, transit_path=transit_path)
         try:
             if ignore_project:
                 logger.warning("Ignoring project database during upgrade")
@@ -315,18 +308,23 @@ class Project:
         """Makes results_database.sqlite and the matrices folder compatible with project database"""
         raise NotImplementedError
 
-    def __create_empty_network(self):
-        pth = self.project_base_path / "run"
-        pth.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(demo_init_py, pth / "__init__.py")
+    @staticmethod
+    def __create_empty_network(base_path: Path):
+        # Create the project database before constructing the connections.
+        base_path.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(spatialite_database, base_path / "project_database.sqlite")
 
-        # Write parameters to the project folder
-        p = self.project_parameters
-        p.parameters["system"]["logging_directory"] = str(self.project_base_path)
-        p.write_back()
+        run_folder = base_path / "run"
+        run_folder.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(demo_init_py, run_folder / "__init__.py")
+
+        # # Write parameters to the project folder
+        # p = self.project_parameters
+        # p.parameters["system"]["logging_directory"] = str(self.project_base_path)
+        # p.write_back()
 
         # Create actual tables
-        with self.db_connection as conn:
+        with commit_and_close(base_path / "project_database.sqlite", spatial=True) as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables("network", conn=conn)
 
@@ -362,8 +360,8 @@ class Project:
             self.scenario = Scenario(
                 name=scenario_name,
                 base_path=path,
-                path_to_file=path / "project_database.sqlite",
                 log_handler=logging.FileHandler(path / "aequilibrae.log"),
+                project=self,  # HACK
             )
 
         default_log_file_config(self.scenario.log_handler)

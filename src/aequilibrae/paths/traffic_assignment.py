@@ -908,12 +908,16 @@ class TrafficAssignment(AssignmentBase):
             out_skims.description = f"Skimming for assignment procedure. Class {cls._id}"
             # Now we create the appropriate record
 
-            record = mats.new_record(f"{matrix_name}_{cls._id}", file_name)
-            record.procedure_id = self.procedure_id
-            record.timestamp = self.procedure_date
-            record.procedure = "Traffic Assignment"
-            record.description = out_skims.description
-            record.save()
+            record = mats.create(
+                name=f"{matrix_name}_{cls._id}",
+                file_name=file_name,
+                procedure_id=self.procedure_id,
+                timestamp=self.procedure_date,
+                procedure="Traffic Assignment",
+                description=out_skims.description,
+            )
+
+            return record
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
@@ -949,15 +953,15 @@ class TrafficAssignment(AssignmentBase):
 
         report = {}
         description = f"Select link analysis from {self.procedure_id}"
-        record = project.results.new_record(
+        project.results.create(
             table_name=table_name,
+            data=df,
             procedure="traffic select link",
             procedure_id=f"{self.procedure_id}_sl",
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=description,
         )
-        record.set_data(df)
 
     def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
@@ -982,7 +986,7 @@ class TrafficAssignment(AssignmentBase):
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        if mats.check_exists(matrix_name):
+        if mats.get(matrix_name, default=False):
             raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
         names = [f"{key}_{cls._id}" for cls in self.classes for key in cls._selected_links.keys()]
@@ -1144,15 +1148,15 @@ class TransitAssignment(AssignmentBase):
             project = project or get_active_project()
 
         report = {"setup": self.info()}
-        record = project.results.new_record(
+        project.results.create(
             table_name=table_name,
+            data=df,
             procedure="transit assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame

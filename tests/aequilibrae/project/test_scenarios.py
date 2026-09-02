@@ -56,6 +56,7 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
 def test_transit_assignment_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
+    scenario_example.scenario.create_transit_database()
     data = Transit(scenario_example)
     try:
         graph = data.create_graph(
@@ -110,7 +111,7 @@ def test_matrices_scenarios(scenario_example, scenario):
 
     if len(df) > 0:
         first_matrix = df.iloc[0]["name"]
-        rec = matrices.get_record(first_matrix)
+        rec = matrices.get(first_matrix)
         assert rec.name is not None
         assert rec.name == first_matrix
     else:
@@ -151,9 +152,13 @@ def test_results_scenarios(scenario_example, scenario):
     results = scenario_example.results
     table_name = f"test_result_{scenario}"
 
+    # Test data to save as the result
+    test_data = pd.DataFrame({"id": [1, 2, 3], "scenario": [scenario] * 3, "value": [10, 20, 30]})
+
     # Create a new result record
-    record = results.new_record(
+    record = results.create(
         table_name,
+        data=test_data,
         procedure="test_procedure",
         procedure_id=f"test_id_{scenario}",
         procedure_report=json.dumps({"status": "success", "scenario": scenario}),
@@ -164,21 +169,16 @@ def test_results_scenarios(scenario_example, scenario):
     # Verify the record was created
     assert record.table_name == table_name
     assert record.procedure == "test_procedure"
-    assert results.check_exists(table_name)
-
-    # Test saving data to the result
-    test_data = pd.DataFrame({"id": [1, 2, 3], "scenario": [scenario] * 3, "value": [10, 20, 30]})
-
-    record.set_data(test_data, index=False)
+    assert results.table_exists(table_name)
 
     # Verify data retrieval
-    retrieved_data = record.get_data()
+    retrieved_data = results.get_results(record.table_name)
     assert len(retrieved_data) == 3
     assert list(retrieved_data.columns) == ["id", "scenario", "value"]
 
     # Clean up
-    results.delete_record(table_name)
-    assert not results.check_exists(table_name)
+    results.delete_result(table_name)
+    assert not results.table_exists(table_name)
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
@@ -196,6 +196,7 @@ def test_network_scenarios(scenario_example, scenario):
     if other_scenarios:
         other_scenario = other_scenarios[0]
         scenario_example.use_scenario(other_scenario)
+        network = scenario_example.network
 
         links2 = network.links.data
         nodes2 = network.nodes.data
@@ -234,28 +235,28 @@ def test_scenario_result_isolation(scenario_example, scenario):
     table_name = f"isolation_test_{scenario}"
 
     # Create scenario-specific result
-    _ = results.new_record(
-        table_name,
+    _ = results.insert(
+        table_name=table_name,
         procedure="isolation_test",
         procedure_id=f"isolation_{scenario}",
         description=f"Testing isolation for {scenario}",
     )
-    assert results.check_exists(table_name)
+    assert results.get(table_name)
 
     # Switch to different scenario and verify isolation
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
         other_scenario = other_scenarios[0]
         scenario_example.use_scenario(other_scenario)
-        results.reload()
+        results = scenario_example.results
 
-        assert not results.check_exists(table_name)
+        assert not results.table_exists(table_name)
 
         scenario_example.use_scenario(scenario)
-        results.reload()
+        results = scenario_example.results
 
-        results.delete_record(table_name)
-        assert not results.check_exists(table_name)
+        results.delete_result(table_name)
+        assert not results.table_exists(table_name)
 
 
 @pytest.mark.parametrize("from_scenario", ["root", "nauru", "coquimbo"])
@@ -378,7 +379,7 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Add some data to root
     results = scenario_example.results
-    results.new_record("root_specific", "test", "test_id", description="Root only data")
+    results.insert(table_name="root_specific", procedure="test", procedure_id="test_id", description="Root only data")
 
     # Create empty scenario
     scenario_example.create_empty_scenario("isolated_empty", "Isolated test")
@@ -401,7 +402,7 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Modify clone data shouldn't affect root
     results = scenario_example.results
-    results.new_record("clone_specific", "test", "test_id", description="Clone only data")
+    results.insert(table_name="clone_specific", procedure="test", procedure_id="test_id", description="Clone only data")
 
     scenario_example.use_scenario("root")
     root_results = scenario_example.results.list()

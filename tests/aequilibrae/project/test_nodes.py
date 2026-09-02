@@ -1,8 +1,8 @@
 from random import randint, random
 
+import pytest
 import shapely.wkb
 from shapely.geometry import Point
-import pytest
 
 from aequilibrae.utils.db_utils import read_and_close
 
@@ -52,7 +52,7 @@ def test_fields(sioux_falls_example):
 
 def test_lonlat(sioux_falls_example):
     nodes = sioux_falls_example.network.nodes
-    coordinates = nodes.lonlat
+    coordinates = nodes.lonlat.set_index("node_id")
     node = nodes.get(coordinates.index[0])
     assert coordinates.loc[node.node_id, "lon"] == pytest.approx(node.geometry.x)
     assert coordinates.loc[node.node_id, "lat"] == pytest.approx(node.geometry.y)

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class _AequilibraEConnection(Connection):
-    """SQLite connection type used by AequilibraE connection factories."""
+    """SQLite connection type used by AequilibraEs NestedTransactionManager."""
 
     # FIXME: This is a big hack, in order to still allow the NestedTransactionManager to work with pandas we yield the
     # raw connection in the context manager, however, we can't stop pandas or anyone else from calling .commit and
@@ -93,9 +93,9 @@ class NestedTransactionManager:
         if self.__spatial:
             from aequilibrae.utils.spatialite_utils import connect_spatialite
 
-            connection = connect_spatialite(self.__path)
+            connection = connect_spatialite(self.__path, factory=_AequilibraEConnection)
         else:
-            connection = safe_connect(self.__path)
+            connection = safe_connect(self.__path, factory=_AequilibraEConnection)
 
         try:
             self.__configure(connection)
@@ -384,10 +384,10 @@ def list_tables_in_db(connection: Connection) -> list[str]:
     return sorted(row[0].lower() for row in connection.execute(sql).fetchall() if "idx_" not in row[0].lower())
 
 
-def safe_connect(filepath: PathLike[str] | str, missing_ok: bool = False) -> Connection:
+def safe_connect(filepath: PathLike[str] | str, missing_ok: bool = False, factory=Connection) -> Connection:
     """Open a non-spatial SQLite database without silently creating it."""
     if Path(filepath).exists() or missing_ok or str(filepath) == ":memory:":
-        connection = connect(filepath, factory=_AequilibraEConnection)
+        connection = connect(filepath, factory=factory)
         _enable_foreign_keys(connection)
         return connection
     raise FileNotFoundError(f"Attempting to open non-existent SQLite database: {filepath}")

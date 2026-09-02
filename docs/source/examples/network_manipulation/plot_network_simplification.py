@@ -20,14 +20,15 @@ We use Folium to visualize the resulting network.
 # %%
 
 # Imports
+from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
+
 import branca
 import folium
-from uuid import uuid4
-from tempfile import gettempdir
-from os.path import join
 
-from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
+from aequilibrae.utils.create_example import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_net_simplifier.png'
 
@@ -91,7 +92,6 @@ net = NetworkSimplifier(project)
 # and the output of this operation is
 
 net.simplify(graph)
-net.rebuild_network()
 
 # %%
 # Let's plot the previous and actual networks!
@@ -124,7 +124,6 @@ fig
 # Notice that this operation modifies the network in the neighborhood.
 
 net.collapse_links_into_nodes([903])
-net.rebuild_network()
 
 # %%
 # Let's plot the network once again and check the modifications!

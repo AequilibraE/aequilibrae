@@ -77,6 +77,9 @@ def guess_record_type(connection: NestedTransactionManager, table: str, record_n
         if column == "ogc_fid":
             continue
         record_fields.append((column, _python_type(column, declared_type, not required and not primary_key)))
+
+    if not record_fields:
+        raise RuntimeError(f"tried to guess a record type for '{table}' but didn't find a table")
     return make_dataclass(record_name, record_fields, frozen=True)
 
 

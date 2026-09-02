@@ -2,14 +2,13 @@ import logging
 import os
 import shutil
 import sqlite3
-from typing import Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List
 
 import pandas as pd
 
 if TYPE_CHECKING:
     from aequilibrae import Project
 
-from aequilibrae.utils.python_signal import PythonSignal
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
@@ -18,6 +17,7 @@ from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.python_signal import PythonSignal
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,6 @@ class Transit(WorkerThread):
         super().__init__(None)
 
         self.project: "Project" = project
-        self.periods: Periods = project.network.periods
-
-        self.create_transit_database()
 
     def get_table(self, table_name: str) -> pd.DataFrame:
         with self.project.transit_connection as conn:
@@ -87,13 +84,6 @@ class Transit(WorkerThread):
         gtfs.gtfs_data.signal: PythonSignal = self.transit
         return gtfs
 
-    def create_transit_database(self):
-        """Creates the public transport database"""
-        if not os.path.exists(self.project._transit_database_path):
-            shutil.copyfile(spatialite_database, self.project._transit_database_path)
-            with self.project.transit_connection as conn:
-                initialize_tables("transit", conn=conn)
-
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """
         Create a transit graph from an existing GTFS import.
@@ -103,7 +93,7 @@ class Transit(WorkerThread):
         A 'period_id' may be specified to select a time period. By default, a whole day is used. See
         'project.network.Periods' for more details.
         """
-        period_id: int = kwargs.pop("period_id", self.periods.default_period.period_id)
+        period_id: int = kwargs.pop("period_id", self.project.network.periods.default_period.period_id)
 
         graph = TransitGraphBuilder(self.project, period_id, **kwargs)
         graph.create_graph()

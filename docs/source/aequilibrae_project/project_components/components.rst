@@ -344,19 +344,19 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     # One can also check all the project matrices as a Pandas' DataFrame
     >>> matrices.list() # doctest: +SKIP
 
-    # We can add a naw matrix
-    >>> matrices.new_record() # doctest: +SKIP
+    # We can add a new matrix
+    >>> matrices.create(...) # doctest: +SKIP
     
     # To delete a matrix from the 'matrices' table, we can delete the record directly
-    >>> matrices.delete_record("demand_mc")
+    >>> matrices.delete_matrix("demand_mc")
     
     # or by selecting the matrix and deleting it
-    >>> mat_record = matrices.get_record("demand_mc") # doctest: +SKIP
-    >>> mat_record.delete() # doctest: +SKIP
+    >>> mat_record = matrices.get("demand_mc") # doctest: +SKIP
+    >>> matrices.delete_matrix(mat_record.name) # doctest: +SKIP
 
     # If you're unsure if you have a matrix in you project, you can check if it exists
     # This function will return `True` or `False`
-    >>> matrices.check_exists("my_matrix")
+    >>> matrices.file_exists("my_matrix")
     False
 
     # If a matrix was added or deleted by an external process, you should update or clean

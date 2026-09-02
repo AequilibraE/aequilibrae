@@ -32,11 +32,15 @@ class Scenario:
     log_handler: logging.StreamHandler
 
     def __init__(
-        self, name: str, base_path: pathlib.Path, path_to_file: pathlib.Path, log_handler: logging.StreamHandler
+        self,
+        name: str,
+        base_path: pathlib.Path,
+        log_handler: logging.StreamHandler,
+        project,
     ):
         self.name = name
         self.base_path = base_path
-        self.path_to_file = path_to_file
+        self.path_to_file = base_path / "project_database.sqlite"
         self.log_handler = log_handler
 
         results_path = self.base_path / "results_database.sqlite"
@@ -57,8 +61,11 @@ class Scenario:
         else:
             self._results = None
 
+        # FIXME: Hack for getting transit to work
+        self.__project = project
+
         if transit_path is not None:
-            self._transit = Transit(self)
+            self._transit = Transit(self.__project)
         else:
             self._transit = None
 
@@ -103,7 +110,7 @@ class Scenario:
         """Create and return the transit gateway when explicitly requested."""
         if self._transit is None:
             self.connections.create_transit_connection(self._transit_database_path)
-            self._transit = Transit(self)
+            self._transit = Transit(self.__project)
         return self._transit
 
     @property

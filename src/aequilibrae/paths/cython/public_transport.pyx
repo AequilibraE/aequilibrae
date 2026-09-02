@@ -443,13 +443,12 @@ class HyperpathGenerating:
             project = project or get_active_project()
 
         rep = {"setup": self.info()}
-        record = project.results.new_record(
+        record = project.results.create(
             table_name=table_name,
+            data=df,
             procedure="Hyperpath assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(rep),
             timestamp=self.procedure_date,
             description=self.description,
         )
-
-        record.set_data(df)

@@ -217,11 +217,14 @@ class Ipf:
 
         project = project or get_active_project()
         mats = project.matrices
-        record = mats.new_record(name, file_name, self.output)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Iterative Proportional fitting"
-        record.save()
+        record = mats.create(
+            name,
+            file_name,
+            self.output,
+            procedure="Iterative Proportional fitting",
+            procedure_id=self.procedure_id,
+            timestamp=self.procedure_date,
+        )
         return record
 
     def __tot_rows(self, matrix):

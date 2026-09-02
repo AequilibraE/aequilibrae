@@ -257,7 +257,7 @@ class Network(WorkerThread):
             **path** (:obj:`str`): Output folder path.
         """
 
-        gmns_exporter = GMNSExporter(self, path)
+        gmns_exporter = GMNSExporter(self.links, self.nodes, self.modes, path)
         gmns_exporter.doWork()
 
         logger.info("Network exported successfully")

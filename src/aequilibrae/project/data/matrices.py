@@ -33,7 +33,17 @@ class Matrices(NonSpatialProjectTable):
         super().__init__(connection)
         self.folder: Path = Path(matrices_path)
 
-    def create(self, name: str, file_name: str, matrix: AequilibraeMatrix | None = None) -> Any:
+    def create(
+        self,
+        name: str,
+        file_name: str,
+        matrix: AequilibraeMatrix | None = None,
+        *,
+        procedure: str | None = None,
+        procedure_id: str | None = None,
+        timestamp: str | None = None,
+        description: str | None = None,
+    ) -> Any:
         """
         Create matrix metadata and optionally export a matrix.
 
@@ -80,7 +90,15 @@ class Matrices(NonSpatialProjectTable):
             cores = self.__cores_on_disk(file_name)
 
         try:
-            self.insert(name=name, file_name=file_name, cores=cores)
+            self.insert(
+                name=name,
+                file_name=file_name,
+                cores=cores,
+                procedure=procedure,
+                procedure_id=procedure_id,
+                timestamp=timestamp,
+                description=description,
+            )
         except BaseException as primary:
             if created:
                 try:
@@ -109,8 +127,8 @@ class Matrices(NonSpatialProjectTable):
         :Arguments:
             **name** (:obj:`str`): Matrix name to delete.
         """
-        record = self.get(name)
-        path = self.folder / record.file_name
+        file_name = self.get(name, column="file_name")
+        path = self.folder / file_name
         tombstone = path.with_name(f".{path.name}.{uuid.uuid4().hex}.deleted")
         moved = False
         if path.exists():
@@ -137,9 +155,9 @@ class Matrices(NonSpatialProjectTable):
         :Returns:
             **matrix** (:obj:`AequilibraeMatrix`): Loaded matrix.
         """
-        record = self.get(name)
+        file_name = self.get(name, column="file_name")
         matrix = AequilibraeMatrix()
-        matrix.load(self.folder / record.file_name)
+        matrix.load(self.folder / file_name)
         return matrix
 
     def clear_database(self) -> None:
@@ -176,6 +194,9 @@ class Matrices(NonSpatialProjectTable):
             lambda file_name: "" if (self.folder / file_name).is_file() else "file missing"
         )
         return frame
+
+    def file_exists(self, name: str) -> bool:
+        return (self.folder / self.get(name, column="file_name")).is_file()
 
     def __cores_on_disk(self, file_name: str) -> int:
         matrix = AequilibraeMatrix()
