@@ -2,7 +2,6 @@ import pathlib
 import sqlite3
 from typing import Optional
 
-from aequilibrae import project
 from aequilibrae.log import logger
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 
