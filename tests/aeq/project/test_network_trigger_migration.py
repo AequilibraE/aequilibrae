@@ -2,7 +2,6 @@ import sqlite3
 
 import pytest
 
-
 ENDPOINT_GUARDS = {
     "aequilibrae_links_a_node_update",
     "aequilibrae_links_b_node_update",
@@ -78,7 +77,7 @@ def _assert_topology_and_spatial_indexes_are_consistent(conn):
 
 
 def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
-    """Test that migration 003 aligns geometry with topology and swaps legacy triggers for the new guards."""
+    """Test that migration 004 aligns geometry with topology and swaps legacy triggers for the new guards."""
     with sioux_falls_test.db_connection as conn:
         conn.execute(
             """
@@ -140,9 +139,9 @@ def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
             bad_a_node,
             bad_b_node,
         )
-        expected_node_rowid = conn.execute(
-            "SELECT ROWID FROM nodes WHERE node_id = ?", (original_a_node,)
-        ).fetchone()[0]
+        expected_node_rowid = conn.execute("SELECT ROWID FROM nodes WHERE node_id = ?", (original_a_node,)).fetchone()[
+            0
+        ]
         conn.execute("DELETE FROM idx_nodes_geometry WHERE pkid = ?", (expected_node_rowid,))
         assert conn.execute("SELECT CheckSpatialIndex('nodes', 'geometry')").fetchone() == (0,)
         node_geometries_before_upgrade = conn.execute(
@@ -153,7 +152,7 @@ def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
         sioux_falls_test.upgrade(ignore_transit=True, ignore_results=True)
 
     with sioux_falls_test.db_connection as conn:
-        assert conn.execute("SELECT status FROM migrations WHERE id = 3").fetchone() == ("APPLIED",)
+        assert conn.execute("SELECT status FROM migrations WHERE id = 4").fetchone() == ("APPLIED",)
 
         trigger_names = _trigger_names(conn)
         assert ENDPOINT_GUARDS <= trigger_names
@@ -212,15 +211,15 @@ def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
 
 
 def test_new_project_has_protected_schema_without_running_migration(empty_project):
-    """Test that a freshly created project already ships the endpoint guards and marks migration 003 as SKIPPED."""
+    """Test that a freshly created project already ships the endpoint guards and marks migration 004 as SKIPPED."""
     with empty_project.db_connection as conn:
-        assert conn.execute("SELECT status FROM migrations WHERE id = 3").fetchone() == ("SKIPPED",)
+        assert conn.execute("SELECT status FROM migrations WHERE id = 4").fetchone() == ("SKIPPED",)
         assert ENDPOINT_GUARDS <= _trigger_names(conn)
         _assert_topology_and_spatial_indexes_are_consistent(conn)
 
 
 def test_irreparable_legacy_endpoint_rolls_back_migration(sioux_falls_test):
-    """Test that an endpoint referencing a missing node aborts migration 003 and rolls the schema back untouched."""
+    """Test that an endpoint referencing a missing node aborts migration 004 and rolls the schema back untouched."""
     with sioux_falls_test.db_connection as conn:
         conn.execute("DROP TRIGGER dont_delete_node")
         missing_node = conn.execute("SELECT a_node FROM links ORDER BY link_id LIMIT 1").fetchone()[0]
@@ -232,6 +231,6 @@ def test_irreparable_legacy_endpoint_rolls_back_migration(sioux_falls_test):
             sioux_falls_test.upgrade(ignore_transit=True, ignore_results=True)
 
     with sioux_falls_test.db_connection as conn:
-        assert conn.execute("SELECT status FROM migrations WHERE id = 3").fetchone() == ("MISSING",)
+        assert conn.execute("SELECT status FROM migrations WHERE id = 4").fetchone() == ("MISSING",)
         assert _trigger_names(conn) == triggers_before_upgrade
         assert ENDPOINT_GUARDS.isdisjoint(_trigger_names(conn))
