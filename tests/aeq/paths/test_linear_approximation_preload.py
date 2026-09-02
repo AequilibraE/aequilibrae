@@ -158,6 +158,7 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
 def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
+    assignment.line_search = "trapezoidal"
     assignment.iter = 4
     assignment.rgap = np.inf
     assignment.current_direction = "bfw"
@@ -204,6 +205,7 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
 def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
+    assignment.line_search = "trapezoidal"
     assignment.iter = 5
     assignment.rgap = np.inf
     assignment.current_direction = "fw"
@@ -237,6 +239,7 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
 def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
+    assignment.line_search = "trapezoidal"
     assignment.iter = 4
     assignment.rgap = np.inf
     assignment.current_direction = "bfw"
@@ -281,6 +284,7 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
 def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
+    assignment.line_search = "trapezoidal"
     assignment.iter = 4
     assignment.rgap = np.inf
     assignment.current_direction = "bfw"

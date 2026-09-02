@@ -246,6 +246,15 @@ class TrafficAssignment(AssignmentBase):
 
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
+    all_line_searches = ["exact", "trapezoidal"]
+
+    # Attributes that only need a type check, as {name: (expected type, description used in the error)}.
+    __plain_type_attributes = {
+        "time_field": (str, "string"),
+        "capacity_field": (str, "string"),
+        "cores": (int, "integer"),
+        "save_path_files": (bool, "boolean"),
+    }
 
     def __init__(self, project=None) -> None:
         """"""
@@ -268,6 +277,10 @@ class TrafficAssignment(AssignmentBase):
         self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
+
+        # Line search used by CFW and BFW. "trapezoidal" preserves the historical AequilibraE behaviour; see
+        # set_line_search for the trade-off.
+        self.line_search = "trapezoidal"  # type: str
 
         self._config = {}
 
@@ -311,14 +324,23 @@ class TrafficAssignment(AssignmentBase):
         elif instance == "vdf_parameters":
             if not self.__validate_parameters(value):
                 return False, value, f"Parameter set is not valid: {value} "
-        elif instance in ["time_field", "capacity_field"] and not isinstance(value, str):
-            return False, value, f"Value for {instance} is not string"
-        elif instance == "cores" and not isinstance(value, int):
-            return False, value, f"Value for {instance} is not integer"
-        elif instance == "save_path_files" and not isinstance(value, bool):
-            return False, value, f"Value for {instance} is not boolean"
+        elif instance == "line_search":
+            return self.__check_line_search(value)
+        elif instance in self.__plain_type_attributes:
+            expected, description = self.__plain_type_attributes[instance]
+            if not isinstance(value, expected):
+                return False, value, f"Value for {instance} is not {description}"
         if instance not in self.__dict__:
             return False, value, f"TrafficAssignment class does not have property {instance}"
+        return True, value, ""
+
+    def __check_line_search(self, value):
+        """Validates the line search and pushes it onto an algorithm that may already have been instantiated."""
+        if not isinstance(value, str) or value.lower() not in self.all_line_searches:
+            return False, value, f"Line search must be one of: {', '.join(self.all_line_searches)}"
+        value = value.lower()
+        if isinstance(self.assignment, LinearApproximation):
+            self.assignment.line_search = value
         return True, value, ""
 
     def set_vdf(self, vdf_function: str) -> None:
@@ -384,9 +406,32 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
+        self.assignment.line_search = self.line_search
         self._config["Algorithm"] = algo
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
+        self._config["Line search"] = self.line_search
+
+    def set_line_search(self, line_search: str) -> None:
+        """
+        Chooses the line search used to pick the step size for CFW and BFW. Ignored by the other algorithms:
+        MSA uses ``1/iteration`` and Frank-Wolfe always uses the exact line search.
+
+        * ``"exact"`` - root-find the exact directional derivative of the Beckmann objective,
+          ``sum_a c_a(x + alpha*d)*d_a = 0``, over ``[0, 1]``. This is the line search assumed by the
+          conjugate-direction theory in Mitradjieva & Lindberg, and the step is not capped.
+
+        * ``"trapezoidal"`` (default) - minimize a one-panel trapezoidal approximation of the objective change,
+          additionally capping BFW at ``1/sqrt(iteration)``. The approximation is exact only for affine link costs;
+          for convex costs it overestimates the integral and therefore returns shorter steps than the true
+          minimizer. This is a numerical heuristic, not the line search in the source algorithm, and is the
+          default only because it is the historical AequilibraE behaviour.
+
+        :Arguments:
+            **line_search** (:obj:`str`): One of ``"exact"`` or ``"trapezoidal"``
+        """
+        self.line_search = line_search
+        self._config["Line search"] = self.line_search
 
     def set_vdf_parameters(self, par: dict) -> None:
         """
