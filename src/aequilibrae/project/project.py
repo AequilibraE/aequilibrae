@@ -183,7 +183,6 @@ class Project:
 
         self.activate()
 
-        self.about.create()
         logger.info(f"Created project on {base_path}")
 
     def close(self) -> None:

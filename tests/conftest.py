@@ -172,10 +172,10 @@ def cached_scenario_example(cache_path):
         conn.executemany("INSERT INTO scenarios (scenario_name) VALUES (?)", [("nauru",), ("coquimbo",)])
 
     with nauru.db_connection as conn:
-        conn.execute("DELETE FROM scenarios")
+        conn.execute("DROP TABLE IF EXISTS scenarios")
 
     with coquimbo.db_connection as conn:
-        conn.execute("DELETE FROM scenarios")
+        conn.execute("DROP TABLE IF EXISTS scenarios")
 
     shutil.rmtree(nauru.project_base_path / "run")
     shutil.rmtree(coquimbo.project_base_path / "run")
