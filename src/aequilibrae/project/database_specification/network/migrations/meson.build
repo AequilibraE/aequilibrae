@@ -4,8 +4,9 @@ pyfiles = [
     '000_initial_migration.py',
     '001_add_cols_to_results.py',
     '002_add_scenario_table.py',
-    '003_protect_link_end_nodes.py',
-    '004_fix_default_period_delete_trigger.py',
+    '003_add_periods_table.py',
+    '004_protect_link_end_nodes.py',
+    '005_fix_default_period_delete_trigger.py',
     'migrations.py',
 ]
 
