@@ -230,11 +230,11 @@ class Project:
         """
         Find and apply all applicable migrations.
 
-        All database upgrades are applied within a single transaction.
+        Each database upgrade is applied within a single transaction.
 
         Optionally ignore specific databases. This is useful when a database is known to be incompatible with some
         migrations but you'd still like to upgrade the others. Take care when ignoring a database. For a particular
-        version of aequilibrae, it is assumed that all migrations have been applied successfully or the project was
+        version of AequilibraE, it is assumed that all migrations have been applied successfully or the project was
         created with the latest schema, skipping/ignoring migrations will likely lead to issues/broken assumptions.
 
         If skipping a specific migration is required, use the ``aequilibrae.project.tools.MigrationManager`` object
@@ -248,26 +248,19 @@ class Project:
             **ignore_results** (:obj:`bool`, optional): Ignore the results database. No direct migrations will be
                   applied. Defaults to False.
         """
+
         logger.info("Starting database upgrades")
-        if ignore_project or ignore_transit or ignore_results:
+        if any((ignore_project, ignore_transit, ignore_results)):
             warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
 
-        transit_path = self._transit_database_path if self._transit_database_path.exists() else None
-        results_path = self._results_database_path if self._results_database_path.exists() else None
-        closure = ConnectionClosure(self._project_database_path, results_path=results_path, transit_path=transit_path)
-        try:
-            if ignore_project:
-                logger.warning("Ignoring project database during upgrade")
-            else:
-                MigrationManager(MigrationManager.network_migration_file).upgrade(closure)
-
-            if ignore_transit or not closure.has_transit_connection:
-                logger.warning("Ignoring transit database during upgrade")
-            else:
-                MigrationManager(MigrationManager.transit_migration_file).upgrade(closure)
-            logger.info("Completed database upgrades")
-        finally:
-            closure.close()
+        project_path = self._project_database_path if not ignore_project else None
+        transit_path = (
+            self._transit_database_path if self._transit_database_path.exists() and not ignore_transit else None
+        )
+        results_path = (
+            self._results_database_path if self._results_database_path.exists() and not ignore_results else None
+        )
+        _upgrade(project_path=project_path, results_path=results_path, transit_path=transit_path)
 
     @property
     def project_parameters(self) -> Parameters:
@@ -466,3 +459,24 @@ class Project:
                 )
         finally:
             self.use_scenario(current_scenario)
+
+
+def _upgrade(
+    project_path: Path | None = None,
+    transit_path: Path | None = None,
+    results_path: Path | None = None,
+):
+    closure = ConnectionClosure(db_path=project_path, results_path=results_path, transit_path=transit_path)
+    try:
+        if not closure.has_db_connection:
+            logger.warning("Ignoring project database during upgrade")
+        else:
+            MigrationManager(MigrationManager.network_migration_file).upgrade(closure)
+
+        if not closure.has_transit_connection:
+            logger.warning("Ignoring transit database during upgrade")
+        else:
+            MigrationManager(MigrationManager.transit_migration_file).upgrade(closure)
+        logger.info("Completed database upgrades")
+    finally:
+        closure.close()

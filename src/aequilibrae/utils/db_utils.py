@@ -247,21 +247,25 @@ class ConnectionClosure:
 
     def __init__(
         self,
-        db_path: PathLike[str] | str,
+        db_path: PathLike[str] | str | None = None,
         results_path: PathLike[str] | str | None = None,
         transit_path: PathLike[str] | str | None = None,
         *,
         open_close: bool = False,
     ) -> None:
         paths = (db_path, results_path, transit_path)
+
         present_paths = tuple(path for path in paths if path is not None)
         if not all(isinstance(path, (str, PathLike)) for path in present_paths):
             raise TypeError("database slots must be paths or None")
 
         managers: list[NestedTransactionManager] = []
         try:
-            self.__db_connection = NestedTransactionManager(db_path, spatial=True, open_close=open_close)
-            managers.append(self.__db_connection)
+            self.__db_connection = (
+                NestedTransactionManager(db_path, spatial=True, open_close=open_close) if db_path is not None else None
+            )
+            if self.__db_connection is not None:
+                managers.append(self.__db_connection)
 
             self.__results_connection = (
                 NestedTransactionManager(results_path, spatial=False, open_close=open_close)
@@ -287,6 +291,8 @@ class ConnectionClosure:
     @property
     def db_connection(self) -> NestedTransactionManager:
         """The required project-database transaction manager."""
+        if self.__db_connection is None:
+            raise RuntimeError("This scenario has no project database")
         return self.__db_connection
 
     @property
@@ -341,6 +347,11 @@ class ConnectionClosure:
             path.unlink(missing_ok=True)
             raise
         return self.__transit_connection
+
+    @property
+    def has_db_connection(self) -> bool:
+        """Whether a project database is owned."""
+        return self.__db_connection is not None
 
     @property
     def has_results_connection(self) -> bool:
