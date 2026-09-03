@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from aequilibrae.paths import TrafficClass
@@ -25,12 +26,25 @@ def test_set_pce(tc):
         tc.set_pce("not a number")
     tc.set_pce(1)
     tc.set_pce(3.9)
+    assert tc.pce == 3.9
+
+
+@pytest.mark.parametrize("pce", [0, -1, np.nan, np.inf, -np.inf, True, False])
+def test_set_pce_rejects_nonpositive_and_nonfinite_values(tc, pce):
+    with pytest.raises(ValueError, match="positive finite"):
+        tc.set_pce(pce)
 
 
 def test_set_vot(tc):
     assert tc.vot == 1.0
     tc.set_vot(4.5)
     assert tc.vot == 4.5
+
+
+@pytest.mark.parametrize("vot", [0, -1, np.nan, np.inf, -np.inf, True, False, "not a number"])
+def test_set_vot_rejects_nonpositive_and_nonfinite_values(tc, vot):
+    with pytest.raises(ValueError, match="positive finite"):
+        tc.set_vot(vot)
 
 
 def test_set_fixed_cost(tc):
