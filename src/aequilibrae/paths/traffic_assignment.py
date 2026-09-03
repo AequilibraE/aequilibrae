@@ -253,6 +253,23 @@ class TrafficAssignment(AssignmentBase):
 
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
+    all_line_searches = ["exact", "trapezoidal"]
+    all_bfw_conjugacies = ["approximate", "exact"]
+
+    # Attributes restricted to a fixed set of strings, as {name: (allowed values, description for the error)}.
+    __choice_attributes = {
+        "line_search": (all_line_searches, "Line search"),
+        "bfw_conjugacy": (all_bfw_conjugacies, "BFW conjugacy"),
+    }
+
+    # Attributes that only need a type check, as {name: (expected type, description used in the error)}.
+    __plain_type_attributes = {
+        "time_field": (str, "string"),
+        "capacity_field": (str, "string"),
+        "cores": (int, "integer"),
+        "elementwise_cores": (int, "integer"),
+        "save_path_files": (bool, "boolean"),
+    }
 
     def __init__(self, project=None) -> None:
         """"""
@@ -275,6 +292,13 @@ class TrafficAssignment(AssignmentBase):
         self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
+
+        # Line search used by CFW and BFW. "trapezoidal" preserves the historical AequilibraE behaviour; see
+        # set_line_search for the trade-off.
+        self.line_search = "trapezoidal"  # type: str
+
+        # How BFW solves for its direction coefficients. "approximate" preserves the historical behaviour.
+        self.bfw_conjugacy = "approximate"  # type: str
 
         self._config = {}
 
@@ -318,14 +342,24 @@ class TrafficAssignment(AssignmentBase):
         elif instance == "vdf_parameters":
             if not self.__validate_parameters(value):
                 return False, value, f"Parameter set is not valid: {value} "
-        elif instance in ["time_field", "capacity_field"] and not isinstance(value, str):
-            return False, value, f"Value for {instance} is not string"
-        elif instance in ("cores", "elementwise_cores") and not isinstance(value, int):
-            return False, value, f"Value for {instance} is not integer"
-        elif instance == "save_path_files" and not isinstance(value, bool):
-            return False, value, f"Value for {instance} is not boolean"
+        elif instance in self.__choice_attributes:
+            allowed, description = self.__choice_attributes[instance]
+            return self.__check_choice(instance, value, allowed, description)
+        elif instance in self.__plain_type_attributes:
+            expected, description = self.__plain_type_attributes[instance]
+            if not isinstance(value, expected):
+                return False, value, f"Value for {instance} is not {description}"
         if instance not in self.__dict__:
             return False, value, f"TrafficAssignment class does not have property {instance}"
+        return True, value, ""
+
+    def __check_choice(self, instance, value, allowed, description):
+        """Validates a string-valued choice and pushes it onto an algorithm that may already be instantiated."""
+        if not isinstance(value, str) or value.lower() not in allowed:
+            return False, value, f"{description} must be one of: {', '.join(allowed)}"
+        value = value.lower()
+        if isinstance(self.assignment, LinearApproximation):
+            setattr(self.assignment, instance, value)
         return True, value, ""
 
     def set_vdf(self, vdf_function: str) -> None:
@@ -391,9 +425,60 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
+        self.assignment.line_search = self.line_search
+        self.assignment.bfw_conjugacy = self.bfw_conjugacy
         self._config["Algorithm"] = algo
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
+        self._config["Line search"] = self.line_search
+        self._config["BFW conjugacy"] = self.bfw_conjugacy
+
+    def set_line_search(self, line_search: str) -> None:
+        """
+        Chooses the line search used to pick the step size for CFW and BFW. Ignored by the other algorithms:
+        MSA uses ``1/iteration`` and Frank-Wolfe always uses the exact line search.
+
+        * ``"exact"`` - root-find the exact directional derivative of the Beckmann objective,
+          ``sum_a c_a(x + alpha*d)*d_a = 0``, over ``[0, 1]``. This is the line search assumed by the
+          conjugate-direction theory in Mitradjieva & Lindberg, and the step is not capped.
+
+        * ``"trapezoidal"`` (default) - minimize a one-panel trapezoidal approximation of the objective change,
+          additionally capping BFW at ``1/sqrt(iteration)``. The approximation is exact only for affine link costs;
+          for convex costs it overestimates the integral and therefore returns shorter steps than the true
+          minimizer. This is a numerical heuristic, not the line search in the source algorithm, and is the
+          default only because it is the historical AequilibraE behaviour.
+
+        :Arguments:
+            **line_search** (:obj:`str`): One of ``"exact"`` or ``"trapezoidal"``
+        """
+        self.line_search = line_search
+        self._config["Line search"] = self.line_search
+
+    def set_bfw_conjugacy(self, bfw_conjugacy: str) -> None:
+        """
+        Chooses how BFW solves for its direction coefficients. Ignored by every other algorithm.
+
+        * ``"approximate"`` (default) - appendix A of Mitradjieva & Lindberg, which assumes the two previous
+          directions are already conjugate with respect to the *current* Hessian. They were made conjugate with
+          respect to the previous one, so the assumption holds only in the limit; the paper notes BFW is
+          therefore "correct only in the limit".
+
+        * ``"exact"`` - solve both conjugacy conditions jointly as a 2x2 system, keeping the cross term the
+          appendix drops. Costs two extra Hessian contractions per iteration, which is negligible next to the
+          shortest-path build. The system is singular when the two previous directions are H-parallel, in which
+          case the iteration restarts from Frank-Wolfe.
+
+        Either way, negative coefficients are clamped to zero to keep the weights on the simplex, and that
+        clamping breaks strict biconjugacy whenever it triggers.
+
+        When the algorithm is BFW the convergence report gains ``conjugacy_prev``, ``conjugacy_prev2`` and
+        ``hessian_drift`` columns to compare the two variants; see ``LinearApproximation``.
+
+        :Arguments:
+            **bfw_conjugacy** (:obj:`str`): One of ``"approximate"`` or ``"exact"``
+        """
+        self.bfw_conjugacy = bfw_conjugacy
+        self._config["BFW conjugacy"] = self.bfw_conjugacy
 
     def set_vdf_parameters(self, par: dict) -> None:
         """

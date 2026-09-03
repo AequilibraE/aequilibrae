@@ -69,12 +69,12 @@ iteration of all-or-nothing assignment, as shown in the table below
 | Frank-Wolfe                   | All-or-Nothing        | Optimal value derived from       |
 |                               | Assignment (AoN)      | Wardrop's principle              |
 +-------------------------------+-----------------------+----------------------------------+
-| Biconjugate Frank-Wolfe       | Biconjugate direction | Optimal value derived from       |
-|                               | (Current and two      | Wardrop's principle              |
+| Biconjugate Frank-Wolfe       | Biconjugate direction | Heuristic bounded trapezoidal    |
+|                               | (Current and two      | line search                      |
 |                               | previous AoN)         |                                  |
 +-------------------------------+-----------------------+----------------------------------+
-| Conjugate Frank-Wolfe         | Conjugate direction   | Optimal value derived from       |
-|                               | (Current and          | Wardrop's principle              |
+| Conjugate Frank-Wolfe         | Conjugate direction   | Heuristic bounded trapezoidal    |
+|                               | (Current and          | line search                      |
 |                               | previous AoN)         |                                  |
 +-------------------------------+-----------------------+----------------------------------+
 
@@ -121,8 +121,11 @@ it for those looking to implement their own variations of this algorithm or to s
 purposes.
 
 * The relative gap is computed with the cost used to compute the All-or-Nothing portion of the iteration, 
-  and although the literature on this is obvious, we took some time to realize that we should re-compute the 
-  travel costs only **AFTER** checking for convergence.
+  using the accepted flow at that same iterate. Travel costs are recomputed only **AFTER** checking for convergence.
+
+* CFW and BFW use a heuristic one-panel trapezoidal approximation to the Beckmann objective change. BFW also
+  caps the step at ``1/sqrt(iteration)`` to stabilize its approximate coefficient recursion. These choices are numerical
+  heuristics rather than the exact line search in the original algorithms.
 
 * In some instances, Frank-Wolfe is extremely unstable during the first iterations on assignment, resulting on 
   numerical errors on our line search. We found that setting the step size to the corresponding MSA value 
