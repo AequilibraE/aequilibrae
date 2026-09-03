@@ -6,6 +6,8 @@ import zipfile
 from pathlib import Path
 
 from aequilibrae.project.project import _upgrade
+from aequilibrae.project.project_creation import remove_triggers
+from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.logging_utils import basic_config
 
 ROOT_PATH = Path(__file__).resolve().parent.parent
@@ -23,6 +25,11 @@ def upgrade_project(project_path: Path) -> None:
     transit_path = transit_database_path if transit_database_path.exists() else None
     results_path = results_database_path if results_database_path.exists() else None
     _upgrade(project_path=db_path, results_path=results_path, transit_path=transit_path)
+
+    if project_path.stem == "no_triggers_project":
+        with commit_and_close(db_path, spatial=True) as conn:
+            remove_triggers(conn, "network")
+        print("Removed triggers from no_triggers_project")
 
 
 def upgrade_archive(archive_path: Path) -> None:

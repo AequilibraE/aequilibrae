@@ -16,6 +16,8 @@ def migrate(
     results_conn: Optional[sqlite3.Connection] = None,
 ):
     logger.info("Beginning migration to add period table to the main project_database.sqlite")
+    if project_conn is None:
+        raise RuntimeError("Network migration 003 requires a project_conn connection")
     if project_conn.execute("PRAGMA table_info(periods)").fetchone() is None:
         logger.info("Table does not exist, adding")
         schema = pathlib.Path(__file__).parent.parent / "tables" / "periods.sql"
