@@ -95,12 +95,6 @@ def coquimbo_example(cached_coquimbo_example, cache_path, tmp_path) -> Project:
 @pytest.fixture(scope="function")
 def build_gtfs_project(cached_coquimbo_example, cache_path, tmp_path) -> Project:
     project = cached_model("coquimbo", cache_path, tmp_path)
-    project.close()
-
-    (tmp_path / "public_transport.sqlite").unlink(True)
-
-    project = Project.from_path(tmp_path)
-    project.scenario.create_transit_database()
     yield Transit(project)
     project.close()
 

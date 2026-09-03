@@ -438,11 +438,11 @@ class GMNSBuilder:
                 else:
                     char = unused_chars.pop()
 
-                new_mode = self.modes.new(char)
-                new_mode.mode_name = m
-                new_mode.description = f"GMNS use groups: {', '.join(resolved_use_groups[m])}"
-                self.modes.add(new_mode)
-                new_mode.save()
+                self.modes.insert(
+                    mode_id=char,
+                    mode_name=m,
+                    description=f"GMNS use groups: {', '.join(resolved_use_groups[m])}",
+                )
 
                 modes[m] = char
 

@@ -37,7 +37,6 @@ class Transit(WorkerThread):
     }
     default_pces: dict[int | str, int | float] = {0: 5.0, 1: 5.0, 3: 4.0, 5: 4.0, 11: 3.0, "other": 2.0}
     graphs: Dict[int, TransitGraphBuilder] = {}
-    pt_con: sqlite3.Connection
 
     def __init__(self, project: "Project"):
         """

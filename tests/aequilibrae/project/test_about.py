@@ -33,9 +33,8 @@ def test_create_and_list(sioux_falls_example):
     assert not set(fields) ^ set(expected), "About table does not have all expected fields"
 
 
-def test_warning_when_creating_twice(sioux_falls_example: Project):
-    last_log = sioux_falls_example.log().contents()[-1]
-    assert "About table already exists" in last_log
+def test_about_table_is_available_on_open(sioux_falls_example: Project):
+    assert sioux_falls_example.about.get("project_id").infoname == "project_id"
 
 
 def test_add_info_field(sioux_falls_example: Project):

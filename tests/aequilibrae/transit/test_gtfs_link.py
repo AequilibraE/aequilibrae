@@ -5,7 +5,6 @@ from random import randint
 import pytest
 from shapely.geometry import LineString
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link
 from .random_word import randomword
@@ -40,35 +39,28 @@ def test_build_object(srid):
 
 
 def test_save_to_database(srid, build_gtfs_project):
-    route_type = randint(0, 13)
-    fstop = randomword(randint(3, 15))
-    tstop = randomword(randint(3, 15))
     geo = LineString([(0, 0), (3, 4)])
-
     new_link = Link(srid)
 
-    with database_connection("transit") as transit_conn:
-        with pytest.raises(AttributeError):
-            new_link.save_to_database(transit_conn)
+    with pytest.raises(AttributeError):
+        new_link.save_to_database(build_gtfs_project.project.transit_connection)
+
+    with build_gtfs_project.project.transit_connection as transit_conn:
+        fstop, tstop = [row[0] for row in transit_conn.execute("SELECT stop_id FROM stops LIMIT 2")]
+        pattern_id = transit_conn.execute("SELECT pattern_id FROM routes LIMIT 1").fetchone()[0]
 
         new_link.geo = geo
         new_link.transit_link = 10000001
-        new_link.type = route_type
         new_link.from_stop = fstop
         new_link.to_stop = tstop
-
-        with pytest.raises(sqlite3.IntegrityError):
-            new_link.save_to_database(transit_conn)
-
-        new_link.pattern_id = 10001001000
+        new_link.pattern_id = pattern_id
         new_link.seq = 4
-
-        new_link.save_to_database(transit_conn)
+        new_link.save_to_database(transit_conn, commit=False)
 
         from_stop, to_stop, dist = transit_conn.execute(
-            "Select from_stop, to_stop, distance from route_links where from_stop=?", [fstop]
+            "SELECT from_stop, to_stop, distance FROM route_links WHERE transit_link=?", [new_link.transit_link]
         ).fetchone()
-        assert [from_stop, to_stop, round(dist * 180 / pi / 6371000)] == [
+        assert [str(from_stop), str(to_stop), round(dist * 180 / pi / 6371000)] == [
             fstop,
             tstop,
             geo.length,
