@@ -443,7 +443,7 @@ class HyperpathGenerating:
             project = project or get_active_project()
 
         rep = {"setup": self.info()}
-        record = project.results.create(
+        project.results.create(
             table_name=table_name,
             data=df,
             procedure="Hyperpath assignment",
