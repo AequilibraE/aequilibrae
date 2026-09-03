@@ -12,8 +12,7 @@ def _add_route_link_parents(conn):
         (_PATTERN_ID, 1, "test route", 1, 0),
     )
     conn.executemany(
-        "INSERT INTO stops (stop_id, stop, agency_id, route_type, geometry) "
-        "VALUES (?, ?, ?, ?, GeomFromWKB(?, 4326))",
+        "INSERT INTO stops (stop_id, stop, agency_id, route_type, geometry) VALUES (?, ?, ?, ?, GeomFromWKB(?, 4326))",
         (("5", "5", 1, 0, Point(0, 0).wkb), ("6", "6", 1, 0, Point(1, 1).wkb)),
     )
 
