@@ -268,6 +268,8 @@ class ConnectionClosure:
         if not all(isinstance(path, (str, PathLike)) for path in present_paths):
             raise TypeError("database slots must be paths or None")
 
+        self.__in_collective_transaction = False
+
         managers: list[NestedTransactionManager] = []
         try:
             self.__db_connection = (
@@ -320,7 +322,9 @@ class ConnectionClosure:
 
     def create_results_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:
         """Create and begin owning an empty results database."""
-        if self.__results_connection is not None:
+        if self.__in_collective_transaction:
+            raise RuntimeError("cannot create connection while in collective transaction")
+        elif self.__results_connection is not None:
             raise RuntimeError("This scenario already has a results database")
 
         path = Path(path)
@@ -336,7 +340,9 @@ class ConnectionClosure:
 
     def create_transit_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:
         """Create, initialise, and begin owning a transit database."""
-        if self.__transit_connection is not None:
+        if self.__in_collective_transaction:
+            raise RuntimeError("cannot create connection while in collective transaction")
+        elif self.__transit_connection is not None:
             raise RuntimeError("This scenario already has a transit database")
 
         from aequilibrae.project.project_creation import initialize_tables
@@ -375,13 +381,18 @@ class ConnectionClosure:
     @contextlib.contextmanager
     def transaction(self) -> Generator[None, None, None]:
         """Enter transaction contexts for every existing database connection."""
-        with contextlib.ExitStack() as stack:
-            stack.enter_context(self.__db_connection.transaction())
-            if self.__results_connection is not None:
-                stack.enter_context(self.__results_connection.transaction())
-            if self.__transit_connection is not None:
-                stack.enter_context(self.__transit_connection.transaction())
-            yield
+        self.__in_collective_transaction = True
+        try:
+            with contextlib.ExitStack() as stack:
+                if self.__db_connection is not None:
+                    stack.enter_context(self.__db_connection.transaction())
+                if self.__results_connection is not None:
+                    stack.enter_context(self.__results_connection.transaction())
+                if self.__transit_connection is not None:
+                    stack.enter_context(self.__transit_connection.transaction())
+                yield
+        finally:
+            self.__in_collective_transaction = False
 
     def close(self) -> None:
         """Close every owned connection."""

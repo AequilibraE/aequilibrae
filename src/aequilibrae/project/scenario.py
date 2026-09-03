@@ -2,7 +2,6 @@ import logging
 import pathlib
 from contextlib import AbstractContextManager
 
-
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
@@ -100,7 +99,8 @@ class Scenario:
         try:
             return self.connections.results_connection
         except RuntimeError:
-            return self.connections.create_results_connection(self._results_database_path)
+            self.connections.create_results_connection(self._results_database_path)
+            return self.connections.results_connection
 
     def transaction(self) -> AbstractContextManager[None]:
         return self.connections.transaction()

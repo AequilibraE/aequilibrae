@@ -131,6 +131,10 @@ class Project:
     def _transit_database_path(self) -> Path:
         return self.project_base_path / "public_transport.sqlite"
 
+    def transaction(self):
+        """Enter transaction contexts for every existing database connection."""
+        return self.scenario.connections.transaction()
+
     @property
     def db_connection(self) -> NestedTransactionManager:
         return self.scenario.db_connection
@@ -447,6 +451,10 @@ class Project:
                 )
         finally:
             self.use_scenario(current_scenario)
+
+    def __repr__(self):
+        cls = self.__class__
+        return f"<{cls.__module__}.{cls.__qualname__} object at {hex(id(self))}, {self.project_base_path}>"
 
 
 def _upgrade(
