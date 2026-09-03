@@ -59,10 +59,10 @@ def test_cannot_create_db_during_project_wide_transaction(empty_project):
     with empty_project.transaction():
         with pytest.raises(RuntimeError, match="cannot create connection while in collective transaction"):
             # Property access triggers creation
-            empty_project.results_connection
+            _ = empty_project.results_connection
 
         with pytest.raises(RuntimeError, match="cannot create connection while in collective transaction"):
             empty_project.scenario.create_transit_database()
 
-    empty_project.results_connection
+    _ = empty_project.results_connection
     empty_project.scenario.create_transit_database()
