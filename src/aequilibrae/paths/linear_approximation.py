@@ -442,7 +442,7 @@ class LinearApproximation(WorkerThread):
         self.conjugacy_prev = cosine(np.sum(self.vdf_der * z_ * direction), zz, dd)
         self.conjugacy_prev2 = cosine(np.sum(self.vdf_der * x_ * direction), xx, dd)
         self.hessian_drift = cosine(np.sum(self.vdf_der * x_ * z_), xx, zz)
-        self.logger.debug(
+        logger.debug(
             f"BFW[{self.bfw_conjugacy}] iter={self.iter} mu={mu:.6e} nu={nu:.6e} "
             f"betas=({self.betas[0]:.6e},{self.betas[1]:.6e},{self.betas[2]:.6e}) "
             f"conjugacy_prev={self.conjugacy_prev:.3e} conjugacy_prev2={self.conjugacy_prev2:.3e} "
@@ -455,7 +455,7 @@ class LinearApproximation(WorkerThread):
         self.current_direction = "fw"
         if self.algorithm == "bfw":
             self.next_direction = "cfw"
-        self.logger.debug(message)
+        logger.debug(message)
         self.iteration_issue.append(message)
 
     def _apply_assigned_flow(self, link_flows):
@@ -494,7 +494,7 @@ class LinearApproximation(WorkerThread):
             keys = ("conjugacy_prev", "conjugacy_prev2", "hessian_drift", "bfw_clamped")
             for key, value in zip(keys, diagnostics, strict=True):
                 self.convergence_report[key].append(np.nan if terminal else value)
-        self.logger.info(f"{self.iter},{self.rgap},{'nan' if terminal else self.stepsize}")
+        logger.info(f"{self.iter},{self.rgap},{'nan' if terminal else self.stepsize}")
 
     def __calculate_step_direction(self):  # noqa: C901
         """Calculates step direction depending on the method"""
