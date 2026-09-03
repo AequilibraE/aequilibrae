@@ -183,7 +183,8 @@ of zones and over 100 iterations of assignment.
 
   >>> assig.execute()
   >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
-  >>> assig.save_skims("another_matrix_name")
+  >>> assig.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
+  MatrixRecord(name='another_matrix_name_car', file_name='another_matrix_name_car.omx', ...)
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment
 cost from the last iteration of the assignment by default. These matrices are named *__congested_time__*
@@ -230,7 +231,7 @@ To create a preload for public transport vehicles operating between 8 AM to 10 A
     >>> from aequilibrae.transit import Transit
 
     # Times are specified in seconds from midnight
-    >>> transit = Transit(project)
+    >>> transit = project.scenario.create_transit_database()
     >>> preload = transit.build_pt_preload(start=8*3600, end=10*3600)
 
     # Add the preload to the assignment

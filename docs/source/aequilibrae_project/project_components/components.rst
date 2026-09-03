@@ -22,39 +22,21 @@ Each item in the 'links' table is a ``Link`` object.
     # Let's add a new field to our 'links' table
     >>> project_links.fields.add("my_field", "This is an example", "TEXT")
     
-    # To save this modification, we must refresh the table
-    >>> project_links.refresh_fields()
-
     # Let's add a new link to our project 
-    >>> new_link = project_links.new()
-    >>> new_link.geometry = LineString([(-71.304754, -29.955233), (-71.304863, -29.954049)])
-    >>> new_link.modes = "bctw"
+    >>> new_link = project_links.insert(modes="bctw", geometry=LineString([(-71.304754, -29.955233), (-71.304863, -29.954049)]))
     
-    # To add a new link, it must be explicitly saved
-    >>> new_link.save()
-
     # The 'links' table has three fields which cannot be empty (i.e. with `NULL` values):
     # `link_id`, `direction`, and `modes`. When we create a node, `new` automatically
     # creates a `link_id`, and sets the default value (0) for direction. Thus, the modes
     # information should be added, otherwise, it will raise an error.
 
-    # To delete one link from the project, you can use one of the following
-    >>> other_link = project_links.get(21332)
-    >>> other_link.delete()
-    
-    # or
-    >>> project_links.delete(21337)
+    # To delete one link from the project, you can use the following
+    >>> project_links.delete(21332)
 
     # The `copy_link` function creates a copy of a specified link
     # It is very helpful case you want to split a link. 
     # You can check out in one of the usage examples.
     >>> link_copy = project_links.copy_link(10972)
-
-    # Don't forget to save the modifications to the links layer
-    >>> project_links.save()
-
-    # And refresh the links in memory for usage
-    >>> project_links.refresh()
 
 .. admonition:: References
 
