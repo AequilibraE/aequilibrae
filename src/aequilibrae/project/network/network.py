@@ -28,7 +28,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 if TYPE_CHECKING:
-    from aequilibrae.project import Project
+    pass
 
 logger = logging.getLogger(__name__)
 

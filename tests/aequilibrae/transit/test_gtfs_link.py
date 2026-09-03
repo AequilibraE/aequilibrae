@@ -1,4 +1,3 @@
-import sqlite3
 from math import pi
 from random import randint
 

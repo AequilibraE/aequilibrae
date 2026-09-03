@@ -4,7 +4,6 @@ from random import choice, randint, uniform
 import pytest
 from shapely.geometry import LineString
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Stop
 

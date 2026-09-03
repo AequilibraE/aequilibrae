@@ -14,7 +14,6 @@ from pyproj import Transformer
 from shapely.geometry import LineString, Point
 
 from aequilibrae.parameters import Parameters
-from aequilibrae.utils.db_utils import commit_and_close
 
 logger = logging.getLogger(__name__)
 

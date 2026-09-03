@@ -3,7 +3,6 @@ from random import choice, randint
 
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.transit_elements import Trip
 
 from .random_word import randomword

@@ -1,7 +1,6 @@
 import logging
 import pathlib
 import sqlite3
-import uuid
 from typing import Optional
 
 from aequilibrae.project.project_creation import run_queries_from_sql_file

@@ -2,7 +2,6 @@ import functools
 import logging
 import os
 import shutil
-import sqlite3
 import warnings
 from pathlib import Path
 from typing import NoReturn
@@ -73,8 +72,6 @@ class Project:
 
         if not file_name.is_file() or not file_name.exists():
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-
-        path_to_file = file_name
 
         self.root_scenario = Scenario(
             name="root",

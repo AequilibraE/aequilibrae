@@ -6,7 +6,7 @@ import pandas as pd
 from aequilibrae.parameters import Parameters
 
 if TYPE_CHECKING:
-    from aequilibrae.project.network import Network
+    pass
 
 
 class GMNSExporter:

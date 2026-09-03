@@ -45,7 +45,6 @@ def test_network_skimming(sioux_falls_example):
 
 def test_network_skimming_no_project(sioux_falls_example):
     network = sioux_falls_example.network
-    project = sioux_falls_example
 
     network.build_graphs()
     graph = network.graphs["c"]

@@ -2,7 +2,6 @@ import logging
 import pathlib
 from contextlib import AbstractContextManager
 
-from scipy.special import fresnel
 
 from aequilibrae.project.about import About
 from aequilibrae.project.data import Matrices, Results

@@ -66,9 +66,12 @@ def test_status(migrations_file, closure):
     assert status[3] == MigrationStatus.MISSING
 
     # Check migrations table was created
-    assert closure.db_connection._connection.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
-    ).fetchone() is not None
+    assert (
+        closure.db_connection._connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
+        ).fetchone()
+        is not None
+    )
 
 
 def test_mark_all_as_seen(migrations_file, closure):

@@ -4,7 +4,6 @@ from dataclasses import fields
 import pandas as pd
 import pytest
 
-from aequilibrae.project.network.osm.osm_params import default_headers
 from aequilibrae.project.project_table import NonSpatialProjectTable
 from aequilibrae.utils.db_utils import ConnectionClosure
 

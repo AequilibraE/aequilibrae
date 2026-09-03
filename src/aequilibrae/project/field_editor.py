@@ -1,8 +1,7 @@
 import logging
 import re
 import string
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, List, NoReturn, Optional
+from typing import List, NoReturn
 
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 

@@ -6,9 +6,7 @@ import pytest
 
 def add_extra_test_periods(project):
     for num in range(2, 6):
-        project.network.periods.insert(
-            period_id=num, period_start=num, period_end=num, period_description="test"
-        )
+        project.network.periods.insert(period_id=num, period_start=num, period_end=num, period_description="test")
 
     return project
 

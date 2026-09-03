@@ -1,7 +1,4 @@
 import logging
-import os
-import shutil
-import sqlite3
 from typing import TYPE_CHECKING, Dict, List
 
 import pandas as pd
@@ -9,9 +6,6 @@ import pandas as pd
 if TYPE_CHECKING:
     from aequilibrae import Project
 
-from aequilibrae.project.network.periods import Periods
-from aequilibrae.project.project_creation import initialize_tables
-from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
