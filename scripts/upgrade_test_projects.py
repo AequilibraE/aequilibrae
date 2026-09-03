@@ -12,6 +12,8 @@ from aequilibrae.utils.logging_utils import basic_config
 
 ROOT_PATH = Path(__file__).resolve().parent.parent
 PROJECT_DATABASE = "project_database.sqlite"
+TRANSIT_DATABASE = "public_transport.sqlite"
+RESULTS_DATABASE = "results_database.sqlite"
 PROJECT_DATA_PATHS = (ROOT_PATH / "tests" / "data", ROOT_PATH / "src" / "aequilibrae" / "reference_files")
 
 
@@ -19,8 +21,8 @@ def upgrade_project(project_path: Path) -> None:
     """Open, upgrade, and close one project."""
     print(f"Upgrading {project_path}")
     db_path = project_path / "project_database.sqlite"
-    transit_database_path = project_path / "transit_database.sqlite"
-    results_database_path = project_path / "results_database.sqlite"
+    transit_database_path = project_path / TRANSIT_DATABASE
+    results_database_path = project_path / RESULTS_DATABASE
 
     transit_path = transit_database_path if transit_database_path.exists() else None
     results_path = results_database_path if results_database_path.exists() else None
