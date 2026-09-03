@@ -50,14 +50,21 @@ def resolve_recusive_dict(base_dict):
 
 class GMNSBuilder:
     def __init__(
-        self, net, link_path: str, node_path: str, uses_path: str = "", geom_path: str = "", srid: int = 4326
+        self,
+        net,
+        link_path: str,
+        node_path: str,
+        connections,
+        uses_path: str = "",
+        geom_path: str = "",
+        srid: int = 4326,
     ) -> None:
         self.p = Parameters()
         self.links = net.links
         self.nodes = net.nodes
         self.link_types = net.link_types
         self.modes = net.modes
-        self.__path_file = net.project.path_to_file
+        self.__connections = connections
 
         self.link_df = pd.read_csv(link_path).fillna("")
         self.node_df = pd.read_csv(node_path).fillna("")
@@ -350,18 +357,10 @@ class GMNSBuilder:
         # Adding link_types to AequilibraE model
 
         link_types_list = [s.replace("-", "_") for s in link_types_list]
-        type_saved = ""
-        all_types = list(self.link_types.all_types())
-        for lt_name in list(dict.fromkeys(link_types_list)):
-            letters = lt_name.lower() + lt_name.upper() + string.ascii_letters
-            letters = "".join([lt for lt in letters if lt not in all_types + [type_saved]])
 
-            link_types = self.link_types
-            new_type = link_types.new(letters[0])
-            new_type.link_type = lt_name
-            new_type.description = "Link type from GMNS link table"
-            new_type.save()
-            type_saved = letters[0]
+        for lt_name in set(link_types_list):
+            letter = self.link_types.available_ids(lt_name.lower() + lt_name.upper() + string.ascii_letters)[0]
+            self.link_types.insert(link_type=lt_name, link_type_id=letter, description="Link type from GMNS link table")
 
         return link_types_list
 
@@ -414,7 +413,7 @@ class GMNSBuilder:
             for s in modes_list
         ]
 
-        with commit_and_close(self.__path_file) as conn:
+        with self.__connections.db_connection as conn:
             existing_modes = dict(conn.execute("select mode_name, mode_id from modes").fetchall())
 
         # Invert the resolved_groups dictionary, we're interested in which use_groups contain our "use"
@@ -544,7 +543,7 @@ class GMNSBuilder:
         )
         n_params_list = aeq_nodes_df.to_records(index=False)
 
-        with commit_and_close(self.__path_file, spatial=True) as conn:
+        with self.__connections.db_connection as conn:
             conn.executemany(n_query, n_params_list)
 
             l_query = "insert into links(" + ", ".join(list(links_fields.keys())) + ")"

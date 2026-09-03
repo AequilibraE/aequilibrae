@@ -2,9 +2,9 @@ import sqlite3
 from math import sqrt
 from random import randint
 
-import shapely.wkb
-from shapely.geometry import Point, MultiPolygon, LineString, MultiLineString
 import pytest
+import shapely.wkb
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point
 
 from aequilibrae.utils.db_utils import read_and_close
 
@@ -87,7 +87,11 @@ def test_add_centroid(nauru_example):
     assert node2.geometry == Point(0, 0)
 
     point_that_should = zones.get(1).geometry.centroid
-    network.nodes.update(1000, geometry=point_that_should)
+    with pytest.raises(sqlite3.IntegrityError, match="Cannot cannibalize centroids"):
+        network.nodes.update(1000, geometry=point_that_should)
+
+    nodes.delete(1)
+    nodes.insert(is_centroid=0, geometry=point_that_should)
     with pytest.raises(sqlite3.IntegrityError, match="Cannot create on-top of other node"):
         zones.add_centroid(1, robust=False)
     zones.add_centroid(1, robust=True)

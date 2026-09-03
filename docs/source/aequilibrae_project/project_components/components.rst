@@ -240,11 +240,6 @@ records or update existing values.
     >>> "my_new_field" in project.about.data.infoname.values
     True
 
-    # The 'about' table is created automatically when a project is created, but if you're 
-    # loading a project created with an older AequilibraE version that didn't contain it, 
-    # it is possible to create one too.
-    >>> project.about.create()
-
     >>> project.close()
 
 .. seealso::

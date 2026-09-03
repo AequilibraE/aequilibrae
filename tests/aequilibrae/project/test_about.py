@@ -15,7 +15,6 @@ def randomword(length):
 
 
 def test_create_and_list(sioux_falls_example):
-    sioux_falls_example.about.create()
     fields = sioux_falls_example.about.data.infoname.to_list()
     expected = [
         "model_name",
@@ -35,14 +34,11 @@ def test_create_and_list(sioux_falls_example):
 
 
 def test_warning_when_creating_twice(sioux_falls_example: Project):
-    sioux_falls_example.about.create()
-    sioux_falls_example.about.create()
     last_log = sioux_falls_example.log().contents()[-1]
     assert "About table already exists" in last_log
 
 
 def test_add_info_field(sioux_falls_example: Project):
-    sioux_falls_example.about.create()
     all_added = set()
     for _ in range(30):
         k = randomword(random.randint(1, 15))
@@ -62,7 +58,6 @@ def test_add_info_field(sioux_falls_example: Project):
 
 def test_write_back(sioux_falls_example: Project):
     base_path = sioux_falls_example.project_base_path
-    sioux_falls_example.about.create()
     sioux_falls_example.about.insert(infoname="good_info_field_perhaps")
 
     val = randomword(random.randint(1, 15))

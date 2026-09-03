@@ -2,7 +2,6 @@ import sqlite3
 
 import pytest
 
-
 ENDPOINT_GUARDS = {
     "aequilibrae_links_a_node_update",
     "aequilibrae_links_b_node_update",
@@ -140,9 +139,9 @@ def test_upgrade_repairs_and_protects_legacy_link_endpoints(sioux_falls_test):
             bad_a_node,
             bad_b_node,
         )
-        expected_node_rowid = conn.execute(
-            "SELECT ROWID FROM nodes WHERE node_id = ?", (original_a_node,)
-        ).fetchone()[0]
+        expected_node_rowid = conn.execute("SELECT ROWID FROM nodes WHERE node_id = ?", (original_a_node,)).fetchone()[
+            0
+        ]
         conn.execute("DELETE FROM idx_nodes_geometry WHERE pkid = ?", (expected_node_rowid,))
         assert conn.execute("SELECT CheckSpatialIndex('nodes', 'geometry')").fetchone() == (0,)
         node_geometries_before_upgrade = conn.execute(
@@ -222,7 +221,7 @@ def test_new_project_has_protected_schema_without_running_migration(empty_projec
 def test_irreparable_legacy_endpoint_rolls_back_migration(sioux_falls_test):
     """Test that an endpoint referencing a missing node aborts migration 003 and rolls the schema back untouched."""
     with sioux_falls_test.db_connection as conn:
-        conn.execute("DROP TRIGGER dont_delete_node")
+        conn.execute("DROP TRIGGER aequilibrae_dont_delete_node")
         missing_node = conn.execute("SELECT a_node FROM links ORDER BY link_id LIMIT 1").fetchone()[0]
         conn.execute("DELETE FROM nodes WHERE node_id = ?", (missing_node,))
         triggers_before_upgrade = _trigger_names(conn)

@@ -191,22 +191,14 @@ class Project:
             logger.warning("This Aequilibrae project is not opened")
             return
 
-        try:
-            with self.db_connection as conn:
-                conn.commit()
+        if self.db_connection.is_open():
             clean(self)
-            for obj in [self.parameters, self.network]:
-                del obj
 
-            # del self.network.link_types
-            # del self.network.modes
-
-            logger.info(f"Closed project on {self.project_base_path}")
-
+        logger.info(f"Closed project on {self.project_base_path}")
+        try:
             logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
-        except (sqlite3.ProgrammingError, AttributeError):
+        except ValueError:
             logger.warning(f"This project at {self.project_base_path} is already closed")
-            raise  # FIXME something goes wrong above
 
         finally:
             self.scenario.close()

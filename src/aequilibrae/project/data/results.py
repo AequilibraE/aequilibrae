@@ -41,7 +41,7 @@ class Results(NonSpatialProjectTable):
         table_name: str,
         data: pd.DataFrame,
         *,
-        index: bool = False,
+        index: bool = True,
         procedure: str | None = None,
         procedure_id: str | None = None,
         procedure_report: dict[str, Any] | None = None,

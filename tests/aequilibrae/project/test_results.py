@@ -127,8 +127,8 @@ def test_unnamed_and_multi_indexes_are_saved_as_columns(results):
 def test_format_dataframe_rejects_ambiguous_columns():
     duplicate_columns = pd.DataFrame([[1, 2]], columns=["value", "value"])
     with pytest.raises(ValueError, match="unique"):
-        format_dataframe(duplicate_columns)
+        format_dataframe(duplicate_columns, include_index=True)
 
     non_string_columns = pd.DataFrame([[1]], columns=[1])
     with pytest.raises(ValueError, match="strings"):
-        format_dataframe(non_string_columns)
+        format_dataframe(non_string_columns, include_index=True)

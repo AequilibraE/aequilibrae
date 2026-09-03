@@ -159,6 +159,7 @@ def test_results_scenarios(scenario_example, scenario):
     record = results.create(
         table_name,
         data=test_data,
+        index=False,
         procedure="test_procedure",
         procedure_id=f"test_id_{scenario}",
         procedure_report=json.dumps({"status": "success", "scenario": scenario}),

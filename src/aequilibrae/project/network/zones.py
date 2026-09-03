@@ -80,7 +80,7 @@ class Zones(SpatialProjectTable):
             **zone_id** (:obj:`int`): ID of the zone the centroid belongs to
 
             **point** (:obj:`Point`, *Optional*): Shapely Point corresponding to the desired centroid position.
-            If None, uses the geometric center of the zone
+            If None, uses the geometric centre of the zone
 
             **robust** (:obj:`Bool`, *Optional*): Moves the centroid location around to avoid node conflict.
             Defaults to ``True``.
@@ -181,7 +181,6 @@ class Zones(SpatialProjectTable):
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
-            conn = self._connection
 
             if not bulk:
                 zones_todo = [zone for zone in self if zone.zone_id not in connected_centroids]
@@ -213,16 +212,17 @@ class Zones(SpatialProjectTable):
                 if zones.empty:
                     return
 
-                bulk_connector_creation(
-                    conn,
-                    nodes,
-                    link_data,
-                    zones,
-                    modes=[mode_id],
-                    k_connectors=connectors,
-                    projected_crs=None,
-                    limit_to_zone=limit_to_zone,
-                )
+                with self._connection as conn:
+                    bulk_connector_creation(
+                        conn,
+                        nodes,
+                        link_data,
+                        zones,
+                        modes=[mode_id],
+                        k_connectors=connectors,
+                        projected_crs=None,
+                        limit_to_zone=limit_to_zone,
+                    )
         self._invalidate()
 
     def disconnect_mode(self, mode_id: str, zone_id: int | None = None) -> None:

@@ -7,7 +7,7 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from sqlite3 import Connection, connect
+from sqlite3 import Connection, Error, connect
 from typing import Any
 
 import pandas as pd
@@ -114,6 +114,9 @@ class NestedTransactionManager:
         finally:
             self.__connection = None
 
+    def is_open(self) -> bool:
+        return self.__connection is not None
+
     @property
     def _connection(self) -> Connection:
         """The SQLite connection owned by this manager.
@@ -177,6 +180,7 @@ class NestedTransactionManager:
             # Then this is a noop-context
             self.__stack.pop()
             return False
+
         return self._exit_transaction(savepoint, exc_type)
 
     def _enter_transaction(self) -> str:
@@ -205,7 +209,12 @@ class NestedTransactionManager:
 
         try:
             if exc_type is None:
-                connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
+                try:
+                    connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
+                except Error:  # sqlite3.Error
+                    connection.execute(f'ROLLBACK TO SAVEPOINT "{savepoint}"')
+                    connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')
+                    raise
             else:
                 connection.execute(f'ROLLBACK TO SAVEPOINT "{savepoint}"')
                 connection.execute(f'RELEASE SAVEPOINT "{savepoint}"')

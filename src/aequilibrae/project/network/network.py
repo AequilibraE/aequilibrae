@@ -244,7 +244,9 @@ class Network(WorkerThread):
             **srid** (:obj:`int`, *Optional*): Spatial Reference ID in which the GMNS geometries were created
         """
 
-        gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
+        gmns_builder = GMNSBuilder(
+            self, link_file_path, node_file_path, self.__connections, use_group_path, geometry_path, srid
+        )
         gmns_builder.doWork()
 
         logger.info("Network built successfully")

@@ -46,12 +46,11 @@ def test_deferred_constraint_commit_failure_leaves_sqlite_to_recover():
     connection = manager._connection
     connection.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
     connection.execute("CREATE TABLE child (parent_id INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED)")
+    assert not manager.in_transaction
     try:
         with pytest.raises(sqlite3.IntegrityError):
             with manager.transaction() as connection:
                 connection.execute("INSERT INTO child VALUES (1)")
-        # SQLite leaves the failed commit open; no speculative manager recovery is attempted.
-        connection.rollback()
         with manager.transaction() as connection:
             connection.execute("INSERT INTO parent VALUES (1)")
     finally:
