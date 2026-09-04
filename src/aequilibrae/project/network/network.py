@@ -44,11 +44,12 @@ class Network(WorkerThread):
     link_types: LinkTypes
     signal = SIGNAL(object)
 
-    def __init__(self, connections: ConnectionClosure) -> None:
+    def __init__(self, connections: ConnectionClosure, project=None) -> None:
         WorkerThread.__init__(self, None)
 
         self.graphs: dict = {}
         self.__connections = connections
+        self.__project = project  # HACK
 
         self.modes = Modes(self.__connections.db_connection)
         self.link_types = LinkTypes(self.__connections.db_connection)
@@ -212,7 +213,7 @@ class Network(WorkerThread):
         dwnloader.doWork()
 
         logger.info("Building Network")
-        self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
+        self.builder = OSMBuilder(dwnloader.data, project=self.__project, model_area=model_area, clean=clean)
 
         self.builder.signal = self.signal
         self.builder.doWork()

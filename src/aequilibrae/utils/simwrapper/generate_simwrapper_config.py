@@ -141,14 +141,7 @@ class SimwrapperConfigGenerator:
 
     def _get_link_types(self):
         """Return a list of link-type *names* present in the project's network (empty list if none)."""
-        try:
-            lts = self.project.network.link_types.all_types()
-            if lts:
-                return [lt.link_type for lt in lts.values()]
-        except AttributeError:
-            # safe fallback to links table below when link_types API is not available
-            pass
-        return []
+        return [link_type.link_type for link_type in self.project.network.link_types]
 
     def _categorical_palette(self, n):
         """Returns n visually distinct hex colour strings.

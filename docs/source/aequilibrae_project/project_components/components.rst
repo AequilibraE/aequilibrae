@@ -9,7 +9,7 @@ then we'll go over the project components without geo-spatial information.
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'links' table.
-Each item in the 'links' table is a ``Link`` object.
+Each item in the 'links' table is an immutable ``LinkRecord``.
 
 .. code-block:: python
 
@@ -23,20 +23,20 @@ Each item in the 'links' table is a ``Link`` object.
     >>> project_links.fields.add("my_field", "This is an example", "TEXT")
     
     # Let's add a new link to our project 
-    >>> new_link = project_links.insert(modes="bctw", geometry=LineString([(-71.304754, -29.955233), (-71.304863, -29.954049)]))
+    >>> new_link_id = project_links.insert(modes="bctw", geometry=LineString([(-71.304754, -29.955233), (-71.304863, -29.954049)]))
     
     # The 'links' table has three fields which cannot be empty (i.e. with `NULL` values):
-    # `link_id`, `direction`, and `modes`. When we create a node, `new` automatically
-    # creates a `link_id`, and sets the default value (0) for direction. Thus, the modes
-    # information should be added, otherwise, it will raise an error.
+    # `link_id`, `direction`, and `modes`. `insert()` generates a `link_id`, defaults
+    # direction to 0, and derives endpoint nodes from the geometry. Thus, the modes
+    # information must be provided.
 
     # To delete one link from the project, you can use the following
     >>> project_links.delete(21332)
 
-    # The `copy` function creates a copy of a specified link
-    # It is very helpful case you want to split a link. 
-    # You can check out in one of the usage examples.
-    >>> link_copy = project_links.copy(10972)
+    # The `copy` function creates a copy of a specified link and returns its ID.
+    # It is very helpful when you want to split a link.
+    # You can check this in one of the usage examples.
+    >>> link_copy_id = project_links.copy(10972)
 
 .. admonition:: References
 
@@ -55,7 +55,7 @@ Each item in the 'links' table is a ``Link`` object.
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'nodes' table.
-Each item in the 'nodes' table is a ``Node`` object.
+Each item in the 'nodes' table is an immutable ``NodeRecord``.
 
 .. code-block:: python
 
@@ -63,7 +63,7 @@ Each item in the 'nodes' table is a ``Node`` object.
 
     >>> project_nodes = project.network.nodes
 
-    # To get one 'Node' object
+    # To get one node record
     >>> node = project_nodes.get(10070)
 
     # We can check the existing fields for each node in the 'nodes' table
@@ -74,8 +74,8 @@ Each item in the 'nodes' table is a ``Node`` object.
     >>> project_nodes.renumber(node_id=10070, new_id=1000)
 
     # A node can also be used to add a special generator
-    # `new_centroid` returns a `Node` object.
-    # Don't forget to add a geometry to your centroid if it's a new node
+    # `new_centroid` inserts a centroid and returns its ID.
+    # A geometry is required for a new centroid
     # This centroid corresponds to the Port of Coquimbo!
     >>> centroid_id = project_nodes.new_centroid(2000, geometry=Point(-71.32, -29.94))
     >>> centroid = project_nodes.get(centroid_id)
@@ -115,11 +115,11 @@ Each item in the 'nodes' table is a ``Node`` object.
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'zones' table.
-Each item in the 'zones' table is a ``Zone`` object.
+Each item in the 'zones' table is an immutable ``ZoneRecord``.
 
 .. code-block:: python
 
-    >>> from shapely.geometry import Polygon
+    >>> from shapely.geometry import Point, Polygon
 
     >>> project_zones = project.network.zones
 
@@ -145,9 +145,8 @@ Each item in the 'zones' table is a ``Zone`` object.
     # The changes connecting / disconnecting modes reflect in the zone centroids
     # and can be seen in the 'nodes' table.
 
-    # To return a dictionary with all 'Zone' objects in the model
-    >>> {zone.zone_id: zone for zone in project_zones} # doctest: +ELLIPSIS
-    {1: ..., ..., 133: ...}
+    # To return a dictionary with all zone records in the model
+    >>> zones_by_id = {zone.zone_id: zone for zone in project_zones}
 
     # If you want to delete a zone
     >>> project_zones.delete(38)
@@ -330,7 +329,7 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 ------------------------------
 
 This method allows you to access the API resources to manipulate the 'link_types' table.
-Each item in the 'link_types' table is a ``LinkType`` object.
+Each item in the 'link_types' table is an immutable ``LinkTypeRecord``.
 
 .. doctest::
 
@@ -352,9 +351,8 @@ Each item in the 'link_types' table is a ``LinkType`` object.
     # You can also remove a LinkType from a project using its `link_type_id`
     >>> link_types.delete("A")
 
-    # To check all `LinkTypes` in the project as a dictionary whose keys are the `link_type_id`'s
-    >>> link_types.all_types() # doctest: +SKIP
-    {'z': <aequilibrae.project.network.link_type.LinkType object at 0x...>} 
+    # To collect all LinkType records by their IDs
+    >>> link_types_by_id = {link_type.link_type_id: link_type for link_type in link_types}
 
     # There are two ways to get a LinkType from the 'link_types' table
     # using the `link_type_id`
@@ -376,7 +374,7 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'modes' table.
-Each item in 'modes' table is a ``Mode`` object.
+Each item in 'modes' table is an immutable ``ModeRecord``.
 
 .. doctest::
 
@@ -394,9 +392,8 @@ Each item in 'modes' table is a ``Mode`` object.
     # You can also remove a Mode from a project using its ``mode_id``
     >>> modes.delete("k")
 
-    # To check all `Modes` in the project as a dictionary whose keys are the `mode_id`'s
-    >>> modes.all_modes() # doctest: +SKIP
-    {'b': <aequilibrae.project.network.mode.Mode object at 0x...>}
+    # To collect all Mode records by their IDs
+    >>> modes_by_id = {mode.mode_id: mode for mode in modes}
 
     # There are two ways to get a Mode from the 'modes' table
     # using the ``mode_id``

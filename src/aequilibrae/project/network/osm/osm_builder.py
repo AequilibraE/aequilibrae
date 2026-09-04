@@ -231,9 +231,9 @@ class OSMBuilder(WorkerThread):
 
         if link_type in self.__all_ltp.link_type.values:
             lt = proj_link_types.get_by_name(link_type)
-            if original_link_type not in lt.description:
-                lt.description += f", {original_link_type}"
-                lt.save()
+            description = lt.description or ""
+            if original_link_type not in description:
+                proj_link_types.update(lt.link_type_id, description=f"{description}, {original_link_type}".strip(", "))
             return [lt.link_type_id, link_type]
 
         letter = link_type[0]
@@ -243,10 +243,11 @@ class OSMBuilder(WorkerThread):
                 for letter in string.ascii_letters:
                     if letter not in self.__all_ltp.link_type_id.values:
                         break
-        lt = proj_link_types.new(letter)
-        lt.link_type = link_type
-        lt.description = f"Link types from Open Street Maps: {original_link_type}"
-        lt.save()
+        proj_link_types.insert(
+            link_type_id=letter,
+            link_type=link_type,
+            description=f"Link types from Open Street Maps: {original_link_type}",
+        )
         return [letter, link_type]
 
     def __establish_modes_for_all_links(self, conn, df: pd.DataFrame) -> pd.DataFrame:
