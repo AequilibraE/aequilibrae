@@ -41,7 +41,7 @@ class Links(SpatialProjectTable):
     name = "links"
     key = "link_id"
     record_name = "LinkRecord"
-    defaults = {"direction": 0, "link_type": "default"}
+    defaults = {"a_node": -1, "b_node": -1, "direction": 0, "link_type": "default"}
     _copy_excluded_fields = frozenset(("a_node", "b_node"))
     has_numeric_key = True
 
