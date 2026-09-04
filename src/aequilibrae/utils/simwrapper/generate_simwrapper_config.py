@@ -17,23 +17,23 @@ Notes
 - `output_dir` must be inside the project directory
 """
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pandas as pd
 import yaml
 
 from aequilibrae.utils.simwrapper.simwrapper_panel import (
-    ConvergencePanel,
-    TilePanel,
-    TextPanel,
     AequilibraEMapPanel,
     AequilibraEResultsMapPanel,
+    ConvergencePanel,
+    TextPanel,
+    TilePanel,
 )
 from aequilibrae.utils.simwrapper.simwrapper_utils import (
+    export_convergence_csv,
     get_project_center,
     get_project_zoom,
-    export_convergence_csv,
 )
 
 
@@ -110,7 +110,7 @@ class SimwrapperConfigGenerator:
         otherwise derive a readable title from the project folder name. Guaranteed
         to return a non-empty string.
         """
-        model_name = getattr(self.project.about, "model_name", None)
+        model_name = self.project.about.get("model_name", column="infovalue", default=None)
         if model_name:
             return model_name
 
@@ -141,14 +141,7 @@ class SimwrapperConfigGenerator:
 
     def _get_link_types(self):
         """Return a list of link-type *names* present in the project's network (empty list if none)."""
-        try:
-            lts = self.project.network.link_types.all_types()
-            if lts:
-                return [lt.link_type for lt in lts.values()]
-        except AttributeError:
-            # safe fallback to links table below when link_types API is not available
-            pass
-        return []
+        return [link_type.link_type for link_type in self.project.network.link_types]
 
     def _categorical_palette(self, n):
         """Returns n visually distinct hex colour strings.
@@ -596,6 +589,7 @@ def main(argv=None):
 
     # lazy import to avoid side-effects at module import time
     import sys
+
     from aequilibrae.project import Project
 
     prj = Project()

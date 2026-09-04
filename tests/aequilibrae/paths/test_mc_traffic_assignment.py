@@ -49,7 +49,6 @@ def assignment_setup(sioux_falls_example):
     # Teardown
     for mat in [car_matrix, truck_matrix, moto_matrix]:
         mat.close()
-    sioux_falls_example.close()
 
 
 def test_set_classes(assignment_setup):

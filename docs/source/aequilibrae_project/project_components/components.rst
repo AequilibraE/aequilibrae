@@ -2,14 +2,14 @@ Components
 ===========
 
 An AequilibraE project helds geometric information that can be accessed by the user in 
-three different classes: ``Links``, ``Nodes``, and ``Zoning``. We'll first cover these classes, and
+three different classes: ``Links``, ``Nodes``, and ``Zones``. We'll first cover these classes, and
 then we'll go over the project components without geo-spatial information.
 
 ``project.network.links``
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'links' table.
-Each item in the 'links' table is a ``Link`` object.
+Each item in the 'links' table is an immutable ``LinkRecord``.
 
 .. code-block:: python
 
@@ -22,39 +22,21 @@ Each item in the 'links' table is a ``Link`` object.
     # Let's add a new field to our 'links' table
     >>> project_links.fields.add("my_field", "This is an example", "TEXT")
     
-    # To save this modification, we must refresh the table
-    >>> project_links.refresh_fields()
-
     # Let's add a new link to our project 
-    >>> new_link = project_links.new()
-    >>> new_link.geometry = LineString([(-71.304754, -29.955233), (-71.304863, -29.954049)])
-    >>> new_link.modes = "bctw"
+    >>> new_link_id = project_links.insert(modes="bctw", geometry=LineString([(-71.304754, -29.955233), (-71.304863, -29.954049)]))
     
-    # To add a new link, it must be explicitly saved
-    >>> new_link.save()
-
     # The 'links' table has three fields which cannot be empty (i.e. with `NULL` values):
-    # `link_id`, `direction`, and `modes`. When we create a node, `new` automatically
-    # creates a `link_id`, and sets the default value (0) for direction. Thus, the modes
-    # information should be added, otherwise, it will raise an error.
+    # `link_id`, `direction`, and `modes`. `insert()` generates a `link_id`, defaults
+    # direction to 0, and derives endpoint nodes from the geometry. Thus, the modes
+    # information must be provided.
 
-    # To delete one link from the project, you can use one of the following
-    >>> other_link = project_links.get(21332)
-    >>> other_link.delete()
-    
-    # or
-    >>> project_links.delete(21337)
+    # To delete one link from the project, you can use the following
+    >>> project_links.delete(21332)
 
-    # The `copy_link` function creates a copy of a specified link
-    # It is very helpful case you want to split a link. 
-    # You can check out in one of the usage examples.
-    >>> link_copy = project_links.copy_link(10972)
-
-    # Don't forget to save the modifications to the links layer
-    >>> project_links.save()
-
-    # And refresh the links in memory for usage
-    >>> project_links.refresh()
+    # The `copy` function creates a copy of a specified link and returns its ID.
+    # It is very helpful when you want to split a link.
+    # You can check this in one of the usage examples.
+    >>> link_copy_id = project_links.copy(10972)
 
 .. admonition:: References
 
@@ -73,7 +55,7 @@ Each item in the 'links' table is a ``Link`` object.
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'nodes' table.
-Each item in the 'nodes' table is a ``Node`` object.
+Each item in the 'nodes' table is an immutable ``NodeRecord``.
 
 .. code-block:: python
 
@@ -81,34 +63,26 @@ Each item in the 'nodes' table is a ``Node`` object.
 
     >>> project_nodes = project.network.nodes
 
-    # To get one 'Node' object
+    # To get one node record
     >>> node = project_nodes.get(10070)
 
     # We can check the existing fields for each node in the 'nodes' table
-    >>> node.data_fields()
-    ['node_id', 'is_centroid', 'modes', 'link_types', 'geometry', 'osm_id']
+    >>> project_nodes.columns
+    ('node_id', 'is_centroid', 'modes', 'link_types', 'geometry', 'osm_id')
 
-    # Let's renumber this node and save it
-    >>> node.renumber(1000)
-    >>> node.save()
+    # Let's renumber this node
+    >>> project_nodes.renumber(node_id=10070, new_id=1000)
 
     # A node can also be used to add a special generator
-    # `new_centroid` returns a `Node` object that we can edit
-    >>> centroid = project_nodes.new_centroid(2000)
-
-    # Don't forget to add a geometry to your centroid if it's a new node
+    # `new_centroid` inserts a centroid and returns its ID.
+    # A geometry is required for a new centroid
     # This centroid corresponds to the Port of Coquimbo!
-    >>> centroid.geometry = Point(-71.32, -29.94)
+    >>> centroid_id = project_nodes.new_centroid(2000, geometry=Point(-71.32, -29.94))
+    >>> centroid = project_nodes.get(centroid_id)
 
     # As this centroid is not associated with a zone, we must tell AequilibraE the initial area around
     # the centroid to look for candidate nodes to which the centroid can connect.
-    >>> centroid.connect_mode(area=centroid.geometry.buffer(0.01), mode_id="c")
-
-    # Don't forget to update these changes to the nodes in memory
-    >>> project_nodes.refresh()
-
-    # And save them into your project
-    >>> project_nodes.save()
+    >>> project_nodes.connect_mode(node_id=centroid_id, area=centroid.geometry.buffer(0.01), mode_id="c")
 
     # Last but not less important, you can check your project nodes
     # `project_nodes.data` returns a geopandas GeoDataFrame.
@@ -135,19 +109,19 @@ Each item in the 'nodes' table is a ``Node`` object.
         Usage example
 
 
-.. _project_zoning:
+.. _project_zones:
 
-``project.zoning``
-------------------
+``project.network.zones``
+-------------------------
 
 This method allows you to access the API resources to manipulate the 'zones' table.
-Each item in the 'zones' table is a ``Zone`` object.
+Each item in the 'zones' table is an immutable ``ZoneRecord``.
 
 .. code-block:: python
 
-    >>> from shapely.geometry import Polygon
+    >>> from shapely.geometry import Point, Polygon
 
-    >>> project_zones = project.zoning
+    >>> project_zones = project.network.zones
 
     # Let's start this example by adding a new field to the 'zones' table
     >>> project_zones.fields.add("parking_spots", "Number of public parking spots", "INTEGER")
@@ -160,43 +134,31 @@ Each item in the 'zones' table is a ``Zone`` object.
     >>> zone = project_zones.get(40)
     
     # By disconnecting the transit mode
-    >>> zone.disconnect_mode("t")
+    >>> project_zones.disconnect_mode("t")
     
     # Connecting the bicycle mode
-    >>> zone.connect_mode("b")
+    >>> project_zones.connect_mode("b")
     
     # And adding the number of public parking spots in the field we just created
-    >>> zone.parking_spots = 30
+    >>> project_zones.update(zone.zone_id, parking_spots=30)
     
-    # You can save this changes if you want
-    >>> zone.save()
-
     # The changes connecting / disconnecting modes reflect in the zone centroids
     # and can be seen in the 'nodes' table.
 
-    # To return a dictionary with all 'Zone' objects in the model
-    >>> project_zones.all_zones() # doctest: +ELLIPSIS
-    {1: ..., ..., 133: ...}
+    # To return a dictionary with all zone records in the model
+    >>> zones_by_id = {zone.zone_id: zone for zone in project_zones}
 
     # If you want to delete a zone
-    >>> other_zone = project_zones.get(38)
-    >>> other_zone.delete()
+    >>> project_zones.delete(38)
 
     # Or to add a new one
     >>> zone_extent = Polygon([(-71.3325, -29.9473), (-71.3283, -29.9473), (-71.3283, -29.9539), (-71.3325, -29.9539)])
 
-    >>> new_zone = project_zones.new(38)
-    >>> new_zone.geometry = zone_extent
+    >>> new_zone_id = project_zones.insert(zone_id=38, geometry=zone_extent)
 
     # We can add a centroid to the zone we just created by specifying its location or
     # pass `None` to use the geometric center of the zone 
-    >>> new_zone.add_centroid(Point(-71.33, -29.95))
-
-    # Let's refresh our fields
-    >>> project_zones.refresh_geo_index()
-
-    # And save the new changes in the project
-    >>> project_zones.save()
+    >>> project_zones.add_centroid(new_zone_id, Point(-71.33, -29.95))
 
     # Finally, to return a geopandas GeoDataFrame with the project zones
     >>> zones = project_zones.data
@@ -212,42 +174,31 @@ Each item in the 'zones' table is a ``Zone`` object.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.zoning.Zoning`
+    * :func:`aequilibrae.project.network.zones.Zones`
         Class documentation
     * :ref:`create_zones`
         Usage example
 
-
 ``project.about``
 -----------------
 
-This class provides an interface for editing the 'about' table of a project. We can add new fields or
-edit the existing ones as necessary, but every time you add or modify a field, you have to write back
-this information, otherwise it will be lost.
+This table object provides access to project metadata. Use the standard table API to add metadata
+records or update existing values.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_sfalls_data")
+    >>> project = create_example(my_folder_path / "about")
 
-    >>> project.about.add_info_field("my_new_field")
-    >>> project.about.my_new_field = "add some useful information about the field"
-    
-    # We can add data to an existing field
-    >>> project.about.author = "Your Name" 
+    >>> project.about.insert(infoname="my_new_field")
+    'my_new_field'
+    >>> project.about.update("my_new_field", infovalue="add some useful information about the field")
 
-    # And save our modifications
-    >>> project.about.write_back()
+    # We can update data in an existing field
+    >>> project.about.update("author", infovalue="Your Name")
 
-    # To assert if 'my_new_field' was added to the 'about' table, we can check the characteristics 
-    # stored in the table by returning a list with all characteristics in the 'about' table
-    >>> project.about.list_fields() # doctest: +ELLIPSIS
-    ['model_name', ..., 'my_new_field']
-
-    # The 'about' table is created automatically when a project is created, but if you're 
-    # loading a project created with an older AequilibraE version that didn't contain it, 
-    # it is possible to create one too.
-    >>> project.about.create()
+    # Metadata is available as table data
+    >>> "my_new_field" in project.about.data.infoname.values
+    True
 
     >>> project.close()
 
@@ -270,8 +221,7 @@ This class is directly accessed from within the corresponding module one wants t
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_nauru_data")
+    >>> project = create_example(my_folder_path / "field_editor", "nauru")
 
     # We'll edit the fields in the 'nodes' table
     >>> node_fields = project.network.nodes.fields
@@ -310,8 +260,7 @@ It is possible to access the log file contents, as presented in the next code bl
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_nauru_data")
+    >>> project = create_example(my_folder_path / "log", "nauru")
 
     >>> project_log = project.log()
 
@@ -335,42 +284,37 @@ It is possible to access the log file contents, as presented in the next code bl
 ``project.matrices``
 --------------------
 
-This method is a gateway to all the matrices available in the model, which allows us to update the
+This table provides access to all the matrices available in the model, which allows us to update the
 records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord`` object.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_sfalls_data")
+    >>> project = create_example(my_folder_path / "matrices")
 
     >>> matrices = project.matrices
 
     # One can also check all the project matrices as a Pandas' DataFrame
     >>> matrices.list() # doctest: +SKIP
 
-    # We can add a naw matrix
-    >>> matrices.new_record() # doctest: +SKIP
+    # We can add a new matrix
+    >>> matrices.create(...) # doctest: +SKIP
     
+    # If you're unsure if you have a matrix in your project, you can check if it exists.
+    # This function will return `True` or `False`.
+    >>> matrices.file_exists("demand_mc")
+    True
+
     # To delete a matrix from the 'matrices' table, we can delete the record directly
-    >>> matrices.delete_record("demand_mc")
-    
-    # or by selecting the matrix and deleting it
-    >>> mat_record = matrices.get_record("demand_mc") # doctest: +SKIP
-    >>> mat_record.delete() # doctest: +SKIP
+    >>> matrices.delete_matrix("demand_mc")
 
-    # If you're unsure if you have a matrix in you project, you can check if it exists
-    # This function will return `True` or `False`
-    >>> matrices.check_exists("my_matrix")
-    False
+    # Or by selecting the matrix and deleting it
+    >>> mat_record = matrices.get("demand_mc") # doctest: +SKIP
+    >>> matrices.delete_matrix(mat_record.name) # doctest: +SKIP
 
-    # If a matrix was added or deleted by an external process, you should update or clean
-    # your 'matrices' table to keep your project organised.
-    >>> matrices.update_database()  # in case of addition
-    
-    >>> matrices.clear_database()  # in case of deletion
-
-    # To reload the existing matrices in memory once again
-    >>> matrices.reload()
+    # If a matrix was added or deleted by an external process, synchronise the
+    # 'matrices' table to keep it organised. This will removed matrix records for files
+    # that are not present.
+    >>> matrices.sync()
 
     >>> project.close()
 
@@ -385,24 +329,20 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 ------------------------------
 
 This method allows you to access the API resources to manipulate the 'link_types' table.
-Each item in the 'link_types' table is a ``LinkType`` object.
+Each item in the 'link_types' table is an immutable ``LinkTypeRecord``.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_coquimbo_data")
+    >>> project = create_example(my_folder_path / "link_types", "coquimbo")
 
     >>> link_types = project.network.link_types
 
-    >>> new_link_type = link_types.new("A")  # Create a new LinkType with ID 'A'
+    # Create a new LinkType with ID 'A'    
+    >>> link_types.insert(link_type_id="A", link_type="Arterial")  
+    'A'
 
-    # We can add information to the LinkType we just created
-    >>> new_link_type.description = "This is a description"
-    >>> new_link_type.speed = 35
-    >>> new_link_type.link_type = "Arterial"
-
-    # To save the modifications for `new_link_type`
-    >>> new_link_type.save()
+    # We can update information for the LinkType we just created
+    >>> link_types.update("A", description="This is a description", speed=35)
 
     # To create a new field in the 'link_types' table, you can call the function `fields`
     # to return a FieldEditor instance, which can be edited
@@ -411,12 +351,8 @@ Each item in the 'link_types' table is a ``LinkType`` object.
     # You can also remove a LinkType from a project using its `link_type_id`
     >>> link_types.delete("A")
 
-    # And don't forget to save the modifications you did in the 'link_types' table
-    >>> link_types.save()
-
-    # To check all `LinkTypes` in the project as a dictionary whose keys are the `link_type_id`'s
-    >>> link_types.all_types() # doctest: +SKIP
-    {'z': <aequilibrae.project.network.link_type.LinkType object at 0x...>} 
+    # To collect all LinkType records by their IDs
+    >>> link_types_by_id = {link_type.link_type_id: link_type for link_type in link_types}
 
     # There are two ways to get a LinkType from the 'link_types' table
     # using the `link_type_id`
@@ -438,33 +374,26 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'modes' table.
-Each item in 'modes' table is a ``Mode`` object.
+Each item in 'modes' table is an immutable ``ModeRecord``.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_coquimbo_data")
+    >>> project = create_example(my_folder_path / "modes", "coquimbo")
 
     >>> modes = project.network.modes
 
     # We create a new mode
-    >>> new_mode = modes.new("k")
-    >>> new_mode.mode_name = "flying_car"
+    >>> modes.insert(mode_id="k", mode_name="flying_car")
+    'k'
 
-    # And add it to the modes table
-    >>> modes.add(new_mode)
-
-    # When we add a new mode to the 'modes' table, it is automatically saved in the table
-    # But we can continue editing the modes, and save them as we modify them
-    >>> new_mode.description = "Like the one in the cartoons"
-    >>> new_mode.save()
+    # We can continue editing the mode after adding it
+    >>> modes.update("k", description="Like the one in the cartoons")
 
     # You can also remove a Mode from a project using its ``mode_id``
     >>> modes.delete("k")
 
-    # To check all `Modes` in the project as a dictionary whose keys are the `mode_id`'s
-    >>> modes.all_modes() # doctest: +SKIP
-    {'b': <aequilibrae.project.network.mode.Mode object at 0x...>}
+    # To collect all Mode records by their IDs
+    >>> modes_by_id = {mode.mode_id: mode for mode in modes}
 
     # There are two ways to get a Mode from the 'modes' table
     # using the ``mode_id``
@@ -490,40 +419,28 @@ Each item in the 'periods' table is a ``Period`` object.
 
 .. doctest::
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_coquimbo_data")
+    >>> project = create_example(my_folder_path / "periods", "coquimbo")
 
     >>> periods = project.network.periods
 
     # Let's add a new field to our 'periods' table
     >>> periods.fields.add("my_field", "This is field description", "TEXT")
 
-    # To save this modification, we must refresh the table
-    >>> periods.refresh_fields()
-
-    # Let's get our default period and change the description for our new field
-    >>> select_period = periods.get(1)
-    >>> select_period.my_field = "hello world"
-
-    # And we save this period modification
-    >>> select_period.save()
-
     # To see all periods data as a Pandas' DataFrame
     >>> all_periods = periods.data
 
     # To add a new period
-    >>> new_period = periods.new_period(2, 21600, 43200, "6AM to noon")
+    >>> new_period_id = periods.new_period(2, 21600, 43200, "6AM to noon")
+
+    # We can update the new period with a value for the new field
+    >>> periods.update(new_period_id, my_field="hello world")
 
     # It is also possible to renumber a period
-    >>> new_period.renumber(9)
+    >>> periods.renumber(new_period_id, 9)
 
     # And check the existing data fields for each period
-    >>> new_period.data_fields()
-    ['period_id', 'period_start', 'period_end', 'period_description', 'my_field']
-
-    # Saving can be done after finishing all modifications in the table but for the sake
-    # of this example, we'll save the addition of a new period to our table right away
-    >>> periods.save()
+    >>> periods.columns
+    ('period_id', 'period_start', 'period_end', 'period_description', 'my_field')
 
     >>> project.close()
 

@@ -1,5 +1,4 @@
 import logging
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from datetime import datetime
 from uuid import uuid4
 
@@ -8,6 +7,7 @@ from aequilibrae.paths.cython.skimming_core import skimming_parallel
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.core_setter import clamp_cores
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 logger = logging.getLogger(__name__)
@@ -114,9 +114,11 @@ class NetworkSkimming(WorkerThread):
         file_name = f"{name}.{format.lower()}"
         if not project:
             project = self.project or get_active_project()
-        mats = project.matrices
-        record = mats.new_record(name, file_name, self.results.skims)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Network skimming"
-        record.save()
+        project.matrices.create(
+            name,
+            file_name,
+            self.results.skims,
+            procedure="Network skimming",
+            procedure_id=self.procedure_id,
+            timestamp=self.procedure_date,
+        )

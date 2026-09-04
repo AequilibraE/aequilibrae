@@ -3,9 +3,12 @@ import pathlib
 path = pathlib.Path(__file__).parent
 
 migrations: tuple[int, pathlib.Path] = [
-    path / "000_initial_migration.sql",
-    path / "001_add_cols_to_results.sql",
+    path / "000_initial_migration.py",
+    path / "001_add_cols_to_results.py",
     path / "002_add_scenario_table.py",
-    path / "003_protect_link_end_nodes.py",
-    path / "004_fix_default_period_delete_trigger.sql",
+    path / "003_add_periods_table.py",
+    path / "004_protect_link_end_nodes.py",
+    path / "005_fix_default_period_delete_trigger.py",
+    path / "006_add_about_table.py",
+    path / "007_add_zones_table.py",
 ]

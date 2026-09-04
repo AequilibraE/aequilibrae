@@ -92,6 +92,13 @@ def coquimbo_example(cached_coquimbo_example, cache_path, tmp_path) -> Project:
     project.close()
 
 
+@pytest.fixture(scope="function")
+def build_gtfs_project(cached_coquimbo_example, cache_path, tmp_path) -> Project:
+    project = cached_model("coquimbo", cache_path, tmp_path)
+    yield Transit(project)
+    project.close()
+
+
 @pytest.fixture
 def empty_project(tmp_path) -> Project:
     project = Project()
@@ -113,8 +120,7 @@ def empty_no_triggers_project(empty_project, tmp_path) -> Project:
         for tbl in tables:
             conn.execute(f"DELETE FROM {tbl}")
 
-    yield empty_project
-    empty_project.close()
+    return empty_project
 
 
 @pytest.fixture(scope="function")
@@ -150,16 +156,6 @@ def triangle_graph_blocking(test_data_path, tmp_path) -> Project:
     project.close()
 
 
-@pytest.fixture
-def build_gtfs_project(coquimbo_example):
-    prj = coquimbo_example
-
-    (coquimbo_example.project_base_path / "public_transport.sqlite").unlink(True)
-    data = Transit(prj)
-    yield data
-    prj.close()
-
-
 @pytest.fixture(scope="session")
 def cached_scenario_example(cache_path):
     sioux_falls = create_example(cache_path / "scenario_project", "sioux_falls")
@@ -170,10 +166,10 @@ def cached_scenario_example(cache_path):
         conn.executemany("INSERT INTO scenarios (scenario_name) VALUES (?)", [("nauru",), ("coquimbo",)])
 
     with nauru.db_connection as conn:
-        conn.execute("DELETE FROM scenarios")
+        conn.execute("DROP TABLE IF EXISTS scenarios")
 
     with coquimbo.db_connection as conn:
-        conn.execute("DELETE FROM scenarios")
+        conn.execute("DROP TABLE IF EXISTS scenarios")
 
     shutil.rmtree(nauru.project_base_path / "run")
     shutil.rmtree(coquimbo.project_base_path / "run")

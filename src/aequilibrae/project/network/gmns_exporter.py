@@ -1,29 +1,32 @@
 from os.path import join
+from typing import TYPE_CHECKING
 
 import pandas as pd
-from typing import TYPE_CHECKING
 
 from aequilibrae.parameters import Parameters
 
 if TYPE_CHECKING:
-    from aequilibrae.project.network import Network
+    pass
 
 
 class GMNSExporter:
-    def __init__(self, net: "Network", path: str) -> None:
+    def __init__(
+        self,
+        links,
+        nodes,
+        modes,
+        path: str,
+    ) -> None:
         self.p = Parameters()
-        self.links_df = net.links.data
-        self.nodes_df = net.nodes.data
-        self.source = net.project.path_to_file
+        self.links_df = links.data
+        self.nodes_df = nodes.data
         self.output_path = path
 
         self.gmns_parameters = self.p.parameters["network"]["gmns"]
         self.gmns_links = self.gmns_parameters["link"]
         self.gmns_nodes = self.gmns_parameters["node"]
 
-        with net.project.db_connection as conn:
-            cur = conn.execute("select mode_name, mode_id, description, pce, vot, ppv from modes").fetchall()
-        self.modes_df = pd.DataFrame(cur, columns=["mode_name", "mode_id", "description", "pce", "vot", "ppv"])
+        self.modes_df = modes.data[["mode_name", "mode_id", "description", "pce", "vot", "ppv"]]
 
     def doWork(self) -> None:
         if "ogc_fid" in list(self.links_df.columns):

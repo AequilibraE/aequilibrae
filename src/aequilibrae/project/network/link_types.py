@@ -1,14 +1,11 @@
-from sqlite3 import IntegrityError
-import logging
+from string import ascii_letters
+from typing import Any
 
-from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.project.network.link_type import LinkType
-from aequilibrae.project.table_loader import TableLoader
-
-logger = logging.getLogger(__name__)
+from aequilibrae.project.project_table import _SELECT_ONE_SQL, NonSpatialProjectTable
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
-class LinkTypes:
+class LinkTypes(NonSpatialProjectTable):
     """
     Access to the API resources to manipulate the link_types table in the network.
 
@@ -18,115 +15,72 @@ class LinkTypes:
 
         >>> link_types = project.network.link_types
 
-        # We can get a dictionary of link types in the model
-        >>> all_link_types = link_types.all_types()
+        # We can get a link type as an immutable record
+        >>> default_type = link_types.get('y')
 
-        # And do a bulk change and save it
-        >>> for link_type_id, link_type_obj in all_link_types.items():
-        ...     link_type_obj.beta = 1
+        # or by name
+        >>> default_type = link_types.get_by_name('default')
 
-        # We can save changes for all link types in one go
-        >>> link_types.save()
+        # and write changes explicitly
+        >>> link_types.update('y', description='My own new description', lanes=3)
 
-        # or just get one link_type in specific
-        >>> default_link_type = link_types.get('y')
+        # Creating a new link type is a single insert
+        >>> link_types.insert(link_type_id='a', link_type='Arterial', lanes=3, lane_capacity=1100)
+        'a'
 
-        # or just get it by name
-        >>> default_link_type = link_types.get_by_name('default')
-
-        # We can change the description of the link types
-        >>> default_link_type.description = 'My own new description'
-
-        # Let's say we are using alpha to store lane capacity during the night as 90% of the standard
-        >>> default_link_type.alpha = 0.9 * default_link_type.lane_capacity
-
-        # To save this link types we can simply
-        >>> default_link_type.save()
-
-        # We can also create a completely new link_type and add to the model
-        >>> new_type = link_types.new('a')
-        >>> new_type.link_type = 'Arterial'  # Only ASCII letters and *_* allowed # other fields are not mandatory
-
-        # We then save it to the database
-        >>> new_type.save()
-
-        # we can even keep editing and save it directly once we have added it to the project
-        >>> new_type.lanes = 3
-        >>> new_type.lane_capacity = 1100
-        >>> new_type.save()
+        # Coordinate several writes with the project transaction
+        >>> with project.transaction():
+        ...     for lt in link_types:
+        ...         link_types.update(lt.link_type_id, beta=1)
 
         >>> project.close()
     """
 
-    def __init__(self, net):
-        self.__items = {}
-        self.project = net.project
+    name = "link_types"
+    key = "link_type_id"
+    record_name = "LinkTypeRecord"
 
-        tl = TableLoader()
-        with self.project.db_connection as conn:
-            link_types_list = tl.load_table(conn, "link_types")
-        existing_list = [lt["link_type_id"] for lt in link_types_list]
+    def __init__(self, connection: NestedTransactionManager) -> None:
+        super().__init__(connection)
+        self._select_by_name_sql = _SELECT_ONE_SQL.format(table=self.name, key="link_type", columns="*")
 
-        self.__fields = list(tl.fields)
-        for lt in link_types_list:
-            if lt["link_type_id"] not in self.__items:
-                self.__items[lt["link_type_id"]] = LinkType(lt, self.project)
+    def get_by_name(self, link_type: str) -> Any:
+        """Get a link-type record by its descriptive name.
 
-        to_del = [key for key in self.__items.keys() if key not in existing_list]
-        for key in to_del:
-            del self.__items[key]
+        :Arguments:
+            **link_type** (:obj:`str`): Descriptive link-type name.
 
-    def new(self, link_type_id: str) -> LinkType:
-        if link_type_id in self.__items:
-            raise ValueError(f"Link Type ID ({link_type_id}) already exists in the model. It must be unique.")
+        :Returns:
+            **link type** (:obj:`Any`): Generated frozen link-type record.
+        """
+        self._refresh_record_type()
+        row = self._connection._connection.execute(self._select_by_name_sql, [link_type]).fetchone()
+        if row is None:
+            raise ValueError(f"Link type {link_type} does not exist in the model")
+        return self._build_record(row)
 
-        tp = dict.fromkeys(self.__fields)
-        tp["link_type_id"] = link_type_id
-        lt = LinkType(tp, self.project)
-        self.__items[link_type_id] = lt
-        return lt
+    def available_ids(self, full_list: list[str] | None = None) -> list[str]:
+        """
+        Get a list of IDs that are not used in the provided list.
 
-    def delete(self, link_type_id: str) -> None:
-        """Removes the link_type with *link_type_id* from the project"""
-        try:
-            lt = self.__items[link_type_id]  # type: LinkType
-            lt.delete()
-            del self.__items[link_type_id]
-        except IntegrityError as e:
-            logger.error(f"Failed to remove link_type {link_type_id}. {e.args}")
-            raise e
-        logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
+        :Arguments: **full_list** (:obj:`list[str]`, *Optional*): Full list of IDs, defaults to
+        ``string.ascii_letters```
 
-    def get(self, link_type_id: str) -> LinkType:
-        """Get a link_type from the network by its *link_type_id*"""
-        if link_type_id not in self.__items:
-            raise ValueError(f"Link type {link_type_id} does not exist in the model")
-        return self.__items[link_type_id]
+        :Returns:
+            **unused** (:obj:`list[str]`): Sub set of IDs that are not used..
+        """
 
-    def get_by_name(self, link_type: str) -> LinkType:
-        """Get a link_type from the network by its *link_type* (i.e. name)"""
-        for lt in self.__items.values():
-            if lt.link_type.lower() == link_type.lower():
-                return lt
+        if full_list is None:
+            full_list = list(ascii_letters)
 
-    @property
-    def fields(self) -> FieldEditor:
-        """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
-        return FieldEditor(self.project, "link_types")
+        if len(full_list) == 0:
+            return []
 
-    def all_types(self) -> dict:
-        """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""
-        return self.__items
+        values = ",".join("(?)" for _ in full_list)
 
-    def save(self):
-        for lt in self.__items.values():  # type: LinkType
-            lt.save()
-
-    def __copy__(self):
-        raise Exception("Link Types object cannot be copied")
-
-    def __deepcopy__(self, memodict=None):
-        raise Exception("Link Types object cannot be copied")
-
-    def __del__(self):
-        self.__items.clear()
+        return [
+            row[0]
+            for row in self._connection._connection.execute(
+                self._non_existant_id_sql.format(values=values), full_list
+            ).fetchall()
+        ]

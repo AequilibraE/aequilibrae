@@ -1,6 +1,7 @@
-from os.path import join, isfile
+from os.path import isfile, join
 
 import numpy as np
+
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import SkimResults
 
@@ -33,19 +34,17 @@ def test_network_skimming(sioux_falls_example):
     assert isfile(join(matrix_dir, f"{fn}.omx")), "Did not save project to project"
 
     matrices = project.matrices
-    mat = matrices.get_record(fn)
+    mat = matrices.get(fn)
     assert mat.name == fn, "Matrix record name saved wrong"
     assert mat.file_name == f"{fn}.omx", "matrix file_name saved wrong"
     assert mat.cores == 1, "matrix saved number of matrix cores wrong"
     assert mat.procedure == "Network skimming", "Matrix saved wrong procedure name"
     assert mat.procedure_id == skm.procedure_id, "Procedure ID saved wrong"
     assert mat.timestamp == skm.procedure_date, "Procedure ID saved wrong"
-    project.close()
 
 
 def test_network_skimming_no_project(sioux_falls_example):
     network = sioux_falls_example.network
-    project = sioux_falls_example
 
     network.build_graphs()
     graph = network.graphs["c"]
@@ -53,7 +52,6 @@ def test_network_skimming_no_project(sioux_falls_example):
     graph.set_skimming("distance")
     graph.set_blocked_centroid_flows(False)
 
-    project.close()
     # skimming results
     skm = NetworkSkimming(graph)
     skm.execute()

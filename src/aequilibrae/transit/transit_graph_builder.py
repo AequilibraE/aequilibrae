@@ -517,7 +517,7 @@ class TransitGraphBuilder:
         if "zones" not in self.__dict__:
             self.add_zones(
                 pd.DataFrame(
-                    [(x.zone_id, x.geometry) for x in self.project.zoning.all_zones().values()],
+                    [(zone.zone_id, zone.geometry) for zone in self.project.network.zones],
                     columns=["zone_id", "geometry"],
                 )
             )
@@ -1521,7 +1521,8 @@ class TransitGraphBuilder:
             if conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError("cannot save links into a database with existing links in the same period")
 
-            df = self.edges[SF_EDGE_COLS + ["geometry"]]
+            df = self.edges[SF_EDGE_COLS + ["geometry"]].copy()
+            df.loc[df.stop_id == "", "stop_id"] = None
             conn.executemany(
                 f"""\
                 INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_id)

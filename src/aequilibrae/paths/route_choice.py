@@ -650,15 +650,15 @@ class RouteChoice:
     def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
         self.procedure_id = uuid4().hex
 
-        record = project.results.new_record(
+        project.results.create(
             table_name=table_name,
+            data=df,
             procedure=method_name,
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=description,
         )
-        record.set_data(df, index=True)
 
     def save_link_flows(self, table_name: str, project=None) -> None:
         """
