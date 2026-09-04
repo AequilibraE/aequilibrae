@@ -9,6 +9,7 @@ from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
 from aequilibrae.transit import Transit
@@ -38,10 +39,9 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     assigclass = TrafficClass("car", graph, mat)
     assignment = TrafficAssignment(scenario_example)
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assignment.set_time_field("distance")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 5
     assignment.set_algorithm("msa")
 

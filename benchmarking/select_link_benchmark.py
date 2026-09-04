@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from aequilibrae import Project, TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -28,10 +29,9 @@ def aequilibrae_init(proj_path: str, cost: str):
     assignment = TrafficAssignment()
     car = TrafficClass("car", graph, matrix)
     assignment.set_classes([car])
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assignment.set_time_field("distance")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
     # And we will allow paths to be compute going through other centroids/centroid connectors
@@ -91,10 +91,10 @@ def arkansas(path: str):
     car_class.set_vot(0.2)
     car_class.set_fixed_cost("hov1tollcost")
     assig.set_classes([car_class])
-    assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
-    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})  # And its parameters
+    assig.set_vdf(bpr, {"alpha": "alpha", "beta": "beta"})
     assig.set_time_field(f"tt_{period}_10")
     assig.set_capacity_field(f"{period}_assncap_10")
+
     assig.max_iter = 1
     assig.set_algorithm("msa")
     assig.rgap_target = 0.00001

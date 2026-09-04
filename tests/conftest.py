@@ -23,6 +23,9 @@ ensure_spatialite_binaries()
 
 @pytest.fixture(scope="session", autouse=True)
 def set_env():
+    import matplotlib
+
+    matplotlib.use("Agg")
     os.environ["AEQ_SHOW_PROGRESS"] = "0"
 
 

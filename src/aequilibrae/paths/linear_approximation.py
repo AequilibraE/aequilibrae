@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import time
@@ -37,7 +39,7 @@ class LinearApproximation(WorkerThread):
     assignment = SIGNAL(object)
     signal = SIGNAL(object)
 
-    def __init__(self, assig_spec, algorithm, project=None) -> None:
+    def __init__(self, assig_spec: TrafficAssignment, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
         self.signal.emit(["set_text", "Linear Approximation"])
 
@@ -64,30 +66,32 @@ class LinearApproximation(WorkerThread):
 
         self.assig: TrafficAssignment = assig_spec
 
-        if None in [
-            assig_spec.classes,
-            assig_spec.vdf,
-            assig_spec.capacity_field,
-            assig_spec.time_field,
-            assig_spec.vdf_parameters,
-        ]:
-            all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
-            raise Exception(
-                "Parameter missing. Setting the algorithm is the last thing to do "
-                f"when assigning. Check if you have all of these: {all_par}"
+        if assig_spec.classes is None:
+            raise ValueError(
+                "Traffic classes parameter missing. Setting the algorithm is the last thing to do when assigning."
             )
+        elif assig_spec.vdf is None:
+            raise ValueError(
+                "vdf has not been specified. Setting the algorithm is the last thing to do when assigning."
+            )
+        elif assig_spec.vdf_parameters is None:
+            raise ValueError("vdf_parameters missing. Setting the algorithm is the last thing to do when assigning.")
+        elif assig_spec.capacity_field is None:
+            raise ValueError("capacity field is not set in TrafficAssignment.")
+        elif assig_spec.time_field is None:
+            raise ValueError("time field is not set in TrafficAssignment.")
 
         self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
-        self.cap_field = assig_spec.capacity_field
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
-        self.procedure_id = assig_spec.procedure_id
+        self.capacity = assig_spec.capacity
+        self.procedure_id: str = assig_spec.procedure_id
 
         self.iter = 0
-        self.rgap = np.inf
+        self.rgap: int | float = np.inf
         self.stepsize = 1.0
         self.conjugate_stepsize = 0.0
         self.fw_class_flow = 0
@@ -107,9 +111,6 @@ class LinearApproximation(WorkerThread):
         # BFW specific stuff
         self.betas = np.array([1.0, 0.0, 0.0])
 
-        # Instantiates the arrays that we will use over and over
-        self.capacity = assig_spec.capacity
-
         # Creates preload vector from preloads
         self.preload = None
         if assig_spec.preloads is not None:
@@ -117,7 +118,7 @@ class LinearApproximation(WorkerThread):
             self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
 
         self.free_flow_tt = assig_spec.free_flow_tt
-        self.fw_total_flow = assig_spec.total_flow
+        self.total_flow = assig_spec.total_flow
         self.congested_time = assig_spec.congested_time
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
@@ -156,12 +157,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
-            self.vdf_der,
-            self.fw_total_flow,
-            self.capacity,
-            self.free_flow_tt,
-            *self.vdf_parameters,
-            self.elementwise_cores,
+            delta=self.vdf_der,
+            link_flows=self.total_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
         numerator = 0.0
         denominator = 0.0
@@ -199,12 +200,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
-            self.vdf_der,
-            self.fw_total_flow,
-            self.capacity,
-            self.free_flow_tt,
-            *self.vdf_parameters,
-            self.elementwise_cores,
+            delta=self.vdf_der,
+            link_flows=self.total_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
         mu_numerator = 0.0
         mu_denominator = 0.0
@@ -258,16 +259,16 @@ class LinearApproximation(WorkerThread):
         total = np.array(link_flows, dtype=np.float64, copy=True)
         if self.preload is not None:
             total += self.preload
-        self.fw_total_flow = total
+        self.total_flow = total
 
     def _refresh_congested_costs(self):
         self.vdf.apply_vdf(
-            self.congested_time,
-            self.fw_total_flow,
-            self.capacity,
-            self.free_flow_tt,
-            *self.vdf_parameters,
-            self.elementwise_cores,
+            congested_time=self.congested_time,
+            link_flows=self.total_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
 
         for c in self.traffic_classes:
@@ -542,7 +543,7 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self._apply_assigned_flow(np.zeros_like(self.capacity))
+        self._apply_assigned_flow(np.zeros_like(self.congested_time))
         self._refresh_congested_costs()
 
         logger.info(f"{self.algorithm} Assignment stats")
@@ -725,18 +726,23 @@ class LinearApproximation(WorkerThread):
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
         the corresponding contribution needs to be passed in"""
-        x = np.zeros_like(self.fw_total_flow)
+        x = np.zeros_like(self.total_flow)
         linear_combination_1d(
-            x, self.step_direction_flow, self.fw_total_flow, stepsize, self.elementwise_cores, self.threading_threshold
+            x, self.step_direction_flow, self.total_flow, stepsize, self.elementwise_cores, self.threading_threshold
         )
         # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
         self.vdf.apply_vdf(
-            self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.elementwise_cores
+            congested_time=self.congested_value,
+            link_flows=x,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
         link_cost_term = sum_a_times_b_minus_c(
             self.congested_value,
             self.step_direction_flow,
-            self.fw_total_flow,
+            self.total_flow,
             self.elementwise_cores,
             self.threading_threshold,
         )
@@ -776,18 +782,18 @@ class LinearApproximation(WorkerThread):
         linear_combination_1d(
             self._trap_new_flow,
             self.step_direction_flow,
-            self.fw_total_flow,
+            self.total_flow,
             stepsize,
             self.elementwise_cores,
             self.threading_threshold,
         )
         self.vdf.apply_vdf(
-            self._trap_new_cost,
-            self._trap_new_flow,
-            self.capacity,
-            self.free_flow_tt,
-            *self.vdf_parameters,
-            self.elementwise_cores,
+            congested_time=self._trap_new_cost,
+            link_flows=self._trap_new_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
         np.add(self.congested_time, self._trap_new_cost, out=self._trap_avg_cost)
         link_term = (
@@ -796,7 +802,7 @@ class LinearApproximation(WorkerThread):
             * sum_a_times_b_minus_c(
                 self._trap_avg_cost,
                 self.step_direction_flow,
-                self.fw_total_flow,
+                self.total_flow,
                 self.elementwise_cores,
                 self.threading_threshold,
             )

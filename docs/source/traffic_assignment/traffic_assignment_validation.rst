@@ -308,6 +308,7 @@ understand, and then we'll perform the assignment.
     from aequilibrae.matrix import AequilibraeMatrix
     from aequilibrae.paths import Graph, TrafficAssignment
     from aequilibrae.paths.traffic_class import TrafficClass
+    from aequilibrae.paths.vdf import bpr
 
 
     BASE = Path(r"C:\Users\jake\src\aequilibrae\TransportationNetworks")
@@ -636,9 +637,8 @@ understand, and then we'll perform the assignment.
             assig_class.set_vot(1.0)
 
         assig = TrafficAssignment()
-        assig.set_classes([assig_class])
-        assig.set_vdf("BPR")
-        assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        assig.set_classes([assigclass])
+        assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
         assig.set_capacity_field("capacity")
         assig.set_time_field("free_flow_time")
         assig.max_iter = MAX_ITER
