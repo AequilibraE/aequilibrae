@@ -247,7 +247,7 @@ def test_malformed_vdf_parameters():
         ("akcelik", {"alpha": 0.25, "tau": 0.8, "length": 1.0}, True),
     ],
 )
-def test_plot_vdf_and_check_valid_vdf(tmp_path, vdf_name, parameter_values, expected_convex):
+def test_plot_vdf_and_check_valid_vdf(vdf_name, parameter_values, expected_convex):
     vdfs_preset = VDFsManager(add_preset_vdfs=True)
     vdf = vdfs_preset.get_vdf(vdf_name)
 
@@ -258,4 +258,4 @@ def test_plot_vdf_and_check_valid_vdf(tmp_path, vdf_name, parameter_values, expe
     assert valid_0_value and increasing_f_vals and nonnegative_derivative
     assert convex == expected_convex
 
-    vdf.plot_vdf(tmp_path, num_points, link_attributes)
+    vdf.plot_vdf(num_points, link_attributes)

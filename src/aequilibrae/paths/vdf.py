@@ -16,13 +16,6 @@ from aequilibrae.paths.cython.vdf_core import (
 import numpy as np
 import numexpr as ne
 import matplotlib.pyplot as plt
-from matplotlib import rcParams
-import os
-
-# Configure matplotlib for high-quality output
-rcParams["font.family"] = "sans-serif"
-rcParams["font.size"] = 10
-rcParams["figure.dpi"] = 150
 
 
 FUNCTION_MAP: dict[str, tuple[Callable, Callable]] = {
@@ -303,7 +296,7 @@ class VDF:
 
         return function_values, derivative_values
 
-    def plot_vdf(self, output_dir: str, num_points: int, link_attributes: dict[str, Any]):
+    def plot_vdf(self, num_points: int, link_attributes: dict[str, Any]):
         """Creates a plot of the vdf using num_points for velocity/capacity in the range [0,3]. Link attributes are
         directly passed self.apply_vdf() and self.apply_derivative, so they may need to be a numpy array the size of
         num_points."""
@@ -340,10 +333,8 @@ class VDF:
         fig.suptitle(f"{name}")
 
         plt.tight_layout()
-        filename = f"vdf_{name}_detail.png"
-        plt.savefig(os.path.join(output_dir, filename), dpi=150, bbox_inches="tight")
-        print(f"Saved: {os.path.join(output_dir, filename)}")
-        plt.close()
+
+        return fig
 
     def apply_vdf(self, congested_time, link_flows, fftime, capacity, cores: int, **link_attributes):
         self.func(congested_time, link_flows, fftime, capacity, cores, **link_attributes)
