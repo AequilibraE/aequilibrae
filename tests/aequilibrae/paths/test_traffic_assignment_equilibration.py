@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import VDFsManager
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.utils.logging_utils import basic_config
 
 
@@ -59,7 +59,6 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
 
     proj = assignment.project
     assignment.add_class(assigclass)
-    bpr = VDFsManager.make_preset_vdf("bpr")
     assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
@@ -181,7 +180,6 @@ def test_execute_no_project(project, assignment, assigclass):
     project.close()
     assignment = type(assignment)()
     assignment.add_class(assigclass)
-    bpr = VDFsManager.make_preset_vdf("bpr")
     assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
     assignment.set_capacity_field("capacity")

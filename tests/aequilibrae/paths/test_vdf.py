@@ -4,7 +4,22 @@ import numpy as np
 import pytest
 
 from aequilibrae import VDF, Graph, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import DEFAULT_PRESET_SPECS, FUNCTION_MAP, builtin_vdfs, load_from_parameters
+from aequilibrae.paths.vdf import (
+    AKCELIK,
+    BPR,
+    BPR2,
+    CONICAL,
+    DEFAULT_PRESET_SPECS,
+    FUNCTION_MAP,
+    INRETS,
+    builtin_vdfs,
+    bpr,
+    bpr2,
+    conical,
+    inrets,
+    akcelik,
+    load_from_parameters,
+)
 
 
 @pytest.fixture
@@ -105,6 +120,8 @@ def test_make_preset_vdfs():
         assert isinstance(vdfs[vdf_name], VDF)
 
     assert vdfs.keys() == FUNCTION_MAP.keys()
+    assert vdfs == {"bpr": bpr, "bpr2": bpr2, "conical": conical, "inrets": inrets, "akcelik": akcelik}
+    assert {"bpr": BPR, "bpr2": BPR2, "conical": CONICAL, "inrets": INRETS, "akcelik": AKCELIK} == vdfs
 
 
 def test_vdf_as_parsed_string():

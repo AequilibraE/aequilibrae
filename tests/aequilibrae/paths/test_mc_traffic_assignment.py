@@ -1,7 +1,7 @@
-from aequilibrae.paths.vdf import VDFsManager
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 
 @pytest.fixture(scope="function")
@@ -78,7 +78,6 @@ def test_execute_and_save_results(assignment_setup):
 
     for cls in assignment.classes:
         cls.graph.set_skimming(["free_flow_time", "distance"])
-    bpr = VDFsManager.make_preset_vdf("bpr")
     assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
     assignment.set_time_field("free_flow_time")

@@ -76,7 +76,8 @@ method call:
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TrafficAssignment, VDFsManager
+    >>> from aequilibrae.paths import TrafficAssignment
+    >>> from aequilibrae.paths.vdf import bpr
 
     >>> assig = TrafficAssignment()
 
@@ -97,7 +98,7 @@ procedure.
 
 .. doctest::
 
-    >>> bpr = VDFsManager.make_preset_vdf("bpr")
+
 
 * **name_mapping**: the parameters to be used in the volume-delay function, other than volume, and 
   free-flow time. VDF parameters must be consistent across all graphs.

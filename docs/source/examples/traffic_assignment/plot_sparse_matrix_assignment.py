@@ -28,7 +28,6 @@ skim the last iteration after the assignment is done.
 # %%
 
 # Imports
-from aequilibrae.paths.vdf import VDFsManager
 from os.path import join
 from tempfile import gettempdir
 from uuid import uuid4
@@ -36,6 +35,7 @@ from uuid import uuid4
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
 from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 # sphinx_gallery_thumbnail_path = '../source/_images/sparse_matrix.png'
 
@@ -96,7 +96,6 @@ assig.add_class(assigclass)
 # Then we set these parameters, which an only be configured after adding one class to the assignment
 
 # Setting the volume delay function and its parameters
-bpr = VDFsManager.make_preset_vdf("bpr") # This is not case-sensitive 
 assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
 # The capacity and free flow travel times as they exist in the graph

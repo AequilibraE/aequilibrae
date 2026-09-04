@@ -36,5 +36,4 @@ __all__ = [
     "TrafficClass",
     "TransitClass",
     "VDF",
-    "VDFsManager",
 ]

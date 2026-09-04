@@ -13,6 +13,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficAssignment
 from aequilibrae.paths.results.assignment_results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 # pytest .\tests\aequilibrae\benchmarks\* -- benchmark
 
@@ -312,8 +313,7 @@ def run_validation(
 
         a = TrafficAssignment()
         a.set_classes([tc])
-        a.set_vdf("BPR")
-        a.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        a.set_vdf(bpr, {"alpha": "b", "beta": "power"})
         a.set_capacity_field("capacity")
         a.set_time_field("free_flow_time")
         a.max_iter = ITERATIONS

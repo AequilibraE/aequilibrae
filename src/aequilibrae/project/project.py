@@ -7,7 +7,7 @@ import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, NoReturn
+from typing import NoReturn
 
 import pandas as pd
 
@@ -308,26 +308,6 @@ class Project:
         self.scenario.results = Results(self)
         self.scenario.transit = Transit(self)
         self.scenario.zoning = Zoning(self.scenario.network)
-
-    def add_vdf(
-        self,
-        name: str,
-        function: Callable,
-        spec: dict,
-        derivative: Callable | None = None,
-        override_existing: bool = False,
-    ):
-        if function is None:
-            self.scenario.vdfs_manager.add_preset_vdf(name, spec)
-            return
-        assert spec is not None, "The specification 'spec' for the VDF must be set, or an empty dictionary"
-        self.scenario.vdfs_manager.add_vdf(name, function, spec, derivative, override_existing=override_existing)
-
-    def get_vdf(self, name):
-        return self.scenario.vdfs_manager.get_vdf(name)
-
-    def add_preset_vdf(self, name: str, custom_name: str = "", spec: dict | None = None):
-        self.scenario.vdfs_manager.add_preset_vdf(name, custom_name=custom_name, spec=spec)
 
     @property
     def project_parameters(self) -> Parameters:

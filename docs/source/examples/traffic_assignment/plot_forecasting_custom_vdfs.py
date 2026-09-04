@@ -57,7 +57,7 @@ project.parameters
 # In this step, we'll set the skims for the variable ``free_flow_time``, and execute the
 # traffic assignment for the base-year.
 
-from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.paths import TrafficAssignment, TrafficClass, VDF
 
 # %%
 
@@ -118,10 +118,7 @@ bpr_spec = {
     "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
     "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
 }
-project.add_vdf(name="bpr_tyler", function=bpr, derivative=delta_bpr, spec=bpr_spec)
-
-# VDFs are stored in project
-vdf = project.get_vdf(name="bpr_tyler")
+vdf = VDF("bpr_tyler", bpr, bpr_spec, delta_bpr)
 assig.set_vdf(vdf, name_mapping={"alpha": "b", "beta": "power"})
 
 # Then we set the volume delay function and its parameters
@@ -367,21 +364,20 @@ assig = TrafficAssignment()
 assig.add_class(assigclass)
 
 
-def quadratic(congested_time, link_flows, fftime, cores, a, b, capacity):
+def quadratic(congested_time, link_flows, fftime, capacity, cores, a, b):
     congested_time[:] = fftime * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
 
 
-def quadratic_derivative(delta, link_flows, fftime, cores, a, b, capacity):
+def quadratic_derivative(delta, link_flows, fftime, capacity, cores, a, b):
     delta[:] = fftime * (2 * a * (link_flows / capacity) + b) / capacity
 
 
-project.add_vdf(
+vdf = VDF(
     "quadratic",
     quadratic,
     {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}},
     quadratic_derivative,
 )
-vdf = project.get_vdf("quadratic")
 
 # Then we set the volume delay function and its parameters
 assig.set_vdf(vdf, {"a": 0.15, "b": 1.0})

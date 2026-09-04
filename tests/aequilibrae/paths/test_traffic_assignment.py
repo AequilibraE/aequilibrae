@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from aequilibrae import Graph, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import VDFsManager
+from aequilibrae.paths.vdf import bpr
 
 
 @pytest.fixture(scope="function")
@@ -40,19 +40,11 @@ def assignment(project):
     return TrafficAssignment(project)
 
 
-@pytest.fixture(scope="function")
-def bpr():
-    vdfs = VDFsManager()
-    vdfs.add_preset_vdf("bpr")
-    return vdfs.get_vdf("bpr")
-
-
 def test_skim_after(project, assigclass):
     assig = TrafficAssignment(project)
 
     assig.add_class(assigclass)
 
-    bpr = project.get_vdf("BPR")
     assig.set_vdf(bpr, name_mapping={"alpha": "b", "beta": "power"})
 
     assig.set_time_field("free_flow_time")
@@ -82,9 +74,9 @@ def test_matrix_with_wrong_type(matrix, car_graph):
         TrafficClass("car", car_graph, matrix)
 
 
-def test_set_vdf(assignment, assigclass, bpr):
+def test_set_vdf(assignment, assigclass):
     with pytest.raises(ValueError):
-        assignment.set_vdf("CQS")
+        assignment.set_vdf(object())
     assignment.add_class(assigclass)
     assignment.set_vdf(bpr, {})
 
@@ -114,7 +106,7 @@ def test_set_cores(assignment, assigclass):
     assignment.set_cores(3)
 
 
-def test_set_algorithm(assignment, assigclass, bpr):
+def test_set_algorithm(assignment, assigclass):
     with pytest.raises(AttributeError):
         assignment.set_algorithm("not an algo")
     assignment.add_class(assigclass)
@@ -149,7 +141,6 @@ def test_info(assignment, assigclass):
     rgap = random.random() / 10000
     algo = choice(ALGORITHMS)
     assignment.add_class(assigclass)
-    bpr = VDFsManager.make_preset_vdf("bpr")
     assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
     assignment.set_capacity_field("capacity")

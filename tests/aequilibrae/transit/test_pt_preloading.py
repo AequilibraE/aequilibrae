@@ -1,7 +1,7 @@
-from aequilibrae.paths.vdf import VDFsManager
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.transit import Transit
 
 
@@ -44,7 +44,6 @@ def _assignment(
     # Create assignment and set parameters
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
-    bpr = VDFsManager.make_preset_vdf("bpr")
     assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assignment.set_time_field("travel_time")
     assignment.set_capacity_field("capacity")

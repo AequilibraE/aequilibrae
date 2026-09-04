@@ -1,9 +1,9 @@
-from aequilibrae.paths.vdf import VDFsManager
 import numpy as np
 import pytest
 import tables
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 
 @pytest.fixture
@@ -57,7 +57,6 @@ def test_save_path_files(assignment_setup):
     # Single-iteration AoN with path file saving
     assignment.add_class(assigclass)
     assignment.set_save_path_files(True)
-    bpr = VDFsManager.make_preset_vdf("bpr")
     assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
     assignment.set_capacity_field("capacity")

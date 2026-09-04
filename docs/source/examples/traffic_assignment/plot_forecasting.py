@@ -25,7 +25,6 @@ which are going to be the input of a future year assignment with select link ana
 # %%
 
 # Imports
-from aequilibrae.paths.vdf import VDFsManager
 from uuid import uuid4
 from os.path import join
 from tempfile import gettempdir
@@ -34,6 +33,7 @@ import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.paths.vdf import bpr
 
 # sphinx_gallery_thumbnail_number = 3
 # %%
@@ -101,7 +101,6 @@ assig.add_class(assigclass)
 # Then we set these parameters, which an only be configured after adding one class to the assignment
 # Setting the volume delay function and its parameters
 
-bpr = VDFsManager.make_preset_vdf("bpr")
 assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 assig.set_capacity_field("capacity")
 
@@ -341,7 +340,6 @@ assig = TrafficAssignment()
 assig.add_class(assigclass)
 
 # Set the volume delay function and its parameters
-bpr = VDFsManager.make_preset_vdf("bpr")
 assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
 # Set the capacity and free flow travel times as they exist in the graph

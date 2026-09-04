@@ -25,7 +25,7 @@ We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetwor
 # %%
 
 # Imports
-from aequilibrae.paths.vdf import VDFsManager
+from aequilibrae.paths.vdf import bpr
 import os
 import pandas as pd
 import numpy as np
@@ -132,7 +132,6 @@ assigclass = TrafficClass("car", g, aem)
 assig = TrafficAssignment()
 
 assig.set_classes([assigclass])
-bpr = VDFsManager.make_preset_vdf("bpr")
 assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 assig.set_time_field("free_flow_time")
 assig.set_capacity_field("capacity")

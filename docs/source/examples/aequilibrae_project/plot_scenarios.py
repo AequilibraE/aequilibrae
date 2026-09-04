@@ -24,13 +24,13 @@ within a single project, using different example networks to demonstrate scenari
 # %%
 
 # Imports
-from aequilibrae.paths.vdf import VDFsManager
 from uuid import uuid4
 from tempfile import gettempdir
 from pathlib import Path
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_scenarios.png'
 
@@ -101,7 +101,6 @@ mat.computational_view()
 assigclass = TrafficClass("car", graph, mat)
 assignment = TrafficAssignment(project)
 assignment.add_class(assigclass)
-bpr = VDFsManager.make_preset_vdf("bpr")
 assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
 assignment.set_time_field("distance")
 assignment.set_capacity_field("capacity")

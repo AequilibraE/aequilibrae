@@ -6,24 +6,24 @@ import numexpr as ne
 import numpy as np
 
 from aequilibrae.paths.cython.vdf_core import (
-    akcelik,
-    bpr,
-    bpr2,
-    conical,
-    delta_akcelik,
-    delta_bpr,
-    delta_bpr2,
-    delta_conical,
-    delta_inrets,
-    inrets,
+    akcelik as _akcelik,
+    bpr as _bpr,
+    bpr2 as _bpr2,
+    conical as _conical,
+    delta_akcelik as _delta_akcelik,
+    delta_bpr as _delta_bpr,
+    delta_bpr2 as _delta_bpr2,
+    delta_conical as _delta_conical,
+    delta_inrets as _delta_inrets,
+    inrets as _inrets,
 )
 
 FUNCTION_MAP: dict[str, tuple[Callable, Callable]] = {
-    "bpr": (bpr, delta_bpr),
-    "bpr2": (bpr2, delta_bpr2),
-    "conical": (conical, delta_conical),
-    "inrets": (inrets, delta_inrets),
-    "akcelik": (akcelik, delta_akcelik),
+    "bpr": (_bpr, _delta_bpr),
+    "bpr2": (_bpr2, _delta_bpr2),
+    "conical": (_conical, _delta_conical),
+    "inrets": (_inrets, _delta_inrets),
+    "akcelik": (_akcelik, _delta_akcelik),
 }
 
 DEFAULT_PRESET_SPECS = {
@@ -284,5 +284,27 @@ def load_from_parameters(vdf_data: dict) -> dict[str, VDF]:
     return results
 
 
+# Built-in VDF objects are shared so callers can import the one they need directly.
+bpr = VDF("bpr", _bpr, DEFAULT_PRESET_SPECS["bpr"], _delta_bpr)
+bpr2 = VDF("bpr2", _bpr2, DEFAULT_PRESET_SPECS["bpr2"], _delta_bpr2)
+conical = VDF("conical", _conical, DEFAULT_PRESET_SPECS["conical"], _delta_conical)
+inrets = VDF("inrets", _inrets, DEFAULT_PRESET_SPECS["inrets"], _delta_inrets)
+akcelik = VDF("akcelik", _akcelik, DEFAULT_PRESET_SPECS["akcelik"], _delta_akcelik)
+
+BPR = bpr
+BPR2 = bpr2
+CONICAL = conical
+INRETS = inrets
+AKCELIK = akcelik
+
+_BUILTIN_VDFS = {
+    "bpr": bpr,
+    "bpr2": bpr2,
+    "conical": conical,
+    "inrets": inrets,
+    "akcelik": akcelik,
+}
+
+
 def builtin_vdfs() -> dict[str, VDF]:
-    return load_from_parameters({k: {"function": k, "spec": v} for k, v in DEFAULT_PRESET_SPECS.items()})
+    return _BUILTIN_VDFS.copy()

@@ -1,4 +1,3 @@
-from aequilibrae.paths.vdf import VDFsManager
 import json
 import uuid
 from itertools import combinations
@@ -9,6 +8,7 @@ from scipy.spatial import Delaunay
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
+from aequilibrae.paths.vdf import bpr
 
 DELAUNAY_TABLE = "delaunay_network"
 
@@ -108,7 +108,6 @@ class DelaunayAnalysis:
         ta.set_classes([tc])
         ta.set_time_field("distance")
         ta.set_capacity_field("capacity")
-        bpr = VDFsManager.make_preset_vdf("bpr")
         ta.set_vdf(bpr, {"alpha": 0, "beta": 1.0})
         ta.set_algorithm("all-or-nothing")
         ta.execute()

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from aequilibrae.paths.vdf import VDFsManager
 import sqlite3
 import sys
 import timeit
@@ -12,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from aequilibrae import Project, TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -29,7 +29,6 @@ def aequilibrae_init(proj_path: str, cost: str):
     assignment = TrafficAssignment()
     car = TrafficClass("car", graph, matrix)
     assignment.set_classes([car])
-    bpr = VDFsManager.make_preset_vdf("bpr")
     assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assignment.set_time_field("distance")
     assignment.set_capacity_field("capacity")
@@ -92,8 +91,7 @@ def arkansas(path: str):
     car_class.set_vot(0.2)
     car_class.set_fixed_cost("hov1tollcost")
     assig.set_classes([car_class])
-    bpr = VDFsManager.make_preset_vdf("bpr")  # This is not case-sensitive # Then we set the volume delay function
-    assig.set_vdf(bpr, {"alpha": "alpha", "beta": "beta"})  # And its parameters
+    assig.set_vdf(bpr, {"alpha": "alpha", "beta": "beta"})
     assig.set_time_field(f"tt_{period}_10")
     assig.set_capacity_field(f"{period}_assncap_10")
 

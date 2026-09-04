@@ -188,8 +188,8 @@ class TrafficAssignment(AssignmentBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae.paths import TrafficAssignment, TrafficClass, VDFsManager
-
+        >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
+        >>> from aequilibrae.paths.vdf import bpr
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
@@ -214,7 +214,6 @@ class TrafficAssignment(AssignmentBase):
         >>> assig.set_classes([assigclass])
 
         # Then we set the volume delay function and its parameters
-        >>> bpr = VDFsManager.make_preset_vdf("bpr") # This is not case-sensitive
         >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
         # The free flow travel times and capacities as they exist in the graph
