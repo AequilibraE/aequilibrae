@@ -1,5 +1,7 @@
 import logging
-from typing import Any
+from typing import Any, Mapping
+
+import pandas as pd
 
 from aequilibrae.project.project_table import SpatialProjectTable
 
@@ -39,9 +41,19 @@ class Links(SpatialProjectTable):
     name = "links"
     key = "link_id"
     record_name = "LinkRecord"
-    defaults = {"a_node": 0, "b_node": 0, "direction": 0, "link_type": "default"}
+    defaults = {"direction": 0, "link_type": "default"}
     _copy_excluded_fields = frozenset(("a_node", "b_node"))
     has_numeric_key = True
+
+    def _prepare_insert(self, values: Mapping[str, Any]) -> dict[str, Any]:
+        if not (("a_node" in values and "b_node" in values) or "geometry" in values):
+            raise ValueError("for links either a_node and b_node, or geometry must be provided")
+        return super()._prepare_insert(values=values)
+
+    def _prepare_rows(self, frame: pd.DataFrame, value_columns: tuple[str, ...]) -> list[tuple[Any, ...]]:
+        if not (("a_node" in value_columns and "b_node" in value_columns) or "geometry" in value_columns):
+            raise ValueError("for links either a_node and b_node, or geometry must be provided")
+        return super()._prepare_rows(frame=frame, value_columns=value_columns)
 
     def copy(self, link_id: int) -> int:
         """Duplicate a link under a new ID and return that ID.

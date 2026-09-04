@@ -16,13 +16,12 @@ def test_get(sioux_falls_test):
 
 def test_new(sioux_falls_test):
     links = sioux_falls_test.network.links
-    new_id = links.insert(modes="c")
+    new_id = links.copy(1)
 
     with sioux_falls_test.db_connection as conn:
         expected_id = conn.execute("Select max(link_id) from Links").fetchone()[0]
     new_link = links.get(new_id)
     assert new_link.link_id == expected_id, "Did not allocate a new link ID properly"
-    assert new_link.geometry is None, "Did not populate new geometry properly"
 
 
 def test_copy_link(sioux_falls_test):

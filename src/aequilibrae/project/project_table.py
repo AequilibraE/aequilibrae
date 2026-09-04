@@ -299,9 +299,6 @@ class ProjectTable(ABC):
                 next_key = self._next_key()
                 frame = frame.assign(**{self.key: range(next_key, next_key + len(frame))})
 
-            missing_default_cols = set(self.defaults) - set(frame.columns)
-            frame = frame.assign(**{col: self.defaults[col] for col in missing_default_cols})
-
             # Both functions can have the key in the columns
             columns = tuple(col for col in frame.columns if col != self.key) + (self.key,)
             rows = self._prepare_rows(frame, columns)
