@@ -154,11 +154,11 @@ def test_vdf_as_parsed_string():
 
     output = np.zeros(3)
     quadratic_vdf.apply_vdf(
-        output,
-        link_flows,
-        free_flow_time,
-        capacity,
-        1,
+        congested_time=output,
+        link_flows=link_flows,
+        fftime=free_flow_time,
+        capacity=capacity,
+        cores=1,
         a=a,
         b=b,
     )
@@ -167,11 +167,11 @@ def test_vdf_as_parsed_string():
 
     derivative_output = np.zeros(3)
     quadratic_vdf.apply_derivative(
-        derivative_output,
-        link_flows,
-        free_flow_time,
-        capacity,
-        1,
+        delta=derivative_output,
+        link_flows=link_flows,
+        fftime=free_flow_time,
+        capacity=capacity,
+        cores=1,
         a=a,
         b=b,
     )
@@ -200,11 +200,11 @@ def test_finite_difference():
     derivative_output = np.zeros(3)
 
     quadratic_vdf.apply_derivative(
-        derivative_output,
-        link_flows,
-        free_flow_time,
-        capacity,
-        1,
+        delta=derivative_output,
+        link_flows=link_flows,
+        fftime=free_flow_time,
+        capacity=capacity,
+        cores=1,
         a=a,
         b=b,
     )

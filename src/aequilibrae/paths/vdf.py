@@ -93,8 +93,22 @@ class VDF:
             minus_epsilon_congested_time = np.zeros_like(link_flows)
             plus_epsilon_congested_time = np.zeros_like(link_flows)
 
-            self.apply_vdf(minus_epsilon_congested_time, link_flows - eps, fftime, capacity, cores, **link_attributes)
-            self.apply_vdf(plus_epsilon_congested_time, link_flows + eps, fftime, capacity, cores, **link_attributes)
+            self.apply_vdf(
+                congested_time=minus_epsilon_congested_time,
+                link_flows=link_flows - eps,
+                fftime=fftime,
+                capacity=capacity,
+                cores=cores,
+                **link_attributes,
+            )
+            self.apply_vdf(
+                congested_time=plus_epsilon_congested_time,
+                link_flows=link_flows + eps,
+                fftime=fftime,
+                capacity=capacity,
+                cores=cores,
+                **link_attributes,
+            )
             np.subtract(plus_epsilon_congested_time, minus_epsilon_congested_time, out=delta)
             np.divide(delta, 2 * eps, out=delta)
 
@@ -174,19 +188,19 @@ class VDF:
         capacity = np.ones(size, dtype=np.float64)
 
         self.apply_vdf(
-            function_values,
-            voc_range,
-            fftime,
-            capacity,
-            1,
+            congested_time=function_values,
+            link_flows=voc_range,
+            fftime=fftime,
+            capacity=capacity,
+            cores=1,
             **link_attributes,
         )
         self.apply_derivative(
-            derivative_values,
-            voc_range,
-            fftime,
-            capacity,
-            1,
+            delta=derivative_values,
+            link_flows=voc_range,
+            fftime=fftime,
+            capacity=capacity,
+            cores=1,
             **link_attributes,
         )
 
@@ -239,10 +253,10 @@ class VDF:
 
         return fig
 
-    def apply_vdf(self, congested_time, link_flows, fftime, capacity, cores: int, **link_attributes):
+    def apply_vdf(self, *, congested_time, link_flows, fftime, capacity, cores: int, **link_attributes):
         self.func(congested_time, link_flows, fftime, capacity, cores, **link_attributes)
 
-    def apply_derivative(self, delta, link_flows, fftime, capacity, cores: int, **link_attributes):
+    def apply_derivative(self, *, delta, link_flows, fftime, capacity, cores: int, **link_attributes):
         self.d_func(delta, link_flows, fftime, capacity, cores, **link_attributes)
 
 
