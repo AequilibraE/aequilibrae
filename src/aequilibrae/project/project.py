@@ -7,7 +7,7 @@ import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import NoReturn, Callable
+from typing import Callable, NoReturn
 
 import pandas as pd
 
@@ -22,7 +22,6 @@ from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tools import MigrationManager
 from aequilibrae.project.zoning import Zoning
-from aequilibrae.paths.vdf import VDFsManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import AequilibraEConnection, commit_and_close, safe_connect
@@ -309,9 +308,6 @@ class Project:
         self.scenario.results = Results(self)
         self.scenario.transit = Transit(self)
         self.scenario.zoning = Zoning(self.scenario.network)
-        self.scenario.vdfs_manager = VDFsManager(
-            add_preset_vdfs=True, vdf_data_from_parameters=self.parameters.get("vdfs", None)
-        )
 
     def add_vdf(
         self,

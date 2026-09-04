@@ -1,22 +1,23 @@
 from __future__ import annotations
-from typing import Callable, Any
-from aequilibrae.paths.cython.vdf_core import (
-    bpr,
-    delta_bpr,
-    bpr2,
-    delta_bpr2,
-    conical,
-    delta_conical,
-    inrets,
-    delta_inrets,
-    akcelik,
-    delta_akcelik,
-)
 
-import numpy as np
-import numexpr as ne
+from typing import Any, Callable
+
 import matplotlib.pyplot as plt
+import numexpr as ne
+import numpy as np
 
+from aequilibrae.paths.cython.vdf_core import (
+    akcelik,
+    bpr,
+    bpr2,
+    conical,
+    delta_akcelik,
+    delta_bpr,
+    delta_bpr2,
+    delta_conical,
+    delta_inrets,
+    inrets,
+)
 
 FUNCTION_MAP: dict[str, tuple[Callable, Callable]] = {
     "bpr": (bpr, delta_bpr),
@@ -50,67 +51,55 @@ DEFAULT_PRESET_SPECS = {
 }
 
 
-class VDFsManager:
-    def __init__(self, add_preset_vdfs: bool = False, vdf_data_from_parameters: dict | None = None):
-        self.vdfs: dict[str, VDF] = {}
-        if add_preset_vdfs:
-            for name in FUNCTION_MAP.keys():
-                self.add_preset_vdf(name)
-        if vdf_data_from_parameters is not None:
-            self._load_from_parameters(vdf_data_from_parameters)
+class VDF:
+    """Volume-Delay function
+    spec = {
+        "graph_column_a": {"fill_NA": 5, "bounds": (0, 10)},
+        "graph_column_b": {"bounds": (0, float("inf")},
+    }
 
-    def _load_from_parameters(self, vdf_data: dict):
-        """Populate self.vdfs from the parsed "vdfs" section of parameters.yml, e.g.:
+    ***SUPPORTS multiplicative and additive delays, needs to return the absolute congested time rather than a
+    delay or factor***
 
-        vdfs:
-            default: "bpr_tyler"
-            bpr_tyler:
-                function: bpr
-                spec:
-                    alpha:
-                        fillNA: 0.15
-                        bounds: [0, 10]
-                    beta: 4
-            quadratic:
-                functional_form: "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)"
-                derivative_functional_form: "fftime * (2 * a * (link_flows/capacity) + b) / capacity"
-                spec:
-                    a:
-                        fillNA: 0.15
-                        bounds: [0, .inf]
-                    b:
-                        fillNA: 1.0
-                        bounds: [0, .inf]
-        """
-        vdf_data = dict(vdf_data)  # don't mutate the caller's dict
-        self.default = vdf_data.pop("default", None)
+    .. code-block:: python
 
-        for name, entry in vdf_data.items():
-            if entry is None:
-                continue
+        >>> from aequilibrae.paths import VDF
+    """
 
-            if "function" in entry:
-                function_name = str(entry["function"]).lower()
-                if function_name not in FUNCTION_MAP:
-                    raise ValueError(
-                        f"VDF '{name}' references unknown preset function '{entry['function']}'. "
-                        f"Available presets are: {', '.join(FUNCTION_MAP.keys())}."
-                    )
-                func, derivative = FUNCTION_MAP[function_name]
-                self.add_vdf(name, func, entry["spec"], derivative, override_existing=True)
+    def __init__(
+        self,
+        name: str,
+        function: Callable | str,
+        spec: dict,
+        derivative: Callable | str | None = None,
+    ):
+        if isinstance(function, str):
+            function: Callable = self.convert_str_function_into_function(function)
 
-            elif "functional_form" in entry:
-                func = entry["functional_form"]
-                derivative = None
-                if "derivative_functional_form" in entry:
-                    derivative = entry["derivative_functional_form"]
-                self.add_vdf(name, func, entry["spec"], derivative, override_existing=True)
+        if isinstance(derivative, str):
+            derivative: Callable = self.convert_str_function_into_function(derivative)
 
-            else:
-                raise ValueError(
-                    f"VDF '{name}' must define either 'function' (a preset name) or "
-                    "'functional_form' (a custom expression)."
-                )
+        self.name = name
+        self.spec = spec
+
+        self.func = function
+
+        if derivative is None:
+            self.d_func = self.make_finite_difference_derivative()
+        else:
+            self.d_func = derivative
+
+    def make_finite_difference_derivative(self, eps: float = 1e-4) -> Callable:
+        def finite_diff(delta, link_flows, fftime, capacity, cores, **link_attributes):
+            minus_epsilon_congested_time = np.zeros_like(link_flows)
+            plus_epsilon_congested_time = np.zeros_like(link_flows)
+
+            self.apply_vdf(minus_epsilon_congested_time, link_flows - eps, fftime, capacity, cores, **link_attributes)
+            self.apply_vdf(plus_epsilon_congested_time, link_flows + eps, fftime, capacity, cores, **link_attributes)
+            np.subtract(plus_epsilon_congested_time, minus_epsilon_congested_time, out=delta)
+            np.divide(delta, 2 * eps, out=delta)
+
+        return finite_diff
 
     @staticmethod
     def convert_str_function_into_function(function_def: str) -> Callable:
@@ -127,98 +116,6 @@ class VDFsManager:
             # MAKE fftime, capacity into parameters into spec, link flows is in assignment so keep it called "colume"
 
         return func
-
-    def add_vdf(
-        self,
-        name: str,
-        function: Callable | str,
-        spec: dict,
-        derivative: Callable | str | None,
-        override_existing: bool = False,
-    ):
-        # bpr_spec = {"alpha": {"fill_NA": 0.15}, "beta": {"fill_NA": 4.0}}
-        # project.add_vdf(name="bpr_tyler", function="bpr", spec=bpr_spec)
-        # have wrapper in project that passes all arguments here
-        if isinstance(function, str):
-            function: Callable = VDFsManager.convert_str_function_into_function(function)
-        if isinstance(derivative, str):
-            derivative: Callable = VDFsManager.convert_str_function_into_function(derivative)
-        if not override_existing and name in self.vdfs:
-            raise ValueError(f"A volume delay function of name {name} is already stored.")
-        new_vdf = VDF(name, function, spec, derivative)
-        self.vdfs[name] = new_vdf
-
-    def get_vdf(self, name) -> VDF:
-        name_lower = name.lower()
-        if name_lower in FUNCTION_MAP:
-            name = name_lower
-
-        if name not in self.vdfs:
-            raise ValueError(f"VDF of name {name} is not stored.\nAvailable are {', '.join(self.vdfs.keys())}")
-        return self.vdfs[name]
-
-    def add_preset_vdf(self, name: str, custom_name: str = "", spec: dict | None = None):
-        name_lower = name.lower()
-        if name_lower not in FUNCTION_MAP:
-            raise ValueError(f"A preset volume delay function of name {name_lower} does not exist.")
-        if spec is None:
-            spec = DEFAULT_PRESET_SPECS[name_lower]
-        func, derivative = FUNCTION_MAP[name_lower]
-        self.add_vdf(custom_name if custom_name else name, func, spec, derivative)
-
-    @staticmethod
-    def make_preset_vdf(name: str, custom_name: str = "", spec: dict | None = None):
-        name_lower = name.lower()
-        if name_lower not in FUNCTION_MAP:
-            raise ValueError(f"A preset volume delay function of name {name_lower} does not exist.")
-        if spec is None:
-            spec = DEFAULT_PRESET_SPECS[name_lower]
-        func, derivative = FUNCTION_MAP[name_lower]
-        return VDF(custom_name if custom_name else name, func, spec, d_func=derivative)
-
-    def comparison_plots(self):
-        #
-        pass
-
-
-class VDF:
-    """Volume-Delay function
-    spec = {
-        "graph_column_a": {"fill_NA": 5, "bounds": (0, 10)},
-        "graph_column_b": {"bounds": (0, float("inf")},
-    }
-
-    ***SUPPORTS multiplicative and additive delays, needs to return the absolute congested time rather than a
-    delay or factor***
-
-    .. code-block:: python
-
-        >>> from aequilibrae.paths import VDF
-
-
-
-    """
-
-    def __init__(self, name: str, func: Callable, spec: dict, d_func: Callable | None = None):
-        self.name = name
-        self.func = func
-        assert isinstance(spec, dict)
-        self.spec = spec
-        if d_func is None:
-            d_func = self.make_finite_difference_derivative()
-        self.d_func = d_func
-
-    def make_finite_difference_derivative(self, eps: float = 1e-4):
-        def finite_diff(delta, link_flows, fftime, capacity, cores, **link_attributes):
-            minus_epsilon_congested_time = np.zeros_like(link_flows)
-            plus_epsilon_congested_time = np.zeros_like(link_flows)
-
-            self.apply_vdf(minus_epsilon_congested_time, link_flows - eps, fftime, capacity, cores, **link_attributes)
-            self.apply_vdf(plus_epsilon_congested_time, link_flows + eps, fftime, capacity, cores, **link_attributes)
-            np.subtract(plus_epsilon_congested_time, minus_epsilon_congested_time, out=delta)
-            np.divide(delta, 2 * eps, out=delta)
-
-        return finite_diff
 
     def check_valid(self, num_points, link_attributes: dict[str, Any], from_voc: float = 0.0, to_voc: float = 3.0):
         """Checks if the VDF starts at 1 for 0 volume, is increasing, its derivative is positive, and if it is convex
@@ -341,3 +238,45 @@ class VDF:
 
     def apply_derivative(self, delta, link_flows, fftime, capacity, cores: int, **link_attributes):
         self.d_func(delta, link_flows, fftime, capacity, cores, **link_attributes)
+
+
+def load_from_parameters(vdf_data: dict) -> dict[str, VDF]:
+    results = {}
+
+    for name, entry in vdf_data.items():
+        if name == "default":
+            continue
+
+        if "function" in entry:
+            function_name = str(entry["function"]).lower()
+            if function_name not in FUNCTION_MAP:
+                raise ValueError(
+                    f"VDF '{name}' references unknown preset function '{entry['function']}'. "
+                    f"Available presets are: {', '.join(FUNCTION_MAP.keys())}."
+                )
+            func, derivative = FUNCTION_MAP[function_name]
+            default_spec = DEFAULT_PRESET_SPECS[function_name]
+
+            if extra := entry["spec"].keys() - default_spec.keys():
+                raise ValueError(f"found unexpected keys in the specification for '{name}': {extra}")
+
+            results[name] = VDF(name, func, default_spec | entry["spec"], derivative)
+
+        elif "functional_form" in entry:
+            func = entry["functional_form"]
+            derivative = None
+            if "derivative_functional_form" in entry:
+                derivative = entry["derivative_functional_form"]
+            results[name] = VDF(name, func, entry["spec"], derivative)
+
+        else:
+            raise ValueError(
+                f"VDF '{name}' must define either 'function' (a preset name) or "
+                "'functional_form' (a custom expression)."
+            )
+
+    return results
+
+
+def builtin_vdfs() -> dict[str, VDF]:
+    return load_from_parameters({k: {"function": k, "spec": v} for k, v in DEFAULT_PRESET_SPECS.items()})

@@ -6,7 +6,6 @@ from aequilibrae.project.data import Matrices, Results
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.transit.transit import Transit
-from aequilibrae.paths.vdf import VDFsManager
 
 
 class Scenario:
@@ -34,7 +33,6 @@ class Scenario:
     results: Results
     transit: Transit
     zoning: Zoning
-    vdfs_manager: VDFsManager
 
     log_handler: logging.StreamHandler
 

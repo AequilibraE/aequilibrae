@@ -1,8 +1,8 @@
 import logging
-from pathlib import Path
-from typing import Optional
 from copy import deepcopy
 from os import PathLike
+from pathlib import Path
+from typing import Optional
 
 import yaml
 
@@ -81,6 +81,24 @@ class Parameters:
         """Restores parameters to generic default"""
         self.parameters = deepcopy(self._default)
         self.write_back()
+
+    def get_vdfs(self, exclude_builtins: bool = False):
+        from aequilibrae.paths.vdf import builtin_vdfs, load_from_parameters
+
+        vdfs = self.parameters.get("vdfs", None)
+        if vdfs is None:
+            raise ValueError("no 'vdfs' entry in parameters file")
+
+        vdfs = load_from_parameters({k: v for k, v in vdfs.items() if k != "default"})
+
+        if exclude_builtins:
+            return vdfs
+
+        builtins = builtin_vdfs()
+        if conflicts := builtins.keys() & vdfs.keys():
+            raise ValueError(f"cannot name VDF in parameters the same as a built in VDF, found conflicts {conflicts}")
+
+        return builtins | vdfs
 
     @classmethod
     def load_default(cls):

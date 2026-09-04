@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from aequilibrae import VDF, Graph, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import DEFAULT_PRESET_SPECS, FUNCTION_MAP, VDFsManager
+from aequilibrae.paths.vdf import DEFAULT_PRESET_SPECS, FUNCTION_MAP, builtin_vdfs, load_from_parameters
 
 
 @pytest.fixture
@@ -99,17 +99,17 @@ def test_check_bounds_of_vdfs_exclusive(
 
 
 def test_make_preset_vdfs():
-    vdfs = VDFsManager(add_preset_vdfs=True)
-    for vdf_name in FUNCTION_MAP:
-        assert isinstance(vdfs.get_vdf(vdf_name), VDF)
+    vdfs = builtin_vdfs()
 
-    with pytest.raises(ValueError):
-        vdfs.get_vdf("fake_vdf")
+    for vdf_name in FUNCTION_MAP:
+        assert isinstance(vdfs[vdf_name], VDF)
+
+    assert vdfs.keys() == FUNCTION_MAP.keys()
 
 
 def test_vdf_as_parsed_string():
-    vdfs = VDFsManager(
-        vdf_data_from_parameters={
+    vdfs = load_from_parameters(
+        {
             "default": "bpr_tyler",
             "bpr_tyler": {
                 "function": "bpr",
@@ -128,7 +128,7 @@ def test_vdf_as_parsed_string():
             },
         }
     )
-    quadratic_vdf: VDF = vdfs.get_vdf("quadratic")
+    quadratic_vdf: VDF = vdfs["quadratic"]
 
     link_flows = np.full(3, 0.5)
     capacity = np.ones(3)
@@ -163,8 +163,8 @@ def test_vdf_as_parsed_string():
 
 
 def test_finite_difference():
-    vdfs = VDFsManager(
-        vdf_data_from_parameters={
+    vdfs = load_from_parameters(
+        {
             "quadratic": {
                 "functional_form": "fftime * (a * (link_flows/capacity)**2 + b * (link_flows/capacity) + 1)",
                 "spec": {
@@ -174,7 +174,7 @@ def test_finite_difference():
             },
         }
     )
-    quadratic_vdf: VDF = vdfs.get_vdf("quadratic")
+    quadratic_vdf: VDF = vdfs["quadratic"]
 
     link_flows = np.full(3, 0.5)
     capacity = np.ones(3)
@@ -219,7 +219,7 @@ def test_malformed_vdf_parameters():
             "VDF 'quadratic' must define either 'function' (a preset name) or 'functional_form' (a custom expression)."
         ),
     ):
-        VDFsManager(vdf_data_from_parameters=no_function_def_parameters)
+        load_from_parameters(no_function_def_parameters)
 
     no_preset_function = {
         "quadratic": {
@@ -234,7 +234,7 @@ def test_malformed_vdf_parameters():
             f"Available presets are: {', '.join(FUNCTION_MAP.keys())}."
         ),
     ):
-        VDFsManager(vdf_data_from_parameters=no_preset_function)
+        load_from_parameters(no_preset_function)
 
 
 @pytest.mark.parametrize(
@@ -248,8 +248,8 @@ def test_malformed_vdf_parameters():
     ],
 )
 def test_plot_vdf_and_check_valid_vdf(vdf_name, parameter_values, expected_convex):
-    vdfs_preset = VDFsManager(add_preset_vdfs=True)
-    vdf = vdfs_preset.get_vdf(vdf_name)
+    vdfs_preset = builtin_vdfs()
+    vdf = vdfs_preset[vdf_name]
 
     num_points = 300
     link_attributes = {name: np.full(num_points, value, dtype=np.float64) for name, value in parameter_values.items()}
@@ -259,3 +259,70 @@ def test_plot_vdf_and_check_valid_vdf(vdf_name, parameter_values, expected_conve
     assert convex == expected_convex
 
     vdf.plot_vdf(num_points, link_attributes)
+
+
+def test_builtin_vdf_with_bad_paramater_name():
+    with pytest.raises(ValueError, match="found unexpected keys in the specification for 'bpr_tyler': {'a'}"):
+        load_from_parameters(
+            {
+                "default": "bpr_tyler",
+                "bpr_tyler": {
+                    "function": "bpr",
+                    "spec": {
+                        "a": 4,
+                    },
+                },
+            }
+        )
+
+
+def test_exclude_builtin_vdfs_from_project(project):
+    vdfs = project.project_parameters.get_vdfs(exclude_builtins=True)
+
+    assert "bpr_sioux_falls" in vdfs
+
+    builtins = builtin_vdfs()
+    assert all(k not in vdfs for k in builtins.keys())
+
+
+def test_name_matching_builtin_vdfs_from_project_raises(project):
+    p = project.project_parameters
+    p.parameters["vdfs"] = {
+        "bpr": {
+            "function": "bpr",
+            "spec": {
+                "alpha": 4,
+            },
+        },
+    }
+    p.write_back()
+
+    with pytest.raises(
+        ValueError,
+        match="cannot name VDF in parameters the same as a built in VDF, found conflicts {'bpr'}",
+    ):
+        project.project_parameters.get_vdfs(exclude_builtins=False)
+
+
+def test_default_vdf_adds_default_spec():
+    vdfs = load_from_parameters(
+        {
+            "default": "bpr_tyler",
+            "bpr_tyler": {
+                "function": "bpr",
+                "spec": {
+                    "beta": 4,
+                },
+            },
+        }
+    )
+
+    spec = vdfs["bpr_tyler"].spec
+    assert DEFAULT_PRESET_SPECS["bpr"]["alpha"] == spec["alpha"]
+
+
+def test_default_specs_are_applied_for_builtins():
+    vdfs = builtin_vdfs()
+
+    for k, v in vdfs.items():
+        assert v.spec == DEFAULT_PRESET_SPECS[k]
