@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-import matplotlib.pyplot as plt
 import numexpr as ne
 import numpy as np
 
@@ -197,6 +196,13 @@ class VDF:
         """Creates a plot of the vdf using num_points for velocity/capacity in the range [0,3]. Link attributes are
         directly passed self.apply_vdf() and self.apply_derivative, so they may need to be a numpy array the size of
         num_points."""
+
+        try:
+            import matplotlib.pyplot as plt
+        except ModuleNotFoundError as e:
+            e.add_note("VDF plotting requires matplotlib be available in the environment, make sure it is installed")
+            raise
+
         from_voc, to_voc = 0.0, 3.0
         name = self.name
         voc_range = np.linspace(from_voc, to_voc, num_points)
