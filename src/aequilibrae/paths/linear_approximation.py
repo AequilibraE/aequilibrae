@@ -76,6 +76,10 @@ class LinearApproximation(WorkerThread):
             )
         elif assig_spec.vdf_parameters is None:
             raise ValueError("vdf_parameters missing. Setting the algorithm is the last thing to do when assigning.")
+        elif assig_spec.capacity_field is None:
+            raise ValueError("capacity field is not set in TrafficAssignment.")
+        elif assig_spec.time_field is None:
+            raise ValueError("time field is not set in TrafficAssignment.")
 
         self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
@@ -83,6 +87,7 @@ class LinearApproximation(WorkerThread):
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
+        self.capacity = assig_spec.capacity
         self.procedure_id: str = assig_spec.procedure_id
 
         self.iter = 0
@@ -155,6 +160,7 @@ class LinearApproximation(WorkerThread):
             self.vdf_der,
             self.total_flow,
             self.free_flow_tt,
+            self.capacity,
             self.elementwise_cores,
             **self.vdf_parameters,
         )
@@ -197,6 +203,7 @@ class LinearApproximation(WorkerThread):
             self.vdf_der,
             self.total_flow,
             self.free_flow_tt,
+            self.capacity,
             self.elementwise_cores,
             **self.vdf_parameters,
         )
@@ -259,6 +266,7 @@ class LinearApproximation(WorkerThread):
             self.congested_time,
             self.total_flow,
             self.free_flow_tt,
+            self.capacity,
             self.elementwise_cores,
             **self.vdf_parameters,
         )
@@ -727,6 +735,7 @@ class LinearApproximation(WorkerThread):
             self.congested_value,
             x,
             self.free_flow_tt,
+            self.capacity,
             self.elementwise_cores,
             **self.vdf_parameters,
         )
@@ -782,6 +791,7 @@ class LinearApproximation(WorkerThread):
             self._trap_new_cost,
             self._trap_new_flow,
             self.free_flow_tt,
+            self.capacity,
             self.elementwise_cores,
             **self.vdf_parameters,
         )

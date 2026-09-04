@@ -38,7 +38,7 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 
 
 class DummyVDF:
-    def apply_vdf(self, congested_time, link_flows, fftime, cores, offset, scale, capacity):
+    def apply_vdf(self, congested_time, link_flows, fftime, capacity, cores, offset, scale):
         del capacity, cores
         congested_time[:] = fftime + scale * link_flows + offset
 
@@ -53,9 +53,9 @@ def test_stepsize_derivative_uses_total_flow_state():
     assignment.total_flow = assignment.current_assigned_flow + assignment.preload
     assignment.step_direction_flow = np.array([7.0, 8.0])
     assignment.congested_value = np.zeros(2)
-    capacity = np.ones(2)
+    assignment.capacity = np.ones(2)
     assignment.free_flow_tt = np.zeros(2)
-    assignment.vdf_parameters = {"scale": 1.0, "offset": 0.0, "capacity": capacity}
+    assignment.vdf_parameters = {"scale": 1.0, "offset": 0.0}
     assignment.vdf = DummyVDF()
 
     stepsize = 0.25

@@ -58,8 +58,9 @@ def test_save_path_files(assignment_setup):
     assignment.add_class(assigclass)
     assignment.set_save_path_files(True)
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
     assignment.execute()

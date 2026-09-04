@@ -69,7 +69,7 @@ from cython.parallel import prange
 # ------------------------------------------------------------------------------------------------
 
 
-def bpr(congested_times, link_flows, fftime, cores, alpha, beta, capacity):
+def bpr(congested_times, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
     cdef double[:] congested_view = congested_times
@@ -83,7 +83,7 @@ def bpr(congested_times, link_flows, fftime, cores, alpha, beta, capacity):
         bpr_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 
-def delta_bpr(dbpr, link_flows, fftime, cores, alpha, beta, capacity):
+def delta_bpr(dbpr, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
     cdef double[:] dbpr_view = dbpr
@@ -155,7 +155,7 @@ cpdef void dbpr_cython(
 # ------------------------------------------------------------------------------------------------
 
 
-def bpr2(congested_times, link_flows, fftime, cores, alpha, beta, capacity):
+def bpr2(congested_times, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
     cdef double[:] congested_view = congested_times
@@ -168,7 +168,7 @@ def bpr2(congested_times, link_flows, fftime, cores, alpha, beta, capacity):
     bpr2_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 
-def delta_bpr2(dbpr2, link_flows, fftime, cores, alpha, beta, capacity):
+def delta_bpr2(dbpr2, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
     cdef double[:] dbpr2_view = dbpr2
@@ -253,7 +253,7 @@ cpdef void dbpr2_cython(
 # ------------------------------------------------------------------------------------------------
 
 
-def conical(congested_times, link_flows, fftime, cores, alpha, beta, capacity):
+def conical(congested_times, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
     cdef double[:] congested_view = congested_times
@@ -266,7 +266,7 @@ def conical(congested_times, link_flows, fftime, cores, alpha, beta, capacity):
     conical_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 
-def delta_conical(dbpr, link_flows, fftime, cores, alpha, beta, capacity):
+def delta_conical(dbpr, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
     cdef double[:] dbpr_view = dbpr
@@ -352,7 +352,7 @@ cpdef void dconical_cython(
 #                             INRETS FUNCTION AND DERIVATIVE
 # ------------------------------------------------------------------------------------------------
 
-def inrets(congested_times, link_flows, fftime, cores, alpha, capacity):
+def inrets(congested_times, link_flows, fftime, capacity, cores, alpha):
     cdef int c = cores
 
     cdef double[:] congested_view = congested_times
@@ -364,7 +364,7 @@ def inrets(congested_times, link_flows, fftime, cores, alpha, capacity):
     inrets_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, c)
 
 
-def delta_inrets(dbpr, link_flows, fftime, cores, alpha, capacity):
+def delta_inrets(dbpr, link_flows, fftime, capacity, cores, alpha):
     cdef int c = cores
 
     cdef double[:] dbpr_view = dbpr
@@ -446,7 +446,7 @@ cpdef void dinrets_cython(
 # ------------------------------------------------------------------------------------------------
 
 
-def akcelik(congested_times, link_flows, fftime, cores, alpha, tau, length, capacity):
+def akcelik(congested_times, link_flows, fftime, capacity, cores, alpha, tau, length):
     cdef int c = cores
 
     cdef double[:] congested_view = congested_times
@@ -460,7 +460,7 @@ def akcelik(congested_times, link_flows, fftime, cores, alpha, tau, length, capa
     akcelik_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, length_view, c)
 
 
-def delta_akcelik(d_akcelik, link_flows, fftime, cores, alpha, tau, length, capacity):
+def delta_akcelik(d_akcelik, link_flows, fftime, capacity, cores, alpha, tau, length):
     cdef int c = cores
 
     cdef double[:] d_akcelik_view = d_akcelik

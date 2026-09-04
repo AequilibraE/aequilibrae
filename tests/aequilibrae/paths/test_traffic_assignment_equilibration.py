@@ -60,7 +60,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     proj = assignment.project
     assignment.add_class(assigclass)
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
+    assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
     assignment.set_algorithm("msa")
@@ -134,40 +135,40 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
     assert file_text.count(tc_matrix) > 1
 
     assig_1 = (
-        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
-        "'VDF function': 'bpr', "
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, "
         "'Target RGAP': 0.0001}}"
     ).format(num_cores)
     assert assig_1 in file_text
 
     assig_2 = (
-        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
-        "'VDF function': 'bpr', "
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, "
         "'Target RGAP': 0.001}}"
     ).format(num_cores)
     assert assig_2 in file_text
 
     assig_3 = (
-        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
-        "'VDF function': 'bpr', "
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', "
         "'Maximum iterations': 500, 'Target RGAP': 0.001}}"
     ).format(num_cores)
     assert assig_3 in file_text
 
     assig_4 = (
-        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
-        "'VDF function': 'bpr', "
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, "
         "'Target RGAP': 0.001}}"
     ).format(num_cores)
     assert assig_4 in file_text
 
     assig_5 = (
-        "INFO ; {{'Number of cores': {}, 'VDF parameters': {{'alpha': 'b', 'beta': 'power', 'capacity': 'capacity'}}, "
-        "'VDF function': 'bpr', "
+        "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
+        "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, "
         "'Target RGAP': 0.001}}"
     ).format(num_cores)
@@ -181,8 +182,9 @@ def test_execute_no_project(project, assignment, assigclass):
     assignment = type(assignment)()
     assignment.add_class(assigclass)
     bpr = VDFsManager.make_preset_vdf("bpr")
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 10
     assignment.set_algorithm("msa")
     assignment.execute()

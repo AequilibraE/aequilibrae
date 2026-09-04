@@ -19,7 +19,7 @@ def test_conical_function():
     capacity.fill(1)
     link_flows = np.arange(11).astype(float) * 0.2
 
-    conical(congested_times, link_flows, fftime, cores, alpha, beta, capacity)
+    conical(congested_times, link_flows, fftime, capacity, cores, alpha, beta)
 
     should_be = np.array(
         [
@@ -46,8 +46,8 @@ def test_conical_function():
         link_flows.fill(1 * 0.2 * i)
         link_flows += np.arange(11) * dx
 
-        conical(congested_times, link_flows, fftime, cores, alpha, beta, capacity)
-        delta_conical(delta, link_flows, fftime, cores, alpha, beta, capacity)
+        conical(congested_times, link_flows, fftime, capacity, cores, alpha, beta)
+        delta_conical(delta, link_flows, fftime, capacity, cores, alpha, beta)
 
         # The derivative needs to be monotonically increasing.
         assert delta[1] > delta[0], "Delta is not increasing as it should"

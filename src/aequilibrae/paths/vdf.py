@@ -37,27 +37,22 @@ DEFAULT_PRESET_SPECS = {
     "bpr": {
         "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
         "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
-        "capacity": {"bounds": (0, float("inf"))},
     },
     "bpr2": {
         "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
         "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
-        "capacity": {"bounds": (0, float("inf"))},
     },
     "conical": {
         "alpha": {"fill_NA": 2.0, "bounds": (1.0, float("inf")), "inclusive_lower": False},
         "beta": {"fill_NA": 1.5, "bounds": (1.0, float("inf")), "inclusive_lower": False},
-        "capacity": {"bounds": (0, float("inf"))},
     },
     "inrets": {
         "alpha": {"fill_NA": 1.0, "bounds": (0.0, 1.0)},
-        "capacity": {"bounds": (0, float("inf"))},
     },
     "akcelik": {
         "alpha": {"fill_NA": 0.25, "bounds": (0.0, 1.0)},
         "tau": {"fill_NA": 0.8, "bounds": (0.0, float("inf"))},
         "length": {"bounds": (0, float("inf"))},
-        "capacity": {"bounds": (0, float("inf"))},
     },
 }
 
@@ -126,13 +121,13 @@ class VDFsManager:
 
     @staticmethod
     def convert_str_function_into_function(function_def: str) -> Callable:
-        def func(out: np.ndarray, link_flows, fftime, cores, **link_attributes):
+        def func(out: np.ndarray, link_flows, fftime, capacity, cores, **link_attributes):
             # def bpr(congested_times, link_flows, capacity, fftime, cores, alpha, beta):
 
             ne.evaluate(
                 function_def,
                 out=out,
-                local_dict={"link_flows": link_flows, "fftime": fftime} | link_attributes,
+                local_dict={"link_flows": link_flows, "fftime": fftime, "capacity": capacity} | link_attributes,
                 global_dict={},
                 # disable_cache=True,
             )
@@ -221,12 +216,12 @@ class VDF:
         self.d_func = d_func
 
     def make_finite_difference_derivative(self, eps: float = 1e-4):
-        def finite_diff(delta, link_flows, fftime, cores, **link_attributes):
+        def finite_diff(delta, link_flows, fftime, capacity, cores, **link_attributes):
             minus_epsilon_congested_time = np.zeros_like(link_flows)
             plus_epsilon_congested_time = np.zeros_like(link_flows)
 
-            self.apply_vdf(minus_epsilon_congested_time, link_flows - eps, fftime, cores, **link_attributes)
-            self.apply_vdf(plus_epsilon_congested_time, link_flows + eps, fftime, cores, **link_attributes)
+            self.apply_vdf(minus_epsilon_congested_time, link_flows - eps, fftime, capacity, cores, **link_attributes)
+            self.apply_vdf(plus_epsilon_congested_time, link_flows + eps, fftime, capacity, cores, **link_attributes)
             np.subtract(plus_epsilon_congested_time, minus_epsilon_congested_time, out=delta)
             np.divide(delta, 2 * eps, out=delta)
 
@@ -284,16 +279,16 @@ class VDF:
 
     def _get_fake_vdf_values(self, voc_range: np.ndarray, link_attributes: dict[str, Any]):
         size = voc_range.shape[0]
-
-        size = voc_range.shape[0]
         function_values = np.zeros(size, dtype=np.float64)
         derivative_values = np.zeros(size, dtype=np.float64)
         fftime = np.ones(size, dtype=np.float64)
+        capacity = np.ones(size, dtype=np.float64)
 
         self.apply_vdf(
             function_values,
             voc_range,
             fftime,
+            capacity,
             1,
             **link_attributes,
         )
@@ -301,6 +296,7 @@ class VDF:
             derivative_values,
             voc_range,
             fftime,
+            capacity,
             1,
             **link_attributes,
         )
@@ -349,8 +345,8 @@ class VDF:
         print(f"Saved: {os.path.join(output_dir, filename)}")
         plt.close()
 
-    def apply_vdf(self, congested_time, link_flows, fftime, cores: int, **link_attributes):
-        self.func(congested_time, link_flows, fftime, cores, **link_attributes)
+    def apply_vdf(self, congested_time, link_flows, fftime, capacity, cores: int, **link_attributes):
+        self.func(congested_time, link_flows, fftime, capacity, cores, **link_attributes)
 
-    def apply_derivative(self, delta, link_flows, fftime, cores: int, **link_attributes):
-        self.d_func(delta, link_flows, fftime, cores, **link_attributes)
+    def apply_derivative(self, delta, link_flows, fftime, capacity, cores: int, **link_attributes):
+        self.d_func(delta, link_flows, fftime, capacity, cores, **link_attributes)

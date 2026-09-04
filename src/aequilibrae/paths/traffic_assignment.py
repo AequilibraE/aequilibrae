@@ -215,10 +215,11 @@ class TrafficAssignment(AssignmentBase):
 
         # Then we set the volume delay function and its parameters
         >>> bpr = VDFsManager.make_preset_vdf("bpr") # This is not case-sensitive
-        >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power", "capacity": "capacity"})
+        >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
-        # The free flow travel times as they exist in the graph
+        # The free flow travel times and capacities as they exist in the graph
         >>> assig.set_time_field("free_flow_time")
+        >>> assig.set_capacity_field("capacity")
 
         # And the algorithm we want to use to assign
         >>> assig.set_algorithm('bfw')
@@ -349,12 +350,6 @@ class TrafficAssignment(AssignmentBase):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
-        # set cores from one class
-        c = self.classes[0]
-        self.elementwise_cores = c.results.elementwise_cores
-        self.threading_threshold = c.results.threading_threshold
-        self.cores = c.results.cores
-        self._config["Number of cores"] = c.results.cores
 
     def add_class(self, traffic_class: TrafficClass) -> None:
         """
@@ -369,12 +364,6 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
-        if len(self.classes) == 1:
-            c = self.classes[0]
-            self.elementwise_cores = c.results.elementwise_cores
-            self.threading_threshold = c.results.threading_threshold
-            self.cores = c.results.cores
-            self._config["Number of cores"] = c.results.cores
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
@@ -538,6 +527,25 @@ class TrafficAssignment(AssignmentBase):
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self._config["Time field"] = time_field
 
+    def set_capacity_field(self, capacity_field: str) -> None:
+        """
+        Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
+        :Arguments:
+            **capacity_field** (:obj:`str`): Field name
+        """
+        super()._check_field(capacity_field)
+        c = self.classes[0]
+        self.cores = c.results.cores
+        self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
+        self.capacity_field = capacity_field
+        self._config["Number of cores"] = c.results.cores
+        self._config["Capacity field"] = capacity_field
+
+        # also set threading cores
+        self.elementwise_cores = c.results.elementwise_cores
+        self.threading_threshold = c.results.threading_threshold
+
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
         Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
@@ -674,9 +682,8 @@ class TrafficAssignment(AssignmentBase):
         res1 = assig_results[0]
 
         tot_flow = self.assignment.total_flow[idx]
-        if "capacity" in self.vdf_parameters:
-            capacity = self.vdf_parameters["capacity"]
-            voc = tot_flow / capacity[idx]
+        capacity = self.capacity
+        voc = tot_flow / capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
         if self.assignment.preload is None:

@@ -54,8 +54,10 @@ assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
 assig.add_class(assigclass)
 bpr = VDFsManager.make_preset_vdf("bpr")
-assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0, "capacity": "capacity"})
+assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
 assig.set_time_field("free_flow_time")
+assig.set_capacity_field("capacity")
+
 assig.set_algorithm("bfw")
 assig.max_iter = 50
 assig.rgap_target = 0.001

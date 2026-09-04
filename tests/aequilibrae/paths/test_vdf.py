@@ -41,19 +41,11 @@ def assignment(project):
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[
-            (k, {"alpha": "b", "beta": "power", "capacity": "capacity"})
-            for k in FUNCTION_MAP
-            if (k != "akcelik" and k != "conical")
-        ],
-        *[
-            (k, {"alpha": 0.15, "beta": 4.0, "capacity": "capacity"})
-            for k in FUNCTION_MAP
-            if (k != "akcelik" and k != "conical")
-        ],
-        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance", "capacity": "capacity"}),
-        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
-        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
+        *[(k, {"alpha": "b", "beta": "power"}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
+        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
+        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
     ],
 )
 def test_set_vdf_with_parameters(
@@ -71,18 +63,10 @@ def test_set_vdf_with_parameters(
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[
-            (k, {"alpha": -1, "beta": "power", "capacity": "capacity"})
-            for k in FUNCTION_MAP
-            if (k != "akcelik" and k != "conical")
-        ],
-        *[
-            (k, {"alpha": -1, "beta": 4.0, "capacity": "capacity"})
-            for k in FUNCTION_MAP
-            if (k != "akcelik" and k != "conical")
-        ],
-        ("akcelik", {"alpha": -1, "tau": "power", "length": "distance", "capacity": "capacity"}),
-        ("akcelik", {"alpha": -1, "tau": 0.1 * 8.0, "length": "distance", "capacity": "capacity"}),
+        *[(k, {"alpha": -1, "beta": "power"}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        *[(k, {"alpha": -1, "beta": 4.0}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        ("akcelik", {"alpha": -1, "tau": "power", "length": "distance"}),
+        ("akcelik", {"alpha": -1, "tau": 0.1 * 8.0, "length": "distance"}),
     ],
 )
 def test_check_bounds_of_vdfs_inclusive(
@@ -132,7 +116,6 @@ def test_vdf_as_parsed_string():
                 "spec": {
                     "alpha": {"fill_NA": 0.15, "bounds": [0, 10]},
                     "beta": 4,
-                    "capacity": {"bounds": [0, float("inf")]},
                 },
             },
             "quadratic": {
@@ -141,7 +124,6 @@ def test_vdf_as_parsed_string():
                 "spec": {
                     "a": {"fill_NA": 0.15, "bounds": [0, float("inf")]},
                     "b": {"fill_NA": 1.0, "bounds": [0, float("inf")]},
-                    "capacity": {"bounds": [0, float("inf")]},
                 },
             },
         }
@@ -158,10 +140,10 @@ def test_vdf_as_parsed_string():
         output,
         link_flows,
         free_flow_time,
+        capacity,
         1,
         a=a,
         b=b,
-        capacity=capacity,
     )
     expected = free_flow_time * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
     np.testing.assert_array_equal(expected, output)
@@ -171,10 +153,10 @@ def test_vdf_as_parsed_string():
         derivative_output,
         link_flows,
         free_flow_time,
+        capacity,
         1,
         a=a,
         b=b,
-        capacity=capacity,
     )
     expected_derivative = free_flow_time * (2 * a * (link_flows / capacity) + b) / capacity
     np.testing.assert_array_equal(expected_derivative, derivative_output)
@@ -188,7 +170,6 @@ def test_finite_difference():
                 "spec": {
                     "a": {"fill_NA": 0.15, "bounds": [0, float("inf")]},
                     "b": {"fill_NA": 1.0, "bounds": [0, float("inf")]},
-                    "capacity": {"bounds": [0, float("inf")]},
                 },
             },
         }
@@ -205,10 +186,10 @@ def test_finite_difference():
         derivative_output,
         link_flows,
         free_flow_time,
+        capacity,
         1,
         a=a,
         b=b,
-        capacity=capacity,
     )
     expected = free_flow_time * (2 * a * (link_flows / capacity) + b) / capacity
     np.testing.assert_allclose(expected, derivative_output)
@@ -259,11 +240,11 @@ def test_malformed_vdf_parameters():
 @pytest.mark.parametrize(
     "vdf_name, parameter_values, expected_convex",
     [
-        ("bpr", {"alpha": 0.15, "beta": 4.0, "capacity": 1.0}, True),
-        ("bpr2", {"alpha": 0.15, "beta": 4.0, "capacity": 1.0}, True),
-        ("conical", {"alpha": 2.0, "beta": 1.5, "capacity": 1.0}, True),
-        ("inrets", {"alpha": 0.9, "capacity": 1.0}, False),
-        ("akcelik", {"alpha": 0.25, "tau": 0.8, "length": 1.0, "capacity": 1.0}, True),
+        ("bpr", {"alpha": 0.15, "beta": 4.0}, True),
+        ("bpr2", {"alpha": 0.15, "beta": 4.0}, True),
+        ("conical", {"alpha": 2.0, "beta": 1.5}, True),
+        ("inrets", {"alpha": 0.9}, False),
+        ("akcelik", {"alpha": 0.25, "tau": 0.8, "length": 1.0}, True),
     ],
 )
 def test_plot_vdf_and_check_valid_vdf(tmp_path, vdf_name, parameter_values, expected_convex):

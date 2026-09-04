@@ -117,18 +117,19 @@ from aequilibrae.paths.cython.vdf_core import (
 bpr_spec = {
     "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
     "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
-    "capacity": {"bounds": (0, float("inf"))},
 }
 project.add_vdf(name="bpr_tyler", function=bpr, derivative=delta_bpr, spec=bpr_spec)
 
 # VDFs are stored in project
 vdf = project.get_vdf(name="bpr_tyler")
-assig.set_vdf(vdf, name_mapping={"alpha": "b", "beta": "power", "capacity": "capacity"})
+assig.set_vdf(vdf, name_mapping={"alpha": "b", "beta": "power"})
 
 # Then we set the volume delay function and its parameters
 
 # The capacity and free flow travel times as they exist in the graph
 assig.set_time_field("free_flow_time")
+assig.set_capacity_field("capacity")
+
 
 # And the algorithm we want to use to assign
 assig.set_algorithm("bfw")
@@ -377,18 +378,20 @@ def quadratic_derivative(delta, link_flows, fftime, cores, a, b, capacity):
 project.add_vdf(
     "quadratic",
     quadratic,
-    {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}, "capacity": {"fill_NA": 100}},
+    {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}},
     quadratic_derivative,
 )
 vdf = project.get_vdf("quadratic")
 
 # Then we set the volume delay function and its parameters
-assig.set_vdf(vdf, {"a": 0.15, "b": 1.0, "capacity": "capacity"})
+assig.set_vdf(vdf, {"a": 0.15, "b": 1.0})
 
 # when specifying this, if it is a constant, it is used over all else
 
 # Set the free flow travel times as they exist in the graph
 assig.set_time_field("free_flow_time")
+assig.set_capacity_field("capacity")
+
 
 # And the algorithm we want to use to assign
 assig.set_algorithm("bfw")
