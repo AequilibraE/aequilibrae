@@ -30,7 +30,6 @@ from tempfile import gettempdir
 from uuid import uuid4
 
 import pandas as pd
-import numpy as np
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
@@ -123,11 +122,6 @@ project.add_vdf(name="bpr_tyler", function=bpr, derivative=delta_bpr, spec=bpr_s
 
 # VDFs are stored in project
 vdf = project.get_vdf(name="bpr_tyler")
-vdf.plot_vdf(100, {"alpha": np.full(100, 0.15, dtype=np.float64), "beta": np.full(100, 4.0, dtype=np.float64)})
-
-#  %%
-
-
 assig.set_vdf(vdf, name_mapping={"alpha": "b", "beta": "power"})
 
 # Then we set the volume delay function and its parameters
