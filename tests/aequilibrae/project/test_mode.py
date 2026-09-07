@@ -1,50 +1,46 @@
-import random
-import string
+import pandas as pd
 import pytest
 
-from aequilibrae.project.network.mode import Mode
+from aequilibrae.project.network.modes import Modes
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
-def get_random_string():
-    letters = [random.choice(string.ascii_letters + "_") for _ in range(20)]
-    return "".join(letters)
+@pytest.fixture
+def modes():
+    manager = NestedTransactionManager(":memory:")
+    manager._connection.execute(
+        """CREATE TABLE modes (
+            mode_name TEXT UNIQUE NOT NULL,
+            mode_id TEXT PRIMARY KEY CHECK (length(mode_id) = 1),
+            description TEXT,
+            pce NUMERIC NOT NULL DEFAULT 1,
+            vot NUMERIC NOT NULL DEFAULT 0,
+            ppv NUMERIC NOT NULL DEFAULT 1
+        )"""
+    )
+    yield Modes(manager)
+    manager.close()
 
 
-def test_build(empty_no_triggers_project):
-    for val in ["1", "ab", "", None]:
-        with pytest.raises(ValueError):
-            Mode(val, empty_no_triggers_project)
-    for _ in range(10):
-        letter = random.choice(string.ascii_letters)
-        m = Mode(letter, empty_no_triggers_project)
-        del m
+def test_bulk_insert_and_update_use_explicit_string_keys(modes):
+    additions = pd.DataFrame(
+        {
+            "mode_id": ["c", "b"],
+            "mode_name": ["car", "bicycle"],
+            "description": ["Motorized", "Human powered"],
+        }
+    )
+    original = additions.copy()
+
+    assert modes.insert_from(additions) == ["c", "b"]
+    pd.testing.assert_frame_equal(additions, original)
+
+    changes = pd.DataFrame({"mode_id": ["c", "b"], "vot": [12.5, 3.0]})
+    assert modes.update_from(changes) == 2
+    assert {mode.mode_id: mode.vot for mode in modes} == {"c": 12.5, "b": 3}
 
 
-def test_changing_mode_id(empty_no_triggers_project):
-    m = Mode("c", empty_no_triggers_project)
-    with pytest.raises(ValueError):
-        m.mode_id = "test my description"
-
-
-def test_save(sioux_falls_example):
-    random_string = get_random_string()
-    with sioux_falls_example.db_connection as conn:
-        letter = random.choice([x[0] for x in conn.execute("select mode_id from 'modes'").fetchall()])
-        m = Mode(letter, sioux_falls_example)
-        m.mode_name = random_string
-        m.description = random_string[::-1]
-        m.save()
-        desc, mname = conn.execute(f'select description, mode_name from modes where mode_id="{letter}"').fetchone()
-        assert desc == random_string[::-1], "Didn't save the mode description correctly"
-        assert mname == random_string, "Didn't save the mode name correctly"
-
-
-def test_empty(empty_no_triggers_project):
-    a = Mode("k", empty_no_triggers_project)
-    a.mode_name = "just a_test"
-    with pytest.raises(ValueError):
-        a.save()
-    a = Mode("l", empty_no_triggers_project)
-    a.mode_name = "just_a_test_test_with_l"
-    with pytest.raises(ValueError):
-        a.save()
+def test_bulk_insert_requires_mode_id(modes):
+    frame = pd.DataFrame({"mode_name": ["car"]})
+    with pytest.raises(ValueError, match="non-numeric key tables"):
+        modes.insert_from(frame)

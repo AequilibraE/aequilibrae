@@ -10,7 +10,7 @@ def table_name(request):
 
 @pytest.fixture(scope="function")
 def table(empty_project, table_name):
-    return FieldEditor(empty_project, table_name)
+    return FieldEditor(empty_project.db_connection, table_name)
 
 
 @pytest.fixture(scope="function")
@@ -19,9 +19,9 @@ def field_name(table):
 
 
 @pytest.fixture(scope="function")
-def attribute_count(table, table_name):
+def attribute_count(empty_project, table_name):
     qry = f'select count(*) from "attributes_documentation" where name_table="{table_name}"'
-    with table.project.db_connection as conn:
+    with empty_project.db_connection as conn:
         return conn.execute(qry).fetchone()[0]
 
 
@@ -80,9 +80,9 @@ def test_retrieve_existing_field(table, attribute, description):
     ],
 )
 def test_save(empty_project, table_name, attribute):
-    table = FieldEditor(empty_project, table_name)
+    table = FieldEditor(empty_project.db_connection, table_name)
     random_val = "some_value"
     setattr(table, attribute, random_val)
     table.save()
-    table2 = FieldEditor(empty_project, table_name)
+    table2 = FieldEditor(empty_project.db_connection, table_name)
     assert getattr(table2, attribute) == random_val, "Did not save values properly"

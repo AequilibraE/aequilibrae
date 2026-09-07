@@ -25,7 +25,6 @@ def route_choice_setup(sioux_falls_single_class):
     yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": RouteChoice(graph)}
 
     mat.close()
-    sioux_falls_single_class.close()
 
 
 def test_prepare(route_choice_setup):

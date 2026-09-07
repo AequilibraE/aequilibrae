@@ -7,14 +7,17 @@ import shapely.wkb
 from shapely import union_all
 from shapely.geometry import Polygon
 
+from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.importers import Importer
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.periods import Periods
+from aequilibrae.project.network.zones import Zones
 from aequilibrae.project.project_creation import protected_fields, req_link_flds, req_node_flds
 from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.db_utils import ConnectionClosure
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
@@ -35,17 +38,30 @@ class Network(WorkerThread):
     link_types: LinkTypes
     signal = SIGNAL(object)
 
-    def __init__(self, project: "Project") -> None:
+    def __init__(self, connections: ConnectionClosure, project=None) -> None:
         WorkerThread.__init__(self, None)
 
         self.graphs: dict = {}
-        self.project = project
-        self.modes = Modes(self)
-        self.link_types = LinkTypes(self)
-        self.links = Links(self)
-        self.nodes = Nodes(self)
-        self.periods = Periods(self)
+        self.__connections = connections
+        self.__project = project  # HACK
+
+        self.modes = Modes(self.__connections.db_connection)
+        self.link_types = LinkTypes(self.__connections.db_connection)
+        self.links = Links(self.__connections.db_connection)
+        self.nodes = Nodes(self.__connections.db_connection)
+        self.periods = Periods(self.__connections.db_connection)
+        self.zones = Zones(self.__connections.db_connection)
         self.importer = Importer(self)
+
+    @property
+    def project(self) -> "Project":
+        """The project this network belongs to."""
+        return self.__project
+
+    @property
+    def connections(self) -> ConnectionClosure:
+        """The database connections for the scenario this network belongs to."""
+        return self.__connections
 
     def skimmable_fields(self) -> list:
         """
@@ -55,7 +71,7 @@ class Network(WorkerThread):
             :obj:`list`: List of all fields that can be skimmed
         """
 
-        with self.project.db_connection as conn:
+        with self.__connections.db_connection as conn:
             field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
         ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
@@ -105,15 +121,21 @@ class Network(WorkerThread):
             :obj:`list`: List of all modes
         """
 
-        with self.project.db_connection as conn:
+        with self.__connections.db_connection as conn:
             all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
 
-    def export_to_gmns(self, path: str) -> None:
-        """Export the network to GMNS CSV files in ``path``."""
-        from aequilibrae.project.network.gmns_exporter import GMNSExporter
+    def export_to_gmns(self, path: str):
+        """
+        Exports AequilibraE network to csv files in GMNS format.
 
-        GMNSExporter(self, path).doWork()
+        :Arguments:
+            **path** (:obj:`str`): Output folder path.
+        """
+
+        gmns_exporter = GMNSExporter(self.links, self.nodes, self.modes, path)
+        gmns_exporter.doWork()
+
         logger.info("Network exported successfully")
 
     def build_graphs(
@@ -149,7 +171,7 @@ class Network(WorkerThread):
         """
         from aequilibrae.paths import Graph
 
-        with self.project.db_connection as conn:
+        with self.__connections.db_connection as conn:
             if fields is None:
                 field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
@@ -255,7 +277,7 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        with self.project.db_connection as conn:
+        with self.__connections.db_connection as conn:
             poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
@@ -265,12 +287,12 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        with self.project.db_connection as conn:
+        with self.__connections.db_connection as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return union_all(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        with self.project.db_connection as conn:
+        with self.__connections.db_connection as conn:
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c

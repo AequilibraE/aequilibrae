@@ -11,7 +11,7 @@ Let's consider that you have an OD-matrix, the future production and future attr
 
 *How would your trip distribution matrix using IPF look like?*
 
-The data used in this example comes from Table 5.6 in 
+The data used in this example comes from Table 5.6 in
 `Ortúzar & Willumsen (2011) <https://www.wiley.com/en-us/Modelling+Transport%2C+4th+Edition-p-9780470760390>`_.
 
 """
@@ -54,11 +54,13 @@ future_attr = np.array([260, 400, 500, 802], dtype="float64")
 num_zones = matrix.shape[0]
 
 # %%
+
 mtx = AequilibraeMatrix()
 mtx.create_empty(file_name=join(folder, "matrix.aem"), zones=num_zones)
 mtx.index[:] = np.arange(1, num_zones + 1)[:]
 mtx.matrices[:, :, 0] = matrix[:]
 mtx.computational_view()
+
 
 # %%
 args = {

@@ -130,5 +130,13 @@ class Importer:
         """
         from aequilibrae.project.network.gmns_builder import GMNSBuilder
 
-        GMNSBuilder(self._network, link_file_path, node_file_path, use_group_path, geometry_path, srid).doWork()
+        GMNSBuilder(
+            self._network,
+            link_file_path,
+            node_file_path,
+            self._network.connections,
+            use_group_path,
+            geometry_path,
+            srid,
+        ).doWork()
         logger.info("Network built successfully")

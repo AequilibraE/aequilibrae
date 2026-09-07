@@ -6,12 +6,11 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 import yaml
-from aequilibrae.distribution.cython.ipf_core import ipf_core
 
 from aequilibrae.context import get_active_project
+from aequilibrae.distribution.cython.ipf_core import ipf_core
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.utils.core_setter import resolve_cores
-from aequilibrae.project.data.matrix_record import MatrixRecord
 
 
 class Ipf:
@@ -204,7 +203,7 @@ class Ipf:
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
 
-    def save_to_project(self, name: str, file_name: str, project=None) -> MatrixRecord:
+    def save_to_project(self, name: str, file_name: str, project=None):
         """Saves the matrix output to the project file
 
         :Arguments:
@@ -218,11 +217,14 @@ class Ipf:
 
         project = project or get_active_project()
         mats = project.matrices
-        record = mats.new_record(name, file_name, self.output)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Iterative Proportional fitting"
-        record.save()
+        record = mats.create(
+            name,
+            file_name,
+            self.output,
+            procedure="Iterative Proportional fitting",
+            procedure_id=self.procedure_id,
+            timestamp=self.procedure_date,
+        )
         return record
 
     def __tot_rows(self, matrix):

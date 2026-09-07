@@ -1,16 +1,17 @@
 import logging
 from sqlite3 import Connection
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import geopandas as gpd
 from scipy.spatial import KDTree
-from shapely.geometry import LineString, MultiPolygon
+from shapely.geometry import LineString, Polygon
+
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 if TYPE_CHECKING:
-    from aequilibrae.project.network import Network
-
+    from aequilibrae.project.network.links import Links
 
 INFINITE_CAPACITY = 99999
 
@@ -20,26 +21,28 @@ logger = logging.getLogger(__name__)
 def connector_creation(
     zone_id: int,
     mode_id: str,
-    network: "Network",
+    project_connection: NestedTransactionManager,
+    links: "Links",
     proj_nodes: gpd.GeoDataFrame,
     proj_links: gpd.GeoDataFrame,
     link_types: str = "",
     connectors: int = 1,
-    conn: Optional[Connection] = None,
-    delimiting_area: Optional[MultiPolygon] = None,
+    delimiting_area: Polygon | None = None,
 ) -> None:
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    with conn or network.project.db_connection as connec:
-        if sum(connec.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone()) == 0:
-            logger.warning("This centroid does not exist. Please create it first")
-            return
+    if (
+        sum(project_connection._connection.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone())
+        == 0
+    ):
+        logger.warning("This centroid does not exist. Please create it first")
+        return
 
-        sql = "select count(*) from links where a_node=? and instr(modes,?) > 0"
-        if connec.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
-            logger.warning("Mode is already connected")
-            return
+    sql = "select count(*) from links where a_node=? and instr(modes,?) > 0"
+    if project_connection._connection.execute(sql, [zone_id, mode_id]).fetchone()[0] > 0:
+        logger.warning("Mode is already connected")
+        return
 
     centroid: pd.DataFrame = proj_nodes.query("node_id == @zone_id")
     centroid = centroid.rename(columns={"node_id": "zone_id"})[["zone_id", "geometry"]]
@@ -62,27 +65,25 @@ def connector_creation(
 
     # Check if link with a/b nodes exists to avoid unnecessary repetition
     centr_geo = centroid.geometry.values[0]
-    links = network.links
     query = (
         "(a_node==@zone_id | b_node==@zone_id) & "
         "(a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"
     )
-    for _, rec in joined.iterrows():
-        link_exist = proj_links.query(query)
-        if link_exist.empty:
-            link = links.new()
-            link.geometry = LineString([centr_geo, rec.geometry])
-            link.modes = mode_id
-            link.direction = 0
-            link.link_type = "centroid_connector"
-            link.name = f"centroid connector zone {zone_id}"
-            link.capacity_ab = INFINITE_CAPACITY
-            link.capacity_ba = INFINITE_CAPACITY
-            link.save(conn)
-        else:
-            link = links.get(link_exist.link_id.values[0])
-            link.add_mode(mode_id)
-            link.save(conn)
+    with project_connection.transaction():
+        for _, rec in joined.iterrows():
+            link_exist = proj_links.query(query)
+            if link_exist.empty:
+                links.insert(
+                    geometry=LineString([centr_geo, rec.geometry]),
+                    modes=mode_id,
+                    direction=0,
+                    link_type="centroid_connector",
+                    name=f"centroid connector zone {zone_id}",
+                    capacity_ab=INFINITE_CAPACITY,
+                    capacity_ba=INFINITE_CAPACITY,
+                )
+            else:
+                links.add_mode(link_exist.link_id.values[0], mode_id)
 
     if not joined.empty:
         logger.info(f"{joined.shape[0]} new centroid connectors for mode {mode_id} added for centroid {zone_id}")
@@ -232,15 +233,11 @@ def bulk_connector_creation(
         f"VALUES(?,?,?,?,0,'centroid_connector',{INFINITE_CAPACITY},{INFINITE_CAPACITY}, "
         f"'centroid connector zone ' || ?2,GeomFromWKB(?, 4326))"
     )
-    with conn:
-        conn.executemany(existing_connectors_sql, existing_connectors[["modes", "link_id"]].to_records(index=False))
-        conn.executemany(
-            new_connectors_sql,
-            connectors[["link_id", "a_node", "b_node", "modes", "geometry"]]
-            .to_crs(4326)
-            .to_wkb()
-            .to_records(index=False),
-        )
+    conn.executemany(existing_connectors_sql, existing_connectors[["modes", "link_id"]].to_records(index=False))
+    conn.executemany(
+        new_connectors_sql,
+        connectors[["link_id", "a_node", "b_node", "modes", "geometry"]].to_crs(4326).to_wkb().to_records(index=False),
+    )
 
 
 def k_nearest(

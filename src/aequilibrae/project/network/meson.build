@@ -6,18 +6,13 @@ pyfiles = [
   'gmns_builder.py',
   'gmns_exporter.py',
   'importers.py',
-  'link.py',
-  'link_type.py',
   'link_types.py',
   'links.py',
-  'mode.py',
   'modes.py',
   'network.py',
-  'node.py',
   'nodes.py',
-  'period.py',
   'periods.py',
-  'safe_class.py',
+  'zones.py',
 ]
 
 pkgs = [

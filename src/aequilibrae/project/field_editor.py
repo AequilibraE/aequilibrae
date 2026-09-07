@@ -1,11 +1,7 @@
 import logging
 import re
 import string
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, List, NoReturn, Optional
-
-if TYPE_CHECKING:
-    from aequilibrae.project import Project
+from typing import List, NoReturn
 
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
@@ -41,8 +37,8 @@ class FieldEditor:
 
     _allowed_characters = ALLOWED_CHARACTERS
 
-    def __init__(self, project: "Project", table_name: str) -> None:
-        self.project = project
+    def __init__(self, connection, table_name: str) -> None:
+        self._transaction_manager = connection
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -110,7 +106,7 @@ class FieldEditor:
                 logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
         logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
-        with self.project.db_connection as conn:
+        with self._transaction_manager.transaction() as conn:
             conn.execute(f"SELECT InvalidateLayerStatistics('{self._table}');")
             conn.execute(f"SELECT UpdateLayerStatistics('{self._table}');")
         logger.info(f"Updated layer statistics for {self._table}")
@@ -147,12 +143,10 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        with self.project.db_connection as conn:
-            dt = conn.execute(qry).fetchall()
-        return dt
+        return self._transaction_manager._connection.execute(qry).fetchall()
 
-    def __run_query_commit(self, qry: str, values: Optional[dict | Sequence] = None) -> None:
-        with self.project.db_connection as conn:
+    def __run_query_commit(self, qry: str, values=None) -> None:
+        with self._transaction_manager.transaction() as conn:
             if values is None:
                 conn.execute(qry)
             else:

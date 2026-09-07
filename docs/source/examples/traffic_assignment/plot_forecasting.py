@@ -33,6 +33,7 @@ import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.paths.vdf import bpr
 
 # sphinx_gallery_thumbnail_number = 3
 # %%
@@ -98,13 +99,13 @@ assig = TrafficAssignment()
 assig.add_class(assigclass)
 
 # Then we set these parameters, which an only be configured after adding one class to the assignment
-assig.set_vdf("BPR")  # This is not case-sensitive 
+# Setting the volume delay function and its parameters
 
-# Then we set the volume delay function and its parameters
-assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
-# The capacity and free flow travel times as they exist in the graph
+assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 assig.set_capacity_field("capacity")
+
+
+# The free flow travel times as they exist in the graph
 assig.set_time_field("free_flow_time")
 
 # And the algorithm we want to use to assign
@@ -338,14 +339,12 @@ assig = TrafficAssignment()
 # Add at a list of traffic classes to be assigned
 assig.add_class(assigclass)
 
-assig.set_vdf("BPR")
-
 # Set the volume delay function and its parameters
-assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
 # Set the capacity and free flow travel times as they exist in the graph
-assig.set_capacity_field("capacity")
 assig.set_time_field("free_flow_time")
+assig.set_capacity_field("capacity")
 
 # And the algorithm we want to use to assign
 assig.set_algorithm("bfw")

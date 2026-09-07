@@ -22,11 +22,17 @@ def test_pattern_complete(build_gtfs_project, pat):
     # We map-match
     pat.map_match()
 
-    # We save the pattern to the database
+    # We save the pattern to the database. The importer allocates an agency ID,
+    # so create its parent row when persisting this pattern in isolation.
     with build_gtfs_project.project.transit_connection as transit_conn:
-        pat.save_to_database(transit_conn)
+        routes_before = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
+        transit_conn.execute(
+            "INSERT INTO agencies (agency_id, agency) VALUES (?, ?)",
+            (pat.agency_id, "Lisanco"),
+        )
+        pat.save_to_database(transit_conn, commit=False)
         routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
         pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
 
-    assert routes == 1
+    assert routes == routes_before + 1
     assert pattern_map > 0
