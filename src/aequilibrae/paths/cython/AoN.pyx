@@ -360,6 +360,10 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
     milepost: np.ndarray | None = None
 
     if predecessors_view[dest_index] >= 0:
+        # Materialise the columns once. Reading them from the DataFrame inside the loop dominates
+        # the runtime of this function, as each access re-boxes the whole column.
+        link_ids = graph.graph.link_id.to_numpy(copy=False)
+        directions = graph.graph.direction.to_numpy(copy=False)
         all_connectors = []
         link_directions = []
         all_nodes = [dest_index]
@@ -369,8 +373,8 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
             while p != origin_index:
                 p = predecessors_view[p]
                 connector = conn_view[dest_index]
-                all_connectors.append(graph.graph.link_id.values[connector])
-                link_directions.append(graph.graph.direction.values[connector])
+                all_connectors.append(link_ids[connector])
+                link_directions.append(directions[connector])
                 mileposts.append(g_view[connector])
                 all_nodes.append(p)
                 dest_index = p
@@ -420,6 +424,13 @@ def update_path_trace(results, destination, graph):
         # shortest path tree for all scanned nodes. That is if a node was scanned, its shortest path has been found,
         # even if we exited early. As the un-scanned nodes are marked as unreachable this invariant holds.
         if results.predecessors[dest_index] >= 0:
+            # Materialise the columns once. Reading them from the DataFrame inside the loop dominates
+            # the runtime of this function, as each access re-boxes the whole column.
+            link_ids = graph.graph.link_id.to_numpy(copy=False)
+            directions = graph.graph.direction.to_numpy(copy=False)
+            costs = graph.cost
+            predecessors = results.predecessors
+            connectors = results.connectors
             all_connectors = []
             link_directions = []
             all_nodes = [dest_index]
@@ -427,11 +438,11 @@ def update_path_trace(results, destination, graph):
             p = dest_index
             if p != origin_index:
                 while p != origin_index:
-                    p = results.predecessors[p]
-                    connector = results.connectors[dest_index]
-                    all_connectors.append(graph.graph.link_id.values[connector])
-                    link_directions.append(graph.graph.direction.values[connector])
-                    mileposts.append(graph.cost[connector])
+                    p = predecessors[p]
+                    connector = connectors[dest_index]
+                    all_connectors.append(link_ids[connector])
+                    link_directions.append(directions[connector])
+                    mileposts.append(costs[connector])
                     all_nodes.append(p)
                     dest_index = p
                 results.path = np.asarray(all_connectors, graph.default_types('int'))[::-1]
