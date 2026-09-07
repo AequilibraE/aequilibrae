@@ -9,6 +9,7 @@ pyfiles = [
     '005_fix_default_period_delete_trigger.py',
     '006_add_about_table.py',
     '007_add_zones_table.py',
+    '008_add_other_attributes.py',
     'migrations.py',
 ]
 

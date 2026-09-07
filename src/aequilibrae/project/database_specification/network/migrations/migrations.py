@@ -11,4 +11,5 @@ migrations: tuple[int, pathlib.Path] = [
     path / "005_fix_default_period_delete_trigger.py",
     path / "006_add_about_table.py",
     path / "007_add_zones_table.py",
+    path / "008_add_other_attributes.py",
 ]
