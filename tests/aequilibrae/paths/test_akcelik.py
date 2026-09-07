@@ -18,7 +18,7 @@ def test_akcelik_function():
 
     link_flows = np.arange(num_links, dtype="float64") * 0.2
 
-    akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores)
+    akcelik(congested_times, link_flows, fftime, capacity, cores, alpha, tau, length)
 
     should_be = np.array(
         [
@@ -44,8 +44,8 @@ def test_akcelik_function():
         link_flows.fill(1 * 0.2 * i)
         link_flows += np.arange(num_links) * dx
 
-        akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores)
-        delta_akcelik(delta, link_flows, capacity, fftime, alpha, tau, length, cores)
+        akcelik(congested_times, link_flows, fftime, capacity, cores, alpha, tau, length)
+        delta_akcelik(delta, link_flows, fftime, capacity, cores, alpha, tau, length)
 
         # We check if the analytical solution matches the numerical differentiation
         dydx = (congested_times[1] - congested_times[0]) / dx

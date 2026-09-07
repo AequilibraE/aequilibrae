@@ -69,29 +69,29 @@ from cython.parallel import prange
 # ------------------------------------------------------------------------------------------------
 
 
-def bpr(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
+def bpr(congested_times, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
-    cdef double [:] congested_view = congested_times
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
+    cdef double[:] congested_view = congested_times
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] beta_view = beta
 
     with nogil:
         bpr_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 
-def delta_bpr(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
+def delta_bpr(dbpr, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
-    cdef double [:] dbpr_view = dbpr
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
+    cdef double[:] dbpr_view = dbpr
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] beta_view = beta
 
     with nogil:
         dbpr_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
@@ -103,19 +103,20 @@ def delta_bpr(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
 cpdef void bpr_cython(
     double[:] congested_time,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
-    double [:] beta,
+    double[:] beta,
     int cores
 ) noexcept nogil:
     cdef long long i
     cdef long long n_links = congested_time.shape[0]
 
-    # TODO: Use prange with use_threads_if when Cython 3.1 is released
-    for i in range(n_links):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-            congested_time[i] = fftime[i] * (1 + alpha[i] * (pow(link_flows[i] / capacity[i], beta[i])))
+            congested_time[i] = fftime[i] * (
+                1 + alpha[i] * pow(link_flows[i] / capacity[i], beta[i])
+            )
         else:
             congested_time[i] = fftime[i]
 
@@ -126,23 +127,27 @@ cpdef void bpr_cython(
 cpdef void dbpr_cython(
     double[:] deltaresult,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
-    double [:] beta,
+    double[:] beta,
     int cores
 ) noexcept nogil:
     cdef long long i
     cdef long long n_links = deltaresult.shape[0]
 
     # TODO: Use prange with use_threads_if when Cython 3.1 is released
-    for i in range(n_links):
+    for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-            deltaresult[i] = fftime[i] * (
-                alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1))
-            ) / capacity[i]
+            deltaresult[i] = (
+                fftime[i]
+                * alpha[i]
+                * beta[i]
+                * pow(link_flows[i] / capacity[i], beta[i] - 1)
+                / capacity[i]
+            )
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = 0.0
 
 
 # ------------------------------------------------------------------------------------------------
@@ -150,28 +155,28 @@ cpdef void dbpr_cython(
 # ------------------------------------------------------------------------------------------------
 
 
-def bpr2(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
+def bpr2(congested_times, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
-    cdef double [:] congested_view = congested_times
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
+    cdef double[:] congested_view = congested_times
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] beta_view = beta
 
     bpr2_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 
-def delta_bpr2(dbpr2, link_flows, capacity, fftime, alpha, beta, cores):
+def delta_bpr2(dbpr2, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
-    cdef double [:] dbpr2_view = dbpr2
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
+    cdef double[:] dbpr2_view = dbpr2
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] beta_view = beta
 
     dbpr2_cython(dbpr2_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
@@ -182,10 +187,10 @@ def delta_bpr2(dbpr2, link_flows, capacity, fftime, alpha, beta, cores):
 cpdef void bpr2_cython(
     double[:] congested_time,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
-    double [:] beta,
+    double[:] beta,
     int cores
 ) noexcept:
     cdef long long i
@@ -194,11 +199,13 @@ cpdef void bpr2_cython(
     for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
-                congested_time[i] = fftime[i] * (1 + alpha[i] * (
-                    pow(link_flows[i] / capacity[i], 2*beta[i])))
+                congested_time[i] = fftime[i] * (
+                    1 + alpha[i] * pow(link_flows[i] / capacity[i], 2 * beta[i])
+                )
             else:
-                congested_time[i] = fftime[i] * (1 + alpha[i] * (
-                    pow(link_flows[i] / capacity[i], beta[i])))
+                congested_time[i] = fftime[i] * (
+                    1 + alpha[i] * pow(link_flows[i] / capacity[i], beta[i])
+                )
         else:
             congested_time[i] = fftime[i]
 
@@ -209,10 +216,10 @@ cpdef void bpr2_cython(
 cpdef void dbpr2_cython(
     double[:] deltaresult,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
-    double [:] beta,
+    double[:] beta,
     int cores
 ) noexcept:
     cdef long long i
@@ -221,14 +228,24 @@ cpdef void dbpr2_cython(
     for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
-                deltaresult[i] = fftime[i] * (alpha[i] * 2 * beta[i] * (
-                    pow(link_flows[i] / capacity[i], (2*beta[i])-1))) / (
-                    capacity[i])
+                deltaresult[i] = (
+                    fftime[i]
+                    * alpha[i]
+                    * 2
+                    * beta[i]
+                    * pow(link_flows[i] / capacity[i], (2 * beta[i]) - 1)
+                    / capacity[i]
+                )
             else:
-                deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (
-                    pow(link_flows[i] / capacity[i], beta[i]-1))) / capacity[i]
+                deltaresult[i] = (
+                    fftime[i]
+                    * alpha[i]
+                    * beta[i]
+                    * pow(link_flows[i] / capacity[i], beta[i] - 1)
+                    / capacity[i]
+                )
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = 0.0
 
 
 # ------------------------------------------------------------------------------------------------
@@ -236,28 +253,28 @@ cpdef void dbpr2_cython(
 # ------------------------------------------------------------------------------------------------
 
 
-def conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
+def conical(congested_times, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
-    cdef double [:] congested_view = congested_times
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
+    cdef double[:] congested_view = congested_times
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] beta_view = beta
 
     conical_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 
-def delta_conical(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
+def delta_conical(dbpr, link_flows, fftime, capacity, cores, alpha, beta):
     cdef int c = cores
 
-    cdef double [:] dbpr_view = dbpr
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] beta_view = beta
+    cdef double[:] dbpr_view = dbpr
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] beta_view = beta
 
     dconical_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
@@ -268,10 +285,10 @@ def delta_conical(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
 cpdef void conical_cython(
     double[:] congested_time,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
-    double [:] beta,
+    double[:] beta,
     int cores
 ) noexcept:
     cdef long long i
@@ -279,8 +296,12 @@ cpdef void conical_cython(
 
     for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
+
             congested_time[i] = fftime[i] * (
-                sqrt(pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2))
+                sqrt(
+                    pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2)
+                    + pow(beta[i], 2)
+                )
                 - alpha[i] * (1 - link_flows[i] / capacity[i])
                 - beta[i]
                 + 2
@@ -295,10 +316,10 @@ cpdef void conical_cython(
 cpdef void dconical_cython(
     double[:] deltaresult,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
-    double [:] beta,
+    double[:] beta,
     int cores
 ) noexcept:
     cdef long long i
@@ -309,41 +330,48 @@ cpdef void dconical_cython(
             deltaresult[i] = fftime[i] * (
                 (alpha[i] / capacity[i])
                 - (
-                    (pow(alpha[i], 2) * (1 - link_flows[i] / capacity[i]))
+                    pow(alpha[i], 2) * (1 - link_flows[i] / capacity[i])
                     / (
                         capacity[i]
-                        * sqrt(pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2))
+                        * sqrt(
+                            pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2)
+                            + pow(beta[i], 2)
+                        )
                     )
                 )
             )
+
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = fftime[i] * (
+                (alpha[i] / capacity[i])
+                - pow(alpha[i], 2) / (capacity[i] * sqrt(pow(alpha[i], 2) + pow(beta[i], 2)))
+            )
 
 
 # ------------------------------------------------------------------------------------------------
 #                             INRETS FUNCTION AND DERIVATIVE
 # ------------------------------------------------------------------------------------------------
 
-def inrets(congested_times, link_flows, capacity, fftime, alpha, cores):
+def inrets(congested_times, link_flows, fftime, capacity, cores, alpha):
     cdef int c = cores
 
-    cdef double [:] congested_view = congested_times
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
+    cdef double[:] congested_view = congested_times
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
 
     inrets_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, c)
 
 
-def delta_inrets(dbpr, link_flows, capacity, fftime, alpha, cores):
+def delta_inrets(dbpr, link_flows, fftime, capacity, cores, alpha):
     cdef int c = cores
 
-    cdef double [:] dbpr_view = dbpr
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
+    cdef double[:] dbpr_view = dbpr
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
 
     dinrets_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, c)
 
@@ -354,8 +382,8 @@ def delta_inrets(dbpr, link_flows, capacity, fftime, alpha, cores):
 cpdef void inrets_cython(
     double[:] congested_time,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
     int cores
 ) noexcept:
@@ -366,12 +394,12 @@ cpdef void inrets_cython(
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
                 congested_time[i] = fftime[i] * (
-                    (1.1 - alpha[i])/0.1) * (
-                    pow(link_flows[i] / capacity[i], 2))
+                    (1.1 - alpha[i]) / 0.1
+                ) * pow(link_flows[i] / capacity[i], 2)
             else:
                 congested_time[i] = fftime[i] * (
-                    1.1 - (alpha[i]*(link_flows[i] / capacity[i]))) / (
-                    1.1 - (link_flows[i] / capacity[i]))
+                    1.1 - alpha[i] * (link_flows[i] / capacity[i])
+                ) / (1.1 - link_flows[i] / capacity[i])
         else:
             congested_time[i] = fftime[i]
 
@@ -382,8 +410,8 @@ cpdef void inrets_cython(
 cpdef void dinrets_cython(
     double[:] deltaresult,
     double[:] link_flows,
-    double [:] capacity,
-    double [:] fftime,
+    double[:] capacity,
+    double[:] fftime,
     double[:] alpha,
     int cores
 ) noexcept:
@@ -393,16 +421,24 @@ cpdef void dinrets_cython(
     for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
-                deltaresult[i] = fftime[i] * (
-                    (-20)*(alpha[i]-1.1)*link_flows[i]) / (
-                    pow(capacity[i], 2))
+                deltaresult[i] = (
+                    fftime[i]
+                    * (-20)
+                    * (alpha[i] - 1.1)
+                    * link_flows[i]
+                    / pow(capacity[i], 2)
+                )
             else:
-                deltaresult[i] = fftime[i] * (
-                    (-110)*(alpha[i]-1)*capacity[i]) / (
-                    pow((11*capacity[i])-(10*link_flows[i]), 2))
+                deltaresult[i] = (
+                    fftime[i]
+                    * (-110)
+                    * (alpha[i] - 1)
+                    * capacity[i]
+                    / pow(11 * capacity[i] - 10 * link_flows[i], 2)
+                )
 
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = fftime[i] * (-10) * (alpha[i] - 1) / (11 * capacity[i])
 
 
 # ------------------------------------------------------------------------------------------------
@@ -410,29 +446,29 @@ cpdef void dinrets_cython(
 # ------------------------------------------------------------------------------------------------
 
 
-def akcelik(congested_times, link_flows, capacity, fftime, alpha, tau, length, cores):
+def akcelik(congested_times, link_flows, fftime, capacity, cores, alpha, tau, length):
     cdef int c = cores
 
-    cdef double [:] congested_view = congested_times
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] tau_view = tau
-    cdef double [:] length_view = length
+    cdef double[:] congested_view = congested_times
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] tau_view = tau
+    cdef double[:] length_view = length
 
     akcelik_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, length_view, c)
 
 
-def delta_akcelik(d_akcelik, link_flows, capacity, fftime, alpha, tau, _length, cores):
+def delta_akcelik(d_akcelik, link_flows, fftime, capacity, cores, alpha, tau, length):
     cdef int c = cores
 
-    cdef double [:] d_akcelik_view = d_akcelik
-    cdef double [:] link_flows_view = link_flows
-    cdef double [:] capacity_view = capacity
-    cdef double [:] fftime_view = fftime
-    cdef double [:] alpha_view = alpha
-    cdef double [:] tau_view = tau
+    cdef double[:] d_akcelik_view = d_akcelik
+    cdef double[:] link_flows_view = link_flows
+    cdef double[:] capacity_view = capacity
+    cdef double[:] fftime_view = fftime
+    cdef double[:] alpha_view = alpha
+    cdef double[:] tau_view = tau
 
     dakcelik_cython(d_akcelik_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, c)
 
@@ -443,9 +479,9 @@ def delta_akcelik(d_akcelik, link_flows, capacity, fftime, alpha, tau, _length, 
 cpdef void akcelik_cython(
     double[:] congested_time,
     const double[:] link_flows,
-    const double [:] capacity,
-    const double [:] fftime,
-    const double [:] alpha,
+    const double[:] capacity,
+    const double[:] fftime,
+    const double[:] alpha,
     const double[:] tau,
     const double[:] length,
     const int cores
@@ -465,11 +501,13 @@ cpdef void akcelik_cython(
 
             congested_time[i] = (
                 fftime[i]  # t_o
-                + length[i] * alpha[i] * (
+                + length[i]
+                * alpha[i]
+                * (
                     z + sqrt(
-                         z * z  # z^2
-                         + tau[i] * voc / capacity[i]
-                     )
+                        z * z  # z^2
+                        + tau[i] * voc / capacity[i]
+                    )
                 )
             )
         else:
@@ -481,10 +519,10 @@ cpdef void akcelik_cython(
 @cython.boundscheck(False)
 cpdef void dakcelik_cython(
     double[:] deltaresult,
-    const double [:] link_flows,
-    const double [:] capacity,
-    const double [:] fftime,
-    const double [:] alpha,
+    const double[:] link_flows,
+    const double[:] capacity,
+    const double[:] fftime,
+    const double[:] alpha,
     const double[:] tau,
     const int cores
 ) noexcept:
@@ -493,11 +531,22 @@ cpdef void dakcelik_cython(
 
     for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-            deltaresult[i] = alpha[i] * (
-                0.5 * tau[i] - capacity[i] + link_flows[i]
-            ) / (
-                capacity[i] * sqrt(pow(capacity[i] - link_flows[i], 2) + tau[i] * link_flows[i])
-            ) + (alpha[i] / capacity[i])
+            deltaresult[i] = (
+                alpha[i]
+                * (0.5 * tau[i] - capacity[i] + link_flows[i])
+                / (
+                    capacity[i]
+                    * sqrt(
+                        pow(capacity[i] - link_flows[i], 2)
+                        + tau[i] * link_flows[i]
+                    )
+                )
+                + alpha[i] / capacity[i]
+            )
 
         else:
-            deltaresult[i] = fftime[i]
+            deltaresult[i] = (
+                alpha[i]
+                / capacity[i]
+                * ((0.5 * tau[i] - capacity[i]) / capacity[i] + 1)
+            )

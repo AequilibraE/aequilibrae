@@ -30,6 +30,7 @@ from pathlib import Path
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_scenarios.png'
 
@@ -100,11 +101,10 @@ mat.computational_view()
 assigclass = TrafficClass("car", graph, mat)
 assignment = TrafficAssignment(project)
 assignment.add_class(assigclass)
-assignment.set_vdf("BPR")
-
-assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-assignment.set_capacity_field("capacity")
+assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
 assignment.set_time_field("distance")
+assignment.set_capacity_field("capacity")
+
 assignment.max_iter = 10
 assignment.set_algorithm("msa")
 

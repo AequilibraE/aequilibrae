@@ -3,6 +3,7 @@ import pytest
 import tables
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 
 @pytest.fixture
@@ -56,11 +57,9 @@ def test_save_path_files(assignment_setup):
     # Single-iteration AoN with path file saving
     assignment.add_class(assigclass)
     assignment.set_save_path_files(True)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
     assignment.execute()

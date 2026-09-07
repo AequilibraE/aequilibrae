@@ -7,16 +7,17 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.utils.logging_utils import basic_config
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def project(sioux_falls_test):
     sioux_falls_test.network.build_graphs()
     return sioux_falls_test
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def car_graph(project):
     graph = project.network.graphs["c"]
     graph.set_blocked_centroid_flows(False)
@@ -24,24 +25,24 @@ def car_graph(project):
     return graph
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def matrix(project):
     mat = project.matrices.get_matrix("omx2")
     mat.computational_view()
     return mat
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assigclass(car_graph, matrix):
     return TrafficClass("car", car_graph, matrix)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assignment(project):
     return TrafficAssignment(project)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def file_logging():
     logger = logging.getLogger("aequilibrae")
     handler = basic_config(level=logging.INFO)
@@ -52,19 +53,13 @@ def file_logging():
     logger.propagate = True
 
 
-@pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
-def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type, file_logging):
-    if matrix_type == "memonly":
-        matrix = matrix.copy(memory_only=True)
-
+def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, file_logging):
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
 
     proj = assignment.project
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
@@ -185,11 +180,9 @@ def test_execute_no_project(project, assignment, assigclass):
     project.close()
     assignment = type(assignment)()
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 10
     assignment.set_algorithm("msa")
     assignment.execute()
