@@ -7,7 +7,7 @@ import geopandas as gpd
 import pandas as pd
 
 from aequilibrae.project.project_creation import add_triggers, remove_triggers
-from aequilibrae.utils.db_utils import commit_and_close, list_columns
+from aequilibrae.utils.db_utils import list_columns
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import JSON_COL, split_attributes
@@ -29,7 +29,9 @@ class SpatialiteWriter:
         self.path = project.path_to_file
 
     def write(self, net: StagedNetwork) -> None:
-        with commit_and_close(self.path, spatial=True) as conn:
+        # Write through the project's own connection: a second connection to the same file
+        # would leave the project's connection with a stale schema after the trigger swap.
+        with self.project.db_connection as conn:
             link_cols = list_columns(conn, "links")
             node_cols = list_columns(conn, "nodes")
             if JSON_COL not in link_cols or JSON_COL not in node_cols:

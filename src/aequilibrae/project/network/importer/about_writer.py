@@ -43,12 +43,9 @@ class AboutWriter:
         }
 
         about = self.project.about
-        existing = set(about.list_fields())
-        for field_name in values:
-            if field_name not in existing:
-                about.add_info_field(field_name)
-
         for field_name, value in values.items():
-            setattr(about, field_name, value)
-        about.write_back()
+            if field_name in about:
+                about.update(field_name, infovalue=value)
+            else:
+                about.insert(infoname=field_name, infovalue=value)
         logger.info("Wrote network-import provenance to about table")
