@@ -64,9 +64,7 @@ centroid_count = nodes.data.query('is_centroid == 1').shape[0]
 
 if centroid_count == 0:
     arbitrary_node = nodes.data["node_id"][0]
-    nd = nodes.get(arbitrary_node)
-    nd.is_centroid = 1
-    nd.save()
+    nodes.update(arbitrary_node, is_centroid=1)
 
 network = project.network
 network.build_graphs(modes=[mode])
@@ -76,8 +74,7 @@ graph.set_blocked_centroid_flows(False)
 if centroid_count == 0:
     # Let's revert to setting up that node as centroid in case we had to do it
 
-    nd.is_centroid = 0
-    nd.save()
+    nodes.update(arbitrary_node, is_centroid=0)
 
 # %%
 # We set the graph for computation

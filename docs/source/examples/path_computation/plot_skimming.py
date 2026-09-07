@@ -116,9 +116,10 @@ skm.save_to_project("base_skims")
 # %%
 # We can also retrieve this skim record to write something to its description
 matrices = project.matrices
-mat_record = matrices.get_record("base_skims")
-mat_record.description = "minimized distance while also skimming distance for just a few nodes"
-mat_record.save()
+matrices.update(
+    "base_skims",
+    description="minimized distance while also skimming distance for just a few nodes",
+)
 
 # %%
 project.close()

@@ -2,10 +2,6 @@ import logging
 import sqlite3
 from typing import Optional
 
-from aequilibrae.context import get_active_project
-from aequilibrae.project.data import Results
-from aequilibrae.project.project import Project
-
 logger = logging.getLogger(__name__)
 
 
@@ -15,38 +11,42 @@ def migrate(
     transit_conn: Optional[sqlite3.Connection],
     results_conn: Optional[sqlite3.Connection],
 ):
-    logger.info("Beginning migration to move transit results to the main project_database.sqlite")
+    if project_conn is None:
+        raise RuntimeError("Transit migration 004 requires a project_conn connection")
+    if transit_conn is None:
+        raise RuntimeError("Transit migration 004 requires a transit_conn connection")
 
-    if not transit_conn:
-        logger.info("Migration finished, no 'public_transport.sqlite' connection provided.")
-        return
-    elif not results_conn:
-        logger.info("Migration finished, no 'results.sqlite' connection provided.")
-        return
+    logger.info("Beginning migration to move transit results to the main project database")
 
     if transit_conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='results'").fetchone() is None:
         logger.info("Migration finished, no table 'results' in 'public_transport.sqlite'.")
         return
+    if results_conn is None:
+        raise RuntimeError("Transit migration 004 requires a results_conn connection when transit results exist")
 
-    project: Project = get_active_project(must_exist=True)
+    payloads = {
+        row[0]
+        for row in results_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    }
+    recorded = {row[0] for row in project_conn.execute("SELECT table_name FROM results").fetchall()}
+    for table_name in payloads - recorded:
+        project_conn.execute(
+            "INSERT INTO results (table_name, procedure, procedure_id, procedure_report) VALUES (?, '', '', 'null')",
+            (table_name,),
+        )
 
-    results = Results(project, project_conn=project_conn, results_conn=results_conn)
-    results.update_database()
+    project_columns = {row[1] for row in project_conn.execute("PRAGMA table_info(results)").fetchall()}
+    transit_columns = [row[1] for row in transit_conn.execute("PRAGMA table_info(results)").fetchall()]
+    columns = [column for column in transit_columns if column in project_columns]
+    if "table_name" in columns:
+        quoted = ",".join(f'"{column}"' for column in columns)
+        updates = ",".join(f'"{column}"=excluded."{column}"' for column in columns if column != "table_name")
+        sql = f"INSERT INTO results ({quoted}) VALUES ({','.join('?' for _ in columns)})"
+        if updates:
+            sql += f' ON CONFLICT("table_name") DO UPDATE SET {updates}'
+        rows = transit_conn.execute(f"SELECT {quoted} FROM results").fetchall()
+        project_conn.executemany(sql, rows)
 
-    transit_results = Results(project, project_conn=transit_conn, results_conn=results_conn)
-    df = transit_results.list()
-
-    for _, row in df.iterrows():
-        logger.info(f"Migrating the {row.table_name} results record")
-        record = results.get_record(row.table_name)
-
-        record.procedure = row.procedure
-        record.procedure_id = row.procedure_id
-        record.procedure_report = row.procedure_report
-        record.timestamp = row.timestamp
-        record.description = row.description
-
-        record.save()
-
-    logger.info("Dropping the transit results table")
-    transit_conn.execute("DROP TABLE IF EXISTS results")
+    transit_conn.execute("DROP TABLE results")

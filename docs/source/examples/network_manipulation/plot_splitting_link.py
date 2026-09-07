@@ -49,21 +49,18 @@ print(link.distance)
 # The idea is basically to copy a link and allocate the appropriate geometries
 # to split the geometry we use Shapely's substring.
 
-new_link = links.copy_link(37)
+new_link_id = links.copy(37)
 
 first_geometry = substring(link.geometry, 0, 0.5, normalized=True)
 second_geometry = substring(link.geometry, 0.5, 1, normalized=True)
 
-link.geometry = first_geometry
-new_link.geometry = second_geometry
-links.save()
+links.update(37, geometry=first_geometry)
+links.update(new_link_id, geometry=second_geometry)
 
 # %%
-# The link objects in memory still don't have their ID fields updated, so we refresh them.
-links.refresh()
-
+# Retrieve the updated immutable records from the database.
 link = links.get(37)
-new_link = links.get(new_link.link_id)
+new_link = links.get(new_link_id)
 print(link.distance, new_link.distance)
 
 # %%

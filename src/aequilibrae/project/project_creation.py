@@ -1,10 +1,9 @@
 import logging
-from pathlib import Path
 import re
+from pathlib import Path
 from sqlite3 import Connection
 
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
-
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
@@ -35,7 +34,6 @@ def create_base_tables(conn: Connection, db_type: str) -> None:
     # For a new database construction all present migrations should have already been applied implicitly by the new
     # schema. So we mark them all as skipped.
     mm = MigrationManager(base_folder / "migrations" / "migrations.py")
-    mm.mark_all_as_seen(conn)
     for migration in mm.migrations.values():
         migration.mark_as(conn, MigrationStatus.SKIPPED)
 

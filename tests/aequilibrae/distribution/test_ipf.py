@@ -45,7 +45,6 @@ def test_fit(sioux_falls_test):
     assert np.isclose(np.nansum(result.matrix_view), np.nansum(vectors["rows"]), rtol=0.0001), "Ipf did not converge"
     assert fratar.parameters["convergence level"] > fratar.gap, "Ipf did not converge"
 
-    mr = fratar.save_to_project("my_matrix_ipf", "my_matrix_ipf.aem")
+    mats.create("my_matrix_ipf", "my_matrix_ipf.omx", fratar.output)
 
-    assert os.path.isfile(os.path.join(mats.fldr, "my_matrix_ipf.aem")), "Did not save file to the appropriate place"
-    assert mr.procedure_id == fratar.procedure_id, "procedure ID saved wrong"
+    assert os.path.isfile(os.path.join(mats.folder, "my_matrix_ipf.omx")), "Did not save file to the appropriate place"
