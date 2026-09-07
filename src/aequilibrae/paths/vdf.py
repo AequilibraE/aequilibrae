@@ -7,14 +7,32 @@ import numpy as np
 
 from aequilibrae.paths.cython.vdf_core import (
     akcelik as _akcelik,
+)
+from aequilibrae.paths.cython.vdf_core import (
     bpr as _bpr,
+)
+from aequilibrae.paths.cython.vdf_core import (
     bpr2 as _bpr2,
+)
+from aequilibrae.paths.cython.vdf_core import (
     conical as _conical,
+)
+from aequilibrae.paths.cython.vdf_core import (
     delta_akcelik as _delta_akcelik,
+)
+from aequilibrae.paths.cython.vdf_core import (
     delta_bpr as _delta_bpr,
+)
+from aequilibrae.paths.cython.vdf_core import (
     delta_bpr2 as _delta_bpr2,
+)
+from aequilibrae.paths.cython.vdf_core import (
     delta_conical as _delta_conical,
+)
+from aequilibrae.paths.cython.vdf_core import (
     delta_inrets as _delta_inrets,
+)
+from aequilibrae.paths.cython.vdf_core import (
     inrets as _inrets,
 )
 
@@ -260,8 +278,13 @@ class VDF:
         self.d_func(delta, link_flows, fftime, capacity, cores, **link_attributes)
 
 
-def load_from_parameters(vdf_data: dict) -> dict[str, VDF]:
+def load_from_parameters(
+    vdf_data: dict,
+    function_map: dict[str, tuple[Callable, Callable]] | None = None,
+) -> dict[str, VDF]:
     results = {}
+
+    function_map = FUNCTION_MAP if function_map is None else FUNCTION_MAP | function_map
 
     for name, entry in vdf_data.items():
         if name == "default":
@@ -269,18 +292,24 @@ def load_from_parameters(vdf_data: dict) -> dict[str, VDF]:
 
         if "function" in entry:
             function_name = str(entry["function"]).lower()
-            if function_name not in FUNCTION_MAP:
+            if function_name not in function_map:
                 raise ValueError(
                     f"VDF '{name}' references unknown preset function '{entry['function']}'. "
-                    f"Available presets are: {', '.join(FUNCTION_MAP.keys())}."
+                    f"Available presets are: {', '.join(function_map.keys())}."
                 )
-            func, derivative = FUNCTION_MAP[function_name]
+            func, derivative = function_map[function_name]
             default_spec = DEFAULT_PRESET_SPECS[function_name]
 
-            if extra := entry["spec"].keys() - default_spec.keys():
-                raise ValueError(f"found unexpected keys in the specification for '{name}': {extra}")
+            spec = entry.get("spec")
+            if spec is not None:
+                if extra := entry["spec"].keys() - default_spec.keys():
+                    raise ValueError(f"found unexpected keys in the specification for '{name}': {extra}")
 
-            results[name] = VDF(name, func, default_spec | entry["spec"], derivative)
+                spec = default_spec | entry["spec"]
+            else:
+                spec = default_spec
+
+            results[name] = VDF(name, func, spec, derivative)
 
         elif "functional_form" in entry:
             func = entry["functional_form"]

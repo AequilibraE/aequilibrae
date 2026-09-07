@@ -2,7 +2,7 @@ import logging
 from copy import deepcopy
 from os import PathLike
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import yaml
 
@@ -82,14 +82,18 @@ class Parameters:
         self.parameters = deepcopy(self._default)
         self.write_back()
 
-    def get_vdfs(self, exclude_builtins: bool = False):
+    def get_vdfs(
+        self,
+        exclude_builtins: bool = False,
+        function_map: dict[str, tuple[Callable, Callable]] | None = None,
+    ):
         from aequilibrae.paths.vdf import builtin_vdfs, load_from_parameters
 
         vdfs = self.parameters.get("vdfs", None)
         if vdfs is None:
             raise ValueError("no 'vdfs' entry in parameters file")
 
-        vdfs = load_from_parameters({k: v for k, v in vdfs.items() if k != "default"})
+        vdfs = load_from_parameters({k: v for k, v in vdfs.items() if k != "default"}, function_map=function_map)
 
         if exclude_builtins:
             return vdfs

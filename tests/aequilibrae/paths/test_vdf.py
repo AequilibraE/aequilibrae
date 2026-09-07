@@ -12,12 +12,12 @@ from aequilibrae.paths.vdf import (
     DEFAULT_PRESET_SPECS,
     FUNCTION_MAP,
     INRETS,
-    builtin_vdfs,
+    akcelik,
     bpr,
     bpr2,
+    builtin_vdfs,
     conical,
     inrets,
-    akcelik,
     load_from_parameters,
 )
 
@@ -321,21 +321,23 @@ def test_name_matching_builtin_vdfs_from_project_raises(project):
         project.project_parameters.get_vdfs(exclude_builtins=False)
 
 
-def test_default_vdf_adds_default_spec():
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"function": "bpr", "spec": {"beta": 4}},
+        {"function": "bpr", "spec": {}},
+        {"function": "bpr"},  # no spec
+    ],
+)
+def test_default_vdf_adds_default_spec(params):
     vdfs = load_from_parameters(
         {
             "default": "bpr_tyler",
-            "bpr_tyler": {
-                "function": "bpr",
-                "spec": {
-                    "beta": 4,
-                },
-            },
+            "bpr_tyler": params,
         }
     )
 
-    spec = vdfs["bpr_tyler"].spec
-    assert DEFAULT_PRESET_SPECS["bpr"]["alpha"] == spec["alpha"]
+    assert DEFAULT_PRESET_SPECS["bpr"]["alpha"] == vdfs["bpr_tyler"].spec["alpha"]
 
 
 def test_default_specs_are_applied_for_builtins():
@@ -343,3 +345,17 @@ def test_default_specs_are_applied_for_builtins():
 
     for k, v in vdfs.items():
         assert v.spec == DEFAULT_PRESET_SPECS[k]
+
+
+def test_override_function_map():
+    func1, func2 = lambda x: x, lambda x: x
+    vdfs = load_from_parameters(
+        {
+            "default": "bpr_tyler",
+            "bpr_tyler": {"function": "bpr"},
+        },
+        function_map={"bpr": (func1, func2)},
+    )
+
+    assert vdfs["bpr_tyler"].func is func1
+    assert vdfs["bpr_tyler"].d_func is func2
