@@ -1,6 +1,9 @@
 #pragma once
 #include "aeq_log.hpp"
+#include "graph_context.hpp"
 #include "pq_heap_base.hpp"
+#include "search_results.hpp"
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <type_traits>
@@ -177,3 +180,186 @@ void a_star(size_t origin, size_t destination, const size_t max_size,
 }
 
 } // namespace aequilibrae::paths::cpp
+
+namespace aequilibrae::paths::cpp::mvp {
+
+template <class Queue>
+void dijkstra(const NodeBasedContext &context, std::size_t origin,
+              SearchResults &results) noexcept {
+  static_assert(std::is_base_of<PriorityQueueBase<Queue>, Queue>::value,
+                "Queue provided does not derive from PriorityQueueBase");
+
+  results.origin = origin;
+  results.root = origin;
+  results.settled_count = 0;
+  results.destination_count = 0;
+  results.reached_destination_count = 0;
+
+  std::fill_n(results.predecessors, context.node_count, SENTINEL);
+  std::fill_n(results.connectors, context.node_count, SENTINEL);
+  std::fill_n(results.reached_first, context.node_count, SENTINEL);
+  std::fill_n(results.distances, context.node_count, kInfinity);
+  std::fill_n(results.turn_costs, context.node_count, kInfinity);
+  std::fill_n(results.terminal_states, context.node_count, SENTINEL);
+
+  for (std::size_t node = 0; node < context.node_count; ++node) {
+    results.destination_count += results.destination_mask[node] != 0;
+  }
+
+  Queue queue;
+  queue.init_heap(context.node_count);
+  queue.insert(origin, 0.0);
+
+  while (!queue.is_empty()) {
+    const auto state = queue.extract_min();
+    const double cost = queue.element_key(state);
+
+    results.reached_first[results.settled_count++] = state;
+    results.distances[state] = cost;
+    results.turn_costs[state] = 0.0;
+    results.terminal_states[state] = state;
+
+    if (results.destination_mask[state] != 0) {
+      ++results.reached_destination_count;
+
+      if (results.reached_destination_count == results.destination_count) {
+        break;
+      }
+    }
+
+    for (auto link = context.fs[state]; link < context.fs[state + 1]; ++link) {
+      const auto next = context.heads[link];
+      const auto next_state = queue.effective_state(next);
+
+      if (next_state == SCANNED) {
+        continue;
+      }
+
+      const double next_cost = cost + context.costs[link];
+      if (!std::isfinite(next_cost)) {
+        continue;
+      }
+
+      if (next_state == NOT_IN_HEAP) {
+        queue.insert(next, next_cost);
+      } else if (next_cost < queue.element_key(next)) {
+        queue.decrease_key(next, next_cost);
+      } else {
+        continue;
+      }
+
+      results.predecessors[next] = state;
+      results.connectors[next] = context.link_ids[link];
+    }
+  }
+
+  // Early exit must not expose tentative paths as finalized.
+  for (std::size_t state = 0; state < context.node_count; ++state) {
+    if (queue.effective_state(state) == IN_HEAP) {
+      results.predecessors[state] = SENTINEL;
+      results.connectors[state] = SENTINEL;
+    }
+  }
+}
+
+template <class Queue>
+void dijkstra(const TurnBasedContext &context, std::size_t origin,
+              SearchResults &results) noexcept {
+  const auto &graph = context.graph;
+  // State s < link_count means arrival via directed link s. The last state is
+  // a virtual source, so first links pay no turn cost and even an edgeless
+  // graph has a valid root. No expanded transition graph is allocated.
+  const auto root = graph.link_count;
+  const auto state_count = graph.link_count + 1;
+
+  results.origin = origin;
+  results.root = root;
+  results.settled_count = 0;
+  results.destination_count = 0;
+  results.reached_destination_count = 0;
+
+  std::fill_n(results.predecessors, state_count, SENTINEL);
+  std::fill_n(results.connectors, state_count, SENTINEL);
+  std::fill_n(results.reached_first, state_count, SENTINEL);
+  std::fill_n(results.distances, state_count, kInfinity);
+  std::fill_n(results.turn_costs, state_count, kInfinity);
+  std::fill_n(results.terminal_states, graph.node_count, SENTINEL);
+
+  for (std::size_t node = 0; node < graph.node_count; ++node) {
+    results.destination_count += results.destination_mask[node] != 0;
+  }
+  results.turn_costs[root] = 0.0;
+
+  Queue queue;
+  queue.init_heap(state_count);
+  queue.insert(root, 0.0);
+
+  while (!queue.is_empty()) {
+    const auto state = queue.extract_min();
+    const double cost = queue.element_key(state);
+    const auto node = state == root ? origin : graph.heads[state];
+    results.reached_first[results.settled_count++] = state;
+    results.distances[state] = cost;
+
+    if (results.terminal_states[node] == SENTINEL) {
+      results.terminal_states[node] = state;
+
+      if (results.destination_mask[node] != 0) {
+        ++results.reached_destination_count;
+
+        if (results.reached_destination_count == results.destination_count) {
+          break;
+        }
+      }
+    }
+
+    auto turn = state == root ? 0 : context.turn_fs[state];
+    const auto turn_end = state == root ? 0 : context.turn_fs[state + 1];
+    for (auto next = graph.fs[node]; next < graph.fs[node + 1]; ++next) {
+      if (queue.effective_state(next) == SCANNED) {
+        continue;
+      }
+
+      // Merge the sorted sparse turn row with the outgoing forward-star row.
+      while (turn < turn_end && context.turn_to_links[turn] < next) {
+        ++turn;
+      }
+
+      const bool explicit_turn =
+          turn < turn_end && context.turn_to_links[turn] == next;
+      const double penalty = explicit_turn ? context.turn_penalties[turn] : 0.0;
+      if (state != root && !explicit_turn && !context.allow_uturns &&
+          graph.heads[next] == context.tails[state]) {
+        continue;
+      }
+
+      const double next_cost = cost + graph.costs[next] + penalty;
+      if (!std::isfinite(next_cost)) {
+        continue;
+      }
+
+      if (queue.effective_state(next) == NOT_IN_HEAP) {
+        queue.insert(next, next_cost);
+      } else if (next_cost < queue.element_key(next)) {
+        queue.decrease_key(next, next_cost);
+      } else {
+        continue;
+      }
+
+      results.predecessors[next] = state;
+      results.connectors[next] = graph.link_ids[next];
+      results.turn_costs[next] = results.turn_costs[state] + penalty;
+    }
+  }
+
+  // Early exit must not expose tentative paths or turn labels as finalized.
+  for (std::size_t state = 0; state < state_count; ++state) {
+    if (queue.effective_state(state) == IN_HEAP) {
+      results.predecessors[state] = SENTINEL;
+      results.connectors[state] = SENTINEL;
+      results.turn_costs[state] = kInfinity;
+    }
+  }
+}
+
+} // namespace aequilibrae::paths::cpp::mvp
