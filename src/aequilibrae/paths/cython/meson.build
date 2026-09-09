@@ -19,6 +19,8 @@ exts = [
     'new_path_finding',
     'graph_context',
     'search_results',
+    'routing_workspace',
+    'skimming_context',
     'dijkstra',
 ]
 
