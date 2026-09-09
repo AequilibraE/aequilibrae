@@ -5,6 +5,7 @@ pyfiles = [
 ]
 
 exts = [
+  'array_allocations',
   'bar',
   'bridge',
 ]
