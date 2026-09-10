@@ -1,5 +1,5 @@
 from libc.stddef cimport size_t
-from aequilibrae.paths.cython.routing_workspace cimport RoutingWorkspace, CppRoutingWorkspace
+from aequilibrae.paths.cython.aon_workspace cimport AoNWorkspace, CppAoNWorkspace
 from aequilibrae.paths.cython.skimming_context cimport SkimmingContext
 
 cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
@@ -23,17 +23,32 @@ cdef extern from "skimming.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
     void cpp_skim_fields "aequilibrae::paths::cpp::mvp::skim_fields"[T](
         const CppSearchResults &results, size_t destination_count,
         const T *const *fields, size_t field_count,
-        CppRoutingWorkspace[T] &workspace, T *output) noexcept
+        CppAoNWorkspace[T] &workspace, T *output) noexcept
     void cpp_skim_costs "aequilibrae::paths::cpp::mvp::skim_costs"[T](
         const CppSearchResults &results, size_t destination_count, T *output) noexcept
     void cpp_skim_turn_costs "aequilibrae::paths::cpp::mvp::skim_turn_costs"[T](
         const CppSearchResults &results, size_t destination_count, T *output) noexcept
 
 
+cdef extern from "network_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
+    void cpp_network_loading "aequilibrae::paths::cpp::mvp::network_loading"[T](
+        const CppSearchResults &results, size_t destination_count,
+        const T *demand, size_t class_count,
+        CppAoNWorkspace[T] &workspace, T *link_loads) noexcept
+
+
 cdef class SearchResults:
     cdef CppSearchResults cpp
     cdef size_t _node_count
-    cdef readonly RoutingWorkspace workspace
+    cdef readonly AoNWorkspace workspace
+    # Prepare workspace.prepare_loading(class_count) under the GIL first.
+    # demand: packed [destination_count, class_count], count <= node_count.
+    # link_loads: caller-owned packed [link_count, class_count], accumulated into.
+    # All buffers must remain alive, with exclusive access to results/workspace
+    # and output. Scratch, demand and output must not overlap. No allocations.
+    cdef void network_loading_nogil(self, const double *demand,
+                                   size_t destination_count, size_t class_count,
+                                   double *link_loads) noexcept nogil
     cdef SkimmingContext _prepared_skims
     cdef object _prepared_workspace
     cpdef prepare_skims(self, SkimmingContext fields)

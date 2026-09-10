@@ -9,8 +9,9 @@ cdef class AoNWorkspace:
     """Per-results scratch storage, owned by NumPy and borrowed by C++.
 
     Allocate/resize under the GIL, then use from one worker at a time. Retained
-    state_skims views pin their allocation; preparing a different field count
-    replaces the buffer, while repeated skims of the same width overwrite it.
+    state_skims/state_loads views pin their allocations; preparing a different
+    width replaces that buffer, while repeated same-width operations reuse it.
+    Link-load accumulators are always caller-owned and passed to loading.
     """
 
     def __init__(self, context, field_count=0):

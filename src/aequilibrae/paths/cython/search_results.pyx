@@ -88,7 +88,7 @@ cdef class SearchResults:
 
         self.context = context  # Strong reference pins the graph snapshot.
         self._node_count = n
-        self.workspace = RoutingWorkspace(context)
+        self.workspace = AoNWorkspace(context)
         self._prepared_skims = None
         self._prepared_workspace = None
         self._predecessors = predecessors
@@ -122,6 +122,61 @@ cdef class SearchResults:
             terminal_states,
         ):
             array.flags.writeable = False
+
+    cdef void network_loading_nogil(self, const double *demand,
+                                   size_t destination_count, size_t class_count,
+                                   double *link_loads) noexcept nogil:
+        cpp_network_loading[double](self.cpp, destination_count, demand, class_count,
+                                    self.workspace.cpp, link_loads)
+
+    def network_loading(self, demand, link_loads):
+        """Accumulate one origin's demand into caller-owned link loads.
+
+        demand must be aligned, C-contiguous float64 [D, classes], with rows
+        corresponding to nodes 0..D-1 (D <= context.node_count). Read-only inputs
+        are accepted. link_loads must be writable, aligned, C-contiguous float64
+        [context.link_count, classes]. No input copies or output allocations.
+
+        Unreachable/unfinalized destinations and intrazonal demand are ignored;
+        a pre-search result loads nothing. This does not extend a partial search.
+        NaN/inf demand propagates through ordinary addition on its path.
+        Scratch is reset per call; link_loads is NOT reset. Returns link_loads.
+
+        For parallel AoN, give each worker separate results and a disjoint slice
+        of a zeroed [threads, links, classes] array. Accumulate origins, then use
+        array.sum(axis=0) after all workers finish. Clear it for a new iteration.
+        Do not concurrently mutate inputs, search, skim, load, or resize this
+        workspace; do not force internal search/context/scratch arrays writable.
+        """
+        cdef const double[::1] demand_view
+        cdef double[::1] loads_view
+        cdef size_t rows, classes
+        if not isinstance(demand, np.ndarray):
+            raise TypeError("demand must be a NumPy array")
+        if demand.dtype != np.dtype(np.float64):
+            raise TypeError("demand must have dtype float64")
+        if demand.ndim != 2 or demand.shape[0] > self._node_count:
+            raise ValueError("demand must have shape (D, classes), D <= context.node_count")
+        if not demand.flags.c_contiguous or not demand.flags.aligned:
+            raise ValueError("demand must be aligned and C-contiguous")
+        rows, classes = demand.shape
+        # Unlike skimming, loading always requires a caller-owned accumulator.
+        if link_loads is None:
+            raise TypeError("link_loads must be a NumPy array")
+        _skim_output(link_loads, self.context.link_count, classes)
+        if np.shares_memory(demand, link_loads):
+            raise ValueError("demand and link_loads must not overlap")
+        self.workspace.prepare_loading(classes)
+        scratch = self.workspace._state_loads
+        if np.shares_memory(demand, scratch) or np.shares_memory(link_loads, scratch):
+            raise ValueError("loading inputs and output must not overlap workspace scratch")
+        demand_view = demand.reshape(-1)
+        loads_view = link_loads.reshape(-1)
+        cdef const double *input_ptr = &demand_view[0] if demand_view.shape[0] else NULL
+        cdef double *output_ptr = &loads_view[0] if loads_view.shape[0] else NULL
+        with nogil:
+            self.network_loading_nogil(input_ptr, rows, classes, output_ptr)
+        return link_loads
 
     cdef void skim_fields_nogil(self, const double *const *fields,
                                size_t field_count, size_t destination_count,

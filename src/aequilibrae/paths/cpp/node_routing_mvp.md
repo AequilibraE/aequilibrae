@@ -2,7 +2,7 @@
 
 This remains separate from `Graph`, `PathResults`, assignment, production
 skimming, select-link analysis, and the public `aequilibrae.paths` exports.
-Single-origin state-tree skimming is now available as a standalone utility.
+Single-origin state-tree skimming and network loading are available as standalone utilities.
 
 ## Python API
 
@@ -227,9 +227,9 @@ scratch allocation or summation.
 
 ### Workspace and Cython entry points
 
-`results.workspace` is a `RoutingWorkspace`, with a separate borrowed-pointer
-C++ struct in `routing_workspace.hpp` and a NumPy-owning Cython wrapper in
-`routing_workspace.pyx`. Its `prepare_skims(field_count)` method allocates under
+`results.workspace` is an `AoNWorkspace`, with a separate borrowed-pointer
+C++ struct in `aon_workspace.hpp` and a NumPy-owning Cython wrapper in
+`aon_workspace.pyx`. Its `prepare_skims(field_count)` method allocates under
 the GIL, reusing the existing allocation when the field count is unchanged.
 The Python `skim_fields` method calls this automatically. The workspace is
 separate from finalized search results so future heap/routing scratch can be
@@ -285,6 +285,85 @@ input fields. Do not overwrite search/context buffers with outputs. The C++
 kernels live in `skimming.hpp` and are templated on the floating-point numeric
 type; the Cython interface currently specializes them for `double` only.
 The kernels do not allocate, call Python, or branch on the routing mode.
+
+## Single-origin network loading
+
+`results.network_loading(demand, link_loads)` accumulates the current search's
+flows into a **required caller-owned** buffer and returns it by identity:
+
+- `demand`: aligned, C-contiguous `float64` NumPy array shaped `[D, classes]`,
+  normally `matrix[origin]` from an `[O, D, classes]` cube. Read-only inputs are
+  accepted, without copying. Rows are physical nodes `0` through `D-1`, with
+  `0 <= D <= context.node_count`; intermediate states need not be in this range.
+- `link_loads`: writable, aligned, C-contiguous `float64` NumPy array shaped
+  `[context.link_count, classes]`, in context-local directed-link order. This
+  buffer is **accumulated into, never cleared or allocated by loading**.
+
+Unreachable/unfinalized destinations and intrazonal demand are ignored. Loading
+neither runs nor extends a search: request every destination whose demand you
+want loaded. Before a search it loads nothing. Empty destination/class axes and
+edgeless contexts are supported. Negative/NaN/infinite demand uses ordinary
+floating-point addition along the selected paths; no turn penalties are added
+to demand. Inputs, output and active loading scratch must not overlap. Do not
+force internal search/context/workspace arrays writable or overwrite them.
+
+Each worker keeps its own `SearchResults` and `AoNWorkspace`. An iteration-level
+caller allocates `[threads, links, classes]` once, hands each worker its slice,
+and reduces after all workers finish:
+
+```python
+thread_loads = np.zeros((threads, context.link_count, classes), dtype=np.float64)
+workers = [context.make_results() for _ in range(threads)]
+for results in workers:
+    results.workspace.prepare_loading(classes)  # Optional up-front scratch allocation.
+
+# Each worker executes this with its own tid and assigned origins:
+# for origin in assigned_origins:
+#     dijkstra(context, origin, range(D), workers[tid])
+#     workers[tid].network_loading(matrix[origin], thread_loads[tid])
+
+# Only after all workers have finished:
+link_loads = thread_loads.sum(axis=0)
+thread_loads.fill(0)  # Before starting the next iteration.
+```
+
+No thread index is passed to the kernel, and no shared mutable workspace or
+atomics are needed. The caller owns the output allocation and its lifetime;
+workspaces do not retain it. Do not read or clear an active worker's slice.
+Input demand may be shared but must not change while loading.
+
+`workspace.prepare_loading(class_count)` allocates `[state_count, class_count]`
+cascade scratch under the GIL, reusing it at the same width. Python loading
+calls this automatically. `workspace.state_loads` is `None` before preparation,
+otherwise a read-only, zero-copy view. Every loading call resets this scratch
+and seeds demand at `terminal_states[d]`, excluding the root. It then traverses
+`reached_first[:settled_count]` in reverse, adding each state's demand to its
+connector link and parent state. This handles nonterminal arrival histories in
+turn routing without a mode branch. At completion each state holds its subtree's
+demand; the root holds total reachable non-intrazonal demand, and unfinalized
+states are zero. Skims and searches do not refresh loading scratch. Retained
+views pin allocations; same-width loading overwrites them, resizing preserves
+old views. Use `.copy()` for snapshots.
+
+The allocation-free kernel lives in `network_loading.hpp`, templated on the
+floating-point type. Cython currently specializes it for `double`, like skimming.
+Runtime is `O((state_count + D) * classes)`, with `O(state_count * classes)` scratch.
+Cython callers can avoid Python validation in the origin loop:
+
+```cython
+# results must be typed SearchResults. Prepare once under the GIL:
+results.workspace.prepare_loading(class_count)
+# demand: const double *, packed [D, class_count]
+# link_loads: double *, packed [context.link_count, class_count]
+with nogil:
+    results.network_loading_nogil(demand, D, class_count, link_loads)
+```
+
+The unchecked caller must guarantee the shapes above, prepared scratch, buffer
+lifetimes/non-overlap, and exclusive access to results/workspace/output. Zero
+classes permits null pointers; zero destinations permits null demand; zero
+links permits null output. No select-link loading or iteration scheduler is
+implemented here.
 
 ## Turn representation
 
@@ -378,9 +457,9 @@ locality. The mask is immutable during search. A monotonic reached-target count
 is exposed in the result instead of destructively clearing mask bits or exposing
 a decrementing implementation counter.
 
-No loading, centroid blocking, graph compression, A*, or heap selection is
-implemented here. The persistent workspace currently holds skim scratch only;
-heaps are still allocated by each search.
+No select-link loading, centroid blocking, graph compression, A*, or heap
+selection is implemented here. The persistent workspace holds skim and cascade
+loading scratch; heaps are still allocated by each search.
 
 ## Validation
 
@@ -392,7 +471,8 @@ LD_PRELOAD=$(gcc -print-file-name=libasan.so) \
 python -m pytest --durations=50 --color=yes \
     tests/aequilibrae/paths/test_node_routing_mvp.py \
     tests/aequilibrae/paths/test_turn_routing_mvp.py \
-    tests/aequilibrae/paths/test_context_skimming.py
+    tests/aequilibrae/paths/test_context_skimming.py \
+    tests/aequilibrae/paths/test_context_network_loading.py
 ```
 
 Tests cover both state layouts, different arrival histories, turn penalties and
@@ -405,4 +485,8 @@ unreachable/unfinalized states, workspace reuse and retained views, buffer
 validation, shared-context workers, and random multigraph path-sum comparisons.
 Prepared skim tests check no-copy inputs, read-only views, OD buffer reuse,
 optional cost/penalty outputs, cached preparation, input lifetimes, and workers
-sharing one prepared object while writing separate origin rows.
+sharing one prepared object while writing separate origin rows. Loading tests
+cover both state layouts, turn arrival histories, partial/unreachable paths,
+centroid-sized demand, empty axes, scratch reuse/lifetimes, buffer validation,
+random multigraph comparisons against path walks, and worker-local accumulation
+with thread-axis reduction and iteration resets.
