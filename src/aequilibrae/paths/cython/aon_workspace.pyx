@@ -5,7 +5,7 @@ import numpy as np
 from aequilibrae.paths.cython.graph_context cimport GraphContext
 
 
-cdef class RoutingWorkspace:
+cdef class AoNWorkspace:
     """Per-results scratch storage, owned by NumPy and borrowed by C++.
 
     Allocate/resize under the GIL, then use from one worker at a time. Retained
@@ -21,6 +21,7 @@ cdef class RoutingWorkspace:
         self.context = context
         self.cpp.state_count = context.state_count
         self._state_skims = None
+        self._state_loads = None
         self.prepare_skims(field_count)
 
     cpdef prepare_skims(self, object field_count):
@@ -37,6 +38,38 @@ cdef class RoutingWorkspace:
         self.cpp.state_skims = &flat[0] if flat.shape[0] else NULL
         self._state_skims = array
         array.flags.writeable = False
+
+    cpdef prepare_loading(self, object class_count):
+        """Ensure packed [state_count, class_count] cascade scratch (requires GIL).
+
+        Link-load accumulators are always supplied by the caller, not allocated
+        here. Same-width preparation preserves the current scratch allocation.
+        """
+        cdef double[::1] flat
+        class_count = operator.index(class_count)
+        if class_count < 0:
+            raise ValueError("class_count must be nonnegative")
+        if self._state_loads is not None and class_count == self.cpp.loading_class_count:
+            return
+        array = np.zeros((self.cpp.state_count, class_count), dtype=np.float64)
+        flat = array.reshape(-1)
+        self.cpp.loading_class_count = class_count
+        self.cpp.state_loads = &flat[0] if flat.shape[0] else NULL
+        self._state_loads = array
+        array.flags.writeable = False
+
+    @property
+    def loading_class_count(self):
+        return self.cpp.loading_class_count
+
+    @property
+    def state_loads(self):
+        """Read-only cascade scratch from the last loading call, or None.
+
+        Each state holds the demand in its finalized subtree. Unsettled states
+        are zero. Searches/skims do not refresh it; resizing preserves old views.
+        """
+        return None if self._state_loads is None else self._state_loads.view()
 
     @property
     def state_count(self):

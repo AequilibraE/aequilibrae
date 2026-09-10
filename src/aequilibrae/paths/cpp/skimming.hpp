@@ -5,7 +5,7 @@
 #include <limits>
 #include <type_traits>
 
-#include "routing_workspace.hpp"
+#include "aon_workspace.hpp"
 #include "search_results.hpp"
 
 namespace aequilibrae::paths::cpp::mvp {
@@ -37,7 +37,7 @@ namespace aequilibrae::paths::cpp::mvp {
 template <typename T>
 void skim_fields(const SearchResults &results, std::size_t destination_count,
                  const T *const *fields, std::size_t field_count,
-                 RoutingWorkspace<T> &workspace, T *output) noexcept {
+                 AoNWorkspace<T> &workspace, T *output) noexcept {
   static_assert(std::is_floating_point_v<T>,
                 "Skims require floating-point infinity");
   if (field_count == 0) {

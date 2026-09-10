@@ -9,7 +9,7 @@ import pytest
 
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.graph_context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.routing_workspace import RoutingWorkspace
+from aequilibrae.paths.cython.aon_workspace import AoNWorkspace
 from aequilibrae.paths.cython.skimming_context import SkimmingContext
 
 
@@ -193,7 +193,7 @@ def test_validation_and_read_only_inputs():
         results.workspace.prepare_skims(-1)
     with pytest.raises(TypeError):
         results.workspace.prepare_skims(1.5)
-    workspace = RoutingWorkspace(context, 2)
+    workspace = AoNWorkspace(context, 2)
     assert workspace.state_skims.shape == (context.state_count, 2)
     assert workspace.context is context
     assert workspace.state_count == context.state_count
