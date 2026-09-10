@@ -195,3 +195,33 @@ def test_dead_end_removal(compressed_graph):
     assert set(compressed_graph.dead_end_links) == set(
         compressed_graph.graph[compressed_graph.graph.dead_end == 1].link_id
     ) - {40}, "Dead end removal removed incorrect links"
+
+
+def test_degree_two_sink_is_not_compressed():
+    # A non-centroid node with two links pointing into it is a sink, which dead-end removal skips. Contracting it
+    # yields a chain that cannot be traversed either way, and that used to become a phantom arc between its
+    # neighbours, making the compact graph cheaper than the network actually is.
+    network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3, 4, 5],
+            "a_node": [1, 2, 3, 3, 4],
+            "b_node": [3, 4, 4, 5, 5],
+            "direction": [0, 0, 0, 1, 1],  # node 5 is a sink, fed by 3 -> 5 and 4 -> 5
+            "cost": [1.0, 1.0, 10.0, 1.0, 1.0],
+        }
+    )
+
+    graph = Graph()
+    graph.network = network
+    graph.prepare_graph(np.array([1, 2]))
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+    graph.set_blocked_centroid_flows(False)
+
+    # Nothing can leave node 5, so the links into it must map to the dummy compressed ID, which always carries zero
+    dummy_id = graph.compact_graph.id.max() + 1
+    assert graph.graph[graph.graph.link_id.isin([4, 5])].__compressed_id__.unique().tolist() == [dummy_id]
+
+    # The only way from 1 to 2 is over link 3, on the compact graph just as on the full one
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 12.0
+    assert graph.compute_path(1, 2).milepost[-1] == 12.0
