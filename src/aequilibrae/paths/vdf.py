@@ -69,14 +69,9 @@ DEFAULT_PRESET_SPECS = {
 
 
 class VDF:
-    """Volume-Delay function
-    spec = {
-        "graph_column_a": {"fill_NA": 5, "bounds": (0, 10)},
-        "graph_column_b": {"bounds": (0, float("inf")},
-    }
-
-    ***SUPPORTS multiplicative and additive delays, needs to return the absolute congested time rather than a
-    delay or factor***
+    """Volume-Delay function that describes the total travel time across a link for a based on its
+    free flow travel time and capacity for a given volume of traffic. Supports multiplicative and
+    additive delays, and returns the absolute congested time rather than a delay or factor***
 
     .. code-block:: python
 
@@ -90,6 +85,29 @@ class VDF:
         spec: dict,
         derivative: Callable | str | None = None,
     ):
+        """Creates a Volume Delay Function (VDF) that describes the total travel time across a
+        link for a based on its free flow travel time and capacity for a given volume of traffic.
+
+        :Arguments:
+            **name** (:obj:`str`): the name of this VDF.
+
+            **function** (:obj:`Callable | str`): the function computing travel time given
+            volume, capacity and free flow travel time, as well as the parameters in spec.
+            Can be passed directly as a callable, or as a string expression to be interpreted by
+            NumExpr.
+
+            **spec** (:obj:`dict`): mapping of parameter names to values used by function (and
+            derivative, if applicable) when computing travel time.
+
+            **derivative** (:obj:`Callable | str`, *Optional*): the derivative of function with
+            respect to volume. Can be passed directly as a callable, or as a string expression
+            that will be converted into a callable via NumExpr. Defaults to None, in which case
+            the derivative is instead approximated with a finite difference method.
+
+        :Raises:
+            **ValueError**: if function or derivative is passed as a string that cannot be
+            converted into a callable.
+        """
         if isinstance(function, str):
             function: Callable = self.convert_str_function_into_function(function)
 
