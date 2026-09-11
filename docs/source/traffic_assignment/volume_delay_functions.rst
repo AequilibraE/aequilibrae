@@ -335,7 +335,7 @@ General Recommendations
 **For Conical:**
 
 * Can use similar values to BPR as starting points
-* :math:`\alpha = 0.15` and :math:`\beta = 4.0` provide comparable behavior to BPR
+* Values of :math:`\alpha \in [2.0, 9.0]` have been recommended by Hampton Roads Transportation Planning Organization (2020), depending on the types of roads being modelled. 
 * Fine-tuning may require understanding of the specific mathematical properties
 
 **For INRETS:**
@@ -479,6 +479,144 @@ Link-Specific Parameters
     # Assume your network has fields 'alpha_field' and 'beta_field'
     # with values calibrated for each link
     assig.set_vdf(bpr, {"alpha": "alpha_field", "beta": "beta_field"})
+
+Creating Custom VDFs
+--------------------
+
+Custom VDFs can be created and accessed many different ways. The VDF function and its derivative can be input as either a ``Callable``, or as a string to be interpreted by NumExpr. 
+
+Note that the VDF and its derivative place their result in the first argument, assumed to be an array. The exact way they will be called is given by the following methods in the ``VDF`` class:
+
+.. code-block:: python
+
+    def apply_vdf(self, *, congested_time, link_flows, fftime, capacity, cores: int, **link_attributes):
+        self.func(congested_time, link_flows, fftime, capacity, cores, **link_attributes)
+
+    def apply_derivative(self, *, delta, link_flows, fftime, capacity, cores: int, **link_attributes):
+        self.d_func(delta, link_flows, fftime, capacity, cores, **link_attributes)
+
+This implies that VDFs implemented in python must take in the arguments ``delta, link_flows, fftime, capacity, cores``, and then any custom link attributes. 
+
+
+
+The following shows a custom VDF, the SANDAG modified two-part additive formulation (https://tfresource.org/topics/SANDAG_C04Report.pdf), being created by defining the functions in python. Note that if a function for the derivative of the VDF is not specified, when required the derivative will be computed numerically via finite difference.
+
+.. code-block:: python
+
+    # define custom vdf function
+    def SANDAG_modified_two_part_additive(
+        congested_time,
+        link_flows,
+        fftime,
+        capacity,
+        cores,
+        alpha_1,
+        beta_1,
+        alpha_2,
+        beta_2,
+        green_to_cycle_ratio,
+        cycle_time,
+        intersection_capacity,
+    ):
+        voc = link_flows / capacity
+        voc_intersection = link_flows / intersection_capacity
+        term_1 = fftime * (
+            1.0 + alpha_1 * voc**beta_1
+        )
+        term_2 = (
+            0.5
+            * cycle_time
+            * (1 - green_to_cycle_ratio) ** 2
+            * (1.0 + alpha_2 * voc_intersection**beta_2)
+        )
+        congested_times[:] = term_1 + term_2
+
+    # define custom vdf derivative
+    def derivative_SANDAG_modified_two_part_additive(
+        delta,
+        link_flows,
+        fftime,
+        capacity,
+        cores,
+        alpha_1,
+        beta_1,
+        alpha_2,
+        beta_2,
+        green_to_cycle_ratio,
+        cycle_time,
+        intersection_capacity,
+    ):
+        voc = link_flows / capacity
+        voc_intersection = link_flows / intersection_capacity
+        term_1 = (
+            fftime
+            * alpha_1
+            * beta_1
+            * voc ** (beta_1 - 1)
+            / capacity
+        )
+        term_2 = (
+            0.5
+            * cycle_time
+            * (1 - green_to_cycle_ratio) ** 2
+            * alpha_2
+            * beta_2
+            * voc_intersection ** (beta_2 - 1)
+            / intersection_capacity
+        )
+        delta[:] = term_1 + term_2
+        
+    # define the specification
+    SANDAG_spec = {
+        "alpha_1": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
+        "beta_1": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+        "alpha_2": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
+        "beta_2": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+        "green_to_cycle_ratio": {"bounds": (0.0, 1.0)},
+        "cycle_time": {"bounds": (0.0, float("inf"))},
+        "intersection_capacity": {"bounds": (0.0, float("inf"))}
+    }
+    
+    # uses both the defined function and derivative
+    sandag_vdf = VDF(
+        "SANDAG", 
+        SANDAG_modified_two_part_additive, 
+        SANDAG_spec, 
+        derivative_SANDAG_modified_two_part_additive,
+    )
+
+    # only uses the definition of the vdf function
+    # derivative is calculated numerically using finite difference 
+    sandag_finite_difference_derivative_vdf = VDF(
+        "SANDAG", 
+        SANDAG_modified_two_part_additive, 
+        SANDAG_spec,
+    )
+
+The following shows the SANDAG modified two-part additive formulation being created using a string representation to be evaluated by NumExpr.
+
+.. code-block:: python
+  
+    SANDAG_string_representation = "fftime * (1.0 + alpha_1 * (link_flows/capacity)**beta_1) + "
+        "0.5 * cycle_time * (1 - green_to_cycle_ratio)**2 * (1.0 + alpha_2 * (link_flows/capacity)**beta_2)"
+    
+    derivative_SANDAG_string_representation = "(fftime * alpha_1 * beta_1 * (link_flows / capacity) ** (beta_1 - 1) / capacity"
+        "+ 0.5 * cycle_time * (1 - green_to_cycle_ratio) ** 2
+        "* alpha_2 * beta_2 * (link_flows / capacity) ** (beta_2 - 1) / capacity)"
+
+    # string representations of the function and its derivative will be interpreted by NumExpr
+    sandag_string_vdf = VDF(
+      "SANDAG", 
+      SANDAG_string_representation, 
+      SANDAG_spec, 
+      derivative_SANDAG_string_representation
+    )
+
+
+Checking Custom VDFs
+~~~~~~~~~~~~~~~~~~~~
+
+Spiess, 1989 specified 
 
 References and Further Reading
 -------------------------------
