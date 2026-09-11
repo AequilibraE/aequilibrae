@@ -334,8 +334,7 @@ General Recommendations
 
 **For Conical:**
 
-* Can use similar values to BPR as starting points
-* Values of :math:`\alpha \in [2.0, 9.0]` have been recommended by Hampton Roads Transportation Planning Organization (2020), depending on the types of roads being modelled. 
+* Values of :math:`\alpha \in [2.0, 9.0]` have been recommended by Hampton Roads Transportation Planning Organization (2020), depending on the types of roads being modelled
 * Fine-tuning may require understanding of the specific mathematical properties
 
 **For INRETS:**
