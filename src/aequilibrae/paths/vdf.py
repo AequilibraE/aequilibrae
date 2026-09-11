@@ -302,7 +302,7 @@ def load_from_parameters(
               (:obj:`dict`) of parameters.
 
         **function_map** (:obj:`dict[str, tuple[Callable, Callable]]`, *Optional*): mapping of
-        preset function names to (function, derivative) tuples, merged with (and taking
+        user supplied function names to (function, derivative) tuples, merged with (and taking
         precedence over) FUNCTION_MAP. Defaults to None, in which case FUNCTION_MAP alone is used.
 
     :Returns:
@@ -310,9 +310,9 @@ def load_from_parameters(
         objects.
 
     :Raises:
-        **ValueError**: if a "function" entry references a preset not found in function_map,
-        if a "spec" contains keys not present in the preset's default spec, or if an entry
-        defines neither "function" nor "functional_form".
+        **ValueError**: if a "function" entry references an unknown preset vdf, if a "spec"
+        contains keys not present in the preset's default spec, or if an entry defines
+        neither "function" nor "functional_form".
     """
     results = {}
 
