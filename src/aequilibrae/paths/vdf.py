@@ -69,14 +69,9 @@ DEFAULT_PRESET_SPECS = {
 
 
 class VDF:
-    """Volume-Delay function
-    spec = {
-        "graph_column_a": {"fill_NA": 5, "bounds": (0, 10)},
-        "graph_column_b": {"bounds": (0, float("inf")},
-    }
-
-    ***SUPPORTS multiplicative and additive delays, needs to return the absolute congested time rather than a
-    delay or factor***
+    """Volume-Delay function that describes the total travel time across a link for a based on its
+    free flow travel time and capacity for a given volume of traffic. Supports multiplicative and
+    additive delays, and returns the absolute congested time rather than a delay or factor***
 
     .. code-block:: python
 
@@ -90,6 +85,29 @@ class VDF:
         spec: dict,
         derivative: Callable | str | None = None,
     ):
+        """Creates a Volume Delay Function (VDF) that describes the total travel time across a
+        link for a based on its free flow travel time and capacity for a given volume of traffic.
+
+        :Arguments:
+            **name** (:obj:`str`): the name of this VDF.
+
+            **function** (:obj:`Callable | str`): the function computing travel time given
+            volume, capacity and free flow travel time, as well as the parameters in spec.
+            Can be passed directly as a callable, or as a string expression to be interpreted by
+            NumExpr.
+
+            **spec** (:obj:`dict`): mapping of parameter names to values used by function (and
+            derivative, if applicable) when computing travel time.
+
+            **derivative** (:obj:`Callable | str`, *Optional*): the derivative of function with
+            respect to volume. Can be passed directly as a callable, or as a string expression
+            that will be converted into a callable via NumExpr. Defaults to None, in which case
+            the derivative is instead approximated with a finite difference method.
+
+        :Raises:
+            **ValueError**: if function or derivative is passed as a string that cannot be
+            converted into a callable.
+        """
         if isinstance(function, str):
             function: Callable = self.convert_str_function_into_function(function)
 
@@ -149,10 +167,44 @@ class VDF:
         return func
 
     def check_valid(self, num_points, link_attributes: dict[str, Any], from_voc: float = 0.0, to_voc: float = 3.0):
-        """Checks if the VDF starts at 1 for 0 volume, is increasing, its derivative is positive, and if it is convex
-        via checking that the derivative is increasing. Returns a tuple of bools that are true if it is satisfied, and
-        false if these are violated respectively.
+        """Implements a number of checks copied from Spiess, 1989 where requirements for VDFs are described, accessed
+        from http://www.spiess.ch/emme2/conic/conic.html#SECTION0003.
 
+        The VDF is evaluated at num_points values of volume/capacity in the range between from_voc to to_voc. Then,
+        these values are used in the following checks:
+            It is strictly increasing, found by comparing neighbouring function values and checking that the derivative
+            is positive.
+            It is convex from above, found by checking that the derivative only increases between evaluated points
+            For zero volume on the road, the VDF returns the free flow travel time
+
+        Any violations found are printed, listing the offending volume/capacity values.
+
+        :Arguments:
+            **num_points** (:obj:`int`): the number of volume/capacity values at which to evaluate
+            the VDF and its derivative between from_voc and to_voc.
+
+            **link_attributes** (:obj:`dict[str, Any]`): mapping of link attribute names to
+            values used to evaluate the VDF and its derivative, for example secondary capacity
+            or the parameters for the VDF.
+
+            **from_voc** (:obj:`float`, *Optional*): the lower bound of the volume/capacity range
+            to evaluate. Defaults to 0.0.
+
+            **to_voc** (:obj:`float`, *Optional*): the upper bound of the volume/capacity range
+            to evaluate. Defaults to 3.0.
+
+        :Returns:
+            **vdf_valid_0_value** (:obj:`bool`): True if the VDF evaluates to 1 (the free flow
+            travel time) at zero volume/capacity, within a small tolerance.
+
+            **vdf_increasing_f_vals** (:obj:`bool`): True if the VDF's values are non-decreasing
+            across the evaluated volume/capacity range.
+
+            **vdf_nonnegative_derivative** (:obj:`bool`): True if the VDF's derivative is
+            non-negative across the evaluated volume/capacity range.
+
+            **vdf_convex** (:obj:`bool`): True if the VDF's derivative is non-decreasing across
+            the evaluated volume/capacity range (i.e. the VDF is convex from above).
         """
         voc_range = np.linspace(from_voc, to_voc, num_points)
 
@@ -282,6 +334,38 @@ def load_from_parameters(
     vdf_data: dict,
     function_map: dict[str, tuple[Callable, Callable]] | None = None,
 ) -> dict[str, VDF]:
+    """Creates Volume Delay Functions from the given vdf_data dictionary.
+
+    Each entry in vdf_data must specify either a preset function (via "function", referencing
+    a name in function_map/FUNCTION_MAP, with an optional "spec" dict overriding the preset's
+    default parameters) or a custom functional form (via "functional_form", with an optional
+    "derivative_functional_form" and a required "spec" dict). An entry named "default" is
+    skipped. If a derivative of a custom VDF is not specified, it will use a finite difference
+    scheme to calculate the derivative.
+
+    :Arguments:
+        **vdf_data** (:obj:`dict`): Mapping of VDF names to their definitions, which could be
+        originally specified in the parameters yaml file. Each entry is a dict containing
+        either:
+            - "function" (:obj:`str`): the name of a preset VDF function, and optionally
+              "spec" (:obj:`dict`) with parameter overrides for that preset; or
+            - "functional_form" (:obj:`Callable`): a custom VDF function, optionally paired
+              with "derivative_functional_form" (:obj:`Callable`), and a required "spec"
+              (:obj:`dict`) of parameters.
+
+        **function_map** (:obj:`dict[str, tuple[Callable, Callable]]`, *Optional*): mapping of
+        user supplied function names to (function, derivative) tuples, merged with (and taking
+        precedence over) FUNCTION_MAP. Defaults to None, in which case FUNCTION_MAP alone is used.
+
+    :Returns:
+        **results** (:obj:`dict[str, VDF]`): mapping of VDF names to their constructed VDF
+        objects.
+
+    :Raises:
+        **ValueError**: if a "function" entry references an unknown preset vdf, if a "spec"
+        contains keys not present in the preset's default spec, or if an entry defines
+        neither "function" nor "functional_form".
+    """
     results = {}
 
     function_map = FUNCTION_MAP if function_map is None else FUNCTION_MAP | function_map

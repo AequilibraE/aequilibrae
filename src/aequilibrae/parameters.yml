@@ -5,8 +5,8 @@ run:
   example_function_with_kwargs:
     arg1: "parameters.yml argument"
 vdfs:
-  default: "bpr_tyler"
-  bpr_tyler: 
+  default: "bpr_example"
+  bpr_example:
     function: bpr
     spec: 
       alpha:
