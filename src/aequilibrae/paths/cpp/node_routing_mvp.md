@@ -364,8 +364,133 @@ with nogil:
 The unchecked caller must guarantee the shapes above, prepared scratch, buffer
 lifetimes/non-overlap, and exclusive access to results/workspace/output. Zero
 classes permits null pointers; zero destinations permits null demand; zero
-links permits null output. These single-origin kernels do not implement
-select-link loading or schedule origins; the prepared assignment below supplies the loop.
+links permits null output. This kernel does not schedule origins; the prepared
+assignment below supplies the loop. Select-link loading is a separate kernel.
+
+## Select-link analysis
+
+Select-link analysis uses the same finalized **state** tree for node and turn
+contexts. Each set has OR semantics, matching legacy assignment: an OD matches
+if its chosen path traverses **any** member of the set. Multiple hits or duplicate
+members do not multiply its demand. All links on the matched path receive loads,
+including links before and after the selected link. Different sets are independent;
+the same OD can contribute to several sets. This does not implement AND-sets,
+ordered sequences, or alternative-route selection.
+
+### Single-origin loading
+
+```python
+# After dijkstra(context, origin, required_destinations, results):
+selected_loads = np.zeros((context.link_count, classes), dtype=np.float64)
+selected_od = np.empty((D, classes), dtype=np.float64)
+results.select_link_loading([0, 3], demand[origin], selected_loads, selected_od)
+```
+
+`selected_links` is an iterable of context-local directed-link indices; integers
+outside `[0, link_count)`, booleans and nonintegers are rejected. Duplicates are
+ignored and an empty set matches nothing. Demand follows `network_loading`'s
+aligned, C-contiguous `float64 [D, classes]` contract. Both outputs are required,
+writable, aligned, C-contiguous `float64` arrays: loads `[links, classes] are
+**accumulated**, OD `[D, classes]` is **overwritten**. The method returns
+`(selected_loads, selected_od)` with those same objects. It does not also perform
+regular loading; call `network_loading` separately if needed.
+
+Intrazonal, unmatched, unreachable and unfinalized destinations have zero selected
+OD demand and contribute no selected loads. Before a search nothing matches.
+Partial searches are not extended. Empty axes/edgeless contexts are supported;
+zero classes does no kernel work. Negative and nonfinite demand uses ordinary
+floating-point addition. Inputs, outputs and active scratch must not overlap.
+The same buffer-lifetime and worker-exclusivity rules as network loading apply.
+This convenience method builds a membership mask per call; repeated assignment
+should use the persistent interface below instead.
+
+### Prepared assignment and outputs
+
+```python
+aon = PreparedAoN(
+    context, demand, costs=context.costs, cores=4,
+    selected_links={"screenline": [0, 3], "other": [2], "empty": []},
+)
+previous, current = aon.make_outputs(), aon.make_outputs()
+aon.run(previous)
+aon.update_costs(new_costs)
+aon.run(current)
+# Set order is aon.select_link_names == current.select_link_names.
+screenline_loads = current.select_link_loads[0]  # [links, classes]
+screenline_od = current.select_link_od[0]        # [zones, zones, classes]
+```
+
+`selected_links=None` or `{}` disables analysis. Otherwise the mapping's insertion
+order fixes the set axis and immutable `select_link_names` tuple. Membership is
+snapshotted into read-only byte masks `[sets, links]` at setup, exposed through
+`aon.select_link_masks`. Mutating the original mapping or its members has no effect.
+Select-link analysis does not activate additional origins/destinations: demand
+and optional skims determine the target set as before.
+
+Outputs own read-only `float64` arrays `select_link_loads [sets, links, classes]`
+and `select_link_od [sets, zones, zones, classes]`, or `None` when disabled. They
+start at zero and each run overwrites them, including skipped OD rows. Retained
+views, copying, output rotation and cost-alias rejection work just like ordinary
+loads/skims. `AoNOutputs.shape` remains the four existing numeric dimensions;
+`select_link_names` is an additional layout constraint checked by `run` and
+`copy_to`, including name order. Manual construction uses
+`AoNOutputs(*aon.shape, select_link_names=aon.select_link_names)`.
+
+Workers share masks and write disjoint origin rows directly into the caller's
+selected OD array. Only selected link loads require thread-axis scratch:
+`aon.thread_select_link_loads [workers, sets, links, classes]` is reduced at the
+end of a run. No per-worker OD cubes, per-origin pointer tables, numeric buffer
+allocations, atomics or Python callbacks are needed in the prepared loop.
+
+### Algorithm and Cython kernel
+
+For each set and origin, `select_link_loading.hpp`:
+
+1. Traverses `reached_first` forward, setting each state's flag to its parent's
+   flag OR membership of its connector link; the root is false.
+2. Projects flags through `terminal_states`, writes matching OD demand, and seeds
+   that demand at its selected terminal state.
+3. Cascades seeded demand in reverse settlement order onto connector links and
+   parent states, including the entire matched route.
+
+This preserves nonterminal arrival histories: the path to an intermediate node's
+optimal terminal need not be the history used en route to another destination.
+It also avoids counting demand multiple times when several set members occur on
+one route. Parent-before-child settlement makes it valid with zero-cost cycles.
+
+For `K` sets, `S` states, `D` destination rows and `C` classes, per-origin time is
+`O(K * (S + D) * C)` and reusable worker scratch is `O(S * C + S)`, independent
+of K. Membership storage is `O(K * links)` bytes. Sets are processed sequentially
+using the existing loading cascade scratch plus one byte per state, rather than
+allocating `[states, sets, classes]`. Compared with legacy OD-by-OD path retracing,
+this avoids repeated walks over shared route prefixes and clearing link masks
+for every OD. It is intended for dense repeated assignments; sparse one-off OD
+queries can favor path walking, so this is not a claim of universal speedup.
+Cascade summation order can differ from legacy floating-point roundoff.
+
+`workspace.prepare_select_links()` allocates state flags once under the GIL;
+`workspace.selected_paths` exposes a read-only view, or `None` before preparation.
+Loading scratch and flags describe the last processed set (not the regular
+loading immediately preceding it). Searches and skims do not refresh them.
+Same-size calls reuse allocations and retained views pin their storage.
+Cython callers can process one set without Python setup in their origin loop:
+
+```cython
+from aequilibrae.paths.cython.search_results cimport cpp_select_link_loading
+
+results.workspace.prepare_loading(classes)
+results.workspace.prepare_select_links()
+# mask: const bool [links]; demand/od: double [D, classes]
+# loads: double [links, classes]; od overwritten, loads accumulated
+with nogil:
+    cpp_select_link_loading[double](results.cpp, D, demand, classes, mask,
+                                    results.workspace.cpp, od, loads)
+```
+
+This unchecked entry point requires matching prepared scratch, valid finalized
+search buffers, correct dimensions, disjoint live buffers, and exclusive worker
+access. Empty destination/class/link axes permit their respective pointers to be
+NULL. The kernel is templated on floating-point type; Python uses double.
 
 ## Persistent all-or-nothing assignment
 
@@ -414,7 +539,8 @@ for iteration in range(100):
 Dimensions, topology, field widths, and origin uniqueness are checked during
 setup. Outputs establish their immutable layout when constructed; pointers are
 borrowed directly from their memoryview attributes when needed. `run(out)` compares
-the four dimensions (links, zones, classes, fields) and rejects cost/output overlap
+the four dimensions (links, zones, classes, fields), select-link names/order,
+and rejects cost/output overlap
 before writing. It does not retain the output.
 
 Costs are an explicit input, not a private copy. Construction and `update_costs`
@@ -428,8 +554,8 @@ valid values and must not mutate or resize costs during a run. Costs cannot alia
 worker scratch or the output being written. The context is not modified;
 assignments sharing a context can bind independent objectives.
 
-The only changing **input** is routing cost. Skim link attributes and turn
-penalties are fixed. Even a skim field originally taken from `context.costs`
+The only changing **input** is routing cost. Skim link attributes, select-link
+membership and turn penalties are fixed. Even a skim field originally taken from `context.costs`
 keeps its preparation-time link values; it is not a congested routing-cost skim.
 Changing the objective can, of course, change the selected path and its skim sums.
 
@@ -463,6 +589,7 @@ no default output and has no `outputs` property. Each output owns:
   workers, without a sentinel link or a full-network crosswalk.
 - `skims`: read-only, C-contiguous `float64 [z, z, fields]`, or `None` when disabled.
 - `total_turn_penalty`: scalar demand-weighted turn cost, computed even without skims.
+- Optional `select_link_loads` and `select_link_od`, described above.
 
 Each run **overwrites only its target**, rather than accumulating. Skims are written
 directly into that target, and thread loads are reduced directly into its load
@@ -522,8 +649,16 @@ centroid reports, and untouched skipped skim rows. The existing caller still
 reduces and maps compact loads. Clear auxiliary accumulators between iterations.
 Use `prepare_aon` instead when preparation should persist.
 
-Select-link loading, path-file saving, and non-4ary heaps are explicitly rejected
-by the adapter. `bridge` is accepted but unused. Production dispatch is unchanged.
+`prepare_aon(..., selected_links={name: compact_link_indices})` also supports
+select-link analysis. Indices must already be compact directed-link positions,
+not external link IDs/directions. The legacy adapter translates the prepared
+`result._selected_links` name-to-row mapping and `aux_result.select_links` table
+(with trailing -1 padding), validates the selected output buffers, accumulates
+selected thread loads, and replaces processed selected OD rows. Skipped rows
+remain untouched; each processed row is stored once on the thread axis for the
+existing caller's reduction. Clear auxiliary load accumulators between runs.
+Path-file saving and non-4ary heaps remain explicitly rejected by the adapter.
+`bridge` is accepted but unused. Production dispatch is unchanged.
 
 ## Turn representation
 
@@ -637,10 +772,11 @@ locality. The mask is immutable during search. A monotonic reached-target count
 is exposed in the result instead of destructively clearing mask bits or exposing
 a decrementing implementation counter.
 
-The standalone search kernels do not implement select-link loading, graph
-compression, A*, or heap selection. Prepared AoN supplies node centroid blocking;
-turn contexts use their prepared connector bans. The persistent workspace holds
-skim and cascade loading scratch; heaps are still allocated by each search.
+The standalone search kernels do not implement graph compression, A*, or heap
+selection. Select-link analysis is a separate post-search state-tree kernel.
+Prepared AoN supplies node centroid blocking; turn contexts use their prepared
+connector bans. The persistent workspace holds skim, cascade loading and
+select-link flag scratch; heaps are still allocated by each search.
 
 ## Validation
 
@@ -678,3 +814,8 @@ costs, precomputed target reuse, no NumPy buffer construction during repeated ru
 empty/edgeless assignments, output identity and view lifetimes, allocation/copy-free
 output rotation, no output retention by assignments, layout validation before
 writes, cost-buffer aliasing/lifetimes, and optional independent/reusable snapshots.
+Select-link tests in `test_aon_context.py` cover OR-set semantics, duplicate/empty
+sets, full-path loading, turn arrival histories, partial searches, zero-cost
+multigraphs and bans, negative/nonfinite demand, random path-walk comparisons,
+worker reduction, iteration resets, output rotation/copy/lifetimes, input/layout
+validation, cost/output aliasing, and legacy node/turn adapter equivalence.

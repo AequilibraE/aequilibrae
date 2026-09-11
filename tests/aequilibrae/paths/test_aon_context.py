@@ -60,9 +60,11 @@ def make_matrix(graph, classes=2):
     return matrix
 
 
-def buffers(graph, matrix, cores):
+def buffers(graph, matrix, cores, selected_links=None):
     result = AssignmentResults()
     result.set_cores(cores)
+    if selected_links is not None:
+        result._selected_links = selected_links
     result.prepare(graph, matrix)
     aux = MultiThreadedAoN()
     aux.prepare(graph, result)
@@ -146,7 +148,8 @@ def test_adapter_matches_legacy_for_connector_bans(blocked):
     np.testing.assert_allclose(new.skims.matrix_view, old.skims.matrix_view)
 
 
-def test_compressed_network_through_existing_assignment_caller(monkeypatch):
+@pytest.mark.parametrize("select_links", [False, True])
+def test_compressed_network_through_existing_assignment_caller(monkeypatch, select_links):
     # Degree-two intermediate nodes compress into links between centroids. Full
     # link mapping, skim expansion and reduction are the real production caller's.
     graph = Graph()
@@ -166,12 +169,15 @@ def test_compressed_network_through_existing_assignment_caller(monkeypatch):
     assert graph.compact_num_links < graph.num_links
     matrix = make_matrix(graph, classes=1)
     matrix.matrix_view[:] = np.arange(9.0).reshape(3, 3, 1)
-    old, _ = buffers(graph, matrix, 2)
+    selected = None
+    if select_links:
+        selected = {"screenline": graph.graph.loc[graph.graph.link_id == 1, "__compressed_id__"].to_numpy()}
+    old, _ = buffers(graph, matrix, 2, selected)
     baseline = allOrNothing("baseline", matrix, graph, old)
     baseline.execute()
 
     monkeypatch.setattr("aequilibrae.paths.all_or_nothing.aon_parallel", aon_parallel_context)
-    new, _ = buffers(graph, matrix, 2)
+    new, _ = buffers(graph, matrix, 2, selected)
     assignment = allOrNothing("context", matrix, graph, new)
     assignment.execute()
     np.testing.assert_allclose(new.link_loads, old.link_loads)
@@ -179,6 +185,12 @@ def test_compressed_network_through_existing_assignment_caller(monkeypatch):
     np.testing.assert_allclose(new.skims.matrix_view, old.skims.matrix_view)
     assert assignment.report == baseline.report
     assert np.any(new.link_loads > 0)
+    if select_links:
+        np.testing.assert_allclose(assignment.aux_res.temp_sl_link_loading.sum(axis=0),
+                                   baseline.aux_res.temp_sl_link_loading.sum(axis=0))
+        np.testing.assert_allclose(assignment.aux_res.temp_sl_od_matrix.sum(axis=0),
+                                   baseline.aux_res.temp_sl_od_matrix.sum(axis=0))
+        assert np.any(assignment.aux_res.temp_sl_link_loading > 0)
 
 
 @pytest.mark.parametrize("penalty", [0.5, 10.0])
@@ -267,7 +279,6 @@ def test_no_demand_and_no_skims_leaves_outputs_alone():
     "option, value, message",
     [
         ("save_path_file", True, "path-file"),
-        ("_selected_links", {"x": [1]}, "select-link"),
         ("_heap", "pairing", "4ary"),
     ],
 )
@@ -780,3 +791,269 @@ def test_output_guard_released_on_iteration_failure(monkeypatch):
             prepared.run(out)
     assert prepared.run(out) is out
     assert other.run(out) is out
+
+
+def select_link_reference(context, demand, selections, origins=None):
+    """Walk each OD path so the test does not repeat the kernel's tree logic."""
+    from aequilibrae.paths.cython.dijkstra import dijkstra
+
+    zones, _, classes = demand.shape
+    loads = np.zeros((len(selections), context.link_count, classes))
+    od = np.zeros((len(selections), zones, zones, classes))
+    results = context.make_results()
+    for origin in range(zones) if origins is None else origins:
+        dijkstra(context, origin, range(zones), results)
+        for destination in range(zones):
+            path = results.path_links_to(destination).tolist()
+            for selection, members in enumerate(selections.values()):
+                if set(path).intersection(members):
+                    od[selection, origin, destination] = demand[origin, destination]
+                    for link in path:
+                        loads[selection, link] += demand[origin, destination]
+    return loads, od
+
+
+@pytest.mark.parametrize("turn", [False, True])
+@pytest.mark.parametrize("cores", [1, 3])
+def test_select_link_history_rotation_and_ownership(turn, cores, monkeypatch):
+    args = ([0, 2, 3, 4, 4], [1, 2, 3, 1], [1.] * 4)
+    context = TurnBasedContext(*args, [0, 1, 1, 1, 1], [2], [10.]) if turn else NodeBasedContext(*args)
+    demand = np.zeros((4, 4, 2))
+    demand[0] = [[999, 999], [2, -2], [3, 30], [5, 50]]
+    demand[1, 3] = [7, 70]
+    demand[3, 0] = [11, 110]  # Unreachable.
+    selected = {"direct": [0], "history": [3], "both": [0, 1, 2, 2], "empty": []}
+    prepared = PreparedAoN(context, demand, costs=context.costs, cores=cores,
+                           selected_links=selected, skim_fields=[context.costs])
+    assert prepared.select_link_names == tuple(selected)
+    expected = select_link_reference(context, demand, selected)
+    selected["direct"].clear()  # Input membership is snapshotted.
+    first, second = prepared.make_outputs(), prepared.make_outputs()
+    assert prepared.run(first) is first
+    for actual, reference in zip((first.select_link_loads, first.select_link_od), expected, strict=True):
+        np.testing.assert_array_equal(actual, reference)
+    # A matched route includes upstream and downstream links, counted only once
+    # even when multiple selected members occur on it.
+    np.testing.assert_array_equal(first.select_link_loads[2], first.link_loads)
+    if turn:
+        np.testing.assert_array_equal(first.select_link_od[1, 0, 1], 0)
+        np.testing.assert_array_equal(first.select_link_od[1, 0, 3], [5, 50])
+        np.testing.assert_array_equal(first.select_link_loads[1, [1, 2, 3]], [[5, 50]] * 3)
+    views = first.select_link_loads, first.select_link_od
+    for view in (*views, prepared.select_link_masks, prepared.thread_select_link_loads):
+        with pytest.raises(ValueError):
+            view.flags.writeable = True
+    snapshot = first.copy()
+    assert snapshot.select_link_names == first.select_link_names
+    assert not np.shares_memory(snapshot.select_link_loads, views[0])
+    prepared.update_costs(np.array([5., 1., 1., 1.]))
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("select-link run allocated/copied/prepared numeric buffers")
+
+    with monkeypatch.context() as patch:
+        for name in ("array", "empty", "zeros", "full", "tile", "copyto"):
+            patch.setattr(np, name, unexpected)
+        patch.setattr("aequilibrae.paths.cython.aon_context.make_select_link_masks", unexpected)
+        for _ in range(3):
+            prepared.run(second)
+    np.testing.assert_array_equal(first.select_link_loads, expected[0])
+    np.testing.assert_array_equal(first.select_link_od, expected[1])
+    np.testing.assert_array_equal(second.select_link_loads[0], 0)
+    np.testing.assert_array_equal(second.select_link_od[0], 0)
+    assert second.copy_to(first) is first
+    np.testing.assert_array_equal(views[0], second.select_link_loads)
+    np.testing.assert_array_equal(views[1], second.select_link_od)
+    del prepared, first, second, context
+    gc.collect()
+    np.testing.assert_array_equal(views[0][0], 0)
+    np.testing.assert_array_equal(snapshot.select_link_loads, expected[0])
+
+
+@pytest.mark.parametrize("turn", [False, True])
+@pytest.mark.parametrize("seed", range(5))
+def test_select_link_random_multigraph_path_walks(turn, seed):
+    rng = np.random.default_rng(seed)
+    nodes, zones, links = 9, 6, 32
+    tails = np.sort(rng.integers(nodes, size=links))
+    heads = rng.integers(nodes, size=links)
+    fs = np.r_[0, np.cumsum(np.bincount(tails, minlength=nodes))]
+    costs = rng.integers(0, 5, size=links).astype(float)
+    kwargs = {}
+    if turn:
+        turn_fs, to_links, penalties = [0], [], []
+        for head in heads:
+            for outgoing in range(fs[head], fs[head + 1]):
+                if rng.random() < 0.4:
+                    to_links.append(outgoing)
+                    penalties.append(rng.choice([0., 2., 10., np.inf]))
+            turn_fs.append(len(to_links))
+        kwargs = {"turn_fs": turn_fs, "turn_to_links": to_links, "turn_penalties": penalties,
+                  "allow_uturns": False}
+    context = (TurnBasedContext if turn else NodeBasedContext)(fs, heads, costs, **kwargs)
+    demand = rng.integers(-3, 8, size=(zones, zones, 3)).astype(float)
+    selections = {str(i): rng.choice(links, size=i * 3).tolist() for i in range(5)}
+    origins = [0, 2, 5]
+    expected = select_link_reference(context, demand, selections, origins)
+    prepared = PreparedAoN(context, demand, costs=context.costs, cores=3,
+                           selected_links=selections, origins=origins)
+    outputs = prepared.make_outputs()
+    for _ in range(2):
+        prepared.run(outputs)
+        np.testing.assert_array_equal(outputs.select_link_loads, expected[0])
+        np.testing.assert_array_equal(outputs.select_link_od, expected[1])
+
+
+@pytest.mark.parametrize("turn", [False, True])
+def test_single_origin_select_link_partial_empty_and_scratch(turn):
+    from aequilibrae.paths.cython.dijkstra import dijkstra
+
+    context = prepared_context(turn)
+    results = context.make_results()
+    demand = np.ones((4, 2))
+    demand.flags.writeable = False
+    loads, od = np.full((4, 2), 7.), np.full((4, 2), 99.)
+    returned = results.select_link_loading([0], demand, loads, od)
+    assert returned[0] is loads and returned[1] is od
+    np.testing.assert_array_equal(loads, 7)
+    np.testing.assert_array_equal(od, 0)
+    dijkstra(context, 0, 1, results)  # Destination 3 is unfinalized.
+    results.select_link_loading([0, 0], demand, loads, od)
+    np.testing.assert_array_equal(loads, [[8, 8], [7, 7], [7, 7], [7, 7]])
+    np.testing.assert_array_equal(od, [[0, 0], [1, 1], [0, 0], [0, 0]])
+    scratch, flags = results.workspace.state_loads, results.workspace.selected_paths
+    results.select_link_loading([], demand, loads, od)
+    np.testing.assert_array_equal(od, 0)
+    np.testing.assert_array_equal(scratch, 0)
+    np.testing.assert_array_equal(flags, False)
+    assert np.shares_memory(scratch, results.workspace.state_loads)
+    assert np.shares_memory(flags, results.workspace.selected_paths)
+    # Destination and class axes can independently be empty.
+    results.select_link_loading([0], np.empty((0, 2)), loads, np.empty((0, 2)))
+    results.select_link_loading([0], np.empty((4, 0)), np.empty((4, 0)), np.empty((4, 0)))
+    np.testing.assert_array_equal(scratch, 0)  # Old allocation survives resizing.
+    with pytest.raises(ValueError):
+        flags.flags.writeable = True
+
+
+@pytest.mark.parametrize("turn", [False, True])
+@pytest.mark.parametrize("origins", [None, []])
+def test_select_link_edgeless_and_no_active_origins(turn, origins):
+    context = (TurnBasedContext if turn else NodeBasedContext)([0, 0, 0], [], [])
+    prepared = PreparedAoN(context, np.ones((2, 2, 1)), costs=context.costs, cores=3,
+                           selected_links={"empty": []}, origins=origins)
+    outputs = prepared.run(prepared.make_outputs())
+    assert outputs.select_link_loads.shape == (1, 0, 1)
+    np.testing.assert_array_equal(outputs.select_link_od, 0)
+    prepared.run(outputs)
+    np.testing.assert_array_equal(outputs.select_link_od, 0)
+
+
+@pytest.mark.parametrize("selected, error", [
+    ([0], TypeError), ({"x": [-1]}, ValueError), ({"x": [4]}, ValueError),
+    ({"x": [0.5]}, TypeError), ({"x": [True]}, TypeError), ({"x": [[0]]}, TypeError),
+])
+def test_select_link_setup_validation(selected, error):
+    context = prepared_context(False)
+    with pytest.raises(error):
+        PreparedAoN(context, np.ones((4, 4, 1)), costs=context.costs, selected_links=selected)
+
+
+def test_select_link_output_layout_and_cost_alias_validation():
+    context = prepared_context(False)
+    prepared = PreparedAoN(context, np.ones((4, 4, 1)), costs=context.costs,
+                           selected_links={"x": [0], "y": [1]})
+    out = prepared.run(prepared.make_outputs())
+    for names in ((), ("x",), ("y", "x"), ("x", "z")):
+        other = AoNOutputs(*out.shape, select_link_names=names)
+        with pytest.raises(ValueError, match="shape"):
+            prepared.run(other)
+        with pytest.raises(ValueError, match="shapes"):
+            out.copy_to(other)
+        np.testing.assert_array_equal(other.link_loads, 0)
+    for costs in (out.select_link_loads[0, :, 0], out.select_link_od[0, 0, :, 0]):
+        prepared.update_costs(costs)
+        snapshot = out.copy()
+        with pytest.raises(ValueError, match="overlap output"):
+            prepared.run(out)
+        np.testing.assert_array_equal(out.select_link_loads, snapshot.select_link_loads)
+        np.testing.assert_array_equal(out.select_link_od, snapshot.select_link_od)
+    with pytest.raises(ValueError, match="worker scratch"):
+        prepared.update_costs(prepared.thread_select_link_loads[0, 0, :, 0])
+    with pytest.raises(ValueError, match="unique"):
+        AoNOutputs(*out.shape, select_link_names=("x", "x"))
+    disabled = PreparedAoN(context, np.ones((4, 4, 1)), costs=context.costs)
+    assert disabled.thread_select_link_loads is None
+    assert disabled.select_link_masks.shape == (0, context.link_count)
+    plain = disabled.make_outputs()
+    assert plain.select_link_loads is None and plain.select_link_od is None
+
+
+def test_single_origin_select_link_validation_and_nonfinite_demand():
+    from aequilibrae.paths.cython.dijkstra import dijkstra
+
+    context = prepared_context(False)
+    results = dijkstra(context, 0, None)
+    demand = np.zeros((4, 2))
+    demand[1] = [np.nan, np.inf]
+    loads, od = np.zeros((4, 2)), np.empty((4, 2))
+    results.select_link_loading([0], demand, loads, od)
+    assert np.isnan(loads[0, 0]) and np.isposinf(loads[0, 1])
+    np.testing.assert_array_equal(loads[1:], 0)
+    np.testing.assert_array_equal(od[1], demand[1])
+    for invalid in ([-1], [4], [True], [1.5]):
+        with pytest.raises((ValueError, TypeError)):
+            results.select_link_loading(invalid, demand, loads, od)
+    for bad_demand in (demand.tolist(), demand.astype(np.float32), demand[:, ::-1], np.ones((5, 2))):
+        with pytest.raises((ValueError, TypeError)):
+            results.select_link_loading([0], bad_demand, loads, od)
+    for bad_loads, bad_od in ((None, od), (loads, None), (loads, loads), (demand, od),
+                              (loads, demand), (loads[:, ::-1], od), (loads, od[:2])):
+        with pytest.raises((ValueError, TypeError)):
+            results.select_link_loading([0], demand, bad_loads, bad_od)
+    scratch = results.workspace.state_loads
+    with pytest.raises(ValueError, match="overlap"):
+        results.select_link_loading([0], scratch, loads, od)
+
+
+@pytest.mark.parametrize("penalty", [None, 0.5, 10., np.inf])
+@pytest.mark.parametrize("cores", [1, 3])
+def test_select_link_legacy_adapter(penalty, cores):
+    graph = history_graph(penalty)
+    matrix = make_matrix(graph)
+    matrix.matrix_view[0] = [[999, 999], [2, 20], [3, 30], [5, 50]]
+    matrix.matrix_view[1, 3] = [7, 70]
+    selected = {"direct": [0], "history": [3], "both": [0, 1, 2], "empty": []}
+
+    def selected_buffers():
+        result = AssignmentResults()
+        result.set_cores(cores)
+        result._selected_links = {name: np.array(links, dtype=np.int64) for name, links in selected.items()}
+        result.prepare(graph, matrix)
+        aux = MultiThreadedAoN()
+        aux.prepare(graph, result)
+        return result, aux
+
+    old, old_aux = selected_buffers()
+    new, new_aux = selected_buffers()
+    old_report = aon_parallel(matrix, graph, old, old_aux, cores)
+    assert aon_parallel_context(matrix, graph, new, new_aux, cores) == old_report
+    np.testing.assert_allclose(new_aux.temp_sl_od_matrix.sum(axis=0), old_aux.temp_sl_od_matrix.sum(axis=0))
+    np.testing.assert_allclose(new_aux.temp_sl_link_loading.sum(axis=0), old_aux.temp_sl_link_loading.sum(axis=0))
+    np.testing.assert_allclose(new_aux.temp_link_loads.sum(axis=0), old_aux.temp_link_loads.sum(axis=0))
+    prepared = prepare_aon(matrix, graph, cores=cores, selected_links=selected)
+    expected = prepared.run(prepared.make_outputs())
+    np.testing.assert_array_equal(new_aux.temp_sl_od_matrix.sum(axis=0), expected.select_link_od)
+    # OD rows replace; loads accumulate, matching the adapter's existing contract.
+    aon_parallel_context(matrix, graph, new, new_aux, cores)
+    np.testing.assert_array_equal(new_aux.temp_sl_od_matrix.sum(axis=0), expected.select_link_od)
+    np.testing.assert_array_equal(new_aux.temp_sl_link_loading.sum(axis=0), expected.select_link_loads * 2)
+    # Clear stale OD rows even if a later call uses fewer than the allocated workers.
+    new_aux.temp_sl_od_matrix[:, :, :3] = 99
+    aon_parallel_context(matrix, graph, new, new_aux, 1)
+    np.testing.assert_array_equal(new_aux.temp_sl_od_matrix.sum(axis=0), expected.select_link_od)
+    before = new_aux.temp_link_loads.copy()
+    new_aux.select_links[0, 0] = graph.compact_num_links
+    with pytest.raises(ValueError, match="valid compact"):
+        aon_parallel_context(matrix, graph, new, new_aux, cores)
+    np.testing.assert_array_equal(new_aux.temp_link_loads, before)

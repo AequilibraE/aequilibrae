@@ -19,6 +19,10 @@ template <typename T> struct AoNWorkspace {
   // Link loads are caller-owned [link_count, loading_class_count] accumulators
   // passed to network_loading, normally one slice of a per-thread allocation.
   T *state_loads = nullptr;
+
+  // One flag per state: does its path use a selected link? Reuse these flags
+  // across sets so scratch size does not grow with the number of sets.
+  bool *selected_paths = nullptr;
 };
 
 } // namespace aequilibrae::paths::cpp::mvp

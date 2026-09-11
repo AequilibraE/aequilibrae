@@ -42,6 +42,17 @@ def prepare_output_array(out, node_count, field_count):
     return out
 
 
+def validate_loading_demand(demand, node_count):
+    if not isinstance(demand, np.ndarray):
+        raise TypeError("demand must be a NumPy array")
+    if demand.dtype != np.dtype(np.float64):
+        raise TypeError("demand must have dtype float64")
+    if demand.ndim != 2 or demand.shape[0] > node_count:
+        raise ValueError("demand must have shape (D, classes), D <= context.node_count")
+    if not demand.flags.c_contiguous or not demand.flags.aligned:
+        raise ValueError("demand must be aligned and C-contiguous")
+
+
 cdef class SearchResults:
     """Store a search tree, path costs and reusable loading/skimming scratch.
 
@@ -108,14 +119,7 @@ cdef class SearchResults:
         cdef double[::1] loads_view
         cdef size_t rows, classes
 
-        if not isinstance(demand, np.ndarray):
-            raise TypeError("demand must be a NumPy array")
-        if demand.dtype != np.dtype(np.float64):
-            raise TypeError("demand must have dtype float64")
-        if demand.ndim != 2 or demand.shape[0] > self.node_count:
-            raise ValueError("demand must have shape (D, classes), D <= context.node_count")
-        if not demand.flags.c_contiguous or not demand.flags.aligned:
-            raise ValueError("demand must be aligned and C-contiguous")
+        validate_loading_demand(demand, self.node_count)
 
         rows, classes = demand.shape
         # Unlike skimming, loading always requires a caller-owned accumulator.
@@ -141,6 +145,80 @@ cdef class SearchResults:
             self.network_loading_nogil(input_ptr, rows, classes, output_ptr)
 
         return link_loads
+
+    def select_link_loading(self, selected_links, demand, link_loads, od):
+        """Load trips that use any selected link; return (link_loads, od).
+
+        selected_links contains directed-link indices from this context, not
+        external link IDs. Demand is float64 [D, classes]. Supply both output
+        arrays: loads [links, classes] are added to; OD [D, classes] is replaced.
+        Each matching trip loads its whole path. Trips within one zone, paths
+        not finished by the search, and paths with no selected links get zero
+        OD demand. This does not load trips outside the set.
+
+        This method builds link flags each call. Use PreparedAoN for repeated
+        runs so flags and worker buffers can be prepared just once.
+        """
+        cdef const cpp_bool[::1] mask
+        cdef const double[::1] demand_view
+        cdef double[::1] loads_view, od_view
+        cdef size_t rows, classes
+
+        validate_loading_demand(demand, self.node_count)
+        rows, classes = demand.shape
+        if link_loads is None or od is None:
+            raise TypeError("link_loads and od must be NumPy arrays")
+
+        prepare_output_array(link_loads, self.context.link_count, classes)
+        prepare_output_array(od, rows, classes)
+
+        # One flag per link gives the tree pass a direct lookup. Setting the
+        # same flag twice also makes duplicate input links harmless.
+        members = np.zeros(self.context.link_count, dtype=np.bool_)
+        for member in selected_links:
+            if isinstance(member, (bool, np.bool_)):
+                raise TypeError("selected link indices must be integers, not booleans")
+            link = operator.index(member)
+            if not 0 <= link < self.context.link_count:
+                raise ValueError("selected link index must be in [0, link_count)")
+            members[link] = True
+
+        mask = members
+
+        self.workspace.prepare_loading(classes)
+        self.workspace.prepare_select_links()
+
+        # Clearing OD or scratch must not erase demand or existing link loads.
+        # Check before entering C++, where the buffers are used without checks.
+        buffers = (demand, link_loads, od, self.workspace.state_loads_buffer,
+                   self.workspace.selected_paths_buffer)
+        for i, first in enumerate(buffers):
+            for second in buffers[i + 1:]:
+                if np.shares_memory(first, second):
+                    raise ValueError("select-link inputs, outputs and workspace scratch must not overlap")
+
+        demand_view = demand.reshape(-1)
+        loads_view = link_loads.reshape(-1)
+        od_view = od.reshape(-1)
+
+        cdef const double *input_ptr = &demand_view[0] if demand_view.shape[0] else NULL
+        cdef double *loads_ptr = &loads_view[0] if loads_view.shape[0] else NULL
+        cdef double *od_ptr = &od_view[0] if od_view.shape[0] else NULL
+        cdef const cpp_bool *mask_ptr = &mask[0] if mask.shape[0] else NULL
+
+        with nogil:
+            cpp_select_link_loading[double](
+                self.cpp,
+                rows,
+                input_ptr,
+                classes,
+                mask_ptr,
+                self.workspace.cpp,
+                od_ptr,
+                loads_ptr,
+            )
+
+        return link_loads, od
 
     cdef void skim_fields_nogil(
         self,

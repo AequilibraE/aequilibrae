@@ -126,7 +126,8 @@ T sum_weighted_turn_costs(const SearchResults &search, size_t zones,
   T total = 0;
   for (size_t node = 0; node < zones; ++node) {
     size_t terminal = search.terminal_states[node];
-    if (terminal == (size_t)-1 || terminal == search.root) {
+    if (terminal == std::numeric_limits<std::size_t>::max() ||
+        terminal == search.root) {
       continue;
     }
 

@@ -52,6 +52,15 @@ cdef extern from "network_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" 
         CppAoNWorkspace[T] &workspace, T *link_loads) noexcept
 
 
+# This call skips Python checks so prepared workers can use it in their loop.
+# The caller must prepare loading/path flags and check buffer sizes first.
+cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
+    void cpp_select_link_loading "aequilibrae::paths::cpp::mvp::select_link_loading"[T](
+        const CppSearchResults &results, size_t destination_count,
+        const T *demand, size_t class_count, const cpp_bool *selected_links,
+        CppAoNWorkspace[T] &workspace, T *od, T *link_loads) noexcept
+
+
 cdef class SearchResults:
     cdef CppSearchResults cpp
     cdef size_t node_count

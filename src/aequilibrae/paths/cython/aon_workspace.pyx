@@ -25,6 +25,8 @@ cdef class AoNWorkspace:
 
         self.state_skims_buffer = None
         self.state_loads_buffer = None
+        self.selected_paths_buffer = None
+        self.cpp.selected_paths = NULL
         self.prepare_skims(field_count)
 
     cpdef prepare_skims(self, object field_count):
@@ -52,6 +54,22 @@ cdef class AoNWorkspace:
         self.state_loads_buffer = array[double]((self.cpp.state_count, class_count), True, 0)
         self.cpp.loading_class_count = class_count
         self.cpp.state_loads = &self.state_loads_buffer[0, 0] if class_count else NULL
+
+    cpdef prepare_select_links(self):
+        """Prepare flags for paths that use a selected link; requires the GIL.
+
+        Sets are processed one at a time, so all sets can reuse these flags.
+        Keeping the buffer avoids allocating memory for each set and origin.
+        """
+        if self.selected_paths_buffer is not None:
+            return
+        self.selected_paths_buffer = array[cpp_bool](self.cpp.state_count, True, False)
+        self.cpp.selected_paths = &self.selected_paths_buffer[0]
+
+    @property
+    def selected_paths(self):
+        """Read-only path flags for the last set, or None before preparation."""
+        return None if self.selected_paths_buffer is None else readonly_view(self.selected_paths_buffer)
 
     @property
     def loading_class_count(self):

@@ -58,14 +58,15 @@ def prepare_graph_inputs(matrix, graph):
     return context, demand, options
 
 
-def prepare_aon(matrix, graph, *, cores=1):
+def prepare_aon(matrix, graph, *, cores=1, selected_links=None):
     """Prepare reusable assignment from Graph and a matrix demand view.
 
     Copies topology, demand and skim fields, but borrows graph.compact_cost.
     Call update_costs if that array is replaced; never change it during a run.
+    selected_links maps names to compact directed-link indices (not external IDs).
     """
     context, demand, options = prepare_graph_inputs(matrix, graph)
-    return PreparedAoN(context, demand, cores=cores, **options)
+    return PreparedAoN(context, demand, cores=cores, selected_links=selected_links, **options)
 
 
 def validate_output_array(array, name, shape):
@@ -84,7 +85,6 @@ def validate_legacy_outputs(matrix, graph, result, aux, cores):
     if result._graph_id != graph._id:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
     for enabled, feature in ((result.save_path_file, "path-file saving"),
-                             (result._selected_links, "select-link loading"),
                              (result._heap != "4ary", "heaps other than 4ary")):
         if enabled:
             raise NotImplementedError(f"context AoN does not support {feature}")
@@ -97,10 +97,50 @@ def validate_legacy_outputs(matrix, graph, result, aux, cores):
         raise ValueError("aux_result does not have enough link capacity")
     fields = len(graph.skim_fields)
     skims = validate_output_array(result.skims.matrix_view, "skims", (zones, zones, fields)) if fields else None
-    arrays = [array for array in (matrix.matrix_view, loads, turns, skims) if array is not None]
+    sl_loads = sl_od = None
+    if result._selected_links:
+        sets = len(result._selected_links)
+        sl_loads = validate_output_array(aux.temp_sl_link_loading, "temp_sl_link_loading",
+                                        (result.cores, sets, graph.compact_num_links, classes))
+        sl_od = validate_output_array(aux.temp_sl_od_matrix, "temp_sl_od_matrix",
+                                     (result.cores, sets, zones, zones, classes))
+    arrays = [array for array in (matrix.matrix_view, loads, turns, skims, sl_loads, sl_od) if array is not None]
     if any(np.shares_memory(a, b) for a, b in combinations(arrays, 2)):
         raise ValueError("AoN input and output buffers must not overlap")
-    return loads, turns, skims
+    return loads, turns, skims, sl_loads, sl_od
+
+
+def legacy_select_links(result, aux, links):
+    """Read named link sets from the old assignment buffers.
+
+    Rows are padded with -1 because sets can have different lengths. Remove
+    that padding so it cannot be mistaken for a link index in the new kernel.
+    """
+    names = result._selected_links
+    if not names:
+        return None
+    indices = [operator.index(index) for index in names.values()]
+    if sorted(indices) != list(range(len(names))):
+        raise ValueError("selected-link results must be prepared with consecutive set indices")
+    table = aux.select_links
+    if (not isinstance(table, np.ndarray) or table.ndim != 2
+            or table.shape[0] != len(names) or table.dtype.kind not in "iu"):
+        raise ValueError("select_links must contain one integer row per set")
+    selected = {}
+    # Output rows follow stored row indices, which may differ from name order.
+    # Preserve those indices so loads stay attached to the right set names.
+    for name, row_index in sorted(names.items(), key=lambda item: item[1]):
+        members = []
+        padding = False
+        for link in table[row_index]:
+            if link == -1:
+                padding = True
+            elif padding or not 0 <= link < links:
+                raise ValueError("select_links must contain valid compact links followed by -1 padding")
+            else:
+                members.append(int(link))
+        selected[name] = members
+    return selected
 
 
 def choose_legacy_origins(matrix, graph, context, demand, skimming):
@@ -125,17 +165,26 @@ def aon_parallel_context(matrix, graph, result, aux_result, cores, bridge=None):
     Prepares a new assignment each call; use prepare_aon for reuse. bridge is unused.
     """
     cores = operator.index(cores)
-    loads, turns, skims = validate_legacy_outputs(matrix, graph, result, aux_result, cores)
+    loads, turns, skims, sl_loads, sl_od = validate_legacy_outputs(matrix, graph, result, aux_result, cores)
     context, demand, options = prepare_graph_inputs(matrix, graph)
     if demand.shape[2] != result.classes["number"]:
         raise ValueError("matrix view must have shape (zones, zones, classes)")
     origins, report = choose_legacy_origins(matrix, graph, context, demand, bool(options["skim_fields"]))
-    prepared = PreparedAoN(context, demand, cores=cores, origins=origins, **options)
+    selected = legacy_select_links(result, aux_result, context.link_count)
+    prepared = PreparedAoN(context, demand, cores=cores, origins=origins, selected_links=selected, **options)
     outputs = prepared.make_outputs()
     prepared.run(outputs)
     thread_loads, thread_turns = prepared.thread_outputs
     loads[:cores, :context.link_count, :] += thread_loads
     turns[:cores] += thread_turns
+    if selected:
+        sl_loads[:cores] += prepared.thread_select_link_loads
+        # The caller sums OD across workers. Store each row only once to avoid
+        # counting it twice. Clear all worker copies, even if this run uses fewer
+        # workers, so old OD values cannot survive in unused worker slots.
+        for origin in origins:
+            sl_od[:, :, origin, :, :] = 0
+            sl_od[0, :, origin, :, :] = outputs.select_link_od[:, origin, :, :]
     if skims is not None:
         for origin in origins:
             skims[origin] = outputs.skims[origin]
