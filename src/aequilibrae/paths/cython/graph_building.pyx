@@ -346,8 +346,9 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         }
     )
 
-    # Link compression can introduce new simple cycles into the graph
-    comp_lnk = comp_lnk[comp_lnk.a_node != comp_lnk.b_node]
+    # Link compression can introduce new simple cycles into the graph. Chains that cannot be traversed in either
+    # direction (e.g. one ending on a degree-two sink) are marked with direction -999
+    comp_lnk = comp_lnk[(comp_lnk.a_node != comp_lnk.b_node) & (comp_lnk.direction != -999)]
 
     max_link_id = link_id_max * 10
     comp_lnk.link_id += max_link_id
