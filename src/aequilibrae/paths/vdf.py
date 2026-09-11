@@ -282,6 +282,38 @@ def load_from_parameters(
     vdf_data: dict,
     function_map: dict[str, tuple[Callable, Callable]] | None = None,
 ) -> dict[str, VDF]:
+    """Creates Volume Delay Functions from the given vdf_data dictionary.
+
+    Each entry in vdf_data must specify either a preset function (via "function", referencing
+    a name in function_map/FUNCTION_MAP, with an optional "spec" dict overriding the preset's
+    default parameters) or a custom functional form (via "functional_form", with an optional
+    "derivative_functional_form" and a required "spec" dict). An entry named "default" is
+    skipped. If a derivative of a custom VDF is not specified, it will use a finite difference
+    scheme to calculate the derivative.
+
+    :Arguments:
+        **vdf_data** (:obj:`dict`): Mapping of VDF names to their definitions, which could be
+        originally specified in the parameters yaml file. Each entry is a dict containing
+        either:
+            - "function" (:obj:`str`): the name of a preset VDF function, and optionally
+              "spec" (:obj:`dict`) with parameter overrides for that preset; or
+            - "functional_form" (:obj:`Callable`): a custom VDF function, optionally paired
+              with "derivative_functional_form" (:obj:`Callable`), and a required "spec"
+              (:obj:`dict`) of parameters.
+
+        **function_map** (:obj:`dict[str, tuple[Callable, Callable]]`, *Optional*): mapping of
+        preset function names to (function, derivative) tuples, merged with (and taking
+        precedence over) FUNCTION_MAP. Defaults to None, in which case FUNCTION_MAP alone is used.
+
+    :Returns:
+        **results** (:obj:`dict[str, VDF]`): mapping of VDF names to their constructed VDF
+        objects.
+
+    :Raises:
+        **ValueError**: if a "function" entry references a preset not found in function_map,
+        if a "spec" contains keys not present in the preset's default spec, or if an entry
+        defines neither "function" nor "functional_form".
+    """
     results = {}
 
     function_map = FUNCTION_MAP if function_map is None else FUNCTION_MAP | function_map
