@@ -23,21 +23,17 @@ cdef extern from "graph_context.hpp" namespace "aequilibrae::paths::cpp::mvp" no
 
 
 cdef class GraphContext:
-    cdef object _fs
-    cdef object _heads
-    cdef object _costs
-    cdef object _link_ids
-    cdef void _initialize_graph(self, object fs, object heads, object costs) except *
-    cdef void _initialize_cpp_graph(self, CppNodeBasedContext *cpp) except *
+    cdef const size_t[::1] node_offsets, heads_buffer, link_ids_buffer
+    cdef double[::1] costs_buffer
+    cdef CppNodeBasedContext graph_view(self) noexcept nogil
 
 
 cdef class NodeBasedContext(GraphContext):
-    cdef CppNodeBasedContext cpp
+    cdef CppNodeBasedContext view(self) noexcept nogil
 
 
 cdef class TurnBasedContext(GraphContext):
-    cdef CppTurnBasedContext cpp
-    cdef object _tails
-    cdef object _turn_fs
-    cdef object _turn_to_links
-    cdef object _turn_penalties
+    cdef const size_t[::1] tails_buffer, turn_offsets, turn_links
+    cdef double[::1] turn_penalties_buffer
+    cdef cpp_bool uturns_allowed
+    cdef CppTurnBasedContext view(self) noexcept nogil

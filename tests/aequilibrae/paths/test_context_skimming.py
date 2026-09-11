@@ -394,12 +394,15 @@ def test_prepared_calls_do_not_rebuild_inputs_or_scratch(monkeypatch):
     def unexpected(*args, **kwargs):
         raise AssertionError("prepared calls must reuse inputs and scratch")
 
+    scratch = results.workspace.state_skims
     with monkeypatch.context() as patch:
-        patch.setattr(np, "asarray", unexpected)
+        # Returning read-only NumPy views is allowed; rebuilding inputs is not.
+        patch.setattr(np, "array", unexpected)
         patch.setattr(np, "shares_memory", unexpected)
         patch.setattr(np, "full", unexpected)
         for _ in range(100):
             results.skim_fields(prepared)
+    assert np.shares_memory(scratch, results.workspace.state_skims)
     np.testing.assert_array_equal(prepared.od_skims[0], results.skim_fields([source]))
     # Switching widths replaces scratch; returning to prepared input must prepare it again.
     results.skim_fields([source, source])

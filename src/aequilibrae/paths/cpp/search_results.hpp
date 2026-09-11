@@ -254,7 +254,7 @@ struct SearchResults {
   // first settled arrival. An all-zero mask disables early exit. The mask
   // remains unchanged during the search, so it can be inspected afterwards
   // and safely reused by the caller.
-  unsigned char *destination_mask = nullptr;
+  const bool *destination_mask = nullptr;
 
   // This array has state_count entries. Each entry is the total path cost,
   // including turn penalties. The cost is zero at root and infinite for
@@ -287,10 +287,10 @@ struct SearchResults {
   // It may differ from the root state index. It is invalid before a search.
   std::size_t origin = std::numeric_limits<std::size_t>::max();
 
-  // These counts are derived from destination_mask by each search. The first
-  // is the number of requested physical nodes and the second is how many of
-  // them received a terminal. Comparing them reports whether all destinations
-  // were reached without scanning the mask again.
+  // The caller supplies destination_count together with the immutable borrowed
+  // mask, whose allocation must outlive the search. Searches preserve both and
+  // reset only reached_destination_count. Comparing the counts reports whether
+  // all destinations were reached without rescanning the mask.
   std::size_t destination_count = 0;
   std::size_t reached_destination_count = 0;
 

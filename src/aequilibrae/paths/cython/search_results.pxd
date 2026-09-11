@@ -1,4 +1,5 @@
 from libc.stddef cimport size_t
+from libcpp cimport bool as cpp_bool
 from aequilibrae.paths.cython.aon_workspace cimport AoNWorkspace, CppAoNWorkspace
 from aequilibrae.paths.cython.skimming_context cimport SkimmingContext
 
@@ -8,7 +9,9 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::mvp" n
         size_t *predecessors
         size_t *connectors
         size_t *reached_first
-        unsigned char *destination_mask
+        # Borrowed immutable search input: node_count bytes, with a matching
+        # precomputed destination_count. Both are preserved by Dijkstra.
+        const cpp_bool *destination_mask
         double *distances
         double *turn_costs
         size_t *terminal_states
@@ -24,10 +27,22 @@ cdef extern from "skimming.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         const CppSearchResults &results, size_t destination_count,
         const T *const *fields, size_t field_count,
         CppAoNWorkspace[T] &workspace, T *output) noexcept
+
     void cpp_skim_costs "aequilibrae::paths::cpp::mvp::skim_costs"[T](
         const CppSearchResults &results, size_t destination_count, T *output) noexcept
+
     void cpp_skim_turn_costs "aequilibrae::paths::cpp::mvp::skim_turn_costs"[T](
         const CppSearchResults &results, size_t destination_count, T *output) noexcept
+
+    cdef T cpp_sum_weighted_turn_costs"aequilibrae::paths::cpp::mvp::sum_weighted_turn_costs"[T](
+        const CppSearchResults &search,
+        size_t zones,
+        const T *demand,
+        size_t classes,
+        const cpp_bool *penalty_fields,
+        size_t fields,
+        T *skims
+    ) noexcept
 
 
 cdef extern from "network_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
@@ -39,7 +54,7 @@ cdef extern from "network_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" 
 
 cdef class SearchResults:
     cdef CppSearchResults cpp
-    cdef size_t _node_count
+    cdef size_t node_count
     cdef readonly AoNWorkspace workspace
     # Prepare workspace.prepare_loading(class_count) under the GIL first.
     # demand: packed [destination_count, class_count], count <= node_count.
@@ -49,8 +64,7 @@ cdef class SearchResults:
     cdef void network_loading_nogil(self, const double *demand,
                                    size_t destination_count, size_t class_count,
                                    double *link_loads) noexcept nogil
-    cdef SkimmingContext _prepared_skims
-    cdef object _prepared_workspace
+    cdef SkimmingContext prepared_skims
     cpdef prepare_skims(self, SkimmingContext fields)
     # Unchecked allocation-free entry points. Call workspace.prepare_skims(F)
     # under the GIL first for skim_fields_nogil. Inputs: F pointers to L doubles.
@@ -68,12 +82,15 @@ cdef class SearchResults:
     # search with origin < centroid_count, and workspace prepared for field_count.
     # Concurrent workers must use separate results and write different OD rows.
     cdef void skim_prepared_nogil(self, SkimmingContext fields) noexcept nogil
-    cdef object _skim_prepared(self, SkimmingContext fields)
+    cdef object skim_prepared(self, SkimmingContext fields)
     cdef readonly object context
-    cdef object _predecessors
-    cdef object _connectors
-    cdef object _reached_first
-    cdef object _destination_mask
-    cdef object _distances
-    cdef object _turn_costs
-    cdef object _terminal_states
+
+    cdef size_t[::1] predecessors_buffer
+    cdef size_t[::1] connectors_buffer
+    cdef size_t[::1] settled_states
+    cdef size_t[::1] terminal_states_buffer
+
+    cdef double[::1] distances_buffer
+    cdef double[::1] turn_costs_buffer
+
+    cdef cpp_bool[::1] destination_mask_buffer

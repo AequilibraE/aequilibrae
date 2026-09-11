@@ -192,7 +192,6 @@ void dijkstra(const NodeBasedContext &context, std::size_t origin,
   results.origin = origin;
   results.root = origin;
   results.settled_count = 0;
-  results.destination_count = 0;
   results.reached_destination_count = 0;
 
   std::fill_n(results.predecessors, context.node_count, SENTINEL);
@@ -201,10 +200,6 @@ void dijkstra(const NodeBasedContext &context, std::size_t origin,
   std::fill_n(results.distances, context.node_count, kInfinity);
   std::fill_n(results.turn_costs, context.node_count, kInfinity);
   std::fill_n(results.terminal_states, context.node_count, SENTINEL);
-
-  for (std::size_t node = 0; node < context.node_count; ++node) {
-    results.destination_count += results.destination_mask[node] != 0;
-  }
 
   Queue queue;
   queue.init_heap(context.node_count);
@@ -275,7 +270,6 @@ void dijkstra(const TurnBasedContext &context, std::size_t origin,
   results.origin = origin;
   results.root = root;
   results.settled_count = 0;
-  results.destination_count = 0;
   results.reached_destination_count = 0;
 
   std::fill_n(results.predecessors, state_count, SENTINEL);
@@ -285,9 +279,6 @@ void dijkstra(const TurnBasedContext &context, std::size_t origin,
   std::fill_n(results.turn_costs, state_count, kInfinity);
   std::fill_n(results.terminal_states, graph.node_count, SENTINEL);
 
-  for (std::size_t node = 0; node < graph.node_count; ++node) {
-    results.destination_count += results.destination_mask[node] != 0;
-  }
   results.turn_costs[root] = 0.0;
 
   Queue queue;

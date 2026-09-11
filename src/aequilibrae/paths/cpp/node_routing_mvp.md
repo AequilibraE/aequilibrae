@@ -1,8 +1,10 @@
 # Standalone routing-context MVP
 
-This remains separate from `Graph`, `PathResults`, assignment, production
-skimming, select-link analysis, and the public `aequilibrae.paths` exports.
-Single-origin state-tree skimming and network loading are available as standalone utilities.
+The routing-context kernels remain separate from `Graph`, `PathResults`, and
+the public `aequilibrae.paths` exports. Single-origin state-tree skimming and
+network loading are available as standalone utilities. Persistent `PreparedAoN`
+combines them into reusable assignment iterations, with separate Graph preparation
+and legacy AoN adapters. Production dispatch is unchanged.
 
 ## Python API
 
@@ -119,12 +121,12 @@ destinations; skimming does not run or extend the search.
 
 Only the current origin's row is overwritten. Other rows keep their last values,
 so finish all origins before reading a complete iteration. Use `.copy()` to keep
-a previous iteration. Read-only views pin their NumPy allocations after the
+a previous iteration. Read-only views pin their buffer allocations after the
 wrappers are deleted. The prepared object cannot be reinitialized.
 
 `results.prepare_skims(skims)` prepares state scratch under the GIL and checks
 that it does not overlap the inputs. `skim_fields(skims)` calls this automatically.
-The check is cached for the prepared object and scratch allocation; repeated
+The check is cached for the prepared object and scratch width; repeated
 calls do not rebuild or revalidate inputs, allocate a pointer table, or allocate
 numeric output/scratch buffers. The result retains its most recently prepared
 object. Switching field counts may replace scratch, but not the OD allocations.
@@ -228,7 +230,7 @@ scratch allocation or summation.
 ### Workspace and Cython entry points
 
 `results.workspace` is an `AoNWorkspace`, with a separate borrowed-pointer
-C++ struct in `aon_workspace.hpp` and a NumPy-owning Cython wrapper in
+C++ struct in `aon_workspace.hpp` and a memoryview-owning Cython wrapper in
 `aon_workspace.pyx`. Its `prepare_skims(field_count)` method allocates under
 the GIL, reusing the existing allocation when the field count is unchanged.
 The Python `skim_fields` method calls this automatically. The workspace is
@@ -362,8 +364,166 @@ with nogil:
 The unchecked caller must guarantee the shapes above, prepared scratch, buffer
 lifetimes/non-overlap, and exclusive access to results/workspace/output. Zero
 classes permits null pointers; zero destinations permits null demand; zero
-links permits null output. No select-link loading or iteration scheduler is
-implemented here.
+links permits null output. These single-origin kernels do not implement
+select-link loading or schedule origins; the prepared assignment below supplies the loop.
+
+## Persistent all-or-nothing assignment
+
+`PreparedAoN` in `cython/aon_context.pyx` separates assignment setup from repeated
+iterations. It has no dependency on `Graph`, `AssignmentResults`, or
+`MultiThreadedAoN`. Network loading is mandatory; skimming is optional.
+
+```python
+from aequilibrae.paths.cython.aon_context import PreparedAoN
+
+# Centroids are the first z physical nodes. Fields are in context-link order.
+aon = PreparedAoN(
+    context, demand,                 # demand: [z, z, classes], classes >= 1
+    costs=context.costs,             # Explicit, borrowed float64 buffer.
+    cores=4,
+    skim_fields=[link_distance],     # Omit or use [] to disable skimming.
+    skim_penalties=[False],          # Optional: add turn costs to selected fields.
+)
+previous = aon.make_outputs()        # Caller-owned; not retained by aon.
+current = aon.make_outputs()
+aon.run(previous)                    # Uses the currently bound costs.
+blended_loads = np.empty_like(previous.link_loads)
+
+for iteration in range(100):
+    # Compute new_costs from the VDF outside this object.
+    aon.update_costs(new_costs)
+    aon.run(current)                 # Writes directly into current, returns it.
+    np.add(previous.link_loads, current.link_loads, out=blended_loads)
+    blended_loads *= 0.5
+    # Rotate references after consuming the old iteration: no history copies.
+    previous, current = current, previous
+```
+
+### Preparation and ownership
+
+| Lifetime | Owned/retained state | Changes |
+| --- | --- | --- |
+| Assignment | Retained routing context: FS, heads, link IDs, turn CSR/penalties | Never; do not reinitialize the context |
+| Assignment | Private packed copies of demand and skim fields | Never; later caller mutations are not observed |
+| Assignment | Active origins, destination masks/counts, field pointer table | Prepared once |
+| Assignment | One SearchResults/workspace and loading scratch per worker; skim scratch when requested; private blocking heads | Reused for every origin and iteration |
+| Until rebound | Caller-supplied routing costs, retained by a const memoryview | `update_costs` validates and rebinds without copying |
+| Assignment | Thread loads/turn totals (worker scratch) | `run` clears/overwrites existing allocations |
+| Caller-selected | AoNOutputs: memoryview attributes and turn total | Only overwritten when passed to `run(out)` or explicitly copied into |
+
+Dimensions, topology, field widths, and origin uniqueness are checked during
+setup. Outputs establish their immutable layout when constructed; pointers are
+borrowed directly from their memoryview attributes when needed. `run(out)` compares
+the four dimensions (links, zones, classes, fields) and rejects cost/output overlap
+before writing. It does not retain the output.
+
+Costs are an explicit input, not a private copy. Construction and `update_costs`
+accept an aligned, contiguous `float64` buffer with one nonnegative, non-NaN value
+per link (infinity is permitted). Lists, dtype conversions and strided buffers
+are rejected rather than silently copied. Read-only buffers are supported.
+The const memoryview keeps the input alive until rebound; `aon.costs` exposes a
+read-only view of that same buffer. Failed updates preserve the previous binding.
+Mutations between runs are visible without rebinding, but the caller must preserve
+valid values and must not mutate or resize costs during a run. Costs cannot alias
+worker scratch or the output being written. The context is not modified;
+assignments sharing a context can bind independent objectives.
+
+The only changing **input** is routing cost. Skim link attributes and turn
+penalties are fixed. Even a skim field originally taken from `context.costs`
+keeps its preparation-time link values; it is not a congested routing-cost skim.
+Changing the objective can, of course, change the selected path and its skim sums.
+
+Without skimming, any nonzero demand activates an origin and requests a destination
+when **any class** is nonzero; cancellation between classes cannot hide a target.
+Masks have shape `[z, node_count]`, with one count per origin. With skimming, all
+origins are processed and share a single `[1, node_count]` centroid mask/count.
+`destination_masks`, `destination_counts`, and `origins` expose read-only views.
+Optional `origins=[...]` fixes a unique subset during setup; other skim rows remain
+infinite. At least one zone is required; edgeless contexts are supported. Empty masks retain the
+standalone search convention: no early exit.
+
+The OpenMP loop only binds a prepared target set, searches, optionally skims,
+loads demand, and accumulates demand-weighted turn costs. A local C++ search
+record borrows the worker's state arrays and assignment's immutable target mask;
+its target binding does not escape or alter Python SearchResults' owned mask.
+Workers write disjoint origin rows and thread load slices. Dijkstra's heap is
+still allocated per search; persistent heap storage is a separate follow-up.
+
+`block_centroids=True` supports node contexts using private per-worker heads.
+Turn contexts must already encode blocking in their turn restrictions; requesting
+this option with a turn context is rejected rather than silently ignored.
+
+### Caller-owned outputs and rotation
+
+`make_outputs()` allocates a compatible `AoNOutputs` without retaining it.
+`run(out)` requires an output target and returns it by identity. PreparedAoN owns
+no default output and has no `outputs` property. Each output owns:
+
+- `link_loads`: read-only, C-contiguous `float64 [links, classes]`, reduced across
+  workers, without a sentinel link or a full-network crosswalk.
+- `skims`: read-only, C-contiguous `float64 [z, z, fields]`, or `None` when disabled.
+- `total_turn_penalty`: scalar demand-weighted turn cost, computed even without skims.
+
+Each run **overwrites only its target**, rather than accumulating. Skims are written
+directly into that target, and thread loads are reduced directly into its load
+array. Unreachable and unprocessed skim entries are infinite. Searched diagonals
+are zero, including isolated origins. Intrazonal and unreachable demand load no links.
+
+Allocate the required number of outputs at setup and rotate references as in the
+example above. For more history, use a fixed-size list/ring of outputs, reusing a
+slot only after its old values are no longer needed. Other output objects remain
+unchanged, including their scalar turn totals. Retained views change only when
+that specific output is written again and pin their allocations after both the
+output wrapper and assignment are deleted. Outputs with matching layouts can also
+be reused sequentially by different assignments.
+
+`outputs.copy()` and `outputs.copy_to(other)` remain optional conveniences for
+one-off snapshots, not requirements for iteration history. Copying preserves the
+full layout, including the zone count when skimming is disabled. For blending,
+use separate writable arrays; public output views are read-only. Output arrays
+cannot be replaced and outputs cannot be reinitialized. Do not force their views
+writable or resize their bases.
+
+`run` requires exclusive access to both assignment and output until all workers
+and reduction finish. The caller must serialize runs, cost updates, output copies,
+and reads of retained views; concurrent/reentrant use of the same objects is not
+supported. Independent assignments with independent outputs can run concurrently.
+Failed iterations may leave partial results; rerun before consuming them.
+
+### Graph preparation and legacy compatibility
+
+`cython/aon_graph.py` contains Graph-specific validation/translation:
+
+```python
+from aequilibrae.paths.cython.aon_graph import prepare_aon
+
+aon = prepare_aon(matrix, graph, cores=4)  # No legacy results/workspaces needed.
+outputs = aon.make_outputs()             # Or allocate several for rotation.
+for iteration in range(100):
+    aon.update_costs(graph.compact_cost[:graph.compact_num_links])
+    aon.run(outputs)
+```
+
+It preserves compact turn restrictions, U-turn policy and generated connector
+bans, strips padded links/skim columns, and packs strided demand/fields at setup.
+Centroids must be the first compact nodes in matrix order, and compact link IDs
+must be consecutive CSR positions. `graph.turn_skim_fields` selects skim fields
+receiving penalties, falling back to `graph.cost_field` when empty. Topology,
+demand and skim fields are snapshotted. Routing costs instead alias
+`graph.compact_cost`: in-place edits between runs are visible, while replacing the
+array requires `update_costs`. Full-network mapping remains the caller's responsibility.
+
+`aon_parallel_context(matrix, graph, result, aux_result, cores, bridge=None)`
+remains exported from `AoN` for drop-in compatibility. Its wrapper delegates to
+`aon_graph.py`, prepares a fresh assignment per call, then **accumulates** thread
+loads/turn totals into the existing auxiliary buffers and copies processed skim
+rows. It preserves the legacy positive-total-demand origin filter, disconnected
+centroid reports, and untouched skipped skim rows. The existing caller still
+reduces and maps compact loads. Clear auxiliary accumulators between iterations.
+Use `prepare_aon` instead when preparation should persist.
+
+Select-link loading, path-file saving, and non-4ary heaps are explicitly rejected
+by the adapter. `bridge` is accepted but unused. Production dispatch is unchanged.
 
 ## Turn representation
 
@@ -422,15 +582,32 @@ search returns a one-node path, no links, and zero costs.
 
 ## Ownership and implementation
 
-The shared Cython `GraphContext` parent owns and validates the initialized
-NumPy graph arrays; the node- and turn-based subclasses add their respective
-embedded C++ structs and turn buffers. C++ structs borrow these pointers, and
-results retain their context. Graph inputs are copied into contiguous snapshots
-and exposed read-only. Prepared skim fields are instead retained without copying
-and marked read-only.
+The shared Cython `GraphContext` parent validates graph inputs and retains them
+in typed memoryview attributes. Node/turn `view()` methods generate borrowed C++
+pointer records on demand rather than storing duplicate pointer state. Results
+retain their context. Graph inputs are copied into contiguous, read-only snapshots;
+standalone prepared skim fields and AoN routing costs are instead borrowed.
 Index arrays use `np.uintp` (`size_t`), and costs use `np.float64`.
 
-Retained views pin their NumPy allocations after wrappers are deleted. Reusing a
+Helpers use action names such as `choose_origins`, `assign_origin` and
+`sum_turn_costs`. Internal buffer names have no leading underscore; a `_buffer`
+suffix distinguishes storage such as `costs_buffer` from the read-only `costs`
+property. Removing the prefix does not make Cython buffers writable from Python.
+
+Owned numeric outputs and scratch use `utils/cython/array_allocations` directly:
+
+```cython
+self.link_loads_buffer = array[double]((links, classes), True, 0)
+# The memoryview attribute retains the allocation; no separate owner is needed.
+# Borrow a pointer only while using the buffer (NULL for an empty buffer).
+```
+
+The allocator supports zero-length dimensions without special padding at call
+sites. `readonly_view(buffer)` creates `np.asarray(memoryview(buffer).toreadonly())`:
+NumPy arrays and Cython memoryviews lack Python memoryview's `toreadonly()` method.
+This wraps the buffer without copying data and prevents re-enabling NumPy writes.
+
+Retained views pin their allocations after wrappers are deleted. Reusing a
 result overwrites those same buffers; use `.copy()` for a snapshot. Do not
 reinitialize contexts while results refer to them, resize the underlying buffers,
 or force them writable.
@@ -440,8 +617,9 @@ contexts across workers, but give each worker separate results. Access to the
 same results must be externally serialized, including reads through retained
 array views. Both kernels still allocate/free their own four-ary heap per call.
 
-Cython's `RoutingContext` fused type specializes only the Dijkstra entry point;
-`SearchResults.context` is an ordinary object reference, not a fused member.
+Cython's `RoutingContext` fused type specializes the Dijkstra entry point and
+prepared AoN's worker loop; `SearchResults.context` is an ordinary object
+reference, not a fused member.
 C++ overloads accept concrete contexts and populate a common results struct.
 The node kernel explores physical-node states directly, while the turn kernel
 explores the implicit incoming-link state space. Both use the existing heap and
@@ -449,17 +627,20 @@ neither calls Python in its search loop or materializes additional graph edges.
 
 The target set uses one byte per physical node rather than `std::vector<bool>`.
 Dense node indices make this an allocation-free O(1) membership test in the hot
-settlement loop, and the O(node_count) target count is folded into result-array
-initialization that every search already performs. An all-zero mask means that
+settlement loop. Callers supply a matching precomputed destination count; neither
+routing kernel scans or resets the requested mask/count. Standalone `dijkstra`
+normalizes its public destinations and supplies their count, while prepared AoN
+reuses assignment-owned masks/counts across iterations. An all-zero mask means that
 no early-exit condition is active. A sorted sparse target list
 would require O(log targets) checks; a hash set would add allocation and poor
 locality. The mask is immutable during search. A monotonic reached-target count
 is exposed in the result instead of destructively clearing mask bits or exposing
 a decrementing implementation counter.
 
-No select-link loading, centroid blocking, graph compression, A*, or heap
-selection is implemented here. The persistent workspace holds skim and cascade
-loading scratch; heaps are still allocated by each search.
+The standalone search kernels do not implement select-link loading, graph
+compression, A*, or heap selection. Prepared AoN supplies node centroid blocking;
+turn contexts use their prepared connector bans. The persistent workspace holds
+skim and cascade loading scratch; heaps are still allocated by each search.
 
 ## Validation
 
@@ -472,7 +653,9 @@ python -m pytest --durations=50 --color=yes \
     tests/aequilibrae/paths/test_node_routing_mvp.py \
     tests/aequilibrae/paths/test_turn_routing_mvp.py \
     tests/aequilibrae/paths/test_context_skimming.py \
-    tests/aequilibrae/paths/test_context_network_loading.py
+    tests/aequilibrae/paths/test_context_network_loading.py \
+    tests/aequilibrae/paths/test_aon_context.py \
+    tests/aequilibrae/utils/test_array_allocations.py
 ```
 
 Tests cover both state layouts, different arrival histories, turn penalties and
@@ -489,4 +672,9 @@ sharing one prepared object while writing separate origin rows. Loading tests
 cover both state layouts, turn arrival histories, partial/unreachable paths,
 centroid-sized demand, empty axes, scratch reuse/lifetimes, buffer validation,
 random multigraph comparisons against path walks, and worker-local accumulation
-with thread-axis reduction and iteration resets.
+with thread-axis reduction and iteration resets. Prepared AoN tests additionally
+cover changing objectives with fixed demand/fields, shared contexts with independent
+costs, precomputed target reuse, no NumPy buffer construction during repeated runs,
+empty/edgeless assignments, output identity and view lifetimes, allocation/copy-free
+output rotation, no output retention by assignments, layout validation before
+writes, cost-buffer aliasing/lifetimes, and optional independent/reusable snapshots.

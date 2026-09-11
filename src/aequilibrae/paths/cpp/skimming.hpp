@@ -119,4 +119,31 @@ void skim_turn_costs(const SearchResults &results,
   project_costs(results, destination_count, results.turn_costs, output);
 }
 
+template <typename T>
+T sum_weighted_turn_costs(const SearchResults &search, size_t zones,
+                          const T *demand, size_t classes,
+                          const bool *penalty_fields, size_t fields, T *skims) {
+  T total = 0;
+  for (size_t node = 0; node < zones; ++node) {
+    size_t terminal = search.terminal_states[node];
+    if (terminal == (size_t)-1 || terminal == search.root) {
+      continue;
+    }
+
+    T penalty = search.turn_costs[terminal];
+
+    for (size_t field = 0; field < fields; ++field) {
+      if (penalty_fields[field]) {
+        skims[node * fields + field] += penalty;
+      }
+    }
+
+    for (size_t class_index = 0; class_index < classes; ++class_index) {
+      total += demand[node * classes + class_index] * penalty;
+    }
+  }
+
+  return total;
+}
+
 } // namespace aequilibrae::paths::cpp::mvp

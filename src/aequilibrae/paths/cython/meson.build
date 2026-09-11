@@ -2,10 +2,12 @@ thisdir = 'aequilibrae/paths/cython'
 
 pyfiles = [
     '__init__.py',
+    'aon_graph.py',
 ]
 
 exts = [
     'AoN',
+    'aon_context',
     'basic_path_finding',
     'graph_building',
     'parallel_numpy',
