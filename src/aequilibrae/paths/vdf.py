@@ -167,10 +167,44 @@ class VDF:
         return func
 
     def check_valid(self, num_points, link_attributes: dict[str, Any], from_voc: float = 0.0, to_voc: float = 3.0):
-        """Checks if the VDF starts at 1 for 0 volume, is increasing, its derivative is positive, and if it is convex
-        via checking that the derivative is increasing. Returns a tuple of bools that are true if it is satisfied, and
-        false if these are violated respectively.
+        """Implements a number of checks copied from Spiess, 1989 where requirements for VDFs are described, accessed
+        from http://www.spiess.ch/emme2/conic/conic.html#SECTION0003.
 
+        The VDF is evaluated at num_points values of volume/capacity in the range between from_voc to to_voc. Then,
+        these values are used in the following checks:
+            It is strictly increasing, found by comparing neighbouring function values and checking that the derivative
+            is positive.
+            It is convex from above, found by checking that the derivative only increases between evaluated points
+            For zero volume on the road, the VDF returns the free flow travel time
+
+        Any violations found are printed, listing the offending volume/capacity values.
+
+        :Arguments:
+            **num_points** (:obj:`int`): the number of volume/capacity values at which to evaluate
+            the VDF and its derivative between from_voc and to_voc.
+
+            **link_attributes** (:obj:`dict[str, Any]`): mapping of link attribute names to
+            values used to evaluate the VDF and its derivative, for example secondary capacity
+            or the parameters for the VDF.
+
+            **from_voc** (:obj:`float`, *Optional*): the lower bound of the volume/capacity range
+            to evaluate. Defaults to 0.0.
+
+            **to_voc** (:obj:`float`, *Optional*): the upper bound of the volume/capacity range
+            to evaluate. Defaults to 3.0.
+
+        :Returns:
+            **vdf_valid_0_value** (:obj:`bool`): True if the VDF evaluates to 1 (the free flow
+            travel time) at zero volume/capacity, within a small tolerance.
+
+            **vdf_increasing_f_vals** (:obj:`bool`): True if the VDF's values are non-decreasing
+            across the evaluated volume/capacity range.
+
+            **vdf_nonnegative_derivative** (:obj:`bool`): True if the VDF's derivative is
+            non-negative across the evaluated volume/capacity range.
+
+            **vdf_convex** (:obj:`bool`): True if the VDF's derivative is non-decreasing across
+            the evaluated volume/capacity range (i.e. the VDF is convex from above).
         """
         voc_range = np.linspace(from_voc, to_voc, num_points)
 
