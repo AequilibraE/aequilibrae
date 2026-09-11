@@ -596,7 +596,7 @@ The following shows a custom VDF, the SANDAG modified two-part additive formulat
 The following shows the SANDAG modified two-part additive formulation being created using a string representation to be evaluated by NumExpr.
 
 .. code-block:: python
-  
+
     SANDAG_string_representation = "fftime * (1.0 + alpha_1 * (link_flows/capacity)**beta_1) + "
         "0.5 * cycle_time * (1 - green_to_cycle_ratio)**2 * (1.0 + alpha_2 * (link_flows/capacity)**beta_2)"
     
@@ -616,7 +616,29 @@ The following shows the SANDAG modified two-part additive formulation being crea
 Checking Custom VDFs
 ~~~~~~~~~~~~~~~~~~~~
 
-Spiess, 1989 specified 
+Spiess, 1990 specified qualities of a "Well Behaved Congestion Function". The function ``check_valid`` on a ``VDF`` object checks that the VDF satisfies the following criteria originally numbered by Spiess:
+
+ 1. The VDF is strictly increasing - when there is more traffic, the delay increases
+ 2. (part of) For no volume on the link, the congested time is the free flow travel time
+ 3. The VDF's derivative exists and is strictly increasing, to ensure that it is convex
+
+It acheives this by evalulating the VDF and its derivative at a specified number of points between a volume / capacity from 0 to 3. It then finds the values of volume / capacity where these were violated, and prints out the result. 
+
+For example, the built-in INRETS VDF is non-convex:
+
+.. code-block:: python
+
+    from aequilibrae.paths.vdf import inrets
+
+    num_points = 300
+    link_attributes = {"alpha": np.full(num_points, 0.9, dtype=np.float64)}
+
+    # true,        true,              true,                   false
+    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = inrets.check_valid(num_points, link_attributes)
+
+    # Prints out:
+    # The VDF is non-convex due to its derivative decreasing at these values of volume/capacity: [np.float64(1.0033444816053512)]
+
 
 References and Further Reading
 -------------------------------
