@@ -90,6 +90,8 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
 @pytest.mark.parametrize("stepsize", [0.0, 0.25, 1.0])
 def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.cores = 1
     assignment.preload = np.array([10.0, 20.0])
     current_assigned_flow = np.array([3.0, 4.0])
@@ -113,6 +115,8 @@ def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
 
 def test_relative_gap_ignores_constant_preload():
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.congested_time = np.array([2.0, 3.0])
     assignment.aon_total_turn_cost = 0.0
     assignment.fw_total_turn_cost = 0.0
@@ -143,6 +147,8 @@ def test_relative_gap_ignores_constant_preload():
 
 def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cost():
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.congested_time = np.array([2.0, 3.0])
     assignment.aon_total_turn_cost = 0.0
     assignment.fw_total_turn_cost = 0.0
@@ -165,6 +171,8 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
 
 def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 4
@@ -213,6 +221,8 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
 
 def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 5
@@ -248,6 +258,8 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
 
 def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 4
@@ -294,6 +306,8 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
 
 def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 4
@@ -340,6 +354,8 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
 
 def test_cfw_zero_denominator_falls_back_to_fw():
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.cores = 1
     assignment.vdf = DummyDerivativeVDF(np.ones(2))
     assignment.vdf_der = np.zeros(2)
@@ -376,6 +392,8 @@ def test_cfw_zero_denominator_falls_back_to_fw():
 
 def test_bfw_nonfinite_coefficient_falls_back_to_fw():
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.cores = 1
     assignment.vdf = DummyDerivativeVDF(np.array([np.nan, 1.0]))
     assignment.vdf_der = np.zeros(2)
@@ -416,6 +434,8 @@ def test_bfw_nonfinite_coefficient_falls_back_to_fw():
 
 def test_append_terminal_convergence_report_uses_nan_direction_coefficients():
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment._LinearApproximation__start_time = 0.0
     assignment.iter = 4
     assignment.rgap = 0.001
@@ -500,6 +520,8 @@ def _multiclass_fixture(num_links=4, num_classes=3, num_cores=2, seed=None):
         previous_step_direction[cid] = SimpleNamespace(link_loads=loads["prev_step_dir"][m])
 
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10000
     assignment.cores = 1
     assignment.vdf = DummyDerivativeVDF(vdf_der)
     assignment.vdf_der = np.zeros(num_links)
