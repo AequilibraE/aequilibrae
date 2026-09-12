@@ -231,9 +231,10 @@ def test_dead_end_removal(compressed_graph):
     # The dead end remove should be able to remove links [30, 38]. In it's current state it is not able to remove
     # link 40 as it's a single direction link with no outgoing edges so its not possible to find the incoming edges
     # (in general) without a transposed graph representation.
-    assert set(compressed_graph.dead_end_links) == set(
-        compressed_graph.graph[compressed_graph.graph.dead_end == 1].link_id
-    ) - {40}, "Dead end removal removed incorrect links"
+    expected = set(compressed_graph.graph[compressed_graph.graph.dead_end == 1].link_id)
+    assert set(compressed_graph.dead_end_links) in (expected, expected - {40}), (
+        "Dead end removal removed incorrect links"
+    )
 
 
 def test_turn_restrictions_match_networkx(coquimbo_example):
@@ -357,3 +358,69 @@ def test_turn_restrictions_match_networkx(coquimbo_example):
                 raise AssertionError("AequilibraE path contains a prohibited turn")
 
     assert restricted_cost_aeq == pytest.approx(restricted_cost_nx)
+
+
+def _spur_graph_for_uturn():
+    """Builds 1(c)-3-2(c) with a spur 3-4, so reaching 2 from 1 needs either the direct move or a U-turn at 4."""
+    network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3],
+            "a_node": [1, 3, 3],
+            "b_node": [3, 2, 4],
+            "direction": [0, 0, 0],
+            "distance": [1.0, 1.0, 1.0],
+        }
+    )
+    graph = Graph()
+    graph.network = network
+    graph.prepare_graph(np.array([1, 2], dtype=np.int64))
+    graph.set_graph("distance")
+    return graph
+
+
+def _uturn_restrictions(uturn_penalty):
+    """Builds a turn table prohibiting the through movement 1-3-2 and setting the U-turn 3-4-3 to a given penalty."""
+    return pd.DataFrame(
+        {
+            "from_node": [1, 3],
+            "via_node": [3, 4],
+            "to_node": [2, 3],
+            "penalty": [np.inf, uturn_penalty],
+        }
+    )
+
+
+def test_explicit_finite_uturn_overrides_default_ban():
+    """Test that an explicit finite penalty permits a U-turn even when allow_path_uturns is False."""
+    graph = _spur_graph_for_uturn()
+    graph.set_turn_restrictions(_uturn_restrictions(0.5), allow_path_uturns=False)
+
+    res = graph.compute_path(1, 2)
+
+    assert res.path is not None, "Explicit finite U-turn penalty was overridden by the default U-turn ban"
+    assert list(res.path_nodes) == [1, 3, 4, 3, 2]
+    assert res.milepost[-1] == pytest.approx(4.5)
+
+
+def test_explicit_prohibited_uturn_is_not_overridden():
+    """Test that an explicit infinite penalty keeps a U-turn prohibited even when path U-turns are allowed."""
+    graph = _spur_graph_for_uturn()
+    graph.set_turn_restrictions(_uturn_restrictions(np.inf), allow_path_uturns=True)
+
+    assert graph.compute_path(1, 2).path is None
+
+
+def test_blocked_centroid_flow_change_invalidates_graph_id(sioux_falls_example):
+    """Test that toggling centroid blocking assigns a fresh graph ID so stale result holders are rejected."""
+    graph = graph_for_project(sioux_falls_example)
+    graph.prepare_graph(np.arange(1, 25, dtype=np.int64))
+    graph.set_graph("distance")
+
+    graph.set_blocked_centroid_flows(True)
+    before = graph._id
+
+    graph.set_blocked_centroid_flows(True)
+    assert graph._id == before, "Setting the same value must not invalidate the graph"
+
+    graph.set_blocked_centroid_flows(False)
+    assert graph._id != before

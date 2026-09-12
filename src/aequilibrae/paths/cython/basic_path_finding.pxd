@@ -66,6 +66,10 @@ cdef int _path_finding_arc_based_core(
     bint allow_uturns,
     double [:] arc_turn_penalties,
     double *node_costs,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
 ) noexcept nogil
 
 cpdef int path_finding_arc_based(
@@ -86,5 +90,35 @@ cpdef int path_finding_arc_based(
     const long long [:] turn_to_arcs,
     const double [:] turn_penalties,
     bint allow_uturns,
-    double [:] arc_turn_penalties
+    double [:] arc_turn_penalties,
+    bint block_centroid_flows=*,
+    long long num_zones=*,
+    const long long [:] first_ctx=*,
+    const long long [:] last_ctx=*,
 ) noexcept nogil
+
+cpdef int path_finding_hybrid(
+    long origin,
+    double[:] graph_costs,
+    const long long [:] csr_indices,
+    const long long [:] graph_fs,
+    const long long [:] a_nodes,
+    const unsigned char [:] stateful,
+    const long long [:] rep_arc,
+    long long [:] node_pred,
+    long long [:] connectors,
+    long long [:] reached_first,
+    double [:] node_costs,
+    double [:] node_turn_penalties,
+    long long [:] arc_pred,
+    double [:] arc_turn_penalties,
+    const long long [:] turn_fs,
+    const long long [:] turn_to_arcs,
+    const double [:] turn_penalties,
+    bint allow_uturns,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
+) noexcept nogil
+

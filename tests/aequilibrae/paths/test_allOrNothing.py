@@ -35,11 +35,12 @@ def matrix_omx(project):
 def test_skimming_on_assignment(sioux_falls_example):
     matrix = matrix_aem(sioux_falls_example)
     graph = build_graph(sioux_falls_example)
+    # Changing centroid blocking changes results, so it invalidates the graph. Do it before preparing.
+    graph.set_blocked_centroid_flows(True)
     res = AssignmentResults()
     res.prepare(graph, matrix)
 
     graph.set_skimming([])
-    graph.set_blocked_centroid_flows(True)
     assig = allOrNothing("name", matrix, graph, res)
     assig.execute()
 

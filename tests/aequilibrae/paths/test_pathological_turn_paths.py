@@ -211,8 +211,8 @@ def test_disconnected_destination_has_no_path(disconnected_network: Pathological
     assert result.milepost is None
 
 
-def test_global_path_uturn_policy_is_absolute(uturn_network: PathologicalNetwork):
-    """NetworkX blocks the finite branch reversal globally when false and permits it when true."""
+def test_explicit_finite_uturn_overrides_the_global_path_uturn_ban(uturn_network: PathologicalNetwork):
+    """NetworkX takes the explicitly priced branch reversal under both global U-turn settings."""
     origin = uturn_network.node_id("uturn:origin")
     destination = uturn_network.node_id("uturn:destination")
     expected_blocked = uturn_network.oracle_path(origin, destination, allow_path_uturns=False)
@@ -223,9 +223,17 @@ def test_global_path_uturn_policy_is_absolute(uturn_network: PathologicalNetwork
     allowed_graph = uturn_network.build_graph(allow_uturns_everywhere=True, allow_path_uturns=True)
     allowed_result = allowed_graph.compute_path(origin, destination)
 
-    assert expected_blocked.directed_links != expected_allowed.directed_links
+    # The branch reversal carries an explicit finite control, so it decides the movement on its
+    # own and allow_path_uturns does not change the answer. The global ban is the default for
+    # movements with no explicit entry, not an override of the ones that have it.
+    assert expected_blocked.directed_links == expected_allowed.directed_links
     _assert_unique_path_result(uturn_network, expected_blocked, blocked_result)
     _assert_unique_path_result(uturn_network, expected_allowed, allowed_result, allow_path_uturns=True)
+
+    # The reversal really is in the chosen path, and it is charged once.
+    assert expected_blocked.turn_cost == pytest.approx(2.0)
+    _, actual_turn_cost = _result_cost_breakdown(uturn_network, blocked_result)
+    assert actual_turn_cost == pytest.approx(2.0)
 
 
 def test_explicit_finite_uturn_contributes_to_cost(uturn_network: PathologicalNetwork):

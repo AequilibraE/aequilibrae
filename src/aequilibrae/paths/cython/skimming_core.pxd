@@ -37,3 +37,17 @@ cpdef void skim_single_path_with_turn_penalties(long origin,
                                                 long found,
                                                 double [:] node_turn_penalties,
                                                 const long long [:] penalty_indices) noexcept nogil
+
+cpdef void skim_arc_based_paths(long long origin,
+                                long long dest_count,
+                                long long skims,
+                                double[:, :] node_skims,
+                                const long long[:] arc_pred,
+                                const long long[:] connectors,
+                                const double[:, :] graph_costs,
+                                const double[:] arc_turn_penalties,
+                                const long long[:] penalty_indices,
+                                double[:, :] arc_skims_memo,
+                                long long[:] arc_visited,
+                                long long[:] arc_stack,
+                                long long run_id) noexcept nogil

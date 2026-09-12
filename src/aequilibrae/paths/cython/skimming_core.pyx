@@ -2,7 +2,12 @@ cimport cython
 from libc.math cimport INFINITY
 from cython.parallel cimport parallel, prange, threadid
 import numpy as np
-from aequilibrae.paths.cython.basic_path_finding cimport blocking_centroid_flows, path_finding
+from aequilibrae.paths.cython.basic_path_finding cimport (
+    blocking_centroid_flows,
+    path_finding,
+    _path_finding_arc_based_core,
+    path_finding_hybrid,
+)
 
 
 def skimming_parallel(graph, result, long cores):
@@ -12,8 +17,8 @@ def skimming_parallel(graph, result, long cores):
     block, eliminating the per-origin Python ThreadPool dispatch overhead
     that ``NetworkSkimming.execute`` paid before. Each OpenMP thread uses
     its own slice of the per-thread aux arrays (indexed by ``threadid()``),
-    while ``path_finding`` is invoked once per origin within the parallel
-    loop.
+    while ``path_finding`` or ``_path_finding_arc_based_core`` is invoked
+    once per origin within the parallel loop.
 
     Returns a list of (origin, message) tuples for any centroid that could
     not be processed. Successful origins return an empty list.
@@ -24,12 +29,15 @@ def skimming_parallel(graph, result, long cores):
 
     cdef:
         long long compact_nodes = graph.compact_num_nodes + 1
+        long long compact_links = graph.compact_num_links + 1
         long long zones = graph.num_zones
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long skims = result.num_skims
-        Py_ssize_t i, j, n_b = graph.compact_graph.b_node.shape[0]
+        Py_ssize_t i, j
         long long oi, w
         int tid
+        bint use_turn_restrictions = graph.has_turn_restrictions
+        bint allow_uturns = graph._allow_path_uturns if use_turn_restrictions else False
 
 
     # Pre-resolve centroids -> compact indices on the Python side. We also
@@ -63,6 +71,87 @@ def skimming_parallel(graph, result, long cores):
     cdef const long long [::1] original_b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
     cdef double [:, ::1] graph_skim_view = graph.compact_skims[:, :]
 
+    # Turn restriction views (if applicable).
+    cdef long long [:] turn_fs_view
+    cdef long long [:] turn_to_arcs_view
+    cdef double [:] turn_penalties_view
+    cdef const long long [:] a_nodes_view
+    cdef const long long [:] first_ctx_view
+    cdef const long long [:] last_ctx_view
+    cdef const long long [::1] penalty_skim_indices_view
+    cdef bint turn_penalty_skims = False
+
+    cdef long long [:, ::1] arc_pred_mat
+    cdef double [:, ::1] arc_turn_pen_mat
+    cdef double [:, ::1] node_turn_pen_mat
+    cdef double [:, ::1] node_costs_mat
+    cdef double [:, :, ::1] arc_skims_memo_mat
+    cdef long long [:, ::1] arc_visited_mat
+    cdef long long [:, ::1] arc_stack_mat
+
+    if use_turn_restrictions:
+        if graph.compact_turn_fs.shape[0] < graph.compact_num_links + 1:
+            raise ValueError("Turn restriction CSR is not sized for the compact graph. Re-run Graph.prepare_graph()")
+        turn_fs = graph.compact_turn_fs
+        turn_to = graph.compact_turn_to_arcs if graph.compact_turn_to_arcs.size else np.zeros(1, dtype=np.int64)
+        turn_pen = graph.compact_turn_penalties if graph.compact_turn_penalties.size else np.zeros(1, dtype=np.float64)
+
+        _pen_fields = graph.turn_skim_fields if graph.turn_skim_fields else (
+            [graph.cost_field] if graph.cost_field else []
+        )
+        pen_idx = np.array(
+            [graph.skim_fields.index(f) for f in _pen_fields if f in graph.skim_fields], dtype=np.int64
+        )
+        turn_penalty_skims = skims > 0 and pen_idx.shape[0] > 0
+        if pen_idx.shape[0] == 0:
+            pen_idx = np.zeros(1, dtype=np.int64)
+
+        turn_fs_view = turn_fs
+        turn_to_arcs_view = turn_to
+        turn_penalties_view = turn_pen
+        penalty_skim_indices_view = pen_idx
+        a_nodes_view = graph.compact_graph.a_node.to_numpy(copy=False)
+
+        # Boundary contexts are sized to the compact graph.
+        first_ctx_view = graph._compact_first_node
+        last_ctx_view = graph._compact_last_node
+
+        arc_pred_mat = np.zeros((cores, compact_links), dtype=np.int64)
+        arc_turn_pen_mat = np.zeros((cores, compact_links), dtype=np.float64)
+        node_turn_pen_mat = np.zeros((cores, compact_nodes), dtype=np.float64)
+        node_costs_mat = np.zeros((cores, compact_nodes), dtype=np.float64)
+        # Sized on use_turn_restrictions alone, not on skims: skim_arc_based_paths walks
+        # arc_visited/arc_stack even when there are no skim columns to accumulate.
+        arc_skims_memo_mat = np.zeros((cores, compact_links, skims), dtype=np.float64)
+        arc_visited_mat = np.zeros((cores, compact_links), dtype=np.int64)
+        arc_stack_mat = np.zeros((cores, compact_links), dtype=np.int64)
+    else:
+        turn_fs_view = np.zeros(1, dtype=np.int64)
+        turn_to_arcs_view = np.zeros(1, dtype=np.int64)
+        turn_penalties_view = np.zeros(1, dtype=np.float64)
+        penalty_skim_indices_view = np.zeros(1, dtype=np.int64)
+        a_nodes_view = np.zeros(1, dtype=np.int64)
+        first_ctx_view = original_b_nodes_view
+        last_ctx_view = original_b_nodes_view
+        arc_pred_mat = np.zeros((1, 1), dtype=np.int64)
+        arc_turn_pen_mat = np.zeros((1, 1), dtype=np.float64)
+        node_turn_pen_mat = np.zeros((1, 1), dtype=np.float64)
+        node_costs_mat = np.zeros((1, 1), dtype=np.float64)
+        arc_skims_memo_mat = np.zeros((1, 1, 1), dtype=np.float64)
+        arc_visited_mat = np.zeros((1, 1), dtype=np.int64)
+        arc_stack_mat = np.zeros((1, 1), dtype=np.int64)
+
+    cdef const unsigned char [:] stateful_view
+    cdef const long long [:] rep_arc_view
+    cdef bint use_hybrid = False
+    if use_turn_restrictions:
+        stateful_view = graph.compact_stateful
+        rep_arc_view = graph.compact_rep_arc
+        use_hybrid = True
+    else:
+        stateful_view = np.zeros(1, dtype=np.uint8)
+        rep_arc_view = np.zeros(1, dtype=np.int64)
+
     # Output skim cube (origin_index, dest_zone, skim).
     cdef double [:, :, :] final_skim_view = result.skims.matrix_view
 
@@ -80,36 +169,105 @@ def skimming_parallel(graph, result, long cores):
         for i in prange(n_origins, schedule="guided"):
             oi = origin_idx_view[i]
 
-            if block_flows_through_centroids:
-                blocking_centroid_flows(0, oi, zones, graph_fs_view,
-                                        b_nodes_mat[tid], original_b_nodes_view)
+            if use_turn_restrictions:
+                if use_hybrid:
+                    w = path_finding_hybrid(
+                        oi,
+                        g_view,
+                        original_b_nodes_view,
+                        graph_fs_view,
+                        a_nodes_view,
+                        stateful_view,
+                        rep_arc_view,
+                        predecessors_mat[tid],
+                        connectors_mat[tid],
+                        reached_first_mat[tid],
+                        node_costs_mat[tid],
+                        node_turn_pen_mat[tid],
+                        arc_pred_mat[tid],
+                        arc_turn_pen_mat[tid],
+                        turn_fs_view,
+                        turn_to_arcs_view,
+                        turn_penalties_view,
+                        allow_uturns,
+                        block_flows_through_centroids,
+                        zones,
+                        first_ctx_view,
+                        last_ctx_view,
+                    )
+                else:
+                    w = _path_finding_arc_based_core(
+                        oi,
+                        destinations,
+                        -1,
+                        g_view,
+                        original_b_nodes_view,
+                        graph_fs_view,
+                        arc_pred_mat[tid],
+                        ids_graph_view,
+                        a_nodes_view,
+                        predecessors_mat[tid],
+                        connectors_mat[tid],
+                        reached_first_mat[tid],
+                        node_turn_pen_mat[tid],
+                        turn_fs_view,
+                        turn_to_arcs_view,
+                        turn_penalties_view,
+                        allow_uturns,
+                        arc_turn_pen_mat[tid],
+                        &node_costs_mat[tid, 0],
+                        block_flows_through_centroids,
+                        zones,
+                        first_ctx_view,
+                        last_ctx_view,
+                    )
+                skim_arc_based_paths(
+                    oi,
+                    zones,
+                    skims,
+                    skim_mat[tid],
+                    arc_pred_mat[tid],
+                    connectors_mat[tid],
+                    graph_skim_view,
+                    arc_turn_pen_mat[tid],
+                    penalty_skim_indices_view if turn_penalty_skims else penalty_skim_indices_view[:0],
+                    arc_skims_memo_mat[tid],
+                    arc_visited_mat[tid],
+                    arc_stack_mat[tid],
+                    oi + 1,
+                )
+                _copy_skims(skim_mat[tid, :zones, :], final_skim_view[oi, :, :])
+            else:
+                if block_flows_through_centroids:
+                    blocking_centroid_flows(0, oi, zones, graph_fs_view,
+                                            b_nodes_mat[tid], original_b_nodes_view)
 
-            w = path_finding(oi,
-                             destinations,
-                             -1,
-                             g_view,
-                             b_nodes_mat[tid],
-                             graph_fs_view,
-                             predecessors_mat[tid],
-                             ids_graph_view,
-                             connectors_mat[tid],
-                             reached_first_mat[tid])
-
-            skim_multiple_fields(oi,
-                                 compact_nodes,
-                                 zones,
-                                 skims,
-                                 skim_mat[tid],
+                w = path_finding(oi,
+                                 destinations,
+                                 -1,
+                                 g_view,
+                                 b_nodes_mat[tid],
+                                 graph_fs_view,
                                  predecessors_mat[tid],
+                                 ids_graph_view,
                                  connectors_mat[tid],
-                                 graph_skim_view,
-                                 reached_first_mat[tid],
-                                 w,
-                                 final_skim_view[oi, :, :])
+                                 reached_first_mat[tid])
 
-            if block_flows_through_centroids:
-                blocking_centroid_flows(1, oi, zones, graph_fs_view,
-                                        b_nodes_mat[tid], original_b_nodes_view)
+                skim_multiple_fields(oi,
+                                     compact_nodes,
+                                     zones,
+                                     skims,
+                                     skim_mat[tid],
+                                     predecessors_mat[tid],
+                                     connectors_mat[tid],
+                                     graph_skim_view,
+                                     reached_first_mat[tid],
+                                     w,
+                                     final_skim_view[oi, :, :])
+
+                if block_flows_through_centroids:
+                    blocking_centroid_flows(1, oi, zones, graph_fs_view,
+                                            b_nodes_mat[tid], original_b_nodes_view)
 
     return skipped
 
@@ -345,3 +503,74 @@ cpdef void skim_single_path_with_turn_penalties(long origin,
         # the incremental penalty of the final turn is added here.
         for k in range(<long>penalty_indices.shape[0]):
             node_skims[node, penalty_indices[k]] += node_turn_penalties[node] - node_turn_penalties[predecessor]
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef void skim_arc_based_paths(
+    long long origin,
+    long long dest_count,
+    long long skims,
+    double[:, :] node_skims,
+    const long long[:] arc_pred,
+    const long long[:] connectors,
+    const double[:, :] graph_costs,
+    const double[:] arc_turn_penalties,
+    const long long[:] penalty_indices,
+    double[:, :] arc_skims_memo,
+    long long[:] arc_visited,
+    long long[:] arc_stack,
+    long long run_id,
+) noexcept nogil:
+    """
+    Skims paths using arc-based memoized prefix accumulation from destination connectors.
+    Traverses each arc in the shortest path tree at most once per origin, avoiding quadratic
+    backtracking overhead while strictly preserving arc-specific costs and turn penalties.
+    """
+    cdef long long d, j, k, current_arc, curr, arc, p, stack_top
+    cdef double total_turn
+
+    for d in range(dest_count):
+        for j in range(skims):
+            node_skims[d, j] = INFINITY
+
+    if 0 <= origin < dest_count:
+        for j in range(skims):
+            node_skims[origin, j] = 0.0
+
+    for d in range(dest_count):
+        if d == origin:
+            continue
+        current_arc = connectors[d]
+        if current_arc < 0:
+            continue
+
+        # Walk backwards pushing unvisited arcs onto arc_stack
+        stack_top = 0
+        curr = current_arc
+        while curr >= 0 and arc_visited[curr] != run_id:
+            arc_stack[stack_top] = curr
+            stack_top += 1
+            curr = arc_pred[curr]
+
+        # Unwind stack forwards, accumulating prefix totals
+        while stack_top > 0:
+            stack_top -= 1
+            arc = arc_stack[stack_top]
+            p = arc_pred[arc]
+            if p >= 0 and arc_visited[p] == run_id:
+                for j in range(skims):
+                    arc_skims_memo[arc, j] = arc_skims_memo[p, j] + graph_costs[arc, j]
+            else:
+                for j in range(skims):
+                    arc_skims_memo[arc, j] = graph_costs[arc, j]
+            arc_visited[arc] = run_id
+
+        for j in range(skims):
+            node_skims[d, j] = arc_skims_memo[current_arc, j]
+
+        if penalty_indices.shape[0] > 0:
+            total_turn = arc_turn_penalties[connectors[d]]
+            for k in range(penalty_indices.shape[0]):
+                node_skims[d, penalty_indices[k]] += total_turn

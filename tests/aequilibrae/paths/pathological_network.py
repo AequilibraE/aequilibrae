@@ -392,14 +392,21 @@ class PathologicalNetwork:
         for via_node in set(incoming) & set(outgoing):
             for from_arc in incoming[via_node]:
                 for to_arc in outgoing[via_node]:
-                    is_uturn = to_arc.head == from_arc.tail
-                    if is_uturn and not allow_path_uturns:
-                        continue
+                    # Centroid blocking is evaluated first: an explicit movement control
+                    # never lets a path pass through a centroid.
                     if block_centroid_flows and via_node in centroids:
                         continue
-                    penalty = restrictions.get((from_arc.tail, via_node, to_arc.head), 0.0)
-                    if not isfinite(penalty):
+                    penalty = restrictions.get((from_arc.tail, via_node, to_arc.head))
+                    if penalty is None:
+                        # No explicit control for this movement, so the default U-turn ban applies.
+                        if to_arc.head == from_arc.tail and not allow_path_uturns:
+                            continue
+                        penalty = 0.0
+                    elif not isfinite(penalty):
                         continue
+                    # An explicit finite penalty decides the movement outright, permitting a
+                    # reversal that the default ban would otherwise reject - matching
+                    # _path_finding_arc_based_core.
                     graph.add_edge(from_arc, to_arc, weight=to_arc.cost + penalty, turn_penalty=penalty)
         return graph
 
@@ -493,11 +500,15 @@ class PathologicalNetwork:
         centroids = {int(node) for node in self.centroids}
         cost = sum(arc.cost for arc in arcs)
         for from_arc, to_arc in zip(arcs[:-1], arcs[1:], strict=True):
-            if to_arc.head == from_arc.tail and not allow_path_uturns:
-                return inf
             if block_centroid_flows and from_arc.head in centroids:
                 return inf
-            cost += turn_lookup.get((from_arc.tail, from_arc.head, to_arc.head), 0.0)
+            penalty = turn_lookup.get((from_arc.tail, from_arc.head, to_arc.head))
+            if penalty is None:
+                # No explicit control for this movement, so the default U-turn ban applies.
+                if to_arc.head == from_arc.tail and not allow_path_uturns:
+                    return inf
+                penalty = 0.0
+            cost += penalty
         return float(cost)
 
     def dump_geoparquet(self, directory: Path) -> dict[str, Path]:

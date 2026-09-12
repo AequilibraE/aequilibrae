@@ -243,6 +243,10 @@ cdef int _path_finding_arc_based_core(
     bint allow_uturns,
     double [:] arc_turn_penalties,
     double *node_costs,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
 ) noexcept nogil:
     """
     Arc-based Dijkstra's algorithm with turn restrictions.
@@ -348,6 +352,9 @@ cdef int _path_finding_arc_based_core(
                 if destination_count == 0:
                     break
 
+        if block_centroid_flows and current_node < <size_t>num_zones and current_node != origin_vert:
+            continue
+
         # Explore possible outgoing arcs from current node.
         #
         # Representation details:
@@ -380,7 +387,12 @@ cdef int _path_finding_arc_based_core(
             # global u-turn ban.  Only apply the ban when no explicit entry covers this
             # transition - so a user-defined penalty can still permit a u-turn even when
             # allow_uturns is False.
-            if not allow_uturns and not has_explicit_entry and csr_indices[next_arc] == a_nodes[current_arc]:
+            #
+            # The reversal test compares original boundary nodes, not compact endpoints:
+            # first_ctx[next_arc] is the first original node after that arc's tail and
+            # last_ctx[current_arc] the last original node before this arc's head, so a
+            # contracted shortcut is judged by the movement it really represents.
+            if not allow_uturns and not has_explicit_entry and first_ctx[next_arc] == last_ctx[current_arc]:
                 continue
 
             # INFINITY marks prohibited turns.
@@ -426,13 +438,19 @@ cpdef int path_finding_arc_based(
     const long long [:] turn_to_arcs,
     const double [:] turn_penalties,
     bint allow_uturns,
-    double [:] arc_turn_penalties
+    double [:] arc_turn_penalties,
+    bint block_centroid_flows=False,
+    long long num_zones=0,
+    const long long [:] first_ctx=None,
+    const long long [:] last_ctx=None,
 ) noexcept nogil:
     """Arc-based Dijkstra wrapper that allocates its own node label cost scratch array."""
     cdef unsigned int num_nodes = node_pred.shape[0]
     cdef:
         double *node_costs = <double *>malloc(num_nodes * sizeof(double))
         int found = 0
+        const long long [:] eff_first_ctx = csr_indices if first_ctx is None else first_ctx
+        const long long [:] eff_last_ctx = a_nodes if last_ctx is None else last_ctx
 
     if node_costs == NULL:
         return 0
@@ -457,7 +475,196 @@ cpdef int path_finding_arc_based(
         allow_uturns,
         arc_turn_penalties,
         node_costs,
+        block_centroid_flows,
+        num_zones,
+        eff_first_ctx,
+        eff_last_ctx,
     )
 
     free(node_costs)
     return found
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.initializedcheck(False)
+cpdef int path_finding_hybrid(
+    long origin,
+    double[:] graph_costs,
+    const long long [:] csr_indices,
+    const long long [:] graph_fs,
+    const long long [:] a_nodes,
+    const unsigned char [:] stateful,
+    const long long [:] rep_arc,
+    long long [:] node_pred,
+    long long [:] connectors,
+    long long [:] reached_first,
+    double [:] node_costs,
+    double [:] node_turn_penalties,
+    long long [:] arc_pred,
+    double [:] arc_turn_penalties,
+    const long long [:] turn_fs,
+    const long long [:] turn_to_arcs,
+    const double [:] turn_penalties,
+    bint allow_uturns,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
+) noexcept nogil:
+    """Hybrid node/arc-state Dijkstra: arc labels only where the incoming arc can matter.
+
+    Turn penalties are classically handled by labelling arcs rather than nodes (the line
+    graph of Caldwell 1961 / Kirby & Potts 1969), which multiplies the label count by the
+    arcs-per-node ratio - roughly 4 on an urban network - whether or not any restriction
+    actually binds.
+
+    The incoming arc changes what a path may do next only at a node carrying an explicit
+    movement control, or at one of its neighbours (where a control can force a reversal).
+    ``stateful`` marks exactly those nodes: R, the nodes with an explicit turn entry keyed
+    on an incoming arc, union N(R), their in- and out-neighbours. Everywhere else one
+    label per node is enough.
+
+    Correctness of the collapse. At a plain node every movement except a U-turn is free
+    and permitted from any label, so the only thing the collapsed label can forbid that
+    the arc-based kernel allows is a U-turn back along an arrival arc that was not the
+    cheapest. Such a U-turn is never needed: let W be an optimal walk entering plain node
+    v by arc a and leaving by rev(a) to u = tail(a), and excise the pair. The result is
+    still a walk to the same destination; it is feasible because v not in N(R) implies
+    u not in R, so no explicit prohibition is keyed at u and the only way the splice can
+    be illegal is by being itself a U-turn, handled by repeating the excision (which
+    terminates, each step removing two arcs); and it is no more expensive because link
+    costs and turn penalties are non-negative while the spliced movement at an
+    uncontrolled node costs zero. Including N(R) in ``stateful`` is what makes the
+    feasibility half hold - R alone would not.
+
+    Labels stay in the arc index space so the heap is sized exactly as the arc-based
+    kernel's. At a stateful node each incoming arc keeps its own label; at a plain node
+    every incoming arc collapses onto that node's representative label ``rep_arc[v]``,
+    so the node holds one label however many arcs enter it, and the arc actually taken is
+    read back from ``connectors[v]``, written by the winning relaxation.
+
+    ``first_ctx``/``last_ctx`` carry each arc's boundary contexts - the first and last
+    *physical* node it occupies - because a compressed arc may span many physical nodes
+    and a U-turn is a reversal at a physical node. See the "Turn-aware path computation"
+    page of the documentation for the full treatment and references.
+    """
+    cdef unsigned int num_nodes = node_pred.shape[0]
+    cdef unsigned int num_arcs = graph_costs.shape[0]
+    cdef:
+        size_t label, next_label, idx, turn_idx
+        size_t restriction_start, restriction_end
+        long long cur_arc, next_arc, cur_node, head
+        double current_cost, next_cost, turn_penalty, current_turn_cost
+        FourAryHeap pqueue
+        ElementState st
+        size_t origin_vert = <size_t>origin
+        int found = 0
+        bint has_explicit_entry
+        unsigned int i
+
+    for i in range(num_nodes):
+        node_pred[i] = -1
+        connectors[i] = -1
+        node_costs[i] = INFINITY
+
+    pqueue.init_heap(<size_t>num_arcs)
+
+    node_costs[origin_vert] = 0.0
+    node_turn_penalties[origin_vert] = 0.0
+    reached_first[0] = origin_vert
+    found = 1
+
+    for idx in range(<size_t>graph_fs[origin_vert], <size_t>graph_fs[origin_vert + 1]):
+        if graph_costs[idx] < INFINITY:
+            arc_pred[idx] = ORIGIN_ARC_SENTINEL
+            arc_turn_penalties[idx] = 0.0
+            head = csr_indices[idx]
+            next_label = <size_t>idx if stateful[head] else <size_t>rep_arc[head]
+            st = pqueue.effective_state(next_label)
+            if st == NOT_IN_HEAP:
+                pqueue.insert(next_label, graph_costs[idx])
+                if not stateful[head]:
+                    connectors[head] = idx
+            elif st != SCANNED and pqueue.element_key(next_label) > graph_costs[idx]:
+                pqueue.decrease_key(next_label, graph_costs[idx])
+                if not stateful[head]:
+                    connectors[head] = idx
+
+    while not pqueue.is_empty():
+        label = pqueue.extract_min()
+        current_cost = pqueue.element_key(label)
+
+        cur_node = csr_indices[label]
+        # At a plain node the label is the representative arc, so the arc actually taken
+        # is the one the winning relaxation recorded.
+        cur_arc = <long long>label if stateful[cur_node] else connectors[cur_node]
+
+        if current_cost < node_costs[cur_node]:
+            node_costs[cur_node] = current_cost
+            reached_first[found] = cur_node
+            found += 1
+            if cur_arc >= 0:
+                node_pred[cur_node] = a_nodes[cur_arc]
+                connectors[cur_node] = cur_arc
+                node_turn_penalties[cur_node] = arc_turn_penalties[cur_arc]
+
+        if block_centroid_flows and cur_node < num_zones and <size_t>cur_node != origin_vert:
+            continue
+
+        if cur_arc < 0:
+            continue
+
+        current_turn_cost = arc_turn_penalties[cur_arc]
+        if stateful[cur_node]:
+            restriction_start = <size_t>turn_fs[cur_arc]
+            restriction_end = <size_t>turn_fs[cur_arc + 1]
+        else:
+            restriction_start = 0
+            restriction_end = 0
+
+        for idx in range(<size_t>graph_fs[cur_node], <size_t>graph_fs[cur_node + 1]):
+            next_arc = <long long>idx
+            turn_penalty = 0.0
+            has_explicit_entry = False
+
+            for turn_idx in range(restriction_start, restriction_end):
+                if turn_to_arcs[turn_idx] == next_arc:
+                    turn_penalty = turn_penalties[turn_idx]
+                    has_explicit_entry = True
+                    break
+                if turn_to_arcs[turn_idx] > next_arc:
+                    break
+
+            # U-turns are prohibited when allow_uturns is False (unless an explicit turn entry permits it)
+            if not allow_uturns and not has_explicit_entry:
+                if first_ctx[next_arc] == last_ctx[cur_arc]:
+                    continue
+
+            if turn_penalty == INFINITY:
+                continue
+
+            next_cost = current_cost + graph_costs[next_arc] + turn_penalty
+            if next_cost == INFINITY:
+                continue
+
+            head = csr_indices[next_arc]
+            next_label = <size_t>next_arc if stateful[head] else <size_t>rep_arc[head]
+
+            st = pqueue.effective_state(next_label)
+            if st == SCANNED:
+                continue
+            if st == NOT_IN_HEAP:
+                pqueue.insert(next_label, next_cost)
+                arc_pred[next_arc] = cur_arc
+                arc_turn_penalties[next_arc] = current_turn_cost + turn_penalty
+                if not stateful[head]:
+                    connectors[head] = next_arc
+            elif pqueue.element_key(next_label) > next_cost:
+                pqueue.decrease_key(next_label, next_cost)
+                arc_pred[next_arc] = cur_arc
+                arc_turn_penalties[next_arc] = current_turn_cost + turn_penalty
+                if not stateful[head]:
+                    connectors[head] = next_arc
+
+    return found - 1
