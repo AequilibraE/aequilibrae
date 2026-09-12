@@ -279,16 +279,22 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.compact_graph = pd.DataFrame(columns=["id", "link_id", "a_node", "b_node", "direction"])
         graph.compact_num_links = 0
         graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
-        graph.graph["__compressed_id__"] = np.empty(len(graph.graph), dtype=np.int64)
+        graph.graph["__compressed_id__"] = np.zeros(len(graph.graph), dtype=np.int64)
+        graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
+        graph._compact_first_node = np.empty(0, dtype=np.int64)
+        graph._compact_last_node = np.empty(0, dtype=np.int64)
+        graph._compact_source = np.empty(0, dtype=np.int64)
         return
 
-    directed_node_max = max(graph_a_nodes.max(), graph_b_nodes.max())
-    in_degree = np.bincount(graph_b_nodes, minlength=directed_node_max + 1)
-    out_degree = np.bincount(graph_a_nodes, minlength=directed_node_max + 1)
+    num_directed_nodes = max(graph.num_nodes, int(graph_a_nodes.max()) + 1, int(graph_b_nodes.max()) + 1)
+    in_degree = np.bincount(graph_b_nodes, minlength=num_directed_nodes)
+    out_degree = np.bincount(graph_a_nodes, minlength=num_directed_nodes)
 
     centroid_idx = graph.nodes_to_indices[graph.centroids]
-    in_degree[centroid_idx] = -1
-    out_degree[centroid_idx] = -1
+    valid_c = (centroid_idx >= 0) & (centroid_idx < num_directed_nodes)
+    if np.any(valid_c):
+        in_degree[centroid_idx[valid_c]] = -1
+        out_degree[centroid_idx[valid_c]] = -1
     del centroid_idx
 
     effective_vias = graph._compute_effective_turn_vias()
@@ -296,7 +302,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         via = int(via)
         if 0 <= via < len(graph.nodes_to_indices):
             v_idx = graph.nodes_to_indices[via]
-            if 0 <= v_idx <= directed_node_max:
+            if 0 <= v_idx < num_directed_nodes:
                 in_degree[v_idx] = -1
                 out_degree[v_idx] = -1
 
@@ -304,7 +310,6 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     df = pd.DataFrame(graph.network, copy=True)
     if remove_dead_ends:
-        num_directed_nodes = directed_node_max + 1
         num_directed_arcs = len(graph_b_nodes)
         r_counts = np.bincount(graph_b_nodes, minlength=num_directed_nodes)
         r_fs = np.zeros(num_directed_nodes + 1, dtype=np.int64)
@@ -357,7 +362,11 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.compact_graph = pd.DataFrame(columns=["id", "link_id", "a_node", "b_node", "direction"])
         graph.compact_num_links = 0
         graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
-        graph.graph["__compressed_id__"] = np.empty(len(graph.graph), dtype=np.int64)
+        graph.graph["__compressed_id__"] = np.zeros(len(graph.graph), dtype=np.int64)
+        graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
+        graph._compact_first_node = np.empty(0, dtype=np.int64)
+        graph._compact_last_node = np.empty(0, dtype=np.int64)
+        graph._compact_source = np.empty(0, dtype=np.int64)
         return
     # Build link index
     link_id_max = df.link_id.max()
@@ -499,7 +508,6 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     links_to_remove = (simplified_links >= 0).nonzero()[0]
     if links_to_remove.shape[0]:
         df = df[~df.link_id.isin(links_to_remove)]
-        df = df[df.a_node != df.b_node]
 
     comp_lnk = pd.DataFrame(
         {

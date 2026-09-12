@@ -222,12 +222,16 @@ class TrafficClass(TransportClassBase):
         :Arguments:
             **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
         """
+        if self.graph.compact_num_links > 0:
+            self.graph.compact_costs_from_link_costs(self.fixed_cost + self.congested_time)
+
         # fixed_cost and congested_time are indexed by __supernet_id__, while the rows of
         # graph.graph are ordered by (a_node, b_node). Those two orders differ on any network
         # with bidirectional links, so both vectors have to be gathered into row order before
         # they can be assigned positionally.
         supernet_ids = self.graph.graph.__supernet_id__.to_numpy(copy=False)
         cost = (self.fixed_cost + self.congested_time)[supernet_ids]
+        self.graph.cost = cost
         congested_time = np.asarray(self.congested_time)[supernet_ids]
         self.graph.graph = self.graph.graph.assign(__assignment_cost__=cost, __congested_time__=congested_time)
         skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]

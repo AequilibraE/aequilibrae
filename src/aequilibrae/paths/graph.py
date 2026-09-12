@@ -227,8 +227,15 @@ class GraphBase(ABC):  # noqa: B024
                 ``graph.set_turn_restrictions`` to allow U-turns at intersections. This options takes effect after dead
                 end link removal.
         """
+        if not isinstance(remove_dead_ends, bool):
+            raise TypeError(f"remove_dead_ends must be a boolean, got {type(remove_dead_ends).__name__}")
+        if not isinstance(allow_uturns_everywhere, bool):
+            raise TypeError(f"allow_uturns_everywhere must be a boolean, got {type(allow_uturns_everywhere).__name__}")
+
         self._remove_dead_ends = remove_dead_ends
         self._allow_uturns_everywhere = allow_uturns_everywhere
+        self._effective_vias_cache = None
+        self._graph_generation += 1
 
         self.__network_error_checking__()
 
@@ -606,6 +613,15 @@ class GraphBase(ABC):  # noqa: B024
                 f"Field '{cost_field}' not found in graph columns. Available fields: {list(self.graph.columns)}"
             )
 
+        if not self.graph.empty:
+            raw_costs = pd.to_numeric(self.graph[cost_field], errors="coerce").to_numpy(np.float64)
+            if np.isnan(raw_costs).any():
+                raise ValueError(f"Cost field '{cost_field}' contains NaN values.")
+            if np.isneginf(raw_costs).any():
+                raise ValueError(f"Cost field '{cost_field}' contains -inf values.")
+            if (raw_costs < 0).any():
+                raise ValueError(f"Cost field '{cost_field}' contains negative values.")
+
         self.cost_field = cost_field
 
         # Restore turn penalties from master copies (they are preserved across cost field changes).
@@ -635,6 +651,22 @@ class GraphBase(ABC):  # noqa: B024
             logger.warning("Cost field with wrong type. Converting to float64")
 
         self.__build_derived_properties()
+
+    def compact_costs_from_link_costs(self, link_costs: np.ndarray) -> None:
+        """Updates compact_cost from link costs indexed by __supernet_id__."""
+        if self.compact_num_links > 0:
+            if len(self.compact_cost) <= 1 and not self.compact_graph.empty:
+                self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
+            if not hasattr(self, "_crosswalk") or self._crosswalk is None or len(self._crosswalk) != self.graph.shape[0]:
+                crosswalk = np.zeros(self.graph.shape[0], dtype=self.default_types("int"))
+                supernet_ids = self.graph.__supernet_id__.to_numpy(copy=False)
+                compressed_ids = self.graph.__compressed_id__.to_numpy(copy=False)
+                crosswalk[supernet_ids] = compressed_ids
+                self._crosswalk = crosswalk
+            from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs
+
+            costs_arr = np.ascontiguousarray(link_costs, dtype=self.__float_type)
+            aggregate_link_costs(costs_arr, self.compact_cost, self._crosswalk)
 
     def set_skimming(self, skim_fields: list) -> None:
         """
@@ -725,7 +757,9 @@ class GraphBase(ABC):  # noqa: B024
 
     def set_hybrid_kernel(self, use_hybrid: bool) -> None:
         """Sets whether to use the hybrid node/arc-state Dijkstra kernel for turn-restricted routing."""
-        self.use_hybrid = bool(use_hybrid)
+        if not isinstance(use_hybrid, bool):
+            raise TypeError(f"use_hybrid must be a boolean, got {type(use_hybrid).__name__}")
+        self.use_hybrid = use_hybrid
 
     @property
     def allow_uturns_everywhere(self) -> bool:
@@ -761,11 +795,17 @@ class GraphBase(ABC):  # noqa: B024
         if self.graph.empty:
             return {int(v) for v in self._turn_restrictions["via_node"].dropna().unique()}
 
+        topo_hash = (
+            int(self.graph.a_node.sum()) + int(self.graph.b_node.sum())
+            if not self.graph.empty and "a_node" in self.graph and "b_node" in self.graph
+            else 0
+        )
         cache_key = (
             self._turn_restrictions_generation,
             self._graph_generation,
             len(self._turn_restrictions),
             self.graph.shape[0],
+            topo_hash,
         )
         cached = self._effective_vias_cache
         if cached is not None and cached[0] == cache_key:
@@ -835,6 +875,9 @@ class GraphBase(ABC):  # noqa: B024
                 U-turns are node-based transitions that return to the tail node of the
                 current directed arc. Default is ``False``.
         """
+        if not isinstance(allow_path_uturns, bool):
+            raise TypeError(f"allow_path_uturns must be a boolean, got {type(allow_path_uturns).__name__}")
+
         if turn_restrictions is None:
             self.clear_turn_restrictions()
             return
@@ -871,6 +914,26 @@ class GraphBase(ABC):  # noqa: B024
         normalised["via_node"] = normalised["via_node"].astype(np.int64)
         normalised["to_node"] = normalised["to_node"].astype(np.int64)
         normalised["penalty"] = normalised["penalty"].apply(self._normalise_turn_penalty)
+
+        if not normalised.empty:
+            mvmt_cols = ["from_node", "via_node", "to_node"]
+            if normalised.duplicated(subset=mvmt_cols).any():
+                records = []
+                for mvmt, group in normalised.groupby(mvmt_cols, sort=False):
+                    pens = group["penalty"].to_numpy()
+                    has_prohib = np.any(np.isinf(pens))
+                    if has_prohib:
+                        final_pen = np.inf
+                    else:
+                        finite_pens = pens[np.isfinite(pens)]
+                        if len(finite_pens) > 1:
+                            if not np.all(np.isclose(finite_pens, finite_pens[0])):
+                                raise ValueError(
+                                    f"Conflicting duplicate turn penalties for movement {mvmt}: {sorted(set(finite_pens))}"
+                                )
+                        final_pen = finite_pens[0] if len(finite_pens) > 0 else np.inf
+                    records.append((*mvmt, final_pen))
+                normalised = pd.DataFrame(records, columns=["from_node", "via_node", "to_node", "penalty"])
 
         self._turn_restrictions = normalised
         self._allow_path_uturns = allow_path_uturns
@@ -1373,21 +1436,30 @@ class GraphBase(ABC):  # noqa: B024
         key_to_penalty: dict[tuple[int, int], float] = {}
         prohibited_keys: set[tuple[int, int]] = set()
 
+        # First collect all prohibited keys so prohibition dominance wins unconditionally
         for f_arc, t_arc, penalty in zip(restricted_from_arcs, restricted_to_arcs, restricted_penalties, strict=True):
             f_arc = int(f_arc)
             t_arc = int(t_arc)
             if f_arc < 0 or t_arc < 0 or f_arc >= num_arcs or t_arc >= num_arcs:
                 continue
-
-            key = (f_arc, t_arc)
             if penalty < 0:
                 raise ValueError("Negative turn penalties are not allowed. Use None/NaN/+inf for a prohibition")
-            # Convention: NaN/non-finite means prohibited turn.
             if not np.isfinite(penalty):
-                prohibited_keys.add(key)
-                key_to_penalty.pop(key, None)
-            elif key not in prohibited_keys:
-                key_to_penalty[key] = float(penalty)
+                prohibited_keys.add((f_arc, t_arc))
+
+        for f_arc, t_arc, penalty in zip(restricted_from_arcs, restricted_to_arcs, restricted_penalties, strict=True):
+            f_arc = int(f_arc)
+            t_arc = int(t_arc)
+            if f_arc < 0 or t_arc < 0 or f_arc >= num_arcs or t_arc >= num_arcs:
+                continue
+            key = (f_arc, t_arc)
+            if key in prohibited_keys:
+                continue
+            if key in key_to_penalty and not np.isclose(key_to_penalty[key], float(penalty)):
+                raise ValueError(
+                    f"Conflicting duplicate turn penalties for arc pair {key}: {key_to_penalty[key]} vs {float(penalty)}"
+                )
+            key_to_penalty[key] = float(penalty)
 
         if not prohibited_keys and not key_to_penalty:
             return (
@@ -1472,6 +1544,7 @@ class GraphBase(ABC):  # noqa: B024
             else self.compact_turn_penalties
         )
 
+        mygraph["use_hybrid"] = self.use_hybrid
         mygraph["_remove_dead_ends"] = self._remove_dead_ends
 
         with open(filename, "wb") as f:
@@ -1492,6 +1565,7 @@ class GraphBase(ABC):  # noqa: B024
         if isinstance(self.network, np.ndarray):
             self.network = pd.DataFrame(self.network)
         self.mode = mygraph.get("mode", "")
+        self.use_hybrid = mygraph.get("use_hybrid", True)
         self.turn_penalty_dimension = mygraph.get("turn_penalty_dimension", "time")
         self.centroids = mygraph.get("centroids", None)
         self._remove_dead_ends = mygraph.get("_remove_dead_ends", mygraph.get("remove_dead_ends", True))

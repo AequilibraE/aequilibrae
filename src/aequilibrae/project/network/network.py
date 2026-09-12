@@ -365,7 +365,11 @@ class Network(WorkerThread):
             if allow_uturns_r:
                 allow_uturns = allow_uturns_r[0] == "1"
 
-        assert turn_restrictions_df is None or "modes" in turn_restrictions_df.columns
+        if turn_restrictions_df is not None and "modes" not in turn_restrictions_df.columns:
+            raise ValueError(
+                "Turn restrictions table is missing required 'modes' column. "
+                "Run project.upgrade() to update the schema."
+            )
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[all_fields]
@@ -380,21 +384,16 @@ class Network(WorkerThread):
             g.network = net
 
             if turn_restrictions_df is not None:
-                g._turn_restrictions = turn_restrictions_df[
+                mode_turns = turn_restrictions_df[
                     turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
                 ].copy()
+                g.set_turn_restrictions(mode_turns, allow_path_uturns=allow_uturns)
 
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)
             if centroids is None:
                 logger.warning("Your graph has no centroids")
             g.lonlat_index = lonlat.loc[g.all_nodes]
-
-            # Always install the table, even when this mode filtered down to no rows: the
-            # allow_uturns setting is project-wide, and skipping the call here would leave
-            # classes without applicable restrictions on a different U-turn policy.
-            if turn_restrictions_df is not None:
-                g.set_turn_restrictions(g._turn_restrictions, allow_path_uturns=allow_uturns)
 
             self.graphs[m] = g
 

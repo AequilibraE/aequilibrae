@@ -592,6 +592,14 @@ cpdef int path_finding_hybrid(
     reached_first[0] = origin_vert
     found = 1
 
+    if destination_count > 0 and destinations.shape[0] > 0 and destinations[origin_vert]:
+        destinations[origin_vert] = 0
+        destination_count = destination_count - 1
+        if destination_count == 0:
+            if settled_count is not None and settled_count.shape[0] > 0:
+                settled_count[0] = labels_settled
+            return found
+
     for idx in range(<size_t>graph_fs[origin_vert], <size_t>graph_fs[origin_vert + 1]):
         if graph_costs[idx] < INFINITY:
             arc_pred[idx] = ORIGIN_ARC_SENTINEL

@@ -886,6 +886,7 @@ class LinearApproximation(WorkerThread):
                                 self.threading_threshold,
                             )
                     flows.append(c.results.total_link_loads)
+                    c.results.total_turn_penalty = c._aon_results.total_turn_penalty
 
                 # For iteration 1, turn cost equals AoN turn cost
                 self.fw_total_turn_cost = self.aon_total_turn_cost
@@ -941,6 +942,10 @@ class LinearApproximation(WorkerThread):
 
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
+                    cls_res.total_turn_penalty = (
+                        self.stepsize * self.step_direction_turn_cost[c._id]
+                        + (1.0 - self.stepsize) * cls_res.total_turn_penalty
+                    )
 
                 # Update aggregate turn cost with the same stepsize used for flows.
                 # Turn penalties are fixed costs (not flow-dependent VDF outputs), so this
