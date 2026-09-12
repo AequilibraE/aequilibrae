@@ -181,6 +181,22 @@ centroid-flow blocking.**
     * :func:`aequilibrae.paths.graph.TransitGraph`
         Class documentation
 
+Turn restrictions and turn penalties
+------------------------------------
+
+Movements through an intersection can be penalised or prohibited by setting turn restrictions
+on the graph. Restrictions are directed triples ``from_node -> via_node -> to_node`` carrying a
+penalty in the unit of the cost field, with ``+inf`` denoting a prohibited movement.
+
+.. code-block:: python
+
+    >>> graph.set_turn_restrictions(turns, allow_path_uturns=False)  # doctest: +SKIP
+
+Turn restrictions interact with graph compression: a via node cannot be contracted away, and
+U-turn detection has to be expressed against physical nodes rather than the endpoints of a
+shortcut. The algorithm that handles this, the argument for its correctness and its cost are
+covered in :ref:`turn_aware_path_computation`.
+
 Blocking centroid flows
 -----------------------
 

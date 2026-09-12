@@ -46,4 +46,5 @@ entirely dedicated to this object.
     :maxdepth: 1
 
     path_computation/aequilibrae_graph
+    path_computation/turn_aware_path_computation
     _auto_examples/path_computation/index
