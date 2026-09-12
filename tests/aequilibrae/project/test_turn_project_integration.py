@@ -1,4 +1,4 @@
-"""Tests verifying turn project integration, schema upgrade messaging, int64 validation, mode filtering, and exclude_links (H6)."""
+"""Tests for turn project integration: upgrade messaging, validation, mode filtering, exclude_links (H6)."""
 
 from __future__ import annotations
 

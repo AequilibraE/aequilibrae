@@ -357,6 +357,7 @@ class GraphBase(ABC):  # noqa: B024
 
         self.compressed_link_network_mapping_idx = None
         self.compressed_link_network_mapping_data = None
+        self.network_compressed_node_mapping = None
         self._effective_vias_cache = None
         self._graph_generation += 1
         self.__build_derived_properties()
@@ -834,10 +835,14 @@ class GraphBase(ABC):  # noqa: B024
                 U-turns are node-based transitions that return to the tail node of the
                 current directed arc. Default is ``False``.
         """
-        if turn_restrictions is None or turn_restrictions.empty:
+        if turn_restrictions is None:
             self.clear_turn_restrictions()
             return
 
+        # An empty table still carries policy: ``allow_path_uturns`` is a global setting and
+        # must be honoured whether or not this traffic class has any applicable restriction.
+        # The table is still installed (as an empty one), so ``has_turn_restrictions`` stays
+        # False and the node-based kernel is still selected.
         required_cols = {"from_node", "via_node", "to_node", "penalty"}
         if not required_cols.issubset(turn_restrictions.columns):
             missing = required_cols - set(turn_restrictions.columns)
@@ -847,7 +852,7 @@ class GraphBase(ABC):  # noqa: B024
             )
 
         # Validate node IDs: finite, integral, non-negative int64
-        for col in ["from_node", "via_node", "to_node"]:
+        for col in ["from_node", "via_node", "to_node"] if not turn_restrictions.empty else []:
             vals = turn_restrictions[col]
             if vals.isnull().any():
                 raise ValueError(f"Turn restrictions column '{col}' contains null/NaN values.")
@@ -1098,7 +1103,10 @@ class GraphBase(ABC):  # noqa: B024
                         diffs = ends - starts
                         has_out = diffs > 0
                         if np.any(has_out):
-                            out_ranges = [np.arange(s, e, dtype=np.int64) for s, e in zip(starts[has_out], ends[has_out])]
+                            out_ranges = [
+                                np.arange(s, e, dtype=np.int64)
+                                for s, e in zip(starts[has_out], ends[has_out], strict=True)
+                            ]
                             out_arcs = np.concatenate(out_ranges)
                             out_arcs = out_arcs[out_arcs < num_arcs]
                             w = csr_indices[out_arcs]
@@ -1261,7 +1269,9 @@ class GraphBase(ABC):  # noqa: B024
                 np.empty(0, dtype=np.float64),
             )
 
-        stride = int(max(int(a_by_arc.max()) if a_by_arc.size else 0, int(b_by_arc.max()) if b_by_arc.size else 0, 0)) + 1
+        max_a = int(a_by_arc.max()) if a_by_arc.size else 0
+        max_b = int(b_by_arc.max()) if b_by_arc.size else 0
+        stride = int(max(max_a, max_b, 0)) + 1
         sorted_keys, order = GraphBase._pair_index(a_by_arc, b_by_arc, stride)
 
         fn = from_nodes.astype(np.int64, copy=False)
@@ -1292,9 +1302,14 @@ class GraphBase(ABC):  # noqa: B024
             t_arcs = order[lo_out[single]]
             heads = b_by_arc[f_arcs]
             in_fs = (heads >= 0) & (heads + 1 < fs.shape[0])
-            lo_fs = fs[heads[in_fs]]
-            hi_fs = fs[heads[in_fs] + 1]
-            t_valid = in_fs & (lo_fs <= t_arcs[in_fs]) & (t_arcs[in_fs] < hi_fs)
+            # Gather the forward star with the out-of-range heads clamped to a safe slot so
+            # every intermediate stays the same length as `single`; `in_fs` then masks the
+            # clamped rows out. Indexing `fs` with `heads[in_fs]` instead would produce a
+            # shorter array and either broadcast silently or raise.
+            safe_heads = np.where(in_fs, heads, 0)
+            lo_fs = fs[safe_heads]
+            hi_fs = fs[safe_heads + 1]
+            t_valid = in_fs & (lo_fs <= t_arcs) & (t_arcs < hi_fs)
             if np.any(t_valid):
                 out_from_parts.append(f_arcs[t_valid])
                 out_to_parts.append(t_arcs[t_valid])

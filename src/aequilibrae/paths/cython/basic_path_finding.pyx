@@ -556,19 +556,13 @@ cpdef int path_finding_hybrid(
     and a U-turn is a reversal at a physical node. See the "Turn-aware path computation"
     page of the documentation for the full treatment and references.
     """
+    # Sizes come from the primary arrays and are NOT clamped to the shortest companion
+    # array. Labels are arc ids drawn from the whole of ``graph_costs``, so shrinking
+    # ``num_arcs`` would size the heap below the index space it is addressed with and,
+    # with bounds checking off, overrun it instead of protecting anything. Callers are
+    # responsible for passing companion arrays of the right length.
     cdef unsigned int num_nodes = node_pred.shape[0]
-    if node_costs.shape[0] < num_nodes:
-        num_nodes = node_costs.shape[0]
-    if connectors.shape[0] < num_nodes:
-        num_nodes = connectors.shape[0]
-    if node_turn_penalties.shape[0] < num_nodes:
-        num_nodes = node_turn_penalties.shape[0]
-
     cdef unsigned int num_arcs = graph_costs.shape[0]
-    if arc_pred.shape[0] < num_arcs:
-        num_arcs = arc_pred.shape[0]
-    if arc_turn_penalties.shape[0] < num_arcs:
-        num_arcs = arc_turn_penalties.shape[0]
     cdef:
         size_t label, next_label, idx, turn_idx
         size_t restriction_start, restriction_end

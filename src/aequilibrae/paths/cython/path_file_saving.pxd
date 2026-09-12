@@ -1,6 +1,6 @@
 from libc.stdint cimport int64_t, uint32_t
 
-cpdef void save_path_file(
+cpdef int save_path_file(
     long origin_index,
     long num_links,
     long zones,

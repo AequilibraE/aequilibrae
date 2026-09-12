@@ -97,6 +97,11 @@ class allOrNothing(WorkerThread):
 
     def __execute_pooled(self, bridge):
         mat = self.matrix.matrix_view
+        # Path saving under turn restrictions expands compressed arcs through the
+        # link-network mapping. Build it once here rather than letting every pooled worker
+        # race to populate the graph-level cache.
+        if self.graph.has_turn_restrictions:
+            self.graph.create_compressed_link_network_mapping()
         pool = ThreadPool(self.results.cores)
         all_threads = {"count": 0}
         async_results = []

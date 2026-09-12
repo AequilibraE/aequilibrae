@@ -6,21 +6,51 @@ import networkx as nx
 import numpy as np
 import pytest
 
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph
+from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.cython.basic_path_finding import path_finding_hybrid
 from aequilibrae.paths.network_skimming import NetworkSkimming
+from aequilibrae.paths.results import AssignmentResults
 from tests.aequilibrae.paths.pathological_components import (
     make_composed_pathological_network,
     make_duplicate_uturn_control_component,
     make_equal_parallel_component,
     make_finite_turn_component,
-    make_mixed_direction_component,
     make_prohibited_parallel_component,
     make_prohibited_uturn_component,
     make_selected_finite_turn_component,
     make_uturn_component,
 )
 from tests.aequilibrae.paths.pathological_network import PathologicalNetwork
+
+
+def _audit_path(network: PathologicalNetwork, result) -> float:
+    """Re-prices a kernel path from the network definition and asserts every movement is legal.
+
+    Comparing the reported cost against the oracle only shows the two numbers agree. Walking the
+    returned path independently shows the kernel returned a real, legal route priced correctly -
+    the "legal arc sequences" half of the Stage H exit gate.
+    """
+    lookup = network.turn_lookup()
+    # Both directions of a link carry the same cost in this suite (see PathologicalNetwork.arcs).
+    link_costs = {
+        int(row.link_id): float(row.cost)
+        for row in network.link_frame().drop(columns="geometry").itertuples(index=False)
+    }
+    nodes = [int(n) for n in result.path_nodes]
+    assert len(result.path) >= 1
+    assert len(nodes) == len(result.path) + 1
+    total = 0.0
+    for i, link_id in enumerate(result.path):
+        total += link_costs[int(link_id)]
+        if i > 0:
+            penalty = lookup.get((nodes[i - 1], nodes[i], nodes[i + 1]), 0.0)
+            assert np.isfinite(penalty), (
+                f"kernel path traverses the prohibited movement {nodes[i - 1]} -> {nodes[i]} -> {nodes[i + 1]}"
+            )
+            total += penalty
+    return total
 
 
 @pytest.fixture(
@@ -39,7 +69,7 @@ def pathological_network(request) -> PathologicalNetwork:
 
 
 def test_hybrid_vs_arc_based_vs_networkx_oracle_parity(pathological_network: PathologicalNetwork):
-    """Verifies complete generalized cost parity between NetworkX line-graph oracle, arc-based kernel, and hybrid kernel."""
+    """Verifies cost and path parity between the NetworkX oracle, the arc-based kernel and the hybrid kernel."""
     graph = pathological_network.build_graph()
     nodes = list(graph.all_nodes)
 
@@ -78,9 +108,19 @@ def test_hybrid_vs_arc_based_vs_networkx_oracle_parity(pathological_network: Pat
                 assert res_hybrid.milepost[-1] == pytest.approx(expected_cost)
                 assert res_arc.milepost[-1] == pytest.approx(expected_cost)
 
+                # Equal totals are not enough: a path could be mispriced or could take a
+                # prohibited movement and still add up. Re-walk both and re-price them.
+                assert int(res_hybrid.path_nodes[0]) == origin
+                assert int(res_hybrid.path_nodes[-1]) == dest
+                assert _audit_path(pathological_network, res_hybrid) == pytest.approx(expected_cost)
+                if graph.has_turn_restrictions:
+                    assert int(res_arc.path_nodes[0]) == origin
+                    assert int(res_arc.path_nodes[-1]) == dest
+                    assert _audit_path(pathological_network, res_arc) == pytest.approx(expected_cost)
+
 
 def test_hybrid_settled_label_efficiency_and_early_exit():
-    """Verifies that hybrid kernel settles fewer or equal labels than arc-based, and early exit settles <= full search."""
+    """Verifies the hybrid kernel settles at most one label per plain node, and that early exit settles fewer."""
     composed = make_composed_pathological_network()
     graph = composed.build_graph()
 
@@ -188,6 +228,16 @@ def test_hybrid_settled_label_efficiency_and_early_exit():
     assert settled_early[0] > 0
     assert settled_early[0] <= settled_full[0]
 
+    # The design claim is that only stateful nodes hold more than one live label: every other
+    # node collapses onto its representative arc. A plain arc-based kernel would settle up to
+    # num_arcs labels, so bound the hybrid by the label space it is supposed to occupy.
+    in_degree = np.bincount(csr_indices[:num_arcs], minlength=num_nodes)[:num_nodes]
+    label_budget = int(np.where(stateful[:num_nodes].astype(bool), np.maximum(in_degree, 1), 1).sum())
+    assert settled_full[0] <= label_budget, (
+        f"hybrid settled {settled_full[0]} labels but only {label_budget} are reachable under the state-collapse rule"
+    )
+    assert label_budget <= num_arcs
+
 
 def test_unreachable_connectors_cleaned_up():
     """Verifies that unreachable destination nodes have connectors[d] == -1."""
@@ -216,7 +266,7 @@ def test_unreachable_connectors_cleaned_up():
 
 
 def test_skimming_oracle_parity():
-    """Verifies skimming returns identical matrices between hybrid and arc-based kernels."""
+    """Verifies skimming matches the NetworkX oracle, not only the arc-based kernel."""
     composed = make_composed_pathological_network()
     graph = composed.build_graph()
     centroids = graph.centroids
@@ -229,11 +279,67 @@ def test_skimming_oracle_parity():
     graph.set_hybrid_kernel(True)
     skm_hybrid = NetworkSkimming(graph)
     skm_hybrid.execute()
-    mat_hybrid = skm_hybrid.results.skims.cost[:, :]
+    mat_hybrid = np.array(skm_hybrid.results.skims.cost[:, :], copy=True)
+    index = np.array(skm_hybrid.results.skims.index[:], copy=True)
 
     graph.set_hybrid_kernel(False)
     skm_arc = NetworkSkimming(graph)
     skm_arc.execute()
-    mat_arc = skm_arc.results.skims.cost[:, :]
+    mat_arc = np.array(skm_arc.results.skims.cost[:, :], copy=True)
 
+    # The two kernels must agree with each other ...
     np.testing.assert_allclose(mat_hybrid, mat_arc, equal_nan=True)
+
+    # ... and with an independent oracle, which is the part that makes this a parity test.
+    for i, origin in enumerate(index):
+        for j, dest in enumerate(index):
+            if origin == dest:
+                continue
+            try:
+                expected = composed.oracle_path(int(origin), int(dest)).cost
+            except nx.NetworkXNoPath:
+                assert not np.isfinite(mat_hybrid[i, j]) or mat_hybrid[i, j] == 0.0
+                continue
+            assert mat_hybrid[i, j] == pytest.approx(expected), f"{origin} -> {dest}"
+
+
+def _assign(graph, use_hybrid: bool, cores: int = 1, save_path_file: bool = False):
+    """Runs an all-or-nothing assignment on `graph` with the requested kernel."""
+    graph.set_hybrid_kernel(use_hybrid)
+    mat = AequilibraeMatrix()
+    mat.create_empty(file_name=AequilibraeMatrix().random_name(), zones=len(graph.centroids), matrix_names=["matrix"])
+    mat.index[:] = graph.centroids[:]
+    mat.computational_view(core_list=["matrix"])
+    mat.matrix_view[:, :] = 1.0
+
+    res = AssignmentResults()
+    res.cores = cores
+    res.save_path_file = save_path_file
+    res.prepare(graph, mat)
+    allOrNothing("car", mat, graph, res).execute()
+    return np.array(res.link_loads, copy=True)
+
+
+def test_assignment_link_load_parity_between_kernels():
+    """Verifies all-or-nothing link loads are identical under the hybrid and arc-based kernels."""
+    composed = make_composed_pathological_network()
+    graph = composed.build_graph()
+    assert graph.has_turn_restrictions
+
+    loads_hybrid = _assign(graph, use_hybrid=True)
+    loads_arc = _assign(graph, use_hybrid=False)
+
+    assert loads_hybrid.sum() > 0
+    np.testing.assert_allclose(loads_hybrid, loads_arc)
+
+
+def test_assignment_link_loads_are_thread_count_invariant():
+    """Verifies pooled assignment produces the same link loads as a single-threaded run."""
+    composed = make_composed_pathological_network()
+    graph = composed.build_graph()
+
+    single = _assign(graph, use_hybrid=True, cores=1)
+    pooled = _assign(graph, use_hybrid=True, cores=4)
+
+    assert single.sum() > 0
+    np.testing.assert_allclose(single, pooled)

@@ -147,7 +147,7 @@ def skimming_parallel(graph, result, long cores):
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = bool(getattr(graph, "use_hybrid", True))
+        use_hybrid = bool(graph.use_hybrid)
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -162,6 +162,10 @@ def skimming_parallel(graph, result, long cores):
     cdef double [:, :, ::1] skim_mat = np.zeros((cores, compact_nodes, skims), dtype=np.float64)
     cdef unsigned char [::1] destinations = np.empty(0, dtype=np.uint8)
     cdef long long[:, ::1] b_nodes_mat = np.tile(graph.compact_graph.b_node.to_numpy(copy=False), (cores, 1))
+    # Set if a prefix walk overruns its stack, which can only happen if arc_pred holds a
+    # cycle. Checked once the parallel region ends so the failure is loud.
+    truncated_arr = np.zeros(cores, dtype=np.int64)
+    cdef long long [::1] truncated_view = truncated_arr
 
     with nogil, parallel(num_threads=cores):
         tid = threadid()
@@ -223,7 +227,7 @@ def skimming_parallel(graph, result, long cores):
                         first_ctx_view,
                         last_ctx_view,
                     )
-                skim_arc_based_paths(
+                truncated_view[tid] += skim_arc_based_paths(
                     oi,
                     zones,
                     skims,
@@ -270,6 +274,12 @@ def skimming_parallel(graph, result, long cores):
                 if block_flows_through_centroids:
                     blocking_centroid_flows(1, oi, zones, graph_fs_view,
                                             b_nodes_mat[tid], original_b_nodes_view)
+
+    if truncated_arr.sum() > 0:
+        raise RuntimeError(
+            "Arc predecessor chain exceeded the number of arcs during skimming, which means the "
+            "shortest path tree contains a cycle. Skims from this run are not valid."
+        )
 
     return skipped
 
@@ -510,7 +520,7 @@ cpdef void skim_single_path_with_turn_penalties(long origin,
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void skim_arc_based_paths(
+cpdef int skim_arc_based_paths(
     long long origin,
     long long dest_count,
     long long skims,
@@ -531,6 +541,9 @@ cpdef void skim_arc_based_paths(
     backtracking overhead while strictly preserving arc-specific costs and turn penalties.
     """
     cdef long long d, j, k, current_arc, curr, arc, p, stack_top
+    # The prefix walk pushes each arc at most once, so overrunning the stack means arc_pred
+    # holds a cycle. Bound the walk and report it rather than skimming a truncated path.
+    cdef int truncated = 0
     cdef double total_turn
 
     for d in range(dest_count):
@@ -555,6 +568,8 @@ cpdef void skim_arc_based_paths(
             arc_stack[stack_top] = curr
             stack_top += 1
             curr = arc_pred[curr]
+        if curr >= 0 and arc_visited[curr] != run_id:
+            truncated = 1
 
         # Unwind stack forwards, accumulating prefix totals
         while stack_top > 0:
@@ -576,3 +591,5 @@ cpdef void skim_arc_based_paths(
             total_turn = arc_turn_penalties[connectors[d]]
             for k in range(penalty_indices.shape[0]):
                 node_skims[d, penalty_indices[k]] += total_turn
+
+    return truncated

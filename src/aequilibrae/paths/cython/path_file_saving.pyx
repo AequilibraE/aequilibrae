@@ -11,7 +11,7 @@ import pandas as pd
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn of bounds-checking for entire function
-cpdef void save_path_file(
+cpdef int save_path_file(
     long origin_index,
     long num_links,
     long zones,
@@ -29,6 +29,7 @@ cpdef void save_path_file(
     cdef vector[long long] path_data
     # could make this an ndarray and not do the conversion, we know the size of the index array is zones
     cdef vector[long long] size_of_path_arrays
+    cdef int truncated = 0
     cdef bint has_arc_pred = (arc_pred is not None and arc_pred.shape[0] > 0)
     cdef bint has_mapping = (mapping_idx is not None and mapping_data is not None and mapping_idx.shape[0] > 0)
     cdef uint32_t m_start, m_end
@@ -45,6 +46,9 @@ cpdef void save_path_file(
                 cur_arc = conn[node]
                 steps = 0
                 max_steps = <long long>arc_pred.shape[0]
+                # Each arc appears at most once in a shortest path, so exceeding the arc
+                # count means arc_pred holds a cycle. Bound the walk and report it: writing a
+                # truncated path file would look like a valid but shorter route.
                 while cur_arc >= 0 and steps < max_steps:
                     steps += 1
                     if has_mapping:
@@ -58,6 +62,8 @@ cpdef void save_path_file(
                     else:
                         path_data.push_back(cur_arc)
                     cur_arc = arc_pred[cur_arc]
+                if cur_arc >= 0:
+                    truncated = 1
             else:
                 connector = conn[node]
                 path_data.push_back(connector)
@@ -82,3 +88,5 @@ cpdef void save_path_file(
     else:
         table1.to_parquet(path_file)
         table2.to_parquet(index_file)
+
+    return truncated

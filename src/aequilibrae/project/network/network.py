@@ -390,8 +390,10 @@ class Network(WorkerThread):
                 logger.warning("Your graph has no centroids")
             g.lonlat_index = lonlat.loc[g.all_nodes]
 
-            # Load turn restrictions if any exist
-            if g._turn_restrictions is not None and not g._turn_restrictions.empty:
+            # Always install the table, even when this mode filtered down to no rows: the
+            # allow_uturns setting is project-wide, and skipping the call here would leave
+            # classes without applicable restrictions on a different U-turn policy.
+            if turn_restrictions_df is not None:
                 g.set_turn_restrictions(g._turn_restrictions, allow_path_uturns=allow_uturns)
 
             self.graphs[m] = g

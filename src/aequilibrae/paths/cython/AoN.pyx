@@ -185,7 +185,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = bool(getattr(graph, "use_hybrid", True))
+        use_hybrid = bool(graph.use_hybrid)
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -207,6 +207,10 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     cdef double [:, ::1] node_turn_pen_mat = aux_result.node_turn_penalties
     cdef double [:, ::1] node_costs_mat = aux_result.node_label_costs
     cdef double [::1] turn_pen_acc_view = aux_result.turn_penalty_accumulator
+    # Set if a path backtrack ever exceeds the arc count, which can only happen if arc_pred
+    # holds a cycle. Checked once the parallel region ends so the failure is loud.
+    truncated_arr = np.zeros(cores, dtype=np.int64)
+    cdef long long [::1] truncated_view = truncated_arr
 
     cdef double [:, :, ::1] arc_skims_memo_mat
     cdef long long [:, ::1] arc_visited_mat
@@ -341,7 +345,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
 
             if skims > 0:
                 if use_turn_restrictions:
-                    skim_arc_based_paths(oi,
+                    truncated_view[tid] += skim_arc_based_paths(oi,
                                          zones,
                                          skims,
                                          temp_skims_mat[tid],
@@ -385,7 +389,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
             origin_turn_penalty = 0.0
             if use_turn_restrictions:
                 if select_link:
-                    sl_arc_based_network_loading(link_list,
+                    truncated_view[tid] += sl_arc_based_network_loading(link_list,
                                                  demand_view[oi],
                                                  arc_pred_mat[tid],
                                                  connectors_mat[tid],
@@ -397,7 +401,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                                                  arc_turn_pen_mat[tid],
                                                  &origin_turn_penalty)
                 else:
-                    arc_based_network_loading(classes,
+                    truncated_view[tid] += arc_based_network_loading(classes,
                                               demand_view[oi],
                                               arc_pred_mat[tid],
                                               connectors_mat[tid],
@@ -425,6 +429,12 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                                 predecessors_mat[tid],
                                 connectors_mat[tid],
                                 link_loads_mat[tid])
+
+    if truncated_arr.sum() > 0:
+        raise RuntimeError(
+            "Arc predecessor chain exceeded the number of arcs during network loading, which means "
+            "the shortest path tree contains a cycle. Link loads from this iteration are not valid."
+        )
 
     return report
 
@@ -573,7 +583,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = bool(getattr(graph, "use_hybrid", True))
+        use_hybrid = bool(graph.use_hybrid)
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -595,6 +605,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
         unsigned char [:] has_flow_mask
         long long[:, :] link_list
         bint select_link = False
+        int truncated = 0
 
     if result._selected_links:
         select_link = True
@@ -707,7 +718,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
 
         if skims > 0:
             if use_turn_restrictions:
-                skim_arc_based_paths(origin_index,
+                truncated += skim_arc_based_paths(origin_index,
                                      zones,
                                      skims,
                                      skim_matrix_view,
@@ -740,11 +751,12 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
         # Note: 1 corresponds to select link analysis, 0 means no select link
         if use_turn_restrictions:
             if select_link:
-                sl_arc_based_network_loading(link_list, demand_view, arc_pred_view, conn_view, link_loads_view,
+                truncated = sl_arc_based_network_loading(link_list, demand_view, arc_pred_view, conn_view,
+                                             link_loads_view,
                                              sl_od_matrix_view, sl_link_loading_view, has_flow_mask, classes,
                                              arc_turn_penalties_view, &total_turn_penalty)
             else:
-                arc_based_network_loading(
+                truncated = arc_based_network_loading(
                     classes,
                     demand_view,
                     arc_pred_view,
@@ -767,6 +779,12 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
                 link_loads_view
             )
 
+    if truncated:
+        raise RuntimeError(
+            "Arc predecessor chain exceeded the number of arcs during network loading, which means "
+            "the shortest path tree contains a cycle. Link loads from this origin are not valid."
+        )
+
     # Store accumulated turn penalty for this thread (outside nogil block)
     if use_turn_restrictions:
         aux_result.turn_penalty_accumulator[curr_thread] += total_turn_penalty
@@ -774,7 +792,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
     if result.save_path_file:
         if use_turn_restrictions:
             mapping_idx, mapping_data, _ = graph.create_compressed_link_network_mapping()
-            save_path_file(
+            truncated += save_path_file(
                 origin_index,
                 links,
                 zones,
@@ -787,6 +805,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
                 mapping_idx,
                 mapping_data,
             )
+            if truncated:
+                raise RuntimeError(
+                    "Arc predecessor chain exceeded the number of arcs while writing path files, which "
+                    "means the shortest path tree contains a cycle. The path file is not valid."
+                )
         else:
             save_path_file(
                 origin_index,
@@ -860,6 +883,7 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
     cdef long long [::1] conn_view = results.connectors
     cdef double [:, :] skim_matrix_view = results._skimming_array
     cdef long long [::1] reached_first_view = results.reached_first
+    cdef int truncated = 0
 
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [::1] b_nodes_view = new_b_nodes
@@ -893,7 +917,7 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
         turn_to_arcs_view = graph.turn_to_arcs
         turn_penalties_view = graph.turn_penalties
 
-        use_hybrid = bool(getattr(graph, "use_hybrid", True))
+        use_hybrid = bool(graph.use_hybrid)
         if use_hybrid:
             stateful_view = graph.stateful
             rep_arc_view = graph.rep_arc
@@ -1044,7 +1068,7 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
 
         if skims > 0 and not a_star_bint:
             if use_turn_restrictions:
-                skim_arc_based_paths(origin_index,
+                truncated += skim_arc_based_paths(origin_index,
                                      nodes,
                                      skims,
                                      skim_matrix_view,
@@ -1077,6 +1101,12 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
+    if truncated:
+        raise RuntimeError(
+            "Arc predecessor chain exceeded the number of arcs while skimming, which means the "
+            "shortest path tree contains a cycle. Skims from this path computation are not valid."
+        )
 
     path: np.ndarray | None = None
     path_nodes: np.ndarray | None = None
@@ -1299,7 +1329,7 @@ cdef void sl_network_loading(
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef void arc_based_network_loading(
+cdef int arc_based_network_loading(
     long classes,
     double[:, :] demand,
     long long [:] arc_pred,
@@ -1322,7 +1352,11 @@ cdef void arc_based_network_loading(
     """
     cdef long long i, j, current_arc, steps
     cdef long long zones = demand.shape[0]
+    # A shortest path visits each arc at most once, so a backtrack longer than the arc count
+    # means arc_pred holds a cycle. Bound the walk so it terminates, and report it: silently
+    # loading a truncated path would return plausible but wrong link loads.
     cdef long long max_steps = <long long>arc_pred.shape[0]
+    cdef int truncated = 0
 
     for i in range(zones):
         # Start backtracking from the last arc that reached the destination zone
@@ -1343,12 +1377,16 @@ cdef void arc_based_network_loading(
             # Move to predecessor arc.
             # Origin arcs have arc_pred = ORIGIN_ARC_SENTINEL, which stops the loop (>= 0 condition).
             current_arc = arc_pred[current_arc]
+        if current_arc >= 0:
+            truncated = 1
+
+    return truncated
 
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef void sl_arc_based_network_loading(
+cdef int sl_arc_based_network_loading(
     long long [:, :] selected_links,
     double [:, :] demand,
     long long [:] arc_pred,
@@ -1367,7 +1405,10 @@ cdef void sl_arc_based_network_loading(
     cdef:
         int i, j, k, m, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
         long long current_arc, steps
+        # See arc_based_network_loading: the bound only trips on a cyclic arc_pred, and the
+        # caller turns that into an error rather than into quietly wrong loads.
         long long max_steps = <long long>arc_pred.shape[0]
+        int truncated = 0
         bint found
 
     for j in range(dests):
@@ -1391,6 +1432,8 @@ cdef void sl_arc_based_network_loading(
 
             has_flow_mask[current_arc] = 1
             current_arc = arc_pred[current_arc]
+        if current_arc >= 0:
+            truncated = 1
 
         # 2. Check selected link matches
         for i in range(selected_links.shape[0]):
@@ -1419,3 +1462,7 @@ cdef void sl_arc_based_network_loading(
                 for k in range(classes):
                     sl_link_loading[i, current_arc, k] += demand[j, k]
                 current_arc = arc_pred[current_arc]
+            if current_arc >= 0:
+                truncated = 1
+
+    return truncated
