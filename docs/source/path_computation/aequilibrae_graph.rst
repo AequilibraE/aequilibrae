@@ -201,15 +201,15 @@ Blocking centroid flows
 -----------------------
 
 When using AequilibraE Graph, it is possible to configure whether paths may pass
-through centroid connector turns. In current versions, enabling blocked centroid
-flows applies automatic turn prohibitions between centroid connectors that meet at
-the same node (when a centroid has multiple connectors).
+through centroids. In current versions, enabling blocked centroid flows prevents
+intermediary centroid traversal directly: node-based Dijkstra patches outgoing
+edges at centroids (b-node patching), while arc-based Dijkstra terminates outgoing
+edge expansion when a reached node is a non-origin centroid.
 
 Suppose one wants to compute the shortest path between node N1 and centroid C3 in the
 figure below. An initial path guess would be N1 -> N3 -> C2 -> N6 -> C3 because all
-links are bi-directional. However, when blocked centroid flows are enabled, the
-connector-to-connector transition at C2 is prohibited, so that intermediary centroid
-traversal is prevented.
+links are bi-directional. However, when blocked centroid flows are enabled,
+traversal through C2 is blocked, so that intermediary centroid traversal is prevented.
 
 .. image:: ../_images/aequilibrae_graph-1.png
     :align: center

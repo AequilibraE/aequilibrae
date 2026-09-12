@@ -59,7 +59,8 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     * Centroid flow blocking is applied differently between branches:
       - The node-based branch uses ``blocking_centroid_flows`` to patch b-nodes.
       - The arc-based branch reads unpatched b-nodes and terminates outgoing edge
-        expansion directly when a reached node is a non-origin centroid.
+        expansion directly when a reached node is a non-origin centroid. Blocking is
+        therefore a run-time flag, never baked into the topology or the turn table.
     * ``result._heap`` is ignored under turn restrictions, because the arc-based
       kernel hardcodes the 4-ary heap. This mirrors ``one_to_all``.
 
@@ -260,9 +261,9 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                     nnz_destinations = -1
 
             if use_turn_restrictions:
-                # Reads the shared, *unpatched* b-nodes: centroid flow blocking is
-                # already encoded as connector-to-connector prohibitions in the turn
-                # CSR, so blocking_centroid_flows must not run here. This kernel
+                # Reads the shared, *unpatched* b-nodes: this kernel blocks centroid
+                # flows itself, by refusing to expand out of a non-origin centroid, so
+                # blocking_centroid_flows must not patch them here. The kernel also
                 # hardcodes the 4-ary heap and takes no log closure, so heap_type and
                 # closure do not apply.
                 if use_hybrid:
@@ -559,8 +560,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
 
     # Node-based path finding uses the per-thread, writable b-node copy, which
     # ``blocking_centroid_flows`` patches to block flows through centroids.
-    # Arc-based path finding (turn restrictions) blocks centroid flows through
-    # automatic connector-to-connector turn prohibitions instead, so it reads the
+    # Arc-based path finding (turn restrictions) blocks centroid flows at run time
+    # instead - it stops expanding out of a non-origin centroid - so it reads the
     # shared, unpatched b-nodes (``original_b_nodes_view``).
     cdef long long [::1] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
 
@@ -911,8 +912,8 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
     # Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids and not use_turn_restrictions:
-            # Unblocks the centroid if that is the case. With turn restrictions the
-            # automatic connector-to-connector turn bans replace b-node patching.
+            # Unblocks the centroid if that is the case. The arc-based kernels take
+            # ``block_centroid_flows`` directly and need no b-node patching.
             b = 0
             blocking_centroid_flows(b,
                                     origin_index,

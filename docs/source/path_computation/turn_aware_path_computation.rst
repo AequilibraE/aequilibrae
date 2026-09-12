@@ -164,10 +164,12 @@ Two further rules complete the semantics:
   perturb the graph topology, so a class that cannot use a restricted movement pays nothing for
   its existence.
 
-Centroid-flow blocking is expressed in the same machinery. When blocking is enabled, transitions
-between two centroid connectors meeting at the same node are written into the turn table as
-prohibitions, which is why the kernel reads the unpatched b-node array rather than the classic
-patched one.
+Centroid-flow blocking is handled differently from the classic node-based kernel, which patches
+the b-node array to sever outgoing edges at centroids. The hybrid kernel reads the *unpatched*
+b-nodes and enforces blocking itself, by refusing to expand out of any centroid that is not the
+origin of the search. Blocking is therefore a run-time flag: it is never baked into the graph
+topology or into the turn table, which is why toggling it invalidates cached results but requires
+no rebuild.
 
 Complexity
 ----------
