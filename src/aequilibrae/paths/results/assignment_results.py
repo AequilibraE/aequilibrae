@@ -236,6 +236,7 @@ class AssignmentResults(AssignmentResultsBase):
             self.total_link_loads.fill(0)
             self.compact_link_loads.fill(0)
             self.compact_total_link_loads.fill(0)
+            self.total_turn_penalty = 0.0
         else:
             raise ValueError("Exception: Assignment results object was not yet prepared/initialized")
 

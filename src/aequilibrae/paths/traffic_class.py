@@ -222,14 +222,22 @@ class TrafficClass(TransportClassBase):
         :Arguments:
             **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
         """
+        cost = self.fixed_cost + self.congested_time
         self.graph.graph = self.graph.graph.assign(
-            __assignment_cost__=self.graph.cost, __congested_time__=self.congested_time
+            __assignment_cost__=cost, __congested_time__=self.congested_time
         )
         skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]
         pre_fields = self.graph.skim_fields
+        pre_turn_fields = list(self.graph.turn_skim_fields) if self.graph.turn_skim_fields else []
         self.graph.set_skimming(skims)
+        if pre_turn_fields:
+            if "__assignment_cost__" not in self.graph.turn_skim_fields:
+                self.graph.turn_skim_fields.append("__assignment_cost__")
+        else:
+            self.graph.turn_skim_fields = ["__assignment_cost__"]
         skimmer = self.graph.compute_skims()
         self.graph.set_skimming(pre_fields)
+        self.graph.turn_skim_fields = pre_turn_fields
         return skimmer
 
     def __setattr__(self, key, value):

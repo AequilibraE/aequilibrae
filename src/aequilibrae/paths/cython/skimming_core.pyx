@@ -147,7 +147,7 @@ def skimming_parallel(graph, result, long cores):
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = True
+        use_hybrid = bool(getattr(graph, "use_hybrid", True))
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -173,6 +173,8 @@ def skimming_parallel(graph, result, long cores):
                 if use_hybrid:
                     w = path_finding_hybrid(
                         oi,
+                        destinations,
+                        -1,
                         g_view,
                         original_b_nodes_view,
                         graph_fs_view,
@@ -549,7 +551,7 @@ cpdef void skim_arc_based_paths(
         # Walk backwards pushing unvisited arcs onto arc_stack
         stack_top = 0
         curr = current_arc
-        while curr >= 0 and arc_visited[curr] != run_id:
+        while curr >= 0 and arc_visited[curr] != run_id and stack_top < arc_stack.shape[0]:
             arc_stack[stack_top] = curr
             stack_top += 1
             curr = arc_pred[curr]

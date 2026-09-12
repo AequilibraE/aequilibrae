@@ -391,7 +391,7 @@ class Network(WorkerThread):
             g.lonlat_index = lonlat.loc[g.all_nodes]
 
             # Load turn restrictions if any exist
-            if turn_restrictions_df is not None:
+            if g._turn_restrictions is not None and not g._turn_restrictions.empty:
                 g.set_turn_restrictions(g._turn_restrictions, allow_path_uturns=allow_uturns)
 
             self.graphs[m] = g

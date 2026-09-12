@@ -237,6 +237,24 @@ change set rather than to any difference in graph preparation.
     never reused. Graph preparation fell from 79.7 s to 6.4 s once that was corrected. Benchmarks
     taken before that fix are not comparable with these.
 
+Kernel Specification and Operational Invariants
+-----------------------------------------------
+
+The hybrid kernel adheres to seven strict operational invariants:
+
+1. **Kernel Selection API:** The shortest-path kernel can be inspected via ``graph.selected_kernel`` (returning ``"hybrid"``, ``"arc-based"``, or ``"node-based"``) and toggled via ``graph.set_hybrid_kernel(use_hybrid: bool)``. When turn restrictions are inactive, the engine automatically selects ``"node-based"``.
+2. **Sparse Early Exit:** When searching for a sparse subset of destinations (``destination_count > 0``), the heap extraction loop terminates immediately once all requested destinations are settled, decrementing the destination count and avoiding scanning the remainder of the network.
+3. **Centroid Stopping:** Centroid through-flows are prevented at run time when ``block_centroid_flows=True``. The expansion loop halts outgoing edge exploration from any non-origin centroid, ensuring centroid connectors cannot serve as intermediate shortcuts.
+4. **Settled Label Counter:** The kernel tracks the exact number of labels settled from the priority queue via the ``labels_settled`` output parameter, enabling direct empirical verification of label efficiency against the arc-state reference kernel.
+5. **Unreachable Connector Cleanup:** Any destination node unreachable from the origin is guaranteed to have its connector and predecessor initialized to ``-1`` upon kernel completion, eliminating stale pointers during backtracking.
+6. **Tie-breaking Policy:** In the presence of equal-cost paths, transitions follow the first-seen insertion order in the 4-ary heap.
+7. **Result and Turn Penalty Accounting:** Cumulative turn penalties paid along paths are tracked per origin-destination pair. When computing assignment skims via ``TrafficClass.skim_congested()``, turn penalties are automatically incorporated into the generalized assignment cost (``__assignment_cost__``), and ``AssignmentResults.reset()`` resets the cumulative turn penalty accumulator to zero.
+
+Global U-Turn Policy (Outcome 3 Disposition)
+--------------------------------------------
+
+When ``allow_path_uturns=True`` is set, U-turns are permitted unconditionally at every node without requiring explicit turn entries. On large-scale regional models (such as the Arkansas statewide model), permitting global U-turns introduces a significant combinatorial expansion of valid transitions, as vehicles can reverse direction at any intermediate junction. In contrast, the standard default ``allow_path_uturns=False`` enforces standard transportation modeling conventions: U-turns are forbidden throughout the network unless explicitly permitted by an entry in the turn table. Modellers requiring turnaround maneuvers are encouraged to specify localized turn entries rather than enabling global U-turns statewide.
+
 Limitations
 -----------
 

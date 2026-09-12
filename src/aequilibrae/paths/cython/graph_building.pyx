@@ -371,13 +371,20 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     nodes = np.hstack([a_nodes, b_nodes])
     links = np.hstack([link_ids, link_ids])
-    # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
-    counts = np.bincount(nodes)
 
     idx = np.argsort(nodes)
     all_nodes = nodes[idx]
     all_links = links[idx]
     all_nodes_max = all_nodes.max()
+
+    max_node_id = all_nodes_max
+    if graph.centroids is not None and len(graph.centroids) > 0:
+        c_max = int(np.max(graph.centroids))
+        if c_max > max_node_id:
+            max_node_id = c_max
+
+    # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
+    counts = np.bincount(nodes, minlength=max_node_id + 1).astype(np.int64)
 
     links_index = np.full(all_nodes_max + 2, -1, dtype=np.int64)
     nlist = np.arange(all_nodes_max + 2)
@@ -389,7 +396,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     _back_fill(links_index[:], all_nodes_max)
 
     # We keep all centroids for sure
-    counts[graph.centroids] = 999
+    if graph.centroids is not None and len(graph.centroids) > 0:
+        counts[graph.centroids] = 999
 
     # If U-turns are allowed, we need to preserve nodes with bidirectional links
     # because U-turns can occur at these nodes

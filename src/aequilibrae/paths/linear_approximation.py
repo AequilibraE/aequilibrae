@@ -37,6 +37,8 @@ class LinearApproximation(WorkerThread):
     equilibration = SIGNAL(object)
     assignment = SIGNAL(object)
     signal = SIGNAL(object)
+    elementwise_cores = 1
+    threading_threshold = 100_000
 
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)

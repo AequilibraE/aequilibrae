@@ -99,6 +99,8 @@ cpdef int path_finding_arc_based(
 
 cpdef int path_finding_hybrid(
     long origin,
+    unsigned char [:] destinations,
+    long long destination_count,
     double[:] graph_costs,
     const long long [:] csr_indices,
     const long long [:] graph_fs,
@@ -120,5 +122,7 @@ cpdef int path_finding_hybrid(
     long long num_zones,
     const long long [:] first_ctx,
     const long long [:] last_ctx,
+    long long [:] settled_count=*,
 ) noexcept nogil
+
 

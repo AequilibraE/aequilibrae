@@ -185,7 +185,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = True
+        use_hybrid = bool(getattr(graph, "use_hybrid", True))
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -269,6 +269,8 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                 if use_hybrid:
                     w = path_finding_hybrid(
                         oi,
+                        destinations_mat[tid],
+                        nnz_destinations,
                         g_view,
                         original_b_nodes_view,
                         graph_fs_view,
@@ -571,7 +573,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = True
+        use_hybrid = bool(getattr(graph, "use_hybrid", True))
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -595,6 +597,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
         bint select_link = False
 
     if result._selected_links:
+        select_link = True
         has_flow_mask = aux_result.has_flow_mask[curr_thread, :]
         sl_od_matrix_view = aux_result.temp_sl_od_matrix[curr_thread, :, origin_index, :, :]
         sl_link_loading_view = aux_result.temp_sl_link_loading[curr_thread, :, :, :]
@@ -621,6 +624,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
             if use_hybrid:
                 w = path_finding_hybrid(
                     origin_index,
+                    destinations,
+                    -1 if skims > 0 else nnz_destinations,
                     g_view,
                     original_b_nodes_view,
                     graph_fs_view,
@@ -767,16 +772,32 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
         aux_result.turn_penalty_accumulator[curr_thread] += total_turn_penalty
 
     if result.save_path_file:
-        save_path_file(
-            origin_index,
-            links,
-            zones,
-            predecessors_view,
-            conn_view,
-            base_string,
-            index_string,
-            write_feather
-        )
+        if use_turn_restrictions:
+            mapping_idx, mapping_data, _ = graph.create_compressed_link_network_mapping()
+            save_path_file(
+                origin_index,
+                links,
+                zones,
+                predecessors_view,
+                conn_view,
+                base_string,
+                index_string,
+                write_feather,
+                arc_pred_view,
+                mapping_idx,
+                mapping_data,
+            )
+        else:
+            save_path_file(
+                origin_index,
+                links,
+                zones,
+                predecessors_view,
+                conn_view,
+                base_string,
+                index_string,
+                write_feather,
+            )
     return origin
 
 
@@ -854,10 +875,16 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
     cdef long long [::1] arc_visited
     cdef long long [::1] arc_stack
 
+    cdef const unsigned char [:] stateful_view = np.zeros(1, dtype=np.uint8)
+    cdef const long long [:] rep_arc_view = np.zeros(1, dtype=np.int64)
+    cdef double [:] node_label_costs_view = np.zeros(1, dtype=np.float64)
+    cdef bint use_hybrid = False
+
+    cdef unsigned int n_nodes = results.predecessors.shape[0]
     if use_turn_restrictions:
         arc_pred = np.empty(graph.num_links, dtype=graph.default_types('int'))
         arc_pred_view = arc_pred
-        node_turn_penalties = np.empty(graph.num_nodes, dtype=graph.default_types('float'))
+        node_turn_penalties = np.empty(n_nodes, dtype=graph.default_types('float'))
         node_turn_penalties_view = node_turn_penalties
         arc_turn_penalties = np.empty(graph.num_links, dtype=graph.default_types('float'))
         arc_turn_penalties_view = arc_turn_penalties
@@ -865,6 +892,13 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
         turn_fs_view = graph.turn_fs
         turn_to_arcs_view = graph.turn_to_arcs
         turn_penalties_view = graph.turn_penalties
+
+        use_hybrid = bool(getattr(graph, "use_hybrid", True))
+        if use_hybrid:
+            stateful_view = graph.stateful
+            rep_arc_view = graph.rep_arc
+            node_label_costs = np.empty(n_nodes, dtype=graph.default_types('float'))
+            node_label_costs_view = node_label_costs
 
         # Compute which skim fields receive turn penalties.
         # Default (empty turn_skim_fields) falls back to [cost_field] for backward compatibility.
@@ -940,32 +974,60 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
                 closure
             )
         elif use_turn_restrictions:
-            # Arc-based shortest path reconstruction still writes node-level
-            # predecessor/connectors for compatibility with existing result APIs.
-            w = path_finding_arc_based(
-                origin_index,
-                destinations,
-                1 if early_exit_bint else -1,
-                g_view,
-                original_b_nodes_view,
-                graph_fs_view,
-                arc_pred_view,
-                ids_graph_view,
-                a_nodes_view,
-                predecessors_view,
-                conn_view,
-                reached_first_view,
-                node_turn_penalties_view,
-                turn_fs_view,
-                turn_to_arcs_view,
-                turn_penalties_view,
-                allow_uturns,
-                arc_turn_penalties_view,
-                block_flows_through_centroids,
-                zones,
-                original_b_nodes_view,
-                a_nodes_view,
-            )
+            if use_hybrid:
+                w = path_finding_hybrid(
+                    origin_index,
+                    destinations,
+                    1 if early_exit_bint else -1,
+                    g_view,
+                    original_b_nodes_view,
+                    graph_fs_view,
+                    a_nodes_view,
+                    stateful_view,
+                    rep_arc_view,
+                    predecessors_view,
+                    conn_view,
+                    reached_first_view,
+                    node_label_costs_view,
+                    node_turn_penalties_view,
+                    arc_pred_view,
+                    arc_turn_penalties_view,
+                    turn_fs_view,
+                    turn_to_arcs_view,
+                    turn_penalties_view,
+                    allow_uturns,
+                    block_flows_through_centroids,
+                    zones,
+                    original_b_nodes_view,
+                    a_nodes_view,
+                )
+            else:
+                # Arc-based shortest path reconstruction still writes node-level
+                # predecessor/connectors for compatibility with existing result APIs.
+                w = path_finding_arc_based(
+                    origin_index,
+                    destinations,
+                    1 if early_exit_bint else -1,
+                    g_view,
+                    original_b_nodes_view,
+                    graph_fs_view,
+                    arc_pred_view,
+                    ids_graph_view,
+                    a_nodes_view,
+                    predecessors_view,
+                    conn_view,
+                    reached_first_view,
+                    node_turn_penalties_view,
+                    turn_fs_view,
+                    turn_to_arcs_view,
+                    turn_penalties_view,
+                    allow_uturns,
+                    arc_turn_penalties_view,
+                    block_flows_through_centroids,
+                    zones,
+                    original_b_nodes_view,
+                    a_nodes_view,
+                )
         else:
             w = path_finding(origin_index,
                              destinations,
@@ -1258,8 +1320,9 @@ cdef void arc_based_network_loading(
         arc_turn_penalties: Cumulative turn penalty to enter each arc
         total_turn_penalty: Pointer to variable to accumulate total turn cost
     """
-    cdef long long i, j, current_arc
+    cdef long long i, j, current_arc, steps
     cdef long long zones = demand.shape[0]
+    cdef long long max_steps = <long long>arc_pred.shape[0]
 
     for i in range(zones):
         # Start backtracking from the last arc that reached the destination zone
@@ -1271,7 +1334,9 @@ cdef void arc_based_network_loading(
                 # arc's value is the total turn cost paid by this OD pair.
                 total_turn_penalty[0] += demand[i, j] * arc_turn_penalties[current_arc]
 
-        while current_arc >= 0:
+        steps = 0
+        while current_arc >= 0 and steps < max_steps:
+            steps += 1
             for j in range(classes):
                 link_loads[current_arc, j] += demand[i, j]
 
@@ -1301,7 +1366,8 @@ cdef void sl_arc_based_network_loading(
     """
     cdef:
         int i, j, k, m, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
-        long long current_arc
+        long long current_arc, steps
+        long long max_steps = <long long>arc_pred.shape[0]
         bint found
 
     for j in range(dests):
@@ -1317,7 +1383,9 @@ cdef void sl_arc_based_network_loading(
                 # arc's value is the total turn cost paid by this OD pair.
                 total_turn_penalty[0] += demand[j, k] * arc_turn_penalties[current_arc]
 
-        while current_arc >= 0:
+        steps = 0
+        while current_arc >= 0 and steps < max_steps:
+            steps += 1
             for k in range(classes):
                 link_loads[current_arc, k] += demand[j, k]
 
@@ -1345,7 +1413,9 @@ cdef void sl_arc_based_network_loading(
 
             # Backtrack again to add to sl_link_loading
             current_arc = connectors[j]
-            while current_arc >= 0:
+            steps = 0
+            while current_arc >= 0 and steps < max_steps:
+                steps += 1
                 for k in range(classes):
                     sl_link_loading[i, current_arc, k] += demand[j, k]
                 current_arc = arc_pred[current_arc]

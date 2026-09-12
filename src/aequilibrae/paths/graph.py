@@ -151,6 +151,7 @@ class GraphBase(ABC):  # noqa: B024
         self.compact_turn_penalties = np.array([])  # Penalties for each turn (INFINITY = prohibited)
 
         # Hybrid node/arc-state Dijkstra structures
+        self.use_hybrid: bool = True
         self.stateful = np.empty(0, dtype=np.uint8)
         self.rep_arc = np.empty(0, dtype=np.int64)
         self.compact_stateful = np.empty(0, dtype=np.uint8)
@@ -160,6 +161,9 @@ class GraphBase(ABC):  # noqa: B024
         self._turn_topology_signature = None
         self._compact_first_node = np.empty(0, dtype=np.int64)
         self._compact_last_node = np.empty(0, dtype=np.int64)
+
+        self._graph_generation: int = 0
+        self._turn_restrictions_generation: int = 0
 
         # Randomly generate a unique Graph ID randomly
         self._id = uuid.uuid4().hex
@@ -287,6 +291,7 @@ class GraphBase(ABC):  # noqa: B024
 
         self._turn_topology_signature = self._compute_turn_topology_signature()
         self._build_turn_csr_structures()
+        self._graph_generation += 1
         self._id = uuid.uuid4().hex
 
     def _initialize_empty_topology(self) -> None:
@@ -352,8 +357,8 @@ class GraphBase(ABC):  # noqa: B024
 
         self.compressed_link_network_mapping_idx = None
         self.compressed_link_network_mapping_data = None
-        self.network_compressed_node_mapping = None
-
+        self._effective_vias_cache = None
+        self._graph_generation += 1
         self.__build_derived_properties()
         self._id = uuid.uuid4().hex
 
@@ -711,6 +716,17 @@ class GraphBase(ABC):  # noqa: B024
         return self._has_turn_restrictions
 
     @property
+    def selected_kernel(self) -> str:
+        """Returns the active shortest path kernel name ('node-based', 'arc-based', or 'hybrid')."""
+        if not self._has_turn_restrictions:
+            return "node-based"
+        return "hybrid" if self.use_hybrid else "arc-based"
+
+    def set_hybrid_kernel(self, use_hybrid: bool) -> None:
+        """Sets whether to use the hybrid node/arc-state Dijkstra kernel for turn-restricted routing."""
+        self.use_hybrid = bool(use_hybrid)
+
+    @property
     def allow_uturns_everywhere(self) -> bool:
         """Returns the allow U-turns everywhere setting that was used to build the graph."""
         return self._allow_uturns_everywhere
@@ -744,13 +760,10 @@ class GraphBase(ABC):  # noqa: B024
         if self.graph.empty:
             return {int(v) for v in self._turn_restrictions["via_node"].dropna().unique()}
 
-        # Called once for the topology signature, once from the compressed-graph builder and
-        # once from the core builder, all within a single prepare_graph. Both inputs are
-        # replaced wholesale rather than mutated, so identity is a sound cache key.
         cache_key = (
-            id(self._turn_restrictions),
+            self._turn_restrictions_generation,
+            self._graph_generation,
             len(self._turn_restrictions),
-            id(self.graph),
             self.graph.shape[0],
         )
         cached = self._effective_vias_cache
@@ -786,6 +799,9 @@ class GraphBase(ABC):  # noqa: B024
         has_outgoing = np.isin(v_idx * stride + t_idx, edge_keys)
 
         effective = usable & has_incoming & has_outgoing
+        if effective.sum() < usable.sum():
+            logger.warning("Turn restrictions contain movements between non-adjacent links that will have no effect")
+
         result = {int(v) for v in vn[effective]}
         self._effective_vias_cache = (cache_key, result)
         return result
@@ -818,16 +834,42 @@ class GraphBase(ABC):  # noqa: B024
                 U-turns are node-based transitions that return to the tail node of the
                 current directed arc. Default is ``False``.
         """
+        if turn_restrictions is None or turn_restrictions.empty:
+            self.clear_turn_restrictions()
+            return
+
         required_cols = {"from_node", "via_node", "to_node", "penalty"}
         if not required_cols.issubset(turn_restrictions.columns):
             missing = required_cols - set(turn_restrictions.columns)
-            raise ValueError(f"Turn restrictions DataFrame missing required columns: {missing}")
+            raise ValueError(
+                f"Turn restrictions table missing required columns: {missing}. "
+                "Run project.upgrade() to update the schema."
+            )
+
+        # Validate node IDs: finite, integral, non-negative int64
+        for col in ["from_node", "via_node", "to_node"]:
+            vals = turn_restrictions[col]
+            if vals.isnull().any():
+                raise ValueError(f"Turn restrictions column '{col}' contains null/NaN values.")
+            numeric_vals = pd.to_numeric(vals, errors="coerce")
+            if numeric_vals.isnull().any() or not np.all(np.isfinite(numeric_vals)):
+                raise ValueError(f"Turn restrictions column '{col}' contains non-numeric or non-integer values.")
+            if not np.all(numeric_vals == np.floor(numeric_vals)):
+                raise ValueError(f"Turn restrictions column '{col}' contains non-integer values.")
+            if (numeric_vals < 0).any():
+                raise ValueError(f"Turn restrictions column '{col}' contains negative node IDs.")
+            if (numeric_vals > np.iinfo(np.int64).max).any():
+                raise ValueError(f"Turn restrictions column '{col}' contains values exceeding int64 maximum.")
 
         normalised = turn_restrictions.copy()
+        normalised["from_node"] = normalised["from_node"].astype(np.int64)
+        normalised["via_node"] = normalised["via_node"].astype(np.int64)
+        normalised["to_node"] = normalised["to_node"].astype(np.int64)
         normalised["penalty"] = normalised["penalty"].apply(self._normalise_turn_penalty)
 
         self._turn_restrictions = normalised
         self._allow_path_uturns = allow_path_uturns
+        self._turn_restrictions_generation += 1
 
         if self.graph.empty or self.num_nodes < 0:
             return
@@ -849,6 +891,8 @@ class GraphBase(ABC):  # noqa: B024
         """Clears all turn restrictions from the graph."""
         self._turn_restrictions = None
         self._allow_path_uturns = False
+        self._turn_restrictions_generation += 1
+        self._effective_vias_cache = None
         if self.graph.empty or self.num_nodes < 0:
             return
 
@@ -1026,45 +1070,46 @@ class GraphBase(ABC):  # noqa: B024
 
         rep_arc = np.full(num_nodes, -1, dtype=np.int64)
         if num_arcs > 0 and csr_indices.shape[0] >= num_arcs:
-            for arc in range(num_arcs):
-                v = int(csr_indices[arc])
-                if 0 <= v < num_nodes and rep_arc[v] == -1:
-                    rep_arc[v] = arc
+            valid_arcs = (csr_indices[:num_arcs] >= 0) & (csr_indices[:num_arcs] < num_nodes)
+            if np.any(valid_arcs):
+                v_nodes = csr_indices[:num_arcs][valid_arcs]
+                arc_ids = np.arange(num_arcs, dtype=np.int64)[valid_arcs]
+                unq_nodes, first_idx = np.unique(v_nodes, return_index=True)
+                rep_arc[unq_nodes] = arc_ids[first_idx]
             rep_arc[rep_arc == -1] = 0
 
         stateful = np.zeros(num_nodes, dtype=np.uint8)
         if turn_fs.shape[0] > 1 and num_arcs > 0 and csr_indices.shape[0] >= num_arcs:
-            via_nodes = set()
             max_arc = min(num_arcs, turn_fs.shape[0] - 1)
-            for arc in range(max_arc):
-                if turn_fs[arc + 1] > turn_fs[arc]:
-                    v = int(csr_indices[arc])
-                    if 0 <= v < num_nodes:
-                        via_nodes.add(v)
+            has_turns = turn_fs[1 : max_arc + 1] > turn_fs[:max_arc]
+            active_arcs = np.flatnonzero(has_turns)
+            if active_arcs.size > 0:
+                v_nodes = csr_indices[active_arcs]
+                v_valid = (v_nodes >= 0) & (v_nodes < num_nodes)
+                via_nodes = np.unique(v_nodes[v_valid])
+                if via_nodes.size > 0:
+                    stateful[via_nodes] = 1
 
-            if len(via_nodes) > 0:
-                stateful_set = set(via_nodes)
-                # Out-neighbors of via nodes
-                for via in via_nodes:
-                    if 0 <= via < graph_fs.shape[0] - 1:
-                        start = int(graph_fs[via])
-                        end = int(graph_fs[via + 1])
-                        for idx in range(start, end):
-                            if idx < num_arcs:
-                                w = int(csr_indices[idx])
-                                if 0 <= w < num_nodes:
-                                    stateful_set.add(w)
+                    # Out-neighbors of via nodes
+                    via_in_range = via_nodes[via_nodes < graph_fs.shape[0] - 1]
+                    if via_in_range.size > 0:
+                        starts = graph_fs[via_in_range]
+                        ends = graph_fs[via_in_range + 1]
+                        diffs = ends - starts
+                        has_out = diffs > 0
+                        if np.any(has_out):
+                            out_ranges = [np.arange(s, e, dtype=np.int64) for s, e in zip(starts[has_out], ends[has_out])]
+                            out_arcs = np.concatenate(out_ranges)
+                            out_arcs = out_arcs[out_arcs < num_arcs]
+                            w = csr_indices[out_arcs]
+                            w_valid = (w >= 0) & (w < num_nodes)
+                            stateful[w[w_valid]] = 1
 
-                # In-neighbors of via nodes: incoming arcs where csr_indices[arc] in via_nodes
-                via_mask = np.isin(csr_indices[:num_arcs], list(via_nodes))
-                in_a = a_nodes[:num_arcs][via_mask]
-                for u in in_a:
-                    u_int = int(u)
-                    if 0 <= u_int < num_nodes:
-                        stateful_set.add(u_int)
-
-                for n in stateful_set:
-                    stateful[n] = 1
+                    # In-neighbors of via nodes: incoming arcs where csr_indices[arc] in via_nodes
+                    via_mask = np.isin(csr_indices[:num_arcs], via_nodes)
+                    in_a = a_nodes[:num_arcs][via_mask]
+                    in_a_valid = (in_a >= 0) & (in_a < num_nodes)
+                    stateful[in_a[in_a_valid]] = 1
 
         return stateful, rep_arc
 
@@ -1097,18 +1142,18 @@ class GraphBase(ABC):  # noqa: B024
         in_range = (nodes >= 0) & (nodes < nodes_to_indices.shape[0])
         full_idx = np.where(in_range, nodes_to_indices[np.clip(nodes, 0, nodes_to_indices.shape[0] - 1)], -1)
         mappable = in_range & (full_idx >= 0)
-        full_to_compact = dict(zip(full_idx[mappable].tolist(), np.flatnonzero(mappable).tolist(), strict=True))
 
-        # (compact endpoint, original boundary node) pairs, packed and sorted so each
-        # restriction resolves through two binary searches rather than a dict built
-        # over every compact arc.
+        max_full = int(full_idx[mappable].max()) if np.any(mappable) else 0
+        full_to_compact = np.full(max_full + 1, -1, dtype=np.int64)
+        full_to_compact[full_idx[mappable]] = np.flatnonzero(mappable)
+
         stride = (
             int(
                 max(
-                    int(compact_a_by_id.max()),
-                    int(compact_b_by_id.max()),
-                    int(compact_first_node.max()),
-                    int(compact_last_node.max()),
+                    int(compact_a_by_id.max()) if compact_a_by_id.size else 0,
+                    int(compact_b_by_id.max()) if compact_b_by_id.size else 0,
+                    int(compact_first_node.max()) if compact_first_node.size else 0,
+                    int(compact_last_node.max()) if compact_last_node.size else 0,
                     0,
                 )
             )
@@ -1117,47 +1162,66 @@ class GraphBase(ABC):  # noqa: B024
         in_keys, in_order = GraphBase._pair_index(compact_b_by_id, compact_last_node, stride)
         out_keys, out_order = GraphBase._pair_index(compact_a_by_id, compact_first_node, stride)
 
-        out_from: list[int] = []
-        out_to: list[int] = []
-        out_penalty: list[float] = []
+        fn = tr_from_node_full.astype(np.int64, copy=False)
+        vn = tr_via_node_full.astype(np.int64, copy=False)
+        tn = tr_to_node_full.astype(np.int64, copy=False)
+        pen = tr_penalties.astype(np.float64, copy=False)
 
-        for i in range(tr_from_node_full.shape[0]):
-            fn = int(tr_from_node_full[i])
-            vn = int(tr_via_node_full[i])
-            tn = int(tr_to_node_full[i])
-            pen = float(tr_penalties[i])
+        c_via = np.full(vn.shape[0], -1, dtype=np.int64)
+        vn_in_range = (vn >= 0) & (vn <= max_full)
+        c_via[vn_in_range] = full_to_compact[vn[vn_in_range]]
 
-            c_via = full_to_compact.get(vn, -1)
-            if c_via < 0:
-                continue
+        valid = (c_via >= 0) & (fn >= 0) & (fn < stride) & (tn >= 0) & (tn < stride) & (c_via < stride)
 
-            if min(c_via, fn, tn) < 0 or max(c_via, fn, tn) >= stride:
-                continue
-            in_arcs = GraphBase._pair_lookup(in_keys, in_order, c_via, fn, stride)
-            if in_arcs.shape[0] == 0:
-                continue
-            out_arcs = GraphBase._pair_lookup(out_keys, out_order, c_via, tn, stride)
-            if out_arcs.shape[0] == 0:
-                continue
+        in_query = np.where(valid, c_via * np.int64(stride) + fn, np.int64(-1))
+        out_query = np.where(valid, c_via * np.int64(stride) + tn, np.int64(-1))
 
-            for f_arc in in_arcs:
-                for t_arc in out_arcs:
-                    out_from.append(int(f_arc))
-                    out_to.append(int(t_arc))
-                    out_penalty.append(pen)
+        lo_in = np.searchsorted(in_keys, in_query, side="left")
+        hi_in = np.searchsorted(in_keys, in_query, side="right")
+        lo_out = np.searchsorted(out_keys, out_query, side="left")
+        hi_out = np.searchsorted(out_keys, out_query, side="right")
 
-        if len(out_from) == 0:
+        cin = np.where(valid, hi_in - lo_in, 0)
+        cout = np.where(valid, hi_out - lo_out, 0)
+
+        out_from_parts = []
+        out_to_parts = []
+        out_pen_parts = []
+
+        single = (cin == 1) & (cout == 1)
+        if np.any(single):
+            out_from_parts.append(in_order[lo_in[single]])
+            out_to_parts.append(out_order[lo_out[single]])
+            out_pen_parts.append(pen[single])
+
+        multi_indices = np.flatnonzero((cin > 0) & (cout > 0) & ((cin > 1) | (cout > 1)))
+        if multi_indices.size > 0:
+            m_from = []
+            m_to = []
+            m_pen = []
+            for idx in multi_indices:
+                p = float(pen[idx])
+                for f_arc in in_order[lo_in[idx] : hi_in[idx]]:
+                    for t_arc in out_order[lo_out[idx] : hi_out[idx]]:
+                        m_from.append(int(f_arc))
+                        m_to.append(int(t_arc))
+                        m_pen.append(p)
+            out_from_parts.append(np.asarray(m_from, dtype=np.int64))
+            out_to_parts.append(np.asarray(m_to, dtype=np.int64))
+            out_pen_parts.append(np.asarray(m_pen, dtype=np.float64))
+
+        if not out_from_parts:
             return (
                 np.empty(0, dtype=np.int64),
                 np.empty(0, dtype=np.int64),
                 np.empty(0, dtype=np.float64),
             )
 
-        return (
-            np.asarray(out_from, dtype=np.int64),
-            np.asarray(out_to, dtype=np.int64),
-            np.asarray(out_penalty, dtype=np.float64),
-        )
+        res_from = np.concatenate(out_from_parts) if len(out_from_parts) > 1 else out_from_parts[0]
+        res_to = np.concatenate(out_to_parts) if len(out_to_parts) > 1 else out_to_parts[0]
+        res_pen = np.concatenate(out_pen_parts) if len(out_pen_parts) > 1 else out_pen_parts[0]
+
+        return res_from, res_to, res_pen
 
     @staticmethod
     def _pair_index(left: np.ndarray, right: np.ndarray, stride: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -1197,51 +1261,78 @@ class GraphBase(ABC):  # noqa: B024
                 np.empty(0, dtype=np.float64),
             )
 
-        stride = int(max(int(a_by_arc.max()), int(b_by_arc.max()), 0)) + 1
+        stride = int(max(int(a_by_arc.max()) if a_by_arc.size else 0, int(b_by_arc.max()) if b_by_arc.size else 0, 0)) + 1
         sorted_keys, order = GraphBase._pair_index(a_by_arc, b_by_arc, stride)
 
-        out_from: list[int] = []
-        out_to: list[int] = []
-        out_penalty: list[float] = []
+        fn = from_nodes.astype(np.int64, copy=False)
+        vn = via_nodes.astype(np.int64, copy=False)
+        tn = to_nodes.astype(np.int64, copy=False)
+        pen = penalties.astype(np.float64, copy=False)
 
-        for i in range(from_nodes.shape[0]):
-            fn = int(from_nodes[i])
-            vn = int(via_nodes[i])
-            tn = int(to_nodes[i])
-            if min(fn, vn, tn) < 0 or max(fn, vn, tn) >= stride:
-                continue
-            incoming = GraphBase._pair_lookup(sorted_keys, order, fn, vn, stride)
-            if incoming.shape[0] == 0:
-                continue
-            outgoing = GraphBase._pair_lookup(sorted_keys, order, vn, tn, stride)
-            if outgoing.shape[0] == 0:
-                continue
+        valid = (fn >= 0) & (fn < stride) & (vn >= 0) & (vn < stride) & (tn >= 0) & (tn < stride)
 
-            for from_arc in incoming:
-                head = int(b_by_arc[from_arc])
-                if head < 0 or head + 1 >= fs.shape[0]:
-                    continue
-                # Arc IDs are CSR positions, so the arcs leaving `head` are exactly the
-                # contiguous block fs[head]:fs[head + 1] - no per-arc set needed.
-                lo, hi = int(fs[head]), int(fs[head + 1])
-                for to_arc in outgoing:
-                    if lo <= int(to_arc) < hi:
-                        out_from.append(int(from_arc))
-                        out_to.append(int(to_arc))
-                        out_penalty.append(float(penalties[i]))
+        in_query = np.where(valid, fn * np.int64(stride) + vn, np.int64(-1))
+        out_query = np.where(valid, vn * np.int64(stride) + tn, np.int64(-1))
 
-        if len(out_from) == 0:
+        lo_in = np.searchsorted(sorted_keys, in_query, side="left")
+        hi_in = np.searchsorted(sorted_keys, in_query, side="right")
+        lo_out = np.searchsorted(sorted_keys, out_query, side="left")
+        hi_out = np.searchsorted(sorted_keys, out_query, side="right")
+
+        cin = np.where(valid, hi_in - lo_in, 0)
+        cout = np.where(valid, hi_out - lo_out, 0)
+
+        out_from_parts = []
+        out_to_parts = []
+        out_pen_parts = []
+
+        single = (cin == 1) & (cout == 1)
+        if np.any(single):
+            f_arcs = order[lo_in[single]]
+            t_arcs = order[lo_out[single]]
+            heads = b_by_arc[f_arcs]
+            in_fs = (heads >= 0) & (heads + 1 < fs.shape[0])
+            lo_fs = fs[heads[in_fs]]
+            hi_fs = fs[heads[in_fs] + 1]
+            t_valid = in_fs & (lo_fs <= t_arcs[in_fs]) & (t_arcs[in_fs] < hi_fs)
+            if np.any(t_valid):
+                out_from_parts.append(f_arcs[t_valid])
+                out_to_parts.append(t_arcs[t_valid])
+                out_pen_parts.append(pen[single][t_valid])
+
+        multi_indices = np.flatnonzero((cin > 0) & (cout > 0) & ((cin > 1) | (cout > 1)))
+        if multi_indices.size > 0:
+            m_from = []
+            m_to = []
+            m_pen = []
+            for idx in multi_indices:
+                p = float(pen[idx])
+                for from_arc in order[lo_in[idx] : hi_in[idx]]:
+                    head = int(b_by_arc[from_arc])
+                    if head < 0 or head + 1 >= fs.shape[0]:
+                        continue
+                    lo, hi = int(fs[head]), int(fs[head + 1])
+                    for to_arc in order[lo_out[idx] : hi_out[idx]]:
+                        if lo <= int(to_arc) < hi:
+                            m_from.append(int(from_arc))
+                            m_to.append(int(to_arc))
+                            m_pen.append(p)
+            out_from_parts.append(np.asarray(m_from, dtype=np.int64))
+            out_to_parts.append(np.asarray(m_to, dtype=np.int64))
+            out_pen_parts.append(np.asarray(m_pen, dtype=np.float64))
+
+        if not out_from_parts:
             return (
                 np.empty(0, dtype=np.int64),
                 np.empty(0, dtype=np.int64),
                 np.empty(0, dtype=np.float64),
             )
 
-        return (
-            np.asarray(out_from, dtype=np.int64),
-            np.asarray(out_to, dtype=np.int64),
-            np.asarray(out_penalty, dtype=np.float64),
-        )
+        res_from = np.concatenate(out_from_parts) if len(out_from_parts) > 1 else out_from_parts[0]
+        res_to = np.concatenate(out_to_parts) if len(out_to_parts) > 1 else out_to_parts[0]
+        res_pen = np.concatenate(out_pen_parts) if len(out_pen_parts) > 1 else out_pen_parts[0]
+
+        return res_from, res_to, res_pen
 
     @staticmethod
     def _build_sparse_turn_restriction_csr(

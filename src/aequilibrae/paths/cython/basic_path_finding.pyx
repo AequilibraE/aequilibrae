@@ -304,6 +304,10 @@ cdef int _path_finding_arc_based_core(
         connectors[i] = -1
         node_costs[i] = INFINITY
 
+    for i in range(num_arcs):
+        arc_pred[i] = -1
+        arc_turn_penalties[i] = 0.0
+
     # Initialize heap for arcs
     pqueue.init_heap(<size_t>num_arcs)
 
@@ -490,6 +494,8 @@ cpdef int path_finding_arc_based(
 @cython.initializedcheck(False)
 cpdef int path_finding_hybrid(
     long origin,
+    unsigned char [:] destinations,
+    long long destination_count,
     double[:] graph_costs,
     const long long [:] csr_indices,
     const long long [:] graph_fs,
@@ -511,6 +517,7 @@ cpdef int path_finding_hybrid(
     long long num_zones,
     const long long [:] first_ctx,
     const long long [:] last_ctx,
+    long long [:] settled_count=None,
 ) noexcept nogil:
     """Hybrid node/arc-state Dijkstra: arc labels only where the incoming arc can matter.
 
@@ -550,7 +557,18 @@ cpdef int path_finding_hybrid(
     page of the documentation for the full treatment and references.
     """
     cdef unsigned int num_nodes = node_pred.shape[0]
+    if node_costs.shape[0] < num_nodes:
+        num_nodes = node_costs.shape[0]
+    if connectors.shape[0] < num_nodes:
+        num_nodes = connectors.shape[0]
+    if node_turn_penalties.shape[0] < num_nodes:
+        num_nodes = node_turn_penalties.shape[0]
+
     cdef unsigned int num_arcs = graph_costs.shape[0]
+    if arc_pred.shape[0] < num_arcs:
+        num_arcs = arc_pred.shape[0]
+    if arc_turn_penalties.shape[0] < num_arcs:
+        num_arcs = arc_turn_penalties.shape[0]
     cdef:
         size_t label, next_label, idx, turn_idx
         size_t restriction_start, restriction_end
@@ -560,6 +578,7 @@ cpdef int path_finding_hybrid(
         ElementState st
         size_t origin_vert = <size_t>origin
         int found = 0
+        long long labels_settled = 0
         bint has_explicit_entry
         unsigned int i
 
@@ -567,6 +586,10 @@ cpdef int path_finding_hybrid(
         node_pred[i] = -1
         connectors[i] = -1
         node_costs[i] = INFINITY
+
+    for i in range(num_arcs):
+        arc_pred[i] = -1
+        arc_turn_penalties[i] = 0.0
 
     pqueue.init_heap(<size_t>num_arcs)
 
@@ -593,6 +616,7 @@ cpdef int path_finding_hybrid(
 
     while not pqueue.is_empty():
         label = pqueue.extract_min()
+        labels_settled += 1
         current_cost = pqueue.element_key(label)
 
         cur_node = csr_indices[label]
@@ -608,6 +632,12 @@ cpdef int path_finding_hybrid(
                 node_pred[cur_node] = a_nodes[cur_arc]
                 connectors[cur_node] = cur_arc
                 node_turn_penalties[cur_node] = arc_turn_penalties[cur_arc]
+
+            if destination_count > 0 and destinations.shape[0] > 0 and destinations[cur_node]:
+                destinations[cur_node] = 0
+                destination_count = destination_count - 1
+                if destination_count == 0:
+                    break
 
         if block_centroid_flows and cur_node < num_zones and <size_t>cur_node != origin_vert:
             continue
@@ -666,5 +696,12 @@ cpdef int path_finding_hybrid(
                 arc_turn_penalties[next_arc] = current_turn_cost + turn_penalty
                 if not stateful[head]:
                     connectors[head] = next_arc
+
+    for i in range(num_nodes):
+        if node_pred[i] == -1 and i != origin_vert:
+            connectors[i] = -1
+
+    if settled_count is not None and settled_count.shape[0] > 0:
+        settled_count[0] = labels_settled
 
     return found - 1

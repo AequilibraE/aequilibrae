@@ -43,6 +43,8 @@ class allOrNothing(WorkerThread):
         elif not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
+        self._thread_lock = threading.Lock()
+
     def doWork(self):
         self.execute()
 
@@ -89,32 +91,40 @@ class allOrNothing(WorkerThread):
         )
         # Aggregate turn penalty costs from all threads
         if self.graph.has_turn_restrictions and self.aux_res.turn_penalty_accumulator.size > 0:
-            self.results.total_turn_penalty = np.sum(self.aux_res.turn_penalty_accumulator)
+            self.results.total_turn_penalty = float(np.sum(self.aux_res.turn_penalty_accumulator))
+        else:
+            self.results.total_turn_penalty = 0.0
 
     def __execute_pooled(self, bridge):
         mat = self.matrix.matrix_view
         pool = ThreadPool(self.results.cores)
         all_threads = {"count": 0}
+        async_results = []
         for orig in self.matrix.index:
             i = int(self.graph.nodes_to_indices[orig])
             if np.nansum(mat[i, :, :]) > 0 or self.results.num_skims > 0:
                 if self.graph.fs[i] == self.graph.fs[i + 1]:
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
-                    pool.apply_async(self.func_assig_thread, args=(orig, all_threads, bridge))
+                    ar = pool.apply_async(self.func_assig_thread, args=(orig, all_threads, bridge))
+                    async_results.append(ar)
         pool.close()
         pool.join()
+        for ar in async_results:
+            ar.get()
 
     def func_assig_thread(self, origin, all_threads, bridge=None):
         thread_id = threading.get_ident()
-        th = all_threads.get(thread_id, all_threads["count"])
-        if th == all_threads["count"]:
-            all_threads[thread_id] = all_threads["count"]
-            all_threads["count"] += 1
+        with self._thread_lock:
+            if thread_id not in all_threads:
+                all_threads[thread_id] = all_threads["count"]
+                all_threads["count"] += 1
+            th = all_threads[thread_id]
 
         x = one_to_all(origin, self.matrix, self.graph, self.results, self.aux_res, th, bridge=bridge)
-        self.cumulative += 1
-        if x != origin:
-            self.report.append(x)
+        with self._thread_lock:
+            self.cumulative += 1
+            if x != origin:
+                self.report.append(x)
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
         self.signal.emit(["set_text", msg])
