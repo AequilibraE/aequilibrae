@@ -485,7 +485,7 @@ class GraphBase(ABC):  # noqa: B024
         # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
         if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
-            df = self.__graph_groupby.sum(numeric_only=True)[[cost_field]].reset_index()
+            df = self.__graph_groupby[[cost_field]].sum().reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
 
         if self.graph[cost_field].dtype == self.__float_type:
@@ -524,10 +524,10 @@ class GraphBase(ABC):  # noqa: B024
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
             gpb = self.__graph_groupby
-            if any(x not in self.__graph_groupby for x in skim_fields):
+            if any(x not in gpb.obj.columns for x in skim_fields):
                 gpb = self.graph.groupby(["__compressed_id__"])
 
-            df = gpb.sum(numeric_only=True)[skim_fields].reset_index()
+            df = gpb[skim_fields].sum().reset_index()
 
             for i, skm in enumerate(skim_fields):
                 self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
