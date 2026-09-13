@@ -110,11 +110,13 @@ class TrafficClass(TransportClassBase):
             if graph is not None and not graph.graph.empty and "__supernet_id__" in graph.graph.columns
             else None
         )
-        supernet_size = (
-            int(supernet_ids.max() + 1)
-            if supernet_ids is not None and supernet_ids.size > 0
-            else (graph.graph.shape[0] if graph is not None else 0)
-        )
+        supernet_size = getattr(graph, "supernet_size", None)
+        if supernet_size is None:
+            supernet_size = (
+                int(supernet_ids.max() + 1)
+                if supernet_ids is not None and supernet_ids.size > 0
+                else (graph.graph.shape[0] if graph is not None else 0)
+            )
         self.fixed_cost = np.zeros(supernet_size, graph.default_types("float")) if graph is not None else np.array([])
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0

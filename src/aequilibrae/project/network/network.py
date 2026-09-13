@@ -373,7 +373,25 @@ class Network(WorkerThread):
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[all_fields].sort_values(by=["link_id", "direction"]).reset_index(drop=True)
-        data["__supernet_id__"] = np.arange(len(data), dtype=np.int64)
+
+        # Build canonical directed arc IDs for the supernet across all links in the project network.
+        # This numbers directed arcs (link_id, direction) rather than unexpanded link records,
+        # ensuring bidirectional links receive distinct IDs for AB and BA directions.
+        pos_arcs = data.loc[data.direction != -1, ["link_id"]].copy()
+        pos_arcs["direction"] = np.int8(1)
+        neg_arcs = data.loc[data.direction != 1, ["link_id"]].copy()
+        neg_arcs["direction"] = np.int8(-1)
+        supernet_arcs = pd.concat([pos_arcs, neg_arcs], ignore_index=True)
+        supernet_arcs.sort_values(by=["link_id", "direction"], inplace=True)
+        supernet_arcs.reset_index(drop=True, inplace=True)
+        supernet_arcs["__supernet_id__"] = np.arange(len(supernet_arcs), dtype=np.int64)
+
+        ab_map = supernet_arcs.loc[supernet_arcs.direction == 1].set_index("link_id")["__supernet_id__"]
+        ba_map = supernet_arcs.loc[supernet_arcs.direction == -1].set_index("link_id")["__supernet_id__"]
+
+        data["__supernet_id_ab"] = data["link_id"].map(ab_map).fillna(-1).astype(np.int64)
+        data["__supernet_id_ba"] = data["link_id"].map(ba_map).fillna(-1).astype(np.int64)
+
         for m in modes:
             # Filter links to only those supporting mode 'm'. This prevents creating
             # routable synthetic self-loops in the full graph that could distort
@@ -382,6 +400,7 @@ class Network(WorkerThread):
 
             g = Graph()
             g.mode = m
+            g.supernet_size = len(supernet_arcs)
             g.network = net
 
             if turn_restrictions_df is not None:

@@ -168,9 +168,12 @@ class AssignmentBase(ABC):
         if not self.classes:
             return 0
         return max(
-            int(c.graph.graph.__supernet_id__.max() + 1)
-            if "__supernet_id__" in c.graph.graph.columns and not c.graph.graph.empty
-            else c.graph.graph.shape[0]
+            getattr(c.graph, "supernet_size", 0)
+            or (
+                int(c.graph.graph.__supernet_id__.max() + 1)
+                if "__supernet_id__" in c.graph.graph.columns and not c.graph.graph.empty
+                else c.graph.graph.shape[0]
+            )
             for c in self.classes
         )
 
@@ -397,6 +400,7 @@ class TrafficAssignment(AssignmentBase):
         self.classes = classes  # type: List[TrafficClass]
         supernet_size = self._get_supernet_size()
         for c in self.classes:
+            c.graph.supernet_size = supernet_size
             if c.fixed_cost.shape[0] < supernet_size:
                 fc = np.zeros(supernet_size, c.graph.default_types("float"))
                 fc[: c.fixed_cost.shape[0]] = c.fixed_cost
@@ -417,6 +421,7 @@ class TrafficAssignment(AssignmentBase):
         self.classes.append(traffic_class)
         supernet_size = self._get_supernet_size()
         for c in self.classes:
+            c.graph.supernet_size = supernet_size
             if c.fixed_cost.shape[0] < supernet_size:
                 fc = np.zeros(supernet_size, c.graph.default_types("float"))
                 fc[: c.fixed_cost.shape[0]] = c.fixed_cost
@@ -669,8 +674,18 @@ class TrafficAssignment(AssignmentBase):
         """
         # Create preloads dataframe in correct order if not already initialised
         if self.preloads is None:
-            g = self.classes[0].graph.graph
-            self.preloads = g.sort_values(by="__supernet_id__")[["link_id", "direction"]].copy()
+            frames = [
+                c.graph.graph[["link_id", "direction", "__supernet_id__"]]
+                for c in self.classes
+                if "__supernet_id__" in c.graph.graph.columns
+            ]
+            if frames:
+                all_links = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["__supernet_id__"])
+                sorted_links = all_links.sort_values(by="__supernet_id__")
+                self.preloads = sorted_links[["link_id", "direction"]].reset_index(drop=True)
+            else:
+                g = self.classes[0].graph.graph
+                self.preloads = g[["link_id", "direction"]].copy()
 
         # Check that columns of preload are link_id, direction, preload:
         expected = {"link_id", "direction", "preload"}
@@ -802,7 +817,7 @@ class TrafficAssignment(AssignmentBase):
         voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
-        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
+        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload[idx]
 
         fields = [
             "Preload_AB",

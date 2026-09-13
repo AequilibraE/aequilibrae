@@ -93,6 +93,7 @@ class GraphBase(ABC):  # noqa: B024
         self._compact_turn_penalties_master = None
 
         self.description = "No description added so far"
+        self.supernet_size: Optional[int] = None
 
         self.num_links = -1
         self.num_nodes = -1
@@ -284,10 +285,16 @@ class GraphBase(ABC):  # noqa: B024
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
-        if "__supernet_id__" not in self.graph.columns:
+        if "__supernet_id" in self.graph.columns:
+            self.graph["__supernet_id__"] = self.graph.pop("__supernet_id").astype(self.__int_type)
+        elif "__supernet_id__" not in self.graph.columns or self.graph["__supernet_id__"].duplicated().any():
             self.graph.sort_values(by=["link_id", "direction"], inplace=True)
             self.graph["__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__int_type)
         self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
+
+        supernet_max = int(self.graph["__supernet_id__"].max() + 1) if not self.graph.empty else 0
+        if self.supernet_size is None or self.supernet_size < supernet_max:
+            self.supernet_size = supernet_max
 
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
@@ -334,6 +341,7 @@ class GraphBase(ABC):  # noqa: B024
         self.graph["__compressed_id__"] = np.empty(0, dtype=np.int64)
         self.graph["__supernet_id__"] = np.empty(0, dtype=self.__int_type)
         self.num_links = 0
+        self.supernet_size = 0
         self.cost = np.zeros(0, dtype=self.__float_type)
         if self.skim_fields:
             self.skims = np.zeros((1, len(self.skim_fields) + 1), dtype=self.__float_type)

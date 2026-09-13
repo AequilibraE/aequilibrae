@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -142,7 +142,7 @@ class AssignmentResults(AssignmentResultsBase):
         return list(HEAP_MAP.keys())
 
     # In case we want to do by hand, we can prepare each method individually
-    def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
+    def prepare(self, graph: Graph, matrix: AequilibraeMatrix, supernet_size: Optional[int] = None) -> None:
         """
         Prepares the object with dimensions corresponding to the assignment matrix and graph objects
 
@@ -151,6 +151,8 @@ class AssignmentResults(AssignmentResultsBase):
 
             **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
             ``matrix.computational_view(:obj:`list`)``
+
+            **supernet_size** (:obj:`int`, `Optional`): Overall size of the supernet across all classes
         """
 
         self.__float_type = graph.default_types("float")
@@ -186,8 +188,15 @@ class AssignmentResults(AssignmentResultsBase):
             if "__compressed_id__" in graph.graph.columns
             else np.arange(graph.graph.shape[0], dtype=self.__integer_type)
         )
-        supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else graph.graph.shape[0]
-        self.links = max(graph.num_links, supernet_size)
+        if graph.num_links == 0:
+            self.links = 0
+            supernet_size = 0
+        else:
+            if supernet_size is None:
+                supernet_size = getattr(graph, "supernet_size", None)
+            if supernet_size is None:
+                supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else graph.graph.shape[0]
+            self.links = max(graph.num_links, supernet_size)
         self.crosswalk = np.full(self.links, graph.compact_num_links, dtype=self.__integer_type)
         self.crosswalk[supernet_ids] = compressed_ids
         self._graph_ids = supernet_ids
@@ -326,8 +335,8 @@ class AssignmentResults(AssignmentResultsBase):
 
         m = self.get_graph_to_network_mapping()
         for name in self._selected_links.keys():
-            # Link flows initialised
-            link_flows = np.full((self.links, self.classes["number"]), np.nan)
+            # Link flows initialised to graph row count
+            link_flows = np.full((self.lids.shape[0], self.classes["number"]), np.nan)
             # maps link flows from the compressed graph to the uncompressed graph
             assign_link_loads(
                 link_flows,

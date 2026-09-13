@@ -161,9 +161,10 @@ class LinearApproximation(WorkerThread):
 
         self.aons = {}
 
+        supernet_size = self.congested_time.shape[0]
         for c in self.traffic_classes:
             r = AssignmentResults()
-            r.prepare(c.graph, c.matrix)
+            r.prepare(c.graph, c.matrix, supernet_size=supernet_size)
             self.step_direction[c._id] = r
             self.step_direction_turn_cost[c._id] = 0.0
             self.previous_step_direction_turn_cost[c._id] = 0.0
@@ -172,7 +173,7 @@ class LinearApproximation(WorkerThread):
             for c in self.traffic_classes:
                 for d in [self.step_direction, self.previous_step_direction, self.temp_step_direction_for_copy]:
                     r = AssignmentResults()
-                    r.prepare(c.graph, c.matrix)
+                    r.prepare(c.graph, c.matrix, supernet_size=supernet_size)
                     r.compact_link_loads = np.zeros([])
                     r.compact_total_link_loads = np.zeros([])
                     d[c._id] = r
@@ -776,8 +777,9 @@ class LinearApproximation(WorkerThread):
                 }
 
             # Sizes the temporary objects used for the results
-            c.results.prepare(c.graph, c.matrix)
-            c._aon_results.prepare(c.graph, c.matrix)
+            supernet_size = self.congested_time.shape[0]
+            c.results.prepare(c.graph, c.matrix, supernet_size=supernet_size)
+            c._aon_results.prepare(c.graph, c.matrix, supernet_size=supernet_size)
             c.results.reset()
 
             # Prepares the fixed cost to be used
