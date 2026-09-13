@@ -653,6 +653,8 @@ class GraphBase(ABC):  # noqa: B024
                 )
                 self.graph = self.graph.copy()
                 self.graph.loc[nan_costs, cost_field] = np.inf
+                if hasattr(self, "_GraphBase__graph_groupby") and self.__graph_groupby is not None:
+                    self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
 
         self.cost_field = cost_field
 
@@ -667,6 +669,8 @@ class GraphBase(ABC):  # noqa: B024
         # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
         if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
+            if self.__graph_groupby.obj is not self.graph:
+                self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
             df = self.__graph_groupby[[cost_field]].sum().reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
         else:
@@ -740,8 +744,9 @@ class GraphBase(ABC):  # noqa: B024
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
             gpb = self.__graph_groupby
-            if any(x not in gpb.obj.columns for x in skim_fields):
+            if gpb.obj is not self.graph or any(x not in gpb.obj.columns for x in skim_fields):
                 gpb = self.graph.groupby(["__compressed_id__"])
+                self.__graph_groupby = gpb
 
             df = gpb[skim_fields].sum().reset_index()
 
@@ -910,7 +915,17 @@ class GraphBase(ABC):  # noqa: B024
         allow_path_uturns = _require_bool(allow_path_uturns, "allow_path_uturns")
 
         if turn_restrictions is None:
-            self.clear_turn_restrictions()
+            self._turn_restrictions = None
+            self._allow_path_uturns = allow_path_uturns
+            self._turn_restrictions_generation += 1
+            self._effective_vias_cache = None
+            if not self.graph.empty and self.num_nodes >= 0:
+                if self.centroids is not None and self.centroids.shape[0] > 0:
+                    self._reprepare(self.centroids)
+                else:
+                    self._turn_topology_signature = self._compute_turn_topology_signature()
+                    self._build_turn_csr_structures()
+                    self._id = uuid.uuid4().hex
             return
 
         # An empty table still carries policy: ``allow_path_uturns`` is a global setting and

@@ -224,3 +224,45 @@ def test_mode_excluded_self_loops_do_not_reach_the_compact_graph():
     compact_link_ids = set(graph.compact_graph.link_id.to_numpy().tolist())
     assert 3 in compact_link_ids, "a genuine source self-loop must survive contraction"
     assert 4 not in compact_link_ids, "a mode-exclusion self-loop must not reach the compact graph"
+
+
+def test_nan_costs_in_set_graph_yields_infinite_compact_cost():
+    """Verifies links with NaN costs produce +inf in compact_cost rather than 0.0."""
+    links = [
+        {"link_id": 1, "a_node": 1, "b_node": 2, "direction": 1, "distance": 1.0, "time": np.nan},
+        {"link_id": 2, "a_node": 2, "b_node": 3, "direction": 1, "distance": 1.0, "time": 5.0},
+    ]
+    df = pd.DataFrame(links)
+    df["modes"] = "c"
+    df["link_type"] = "road"
+
+    graph = Graph()
+    graph.network = df
+    graph.prepare_graph(centroids=np.array([1, 3], dtype=np.int64), remove_dead_ends=False)
+    graph.set_graph("time")
+
+    assert np.isinf(graph.cost[0])
+    # The compressed chain 1->3 contains link 1 (time NaN -> inf), so compact_cost must be inf
+    assert np.isinf(graph.compact_cost[0])
+
+
+def test_set_turn_restrictions_none_preserves_allow_path_uturns():
+    """Verifies passing None for turn_restrictions respects the allow_path_uturns setting."""
+    graph = _scrambled_supernet_graph()
+    graph.set_turn_restrictions(None, allow_path_uturns=True)
+    assert graph._allow_path_uturns is True
+
+    graph.set_turn_restrictions(None, allow_path_uturns=False)
+    assert graph._allow_path_uturns is False
+
+
+def test_build_graphs_when_turn_restrictions_table_missing_preserves_uturn_policy(sioux_falls_example):
+    """Verifies build_graphs applies about-table U-turn policy even if turn_restrictions table is dropped."""
+    with sioux_falls_example.db_connection as conn:
+        conn.execute("UPDATE about SET infovalue='1' WHERE infoname='allow_uturns'")
+        conn.execute("DROP TABLE turn_restrictions")
+        conn.commit()
+
+    sioux_falls_example.network.build_graphs(modes=["c"])
+    graph = sioux_falls_example.network.graphs["c"]
+    assert graph._allow_path_uturns is True
