@@ -136,6 +136,10 @@ def test_all_pruned_crosswalk_retains_project_wide_supernet_size():
     assert len(g._crosswalk) == 7
     assert np.all(g._crosswalk == g.compact_num_links)
 
+    g.supernet_size = 9
+    g.compact_costs_from_link_costs(np.zeros(9, dtype=np.float64))
+    assert len(g._crosswalk) == 9
+
 
 def test_empty_graph_preserves_and_round_trips_project_wide_supernet_size(tmp_path):
     net = pd.DataFrame(
@@ -196,6 +200,11 @@ def test_mode_graph_round_trip_preserves_global_supernet_ids(tmp_path):
 
     assert loaded.supernet_size == 7
     np.testing.assert_array_equal(loaded.graph["__supernet_id__"], expected_ids)
+    assert len(loaded._crosswalk) == 7
+
+    loaded.exclude_links([1, 2])
+    assert loaded.supernet_size == 7
+    assert loaded.num_links == 0
     assert len(loaded._crosswalk) == 7
 
 

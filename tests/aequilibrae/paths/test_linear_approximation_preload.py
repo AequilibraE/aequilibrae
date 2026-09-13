@@ -216,6 +216,35 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assert assignment.iteration_issue == []
 
 
+def test_nonfinite_optimal_line_search_uses_tiny_fw_step(monkeypatch):
+    assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.algorithm = "bfw"
+    assignment.iter = 4
+    assignment.rgap = np.inf
+    assignment.current_direction = "fw"
+    assignment.next_direction = "cfw"
+    assignment.iteration_issue = []
+    assignment.fw_total_turn_cost = 0.0
+    assignment.traffic_classes = []
+
+    monkeypatch.setattr(
+        assignment,
+        "_LinearApproximation__derivative_of_objective_stepsize_independent",
+        lambda: 0.0,
+    )
+    monkeypatch.setattr(
+        assignment,
+        "_LinearApproximation__derivative_of_objective_stepsize_dependent",
+        lambda _alpha, **_kwargs: np.nan,
+    )
+
+    assignment.calculate_stepsize()
+
+    assert assignment.stepsize == 1e-2 / assignment.iter
+    assert assignment.stepsize > 0.0
+    assert assignment.next_direction == "cfw"
+
+
 def test_cfw_turn_direction_uses_same_coefficients_as_link_flows(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.elementwise_cores = 1

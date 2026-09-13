@@ -726,7 +726,11 @@ class GraphBase(ABC):  # noqa: B024
         if "__compressed_id__" not in self.graph.columns:
             self._crosswalk = None
             return
-        supernet_ids = self.graph.__supernet_id__.to_numpy(copy=False)
+        supernet_ids = (
+            self.graph.__supernet_id__.to_numpy(copy=False)
+            if "__supernet_id__" in self.graph.columns
+            else np.arange(self.graph.shape[0], dtype=self.__int_type)
+        )
         compressed_ids = self.graph.__compressed_id__.to_numpy(copy=False)
         if supernet_ids.size > 0 and supernet_ids.min() < 0:
             raise ValueError("__supernet_id__ values must be non-negative")
@@ -741,23 +745,28 @@ class GraphBase(ABC):  # noqa: B024
         """Updates compact_cost from link costs indexed by __supernet_id__.
 
         link_costs must be a 1D array of non-negative numeric values whose length
-        matches the number of links in the graph. ``+inf`` is allowed and marks an
-        unusable link; ``NaN`` values are coerced to ``+inf``; negative values and
-        ``-inf`` are rejected.
+        matches either the number of links in this mode graph or its project-wide
+        ``supernet_size``. ``+inf`` is allowed and marks an unusable link; ``NaN``
+        values are coerced to ``+inf``; negative values and ``-inf`` are rejected.
         """
+        supernet_ids = (
+            self.graph.__supernet_id__.to_numpy(copy=False)
+            if "__supernet_id__" in self.graph.columns
+            else np.arange(self.graph.shape[0], dtype=self.__int_type)
+        )
+        indexed_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else 0
+        configured_size = max(int(self.supernet_size or 0), 0)
+        required_crosswalk_size = max(self.graph.shape[0], indexed_size, configured_size)
+        if self._crosswalk is None or len(self._crosswalk) != required_crosswalk_size:
+            self._build_crosswalk()
+
         if self.compact_num_links > 0:
             costs_arr = np.asarray(link_costs, dtype=self.__float_type)
-            supernet_ids = self.graph.__supernet_id__.to_numpy(copy=False)
-            indexed_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else 0
-            configured_size = max(int(self.supernet_size or 0), 0)
-            required_crosswalk_size = max(self.graph.shape[0], indexed_size, configured_size)
-            if self._crosswalk is None or len(self._crosswalk) != required_crosswalk_size:
-                self._build_crosswalk()
             expected_len = len(self._crosswalk) if self._crosswalk is not None else self.graph.shape[0]
             if costs_arr.shape[0] not in (self.graph.shape[0], expected_len):
                 raise ValueError(
                     f"link_costs array length {costs_arr.shape[0]} does not match "
-                    f"graph link count {self.graph.shape[0]}"
+                    f"graph link count {self.graph.shape[0]} or supernet size {expected_len}"
                 )
             if np.isneginf(costs_arr).any():
                 raise ValueError("link_costs contains -inf values.")

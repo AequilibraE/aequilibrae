@@ -37,6 +37,54 @@ def test_empty_assignment_results_keep_explicit_supernet_extent():
     assert results.crosswalk.shape == (7,)
 
 
+def test_mixed_empty_and_nonempty_classes_share_global_assignment_vectors():
+    centroids = np.array([1, 2], dtype=np.int64)
+    columns = [
+        "link_id",
+        "a_node",
+        "b_node",
+        "direction",
+        "time",
+        "capacity",
+        "alpha",
+        "beta",
+        "modes",
+        "link_type",
+    ]
+
+    active_graph = Graph()
+    active_graph.network = pd.DataFrame(
+        [[1, 1, 2, 0, 1.0, 100.0, 0.15, 4.0, "c", "road"]], columns=columns
+    )
+    active_graph.prepare_graph(centroids=centroids, remove_dead_ends=False)
+    active_graph.set_graph("time")
+
+    empty_graph = Graph()
+    empty_graph.supernet_size = active_graph.supernet_size
+    empty_graph.network = pd.DataFrame(columns=columns)
+    empty_graph.prepare_graph(centroids=centroids)
+    empty_graph.set_graph("time")
+
+    empty_class = TrafficClass("empty", empty_graph, _matrix_for_graph(empty_graph))
+    active_matrix = _matrix_for_graph(active_graph)
+    active_matrix.matrix_view[0, 1] = 10.0
+    active_class = TrafficClass("active", active_graph, active_matrix)
+
+    assignment = TrafficAssignment()
+    assignment.set_classes([empty_class, active_class])
+    assignment.set_vdf("BPR")
+    assignment.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+    assignment.set_capacity_field("capacity")
+    assignment.set_time_field("time")
+    assignment.set_algorithm("all-or-nothing")
+    assignment.execute()
+
+    assert empty_class.results.total_link_loads.shape == (active_graph.supernet_size,)
+    assert np.all(empty_class.results.total_link_loads == 0.0)
+    assert active_class.results.total_link_loads.shape == (active_graph.supernet_size,)
+    assert active_class.results.total_link_loads.sum() == pytest.approx(10.0)
+
+
 def test_filtered_graph_field_vdf_uses_valid_defaults_for_inactive_arcs(coquimbo_example):
     project = coquimbo_example
     project.network.build_graphs(modes=["c"])

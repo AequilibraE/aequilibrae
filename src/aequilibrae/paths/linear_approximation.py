@@ -45,7 +45,6 @@ class LinearApproximation(WorkerThread):
         self.project_path = project.project_base_path if project else gettempdir()
 
         self.algorithm = algorithm
-        self.line_search = getattr(assig_spec, "line_search", "exact")
         self.bfw_conjugacy = getattr(assig_spec, "bfw_conjugacy", "approximate")  # BFW only
         # Conjugacy diagnostics for the iteration in progress; see _record_conjugacy_diagnostics.
         self.conjugacy_prev = np.nan
@@ -1037,46 +1036,54 @@ class LinearApproximation(WorkerThread):
         derivative_of_objective = partial(
             self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term + turn_derivative
         )
+        derivative_cache = {}
+
+        def evaluate_derivative(stepsize: float) -> float:
+            # ``root_scalar`` evaluates both endpoints itself. Cache those
+            # vector-wide VDF evaluations after checking them below.
+            key = float(stepsize)
+            if key not in derivative_cache:
+                derivative_cache[key] = derivative_of_objective(key)
+            return derivative_cache[key]
 
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
-        try:
-            min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
-            self.stepsize = self.__clip_stepsize(min_res.root)
-            if not min_res.converged:
-                logger.warning("Descent direction stepsize finder has not converged")
-
-        except ValueError as e:
-            # `root_scalar` raises ValueError when the derivative does not change sign in [0, 1].
-            # There are two genuinely distinct cases:
-            #   * derivative(0) < 0  ⇒  direction is descent at the current point. Since the
-            #     derivative is monotone non-decreasing along the (convex) line, descent
-            #     persists throughout [0, 1] and the optimum sits at α = 1 (or beyond).
-            #     This is a perfectly valid line-search outcome and only happens because we
-            #     bracket the search to the feasible interval. We must NOT treat it as a
-            #     "reset" - the resulting solution is fine and convergence may be checked.
-            #   * derivative(0) >= 0 ⇒  direction is *not* a descent direction. We then need
-            #     to reset to a Frank-Wolfe step (or, if FW itself failed, take a tiny MSA
-            #     step to avoid stalling).
-            d0_for_branch = derivative_of_objective(0.0)
-
-            if d0_for_branch >= 0:
-                if self.current_direction == "fw" or self.algorithm == "frank-wolfe":
-                    tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
-                    # works well in practice, however for a large number of iterations this might be too much so
-                    # use this heuristic instead.
-                    logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
-                    self.stepsize = self.__clip_stepsize(tiny_step)
-                else:
-                    msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
-                    self.__retry_with_fw_direction(msg)
+        def recover_from_invalid_direction(detail: str) -> None:
+            if self.current_direction == "fw" or self.algorithm == "frank-wolfe":
+                # Use a fraction of the MSA step. A fixed 1e-4 works well in
+                # practice, but scaling it avoids an excessive late-iteration step.
+                tiny_step = 1e-2 / self.iter
+                logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {detail}")
+                self.stepsize = self.__clip_stepsize(tiny_step)
             else:
-                # derivative(0) < 0 (and derivative(1) must also be ≤ 0, otherwise the bracket
-                # search would have succeeded). The objective is still decreasing at α = 1, so
-                # the constrained optimum on [0, 1] is α = 1. Take the full step; do NOT mark
-                # this as a reset - convergence checking remains valid.
-                self.stepsize = self.__clip_stepsize(1.0)
-                logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
+                self.__retry_with_fw_direction(
+                    f"Found bad conjugate direction step. Performing FW search. {detail}"
+                )
+
+        derivative_at_zero = evaluate_derivative(0.0)
+        derivative_at_one = evaluate_derivative(1.0)
+
+        if np.isnan(derivative_at_zero) or np.isnan(derivative_at_one):
+            recover_from_invalid_direction("Line-search derivative is NaN at a feasible-interval endpoint.")
+        elif derivative_at_zero > 0.0:
+            recover_from_invalid_direction("The direction is not a descent direction at alpha=0.")
+        elif derivative_at_zero == 0.0:
+            self.stepsize = 0.0
+        elif derivative_at_one <= 0.0:
+            # The convex objective is still decreasing at the far endpoint, so
+            # the constrained optimum is the full feasible step.
+            self.stepsize = 1.0
+            logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
+        else:
+            try:
+                min_res = root_scalar(evaluate_derivative, bracket=[0, 1], xtol=x_tol)
+            except (RuntimeError, ValueError) as exc:
+                recover_from_invalid_direction(f"Line-search root finder failed: {exc}")
+            else:
+                if not min_res.converged or not np.isfinite(min_res.root):
+                    recover_from_invalid_direction("Line-search root finder did not return a finite converged root.")
+                else:
+                    self.stepsize = self.__clip_stepsize(min_res.root)
 
         assert 0 <= self.stepsize <= 1.0
 

@@ -162,11 +162,11 @@ class TrafficClass(TransportClassBase):
 
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
-        if np.any(np.isnan(self.graph.graph[field_name].values)):
+        values = self.graph.graph[field_name].to_numpy(copy=False)
+        if values.size and np.any(np.isnan(values)):
             logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
-        values = self.graph.graph[field_name]
-        if not values.empty and values.min() < 0:
+        if values.size and values.min() < 0:
             msg = f"Cost field {field_name} has negative values. That is not allowed"
             logger.error(msg)
             raise ValueError(msg)

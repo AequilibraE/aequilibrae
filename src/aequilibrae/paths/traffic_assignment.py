@@ -160,13 +160,14 @@ class AssignmentBase(ABC):
                 raise ValueError(f"'{field}' not in graph for '{c._id}'")
 
             values = c.graph.graph[field].to_numpy(copy=False)
+            # An empty mode graph has no value that can violate the field
+            # contract. It still participates using the project-wide extent.
+            if values.size == 0:
+                continue
             if np.any(np.isnan(values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            # An empty mode graph has no value that can violate the field contract.
-            # It still participates in the assignment using the project-wide
-            # ``supernet_size`` maintained by the other classes.
-            if values.size and values.min() <= 0 and not allow_zeros:
+            if values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
     def _get_supernet_size(self) -> int:
@@ -274,12 +275,10 @@ class TrafficAssignment(AssignmentBase):
 
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
-    all_line_searches = ["exact"]
     all_bfw_conjugacies = ["approximate", "exact"]
 
     # Attributes restricted to a fixed set of strings, as {name: (allowed values, description for the error)}.
     __choice_attributes = {
-        "line_search": (all_line_searches, "Line search"),
         "bfw_conjugacy": (all_bfw_conjugacies, "BFW conjugacy"),
     }
 
@@ -313,10 +312,6 @@ class TrafficAssignment(AssignmentBase):
         self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
-
-        # CFW and BFW use the traditional optimal line search, as does Frank-Wolfe.
-        # Keep this attribute and its setter as an exact-only compatibility surface.
-        self.line_search = "exact"  # type: str
 
         # How BFW solves for its direction coefficients. "approximate" preserves the historical behaviour.
         self.bfw_conjugacy = "approximate"  # type: str
@@ -462,30 +457,11 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
-        self.assignment.line_search = self.line_search
         self.assignment.bfw_conjugacy = self.bfw_conjugacy
         self._config["Algorithm"] = algo
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
-        self._config["Line search"] = self.line_search
         self._config["BFW conjugacy"] = self.bfw_conjugacy
-
-    def set_line_search(self, line_search: str) -> None:
-        """
-        Selects the line search used to pick the step size. MSA still uses
-        ``1/iteration``; Frank-Wolfe, CFW and BFW use the traditional optimal
-        line search.
-
-        * ``"exact"`` - root-find the exact directional derivative of the Beckmann objective,
-          ``sum_a c_a(x + alpha*d)*d_a = 0``, over ``[0, 1]``. This is the line search assumed by the
-          conjugate-direction theory in Mitradjieva & Lindberg, and the step is not capped.
-
-        :Arguments:
-            **line_search** (:obj:`str`): Must be ``"exact"``. The argument is
-            retained for compatibility with existing assignment setup code.
-        """
-        self.line_search = line_search
-        self._config["Line search"] = self.line_search
 
     def set_bfw_conjugacy(self, bfw_conjugacy: str) -> None:
         """
