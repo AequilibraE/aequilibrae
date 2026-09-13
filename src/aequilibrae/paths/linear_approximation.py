@@ -950,10 +950,7 @@ class LinearApproximation(WorkerThread):
                         + (1.0 - self.stepsize) * cls_res.total_turn_penalty
                     )
 
-                # Update aggregate turn cost with the same stepsize used for flows.
-                # Turn penalties are fixed costs (not flow-dependent VDF outputs), so this
-                # convex combination tracks the weighted-average turn cost of the current
-                # flow solution - analogous to how link flows are combined.
+                # Convex combination of turn penalty costs tracking the flow solution
                 direction_turn_cost = sum(c.pce * self.step_direction_turn_cost[c._id] for c in self.traffic_classes)
                 self.fw_total_turn_cost = (
                     self.stepsize * direction_turn_cost + (1.0 - self.stepsize) * self.fw_total_turn_cost
@@ -1184,9 +1181,7 @@ class LinearApproximation(WorkerThread):
         turn_derivative = (
             sum(c.pce * self.step_direction_turn_cost[c._id] for c in self.traffic_classes) - self.fw_total_turn_cost
         )
-        # Turn penalties are constant w.r.t. stepsize (they don't depend on flows or VDF),
-        # so they shift the derivative by a fixed amount. Including them here ensures the
-        # line search accounts for turn costs when finding the optimal stepsize.
+        # Shift line search derivative by turn penalty cost differential
         derivative_of_objective = partial(
             self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term + turn_derivative
         )

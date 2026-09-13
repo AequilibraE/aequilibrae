@@ -25,12 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def _require_bool(value, name: str) -> bool:
-    """Accepts a Python or NumPy boolean and rejects anything else.
-
-    ``np.True_`` is what ``Series.any()``, ``np.all`` and array comparisons return, and it is
-    not an instance of ``bool``, so a bare isinstance check rejects ordinary user code - with a
-    message that reads "must be a boolean, got bool", since NumPy's scalar reports that name.
-    """
+    """Validates that value is a Python or NumPy boolean."""
     if isinstance(value, (bool, np.bool_)):
         return bool(value)
     raise TypeError(f"{name} must be a boolean, got {type(value).__module__}.{type(value).__name__}")
@@ -892,10 +887,7 @@ class GraphBase(ABC):  # noqa: B024
         if self.graph.empty:
             return {int(v) for v in self._turn_restrictions["via_node"].dropna().unique()}
 
-        # _graph_generation is bumped wherever self.graph is replaced (prepare_graph and
-        # _initialize_empty_topology are the only two), so it already separates same-shaped
-        # topologies. A summed-node-id fingerprint would not: it is permutation invariant and
-        # blind to swapping one edge for another with the same endpoint total.
+        # Cached by generation counters, which update whenever turn restrictions or topology change.
         cache_key = (
             self._turn_restrictions_generation,
             self._graph_generation,
@@ -1021,11 +1013,7 @@ class GraphBase(ABC):  # noqa: B024
 
         mvmt_cols = ["from_node", "via_node", "to_node"]
         if not normalised.empty and normalised.duplicated(subset=mvmt_cols).any():
-            # Resolve each repeated movement in place: a prohibition anywhere in the group wins,
-            # and finite penalties that disagree are an input error rather than a silent pick.
-            # Keep the first row of each group so the caller's other columns - modes,
-            # restriction_id, geometry - survive. Rebuilding the frame from the four required
-            # columns would make the schema depend on whether duplicates happened to exist.
+            # Resolve duplicate movements: prohibitions take precedence; conflicting penalties raise.
             resolved = []
             for mvmt, group in normalised.groupby(mvmt_cols, sort=False):
                 pens = group["penalty"].to_numpy(dtype=np.float64)
@@ -1544,7 +1532,7 @@ class GraphBase(ABC):  # noqa: B024
         key_to_penalty: dict[tuple[int, int], float] = {}
         prohibited_keys: set[tuple[int, int]] = set()
 
-        # First collect all prohibited keys so prohibition dominance wins unconditionally
+        # Prohibitions override finite penalties
         for f_arc, t_arc, penalty in zip(restricted_from_arcs, restricted_to_arcs, restricted_penalties, strict=True):
             f_arc = int(f_arc)
             t_arc = int(t_arc)

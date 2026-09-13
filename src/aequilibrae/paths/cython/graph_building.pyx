@@ -317,11 +317,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     df = pd.DataFrame(graph.network, copy=True)
 
-    # Genuine self-loops in the source network are legitimate geometry and are kept. Mode
-    # exclusion, however, *manufactures* self-loops: Network.build_graphs sets b_node = a_node
-    # on every link that does not serve this graph's mode, precisely so they drop out here.
-    # Those carry no geometry and must not reach the compact graph. The `modes` column still
-    # tells the two apart, so use it rather than deleting every self-loop indiscriminately.
+    # Drop synthetic self-loops from unsupported modes while preserving genuine self-loops.
     if graph.mode and "modes" in df.columns:
         self_loops = df.a_node.to_numpy(copy=False) == df.b_node.to_numpy(copy=False)
         if self_loops.any():

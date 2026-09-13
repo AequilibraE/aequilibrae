@@ -374,9 +374,7 @@ class Network(WorkerThread):
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[all_fields].sort_values(by=["link_id", "direction"]).reset_index(drop=True)
 
-        # Build canonical directed arc IDs for the supernet across all links in the project network.
-        # This numbers directed arcs (link_id, direction) rather than unexpanded link records,
-        # ensuring bidirectional links receive distinct IDs for AB and BA directions.
+        # Number directed arcs (link_id, direction) so bidirectional links get distinct IDs
         pos_arcs = data.loc[data.direction != -1, ["link_id"]].copy()
         pos_arcs["direction"] = np.int8(1)
         neg_arcs = data.loc[data.direction != 1, ["link_id"]].copy()
@@ -393,9 +391,7 @@ class Network(WorkerThread):
         data["__supernet_id_ba"] = data["link_id"].map(ba_map).fillna(-1).astype(np.int64)
 
         for m in modes:
-            # Filter links to only those supporting mode 'm'. This prevents creating
-            # routable synthetic self-loops in the full graph that could distort
-            # pathfinding or bypass turn prohibitions.
+            # Filter links to only those supporting mode 'm'
             net = data[data.modes.fillna("").astype(str).str.contains(m, regex=False)].copy()
 
             g = Graph()

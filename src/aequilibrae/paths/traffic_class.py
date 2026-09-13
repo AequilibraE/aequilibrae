@@ -238,10 +238,7 @@ class TrafficClass(TransportClassBase):
             if self.graph.compact_num_links > 0:
                 self.graph.compact_costs_from_link_costs(self.fixed_cost + self.congested_time)
 
-            # fixed_cost and congested_time are indexed by __supernet_id__, while the rows of
-            # graph.graph are ordered by (a_node, b_node). Those two orders differ on any network
-            # with bidirectional links, so both vectors have to be gathered into row order before
-            # they can be assigned positionally.
+            # Reorder supernet-indexed costs to match graph row order (a_node, b_node)
             supernet_ids = self.graph.graph.__supernet_id__.to_numpy(copy=False)
             cost = (self.fixed_cost + self.congested_time)[supernet_ids]
             congested_time = np.asarray(self.congested_time)[supernet_ids]

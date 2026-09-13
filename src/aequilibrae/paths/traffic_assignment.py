@@ -14,6 +14,7 @@ from numpy import nan_to_num
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths.graph import _get_graph_to_network_mapping
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
@@ -387,6 +388,15 @@ class TrafficAssignment(AssignmentBase):
         """
         self.vdf = vdf_function
 
+    def _sync_classes_supernet_size(self) -> None:
+        supernet_size = self._get_supernet_size()
+        for c in self.classes:
+            c.graph.supernet_size = supernet_size
+            if c.fixed_cost.shape[0] < supernet_size:
+                fc = np.zeros(supernet_size, c.graph.default_types("float"))
+                fc[: c.fixed_cost.shape[0]] = c.fixed_cost
+                c.fixed_cost = fc
+
     def set_classes(self, classes: List[TrafficClass]) -> None:
         """
         Sets Traffic classes to be assigned
@@ -399,13 +409,7 @@ class TrafficAssignment(AssignmentBase):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
-        supernet_size = self._get_supernet_size()
-        for c in self.classes:
-            c.graph.supernet_size = supernet_size
-            if c.fixed_cost.shape[0] < supernet_size:
-                fc = np.zeros(supernet_size, c.graph.default_types("float"))
-                fc[: c.fixed_cost.shape[0]] = c.fixed_cost
-                c.fixed_cost = fc
+        self._sync_classes_supernet_size()
 
     def add_class(self, traffic_class: TrafficClass) -> None:
         """
@@ -420,13 +424,7 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
-        supernet_size = self._get_supernet_size()
-        for c in self.classes:
-            c.graph.supernet_size = supernet_size
-            if c.fixed_cost.shape[0] < supernet_size:
-                fc = np.zeros(supernet_size, c.graph.default_types("float"))
-                fc[: c.fixed_cost.shape[0]] = c.fixed_cost
-                c.fixed_cost = fc
+        self._sync_classes_supernet_size()
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
@@ -665,6 +663,21 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
+    def _get_supernet_arcs(self) -> tuple[np.ndarray, np.ndarray, bool]:
+        supernet_size = self._get_supernet_size()
+        link_ids = np.full(supernet_size, -1, dtype=np.int64)
+        directions = np.zeros(supernet_size, dtype=np.int64)
+        populated = False
+        for c in self.classes:
+            g = c.graph.graph
+            if g.empty or "__supernet_id__" not in g.columns:
+                continue
+            sn = g.__supernet_id__.to_numpy(copy=False)
+            link_ids[sn] = g.link_id.to_numpy(copy=False)
+            directions[sn] = g.direction.to_numpy(copy=False)
+            populated = True
+        return link_ids, directions, populated
+
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
         Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
@@ -673,25 +686,8 @@ class TrafficAssignment(AssignmentBase):
             **preload** (:obj:`pd.DataFrame`): dataframe mapping 'link_id' & 'direction' to 'preload'
             **name** (:obj:`str`): Name for particular preload (optional - default name will be chosen if not specified)
         """
-        # Create preloads dataframe in correct order if not already initialised.
-        # Row i of this frame is supernet id i, because LinearApproximation turns it into a
-        # vector that is added straight onto the supernet-indexed flows. Building it from the
-        # classes' own rows instead would be both short (arcs no class serves are missing) and
-        # misaligned (the ids that remain have gaps), so scatter by __supernet_id__ and leave
-        # the unserved arcs as placeholders that no real preload row can match.
         if self.preloads is None:
-            supernet_size = self._get_supernet_size()
-            link_ids = np.full(supernet_size, -1, dtype=np.int64)
-            directions = np.zeros(supernet_size, dtype=np.int64)
-            populated = False
-            for c in self.classes:
-                g = c.graph.graph
-                if g.empty or "__supernet_id__" not in g.columns:
-                    continue
-                sn = g.__supernet_id__.to_numpy(copy=False)
-                link_ids[sn] = g.link_id.to_numpy(copy=False)
-                directions[sn] = g.direction.to_numpy(copy=False)
-                populated = True
+            link_ids, directions, populated = self._get_supernet_arcs()
             if populated:
                 self.preloads = pd.DataFrame({"link_id": link_ids, "direction": directions})
             else:
@@ -729,7 +725,7 @@ class TrafficAssignment(AssignmentBase):
             if self.assignment.preload is None:
                 self.assignment.preload = self.preloads[name].to_numpy()
             else:
-                self.assignment.preload += self.preloads[name]
+                self.assignment.preload += self.preloads[name].to_numpy()
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
@@ -817,17 +813,27 @@ class TrafficAssignment(AssignmentBase):
             **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on `link_id`
         """
 
-        idx = self.classes[0].graph.graph.__supernet_id__
-        assig_results = [cls.results.get_load_results() for cls in self.classes]
+        link_ids, directions, populated = self._get_supernet_arcs()
+        if populated:
+            valid = link_ids >= 0
+            valid_sn = np.where(valid)[0]
+            valid_lids = link_ids[valid]
+            valid_direcs = directions[valid]
+            m = _get_graph_to_network_mapping(valid_lids, valid_direcs)
+            sn_ab = valid_sn[m.graph_ab_idx]
+            sn_ba = valid_sn[m.graph_ba_idx]
+            unique_lids = np.unique(valid_lids)
+        else:
+            class1 = self.classes[0]
+            m = class1.results.get_graph_to_network_mapping()
+            sn_ab, sn_ba = m.graph_ab_idx, m.graph_ba_idx
+            unique_lids = np.unique(class1.results.lids)
 
-        class1 = self.classes[0]
-        res1 = assig_results[0]
-
-        tot_flow = self.assignment.fw_total_flow[idx]
-        voc = tot_flow / self.capacity[idx]
-        congested_time = self.congested_time[idx]
-        free_flow_tt = self.free_flow_tt[idx]
-        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload[idx]
+        tot_flow = self.assignment.fw_total_flow
+        voc = np.divide(tot_flow, self.capacity, out=np.zeros_like(tot_flow), where=self.capacity > 0)
+        congested_time = self.congested_time
+        free_flow_tt = self.free_flow_tt
+        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
 
         fields = [
             "Preload_AB",
@@ -847,19 +853,15 @@ class TrafficAssignment(AssignmentBase):
             "PCE_tot",
         ]
 
-        agg = pd.DataFrame([], columns=fields, index=res1.index[:]).astype(float)
+        agg = pd.DataFrame([], columns=fields, index=unique_lids).astype(float)
         agg.fillna(0.0, inplace=True)
-
-        # Use the first class to get a graph -> network link ID mapping
-        m = class1.results.get_graph_to_network_mapping()
-        graph_ab_idx, graph_ba_idx = m.graph_ab_idx, m.graph_ba_idx
 
         _assign_aggregation_fields(
             agg,
             "Preload_AB",
             "Preload_BA",
-            preload[m.graph_ab_idx],
-            preload[m.graph_ba_idx],
+            preload[sn_ab],
+            preload[sn_ba],
             m.network_ab_idx,
             m.network_ba_idx,
         )
@@ -869,15 +871,15 @@ class TrafficAssignment(AssignmentBase):
             agg,
             "Congested_Time_AB",
             "Congested_Time_BA",
-            congested_time[m.graph_ab_idx],
-            congested_time[m.graph_ba_idx],
+            congested_time[sn_ab],
+            congested_time[sn_ba],
             m.network_ab_idx,
             m.network_ba_idx,
         )
         agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        delay_factor_ab = _safe_delay_factor(congested_time[graph_ab_idx], free_flow_tt[graph_ab_idx])
-        delay_factor_ba = _safe_delay_factor(congested_time[graph_ba_idx], free_flow_tt[graph_ba_idx])
+        delay_factor_ab = _safe_delay_factor(congested_time[sn_ab], free_flow_tt[sn_ab])
+        delay_factor_ba = _safe_delay_factor(congested_time[sn_ba], free_flow_tt[sn_ba])
         _assign_aggregation_fields(
             agg,
             "Delay_factor_AB",
@@ -893,8 +895,8 @@ class TrafficAssignment(AssignmentBase):
             agg,
             "VOC_AB",
             "VOC_BA",
-            voc[m.graph_ab_idx],
-            voc[m.graph_ba_idx],
+            voc[sn_ab],
+            voc[sn_ba],
             m.network_ab_idx,
             m.network_ba_idx,
         )
@@ -904,13 +906,14 @@ class TrafficAssignment(AssignmentBase):
             agg,
             "PCE_AB",
             "PCE_BA",
-            tot_flow[m.graph_ab_idx],
-            tot_flow[m.graph_ba_idx],
+            tot_flow[sn_ab],
+            tot_flow[sn_ba],
             m.network_ab_idx,
             m.network_ba_idx,
         )
         agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
+        assig_results = [cls.results.get_load_results() for cls in self.classes]
         assig_results.append(agg)
         return pd.concat(assig_results, axis=1).fillna(0.0).rename_axis("link_id")
 
