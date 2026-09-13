@@ -814,20 +814,22 @@ class TrafficAssignment(AssignmentBase):
         """
 
         link_ids, directions, populated = self._get_supernet_arcs()
-        if populated:
-            valid = link_ids >= 0
-            valid_sn = np.where(valid)[0]
-            valid_lids = link_ids[valid]
-            valid_direcs = directions[valid]
-            m = _get_graph_to_network_mapping(valid_lids, valid_direcs)
-            sn_ab = valid_sn[m.graph_ab_idx]
-            sn_ba = valid_sn[m.graph_ba_idx]
-            unique_lids = np.unique(valid_lids)
-        else:
-            class1 = self.classes[0]
-            m = class1.results.get_graph_to_network_mapping()
-            sn_ab, sn_ba = m.graph_ab_idx, m.graph_ba_idx
-            unique_lids = np.unique(class1.results.lids)
+        if not populated:
+            raise ValueError(
+                "Assignment results require graphs prepared with prepare_graph(): no traffic class "
+                "carries a __supernet_id__ column, and every aggregate below is indexed by it."
+            )
+        # graph_ab_idx / graph_ba_idx are boolean masks over the arcs handed to the mapping, so
+        # they have to be turned back into supernet ids before they can index the flow, cost and
+        # capacity vectors, which all span the whole supernet.
+        valid = link_ids >= 0
+        valid_sn = np.where(valid)[0]
+        valid_lids = link_ids[valid]
+        valid_direcs = directions[valid]
+        m = _get_graph_to_network_mapping(valid_lids, valid_direcs)
+        sn_ab = valid_sn[m.graph_ab_idx]
+        sn_ba = valid_sn[m.graph_ba_idx]
+        unique_lids = np.unique(valid_lids)
 
         tot_flow = self.assignment.fw_total_flow
         voc = np.divide(tot_flow, self.capacity, out=np.zeros_like(tot_flow), where=self.capacity > 0)

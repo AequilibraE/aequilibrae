@@ -25,7 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 def _require_bool(value, name: str) -> bool:
-    """Validates that value is a Python or NumPy boolean."""
+    """Validates that value is a Python or NumPy boolean.
+
+    ``np.bool_`` has to be accepted: it is what ``Series.any()``, ``np.all`` and array
+    comparisons return, and it is not an instance of ``bool``. A bare isinstance check turns
+    ordinary user code away, and reports "got bool" while doing it, because that is the name
+    NumPy's scalar carries.
+    """
     if isinstance(value, (bool, np.bool_)):
         return bool(value)
     raise TypeError(f"{name} must be a boolean, got {type(value).__module__}.{type(value).__name__}")
@@ -89,6 +95,7 @@ class GraphBase(ABC):  # noqa: B024
 
         self.description = "No description added so far"
         self.supernet_size: Optional[int] = None
+        self.__graph_groupby = None
 
         self.num_links = -1
         self.num_nodes = -1
@@ -671,7 +678,6 @@ class GraphBase(ABC):  # noqa: B024
             if (
                 not self.compact_graph.empty
                 and "__compressed_id__" in self.graph.columns
-                and hasattr(self, "_GraphBase__graph_groupby")
                 and self.__graph_groupby is not None
             ):
                 self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
@@ -689,9 +695,7 @@ class GraphBase(ABC):  # noqa: B024
         # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
         if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
-            if hasattr(self, "_GraphBase__graph_groupby") and (
-                self.__graph_groupby is None or self.__graph_groupby.obj is not self.graph
-            ):
+            if self.__graph_groupby is None or self.__graph_groupby.obj is not self.graph:
                 self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
             df = self.__graph_groupby[[cost_field]].sum().reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
@@ -887,7 +891,9 @@ class GraphBase(ABC):  # noqa: B024
         if self.graph.empty:
             return {int(v) for v in self._turn_restrictions["via_node"].dropna().unique()}
 
-        # Cached by generation counters, which update whenever turn restrictions or topology change.
+        # Cached by generation counters, which update whenever turn restrictions or topology
+        # change. Do not add a cheap content fingerprint here: a summed node id was tried and is
+        # permutation invariant, so it cannot separate two same-shaped topologies.
         cache_key = (
             self._turn_restrictions_generation,
             self._graph_generation,
