@@ -231,7 +231,6 @@ class TrafficClass(TransportClassBase):
         # they can be assigned positionally.
         supernet_ids = self.graph.graph.__supernet_id__.to_numpy(copy=False)
         cost = (self.fixed_cost + self.congested_time)[supernet_ids]
-        self.graph.cost = cost
         congested_time = np.asarray(self.congested_time)[supernet_ids]
         self.graph.graph = self.graph.graph.assign(__assignment_cost__=cost, __congested_time__=congested_time)
         skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]

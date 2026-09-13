@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import tempfile
-import networkx as nx
 import numpy as np
 import pandas as pd
-import pytest
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficAssignment, TrafficClass
@@ -17,10 +15,42 @@ def _build_test_network():
     # 1 -> 2 -> 3: links 1 (cost 5), 2 (cost 5) = total cost 10
     # 1 -> 4 -> 3: links 3 (cost 7), 4 (cost 7) = total cost 14
     links = [
-        {"link_id": 1, "a_node": 1, "b_node": 2, "direction": 1, "distance": 5.0, "free_flow_time": 5.0, "capacity": 1000.0},
-        {"link_id": 2, "a_node": 2, "b_node": 3, "direction": 1, "distance": 5.0, "free_flow_time": 5.0, "capacity": 1000.0},
-        {"link_id": 3, "a_node": 1, "b_node": 4, "direction": 1, "distance": 7.0, "free_flow_time": 7.0, "capacity": 1000.0},
-        {"link_id": 4, "a_node": 4, "b_node": 3, "direction": 1, "distance": 7.0, "free_flow_time": 7.0, "capacity": 1000.0},
+        {
+            "link_id": 1,
+            "a_node": 1,
+            "b_node": 2,
+            "direction": 1,
+            "distance": 5.0,
+            "free_flow_time": 5.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 2,
+            "a_node": 2,
+            "b_node": 3,
+            "direction": 1,
+            "distance": 5.0,
+            "free_flow_time": 5.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 3,
+            "a_node": 1,
+            "b_node": 4,
+            "direction": 1,
+            "distance": 7.0,
+            "free_flow_time": 7.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 4,
+            "a_node": 4,
+            "b_node": 3,
+            "direction": 1,
+            "distance": 7.0,
+            "free_flow_time": 7.0,
+            "capacity": 1000.0,
+        },
     ]
     df = pd.DataFrame(links)
     df["modes"] = "c"
@@ -135,7 +165,7 @@ def test_saved_path_file_with_chain_compression():
     paths_compressed, g = _run_assignment_and_read_paths(net, turns=prohib_turns, compress=True, use_hybrid=True)
 
     assert (1, 3) in paths_compressed
-    # Even though 1 -> 4 -> 3 was compressed into one compact arc, the saved path file must unpack both original links [3, 4]
+    # 1 -> 4 -> 3 compressed into one compact arc, so the path file must unpack both original links
     assert paths_compressed[(1, 3)] == [3, 4]
 
 

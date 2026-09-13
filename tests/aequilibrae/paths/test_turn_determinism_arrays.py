@@ -1,11 +1,10 @@
-"""Test suite verifying byte-for-byte determinism of compact topology, boundary context, rep-arc, and turn-CSR arrays."""
+"""Byte-for-byte determinism of compact topology, boundary context, rep-arc and turn-CSR arrays."""
 
 from __future__ import annotations
 
 import tempfile
 import numpy as np
 import pandas as pd
-import pytest
 
 from aequilibrae.paths import Graph
 from aequilibrae.paths.network_skimming import NetworkSkimming
@@ -136,6 +135,7 @@ def test_determinism_disk_serialization_round_trip():
         assert g2.use_hybrid == g1.use_hybrid
     finally:
         import os
+
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import sqlite3
 import numpy as np
-import pandas as pd
 import pytest
 
 
@@ -143,12 +141,26 @@ def test_project_multimode_turn_restrictions(sioux_falls_example):
     assert graph_b.has_turn_restrictions
 
     # graph_c should only have t1, not t2
-    c_turns = set(zip(graph_c._turn_restrictions.from_node, graph_c._turn_restrictions.via_node, graph_c._turn_restrictions.to_node))
+    c_turns = set(
+        zip(
+            graph_c._turn_restrictions.from_node,
+            graph_c._turn_restrictions.via_node,
+            graph_c._turn_restrictions.to_node,
+            strict=True,
+        )
+    )
     assert t1 in c_turns
     assert t2 not in c_turns
 
     # graph_b should only have t2, not t1
-    b_turns = set(zip(graph_b._turn_restrictions.from_node, graph_b._turn_restrictions.via_node, graph_b._turn_restrictions.to_node))
+    b_turns = set(
+        zip(
+            graph_b._turn_restrictions.from_node,
+            graph_b._turn_restrictions.via_node,
+            graph_b._turn_restrictions.to_node,
+            strict=True,
+        )
+    )
     assert t2 in b_turns
     assert t1 not in b_turns
 

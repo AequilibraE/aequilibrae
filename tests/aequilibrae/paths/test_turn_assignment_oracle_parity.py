@@ -16,7 +16,11 @@ class TurnAssignmentOracle:
 
     def __init__(self, links_df: pd.DataFrame, turns_df: pd.DataFrame | None = None, allow_uturns: bool = False):
         self.links_df = links_df.copy()
-        self.turns_df = turns_df.copy() if turns_df is not None else pd.DataFrame(columns=["from_node", "via_node", "to_node", "penalty"])
+        self.turns_df = (
+            turns_df.copy()
+            if turns_df is not None
+            else pd.DataFrame(columns=["from_node", "via_node", "to_node", "penalty"])
+        )
         self.allow_uturns = allow_uturns
 
         # Precompute turn penalty lookup
@@ -162,11 +166,51 @@ def _make_test_network_and_demand():
     # 4 -> 3 (link 4, cost 12)
     # 2 -> 4 (link 5, cost 3)
     links = [
-        {"link_id": 1, "a_node": 1, "b_node": 2, "direction": 1, "distance": 10.0, "free_flow_time": 10.0, "capacity": 1000.0},
-        {"link_id": 2, "a_node": 2, "b_node": 3, "direction": 1, "distance": 10.0, "free_flow_time": 10.0, "capacity": 1000.0},
-        {"link_id": 3, "a_node": 1, "b_node": 4, "direction": 1, "distance": 12.0, "free_flow_time": 12.0, "capacity": 1000.0},
-        {"link_id": 4, "a_node": 4, "b_node": 3, "direction": 1, "distance": 12.0, "free_flow_time": 12.0, "capacity": 1000.0},
-        {"link_id": 5, "a_node": 2, "b_node": 4, "direction": 1, "distance": 3.0, "free_flow_time": 3.0, "capacity": 1000.0},
+        {
+            "link_id": 1,
+            "a_node": 1,
+            "b_node": 2,
+            "direction": 1,
+            "distance": 10.0,
+            "free_flow_time": 10.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 2,
+            "a_node": 2,
+            "b_node": 3,
+            "direction": 1,
+            "distance": 10.0,
+            "free_flow_time": 10.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 3,
+            "a_node": 1,
+            "b_node": 4,
+            "direction": 1,
+            "distance": 12.0,
+            "free_flow_time": 12.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 4,
+            "a_node": 4,
+            "b_node": 3,
+            "direction": 1,
+            "distance": 12.0,
+            "free_flow_time": 12.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 5,
+            "a_node": 2,
+            "b_node": 4,
+            "direction": 1,
+            "distance": 3.0,
+            "free_flow_time": 3.0,
+            "capacity": 1000.0,
+        },
     ]
     df = pd.DataFrame(links)
     df["modes"] = "c"

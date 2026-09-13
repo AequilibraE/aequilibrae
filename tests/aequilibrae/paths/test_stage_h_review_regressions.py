@@ -133,3 +133,94 @@ def test_node_turn_mapping_handles_heads_outside_the_forward_star():
     np.testing.assert_array_equal(from_arcs, np.array([2, 4], dtype=np.int64))
     np.testing.assert_array_equal(to_arcs, np.array([3, 5], dtype=np.int64))
     np.testing.assert_allclose(penalties, np.array([2.0, 3.0]))
+
+
+def test_boolean_setters_accept_numpy_booleans():
+    """Verifies graph configuration setters accept numpy booleans and still reject non-booleans."""
+    graph = _scrambled_supernet_graph()
+
+    # np.True_ is what Series.any(), np.all() and array comparisons return.
+    graph.set_hybrid_kernel(np.False_)
+    assert graph.use_hybrid is False
+    graph.set_blocked_centroid_flows(np.True_)
+    assert graph.block_centroid_flows is True
+    graph.set_turn_restrictions(
+        pd.DataFrame(columns=["from_node", "via_node", "to_node", "penalty"]), allow_path_uturns=np.True_
+    )
+    assert graph._allow_path_uturns is True
+
+    other = _scrambled_supernet_graph()
+    other.prepare_graph(centroids=np.array([1, 4], dtype=np.int64), remove_dead_ends=np.False_)
+    assert other._remove_dead_ends is False
+
+    with pytest.raises(TypeError, match="use_hybrid"):
+        graph.set_hybrid_kernel("yes")
+    with pytest.raises(TypeError, match="use_hybrid"):
+        graph.set_hybrid_kernel(1)
+
+
+def test_duplicate_turn_restrictions_keep_the_callers_columns():
+    """Verifies collapsing duplicate movements preserves other columns and prohibition dominance."""
+    graph = _scrambled_supernet_graph()
+    rows = [
+        {"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 2.0, "modes": "c", "restriction_id": 10},
+        {"from_node": 1, "via_node": 2, "to_node": 3, "penalty": np.inf, "modes": "c", "restriction_id": 11},
+    ]
+    graph.set_turn_restrictions(pd.DataFrame(rows), allow_path_uturns=False)
+
+    stored = graph._turn_restrictions
+    # The schema must not depend on whether duplicates happened to be present.
+    assert set(stored.columns) >= {"from_node", "via_node", "to_node", "penalty", "modes", "restriction_id"}
+    assert len(stored) == 1
+    assert np.isinf(stored.penalty.iloc[0])
+
+    with pytest.raises(ValueError, match="Conflicting duplicate turn penalties"):
+        conflicting = [
+            {"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 2.0},
+            {"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 9.0},
+        ]
+        graph.set_turn_restrictions(pd.DataFrame(conflicting), allow_path_uturns=False)
+
+
+def test_skim_congested_does_not_mutate_the_graph_cost_vector():
+    """Verifies skimming the congested network leaves graph.cost matching the configured cost field."""
+    graph = _scrambled_supernet_graph()
+    before = np.array(graph.cost, copy=True)
+
+    mat = AequilibraeMatrix()
+    mat.create_empty(file_name=AequilibraeMatrix().random_name(), zones=2, matrix_names=["matrix"])
+    mat.index[:] = graph.centroids[:]
+    mat.computational_view(core_list=["matrix"])
+    mat.matrix_view[:, :] = 1.0
+
+    tc = TrafficClass("car", graph, mat)
+    tc.congested_time = np.full(graph.num_links, 7.0)
+    tc.fixed_cost = np.zeros(graph.num_links, dtype=np.float64)
+    tc.skim_congested()
+
+    np.testing.assert_array_equal(graph.cost, before)
+    np.testing.assert_array_equal(graph.cost, graph.graph[graph.cost_field].to_numpy(np.float64))
+
+
+def test_mode_excluded_self_loops_do_not_reach_the_compact_graph():
+    """Verifies mode-exclusion self-loops are dropped while genuine source self-loops survive."""
+    links = [
+        {"link_id": 1, "a_node": 1, "b_node": 2, "direction": 1, "distance": 1.0, "cost": 1.0, "modes": "ct"},
+        {"link_id": 2, "a_node": 2, "b_node": 3, "direction": 1, "distance": 1.0, "cost": 1.0, "modes": "ct"},
+        # Genuine loop road at a node this mode serves.
+        {"link_id": 3, "a_node": 3, "b_node": 3, "direction": 1, "distance": 1.0, "cost": 1.0, "modes": "ct"},
+        # Network.build_graphs collapses links that do not serve the mode into self-loops.
+        {"link_id": 4, "a_node": 2, "b_node": 2, "direction": 1, "distance": 1.0, "cost": 1.0, "modes": "t"},
+    ]
+    df = pd.DataFrame(links)
+    df["link_type"] = "road"
+    graph = Graph()
+    graph.mode = "c"
+    graph.cost_field = "cost"
+    graph.network = df
+    graph.prepare_graph(centroids=np.array([1, 3], dtype=np.int64), remove_dead_ends=False)
+    graph.set_graph("cost")
+
+    compact_link_ids = set(graph.compact_graph.link_id.to_numpy().tolist())
+    assert 3 in compact_link_ids, "a genuine source self-loop must survive contraction"
+    assert 4 not in compact_link_ids, "a mode-exclusion self-loop must not reach the compact graph"

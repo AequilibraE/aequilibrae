@@ -309,6 +309,18 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     allow_uturns = bool(graph._allow_uturns_everywhere or graph._allow_path_uturns)
 
     df = pd.DataFrame(graph.network, copy=True)
+
+    # Genuine self-loops in the source network are legitimate geometry and are kept. Mode
+    # exclusion, however, *manufactures* self-loops: Network.build_graphs sets b_node = a_node
+    # on every link that does not serve this graph's mode, precisely so they drop out here.
+    # Those carry no geometry and must not reach the compact graph. The `modes` column still
+    # tells the two apart, so use it rather than deleting every self-loop indiscriminately.
+    if graph.mode and "modes" in df.columns:
+        self_loops = df.a_node.to_numpy(copy=False) == df.b_node.to_numpy(copy=False)
+        if self_loops.any():
+            serves_mode = df.modes.fillna("").astype(str).str.contains(graph.mode, regex=False).to_numpy()
+            df = df[~(self_loops & ~serves_mode)]
+
     if remove_dead_ends:
         num_directed_arcs = len(graph_b_nodes)
         r_counts = np.bincount(graph_b_nodes, minlength=num_directed_nodes)

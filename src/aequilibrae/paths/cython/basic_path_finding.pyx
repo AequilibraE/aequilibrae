@@ -598,7 +598,9 @@ cpdef int path_finding_hybrid(
         if destination_count == 0:
             if settled_count is not None and settled_count.shape[0] > 0:
                 settled_count[0] = labels_settled
-            return found
+            # Every exit reports settled nodes excluding the origin, which is seeded into
+            # reached_first[0] before the search starts.
+            return found - 1
 
     for idx in range(<size_t>graph_fs[origin_vert], <size_t>graph_fs[origin_vert + 1]):
         if graph_costs[idx] < INFINITY:

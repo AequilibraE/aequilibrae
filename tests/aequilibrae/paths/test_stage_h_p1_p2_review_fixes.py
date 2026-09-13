@@ -6,7 +6,6 @@ import pytest
 
 from aequilibrae.paths import Graph
 from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.traffic_assignment import TrafficAssignment
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.cython.basic_path_finding import path_finding_hybrid
@@ -209,7 +208,7 @@ def test_issue_6_project_graph_turn_table_validation(sioux_falls_example):
 
 
 def test_issue_7_set_graph_cost_contract():
-    """set_graph rejects NaN, negative values, and -inf, while keeping +inf."""
+    """set_graph rejects negative values and -inf, coerces NaN to +inf, and keeps +inf."""
     net = make_simple_network()
     net["nan_cost"] = [1.0, np.nan, 3.0]
     net["neg_cost"] = [1.0, -2.0, 3.0]
@@ -220,8 +219,10 @@ def test_issue_7_set_graph_cost_contract():
     g.network = net
     g.prepare_graph(centroids=np.array([1, 4], dtype=np.int64), remove_dead_ends=False)
 
-    with pytest.raises(ValueError, match="NaN"):
-        g.set_graph("nan_cost")
+    # NaN means "no data for this field" in real networks - the Coquimbo example ships a
+    # travel_time column like that - so it is coerced to +inf (unusable) rather than rejected.
+    g.set_graph("nan_cost")
+    assert np.isinf(g.cost[1])
 
     with pytest.raises(ValueError, match="negative"):
         g.set_graph("neg_cost")
@@ -291,13 +292,16 @@ def test_issue_8_hybrid_origin_destination_handling():
         turn_to_arcs,
         turn_penalties,
         False,  # allow_uturns
-        True,   # block_centroid_flows
-        2,      # num_zones
+        True,  # block_centroid_flows
+        2,  # num_zones
         first_ctx,
         last_ctx,
         settled,
     )
-    assert found == 1
+    # The return value counts settled nodes excluding the origin, which is seeded into
+    # reached_first[0] before the search starts - so consuming only the origin reports 0,
+    # exactly as this test's name says. Every other exit of the kernel returns found - 1.
+    assert found == 0
     assert settled[0] == 0
 
 
@@ -313,7 +317,9 @@ def test_issue_9_boolean_configuration_type_validation():
         g.set_hybrid_kernel(0)
 
     with pytest.raises(TypeError, match="allow_path_uturns"):
-        g.set_turn_restrictions(pd.DataFrame(columns=["from_node", "via_node", "to_node", "penalty"]), allow_path_uturns="True")
+        g.set_turn_restrictions(
+            pd.DataFrame(columns=["from_node", "via_node", "to_node", "penalty"]), allow_path_uturns="True"
+        )
 
     with pytest.raises(TypeError, match="remove_dead_ends"):
         g.prepare_graph(remove_dead_ends="False")

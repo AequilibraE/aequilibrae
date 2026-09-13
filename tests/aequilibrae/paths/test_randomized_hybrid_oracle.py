@@ -96,7 +96,9 @@ def _generate_random_network(seed: int, num_nodes: int = 8, num_links: int = 18)
         u, v = nodes[i], nodes[i + 1]
         edge_set.add((u, v))
         cost = round(rng.uniform(2.0, 15.0), 1)
-        links.append({"link_id": link_id, "a_node": u, "b_node": v, "direction": 1, "distance": cost, "free_flow_time": cost})
+        links.append(
+            {"link_id": link_id, "a_node": u, "b_node": v, "direction": 1, "distance": cost, "free_flow_time": cost}
+        )
         link_id += 1
 
     # Additional random directed edges
@@ -106,7 +108,9 @@ def _generate_random_network(seed: int, num_nodes: int = 8, num_links: int = 18)
         if u != v and (u, v) not in edge_set:
             edge_set.add((u, v))
             cost = round(rng.uniform(2.0, 20.0), 1)
-            links.append({"link_id": link_id, "a_node": u, "b_node": v, "direction": 1, "distance": cost, "free_flow_time": cost})
+            links.append(
+                {"link_id": link_id, "a_node": u, "b_node": v, "direction": 1, "distance": cost, "free_flow_time": cost}
+            )
             link_id += 1
 
     links_df = pd.DataFrame(links)
@@ -186,11 +190,13 @@ def test_randomized_small_network_oracle_parity(seed: int):
 
                 # Cost parity
                 assert arc_res.milepost[-1] == pytest.approx(expected_cost, abs=1e-5), f"Seed {seed}: {orig} -> {dest}"
-                assert hybrid_res.milepost[-1] == pytest.approx(expected_cost, abs=1e-5), f"Seed {seed}: {orig} -> {dest}"
+                assert hybrid_res.milepost[-1] == pytest.approx(expected_cost, abs=1e-5), (
+                    f"Seed {seed}: {orig} -> {dest}"
+                )
 
                 # Independent audit of hybrid path
                 h_nodes = [int(n) for n in hybrid_res.path_nodes]
-                h_links = [int(l) for l in hybrid_res.path]
+                h_links = [int(lid) for lid in hybrid_res.path]
                 assert h_nodes[0] == orig
                 assert h_nodes[-1] == dest
                 assert len(h_nodes) == len(h_links) + 1
@@ -200,7 +206,9 @@ def test_randomized_small_network_oracle_parity(seed: int):
                     recomputed_cost += link_costs[lid]
                     if i > 0:
                         pen = turn_lookup.get((h_nodes[i - 1], h_nodes[i], h_nodes[i + 1]), 0.0)
-                        assert not np.isinf(pen), f"Prohibited turn in path {h_nodes[i-1]}->{h_nodes[i]}->{h_nodes[i+1]}"
+                        assert not np.isinf(pen), (
+                            f"Prohibited turn in path {h_nodes[i - 1]}->{h_nodes[i]}->{h_nodes[i + 1]}"
+                        )
                         recomputed_cost += pen
 
                 assert recomputed_cost == pytest.approx(expected_cost, abs=1e-5)
