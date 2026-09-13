@@ -56,7 +56,7 @@ class MultiThreadedAoN:
         self.arc_turn_penalties = np.zeros((results.cores, size_links), dtype=ftype)
 
         if results._selected_links:
-            self.has_flow_mask = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
+            self.has_flow_mask = np.zeros((results.cores, graph.compact_num_links + 1), dtype=bool)
             # Copying the select link matrices from results
             self.select_links = results.select_links
             self.temp_sl_od_matrix = np.zeros(
@@ -70,7 +70,7 @@ class MultiThreadedAoN:
                 dtype=graph.default_types("float"),
             )
             self.temp_sl_link_loading = np.zeros(
-                (results.cores, len(results._selected_links), graph.compact_num_links, results.classes["number"]),
+                (results.cores, len(results._selected_links), graph.compact_num_links + 1, results.classes["number"]),
                 dtype=graph.default_types("float"),
             )
 

@@ -176,9 +176,19 @@ class AssignmentResults(AssignmentResultsBase):
         self.skim_names = list(graph.skim_fields)
         self.lids = graph.graph.link_id.to_numpy(copy=False)
         self.direcs = graph.graph.direction.to_numpy(copy=False)
-        self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
-        supernet_ids = graph.graph.__supernet_id__.to_numpy(copy=False)
-        compressed_ids = graph.graph.__compressed_id__.to_numpy(copy=False)
+        supernet_ids = (
+            graph.graph.__supernet_id__.to_numpy(copy=False)
+            if "__supernet_id__" in graph.graph.columns
+            else np.arange(graph.graph.shape[0], dtype=self.__integer_type)
+        )
+        compressed_ids = (
+            graph.graph.__compressed_id__.to_numpy(copy=False)
+            if "__compressed_id__" in graph.graph.columns
+            else np.arange(graph.graph.shape[0], dtype=self.__integer_type)
+        )
+        supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else graph.graph.shape[0]
+        self.links = max(graph.num_links, supernet_size)
+        self.crosswalk = np.full(self.links, graph.compact_num_links, dtype=self.__integer_type)
         self.crosswalk[supernet_ids] = compressed_ids
         self._graph_ids = supernet_ids
         self._graph_compressed_ids = compressed_ids

@@ -164,12 +164,24 @@ class AssignmentBase(ABC):
             if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
+    def _get_supernet_size(self) -> int:
+        if not self.classes:
+            return 0
+        return max(
+            int(c.graph.graph.__supernet_id__.max() + 1)
+            if "__supernet_id__" in c.graph.graph.columns and not c.graph.graph.empty
+            else c.graph.graph.shape[0]
+            for c in self.classes
+        )
+
     def set_time_field(self, time_field: str) -> None:
         self._check_field(time_field)
-        c = self.classes[0]
-        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-        self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
-        self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
+        supernet_size = self._get_supernet_size()
+        c0 = self.classes[0]
+        self.free_flow_tt = np.zeros(supernet_size, c0.graph.default_types("float"))
+        for c in self.classes:
+            self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
+        self.total_flow = np.zeros(supernet_size, np.float64)
         self.time_field = time_field
 
     def get_skim_results(self) -> list:
@@ -383,6 +395,12 @@ class TrafficAssignment(AssignmentBase):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
+        supernet_size = self._get_supernet_size()
+        for c in self.classes:
+            if c.fixed_cost.shape[0] < supernet_size:
+                fc = np.zeros(supernet_size, c.graph.default_types("float"))
+                fc[: c.fixed_cost.shape[0]] = c.fixed_cost
+                c.fixed_cost = fc
 
     def add_class(self, traffic_class: TrafficClass) -> None:
         """
@@ -397,6 +415,12 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
+        supernet_size = self._get_supernet_size()
+        for c in self.classes:
+            if c.fixed_cost.shape[0] < supernet_size:
+                fc = np.zeros(supernet_size, c.graph.default_types("float"))
+                fc[: c.fixed_cost.shape[0]] = c.fixed_cost
+                c.fixed_cost = fc
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
@@ -520,12 +544,14 @@ class TrafficAssignment(AssignmentBase):
             if p1 not in par:
                 raise ValueError(f"{p1} should exist in the set of parameters provided")
             p = par[p1]
+            supernet_size = self._get_supernet_size()
+            c0 = self.classes[0]
             if isinstance(self.vdf_parameters[p1], str):
-                c = self.classes[0]
-                array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-                array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
+                array = np.zeros(supernet_size, c0.graph.default_types("float"))
+                for c in self.classes:
+                    array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
             else:
-                array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+                array = np.zeros(supernet_size, np.float64)
                 array.fill(self.vdf_parameters[p1])
             pars.append(array)
 
@@ -620,13 +646,15 @@ class TrafficAssignment(AssignmentBase):
             **capacity_field** (:obj:`str`): Field name
         """
         super()._check_field(capacity_field)
+        supernet_size = self._get_supernet_size()
         c = self.classes[0]
 
         self.cores = c.results.cores
         self.elementwise_cores = c.results.elementwise_cores
         self.threading_threshold = c.results.threading_threshold
-        self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-        self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
+        self.capacity = np.zeros(supernet_size, c.graph.default_types("float"))
+        for cl in self.classes:
+            self.capacity[cl.graph.graph.__supernet_id__] = cl.graph.graph[capacity_field]
         self.capacity_field = capacity_field
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
@@ -859,7 +887,7 @@ class TrafficAssignment(AssignmentBase):
         agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
         assig_results.append(agg)
-        return pd.concat(assig_results, axis=1).rename_axis("link_id")
+        return pd.concat(assig_results, axis=1).fillna(0.0).rename_axis("link_id")
 
     def info(self) -> dict:
         """Returns information for the traffic assignment procedure

@@ -100,16 +100,17 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     demand_per_origin = np.nansum(mat, axis=(1, 2))
     nodes_to_indices = graph.nodes_to_indices
     compact_nodes_to_indices = graph.compact_nodes_to_indices
-    graph_fs = graph.fs
+    compact_fs = graph.compact_fs
     report = []
     valid_origin_indices = []
     for orig in matrix.index:
         _i = int(nodes_to_indices[orig])
+        c_i = int(compact_nodes_to_indices[orig]) if 0 <= orig < len(compact_nodes_to_indices) else -1
         if demand_per_origin[_i] > 0 or skims > 0:
-            if graph_fs[_i] == graph_fs[_i + 1]:
+            if c_i < 0 or c_i >= len(compact_fs) - 1 or compact_fs[c_i] == compact_fs[c_i + 1]:
                 report.append("Centroid " + str(orig) + " is not connected")
             else:
-                valid_origin_indices.append(int(compact_nodes_to_indices[orig]))
+                valid_origin_indices.append(c_i)
 
     cdef long long n_origins = len(valid_origin_indices)
     if n_origins == 0:
@@ -453,7 +454,17 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread, bridge=No
     # Is is used to actual path computation and to refer to outputs of path computation
 
     orig = origin
-    origin_index = graph.compact_nodes_to_indices[orig]
+    origin_index = (
+        int(graph.compact_nodes_to_indices[orig])
+        if 0 <= orig < len(graph.compact_nodes_to_indices)
+        else -1
+    )
+    if (
+        origin_index < 0
+        or origin_index >= len(graph.compact_fs) - 1
+        or graph.compact_fs[origin_index] == graph.compact_fs[origin_index + 1]
+    ):
+        return "Centroid " + str(orig) + " is not connected"
 
     # We transform the python variables in Cython variables
     nodes = graph.compact_num_nodes

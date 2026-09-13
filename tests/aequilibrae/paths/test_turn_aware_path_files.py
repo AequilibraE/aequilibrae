@@ -118,7 +118,7 @@ def _run_assignment_and_read_paths(
                 end = int(idx_data[d_idx])
                 if start < end:
                     # Stored in destination-to-origin order, reverse to origin-to-destination
-                    seq = [int(abs(x)) for x in reversed(path_data[start:end])]
+                    seq = [int(x) for x in reversed(path_data[start:end])]
                     paths[(int(o_val), int(d_val))] = seq
 
     return paths, g
@@ -179,3 +179,48 @@ def test_saved_path_file_hybrid_vs_arc_parity():
 
     assert paths_hybrid == paths_arc
     assert paths_hybrid[(1, 3)] == [3, 4]
+
+
+def test_saved_path_file_signed_reverse_links():
+    """Verifies that reverse (BA) link traversals unpack with signed negative link IDs without abs()."""
+    # Link 1: 1 -> 2 (direction=1, cost=5)
+    # Link 2: 3 -> 2 (direction=-1, meaning BA directed arc 2 -> 3, cost=5)
+    # Link 3: 1 -> 3 (direction=1, cost=20)
+    links = [
+        {
+            "link_id": 1,
+            "a_node": 1,
+            "b_node": 2,
+            "direction": 1,
+            "distance": 5.0,
+            "free_flow_time": 5.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 2,
+            "a_node": 3,
+            "b_node": 2,
+            "direction": -1,
+            "distance": 5.0,
+            "free_flow_time": 5.0,
+            "capacity": 1000.0,
+        },
+        {
+            "link_id": 3,
+            "a_node": 1,
+            "b_node": 3,
+            "direction": 1,
+            "distance": 20.0,
+            "free_flow_time": 20.0,
+            "capacity": 1000.0,
+        },
+    ]
+    df = pd.DataFrame(links)
+    df["modes"] = "c"
+    df["link_type"] = "road"
+
+    # Route 1 -> 3 traverses link 1 (AB: +1) then link 2 in reverse (BA: -2)
+    turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 0.0}])
+    paths, _ = _run_assignment_and_read_paths(df, turns=turns, compress=False, use_hybrid=True)
+    assert (1, 3) in paths
+    assert paths[(1, 3)] == [1, -2]

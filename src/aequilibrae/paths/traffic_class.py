@@ -105,8 +105,17 @@ class TrafficClass(TransportClassBase):
         self.pce = 1.0
         self.vot = 1.0
         self.mode = graph.mode
-        self.class_flow: np.array  # FIXME: Is this ever access?
-        self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
+        supernet_ids = (
+            graph.graph.__supernet_id__.to_numpy(copy=False)
+            if graph is not None and not graph.graph.empty and "__supernet_id__" in graph.graph.columns
+            else None
+        )
+        supernet_size = (
+            int(supernet_ids.max() + 1)
+            if supernet_ids is not None and supernet_ids.size > 0
+            else (graph.graph.shape[0] if graph is not None else 0)
+        )
+        self.fixed_cost = np.zeros(supernet_size, graph.default_types("float")) if graph is not None else np.array([])
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
         self.results = AssignmentResults()
@@ -222,32 +231,36 @@ class TrafficClass(TransportClassBase):
         :Arguments:
             **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
         """
-        if self.graph.compact_num_links > 0:
-            self.graph.compact_costs_from_link_costs(self.fixed_cost + self.congested_time)
-
-        # fixed_cost and congested_time are indexed by __supernet_id__, while the rows of
-        # graph.graph are ordered by (a_node, b_node). Those two orders differ on any network
-        # with bidirectional links, so both vectors have to be gathered into row order before
-        # they can be assigned positionally.
-        supernet_ids = self.graph.graph.__supernet_id__.to_numpy(copy=False)
-        cost = (self.fixed_cost + self.congested_time)[supernet_ids]
-        congested_time = np.asarray(self.congested_time)[supernet_ids]
-        self.graph.graph = self.graph.graph.assign(__assignment_cost__=cost, __congested_time__=congested_time)
-        skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]
-        pre_fields = self.graph.skim_fields
-        pre_turn_fields = list(self.graph.turn_skim_fields) if self.graph.turn_skim_fields else []
+        pre_compact_cost = np.array(self.graph.compact_cost, copy=True)
         try:
-            self.graph.set_skimming(skims)
-            if pre_turn_fields:
-                if "__assignment_cost__" not in self.graph.turn_skim_fields:
-                    self.graph.turn_skim_fields.append("__assignment_cost__")
-            else:
-                self.graph.turn_skim_fields = ["__assignment_cost__"]
-            skimmer = self.graph.compute_skims()
+            if self.graph.compact_num_links > 0:
+                self.graph.compact_costs_from_link_costs(self.fixed_cost + self.congested_time)
+
+            # fixed_cost and congested_time are indexed by __supernet_id__, while the rows of
+            # graph.graph are ordered by (a_node, b_node). Those two orders differ on any network
+            # with bidirectional links, so both vectors have to be gathered into row order before
+            # they can be assigned positionally.
+            supernet_ids = self.graph.graph.__supernet_id__.to_numpy(copy=False)
+            cost = (self.fixed_cost + self.congested_time)[supernet_ids]
+            congested_time = np.asarray(self.congested_time)[supernet_ids]
+            self.graph.graph = self.graph.graph.assign(__assignment_cost__=cost, __congested_time__=congested_time)
+            skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]
+            pre_fields = self.graph.skim_fields
+            pre_turn_fields = list(self.graph.turn_skim_fields) if self.graph.turn_skim_fields else []
+            try:
+                self.graph.set_skimming(skims)
+                if pre_turn_fields:
+                    if "__assignment_cost__" not in self.graph.turn_skim_fields:
+                        self.graph.turn_skim_fields.append("__assignment_cost__")
+                else:
+                    self.graph.turn_skim_fields = ["__assignment_cost__"]
+                skimmer = self.graph.compute_skims()
+            finally:
+                self.graph.set_skimming(pre_fields)
+                self.graph.turn_skim_fields = pre_turn_fields
+            return skimmer
         finally:
-            self.graph.set_skimming(pre_fields)
-            self.graph.turn_skim_fields = pre_turn_fields
-        return skimmer
+            self.graph.compact_cost[:] = pre_compact_cost[:]
 
     def __setattr__(self, key, value):
         if key not in [

@@ -275,11 +275,18 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         )
         if len(graph.compact_all_nodes) > 0:
             graph.compact_nodes_to_indices[graph.compact_all_nodes] = np.arange(graph.compact_num_nodes)
-        graph.compact_fs = np.zeros(graph.compact_num_nodes + 1, dtype=graph.default_types("int"))
-        graph.compact_graph = pd.DataFrame(columns=["id", "link_id", "a_node", "b_node", "direction"])
+        graph.compact_graph = pd.DataFrame(
+            {
+                "id": np.empty(0, dtype=np.int64),
+                "link_id": np.empty(0, dtype=np.int64),
+                "a_node": np.empty(0, dtype=np.int64),
+                "b_node": np.empty(0, dtype=np.int64),
+                "direction": np.empty(0, dtype=np.int8),
+            }
+        )
         graph.compact_num_links = 0
         graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
-        graph.graph["__compressed_id__"] = np.zeros(len(graph.graph), dtype=np.int64)
+        graph.graph["__compressed_id__"] = np.full(len(graph.graph), graph.compact_num_links, dtype=np.int64)
         graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
         graph._compact_first_node = np.empty(0, dtype=np.int64)
         graph._compact_last_node = np.empty(0, dtype=np.int64)
@@ -370,11 +377,18 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         )
         if len(graph.compact_all_nodes) > 0:
             graph.compact_nodes_to_indices[graph.compact_all_nodes] = np.arange(graph.compact_num_nodes)
-        graph.compact_fs = np.zeros(graph.compact_num_nodes + 1, dtype=graph.default_types("int"))
-        graph.compact_graph = pd.DataFrame(columns=["id", "link_id", "a_node", "b_node", "direction"])
+        graph.compact_graph = pd.DataFrame(
+            {
+                "id": np.empty(0, dtype=np.int64),
+                "link_id": np.empty(0, dtype=np.int64),
+                "a_node": np.empty(0, dtype=np.int64),
+                "b_node": np.empty(0, dtype=np.int64),
+                "direction": np.empty(0, dtype=np.int8),
+            }
+        )
         graph.compact_num_links = 0
         graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
-        graph.graph["__compressed_id__"] = np.zeros(len(graph.graph), dtype=np.int64)
+        graph.graph["__compressed_id__"] = np.full(len(graph.graph), graph.compact_num_links, dtype=np.int64)
         graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
         graph._compact_first_node = np.empty(0, dtype=np.int64)
         graph._compact_last_node = np.empty(0, dtype=np.int64)
@@ -613,7 +627,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     # If will refer all the links that have no correlation to an element beyond the last link
     # This element will always be zero during assignment
     graph.graph.__compressed_id__ = graph.graph.__compressed_id__.fillna(
-        graph.compact_graph.id.max() + 1
+        graph.compact_num_links
     ).astype(np.int64)
 
 
@@ -621,18 +635,6 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 @cython.boundscheck(False)
 @cython.initializedcheck(False)
 def create_compressed_link_network_mapping(graph):
-    # Cache the result, this isn't a huge computation but isn't worth doing twice
-    if (
-        graph.compressed_link_network_mapping_idx is not None
-        and graph.compressed_link_network_mapping_data is not None
-        and graph.network_compressed_node_mapping is not None
-    ):
-        return (
-            graph.compressed_link_network_mapping_idx,
-            graph.compressed_link_network_mapping_data,
-            graph.network_compressed_node_mapping,
-        )
-
     cdef:
         long long i, j, a_node, x, b_node, tmp, compressed_id, non_duplicated_idx
         const long long[:] b
@@ -646,12 +648,33 @@ def create_compressed_link_network_mapping(graph):
         const long long[:] compact_b_nodes
         signed char direction
 
+    # Cache the result, this isn't a huge computation but isn't worth doing twice
+    if (
+        graph.compressed_link_network_mapping_idx is not None
+        and graph.compressed_link_network_mapping_data is not None
+        and graph.network_compressed_node_mapping is not None
+    ):
+        return (
+            graph.compressed_link_network_mapping_idx,
+            graph.compressed_link_network_mapping_data,
+            graph.network_compressed_node_mapping,
+        )
+
+    if graph.compact_num_links <= 0 or graph.compact_graph.empty:
+        idx_arr = np.zeros(1, dtype=np.uint32)
+        data_arr = np.empty(0, dtype=np.int64)
+        node_map_arr = np.full(graph.num_nodes, -1, dtype=np.int32)
+        graph.compressed_link_network_mapping_idx = idx_arr
+        graph.compressed_link_network_mapping_data = data_arr
+        graph.network_compressed_node_mapping = node_map_arr
+        return (idx_arr, data_arr, node_map_arr)
+
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
     # bother redoing sorting it.
 
-    # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`,
+    # Links completely removed from the network are assigned sentinel ID >= graph.compact_num_links,
     # we skip them.
-    filtered = graph.graph[graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1]
+    filtered = graph.graph[graph.graph.__compressed_id__ < graph.compact_num_links]
     filtered = filtered[["__compressed_id__", "a_node", "b_node", "link_id", "direction"]]
     duplicated = filtered.__compressed_id__.duplicated(keep=False)
     gb = filtered[duplicated].groupby(by="__compressed_id__", sort=True)

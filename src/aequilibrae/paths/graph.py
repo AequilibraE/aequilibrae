@@ -284,8 +284,9 @@ class GraphBase(ABC):  # noqa: B024
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
-        self.graph.sort_values(by=["link_id", "direction"], inplace=True)
-        self.graph["__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__int_type)
+        if "__supernet_id__" not in self.graph.columns:
+            self.graph.sort_values(by=["link_id", "direction"], inplace=True)
+            self.graph["__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__int_type)
         self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
 
         self.num_links = self.graph.shape[0]
@@ -295,6 +296,7 @@ class GraphBase(ABC):  # noqa: B024
             self.__build_compressed_graph(remove_dead_ends)
             self.compact_num_links = self.compact_graph.shape[0]
         else:
+            self.__graph_groupby = None
             self.compact_graph = pd.DataFrame([])
             self.compact_num_links = 0
             self.compact_all_nodes = np.empty(0, dtype=self.__int_type)
@@ -358,6 +360,7 @@ class GraphBase(ABC):  # noqa: B024
             self.compact_skims = None
         self.dead_end_links = np.empty(0, dtype=np.int64)
         self._crosswalk = None
+        self.__graph_groupby = None
 
         # Turn restrictions
         self.turn_fs = np.zeros(1, dtype=self.__int_type)
@@ -621,8 +624,8 @@ class GraphBase(ABC):  # noqa: B024
 
         The field must be numeric and every value must be non-negative: shortest path search
         relies on non-negative arc costs, and a negative entry would silently return a wrong
-        path rather than fail. ``+inf`` is allowed and marks an unusable link; ``NaN`` and
-        ``-inf`` are rejected.
+        path rather than fail. ``+inf`` is allowed and marks an unusable link; ``NaN`` values
+        are coerced to ``+inf`` with a warning; negative values and ``-inf`` are rejected.
 
         :Arguments:
             **cost_field** (:obj:`str`): Field name. Must be numeric and non-negative
@@ -635,7 +638,13 @@ class GraphBase(ABC):  # noqa: B024
             )
 
         if not self.graph.empty:
-            raw_costs = pd.to_numeric(self.graph[cost_field], errors="coerce").to_numpy(np.float64)
+            raw_series = self.graph[cost_field]
+            converted = pd.to_numeric(raw_series, errors="coerce")
+            # If conversion yielded NaN where input was not already NA/null/NaN, it was invalid non-numeric text
+            if (converted.isna() & ~raw_series.isna()).any():
+                raise ValueError(f"Cost field '{cost_field}' contains non-numeric values.")
+
+            raw_costs = converted.to_numpy(np.float64, copy=True)
             # A negative or -inf cost breaks the assumption every shortest path routine here
             # rests on, and there is no reading of it that produces a usable graph.
             if np.isneginf(raw_costs).any():
@@ -651,10 +660,18 @@ class GraphBase(ABC):  # noqa: B024
                     f"Cost field '{cost_field}' has {int(nan_costs.sum())} NaN values. "
                     "They are treated as unusable links (+inf)."
                 )
-                self.graph = self.graph.copy()
-                self.graph.loc[nan_costs, cost_field] = np.inf
-                if hasattr(self, "_GraphBase__graph_groupby") and self.__graph_groupby is not None:
-                    self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
+                raw_costs[nan_costs] = np.inf
+
+            # Always install the validated float64 vector into self.graph before groupby
+            self.graph = self.graph.copy()
+            self.graph[cost_field] = raw_costs
+            if (
+                not self.compact_graph.empty
+                and "__compressed_id__" in self.graph.columns
+                and hasattr(self, "_GraphBase__graph_groupby")
+                and self.__graph_groupby is not None
+            ):
+                self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
 
         self.cost_field = cost_field
 
@@ -669,11 +686,14 @@ class GraphBase(ABC):  # noqa: B024
         # We only have a compact graph if we have added centroids, as that's used for skimming and assignment
         if not self.compact_graph.empty:
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
-            if self.__graph_groupby.obj is not self.graph:
+            if hasattr(self, "_GraphBase__graph_groupby") and (
+                self.__graph_groupby is None or self.__graph_groupby.obj is not self.graph
+            ):
                 self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
             df = self.__graph_groupby[[cost_field]].sum().reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
         else:
+            self.__graph_groupby = None
             self.compact_cost = np.zeros(1, self.__float_type)
             if self.skim_fields and self.compact_num_nodes > 0:
                 self.compact_skims = np.zeros((1, len(self.skim_fields) + 1), self.__float_type)
@@ -693,20 +713,50 @@ class GraphBase(ABC):  # noqa: B024
         if self.graph.empty or "__compressed_id__" not in self.graph.columns:
             self._crosswalk = None
             return
-        crosswalk = np.zeros(self.graph.shape[0], dtype=self.__int_type)
-        crosswalk[self.graph.__supernet_id__.to_numpy(copy=False)] = self.graph.__compressed_id__.to_numpy(copy=False)
+        supernet_ids = self.graph.__supernet_id__.to_numpy(copy=False)
+        compressed_ids = self.graph.__compressed_id__.to_numpy(copy=False)
+        supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else self.graph.shape[0]
+        size = max(self.graph.shape[0], supernet_size)
+        crosswalk = np.full(size, self.compact_num_links, dtype=self.__int_type)
+        crosswalk[supernet_ids] = compressed_ids
         self._crosswalk = crosswalk
 
     def compact_costs_from_link_costs(self, link_costs: np.ndarray) -> None:
-        """Updates compact_cost from link costs indexed by __supernet_id__."""
+        """Updates compact_cost from link costs indexed by __supernet_id__.
+
+        link_costs must be a 1D array of non-negative numeric values whose length
+        matches the number of links in the graph. ``+inf`` is allowed and marks an
+        unusable link; ``NaN`` values are coerced to ``+inf``; negative values and
+        ``-inf`` are rejected.
+        """
         if self.compact_num_links > 0:
+            costs_arr = np.asarray(link_costs, dtype=self.__float_type)
+            if self._crosswalk is None:
+                self._build_crosswalk()
+            expected_len = len(self._crosswalk) if self._crosswalk is not None else self.graph.shape[0]
+            if costs_arr.shape[0] not in (self.graph.shape[0], expected_len):
+                raise ValueError(
+                    f"link_costs array length {costs_arr.shape[0]} does not match "
+                    f"graph link count {self.graph.shape[0]}"
+                )
+            if np.isneginf(costs_arr).any():
+                raise ValueError("link_costs contains -inf values.")
+            if (costs_arr < 0).any():
+                raise ValueError("link_costs contains negative values.")
+            if np.isnan(costs_arr).any():
+                costs_arr = costs_arr.copy()
+                costs_arr[np.isnan(costs_arr)] = np.inf
+
+            if costs_arr.shape[0] == self.graph.shape[0] and expected_len != self.graph.shape[0]:
+                expanded = np.zeros(expected_len, dtype=self.__float_type)
+                expanded[self.graph.__supernet_id__.to_numpy(copy=False)] = costs_arr
+                costs_arr = expanded
+
             if len(self.compact_cost) <= 1 and not self.compact_graph.empty:
                 self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
-            if self._crosswalk is None or len(self._crosswalk) != self.graph.shape[0]:
-                self._build_crosswalk()
             from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs
 
-            costs_arr = np.ascontiguousarray(link_costs, dtype=self.__float_type)
+            costs_arr = np.ascontiguousarray(costs_arr, dtype=self.__float_type)
             aggregate_link_costs(costs_arr, self.compact_cost, self._crosswalk)
 
     def set_skimming(self, skim_fields: list) -> None:
@@ -974,7 +1024,7 @@ class GraphBase(ABC):  # noqa: B024
                 finite = pens[np.isfinite(pens)]
                 if np.any(~np.isfinite(pens)):
                     final_pen = np.inf
-                elif len(finite) > 1 and not np.all(np.isclose(finite, finite[0])):
+                elif len(finite) > 1 and not np.all(finite == finite[0]):
                     raise ValueError(
                         f"Conflicting duplicate turn penalties for movement {mvmt}: {sorted(set(finite.tolist()))}"
                     )
@@ -1505,12 +1555,14 @@ class GraphBase(ABC):  # noqa: B024
             key = (f_arc, t_arc)
             if key in prohibited_keys:
                 continue
-            if key in key_to_penalty and not np.isclose(key_to_penalty[key], float(penalty)):
-                raise ValueError(
-                    f"Conflicting duplicate turn penalties for arc pair {key}: "
-                    f"{key_to_penalty[key]} vs {float(penalty)}"
-                )
-            key_to_penalty[key] = float(penalty)
+            if key in key_to_penalty:
+                if key_to_penalty[key] != float(penalty):
+                    raise ValueError(
+                        f"Conflicting duplicate turn penalties for arc pair {key}: "
+                        f"{key_to_penalty[key]} vs {float(penalty)}"
+                    )
+            else:
+                key_to_penalty[key] = float(penalty)
 
         if not prohibited_keys and not key_to_penalty:
             return (

@@ -251,7 +251,7 @@ cpdef cython.floating[:] aggregate_link_costs(
     # accumulation cannot be safely parallelised.
     for i in range(links):
         k = crosswalk[i]
-        if k < c_l:
+        if 0 <= k < c_l:
             compressed[k] += actual[i]
 
     return compressed
@@ -268,6 +268,7 @@ cpdef cython.floating[:, ::1] assign_link_loads(
     cdef long long k
     cdef Py_ssize_t links = actual.shape[0]
     cdef Py_ssize_t n = actual.shape[1]
+    cdef Py_ssize_t comp_rows = compressed.shape[0]
     cdef bool use_threads = links * n > threading_threshold and threading_threshold >= 0
 
     assert crosswalk.shape[0] == links, "mismatched shape"
@@ -276,6 +277,9 @@ cpdef cython.floating[:, ::1] assign_link_loads(
     for i in prange(links, nogil=True, num_threads=cores, use_threads_if=use_threads):
         for j in range(n):
             k = crosswalk[i]
-            actual[i, j] = compressed[k, j]
+            if 0 <= k < comp_rows:
+                actual[i, j] = compressed[k, j]
+            else:
+                actual[i, j] = 0.0
 
     return actual

@@ -183,16 +183,17 @@ def test_issue_5_skim_congested_compact_costs_under_chains():
     tc2.congested_time = np.array([5.0, 5.0, 5.0])
 
     # Skim congested for tc1
-    tc1.skim_congested()
-    c1_cost = float(g.compact_cost[0])
+    skm1 = tc1.skim_congested()
+    c1_cost = float(skm1.results.skims.__assignment_cost__[0, 1])
 
     # Skim congested for tc2
-    tc2.skim_congested()
-    c2_cost = float(g.compact_cost[0])
+    skm2 = tc2.skim_congested()
+    c2_cost = float(skm2.results.skims.__assignment_cost__[0, 1])
 
     assert c2_cost > c1_cost
     assert np.isclose(c1_cost, 33.0)  # (10+1) * 3
     assert np.isclose(c2_cost, 315.0)  # (100+5) * 3
+    assert float(g.compact_cost[0]) == 30.0
 
 
 def test_issue_6_project_graph_turn_table_validation(sioux_falls_example):

@@ -107,8 +107,17 @@ class allOrNothing(WorkerThread):
         async_results = []
         for orig in self.matrix.index:
             i = int(self.graph.nodes_to_indices[orig])
+            c_i = (
+                int(self.graph.compact_nodes_to_indices[orig])
+                if 0 <= orig < len(self.graph.compact_nodes_to_indices)
+                else -1
+            )
             if np.nansum(mat[i, :, :]) > 0 or self.results.num_skims > 0:
-                if self.graph.fs[i] == self.graph.fs[i + 1]:
+                if (
+                    c_i < 0
+                    or c_i >= len(self.graph.compact_fs) - 1
+                    or self.graph.compact_fs[c_i] == self.graph.compact_fs[c_i + 1]
+                ):
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
                     ar = pool.apply_async(self.func_assig_thread, args=(orig, all_threads, bridge))

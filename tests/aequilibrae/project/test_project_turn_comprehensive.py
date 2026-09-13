@@ -50,8 +50,17 @@ def test_project_finite_turn_penalty(sioux_falls_example):
     g_noturns.set_graph("distance")
     path_noturns = g_noturns.compute_path(u, w)
 
-    # The finite turn penalty is in the same units as cost, so cost should be exactly 15.0 higher
-    assert path_res.milepost[-1] == pytest.approx(path_noturns.milepost[-1] + 15.0)
+    # If the route stayed identical, cost is exactly 15.0 higher; if a detour was chosen,
+    # its cost must be <= the penalized route cost, and it must avoid the penalized movement.
+    if list(path_res.path) == list(path_noturns.path):
+        assert path_res.milepost[-1] == pytest.approx(path_noturns.milepost[-1] + 15.0)
+    else:
+        assert path_res.milepost[-1] <= path_noturns.milepost[-1] + 15.0
+        path_nodes = list(path_res.path)
+        has_penalized_turn = any(
+            path_nodes[i] == u and path_nodes[i + 1] == v and path_nodes[i + 2] == w for i in range(len(path_nodes) - 2)
+        )
+        assert not has_penalized_turn
 
 
 def test_project_prohibited_turn_restriction(sioux_falls_example):

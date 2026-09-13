@@ -532,7 +532,7 @@ class LinearApproximation(WorkerThread):
                     for name, idx in c._aon_results._selected_links.items():
                         copy_two_dimensions(
                             self.sl_step_dir_ll[c._id][name]["sdr"],
-                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, : c.graph.compact_num_links, :],
                             self.elementwise_cores,
                             self.threading_threshold,
                         )
@@ -591,7 +591,7 @@ class LinearApproximation(WorkerThread):
                         linear_combination(
                             sl_step_dir_ll["temp_prev_sdr"],
                             sl_step_dir_ll["sdr"],
-                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, : c.graph.compact_num_links, :],
                             self.conjugate_stepsize,
                             self.elementwise_cores,
                             self.threading_threshold,
@@ -665,7 +665,7 @@ class LinearApproximation(WorkerThread):
 
                         triple_linear_combination(
                             sl_step_dir_ll["temp_prev_sdr"],
-                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, : c.graph.compact_num_links, :],
                             sl_step_dir_ll["sdr"],
                             sl_step_dir_ll["prev_sdr"],
                             self.betas,
@@ -833,8 +833,8 @@ class LinearApproximation(WorkerThread):
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
-            # Accumulate AoN turn penalty costs from all traffic classes.
-            self.aon_total_turn_cost = sum(c._aon_results.total_turn_penalty for c in self.traffic_classes)
+            # Accumulate AoN turn penalty costs from all traffic classes (PCE-weighted to match link flows).
+            self.aon_total_turn_cost = sum(c.pce * c._aon_results.total_turn_penalty for c in self.traffic_classes)
 
             converged = self.check_convergence() if self.iter > 1 else False
             if converged:
@@ -879,9 +879,10 @@ class LinearApproximation(WorkerThread):
                                 self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
+                            sl_loads = np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)
                             copy_two_dimensions(
                                 c.results.select_link_loading[name],  # output matrix
-                                np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
+                                sl_loads[idx, : c.graph.compact_num_links, :],  # matrix 1
                                 self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
@@ -951,7 +952,7 @@ class LinearApproximation(WorkerThread):
                 # Turn penalties are fixed costs (not flow-dependent VDF outputs), so this
                 # convex combination tracks the weighted-average turn cost of the current
                 # flow solution - analogous to how link flows are combined.
-                direction_turn_cost = sum(self.step_direction_turn_cost.values())  # TODO: optimize aggregation
+                direction_turn_cost = sum(c.pce * self.step_direction_turn_cost[c._id] for c in self.traffic_classes)
                 self.fw_total_turn_cost = (
                     self.stepsize * direction_turn_cost + (1.0 - self.stepsize) * self.fw_total_turn_cost
                 )
@@ -970,7 +971,7 @@ class LinearApproximation(WorkerThread):
                     if self.time_field not in c.graph.skim_fields:
                         continue
                     idx = c.graph.skim_fields.index(self.time_field)
-                    c.graph.skims[:, idx] = self.congested_time[:]
+                    c.graph.skims[:, idx] = self.congested_time[c.graph.graph.__supernet_id__]
 
             msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
             self.signal.emit(["set_text", msg])
@@ -1178,8 +1179,9 @@ class LinearApproximation(WorkerThread):
         # Exact line search: root-find the directional derivative of the Beckmann objective over [0, 1]. Used by
         # Frank-Wolfe always, and by CFW/BFW when line_search == "exact". No step cap is applied here.
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
-        # TODO: optimize aggregation
-        turn_derivative = sum(self.step_direction_turn_cost.values()) - self.fw_total_turn_cost
+        turn_derivative = (
+            sum(c.pce * self.step_direction_turn_cost[c._id] for c in self.traffic_classes) - self.fw_total_turn_cost
+        )
         # Turn penalties are constant w.r.t. stepsize (they don't depend on flows or VDF),
         # so they shift the derivative by a fixed amount. Including them here ensures the
         # line search accounts for turn costs when finding the optimal stepsize.
