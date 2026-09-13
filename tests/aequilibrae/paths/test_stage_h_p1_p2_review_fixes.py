@@ -81,6 +81,124 @@ def test_issue_2_empty_compact_graph_crosswalk_and_reprepare():
     assert g.compact_num_links == 0
 
 
+def test_compact_crosswalk_uses_project_wide_supernet_size_and_rebuilds_when_enlarged():
+    """Mode-local arcs retain their positions in the project-wide cost vector."""
+    net = pd.DataFrame(
+        {
+            "link_id": [1, 2],
+            "a_node": [1, 2],
+            "b_node": [2, 3],
+            "direction": [1, 1],
+            "distance": [1.0, 1.0],
+            "__supernet_id_ab": [1, 4],
+            "__supernet_id_ba": [-1, -1],
+        }
+    )
+    g = Graph()
+    g.supernet_size = 7
+    g.network = net
+    g.prepare_graph(centroids=np.array([1, 3], dtype=np.int64), remove_dead_ends=False)
+    g.set_graph("distance")
+
+    assert len(g._crosswalk) == 7
+    assert g._crosswalk[1] < g.compact_num_links
+    assert g._crosswalk[4] < g.compact_num_links
+    assert np.all(g._crosswalk[[0, 2, 3, 5, 6]] == g.compact_num_links)
+
+    # Assignment can enlarge the shared index after the graph was prepared.  A
+    # subsequent cost update must detect and replace the stale crosswalk.
+    g.supernet_size = 9
+    costs = np.zeros(9, dtype=np.float64)
+    costs[[1, 4]] = [2.0, 3.0]
+    g.compact_costs_from_link_costs(costs)
+    assert len(g._crosswalk) == 9
+    assert g.compact_cost[0] == pytest.approx(5.0)
+
+
+def test_all_pruned_crosswalk_retains_project_wide_supernet_size():
+    net = pd.DataFrame(
+        {
+            "link_id": [1, 2],
+            "a_node": [3, 4],
+            "b_node": [4, 5],
+            "direction": [1, 1],
+            "distance": [1.0, 1.0],
+            "__supernet_id_ab": [1, 4],
+            "__supernet_id_ba": [-1, -1],
+        }
+    )
+    g = Graph()
+    g.supernet_size = 7
+    g.network = net
+    g.prepare_graph(centroids=np.array([1, 2], dtype=np.int64), remove_dead_ends=True)
+
+    assert g.compact_num_links == 0
+    assert len(g._crosswalk) == 7
+    assert np.all(g._crosswalk == g.compact_num_links)
+
+
+def test_empty_graph_preserves_and_round_trips_project_wide_supernet_size(tmp_path):
+    net = pd.DataFrame(
+        columns=[
+            "link_id",
+            "a_node",
+            "b_node",
+            "direction",
+            "distance",
+            "__supernet_id_ab",
+            "__supernet_id_ba",
+        ]
+    )
+    g = Graph()
+    g.supernet_size = 7
+    g.network = net
+    g.prepare_graph(centroids=np.array([1, 2], dtype=np.int64))
+
+    assert g.supernet_size == 7
+    assert g.num_links == 0
+    assert len(g._crosswalk) == 7
+
+    graph_file = tmp_path / "empty-global-supernet.aeg"
+    g.save_to_disk(graph_file)
+    loaded = Graph()
+    loaded.load_from_disk(graph_file)
+
+    assert loaded.supernet_size == 7
+    assert loaded.num_links == 0
+    assert loaded.compact_num_links == 0
+    assert loaded.num_nodes == 2
+    assert loaded.fs.shape == (3,)
+    assert len(loaded._crosswalk) == 7
+
+
+def test_mode_graph_round_trip_preserves_global_supernet_ids(tmp_path):
+    net = pd.DataFrame(
+        {
+            "link_id": [1, 2],
+            "a_node": [1, 2],
+            "b_node": [2, 3],
+            "direction": [1, 1],
+            "distance": [1.0, 1.0],
+            "__supernet_id_ab": [1, 4],
+            "__supernet_id_ba": [-1, -1],
+        }
+    )
+    g = Graph()
+    g.supernet_size = 7
+    g.network = net
+    g.prepare_graph(centroids=np.array([1, 3], dtype=np.int64), remove_dead_ends=False)
+    expected_ids = g.graph["__supernet_id__"].to_numpy(copy=True)
+
+    graph_file = tmp_path / "mode-global-supernet.aeg"
+    g.save_to_disk(graph_file)
+    loaded = Graph()
+    loaded.load_from_disk(graph_file)
+
+    assert loaded.supernet_size == 7
+    np.testing.assert_array_equal(loaded.graph["__supernet_id__"], expected_ids)
+    assert len(loaded._crosswalk) == 7
+
+
 def test_issue_3_genuine_original_self_loops_preserved():
     """Contraction must not delete genuine source-network self-loops unrelated to chains."""
     # Network with chain 1 -> 2 -> 3 and an uncontracted self-loop 4 -> 4

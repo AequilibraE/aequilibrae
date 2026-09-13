@@ -165,7 +165,8 @@ class TrafficClass(TransportClassBase):
         if np.any(np.isnan(self.graph.graph[field_name].values)):
             logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
-        if self.graph.graph[field_name].min() < 0:
+        values = self.graph.graph[field_name]
+        if not values.empty and values.min() < 0:
             msg = f"Cost field {field_name} has negative values. That is not allowed"
             logger.error(msg)
             raise ValueError(msg)
@@ -243,7 +244,13 @@ class TrafficClass(TransportClassBase):
             cost = (self.fixed_cost + self.congested_time)[supernet_ids]
             congested_time = np.asarray(self.congested_time)[supernet_ids]
             self.graph.graph = self.graph.graph.assign(__assignment_cost__=cost, __congested_time__=congested_time)
-            skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]
+            if skim_fields is None:
+                requested_skims = []
+            elif isinstance(skim_fields, str):
+                requested_skims = [skim_fields]
+            else:
+                requested_skims = list(skim_fields)
+            skims = requested_skims + ["__assignment_cost__", "__congested_time__"]
             pre_fields = self.graph.skim_fields
             pre_turn_fields = list(self.graph.turn_skim_fields) if self.graph.turn_skim_fields else []
             try:

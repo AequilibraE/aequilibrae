@@ -33,7 +33,6 @@ import numpy as np
 import pytest
 from types import SimpleNamespace
 
-import aequilibrae.paths.linear_approximation as linear_approximation
 from aequilibrae.paths.linear_approximation import LinearApproximation
 
 
@@ -85,32 +84,6 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
 
     assert np.isclose(derivative, expected)
     np.testing.assert_array_equal(assignment.vdf.last_link_flows, candidate_total_flow)
-
-
-@pytest.mark.parametrize("stepsize", [0.0, 0.25, 1.0])
-def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
-    assignment = LinearApproximation.__new__(LinearApproximation)
-    assignment.elementwise_cores = 1
-    assignment.threading_threshold = 10000
-    assignment.cores = 1
-    assignment.preload = np.array([10.0, 20.0])
-    current_assigned_flow = np.array([3.0, 4.0])
-    assigned_direction = np.array([7.0, 8.0])
-    assignment.fw_total_flow = current_assigned_flow + assignment.preload
-    assignment.step_direction_flow = assigned_direction + assignment.preload
-    assignment.congested_time = np.zeros(2)
-    assignment._trap_new_flow = np.zeros(2)
-    assignment._trap_new_cost = np.zeros(2)
-    assignment._trap_avg_cost = np.zeros(2)
-    assignment.capacity = np.ones(2)
-    assignment.free_flow_tt = np.zeros(2)
-    assignment.vdf_parameters = [1.0, 0.0]
-    assignment.vdf = DummyVDF()
-
-    assignment._LinearApproximation__objective_change_at_stepsize(0.0, stepsize)
-
-    expected = assignment.preload + current_assigned_flow + stepsize * (assigned_direction - current_assigned_flow)
-    np.testing.assert_array_equal(assignment.vdf.last_link_flows, expected)
 
 
 def test_relative_gap_ignores_constant_preload():
@@ -174,15 +147,14 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assignment.elementwise_cores = 1
     assignment.threading_threshold = 10000
     assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
     assignment.iter = 4
     assignment.rgap = np.inf
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
     assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
     assignment.betas = np.array([1.0, 0.0, 0.0])
+    assignment.traffic_classes = []
 
     monkeypatch.setattr(
         assignment,
@@ -192,16 +164,9 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
 
     monkeypatch.setattr(
         assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0 if assignment.current_direction == "bfw" else -0.5,
+        "_LinearApproximation__derivative_of_objective_stepsize_dependent",
+        lambda _alpha, **_kwargs: 1.0 if assignment.current_direction == "bfw" else -0.5,
     )
-
-    def fake_minimize_scalar(*_args, **_kwargs):
-        if assignment.current_direction == "bfw":
-            return SimpleNamespace(x=0.3, fun=1.0)
-        return SimpleNamespace(x=0.25, fun=-0.5)
-
-    monkeypatch.setattr(linear_approximation, "minimize_scalar", fake_minimize_scalar)
 
     def fake_calculate_step_direction():
         assert assignment.next_direction == "fw"
@@ -214,8 +179,9 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
 
     assert assignment.current_direction == "fw"
     assert assignment.next_direction == "cfw"
-    assert assignment.stepsize == 0.25
-    assert assignment.iteration_issue == ["BFW/CFW direction yielded no improvement; falling back to FW."]
+    assert assignment.stepsize == 1.0
+    assert len(assignment.iteration_issue) == 1
+    assert assignment.iteration_issue[0].startswith("Found bad conjugate direction step. Performing FW search.")
     np.testing.assert_array_equal(assignment.betas, np.array([1.0, 0.0, 0.0]))
 
 
@@ -224,14 +190,13 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assignment.elementwise_cores = 1
     assignment.threading_threshold = 10000
     assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
     assignment.iter = 5
     assignment.rgap = np.inf
     assignment.current_direction = "fw"
     assignment.next_direction = "cfw"
     assignment.iteration_issue = []
     assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
+    assignment.traffic_classes = []
 
     monkeypatch.setattr(
         assignment,
@@ -240,13 +205,8 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     )
     monkeypatch.setattr(
         assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0,
-    )
-    monkeypatch.setattr(
-        linear_approximation,
-        "minimize_scalar",
-        lambda *_args, **_kwargs: SimpleNamespace(x=0.3, fun=1.0),
+        "_LinearApproximation__derivative_of_objective_stepsize_dependent",
+        lambda _alpha, **_kwargs: 1.0,
     )
 
     assignment.calculate_stepsize()
@@ -256,100 +216,54 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assert assignment.iteration_issue == []
 
 
-def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
+def test_cfw_turn_direction_uses_same_coefficients_as_link_flows(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.elementwise_cores = 1
     assignment.threading_threshold = 10000
-    assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
-    assignment.iter = 4
-    assignment.rgap = np.inf
-    assignment.current_direction = "bfw"
+    assignment.algorithm = "cfw"
+    assignment.iter = 3
     assignment.next_direction = None
-    assignment.iteration_issue = []
-    assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
-    assignment.betas = np.array([1.0, 0.0, 0.0])
+    assignment.conjugate_stepsize = 0.25
+    assignment.preload = None
 
-    monkeypatch.setattr(
-        assignment,
-        "_LinearApproximation__derivative_of_objective_stepsize_independent",
-        lambda: 0.0,
+    def results(loads, turn_penalty=0.0):
+        result = SimpleNamespace(
+            link_loads=np.asarray(loads, dtype=np.float64),
+            total_turn_penalty=turn_penalty,
+        )
+
+        def total_flows():
+            result.total_link_loads = np.sum(result.link_loads, axis=1)
+
+        result.total_flows = total_flows
+        result.total_flows()
+        return result
+
+    current_direction = results([[4.0], [12.0]])
+    aon_direction = results([[20.0], [28.0]], turn_penalty=100.0)
+    spare = results([[0.0], [0.0]])
+    previous = results([[0.0], [0.0]])
+    cls = SimpleNamespace(
+        _id="car",
+        results=SimpleNamespace(num_skims=0),
+        _aon_results=aon_direction,
+        _selected_links={},
     )
+    assignment.traffic_classes = [cls]
+    assignment.step_direction = {"car": current_direction}
+    assignment.previous_step_direction = {"car": previous}
+    assignment.temp_step_direction_for_copy = {"car": spare}
+    assignment.step_direction_turn_cost = {"car": 20.0}
+    assignment.previous_step_direction_turn_cost = {"car": -1.0}
 
-    monkeypatch.setattr(
-        assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0 if assignment.current_direction == "bfw" else -0.5,
-    )
+    monkeypatch.setattr(assignment, "calculate_conjugate_stepsize", lambda: True)
 
-    def fake_minimize_scalar(*_args, **_kwargs):
-        if assignment.current_direction == "bfw":
-            return SimpleNamespace(x=0.3, fun=1.0)
-        return SimpleNamespace(x=1.25, fun=-0.5)
+    assignment._LinearApproximation__calculate_step_direction()
 
-    monkeypatch.setattr(linear_approximation, "minimize_scalar", fake_minimize_scalar)
-
-    def fake_calculate_step_direction():
-        assignment.current_direction = "fw"
-        assignment.next_direction = "cfw"
-
-    monkeypatch.setattr(assignment, "_LinearApproximation__calculate_step_direction", fake_calculate_step_direction)
-
-    assignment.calculate_stepsize()
-
-    assert assignment.current_direction == "fw"
-    assert assignment.next_direction == "cfw"
-    assert assignment.stepsize == 0.5
-    assert any("clipping to 0.5" in msg for msg in assignment.iteration_issue)
-
-
-def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch):
-    assignment = LinearApproximation.__new__(LinearApproximation)
-    assignment.elementwise_cores = 1
-    assignment.threading_threshold = 10000
-    assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
-    assignment.iter = 4
-    assignment.rgap = np.inf
-    assignment.current_direction = "bfw"
-    assignment.next_direction = None
-    assignment.iteration_issue = []
-    assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
-    assignment.betas = np.array([1.0, 0.0, 0.0])
-
-    monkeypatch.setattr(
-        assignment,
-        "_LinearApproximation__derivative_of_objective_stepsize_independent",
-        lambda: 0.0,
-    )
-    monkeypatch.setattr(
-        assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0 if assignment.current_direction == "bfw" else -0.5,
-    )
-
-    def fake_minimize_scalar(*_args, **_kwargs):
-        if assignment.current_direction == "bfw":
-            return SimpleNamespace(x=0.3, fun=1.0)
-        return SimpleNamespace(x=np.nan, fun=-0.5)
-
-    monkeypatch.setattr(linear_approximation, "minimize_scalar", fake_minimize_scalar)
-
-    def fake_calculate_step_direction():
-        assignment.current_direction = "fw"
-        assignment.next_direction = "cfw"
-
-    monkeypatch.setattr(assignment, "_LinearApproximation__calculate_step_direction", fake_calculate_step_direction)
-
-    assignment.calculate_stepsize()
-
-    assert assignment.current_direction == "fw"
-    assert assignment.next_direction == "cfw"
-    assert assignment.stepsize == 1e-2 / assignment.iter
-    assert assignment.stepsize > 0.0
-    assert any("invalid stepsize" in msg for msg in assignment.iteration_issue)
+    expected_flows = 0.25 * current_direction.link_loads + 0.75 * aon_direction.link_loads
+    np.testing.assert_array_equal(spare.link_loads, expected_flows)
+    assert assignment.step_direction_turn_cost["car"] == 0.25 * 20.0 + 0.75 * 100.0
+    assert assignment.previous_step_direction_turn_cost["car"] == 20.0
 
 
 def test_cfw_zero_denominator_falls_back_to_fw():

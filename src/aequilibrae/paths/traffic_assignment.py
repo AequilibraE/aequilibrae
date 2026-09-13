@@ -159,10 +159,14 @@ class AssignmentBase(ABC):
             if field not in c.graph.graph.columns:
                 raise ValueError(f"'{field}' not in graph for '{c._id}'")
 
-            if np.any(np.isnan(c.graph.graph[field].values)):
+            values = c.graph.graph[field].to_numpy(copy=False)
+            if np.any(np.isnan(values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
+            # An empty mode graph has no value that can violate the field contract.
+            # It still participates in the assignment using the project-wide
+            # ``supernet_size`` maintained by the other classes.
+            if values.size and values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
     def _get_supernet_size(self) -> int:
@@ -270,7 +274,7 @@ class TrafficAssignment(AssignmentBase):
 
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
-    all_line_searches = ["exact", "trapezoidal"]
+    all_line_searches = ["exact"]
     all_bfw_conjugacies = ["approximate", "exact"]
 
     # Attributes restricted to a fixed set of strings, as {name: (allowed values, description for the error)}.
@@ -310,9 +314,9 @@ class TrafficAssignment(AssignmentBase):
 
         self.steps_below_needed_to_terminate = 1
 
-        # Line search used by CFW and BFW. "trapezoidal" preserves the historical AequilibraE behaviour; see
-        # set_line_search for the trade-off.
-        self.line_search = "trapezoidal"  # type: str
+        # CFW and BFW use the traditional optimal line search, as does Frank-Wolfe.
+        # Keep this attribute and its setter as an exact-only compatibility surface.
+        self.line_search = "exact"  # type: str
 
         # How BFW solves for its direction coefficients. "approximate" preserves the historical behaviour.
         self.bfw_conjugacy = "approximate"  # type: str
@@ -391,7 +395,12 @@ class TrafficAssignment(AssignmentBase):
     def _sync_classes_supernet_size(self) -> None:
         supernet_size = self._get_supernet_size()
         for c in self.classes:
+            previous_size = c.graph.supernet_size
             c.graph.supernet_size = supernet_size
+            if previous_size != supernet_size:
+                # Compact-link aggregation is indexed in global supernet space.
+                # Rebuild lazily after enlarging a mode graph's global extent.
+                c.graph._crosswalk = None
             if c.fixed_cost.shape[0] < supernet_size:
                 fc = np.zeros(supernet_size, c.graph.default_types("float"))
                 fc[: c.fixed_cost.shape[0]] = c.fixed_cost
@@ -463,21 +472,17 @@ class TrafficAssignment(AssignmentBase):
 
     def set_line_search(self, line_search: str) -> None:
         """
-        Chooses the line search used to pick the step size for CFW and BFW. Ignored by the other algorithms:
-        MSA uses ``1/iteration`` and Frank-Wolfe always uses the exact line search.
+        Selects the line search used to pick the step size. MSA still uses
+        ``1/iteration``; Frank-Wolfe, CFW and BFW use the traditional optimal
+        line search.
 
         * ``"exact"`` - root-find the exact directional derivative of the Beckmann objective,
           ``sum_a c_a(x + alpha*d)*d_a = 0``, over ``[0, 1]``. This is the line search assumed by the
           conjugate-direction theory in Mitradjieva & Lindberg, and the step is not capped.
 
-        * ``"trapezoidal"`` (default) - minimize a one-panel trapezoidal approximation of the objective change,
-          additionally capping BFW at ``1/sqrt(iteration)``. The approximation is exact only for affine link costs;
-          for convex costs it overestimates the integral and therefore returns shorter steps than the true
-          minimizer. This is a numerical heuristic, not the line search in the source algorithm, and is the
-          default only because it is the historical AequilibraE behaviour.
-
         :Arguments:
-            **line_search** (:obj:`str`): One of ``"exact"`` or ``"trapezoidal"``
+            **line_search** (:obj:`str`): Must be ``"exact"``. The argument is
+            retained for compatibility with existing assignment setup code.
         """
         self.line_search = line_search
         self._config["Line search"] = self.line_search
@@ -551,19 +556,30 @@ class TrafficAssignment(AssignmentBase):
             supernet_size = self._get_supernet_size()
             c0 = self.classes[0]
             if isinstance(self.vdf_parameters[p1], str):
-                array = np.zeros(supernet_size, c0.graph.default_types("float"))
+                # Mode-specific graphs may not cover the full project supernet.
+                # Initialise absent arcs with a valid neutral bound (notably
+                # beta=1), and validate only arcs active in at least one class.
+                array = np.full(supernet_size, minimum, dtype=c0.graph.default_types("float"))
+                active = np.zeros(supernet_size, dtype=bool)
                 for c in self.classes:
-                    array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
+                    if p not in c.graph.graph.columns:
+                        raise ValueError(f"'{p}' not in graph for '{c._id}'")
+                    ids = c.graph.graph.__supernet_id__.to_numpy(copy=False)
+                    if ids.size:
+                        array[ids] = c.graph.graph[p].to_numpy(copy=False)
+                        active[ids] = True
+                values_to_validate = array[active]
             else:
                 array = np.zeros(supernet_size, np.float64)
                 array.fill(self.vdf_parameters[p1])
+                values_to_validate = array
             pars.append(array)
 
-            if np.any(np.isnan(array)):
+            if np.any(np.isnan(values_to_validate)):
                 raise ValueError(f"At least one {p1} is NaN")
-            elif array.min() < minimum:
+            elif values_to_validate.size and values_to_validate.min() < minimum:
                 raise ValueError(f"At least one {p1} is less than {minimum}")
-            elif array.max() > maximum:
+            elif values_to_validate.size and values_to_validate.max() > maximum:
                 raise ValueError(f"At least one {p1} is greater than {maximum}")
 
         self.__dict__["vdf_parameters"] = pars
@@ -686,13 +702,6 @@ class TrafficAssignment(AssignmentBase):
             **preload** (:obj:`pd.DataFrame`): dataframe mapping 'link_id' & 'direction' to 'preload'
             **name** (:obj:`str`): Name for particular preload (optional - default name will be chosen if not specified)
         """
-        if self.preloads is None:
-            link_ids, directions, populated = self._get_supernet_arcs()
-            if populated:
-                self.preloads = pd.DataFrame({"link_id": link_ids, "direction": directions})
-            else:
-                self.preloads = self.classes[0].graph.graph[["link_id", "direction"]].copy()
-
         # Check that columns of preload are link_id, direction, preload:
         expected = {"link_id", "direction", "preload"}
         missing = expected - set(preload.columns)
@@ -708,16 +717,31 @@ class TrafficAssignment(AssignmentBase):
         if len(preload) == 0:
             raise ValueError("Cannot set empty preload!")
 
+        duplicate_keys = preload.duplicated(subset=["link_id", "direction"], keep=False)
+        if duplicate_keys.any():
+            duplicates = preload.loc[duplicate_keys, ["link_id", "direction"]].drop_duplicates()
+            raise ValueError(
+                "Input preload dataframe contains duplicate (link_id, direction) keys: "
+                f"{duplicates.to_dict(orient='records')}"
+            )
+
+        if self.preloads is None:
+            link_ids, directions, populated = self._get_supernet_arcs()
+            if populated:
+                self.preloads = pd.DataFrame({"link_id": link_ids, "direction": directions})
+            else:
+                self.preloads = self.classes[0].graph.graph[["link_id", "direction"]].copy()
+
         # Check name is not already used (generate new name if needed):
         name = (
             name if name else f"preload_{len(self.preloads.columns) - 1}"
         )  # -1 -> remove keys to get 1 indexed preload columns
         if name in self.preloads.columns:
-            raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
-        preload.rename(columns={"preload": name}, inplace=True)
+            raise ValueError(f"New preload has duplicate name - already used names are: {self.preloads.columns}")
+        named_preload = preload.rename(columns={"preload": name})
 
         # Merge onto current preload dataframe
-        self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
+        self.preloads = pd.merge(self.preloads, named_preload, on=["link_id", "direction"], how="left")
         self.preloads[name] = self.preloads[name].fillna(0)
 
         # Enable preload to be added before or after specifying the algorithm

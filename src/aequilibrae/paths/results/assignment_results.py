@@ -188,15 +188,13 @@ class AssignmentResults(AssignmentResultsBase):
             if "__compressed_id__" in graph.graph.columns
             else np.arange(graph.graph.shape[0], dtype=self.__integer_type)
         )
-        if graph.num_links == 0:
-            self.links = 0
-            supernet_size = 0
-        else:
-            if supernet_size is None:
-                supernet_size = graph.supernet_size
-            if supernet_size is None:
-                supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else graph.graph.shape[0]
-            self.links = max(graph.num_links, supernet_size)
+        if supernet_size is None:
+            supernet_size = graph.supernet_size
+        if supernet_size is None:
+            supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else graph.graph.shape[0]
+        # Even a mode with no active arcs must retain the assignment's global
+        # supernet extent so that every class shares the same result indexing.
+        self.links = max(graph.num_links, int(supernet_size))
         self.crosswalk = np.full(self.links, graph.compact_num_links, dtype=self.__integer_type)
         self.crosswalk[supernet_ids] = compressed_ids
         self._graph_ids = supernet_ids

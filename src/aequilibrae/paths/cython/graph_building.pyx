@@ -287,7 +287,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.compact_num_links = 0
         graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
         graph.graph["__compressed_id__"] = np.full(len(graph.graph), graph.compact_num_links, dtype=np.int64)
-        graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
+        graph._build_crosswalk()
         graph._compact_first_node = np.empty(0, dtype=np.int64)
         graph._compact_last_node = np.empty(0, dtype=np.int64)
         graph._compact_source = np.empty(0, dtype=np.int64)
@@ -385,7 +385,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.compact_num_links = 0
         graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
         graph.graph["__compressed_id__"] = np.full(len(graph.graph), graph.compact_num_links, dtype=np.int64)
-        graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
+        graph._build_crosswalk()
         graph._compact_first_node = np.empty(0, dtype=np.int64)
         graph._compact_last_node = np.empty(0, dtype=np.int64)
         graph._compact_source = np.empty(0, dtype=np.int64)
