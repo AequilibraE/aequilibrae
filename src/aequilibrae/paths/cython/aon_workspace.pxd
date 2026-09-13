@@ -14,10 +14,10 @@ cdef extern from "aon_workspace.hpp" namespace "aequilibrae::paths::cpp::mvp" no
 
 
 cdef class AoNWorkspace:
-    cdef CppAoNWorkspace[double] cpp
+    cdef readonly size_t state_count, skim_field_count, loading_class_count
+    cdef CppAoNWorkspace[double] view(self) noexcept nogil
     cdef double[:, ::1] state_skims_buffer, state_loads_buffer
     cdef cpp_bool[::1] selected_paths_buffer
-    cdef readonly object context
     cpdef prepare_select_links(self)
     cpdef prepare_skims(self, object field_count)
     cpdef prepare_loading(self, object class_count)

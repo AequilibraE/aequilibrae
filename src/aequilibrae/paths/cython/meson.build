@@ -2,7 +2,6 @@ thisdir = 'aequilibrae/paths/cython'
 
 pyfiles = [
     '__init__.py',
-    'aon_graph.py',
 ]
 
 exts = [
@@ -21,6 +20,7 @@ exts = [
     'new_path_finding',
     'graph_context',
     'search_results',
+    'search_query',
     'aon_workspace',
     'skimming_context',
     'dijkstra',

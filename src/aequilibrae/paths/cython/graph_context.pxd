@@ -10,7 +10,7 @@ cdef extern from "graph_context.hpp" namespace "aequilibrae::paths::cpp::mvp" no
         const size_t *fs
         const size_t *heads
         const double *costs
-        const size_t *link_ids
+        size_t blocked_centroid_count
 
     cdef cppclass CppTurnBasedContext "aequilibrae::paths::cpp::mvp::TurnBasedContext":
         CppTurnBasedContext() noexcept
@@ -23,8 +23,10 @@ cdef extern from "graph_context.hpp" namespace "aequilibrae::paths::cpp::mvp" no
 
 
 cdef class GraphContext:
-    cdef const size_t[::1] node_offsets, heads_buffer, link_ids_buffer
-    cdef double[::1] costs_buffer
+    cdef const size_t[::1] node_offsets, heads_buffer
+    cdef const double[::1] costs_buffer
+    cdef readonly size_t blocked_centroid_count
+    cpdef update_costs(self, object costs)
     cdef CppNodeBasedContext graph_view(self) noexcept nogil
 
 

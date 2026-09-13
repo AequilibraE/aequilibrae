@@ -26,7 +26,6 @@ from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
 
 from aequilibrae.paths.cython.basic_path_finding import HEURISTIC_MAP, HEAP_MAP
 from aequilibrae.paths.cython.path_file_saving import save_path_file
-from aequilibrae.paths.cython.aon_context import aon_parallel_context
 
 
 def available_heaps() -> list:

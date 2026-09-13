@@ -1,3 +1,4 @@
+import operator
 import numpy as np
 
 from libc.stddef cimport size_t
@@ -41,31 +42,69 @@ def validate_offsets(value, name, expected_end, end_description, expected_size=N
 
 
 cdef class GraphContext:
-    """Keep a fixed copy of graph links and costs for routing.
+    """Keep fixed topology and borrow the current routing costs.
 
-    Use NodeBasedContext or TurnBasedContext, not this base class directly.
+    Use a concrete node or turn context. Costs must be contiguous float64
+    buffers; binding them never copies or changes their writeability flags.
     """
 
-    def __init__(self, fs, heads, costs):
+    def __cinit__(self):
+        self.node_offsets = None
+
+    def __init__(self, fs, heads, costs, *, blocked_centroid_count=0):
         if type(self) is GraphContext:
             raise TypeError("GraphContext is an abstract base class")
 
+        if self.node_offsets is not None:
+            raise RuntimeError("routing contexts cannot be reinitialized")
+
         heads_array = validate_index_array(heads, "heads")
         fs_array = validate_offsets(fs, "fs", heads_array.size, "the number of links")
-        costs = np.asarray(costs, dtype=np.float64, order="C")
-
-        if costs.ndim != 1 or costs.size != heads_array.size:
-            raise ValueError("costs must be one-dimensional with one value per link")
         if np.any(heads_array >= fs_array.size - 1):
             raise ValueError("heads contains an out-of-range node")
-        if np.any(np.isnan(costs)) or np.any(costs < 0):
-            raise ValueError("costs must be nonnegative and must not contain NaN")
+
+        blocked_centroid_count = operator.index(blocked_centroid_count)
+        if not 0 <= blocked_centroid_count <= fs_array.size - 1:
+            raise ValueError("blocked_centroid_count must be between zero and node_count")
 
         self.node_offsets = fs_array
         self.heads_buffer = heads_array
-        self.costs_buffer = array[double](costs.size, False, 0)
-        np.copyto(np.asarray(self.costs_buffer), costs)
-        self.link_ids_buffer = np.arange(heads_array.size, dtype=np.uintp)
+        self.blocked_centroid_count = blocked_centroid_count
+        self.update_costs(costs)
+
+    cpdef update_costs(self, object costs):
+        """Bind a checked objective without copying it; failed checks keep the old one."""
+        cdef const double[::1] values
+        if costs is None:
+            raise TypeError("costs must be a contiguous float64 buffer")
+        values = costs
+        if values.shape[0] != self.heads_buffer.shape[0]:
+            raise ValueError("costs must have one value per link")
+        data = np.asarray(values)
+        if not data.flags.aligned:
+            raise ValueError("costs must be aligned")
+        if np.any(np.isnan(data)) or np.any(data < 0):
+            raise ValueError("costs must be nonnegative and must not contain NaN")
+        self.costs_buffer = values
+
+    def with_costs(self, costs):
+        """Share topology with a new context that can bind its own objective."""
+        cdef GraphContext other = type(self).__new__(type(self))
+        cdef TurnBasedContext source_turns, other_turns
+        other.node_offsets = self.node_offsets
+        other.heads_buffer = self.heads_buffer
+        other.blocked_centroid_count = self.blocked_centroid_count
+        other.update_costs(costs)
+
+        if isinstance(self, TurnBasedContext):
+            source_turns = <TurnBasedContext>self
+            other_turns = <TurnBasedContext>other
+            other_turns.tails_buffer = source_turns.tails_buffer
+            other_turns.turn_offsets = source_turns.turn_offsets
+            other_turns.turn_links = source_turns.turn_links
+            other_turns.turn_penalties_buffer = source_turns.turn_penalties_buffer
+            other_turns.uturns_allowed = source_turns.uturns_allowed
+        return other
 
     cdef CppNodeBasedContext graph_view(self) noexcept nogil:
         """Build a C++ graph view that borrows this object's buffers."""
@@ -73,16 +112,10 @@ cdef class GraphContext:
         graph.fs = const_array_pointer(self.node_offsets)
         graph.heads = const_array_pointer(self.heads_buffer)
         graph.costs = const_array_pointer[double](self.costs_buffer)
-        graph.link_ids = const_array_pointer(self.link_ids_buffer)
+        graph.blocked_centroid_count = self.blocked_centroid_count
         graph.node_count = self.node_offsets.shape[0] - 1
         graph.link_count = self.heads_buffer.shape[0]
         return graph
-
-    def make_results(self):
-        """Allocate search results for this graph."""
-        from aequilibrae.paths.cython.search_results import SearchResults
-
-        return SearchResults(self)
 
     @property
     def node_count(self):
@@ -114,11 +147,6 @@ cdef class GraphContext:
         """Read-only cost for each directed link."""
         return readonly_view(self.costs_buffer)
 
-    @property
-    def link_ids(self):
-        """Read-only link indices in routing order."""
-        return readonly_view(self.link_ids_buffer)
-
 
 cdef class NodeBasedContext(GraphContext):
     """Graph context whose search states are nodes."""
@@ -145,9 +173,10 @@ cdef class TurnBasedContext(GraphContext):
             turn_to_links=None,
             turn_penalties=None,
             *,
-            allow_uturns=True
+            allow_uturns=True,
+            blocked_centroid_count=0
     ):
-        super().__init__(fs, heads, costs)
+        super().__init__(fs, heads, costs, blocked_centroid_count=blocked_centroid_count)
 
         n = self.node_count
         m = self.link_count

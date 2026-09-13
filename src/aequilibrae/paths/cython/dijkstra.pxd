@@ -1,7 +1,8 @@
-from libc.stddef cimport size_t
-
-from aequilibrae.paths.cython.graph_context cimport CppNodeBasedContext, CppTurnBasedContext, NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.search_results cimport CppSearchResults
+from aequilibrae.paths.cython.graph_context cimport (
+    CppNodeBasedContext, CppTurnBasedContext, NodeBasedContext, TurnBasedContext,
+)
+from aequilibrae.paths.cython.search_query cimport CppSearchQuery, SearchQuery
+from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults, SearchResults
 
 
 ctypedef fused RoutingContext:
@@ -9,16 +10,15 @@ ctypedef fused RoutingContext:
     TurnBasedContext
 
 
-cdef extern from "path_finding.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
+cdef extern from "dijkstra.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
     void cpp_dijkstra "aequilibrae::paths::cpp::mvp::dijkstra"[Queue](
-        const CppNodeBasedContext& context,
-        size_t origin,
-        CppSearchResults& results,
+        const CppNodeBasedContext &context,
+        const CppSearchQuery &query,
+        CppMutableSearchResults results,
     ) noexcept
 
-
     void cpp_turn_dijkstra "aequilibrae::paths::cpp::mvp::dijkstra"[Queue](
-        const CppTurnBasedContext& context,
-        size_t origin,
-        CppSearchResults& results,
+        const CppTurnBasedContext &context,
+        const CppSearchQuery &query,
+        CppMutableSearchResults results,
     ) noexcept

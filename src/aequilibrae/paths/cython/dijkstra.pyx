@@ -1,79 +1,31 @@
-import operator
-
-import numpy as np
-
-from libc.stddef cimport size_t
-from libcpp cimport bool as cpp_bool
+"""One internal search interface for both routing modes."""
 
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
-from aequilibrae.paths.cython.graph_context cimport NodeBasedContext
-from aequilibrae.paths.cython.search_results cimport SearchResults
 
 
-def choose_destinations(destinations, node_count):
-    """Validate destination indices or a mask and return unique node indices."""
-    if destinations is None:
-        return range(node_count)
+def dijkstra(RoutingContext context, SearchQuery query not None, SearchResults results not None):
+    """Replace results using the bound graph costs and query.
 
-    candidate = np.asarray(destinations)
-    if candidate.ndim == 1 and candidate.dtype.kind == "b":
-        if candidate.size != node_count:
-            raise ValueError("a destination mask must have one entry per node")
-        indices = np.flatnonzero(candidate).tolist()
-    else:
-        try:
-            indices = [operator.index(destinations)]
-        except TypeError:
-            try:
-                indices = [operator.index(value) for value in destinations]
-            except TypeError:
-                raise TypeError(
-                    "destinations must be a node index, an iterable of node indices, or a boolean mask"
-                ) from None
-
-    if any(index < 0 or index >= node_count for index in indices):
-        raise ValueError("destination is outside the context's node range")
-    return sorted(set(indices))
-
-
-def dijkstra(RoutingContext context, origin, destinations, SearchResults results = None):
-    """Find shortest paths from one origin, reusing results when supplied.
-
-    Destinations may be a node index, an iterable or a boolean mask; None means
-    all nodes. Empty targets disable early exit. Return the filled SearchResults.
+    Results are caller-owned and may be reused with any matching dimensions.
+    Queries and contexts supply all inputs; neither is retained by results.
+    This call allocates no result buffers. The routing heap is still local to
+    each search and will be addressed separately.
     """
-    cdef size_t origin_index, node, node_count
-    cdef cpp_bool *mask
     if context is None:
         raise TypeError("context must not be None")
-    node_count = context.node_count
-    origin = operator.index(origin)
-    if not 0 <= origin < node_count:
-        raise ValueError("origin is outside the context's node range")
-    origin_index = origin
 
-    destination_indices = choose_destinations(destinations, node_count)
+    if query.node_count != context.node_count:
+        raise ValueError("query node_count does not match context")
 
-    if results is None:
-        results = context.make_results()
-    elif results.context is not context:
-        raise ValueError("different context")
+    if (results.node_count != context.node_count or
+            results.state_count != context.state_count or
+            results.link_count != context.link_count):
+        raise ValueError("results dimensions do not match context")
 
-    # Fill the destination mask without making its public views writable.
-    mask = <cpp_bool *>results.cpp.destination_mask
-    node = 0
-    while node < node_count:
-        mask[node] = 0
-        node += 1
-    for destination in destination_indices:
-        mask[<size_t>destination] = 1
-    results.cpp.destination_count = len(destination_indices)
-
-    # Cython does not dispatch overloaded free functions, so specialize here.
     with nogil:
         if RoutingContext is NodeBasedContext:
-            cpp_dijkstra[FourAryHeap](context.view(), origin_index, results.cpp)
+            cpp_dijkstra[FourAryHeap](context.view(), query.view(), results.view())
         else:
-            cpp_turn_dijkstra[FourAryHeap](context.view(), origin_index, results.cpp)
+            cpp_turn_dijkstra[FourAryHeap](context.view(), query.view(), results.view())
 
     return results

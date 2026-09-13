@@ -10,7 +10,8 @@ struct NodeBasedContext {
   const std::size_t *fs = nullptr;
   const std::size_t *heads = nullptr;
   const double *costs = nullptr;
-  const std::size_t *link_ids = nullptr;
+  // Nodes in this prefix may start or end a path, but cannot be used through.
+  std::size_t blocked_centroid_count = 0;
 };
 
 struct TurnBasedContext {

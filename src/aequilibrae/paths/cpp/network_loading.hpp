@@ -47,7 +47,7 @@ void network_loading(const SearchResults &results, std::size_t destination_count
   for (std::size_t node = 0; node < destination_count; ++node) {
     const auto terminal = results.terminal_states[node];
     if (terminal == std::numeric_limits<std::size_t>::max() ||
-        terminal == results.root) {
+        terminal == results.metadata->root) {
       continue;
     }
     T *row = workspace.state_loads + terminal * class_count;
@@ -56,9 +56,9 @@ void network_loading(const SearchResults &results, std::size_t destination_count
     }
   }
 
-  for (std::size_t i = results.settled_count; i > 0; --i) {
-    const auto state = results.reached_first[i - 1];
-    if (state == results.root) {
+  for (std::size_t i = results.metadata->settled_count; i > 0; --i) {
+    const auto state = results.settlement_order[i - 1];
+    if (state == results.metadata->root) {
       continue;
     }
     const T *row = workspace.state_loads + state * class_count;

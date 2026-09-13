@@ -16,16 +16,17 @@ from libcpp.algorithm cimport fill_n
 
 from aequilibrae.utils.cython.array_allocations cimport array, const_array_pointer
 from aequilibrae.utils.cython.array_allocations import readonly_view
-from aequilibrae.paths.cython.aon_workspace cimport CppAoNWorkspace
+from aequilibrae.paths.cython.aon_workspace cimport AoNWorkspace, CppAoNWorkspace
 from aequilibrae.paths.cython.dijkstra cimport RoutingContext, cpp_dijkstra, cpp_turn_dijkstra
 from aequilibrae.paths.cython.graph_context cimport (
-    GraphContext, NodeBasedContext, TurnBasedContext, CppNodeBasedContext, CppTurnBasedContext,
+    GraphContext, NodeBasedContext, TurnBasedContext,
 )
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
-from aequilibrae.paths.cython.search_results cimport (
-    SearchResults, CppSearchResults, cpp_skim_fields, cpp_network_loading, cpp_sum_weighted_turn_costs,
-    cpp_select_link_loading,
-)
+from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults, CppMutableSearchResults
+from aequilibrae.paths.cython.search_query cimport CppSearchQuery
+from aequilibrae.paths.cython.skimming cimport cpp_skim_fields, cpp_sum_weighted_turn_costs
+from aequilibrae.paths.cython.network_loading cimport cpp_network_loading
+from aequilibrae.paths.cython.select_link_loading cimport cpp_select_link_loading
 
 
 AoNOutputShape = namedtuple('AoNOutputShape', 'links, zones, classes, fields')
@@ -53,6 +54,7 @@ cdef class AoNOutputs:
     def __init__(self, links, zones, classes, fields, *, select_link_names=()):
         if self.link_loads_buffer is not None:
             raise RuntimeError("AoNOutputs cannot be reinitialized")
+
         links, zones, classes, fields = map(operator.index, (links, zones, classes, fields))
         if links < 0 or zones < 1 or classes < 1 or fields < 0:
             raise ValueError("output dimensions must be nonnegative, with at least one class and zone")
@@ -149,10 +151,26 @@ cdef class AoNOutputs:
 def copy_input(value, name, shape=None, dtype=np.float64):
     """Copy an input into a read-only, contiguous array with the requested shape."""
     array = np.array(value, dtype=dtype, order="C", copy=True)
+
     if shape is not None and array.shape != shape:
         raise ValueError(f"{name} must have shape {shape}")
+
     array.flags.writeable = False
     return array
+
+
+def borrow_input(value, name, shape=None):
+    """Keep large numeric inputs alive without packing or copying them."""
+    values = np.asarray(memoryview(value))
+
+    if values.dtype != np.dtype(np.float64):
+        raise TypeError(f"{name} must have dtype float64")
+    if not values.flags.c_contiguous or not values.flags.aligned:
+        raise ValueError(f"{name} must be aligned and C-contiguous")
+    if shape is not None and values.shape != shape:
+        raise ValueError(f"{name} must have shape {shape}")
+
+    return values
 
 
 def make_select_link_masks(selected_links, links):
@@ -230,37 +248,34 @@ def make_destination_masks(demand: np.ndarray, nodes: int, skimming: bool):
 cdef class PreparedAoN:
     """Prepare workers for repeated assignment runs on a fixed graph.
 
-    Demand [zones, zones, classes] and link skim fields are copied once; costs
-    are borrowed. Centroids are nodes 0..zones-1. Empty skim_fields skips skimming;
+    Demand [zones, zones, classes], link skim fields and costs are borrowed.
+    Centroids are nodes 0..zones-1. Empty skim_fields skips skimming;
     skim_penalties selects fields that include turn costs. Use make_outputs()
     and run() for each iteration. selected_links maps names to directed-link
     indices in this context. Sets are copied once so later caller changes do
     not affect a run. A trip matches when it uses any link in a set; its demand
     is added to every link on its path. Do not change inputs or use these same
-    objects elsewhere during a run.
+    objects elsewhere during a run. Origin selection and target masks are fixed
+    at setup, so changes to demand must not introduce new search targets.
     """
     cdef GraphContext context
-    cdef list workers, link_fields
-
-    cdef vector[CppSearchResults *] searches
-    cdef vector[CppAoNWorkspace[double] *] workspaces
-    cdef vector[const double *] field_pointers
-
-    cdef const double[::1] costs_buffer
-    cdef const double[:, :, ::1] demand_buffer
     cdef const cpp_bool[:, ::1] destination_masks_buffer
-    cdef const size_t[::1] destination_counts_buffer, origins_buffer
+    cdef const cpp_bool[:, ::1] select_link_masks_buffer
     cdef const cpp_bool[::1] include_turn_costs
+    cdef const double[:, :, ::1] demand_buffer
+    cdef const size_t[::1] destination_counts_buffer
+    cdef const size_t[::1] origins_buffer
+    cdef double[:, :, :, ::1] select_link_loads_buffer
     cdef double[:, :, ::1] link_loads_buffer
     cdef double[::1] turn_costs_buffer
-    cdef const cpp_bool[:, ::1] select_link_masks_buffer
-    cdef double[:, :, :, ::1] select_link_loads_buffer
+    cdef int cores
+    cdef list workers, worker_workspaces, link_fields
     cdef readonly tuple select_link_names
     cdef size_t select_link_count
-    cdef size_t[:, ::1] blocked_heads
     cdef size_t zone_count, class_count, link_count, field_count
-    cdef int cores
-    cdef bint block_centroids
+    cdef vector[CppAoNWorkspace[double]] workspaces
+    cdef vector[CppMutableSearchResults] searches
+    cdef vector[const double *] field_pointers
 
     def __cinit__(self):
         self.select_link_loads_buffer = None
@@ -278,9 +293,6 @@ cdef class PreparedAoN:
             origins=None,
             selected_links=None
     ):
-        cdef const size_t[::1] context_heads
-        cdef int core
-
         if self.context is not None:
             raise RuntimeError("PreparedAoN cannot be reinitialized")
         if not isinstance(context, (NodeBasedContext, TurnBasedContext)):
@@ -290,21 +302,20 @@ cdef class PreparedAoN:
         if not 1 <= cores <= np.iinfo(np.int32).max:
             raise ValueError("cores must be positive and fit an OpenMP thread count")
 
-        demand = copy_input(demand, "demand")
+        demand = borrow_input(demand, "demand")
         if (demand.ndim != 3 or demand.shape[0] != demand.shape[1]
                 or not 1 <= demand.shape[0] <= context.node_count or demand.shape[2] < 1):
             raise ValueError("demand must have shape (zones, zones, classes), zones <= node_count, classes >= 1")
 
-        if block_centroids and isinstance(context, TurnBasedContext):
-            raise ValueError("turn contexts must encode centroid blocking in their turn restrictions")
-
-        # Copy fixed inputs once and retain their buffers.
-        self.context = context
+        # Independent cost bindings share topology, not routing scratch.
+        self.context = context.with_costs(costs)
+        if block_centroids:
+            self.context.blocked_centroid_count = demand.shape[0]
         self.cores = cores
         self.zone_count, self.class_count = demand.shape[0], demand.shape[2]
         self.link_count = context.link_count
         self.link_fields = [
-            copy_input(field, "skim field", (self.link_count,))
+            borrow_input(field, "skim field", (self.link_count,))
             for field in (() if skim_fields is None else skim_fields)
         ]
         self.field_count = len(self.link_fields)
@@ -334,37 +345,33 @@ cdef class PreparedAoN:
                 (cores, self.select_link_count, self.link_count, self.class_count), True, 0
             )
 
-        self.block_centroids = block_centroids and self.link_count > 0
-        if self.block_centroids:
-            self.blocked_heads = array[size_t]((cores, self.link_count), False, 0)
-            context_heads = context.heads
-            for core in range(cores):
-                self.blocked_heads[core, :] = context_heads
         self.prepare_workers()
-        self.update_costs(costs)
 
     cdef void prepare_workers(self) except *:
         """Allocate each worker's search results and scratch buffers."""
         cdef SearchResults worker
+        cdef AoNWorkspace workspace
         cdef const double[::1] field
 
         self.workers = []
+        self.worker_workspaces = []
         self.searches.clear()
         self.workspaces.clear()
         self.field_pointers.clear()
 
         for _ in range(self.cores):
-            worker = SearchResults(self.context)
-            if self.field_count:
-                worker.workspace.prepare_skims(self.field_count)
-            worker.workspace.prepare_loading(self.class_count)
+            worker = SearchResults(self.context.node_count, self.context.state_count, self.link_count)
+            workspace = AoNWorkspace(self.context.state_count, self.field_count)
+            workspace.prepare_loading(self.class_count)
             if self.select_link_count:
-                # Allocate now so the origin loop can run without Python setup.
-                worker.workspace.prepare_select_links()
+                workspace.prepare_select_links()
 
             self.workers.append(worker)
-            self.searches.push_back(&worker.cpp)
-            self.workspaces.push_back(&worker.workspace.cpp)
+            self.worker_workspaces.append(workspace)
+            # These views borrow fixed allocations. Retain their Cython owners
+            # separately; do not take pointers to temporary view() return values.
+            self.searches.push_back(worker.view())
+            self.workspaces.push_back(workspace.view())
 
         for field in self.link_fields:
             self.field_pointers.push_back(const_array_pointer(field))
@@ -392,7 +399,7 @@ cdef class PreparedAoN:
     @property
     def costs(self):
         """Read-only view of the current link costs, without copying."""
-        return readonly_view(self.costs_buffer)
+        return self.context.costs
 
     @property
     def thread_outputs(self):
@@ -416,21 +423,7 @@ cdef class PreparedAoN:
         negative costs. Changes between runs are visible; changes during a run
         are unsafe. Invalid inputs leave the previous buffer in place.
         """
-        cdef const double[::1] view
-        if costs is None:
-            raise TypeError("costs must be a contiguous float64 buffer")
-        view = costs
-        if <size_t>view.shape[0] != self.link_count:
-            raise ValueError("costs must have one value per context link")
-        values = np.asarray(view)
-        if not values.flags.aligned:
-            raise ValueError("costs must be aligned")
-        if np.any(np.isnan(values)) or np.any(values < 0):
-            raise ValueError("costs must be nonnegative and must not contain NaN")
-        if (np.shares_memory(values, self.link_loads_buffer) or np.shares_memory(values, self.turn_costs_buffer)
-                or (self.select_link_count and np.shares_memory(values, self.select_link_loads_buffer))):
-            raise ValueError("costs must not overlap worker scratch")
-        self.costs_buffer = view
+        self.context.update_costs(costs)
 
     def make_outputs(self):
         """Allocate matching output buffers for the caller to reuse."""
@@ -444,15 +437,6 @@ cdef class PreparedAoN:
         """
         if out.shape != self.shape or out.select_link_names != self.select_link_names:
             raise ValueError("output shape does not match assignment shape (including select-link names/order)")
-
-        # Clearing outputs must not erase costs that the searches still need.
-        # Do this check before changing any output or worker buffer.
-        if (np.shares_memory(self.costs_buffer, out.link_loads_buffer)
-                or (self.field_count and np.shares_memory(self.costs_buffer, out.skims_buffer))
-                or (self.select_link_count and (
-                    np.shares_memory(self.costs_buffer, out.select_link_loads_buffer)
-                    or np.shares_memory(self.costs_buffer, out.select_link_od_buffer)))):
-            raise ValueError("costs must not overlap output buffers")
 
         if self.link_count:
             fill_n(&self.link_loads_buffer[0, 0, 0], <size_t>self.link_loads_buffer.size, 0)
@@ -488,35 +472,14 @@ cdef class PreparedAoN:
 @cython.initializedcheck(False)
 cdef void search_origin(
     RoutingContext context,
-    size_t origin,
-    const double *costs,
-    size_t zones,
-    size_t *blocked_heads,
-    CppSearchResults &search
+    const CppSearchQuery &query,
+    CppMutableSearchResults search
 ) noexcept nogil:
-    """Find paths from one origin using the current costs and centroid blocking."""
-    cdef size_t link
-    cdef CppNodeBasedContext node_graph
-    cdef CppTurnBasedContext turn_graph
-
+    """Use the same complete search inputs as the standalone entry point."""
     if RoutingContext is NodeBasedContext:
-        node_graph = context.view()
-        node_graph.costs = costs
-
-        if blocked_heads != NULL:
-            for link in range(node_graph.fs[zones]):
-                blocked_heads[link] = origin
-            for link in range(node_graph.fs[origin], node_graph.fs[origin + 1]):
-                blocked_heads[link] = node_graph.heads[link]
-
-            node_graph.heads = blocked_heads
-
-        cpp_dijkstra[FourAryHeap](node_graph, origin, search)
+        cpp_dijkstra[FourAryHeap](context.view(), query, search)
     else:
-        turn_graph = context.view()
-        turn_graph.graph.costs = costs
-
-        cpp_turn_dijkstra[FourAryHeap](turn_graph, origin, search)
+        cpp_turn_dijkstra[FourAryHeap](context.view(), query, search)
 
 
 @cython.boundscheck(False)
@@ -530,8 +493,10 @@ cdef void assign_origin(
     int thread_index,
 ) noexcept nogil:
     """Find paths, write skims and load demand for one origin."""
-    cdef CppSearchResults search = prepared.searches[thread_index][0]
-    cdef CppAoNWorkspace[double] *workspace = prepared.workspaces[thread_index]
+    cdef CppMutableSearchResults writable_search = prepared.searches[thread_index]
+    cdef CppSearchResults search = writable_search.read_view()
+    cdef CppAoNWorkspace[double] *workspace = &prepared.workspaces[thread_index]
+    cdef CppSearchQuery query
 
     cdef:
         size_t zones = prepared.zone_count
@@ -544,17 +509,12 @@ cdef void assign_origin(
         double *skims = &out.skims_buffer[origin, 0, 0] if fields else NULL
         double *link_loads = &prepared.link_loads_buffer[thread_index, 0, 0] if prepared.link_count else NULL
 
-    search.destination_mask = &prepared.destination_masks_buffer[mask_row, 0]
-    search.destination_count = prepared.destination_counts_buffer[mask_row]
-
-    search_origin(
-        context,
-        origin,
-        const_array_pointer(prepared.costs_buffer),
-        zones,
-        &prepared.blocked_heads[thread_index, 0] if prepared.block_centroids else NULL,
-        search
-    )
+    query.node_count = search.node_count
+    query.origin = origin
+    query.target_count = prepared.destination_counts_buffer[mask_row]
+    if query.target_count:
+        query.target_mask = &prepared.destination_masks_buffer[mask_row, 0]
+    search_origin(context, query, writable_search)
 
     if fields:
         cpp_skim_fields[double](search, zones, prepared.field_pointers.data(), fields, workspace[0], skims)
@@ -593,10 +553,3 @@ cdef void assign_origins(RoutingContext context, PreparedAoN prepared, AoNOutput
 
     for origin_index in prange(prepared.origins_buffer.shape[0], num_threads=prepared.cores, schedule="guided"):
         assign_origin(context, prepared, out, prepared.origins_buffer[origin_index], threadid())
-
-
-def aon_parallel_context(matrix, graph, result, aux_result, cores, bridge=None):
-    """Run the legacy Graph adapter; use PreparedAoN for repeated runs."""
-    from aequilibrae.paths.cython.aon_graph import aon_parallel_context as legacy
-
-    return legacy(matrix, graph, result, aux_result, cores, bridge)

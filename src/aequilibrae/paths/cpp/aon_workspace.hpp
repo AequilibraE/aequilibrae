@@ -4,10 +4,10 @@
 
 namespace aequilibrae::paths::cpp::mvp {
 
-// Borrowed, per-worker scratch buffers. The owner allocates before releasing
-// the GIL and must serialize access, just as for SearchResults. This workspace
-// is intentionally separate from finalized search labels; future routing
-// scratch (including heaps) can live here without changing that contract.
+// Borrowed, per-worker scratch for operations on finalized paths. Keeping it
+// outside SearchResults lets a search run without loading or skimming buffers.
+// The Cython owner allocates before workers use these pointers. Routing heap
+// storage belongs to the search implementation, not this workspace.
 template <typename T> struct AoNWorkspace {
   std::size_t state_count = 0;
   std::size_t skim_field_count = 0;

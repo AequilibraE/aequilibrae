@@ -51,10 +51,10 @@ void skim_fields(const SearchResults &results, std::size_t destination_count,
   // Include all settled states: paths to centroids can pass through other
   // nodes. Parents come first, so their sums are ready when we process their
   // children.
-  for (std::size_t i = 0; i < results.settled_count; ++i) {
-    const auto state = results.reached_first[i];
+  for (std::size_t i = 0; i < results.metadata->settled_count; ++i) {
+    const auto state = results.settlement_order[i];
     T *row = workspace.state_skims + state * field_count;
-    if (state == results.root) {
+    if (state == results.metadata->root) {
       // No links have been used at the root, and it has no parent or connector.
       std::fill_n(row, field_count, T{0});
     } else {
@@ -127,7 +127,7 @@ T sum_weighted_turn_costs(const SearchResults &search, size_t zones,
   for (size_t node = 0; node < zones; ++node) {
     size_t terminal = search.terminal_states[node];
     if (terminal == std::numeric_limits<std::size_t>::max() ||
-        terminal == search.root) {
+        terminal == search.metadata->root) {
       continue;
     }
 

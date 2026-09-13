@@ -50,10 +50,10 @@ void select_link_loading(const SearchResults &results,
   // Parents come first, even with zero-cost links, so each path can reuse its
   // parent's flag. Keep flags per STATE: with turns, two arrivals at the same
   // node can have different paths and can match different sets.
-  for (std::size_t i = 0; i < results.settled_count; ++i) {
-    const auto state = results.reached_first[i];
+  for (std::size_t i = 0; i < results.metadata->settled_count; ++i) {
+    const auto state = results.settlement_order[i];
     // The root has no incoming link. Its empty path must not match a set.
-    if (state != results.root) {
+    if (state != results.metadata->root) {
       workspace.selected_paths[state] =
           workspace.selected_paths[results.predecessors[state]] ||
           selected_links[results.connectors[state]];
@@ -64,7 +64,7 @@ void select_link_loading(const SearchResults &results,
   for (std::size_t node = 0; node < destination_count; ++node) {
     const auto terminal = results.terminal_states[node];
     if (terminal == std::numeric_limits<std::size_t>::max() ||
-        terminal == results.root || !workspace.selected_paths[terminal]) {
+        terminal == results.metadata->root || !workspace.selected_paths[terminal]) {
       continue;
     }
     for (std::size_t cls = 0; cls < class_count; ++cls) {
@@ -76,9 +76,9 @@ void select_link_loading(const SearchResults &results,
   // Children come first here so each parent receives all its matching trips.
   // Do not skip states with false flags: links BEFORE the first selected link
   // must also receive demand from matching destinations farther down the tree.
-  for (std::size_t i = results.settled_count; i > 0; --i) {
-    const auto state = results.reached_first[i - 1];
-    if (state == results.root) {
+  for (std::size_t i = results.metadata->settled_count; i > 0; --i) {
+    const auto state = results.settlement_order[i - 1];
+    if (state == results.metadata->root) {
       continue;
     }
     const T *row = workspace.state_loads + state * class_count;
