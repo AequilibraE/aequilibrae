@@ -209,3 +209,47 @@ def test_coquimbo_traffic_assignment_execution(coquimbo_example):
     assert len(res) == 19979
     assert "PCE_tot" in res.columns
     assert res["PCE_tot"].sum() > 0
+
+
+def test_preload_is_indexed_by_supernet_id_not_graph_row(coquimbo_example):
+    """Verifies a preload lands on the directed arc it names, in the supernet index space."""
+    project = coquimbo_example
+    project.network.build_graphs(modes=["c"])
+    graph = project.network.graphs["c"]
+    graph.set_graph("distance")
+    graph.graph["capacity"] = 5000.0
+    graph.graph["free_flow_time"] = graph.graph["distance"] / 1000.0
+
+    centroids = np.array(graph.centroids, dtype=np.int64)
+    mat = AequilibraeMatrix()
+    mat.create_empty(zones=len(centroids), matrix_names=["demand"], memory_only=True)
+    mat.index[:] = centroids[:]
+    mat.computational_view(["demand"])
+    mat.matrix_view[:, :] = 1.0
+
+    assig = TrafficAssignment()
+    assig.set_classes([TrafficClass("car", graph, mat)])
+    assig.set_vdf("BPR")
+    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_capacity_field("capacity")
+    assig.set_time_field("free_flow_time")
+    assig.set_algorithm("msa")
+
+    # The class graph is shorter than the project-wide supernet, and the ids it does carry have
+    # gaps, so a preload frame built from graph rows would be both short and misaligned.
+    assert graph.num_links < graph.supernet_size
+
+    rows = graph.graph[graph.graph.duplicated(subset="link_id", keep=False)]
+    link_id = int(rows.link_id.iloc[0])
+    both = graph.graph[graph.graph.link_id == link_id]
+    ab_id = int(both.loc[both.direction == 1, "__supernet_id__"].iloc[0])
+    ba_id = int(both.loc[both.direction == -1, "__supernet_id__"].iloc[0])
+
+    assig.add_preload(pd.DataFrame({"link_id": [link_id], "direction": [-1], "preload": [777.0]}))
+
+    assert len(assig.preloads) == graph.supernet_size
+    vector = assig.assignment.preload
+    assert vector.shape[0] == graph.supernet_size
+    assert vector[ba_id] == 777.0
+    assert vector[ab_id] == 0.0
+    assert vector.sum() == 777.0

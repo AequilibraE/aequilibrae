@@ -110,7 +110,7 @@ class TrafficClass(TransportClassBase):
             if graph is not None and not graph.graph.empty and "__supernet_id__" in graph.graph.columns
             else None
         )
-        supernet_size = getattr(graph, "supernet_size", None)
+        supernet_size = graph.supernet_size if graph is not None else None
         if supernet_size is None:
             supernet_size = (
                 int(supernet_ids.max() + 1)

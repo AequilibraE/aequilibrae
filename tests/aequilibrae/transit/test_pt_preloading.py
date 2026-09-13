@@ -81,7 +81,9 @@ def test_building_pt_preload(graph: Graph, demand: AequilibraeMatrix, transit: T
     assignment.add_preload(preloads[0])
 
     # After adding the preload to the assignment object it should be expanded to cover ALL links
-    assert len(assignment.preloads) == len(graph.graph)
+    # One row per directed arc of the whole project network, not per link of this mode's
+    # graph: the preload vector is added onto supernet-indexed flows.
+    assert len(assignment.preloads) == graph.supernet_size
 
 
 def test_run(graph: Graph, demand: AequilibraeMatrix, transit: Transit):

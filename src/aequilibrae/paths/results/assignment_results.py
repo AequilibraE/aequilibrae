@@ -193,7 +193,7 @@ class AssignmentResults(AssignmentResultsBase):
             supernet_size = 0
         else:
             if supernet_size is None:
-                supernet_size = getattr(graph, "supernet_size", None)
+                supernet_size = graph.supernet_size
             if supernet_size is None:
                 supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else graph.graph.shape[0]
             self.links = max(graph.num_links, supernet_size)
