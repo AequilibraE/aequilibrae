@@ -20,8 +20,10 @@ exts = [
     'new_path_finding',
     'graph_context',
     'search_results',
-    'search_query',
-    'aon_workspace',
+    'queries',
+    'workspaces',
+    'outputs',
+    'network_loading',
     'skimming_context',
     'dijkstra',
 ]

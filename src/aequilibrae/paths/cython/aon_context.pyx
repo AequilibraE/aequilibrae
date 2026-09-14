@@ -16,16 +16,17 @@ from libcpp.algorithm cimport fill_n
 
 from aequilibrae.utils.cython.array_allocations cimport array, const_array_pointer
 from aequilibrae.utils.cython.array_allocations import readonly_view
-from aequilibrae.paths.cython.aon_workspace cimport AoNWorkspace, CppAoNWorkspace
+from aequilibrae.paths.cython.workspaces cimport AoNWorkspace, CppAoNWorkspace
 from aequilibrae.paths.cython.dijkstra cimport RoutingContext, cpp_dijkstra, cpp_turn_dijkstra
 from aequilibrae.paths.cython.graph_context cimport (
     GraphContext, NodeBasedContext, TurnBasedContext,
 )
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults, CppMutableSearchResults
-from aequilibrae.paths.cython.search_query cimport CppSearchQuery
+from aequilibrae.paths.cython.queries cimport CppLoadingQuery, CppSearchQuery
 from aequilibrae.paths.cython.skimming cimport cpp_skim_fields, cpp_sum_weighted_turn_costs
-from aequilibrae.paths.cython.network_loading cimport cpp_network_loading
+from aequilibrae.paths.cython.network_loading cimport cpp_network_loading, cpp_reduce_loading_outputs
+from aequilibrae.paths.cython.outputs cimport LoadingOutputs, CppLoadingOutputs
 from aequilibrae.paths.cython.select_link_loading cimport cpp_select_link_loading
 
 
@@ -38,7 +39,7 @@ cdef class AoNOutputs:
     between runs; do not read an output while a run is writing it.
     """
     cdef double[:, :, ::1] skims_buffer
-    cdef double[:, ::1] link_loads_buffer
+    cdef readonly LoadingOutputs loading
     cdef double[:, :, ::1] select_link_loads_buffer
     cdef double[:, :, :, ::1] select_link_od_buffer
     cdef readonly tuple select_link_names
@@ -46,13 +47,12 @@ cdef class AoNOutputs:
     cdef readonly double turn_cost_total
 
     def __cinit__(self):
-        self.link_loads_buffer = None
         self.skims_buffer = None
         self.select_link_loads_buffer = None
         self.select_link_od_buffer = None
 
     def __init__(self, links, zones, classes, fields, *, select_link_names=()):
-        if self.link_loads_buffer is not None:
+        if self.loading is not None:
             raise RuntimeError("AoNOutputs cannot be reinitialized")
 
         links, zones, classes, fields = map(operator.index, (links, zones, classes, fields))
@@ -68,7 +68,7 @@ cdef class AoNOutputs:
         self.classes = classes
         self.fields = fields
 
-        self.link_loads_buffer = array[double]((links, classes), True, 0)
+        self.loading = LoadingOutputs(links, classes)
         if fields:
             self.skims_buffer = array[double]((zones, zones, fields), True, np.inf)
 
@@ -84,7 +84,7 @@ cdef class AoNOutputs:
     @property
     def link_loads(self) -> np.ndarray:
         """Read-only loads for each link and demand class."""
-        return readonly_view(self.link_loads_buffer)
+        return self.loading.link_loads
 
     @property
     def skims(self) -> np.ndarray | None:
@@ -114,38 +114,6 @@ cdef class AoNOutputs:
     def total_turn_penalty(self):
         """Total turn cost weighted by demand."""
         return self.turn_cost_total
-
-    def copy(self):
-        """Return an independent copy of these outputs."""
-        return self.copy_to(AoNOutputs(*self.shape, select_link_names=self.select_link_names))
-
-    def copy_to(self, other: AoNOutputs):
-        """Copy into matching output buffers and return them."""
-        if not isinstance(other, AoNOutputs):
-            raise TypeError("other must be of type AoNOutputs")
-
-        if self.shape != other.shape:
-            raise ValueError(f"output shapes do not match, got {other.shape}, expected {self.shape}")
-
-        # Equal sizes are not enough: copying rows in a different set order
-        # would give the caller valid numbers under the wrong names.
-        if self.select_link_names != other.select_link_names:
-            raise ValueError("output select-link shapes/names do not match (including set order)")
-
-        if other is self:
-            return other
-
-        np.copyto(np.asarray(other.link_loads_buffer), np.asarray(self.link_loads_buffer))
-        if self.skims_buffer is not None:
-            np.copyto(np.asarray(other.skims_buffer), np.asarray(self.skims_buffer))
-
-        if self.select_link_names:
-            np.copyto(np.asarray(other.select_link_loads_buffer), np.asarray(self.select_link_loads_buffer))
-            np.copyto(np.asarray(other.select_link_od_buffer), np.asarray(self.select_link_od_buffer))
-
-        other.turn_cost_total = self.turn_cost_total
-
-        return other
 
 
 def copy_input(value, name, shape=None, dtype=np.float64):
@@ -266,15 +234,15 @@ cdef class PreparedAoN:
     cdef const size_t[::1] destination_counts_buffer
     cdef const size_t[::1] origins_buffer
     cdef double[:, :, :, ::1] select_link_loads_buffer
-    cdef double[:, :, ::1] link_loads_buffer
     cdef double[::1] turn_costs_buffer
     cdef int cores
-    cdef list workers, worker_workspaces, link_fields
+    cdef list workers, worker_workspaces, worker_loading_outputs, link_fields
     cdef readonly tuple select_link_names
     cdef size_t select_link_count
     cdef size_t zone_count, class_count, link_count, field_count
     cdef vector[CppAoNWorkspace[double]] workspaces
     cdef vector[CppMutableSearchResults] searches
+    cdef vector[CppLoadingOutputs[double]] loading_outputs
     cdef vector[const double *] field_pointers
 
     def __cinit__(self):
@@ -336,7 +304,6 @@ cdef class PreparedAoN:
         self.demand_buffer = demand
 
         # Worker totals are cleared at the start of each run.
-        self.link_loads_buffer = array[double]((cores, self.link_count, self.class_count), True, 0)
         self.turn_costs_buffer = array[double](cores, True, 0)
         # Origins can load the same link at the same time. Give each worker
         # its own loads so workers do not need locks on each addition.
@@ -351,27 +318,35 @@ cdef class PreparedAoN:
         """Allocate each worker's search results and scratch buffers."""
         cdef SearchResults worker
         cdef AoNWorkspace workspace
+        cdef LoadingOutputs loading
         cdef const double[::1] field
 
         self.workers = []
         self.worker_workspaces = []
+        self.worker_loading_outputs = []
         self.searches.clear()
         self.workspaces.clear()
+        self.loading_outputs.clear()
         self.field_pointers.clear()
 
         for _ in range(self.cores):
             worker = SearchResults(self.context.node_count, self.context.state_count, self.link_count)
-            workspace = AoNWorkspace(self.context.state_count, self.field_count)
-            workspace.prepare_loading(self.class_count)
-            if self.select_link_count:
-                workspace.prepare_select_links()
+            workspace = AoNWorkspace(
+                self.context.state_count,
+                class_count=self.class_count,
+                field_count=self.field_count if self.field_count else None,
+                select_links=self.select_link_count > 0,
+            )
+            loading = LoadingOutputs(self.link_count, self.class_count)
 
             self.workers.append(worker)
             self.worker_workspaces.append(workspace)
+            self.worker_loading_outputs.append(loading)
             # These views borrow fixed allocations. Retain their Cython owners
             # separately; do not take pointers to temporary view() return values.
             self.searches.push_back(worker.view())
             self.workspaces.push_back(workspace.view())
+            self.loading_outputs.push_back(loading.view())
 
         for field in self.link_fields:
             self.field_pointers.push_back(const_array_pointer(field))
@@ -402,11 +377,6 @@ cdef class PreparedAoN:
         return self.context.costs
 
     @property
-    def thread_outputs(self):
-        """Read-only link loads and turn totals for each worker."""
-        return readonly_view(self.link_loads_buffer), readonly_view(self.turn_costs_buffer)
-
-    @property
     def select_link_masks(self):
         """Read-only link flags [sets, links], in select_link_names order."""
         return readonly_view(self.select_link_masks_buffer)
@@ -435,11 +405,13 @@ cdef class PreparedAoN:
         Unreachable or skipped skims are infinity; searched diagonals are zero.
         Do not use this assignment or its output concurrently.
         """
+        cdef size_t worker
         if out.shape != self.shape or out.select_link_names != self.select_link_names:
             raise ValueError("output shape does not match assignment shape (including select-link names/order)")
 
-        if self.link_count:
-            fill_n(&self.link_loads_buffer[0, 0, 0], <size_t>self.link_loads_buffer.size, 0)
+        with nogil:
+            for worker in range(self.loading_outputs.size()):
+                self.loading_outputs[worker].reset()
         fill_n(&self.turn_costs_buffer[0], <size_t>self.turn_costs_buffer.size, 0)
 
         if self.select_link_count:
@@ -459,7 +431,10 @@ cdef class PreparedAoN:
             with nogil:
                 assign_origins[TurnBasedContext](<TurnBasedContext>self.context, self, out)
 
-        np.sum(np.asarray(self.link_loads_buffer), axis=0, out=np.asarray(out.link_loads_buffer))
+        with nogil:
+            cpp_reduce_loading_outputs[double](
+                self.loading_outputs.data(), self.loading_outputs.size(), out.loading.view()
+            )
         out.turn_cost_total = float(np.sum(np.asarray(self.turn_costs_buffer)))
         if self.select_link_count:
             np.sum(np.asarray(self.select_link_loads_buffer), axis=0, out=np.asarray(out.select_link_loads_buffer))
@@ -496,7 +471,9 @@ cdef void assign_origin(
     cdef CppMutableSearchResults writable_search = prepared.searches[thread_index]
     cdef CppSearchResults search = writable_search.read_view()
     cdef CppAoNWorkspace[double] *workspace = &prepared.workspaces[thread_index]
-    cdef CppSearchQuery query
+    cdef CppSearchQuery search_query
+    cdef CppLoadingQuery[double] loading_query
+    cdef CppLoadingOutputs[double] selected_output
 
     cdef:
         size_t zones = prepared.zone_count
@@ -507,29 +484,36 @@ cdef void assign_origin(
 
         const double *demand = &prepared.demand_buffer[origin, 0, 0]
         double *skims = &out.skims_buffer[origin, 0, 0] if fields else NULL
-        double *link_loads = &prepared.link_loads_buffer[thread_index, 0, 0] if prepared.link_count else NULL
 
-    query.node_count = search.node_count
-    query.origin = origin
-    query.target_count = prepared.destination_counts_buffer[mask_row]
-    if query.target_count:
-        query.target_mask = &prepared.destination_masks_buffer[mask_row, 0]
-    search_origin(context, query, writable_search)
+    search_query.node_count = search.node_count
+    search_query.origin = origin
+    search_query.target_count = prepared.destination_counts_buffer[mask_row]
+    if search_query.target_count:
+        search_query.target_mask = &prepared.destination_masks_buffer[mask_row, 0]
+    search_origin(context, search_query, writable_search)
 
     if fields:
-        cpp_skim_fields[double](search, zones, prepared.field_pointers.data(), fields, workspace[0], skims)
+        cpp_skim_fields[double](search, zones, prepared.field_pointers.data(), fields, workspace[0].skimming, skims)
 
-    cpp_network_loading[double](search, zones, demand, classes, workspace[0], link_loads)
+    loading_query.destination_count = zones
+    loading_query.class_count = classes
+    loading_query.demand = demand
+    cpp_network_loading[double](search, loading_query, workspace[0].loading, prepared.loading_outputs[thread_index])
 
     # Reuse the same scratch for each set to keep memory use down. Each origin
     # runs on just one worker, so OD can go straight into its output row without
     # locks or a separate OD cube for every worker.
+    selected_output.link_count = prepared.link_count
+    selected_output.class_count = classes
     for selection in range(prepared.select_link_count):
+        selected_output.link_loads = (
+            &prepared.select_link_loads_buffer[thread_index, selection, 0, 0] if prepared.link_count else NULL
+        )
         cpp_select_link_loading[double](
-            search, zones, demand, classes,
+            search, loading_query,
             &prepared.select_link_masks_buffer[selection, 0] if prepared.link_count else NULL,
-            workspace[0], &out.select_link_od_buffer[selection, origin, 0, 0],
-            &prepared.select_link_loads_buffer[thread_index, selection, 0, 0] if prepared.link_count else NULL,
+            workspace[0].select_link, workspace[0].loading,
+            &out.select_link_od_buffer[selection, origin, 0, 0], selected_output,
         )
 
     if RoutingContext is TurnBasedContext:

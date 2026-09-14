@@ -10,7 +10,7 @@ import pytest
 
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.graph_context import NodeBasedContext
-from aequilibrae.paths.cython.search_query import SearchQuery
+from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 
 from .routing_helpers import allocate_results, assert_state_tree, make_context, search

@@ -7,7 +7,7 @@
 
 #include "graph_context.hpp"
 #include "pq_heap_base.hpp"
-#include "search_query.hpp"
+#include "queries.hpp"
 #include "search_results.hpp"
 
 namespace aequilibrae::paths::cpp::mvp {

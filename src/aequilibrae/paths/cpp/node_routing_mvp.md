@@ -26,7 +26,7 @@ locks or runtime checks for concurrent changes or buffer overlap.
 import numpy as np
 
 from aequilibrae.paths.cython.graph_context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.search_query import SearchQuery
+from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.dijkstra import dijkstra
 
@@ -98,6 +98,10 @@ Turn tables retain the existing representation:
   remain banned. The first link leaving the source pays no turn cost.
 
 ### Search queries
+
+`queries.hpp`, `queries.pxd` and `queries.pyx` group the search and loading
+query owners. `outputs.hpp`, `outputs.pxd` and `outputs.pyx` group operation
+outputs as they are extracted.
 
 `SearchQuery(node_count, origin, target_mask=None)` separates inputs that vary
 between origins from the graph data.
@@ -178,30 +182,130 @@ The routing kernels live in `dijkstra.hpp`. Legacy production algorithms remain
 in `path_finding.hpp`. The new kernels still allocate their own four-ary heap on
 each search; persistent heap storage and other heap choices are deferred.
 
-## Downstream migration boundary
+## Second slice: workspaces and network loading
 
-This slice removes all loading, skimming, select-link and preparation methods
-from `SearchResults`. Their C++ kernels remain, with declarations in separate
-operation `.pxd` files. There are no replacement standalone Python operation
-wrappers yet; they will use the smaller workspace and output objects next.
+### Fixed-size operation workspaces
 
-`PreparedAoN` remains as a testable consumer of the new routing boundary. It now:
+All workspace types live together in `workspaces.hpp`, `workspaces.pxd` and
+`workspaces.pyx`. They remain independent objects:
 
-- Retains results and `AoNWorkspace` objects separately for each worker.
-- Builds query views from its prepared masks without changing results inputs.
-- Uses context-owned cost bindings and centroid blocking.
-- Borrows contiguous demand and skim fields instead of copying them.
+| Object | Allocation | Used by |
+| --- | --- | --- |
+| `LoadingWorkspace(states, classes)` | State demand totals `[states, classes]` | Ordinary and selected loading |
+| `SkimmingWorkspace(states, fields)` | Additive field sums `[states, fields]` | Field skimming |
+| `SelectLinkWorkspace(states)` | One boolean path-membership flag per state | Select-link analysis |
 
-Its target masks and origin selection are still prepared once. Changing demand
-magnitudes is possible, but changing which OD pairs require searches needs new
-preparation. Outputs, skimming setup and operation workspaces are not yet the
-final composed interface. The old `SkimmingContext` also still awaits its split
-into inputs and outputs.
+None retains a graph, query, search results or output. Dimensions are fixed at
+construction. There are no `prepare_*` or resize methods. Kernels replace their
+own scratch before using it, so callers need not clear scratch between origins.
+Read-only buffer views keep their allocations alive and reflect the last operation
+that wrote them. Zero class and field widths produce empty buffers.
+
+`AoNWorkspace` allocates an optional group of these objects:
+
+```python
+from aequilibrae.paths.cython.workspaces import AoNWorkspace
+
+workspace = AoNWorkspace(
+    context.state_count, class_count=2, field_count=3, select_links=True,
+)
+loading_scratch = workspace.loading
+skim_scratch = workspace.skimming
+selection_scratch = workspace.select_link
+```
+
+Omitting a width leaves that component `None`; `select_links=False` leaves flags
+unallocated. Components can be used on their own and outlive the group. Each
+C++ kernel takes only its required component views, never `AoNWorkspace`.
+Select-link loading takes both selection flags and loading scratch explicitly,
+so it can reuse the same cascade allocation as ordinary loading.
+
+### Loading query and output
+
+`LoadingQuery(demand)` borrows one origin's aligned, contiguous `float64` demand
+buffer `[destinations, classes]`. It exposes a read-only `demand` view without
+changing the caller's writeability flags. Values may change between calls; the
+shape and allocation stay fixed. Lists, strided buffers and dtype conversion
+are not accepted. The caller selects the row corresponding to the search origin;
+the query does not retain or identify a search.
+
+`LoadingOutputs(links, classes)` owns a zero-initialized link accumulation buffer.
+It exposes read-only `link_loads`, supports explicit `reset()`, and holds no input
+or scratch references. Both axes may be zero. Reset clears existing storage,
+not retained historical snapshots or any workspace. Copy a NumPy view when a
+snapshot is needed; output objects have no separate snapshot API.
+
+```python
+from aequilibrae.paths.cython.queries import LoadingQuery
+from aequilibrae.paths.cython.outputs import LoadingOutputs
+from aequilibrae.paths.cython.workspaces import LoadingWorkspace
+from aequilibrae.paths.cython.network_loading import network_loading
+
+# Use the finalized origin-0 paths from the search example above.
+demand = np.ones((context.node_count, 2), dtype=np.float64)
+loading_query = LoadingQuery(demand)
+loading_scratch = LoadingWorkspace(results.state_count, 2)
+loads = LoadingOutputs(results.link_count, 2)
+
+network_loading(results, loading_query, loading_scratch, loads)
+link_loads = loads.link_loads  # Read-only, zero-copy view.
+loads.reset()                # Clear once before the next iteration's origins.
+```
+
+`network_loading(results, query, workspace, output)` checks dimensions before
+writing and returns the supplied output. It releases the GIL and calls the same
+C++ kernel used by assignment. The kernel accepts the four typed views and does
+not allocate, change the result tree, retain inputs or clear link output.
+
+Demand destinations are physical nodes `0..destination_count-1`; paths may use
+states outside that prefix. Only finalized, non-intrazonal demand is loaded.
+Missing terminals are ignored, even in partial searches; loading never extends
+a search. Before a search it loads nothing. Empty demand replaces scratch with
+zero totals but adds no link demand. Negative and nonfinite values use ordinary
+floating-point addition along their selected paths.
+
+The kernel seeds demand at each node's chosen terminal, then cascades it in reverse
+settlement order. This follows turn histories without a routing-mode branch.
+At completion, `workspace.state_loads` contains subtree demand, the root contains
+all reachable non-intrazonal demand, and unfinalized states are zero. Ordinary
+and selected loading share this reverse pass; selected loading only changes how
+terminal demand is seeded.
+
+### Worker reduction and assignment use
+
+Each worker accumulates into its own `LoadingOutputs`. After workers finish,
+`reduce_loading_outputs(workers, output)` replaces a distinct output with their
+sum. All dimensions must match; checks happen before resetting the target.
+Workers remain unchanged. An empty worker list resets output to zero.
+
+`PreparedAoN` now retains one `LoadingOutputs` per worker rather than a separate
+thread-axis load cube. It prepares a table of views once, resets the worker
+accumulators before each iteration, and reduces them using the same C++ reduction
+as the standalone entry point. Queries borrow already prepared origin rows, so
+the origin loop builds no Python query objects or numeric buffers.
+
+`AoNOutputs.loading` is an independent `LoadingOutputs`; `AoNOutputs.link_loads`
+forwards its read-only view. Other output components have not yet been separated.
+The old aggregate `copy()` / `copy_to()` and thread-load cube accessor are removed.
+Output rotation remains ordinary reference rotation.
+
+## Remaining downstream work
+
+`SearchResults` has no loading, skimming, select-link or preparation methods.
+Standalone loading is available now. Skimming and select-link kernels have been
+adapted to the small workspaces; their Python input/output interfaces remain for
+the next slices. The old `SkimmingContext` still awaits its split into inputs and
+outputs, with one ordered skim array and named zero-copy matrix views.
+
+`PreparedAoN` remains a testable consumer rather than the final integration API.
+It borrows demand, routing costs and skim fields, and uses context-owned cost
+bindings and centroid blocking. Target masks and origin selection are prepared
+once: changing demand magnitudes is possible, but introducing new search targets
+requires new preparation. Further work will separate its remaining outputs and
+skim configuration, then reduce the driver to composition of those objects.
 
 `aon_graph.py`, its adapter exports and legacy integration tests have been removed.
-Production dispatch is unchanged. The next slices will separate the operation
-workspaces and outputs, unify skim fields into one ordered array with named
-zero-copy matrix views, and reduce the driver to composition of those objects.
+Production dispatch is unchanged.
 
 ## Validation
 
@@ -223,5 +327,7 @@ python -m pytest -q -s \
 The new routing tests check independent NetworkX distances and expanded turn
 states, partial-search cleanup, zero-cost cycles, U-turn rules, borrowed inputs,
 context-independent reuse, metadata updates, view lifetimes and separate workers.
-Downstream tests use the retained driver and compare its kernels with OD-by-OD
-path walks until the operation-specific Python interfaces are introduced.
+Standalone loading tests check partial and empty queries, demand borrowing,
+fixed buffer reuse, read-only views, independent lifetimes, dimension validation,
+worker-local accumulation and reduction. Driver tests compare skimming, ordinary
+loading and select-link loading against OD-by-OD path walks.

@@ -14,4 +14,12 @@ struct SearchQuery {
   std::size_t target_count = 0;
 };
 
+// Borrow one origin's demand row. Destinations are the first destination_count
+// physical nodes; paths may use intermediate states outside that range.
+template <typename T> struct LoadingQuery {
+  std::size_t destination_count = 0;
+  std::size_t class_count = 0;
+  const T *demand = nullptr; // [destinations, classes]
+};
+
 } // namespace aequilibrae::paths::cpp::mvp

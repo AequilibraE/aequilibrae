@@ -11,7 +11,11 @@ import numpy as np
 import pytest
 
 from aequilibrae.paths.cython.aon_context import PreparedAoN
-from .routing_helpers import history_context, make_context, path_walk_outputs
+from aequilibrae.paths.cython.queries import LoadingQuery
+from aequilibrae.paths.cython.outputs import LoadingOutputs
+from aequilibrae.paths.cython.network_loading import network_loading
+from aequilibrae.paths.cython.workspaces import LoadingWorkspace
+from .routing_helpers import history_context, make_context, path_walk_outputs, search
 
 
 @pytest.mark.parametrize("turn", [False, True])
@@ -126,6 +130,22 @@ def test_no_active_origins_resets_outputs(turn):
     assert out.total_turn_penalty == 0
     assert np.all(out.select_link_od == 0)
     assert out.select_link_loads.shape == (1, 0, 1)
+
+
+def test_loading_output_component_is_independent_of_assignment():
+    context = history_context()
+    demand = np.ones((4, 4, 1))
+    prepared = PreparedAoN(context, demand, costs=context.costs)
+    out = prepared.run(prepared.make_outputs())
+    loading = out.loading
+    assert isinstance(loading, LoadingOutputs)
+    assert np.shares_memory(loading.link_loads, out.link_loads)
+    del prepared, out
+    loading.reset()
+    results = search(context, 0)
+    network_loading(results, LoadingQuery(demand[0]), LoadingWorkspace(context.state_count, 1), loading)
+    demand[1:] = 0
+    np.testing.assert_array_equal(loading.link_loads, path_walk_outputs(context, demand)[0])
 
 
 def test_large_input_buffers_must_already_be_packed():

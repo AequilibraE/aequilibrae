@@ -4,7 +4,7 @@ import numpy as np
 
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.graph_context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.search_query import SearchQuery
+from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 
 
