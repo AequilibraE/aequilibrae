@@ -67,6 +67,23 @@ void network_loading(const SearchResults &results, const LoadingQuery<T> &query,
   cascade_loads(results, workspace, output);
 }
 
+template <typename T>
+T sum_weighted_turn_costs(const SearchResults &results,
+                          const LoadingQuery<T> &query) noexcept {
+  T total = 0;
+  for (std::size_t node = 0; node < query.destination_count; ++node) {
+    const auto terminal = results.terminal_states[node];
+    if (terminal == invalid_state || terminal == results.metadata->root) {
+      continue;
+    }
+    for (std::size_t cls = 0; cls < query.class_count; ++cls) {
+      total += query.demand[node * query.class_count + cls] *
+               results.turn_costs[terminal];
+    }
+  }
+  return total;
+}
+
 // Reduce a set of LoadingOutputs into a single LoadingOutputs.
 template <typename T>
 void reduce_loading_outputs(const LoadingOutputs<T> *workers,

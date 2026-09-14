@@ -285,24 +285,180 @@ as the standalone entry point. Queries borrow already prepared origin rows, so
 the origin loop builds no Python query objects or numeric buffers.
 
 `AoNOutputs.loading` is an independent `LoadingOutputs`; `AoNOutputs.link_loads`
-forwards its read-only view. Other output components have not yet been separated.
+forwards its read-only view. Skimming is now another independent component,
+described below. Select-link outputs have not yet been separated.
 The old aggregate `copy()` / `copy_to()` and thread-load cube accessor are removed.
 Output rotation remains ordinary reference rotation.
+
+## Third slice: named skimming inputs and outputs
+
+### Skimming inputs
+
+`SkimmingContext` retains field meanings and borrowed link buffers, not a routing
+context, results, demand, scratch or output. Its constructor takes a link count
+and four separate named inputs:
+
+| Argument | Meaning |
+| --- | --- |
+| `link_fields={name: buffer, ...}` | Sum the supplied link values along the path |
+| `link_fields_with_turn_costs={name: buffer, ...}` | Sum the supplied link values, then add the path's turn cost |
+| `cost_name=name` | Copy the routing objective already stored in results |
+| `turn_cost_name=name` | Copy the turn-cost component already stored in results |
+
+Each argument is optional. The output order is the two mappings in the order
+shown above, preserving insertion order within each mapping, then the two label
+fields. Names must be nonempty strings and unique across all four groups.
+`field_names` records that order; `field_count` includes every output field.
+`additive_field_count` counts only the supplied link buffers.
+
+Link buffers must be aligned, contiguous `float64` vectors with `link_count`
+entries in local link order. They are borrowed without conversion or changing
+the caller's writeability flags. Negative and nonfinite values follow ordinary
+floating-point addition. Contents may change between calls, but not during a
+call. `fields` returns a dictionary of read-only views of these supplied buffers.
+The two label fields have no input buffer.
+
+Meanings are explicit. Passing a routing cost buffer as a link field does not
+make it an objective projection or implicitly add penalties. Rebinding a routing
+context's costs does not rebind a skim field. Label projections use the completed
+search's labels even if routing costs have since changed.
+
+### Output storage and one-shot allocation
+
+`SkimmingOutputs(origin_count, destination_count, field_names)` owns one fixed
+array `[origin rows, fields, destinations]`, initially infinity. It copies names
+and dimensions, not an input-owner reference. All three axes may be zero.
+
+- `skims` exposes a read-only, C-contiguous view of the whole origin-major array.
+  Each `skims[origin_row]` is a contiguous `[fields, destinations]` block.
+  There is no transposed compatibility view of the former layout.
+- `matrices` returns a dictionary of named `[origin rows, destinations]` views.
+  Each is a slice `skims[:, field_index, :]`, not a separate allocation. These
+  matrices may be non-contiguous; each destination row remains contiguous.
+- `reset()` replaces every value with infinity without reallocating storage.
+
+Retained views keep buffers alive after the wrapper is deleted. Later calls and
+resets overwrite those views; use `.copy()` for a snapshot.
+
+`inputs.make_outputs(destination_count, origin_count=1)` is a convenient way to
+allocate matching names and order. One origin row is the default, regardless of
+the physical node where the search started. More rows can be requested for OD
+skimming without tying the input owner to those dimensions.
+
+```python
+from aequilibrae.paths.cython.skimming_context import SkimmingContext
+from aequilibrae.paths.cython.skimming import skimming
+from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
+
+skim_inputs = SkimmingContext(
+    context.link_count,
+    link_fields={"distance": np.ones(context.link_count)},
+    link_fields_with_turn_costs={"time": np.ones(context.link_count)},
+    cost_name="objective",
+    turn_cost_name="turn_penalty",
+)
+skim_scratch = SkimmingWorkspace(results.state_count, skim_inputs.additive_field_count)
+skim_output = skim_inputs.make_outputs(context.node_count)  # One origin row per field.
+assert skim_output.skims.shape == (1, 4, context.node_count)
+
+skimming(results, skim_inputs, skim_scratch, skim_output)
+matrices = skim_output.matrices
+assert list(matrices) == ["distance", "time", "objective", "turn_penalty"]
+assert matrices["objective"][0, results.origin] == 0.0
+
+# Label-only skimming needs neither link buffers nor state-sum scratch.
+label_inputs = SkimmingContext(context.link_count, cost_name="objective")
+label_output = label_inputs.make_outputs(context.node_count)
+skimming(results, label_inputs, None, label_output)
+```
+
+### One operation for standalone and assignment skimming
+
+`skimming(results, context, workspace, output, origin_row=0)` checks dimensions,
+ordered field names and the output row before writing anything. It replaces only
+`output.skims[origin_row, :, :]` and returns the supplied output. Destinations are physical nodes
+`0..destination_count-1`, independent of the search target mask. The explicit
+output row need not equal the physical search origin.
+
+Only finalized paths are skimmed. A missing terminal produces infinity, whether
+unreachable or not yet finalized in a partial search. A pre-search result produces
+all infinity. A finalized intrazonal path is zero for every field. Skimming never
+extends or changes a search.
+
+The workspace stays `[states, additive fields]`: the tree pass sums every field
+at a state together. Its width must equal `additive_field_count`, not total field
+count. With additive fields, scratch is replaced on every call: the root is zero,
+finalized states hold link sums, and unfinalized states are infinity. Turn costs
+are added only when writing the output, not into state sums. Paths follow state
+predecessors so they preserve turn history. With no destinations, additive state
+sums are still computed. With no additive fields, supply `None` for workspace;
+label projection reads terminal labels directly without walking the state tree.
+
+Cython calls an allocation-free C++ operation with `results.read_view()`,
+`context.view()`, a workspace view and `output.view().origin(origin_row)`. The context
+prepares group counts and positions, and both label positions at construction.
+Each label has a count of zero or one. Its view borrows the link-buffer pointer
+table and exposes boolean methods such as `has_link_fields()` and
+`has_cost_field()`, derived from those counts rather than separate stored flags.
+Dispatch uses these names; there are no per-field type tags or label position
+calculations during a call.
+
+The combined operation chooses separate functions once per group: `skim_fields`,
+`skim_fields_with_turn_costs`, `skim_costs` and `skim_turn_costs`. The two additive
+functions project the sums from one shared state-tree pass. Each receives a group
+view and writes a contiguous destination row per field. Label functions receive
+only a destination count and a pointer to their single field's row.
+No destination/field loop switches on a field's meaning. Selecting these views
+does not allocate, copy or transpose output.
+
+C++ output storage uses two borrowed views: `SkimmingOutputsView` for the whole
+array and `SkimmingOriginView` for one origin's contiguous block. The origin view
+can select a contiguous field group with `subfields()` or a field's destination
+pointer with `field_data()`. It needs no stored stride: fields are separated by
+`destination_count` elements. Empty views do not offset null pointers.
+
+Inputs may be shared across workers. Workers need separate scratch and may share
+an output only when writing different origin rows. No call may reset shared output while another
+call is writing it. Buffer overlap and concurrent input mutation remain the
+internal caller's responsibility.
+
+`PreparedAoN(..., skimming=skim_inputs)` uses this same kernel and no longer builds
+its own field-pointer table or penalty flags. Its previous `skim_fields` and
+`skim_penalties` arguments are removed. Any requested field, including label-only
+skimming, causes the driver to prepare all centroid targets and, by default, all
+origins. Only additive fields allocate per-worker skim scratch.
+
+`AoNOutputs.skimming` is an independent `SkimmingOutputs`, or `None` when no fields
+are requested. `AoNOutputs.skims` forwards its `[origins, fields, destinations]`
+array view; named matrices are at
+`AoNOutputs.skimming.matrices`. The driver resets all rows before each run so
+skipped origins remain infinity. An output with different names or order is
+rejected before reset. Components can outlive the aggregate and be used standalone.
+
+### Demand-weighted turn totals
+
+`network_loading.sum_weighted_turn_costs(results, loading_query)` returns a scalar
+sum of demand times path turn cost across destinations and classes. Like loading,
+it skips missing terminals and intrazonal demand. Before a search or with empty
+demand it returns zero. Negative and nonfinite demand uses ordinary floating-point
+multiplication and addition, including NaN from infinity times zero.
+
+This operation takes only results and a loading query. It does not allocate
+scratch, modify skim output or require any skim configuration. Assignment uses
+the same C++ function and reduces its per-worker totals separately from skimming.
 
 ## Remaining downstream work
 
 `SearchResults` has no loading, skimming, select-link or preparation methods.
-Standalone loading is available now. Skimming and select-link kernels have been
-adapted to the small workspaces; their Python input/output interfaces remain for
-the next slices. The old `SkimmingContext` still awaits its split into inputs and
-outputs, with one ordered skim array and named zero-copy matrix views.
+Standalone loading and skimming are available now. The select-link kernel uses
+the small workspaces; its Python input and output owners remain for the next slice.
 
 `PreparedAoN` remains a testable consumer rather than the final integration API.
 It borrows demand, routing costs and skim fields, and uses context-owned cost
 bindings and centroid blocking. Target masks and origin selection are prepared
 once: changing demand magnitudes is possible, but introducing new search targets
-requires new preparation. Further work will separate its remaining outputs and
-skim configuration, then reduce the driver to composition of those objects.
+requires new preparation. Further work will separate its select-link inputs and
+outputs, then finish reducing the driver to composition of those objects.
 
 `aon_graph.py`, its adapter exports and legacy integration tests have been removed.
 Production dispatch is unchanged.
@@ -329,5 +485,12 @@ states, partial-search cleanup, zero-cost cycles, U-turn rules, borrowed inputs,
 context-independent reuse, metadata updates, view lifetimes and separate workers.
 Standalone loading tests check partial and empty queries, demand borrowing,
 fixed buffer reuse, read-only views, independent lifetimes, dimension validation,
-worker-local accumulation and reduction. Driver tests compare skimming, ordinary
-loading and select-link loading against OD-by-OD path walks.
+worker-local accumulation and reduction. Standalone skim tests cover all four
+field meanings and all group combinations, strided named matrices, rectangular
+origin-major output, one-row allocation, borrowing, independent lifetimes,
+fixed buffer reuse, dimension and name checks, partial searches, zero-cost cycles,
+empty dimensions, nonfinite fields and disjoint-row workers. Label-only assignment
+tests cover zero demand and skipped-row reset. Skimming is compared both with
+path walks and with assignment output. Weighted turn totals are tested without
+any skim inputs or outputs. Driver tests also compare ordinary and select-link
+loading against OD-by-OD path walks.

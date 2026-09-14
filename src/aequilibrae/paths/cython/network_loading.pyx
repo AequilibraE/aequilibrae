@@ -25,6 +25,20 @@ def network_loading(SearchResults results not None, LoadingQuery query not None,
     return output
 
 
+def sum_weighted_turn_costs(SearchResults results not None, LoadingQuery query not None):
+    """Return demand-weighted turn cost over finalized, non-intrazonal paths.
+
+    Missing paths are ignored. Negative and nonfinite demand follows ordinary
+    floating-point multiplication and addition. No scratch or output is written.
+    """
+    cdef double total
+    if query.destination_count > results.node_count:
+        raise ValueError("demand destination_count exceeds results node_count")
+    with nogil:
+        total = cpp_sum_weighted_turn_costs[double](results.read_view(), query.view())
+    return total
+
+
 def reduce_loading_outputs(workers, LoadingOutputs output not None):
     """Replace output with the sum of completed workers, leaving them unchanged."""
     cdef LoadingOutputs worker

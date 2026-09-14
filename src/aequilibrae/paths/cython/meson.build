@@ -25,6 +25,7 @@ exts = [
     'outputs',
     'network_loading',
     'skimming_context',
+    'skimming',
     'dijkstra',
 ]
 

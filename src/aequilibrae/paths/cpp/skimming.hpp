@@ -5,146 +5,142 @@
 #include <limits>
 #include <type_traits>
 
-#include "workspaces.hpp"
+#include "outputs.hpp"
 #include "search_results.hpp"
+#include "skimming_context.hpp"
+#include "workspaces.hpp"
 
 namespace aequilibrae::paths::cpp::mvp {
 
-// Allocation-free, single-origin skimming of finalized SearchResults.
-//
-// Preconditions (validated by the Python wrapper):
-// - Each of the field_count field pointers addresses link_count contiguous T
-//   values, in exactly the context.costs local directed-link order.
-// - Workspace dimensions are [search state_count, field_count].
-// - Output has destination_count * field_count contiguous T entries, row-major.
-//   Rows are nodes [0, destination_count), with destination_count <=
-//   node_count. This count is independent of the search's destination mask.
-// - Scratch does not overlap inputs, output, or search buffers. All buffers
-//   remain alive and externally serialized for the duration of the call.
-//
-// Additional fields are additive link attributes, NOT routing weights: negative
-// values are allowed and IEEE NaNs/infinities propagate by ordinary addition.
-// No turn penalties are added, even if an input pointer is context.costs.
-// Use skim_costs instead to obtain the routing objective including penalties.
-//
-// Accumulate over STATES, not physical-node terminals: the best path THROUGH
-// a node need not use its cheapest arrival. Parent-before-child settlement
-// order makes this O((state_count + destination_count) * field_count), with no
-// path retracing. Root skims are zero; unfinalized state/node skims are
-// infinity. A pre-search result produces all infinity. Zero fields permits null
-// pointers. With zero destinations, output may be null; state sums are still
-// computed.
+// Both additive groups need the same link sums. Walk the state tree once;
+// adding turn costs later leaves this inner loop identical for every field.
+// The caller requests this pass only when inputs need state sums.
 template <typename T>
-void skim_fields(const SearchResults &results, std::size_t destination_count,
-                 const T *const *fields, std::size_t field_count,
-                 SkimmingWorkspace<T> workspace, T *output) noexcept {
-  static_assert(std::is_floating_point_v<T>,
-                "Skims require floating-point infinity");
-  if (field_count == 0) {
-    return;
-  }
+void sum_skim_fields(const SearchResults &results,
+                     const SkimmingContext<T> &context,
+                     SkimmingWorkspace<T> workspace) noexcept {
+  const auto width = context.additive_field_count;
   const T infinity = std::numeric_limits<T>::infinity();
-  // Reset all states so unreached states do not keep values from the last skim.
-  std::fill_n(workspace.state_skims, workspace.state_count * field_count,
-              infinity);
 
-  // Include all settled states: paths to centroids can pass through other
-  // nodes. Parents come first, so their sums are ready when we process their
-  // children.
+  std::fill_n(workspace.state_skims, workspace.state_count * width, infinity);
+
   for (std::size_t i = 0; i < results.metadata->settled_count; ++i) {
     const auto state = results.settlement_order[i];
-    T *row = workspace.state_skims + state * field_count;
-    if (state == results.metadata->root) {
-      // No links have been used at the root, and it has no parent or connector.
-      std::fill_n(row, field_count, T{0});
-    } else {
-      // Use the parent state. The cheapest path to its node may use a different
-      // state.
-      const T *parent =
-          workspace.state_skims + results.predecessors[state] * field_count;
-      const auto link = results.connectors[state];
-      for (std::size_t field = 0; field < field_count; ++field) {
-        row[field] = parent[field] + fields[field][link];
-      }
-    }
-  }
+    T *row = workspace.state_skims + state * width;
 
-  // Only write the requested first nodes. Each row uses its chosen arrival
-  // state.
-  for (std::size_t node = 0; node < destination_count; ++node) {
-    const auto terminal = results.terminal_states[node];
-    T *row = output + node * field_count;
-    if (terminal == std::numeric_limits<std::size_t>::max()) {
-      // No settled path to this node. Replace any old output values
-      // with infinity.
-      std::fill_n(row, field_count, infinity);
-    } else {
-      std::copy_n(workspace.state_skims + terminal * field_count, field_count,
-                  row);
+    if (state == results.metadata->root) {
+      // The root has used no links and has no parent to read from.
+      std::fill_n(row, width, T{0});
+      continue;
+    }
+
+    const T *parent =
+        workspace.state_skims + results.predecessors[state] * width;
+    const auto link = results.connectors[state];
+
+    // FIXME: Not sure this is the greatest way to do this, pretty
+    // non-contiguous accesses here, but the link_fields are borrowed points
+    // from the graph
+    for (std::size_t field = 0; field < width; ++field) {
+      row[field] = parent[field] + context.link_fields[field][link];
     }
   }
 }
 
-// The routing objective and cumulative penalties are already computed by the
-// search. Copying those labels takes O(destination_count) time, no workspace,
-// and no summation/round-off changes for double outputs. Output is packed [Z,
-// 1], where 0 <= Z <= node_count. A zero count permits a null output pointer.
+// Project a group of link sums after the shared state-tree pass.
+template <typename T, bool IncludeTurnCost>
+void skim_fields(const SearchResults &results, SkimmingWorkspace<T> workspace,
+                 std::size_t first_state_field,
+                 SkimmingOriginView<T> output) noexcept {
+  const T infinity = std::numeric_limits<T>::infinity();
+
+  for (std::size_t field = 0; field < output.field_count; ++field) {
+    T *row = output.field_data(field);
+    const auto state_field = first_state_field + field;
+
+    for (std::size_t node = 0; node < output.destination_count; ++node) {
+      const auto terminal = results.terminal_states[node];
+
+      // A missing terminal may be unreachable or not yet searched.
+      if (terminal == invalid_state) {
+        row[node] = infinity;
+        continue;
+      }
+
+      const auto state_offset = terminal * workspace.field_count + state_field;
+
+      if (IncludeTurnCost == true) {
+        row[node] =
+            workspace.state_skims[state_offset] + results.turn_costs[terminal];
+      } else {
+        row[node] = workspace.state_skims[state_offset];
+      }
+    }
+  }
+}
+
+// Copy labels rather than summing the objective again. This needs no scratch
+// and preserves the search's exact double values, including its turn costs.
 template <typename T>
-void project_costs(const SearchResults &results, std::size_t destination_count,
-                   const double *labels, T *output) noexcept {
-  static_assert(std::is_floating_point_v<T>,
-                "Skims require floating-point infinity");
+void project_skim_labels(const SearchResults &results, const double *labels,
+                         std::size_t destination_count, T *output) noexcept {
+  const T infinity = std::numeric_limits<T>::infinity();
+
   for (std::size_t node = 0; node < destination_count; ++node) {
     const auto terminal = results.terminal_states[node];
-    // A node may be unreached because the search stopped early. Check before
-    // indexing.
-    output[node] = terminal == std::numeric_limits<std::size_t>::max()
-                       ? std::numeric_limits<T>::infinity()
-                       : static_cast<T>(labels[terminal]);
+
+    if (terminal == invalid_state) {
+      output[node] = infinity;
+      continue;
+    }
+
+    output[node] = static_cast<T>(labels[terminal]);
   }
 }
 
 template <typename T>
 void skim_costs(const SearchResults &results, std::size_t destination_count,
                 T *output) noexcept {
-  // Distances include turn penalties. Summing link costs alone would leave them
-  // out.
-  project_costs(results, destination_count, results.distances, output);
+  project_skim_labels(results, results.distances, destination_count, output);
 }
 
 template <typename T>
 void skim_turn_costs(const SearchResults &results,
                      std::size_t destination_count, T *output) noexcept {
-  // The search already summed the penalties, so copy them directly.
-  project_costs(results, destination_count, results.turn_costs, output);
+  project_skim_labels(results, results.turn_costs, destination_count, output);
 }
 
+// Overwrite one output row using finalised paths.
 template <typename T>
-T sum_weighted_turn_costs(const SearchResults &search, size_t zones,
-                          const T *demand, size_t classes,
-                          const bool *penalty_fields, size_t fields, T *skims) {
-  T total = 0;
-  for (size_t node = 0; node < zones; ++node) {
-    size_t terminal = search.terminal_states[node];
-    if (terminal == std::numeric_limits<std::size_t>::max() ||
-        terminal == search.metadata->root) {
-      continue;
-    }
+void skimming(const SearchResults &results, const SkimmingContext<T> &context,
+              SkimmingWorkspace<T> workspace,
+              SkimmingOriginView<T> output) noexcept {
+  static_assert(std::is_floating_point_v<T>);
 
-    T penalty = search.turn_costs[terminal];
-
-    for (size_t field = 0; field < fields; ++field) {
-      if (penalty_fields[field]) {
-        skims[node * fields + field] += penalty;
-      }
-    }
-
-    for (size_t class_index = 0; class_index < classes; ++class_index) {
-      total += demand[node * classes + class_index] * penalty;
-    }
+  if (context.needs_state_sums()) {
+    sum_skim_fields(results, context, workspace);
   }
 
-  return total;
+  if (context.has_link_fields()) {
+    const auto fields = output.subfields(0, context.plain_field_count);
+    skim_fields<T, false>(results, workspace, 0, fields);
+  }
+
+  if (context.has_link_fields_with_turn_costs()) {
+    const auto fields =
+        output.subfields(context.turn_field_offset, context.turn_field_count);
+    skim_fields<T, true>(results, workspace, context.turn_field_offset, fields);
+  }
+
+  if (context.has_cost_field()) {
+    skim_costs(results, output.destination_count,
+               output.field_data(context.cost_field_index));
+  }
+
+  if (context.has_turn_cost_field()) {
+    skim_turn_costs(results, output.destination_count,
+                    output.field_data(context.turn_cost_field_index));
+  }
 }
 
 } // namespace aequilibrae::paths::cpp::mvp

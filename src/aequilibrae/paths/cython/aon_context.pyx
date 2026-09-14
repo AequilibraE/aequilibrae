@@ -2,9 +2,10 @@
 """Reusable all-or-nothing assignment with optional skimming and select links."""
 
 import operator
-import numpy as np
 from collections import namedtuple
 from collections.abc import Mapping
+
+import numpy as np
 cimport cython
 
 from cython.parallel cimport prange, threadid
@@ -13,8 +14,7 @@ from libcpp.vector cimport vector
 from libcpp cimport bool as cpp_bool
 from libcpp.algorithm cimport fill_n
 
-
-from aequilibrae.utils.cython.array_allocations cimport array, const_array_pointer
+from aequilibrae.utils.cython.array_allocations cimport array
 from aequilibrae.utils.cython.array_allocations import readonly_view
 from aequilibrae.paths.cython.workspaces cimport AoNWorkspace, CppAoNWorkspace
 from aequilibrae.paths.cython.dijkstra cimport RoutingContext, cpp_dijkstra, cpp_turn_dijkstra
@@ -24,13 +24,18 @@ from aequilibrae.paths.cython.graph_context cimport (
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults, CppMutableSearchResults
 from aequilibrae.paths.cython.queries cimport CppLoadingQuery, CppSearchQuery
-from aequilibrae.paths.cython.skimming cimport cpp_skim_fields, cpp_sum_weighted_turn_costs
-from aequilibrae.paths.cython.network_loading cimport cpp_network_loading, cpp_reduce_loading_outputs
-from aequilibrae.paths.cython.outputs cimport LoadingOutputs, CppLoadingOutputs
+from aequilibrae.paths.cython.skimming cimport cpp_skimming
+from aequilibrae.paths.cython.skimming_context cimport SkimmingContext, CppSkimmingContext
+from aequilibrae.paths.cython.network_loading cimport (
+    cpp_network_loading, cpp_reduce_loading_outputs, cpp_sum_weighted_turn_costs,
+)
+from aequilibrae.paths.cython.outputs cimport LoadingOutputs, CppLoadingOutputs, SkimmingOutputs
+from aequilibrae.paths.cython.outputs import _validate_skim_names
 from aequilibrae.paths.cython.select_link_loading cimport cpp_select_link_loading
 
 
 AoNOutputShape = namedtuple('AoNOutputShape', 'links, zones, classes, fields')
+
 
 cdef class AoNOutputs:
     """Store link loads, selected trip demand, skims and turn costs for one run.
@@ -38,7 +43,8 @@ cdef class AoNOutputs:
     Views are read-only and keep their buffers alive. Reuse or rotate outputs
     between runs; do not read an output while a run is writing it.
     """
-    cdef double[:, :, ::1] skims_buffer
+    cdef readonly SkimmingOutputs skimming
+    cdef readonly tuple skim_names
     cdef readonly LoadingOutputs loading
     cdef double[:, :, ::1] select_link_loads_buffer
     cdef double[:, :, :, ::1] select_link_od_buffer
@@ -47,17 +53,19 @@ cdef class AoNOutputs:
     cdef readonly double turn_cost_total
 
     def __cinit__(self):
-        self.skims_buffer = None
         self.select_link_loads_buffer = None
         self.select_link_od_buffer = None
 
-    def __init__(self, links, zones, classes, fields, *, select_link_names=()):
+    def __init__(self, links, zones, classes, *, skim_names=(), select_link_names=()):
         if self.loading is not None:
             raise RuntimeError("AoNOutputs cannot be reinitialized")
 
-        links, zones, classes, fields = map(operator.index, (links, zones, classes, fields))
-        if links < 0 or zones < 1 or classes < 1 or fields < 0:
+        links, zones, classes = map(operator.index, (links, zones, classes))
+        if links < 0 or zones < 1 or classes < 1:
             raise ValueError("output dimensions must be nonnegative, with at least one class and zone")
+
+        self.skim_names = _validate_skim_names(skim_names)
+        fields = len(self.skim_names)
 
         self.select_link_names = tuple(select_link_names)
         if len(set(self.select_link_names)) != len(self.select_link_names):
@@ -70,7 +78,7 @@ cdef class AoNOutputs:
 
         self.loading = LoadingOutputs(links, classes)
         if fields:
-            self.skims_buffer = array[double]((zones, zones, fields), True, np.inf)
+            self.skimming = SkimmingOutputs(zones, zones, self.skim_names)
 
         if self.select_link_names:
             self.select_link_loads_buffer = array[double]((len(self.select_link_names), links, classes), True, 0)
@@ -88,11 +96,8 @@ cdef class AoNOutputs:
 
     @property
     def skims(self) -> np.ndarray | None:
-        """Read-only skims by origin, destination and field, or None."""
-        if self.skims_buffer is not None:
-            return readonly_view(self.skims_buffer)
-        else:
-            return None
+        """Read-only skims by origin, field and destination, or None."""
+        return None if self.skimming is None else self.skimming.skims
 
     @property
     def select_link_loads(self):
@@ -114,17 +119,6 @@ cdef class AoNOutputs:
     def total_turn_penalty(self):
         """Total turn cost weighted by demand."""
         return self.turn_cost_total
-
-
-def copy_input(value, name, shape=None, dtype=np.float64):
-    """Copy an input into a read-only, contiguous array with the requested shape."""
-    array = np.array(value, dtype=dtype, order="C", copy=True)
-
-    if shape is not None and array.shape != shape:
-        raise ValueError(f"{name} must have shape {shape}")
-
-    array.flags.writeable = False
-    return array
 
 
 def borrow_input(value, name, shape=None):
@@ -216,11 +210,11 @@ def make_destination_masks(demand: np.ndarray, nodes: int, skimming: bool):
 cdef class PreparedAoN:
     """Prepare workers for repeated assignment runs on a fixed graph.
 
-    Demand [zones, zones, classes], link skim fields and costs are borrowed.
-    Centroids are nodes 0..zones-1. Empty skim_fields skips skimming;
-    skim_penalties selects fields that include turn costs. Use make_outputs()
-    and run() for each iteration. selected_links maps names to directed-link
-    indices in this context. Sets are copied once so later caller changes do
+    Demand [zones, zones, classes] and costs are borrowed. Skimming inputs are
+    supplied as an independent SkimmingContext; None or no fields skips skimming.
+    Centroids are nodes 0..zones-1. Use make_outputs() and run() for each
+    iteration. selected_links maps names to directed-link indices in this
+    context. Sets are copied once so later caller changes do
     not affect a run. A trip matches when it uses any link in a set; its demand
     is added to every link on its path. Do not change inputs or use these same
     objects elsewhere during a run. Origin selection and target masks are fixed
@@ -229,21 +223,21 @@ cdef class PreparedAoN:
     cdef GraphContext context
     cdef const cpp_bool[:, ::1] destination_masks_buffer
     cdef const cpp_bool[:, ::1] select_link_masks_buffer
-    cdef const cpp_bool[::1] include_turn_costs
     cdef const double[:, :, ::1] demand_buffer
     cdef const size_t[::1] destination_counts_buffer
     cdef const size_t[::1] origins_buffer
     cdef double[:, :, :, ::1] select_link_loads_buffer
     cdef double[::1] turn_costs_buffer
     cdef int cores
-    cdef list workers, worker_workspaces, worker_loading_outputs, link_fields
+    cdef list workers, worker_workspaces, worker_loading_outputs
+    cdef SkimmingContext skim_context
+    cdef CppSkimmingContext[double] skim_inputs
     cdef readonly tuple select_link_names
     cdef size_t select_link_count
     cdef size_t zone_count, class_count, link_count, field_count
     cdef vector[CppAoNWorkspace[double]] workspaces
     cdef vector[CppMutableSearchResults] searches
     cdef vector[CppLoadingOutputs[double]] loading_outputs
-    cdef vector[const double *] field_pointers
 
     def __cinit__(self):
         self.select_link_loads_buffer = None
@@ -255,8 +249,7 @@ cdef class PreparedAoN:
             *,
             costs,
             cores=1,
-            skim_fields=None,
-            skim_penalties=None,
+            SkimmingContext skimming=None,
             block_centroids=False,
             origins=None,
             selected_links=None
@@ -279,22 +272,25 @@ cdef class PreparedAoN:
         self.context = context.with_costs(costs)
         if block_centroids:
             self.context.blocked_centroid_count = demand.shape[0]
+
         self.cores = cores
         self.zone_count, self.class_count = demand.shape[0], demand.shape[2]
         self.link_count = context.link_count
-        self.link_fields = [
-            borrow_input(field, "skim field", (self.link_count,))
-            for field in (() if skim_fields is None else skim_fields)
-        ]
-        self.field_count = len(self.link_fields)
-        self.select_link_names, self.select_link_masks_buffer = make_select_link_masks(selected_links, self.link_count)
-        self.select_link_count = len(self.select_link_names)
 
-        # Choose which skim fields include turn costs.
-        if skim_penalties is None:
-            self.include_turn_costs = array[cpp_bool](self.field_count, True, False)
-        else:
-            self.include_turn_costs = copy_input(skim_penalties, "skim_penalties", (self.field_count,), dtype=np.bool_)
+        if skimming is not None:
+            if skimming.link_count != self.link_count:
+                raise ValueError("skimming link_count does not match routing context")
+
+            # The view borrows field pointers. Keep their owner alive across
+            # repeated runs instead of preparing another pointer table here.
+            self.skim_context = skimming
+            self.skim_inputs = skimming.view()
+
+        self.field_count = self.skim_inputs.field_count
+        self.select_link_names, self.select_link_masks_buffer = make_select_link_masks(
+            selected_links, self.link_count
+        )
+        self.select_link_count = len(self.select_link_names)
 
         self.origins_buffer = choose_origins(origins, demand, self.field_count > 0)
         self.destination_masks_buffer, self.destination_counts_buffer = make_destination_masks(
@@ -305,6 +301,7 @@ cdef class PreparedAoN:
 
         # Worker totals are cleared at the start of each run.
         self.turn_costs_buffer = array[double](cores, True, 0)
+
         # Origins can load the same link at the same time. Give each worker
         # its own loads so workers do not need locks on each addition.
         if self.select_link_count:
@@ -319,7 +316,6 @@ cdef class PreparedAoN:
         cdef SearchResults worker
         cdef AoNWorkspace workspace
         cdef LoadingOutputs loading
-        cdef const double[::1] field
 
         self.workers = []
         self.worker_workspaces = []
@@ -327,14 +323,19 @@ cdef class PreparedAoN:
         self.searches.clear()
         self.workspaces.clear()
         self.loading_outputs.clear()
-        self.field_pointers.clear()
+
+        # Objective and turn-only skims read labels directly. Only link fields
+        # need a scratch column for each search state.
+        skim_width = None
+        if self.skim_inputs.needs_state_sums():
+            skim_width = self.skim_inputs.additive_field_count
 
         for _ in range(self.cores):
             worker = SearchResults(self.context.node_count, self.context.state_count, self.link_count)
             workspace = AoNWorkspace(
                 self.context.state_count,
                 class_count=self.class_count,
-                field_count=self.field_count if self.field_count else None,
+                field_count=skim_width,
                 select_links=self.select_link_count > 0,
             )
             loading = LoadingOutputs(self.link_count, self.class_count)
@@ -342,14 +343,12 @@ cdef class PreparedAoN:
             self.workers.append(worker)
             self.worker_workspaces.append(workspace)
             self.worker_loading_outputs.append(loading)
+
             # These views borrow fixed allocations. Retain their Cython owners
             # separately; do not take pointers to temporary view() return values.
             self.searches.push_back(worker.view())
             self.workspaces.push_back(workspace.view())
             self.loading_outputs.push_back(loading.view())
-
-        for field in self.link_fields:
-            self.field_pointers.push_back(const_array_pointer(field))
 
     @property
     def shape(self) -> AoNOutputShape:
@@ -397,7 +396,11 @@ cdef class PreparedAoN:
 
     def make_outputs(self):
         """Allocate matching output buffers for the caller to reuse."""
-        return AoNOutputs(*self.shape, select_link_names=self.select_link_names)
+        return AoNOutputs(
+            self.link_count, self.zone_count, self.class_count,
+            skim_names=() if self.skim_context is None else self.skim_context.field_names,
+            select_link_names=self.select_link_names,
+        )
 
     def run(self, AoNOutputs out not None):
         """Run assignment, overwrite out and return it without keeping a reference.
@@ -406,8 +409,15 @@ cdef class PreparedAoN:
         Do not use this assignment or its output concurrently.
         """
         cdef size_t worker
-        if out.shape != self.shape or out.select_link_names != self.select_link_names:
-            raise ValueError("output shape does not match assignment shape (including select-link names/order)")
+
+        # Check names as well as dimensions before clearing any caller output.
+        skim_names = () if self.skim_context is None else self.skim_context.field_names
+        if (
+            out.shape != self.shape
+            or out.select_link_names != self.select_link_names
+            or out.skim_names != skim_names
+        ):
+            raise ValueError("output shape and ordered names must match assignment")
 
         with nogil:
             for worker in range(self.loading_outputs.size()):
@@ -422,7 +432,9 @@ cdef class PreparedAoN:
             fill_n(&out.select_link_od_buffer[0, 0, 0, 0], <size_t>out.select_link_od_buffer.size, 0)
 
         if self.field_count:
-            fill_n(&out.skims_buffer[0, 0, 0], <size_t>out.skims_buffer.size, <double>np.inf)
+            # A subset run never visits the other origins. Clear their old
+            # values too, so they remain marked as missing in reused outputs.
+            out.skimming.reset()
 
         if isinstance(self.context, NodeBasedContext):
             with nogil:
@@ -436,6 +448,7 @@ cdef class PreparedAoN:
                 self.loading_outputs.data(), self.loading_outputs.size(), out.loading.view()
             )
         out.turn_cost_total = float(np.sum(np.asarray(self.turn_costs_buffer)))
+
         if self.select_link_count:
             np.sum(np.asarray(self.select_link_loads_buffer), axis=0, out=np.asarray(out.select_link_loads_buffer))
 
@@ -483,22 +496,32 @@ cdef void assign_origin(
         size_t selection
 
         const double *demand = &prepared.demand_buffer[origin, 0, 0]
-        double *skims = &out.skims_buffer[origin, 0, 0] if fields else NULL
 
     search_query.node_count = search.node_count
     search_query.origin = origin
     search_query.target_count = prepared.destination_counts_buffer[mask_row]
     if search_query.target_count:
         search_query.target_mask = &prepared.destination_masks_buffer[mask_row, 0]
+
     search_origin(context, search_query, writable_search)
 
     if fields:
-        cpp_skim_fields[double](search, zones, prepared.field_pointers.data(), fields, workspace[0].skimming, skims)
+        # Only this worker writes this origin's contiguous output block.
+        # The view borrows that block without packing a temporary.
+        cpp_skimming[double](
+            search,
+            prepared.skim_inputs,
+            workspace[0].skimming,
+            out.skimming.view().origin(origin),
+        )
 
     loading_query.destination_count = zones
     loading_query.class_count = classes
     loading_query.demand = demand
-    cpp_network_loading[double](search, loading_query, workspace[0].loading, prepared.loading_outputs[thread_index])
+
+    cpp_network_loading[double](
+        search, loading_query, workspace[0].loading, prepared.loading_outputs[thread_index]
+    )
 
     # Reuse the same scratch for each set to keep memory use down. Each origin
     # runs on just one worker, so OD can go straight into its output row without
@@ -516,16 +539,10 @@ cdef void assign_origin(
             &out.select_link_od_buffer[selection, origin, 0, 0], selected_output,
         )
 
-    if RoutingContext is TurnBasedContext:
-        prepared.turn_costs_buffer[thread_index] += cpp_sum_weighted_turn_costs[double](
-            search,
-            zones,
-            demand,
-            classes,
-            &prepared.include_turn_costs[0] if fields else NULL,
-            fields,
-            skims
-        )
+    # Demand-weighted turn totals are independent of which skims were requested.
+    prepared.turn_costs_buffer[thread_index] += cpp_sum_weighted_turn_costs[double](
+        search, loading_query
+    )
 
 
 @cython.boundscheck(False)
