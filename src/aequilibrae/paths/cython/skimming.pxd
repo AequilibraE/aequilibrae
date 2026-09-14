@@ -1,5 +1,5 @@
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults
-from aequilibrae.paths.cython.skimming_context cimport SkimmingContext, CppSkimmingContext
+from aequilibrae.paths.cython.context cimport SkimmingContext, CppSkimmingContext
 from aequilibrae.paths.cython.workspaces cimport SkimmingWorkspace, CppSkimmingWorkspace
 from aequilibrae.paths.cython.outputs cimport SkimmingOutputs, CppSkimmingOriginView
 

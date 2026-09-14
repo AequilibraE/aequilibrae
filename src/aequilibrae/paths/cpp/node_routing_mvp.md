@@ -25,7 +25,7 @@ locks or runtime checks for concurrent changes or buffer overlap.
 ```python
 import numpy as np
 
-from aequilibrae.paths.cython.graph_context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.dijkstra import dijkstra
@@ -62,6 +62,9 @@ One-shot use allocates these same objects and calls the same function. There is
 no optional result allocation inside `dijkstra`, and no context result factory.
 
 ### Routing contexts
+
+`context.hpp`, `context.pxd` and `context.pyx` group routing, skimming and
+select-link context owners. They remain independent objects.
 
 Topology is copied once into contiguous snapshots. Index arrays use `np.uintp`;
 node and link indices are local to the context. Connectors are CSR link positions,
@@ -286,7 +289,7 @@ the origin loop builds no Python query objects or numeric buffers.
 
 `AoNOutputs.loading` is an independent `LoadingOutputs`; `AoNOutputs.link_loads`
 forwards its read-only view. Skimming is now another independent component,
-described below. Select-link outputs have not yet been separated.
+described below. Select-link outputs are also independent components.
 The old aggregate `copy()` / `copy_to()` and thread-load cube accessor are removed.
 Output rotation remains ordinary reference rotation.
 
@@ -346,7 +349,7 @@ the physical node where the search started. More rows can be requested for OD
 skimming without tying the input owner to those dimensions.
 
 ```python
-from aequilibrae.paths.cython.skimming_context import SkimmingContext
+from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.skimming import skimming
 from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
 
@@ -447,18 +450,144 @@ This operation takes only results and a loading query. It does not allocate
 scratch, modify skim output or require any skim configuration. Assignment uses
 the same C++ function and reduces its per-worker totals separately from skimming.
 
+## Fourth slice: select-link inputs and optional outputs
+
+### Selection inputs
+
+`SelectLinkContext(link_count, selections)` takes a mapping of names to local
+link indices, for example `{"screenline": [0, 3], "other": [2]}`. It copies the
+indices into owned boolean masks `[sets, links]`, then discards the index lists.
+It retains no routing context, results, demand, workspace or outputs. Inputs can
+be shared across origins and workers.
+
+- `set_names` preserves mapping order. Names must be unique nonempty strings.
+- `link_count` and `set_count` describe the fixed mask dimensions.
+- `masks` exposes a read-only, zero-copy view which keeps storage alive.
+- Indices must be integers in `[0, link_count)`; booleans are not indices.
+- Repeated indices have no extra effect. Empty sets match nothing; an empty
+  mapping disables all sets. Construction never changes the caller's arrays.
+
+A path matches a set when it uses **any** member. Overlapping sets are evaluated
+independently. Within a set, matching demand contributes once, even if the path
+uses several members. There are no AND-set or ordered-sequence semantics.
+
+### Independent outputs
+
+| Owner | Storage | Write rule |
+| --- | --- | --- |
+| `SelectLinkLoadingOutputs(links, classes, set_names)` | `[sets, links, classes]` | Accumulate across origins; reduce worker totals |
+| `SelectLinkODOutputs(origins, destinations, classes, set_names)` | `[origins, sets, destinations, classes]` | Replace one origin block |
+
+Each owns fixed, zero-initialized storage and copies ordered names, not input or
+scratch references. Every axis may be zero. `reset()` clears existing storage.
+The loading owner exposes `link_loads` and a `loads` dictionary of named
+`[links, classes]` views. The OD owner exposes `demand` and a `matrices` dictionary
+of named `[origins, destinations, classes]` views. Named OD matrices may be
+strided, but each origin block and each set's destination/class block is
+contiguous. All exported views are read-only and keep their allocations alive.
+Later calls and resets overwrite them; use `.copy()` for a snapshot.
+
+`SelectLinkOutputs` groups optional `loading` and `od` components. Use
+`inputs.make_outputs(destination_count, class_count, origin_count=1,
+link_loads=True, od=True)` to allocate matching outputs. Either component can be
+disabled without allocating its buffer. Disabling both allocates neither.
+Components can be used separately and outlive the group. `reset()` delegates to
+only the components present. The group is never passed to a C++ kernel.
+
+### Standalone operation
+
+```python
+from aequilibrae.paths.cython.context import SelectLinkContext
+from aequilibrae.paths.cython.select_link_loading import select_link_loading
+from aequilibrae.paths.cython.workspaces import SelectLinkWorkspace, LoadingWorkspace
+
+selection_inputs = SelectLinkContext(
+    results.link_count, {"screenline": [0, 3], "other": [2]},
+)
+selected = selection_inputs.make_outputs(results.node_count, class_count=2)
+flags = SelectLinkWorkspace(results.state_count)
+cascade = LoadingWorkspace(results.state_count, 2)
+
+select_link_loading(
+    results, LoadingQuery(demand), selection_inputs, flags, cascade,
+    selected.loading, selected.od,
+)
+selected_loads = selected.loading.loads["screenline"]
+selected_demand = selected.od.matrices["screenline"]
+
+# OD-only analysis needs neither link accumulators nor loading scratch.
+od_only = selection_inputs.make_outputs(results.node_count, 2, link_loads=False)
+select_link_loading(
+    results, LoadingQuery(demand), selection_inputs, flags,
+    od_output=od_only.od,
+)
+```
+
+The full signature is
+`select_link_loading(results, query, context, selection_workspace,
+loading_workspace=None, loading_output=None, od_output=None, *, origin_row=0)`.
+It returns the two supplied output components as a tuple. Dimensions, ordered
+names and the OD row are validated before any scratch or output writes. The
+loading query is the same borrowed per-origin demand used by ordinary loading.
+OD destination and class counts must match demand exactly. The output row is
+independent of the physical search origin; `origin_row` is unused without OD
+output. One-shot use defaults to one output row, not a full OD cube.
+
+Only finalized, non-intrazonal paths contribute. Missing terminals produce zero
+selected OD demand and no added loads, even after a partial search. Selection
+never extends or changes the search. Negative and nonfinite demand follows
+ordinary copying and floating-point addition, as in ordinary loading.
+
+The allocation-free C++ operation takes typed input, workspace and output views.
+It iterates sets, replacing one state-membership buffer each time. Membership
+follows state predecessors, not intermediate physical-node terminals. For each
+requested output it then either writes matching OD demand or seeds state demand
+and invokes the ordinary loading cascade. The cascade loads the **whole path**,
+including links before the selected link. OD-only calls do not seed or cascade
+loading scratch, even when a workspace was supplied.
+
+Scratch reflects the last processed set. Membership flags are replaced even for
+zero-class demand; missing states and the root are false. With loading enabled,
+state totals are replaced and hold selected subtree demand, with the root holding
+all matched demand. Empty destination queries still replace scratch. With no sets
+or neither output, there is no operation and scratch is left unchanged.
+
+### Worker reduction and assignment
+
+`reduce_select_link_loading_outputs(workers, output)` replaces a distinct loading
+output with the sum of worker accumulators. It checks dimensions and ordered names
+before resetting the target, leaves workers unchanged, and accepts an empty
+worker list to reset the target to zero. It uses the same C++ reduction as
+assignment. OD output is not reduced: each origin has one writer.
+
+`PreparedAoN(..., selected_links=selection_inputs, select_link_loads=True,
+select_link_od=True)` retains the independent input owner and its view. It no
+longer accepts a mapping or builds its own masks. Output choices are fixed at
+setup so OD-only assignment allocates no selected worker link accumulators.
+Only requested operations allocate membership scratch. Ordinary loading can
+reuse its cascade workspace for selected loading.
+
+`AoNOutputs.select_link` is a `SelectLinkOutputs` group, or `None` when there are
+no sets. The `select_link_loads` and `select_link_od` properties forward component
+views, or return `None` when that component is absent. The OD layout is now
+origin-major; there is no transposed compatibility view. `make_outputs()` allocates
+the configured components. `run()` checks their presence, dimensions and names
+before resetting anything. It clears skipped OD rows, calls the standalone C++
+operation with worker-local loads and disjoint OD origin views, then reduces
+selected loads. The old thread-load cube and its accessor are removed.
+
 ## Remaining downstream work
 
 `SearchResults` has no loading, skimming, select-link or preparation methods.
-Standalone loading and skimming are available now. The select-link kernel uses
-the small workspaces; its Python input and output owners remain for the next slice.
+Standalone loading, skimming and select-link operations now use independent input,
+workspace and output owners, shared with assignment.
 
 `PreparedAoN` remains a testable consumer rather than the final integration API.
 It borrows demand, routing costs and skim fields, and uses context-owned cost
 bindings and centroid blocking. Target masks and origin selection are prepared
 once: changing demand magnitudes is possible, but introducing new search targets
-requires new preparation. Further work will separate its select-link inputs and
-outputs, then finish reducing the driver to composition of those objects.
+requires new preparation. Further work can finish the aggregate/driver cleanup
+before production integration; routing heap persistence remains deferred.
 
 `aon_graph.py`, its adapter exports and legacy integration tests have been removed.
 Production dispatch is unchanged.
@@ -476,6 +605,7 @@ python -m pytest -q -s \
     tests/aequilibrae/paths/test_turn_routing_mvp.py \
     tests/aequilibrae/paths/test_context_skimming.py \
     tests/aequilibrae/paths/test_context_network_loading.py \
+    tests/aequilibrae/paths/test_context_select_link.py \
     tests/aequilibrae/paths/test_aon_context.py \
     tests/aequilibrae/utils/test_array_allocations.py
 ```
@@ -493,4 +623,9 @@ empty dimensions, nonfinite fields and disjoint-row workers. Label-only assignme
 tests cover zero demand and skipped-row reset. Skimming is compared both with
 path walks and with assignment output. Weighted turn totals are tested without
 any skim inputs or outputs. Driver tests also compare ordinary and select-link
-loading against OD-by-OD path walks.
+loading against OD-by-OD path walks. Standalone select-link tests cover independent
+output choices, named origin-major views, copied masks, turn-state histories,
+full-path loading, partial searches, empty dimensions, nonfinite demand,
+validation before writes, buffer reuse and lifetimes. Concurrent workers share
+OD rows and reduce only link accumulators; assignment is checked against the
+standalone operation for every output combination.

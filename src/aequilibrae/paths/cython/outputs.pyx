@@ -133,3 +133,156 @@ cdef class SkimmingOutputs:
         # Slicing the read-only array keeps both its storage and read-only
         # guarantee. No matrix data is copied when building this dictionary.
         return {name: skims[:, field, :] for field, name in enumerate(self.field_names)}
+
+
+def _validate_selection_names(set_names):
+    """Match names as well as sizes so sets cannot silently exchange outputs."""
+    if isinstance(set_names, str):
+        raise TypeError("set_names must be a sequence of names, not a string")
+    names = tuple(set_names)
+    if any(not isinstance(name, str) or not name for name in names):
+        raise ValueError("selection names must be nonempty strings")
+    if len(set(names)) != len(names):
+        raise ValueError("selection names must be unique")
+    return names
+
+
+cdef class SelectLinkLoadingOutputs:
+    """Own [sets, links, classes] accumulators, without inputs or scratch.
+
+    Loading adds to existing values. Reset once before processing the origins
+    of an iteration. Each worker needs its own accumulator.
+    """
+
+    def __init__(self, link_count, class_count, set_names):
+        if self.set_names is not None:
+            raise RuntimeError("SelectLinkLoadingOutputs cannot be reinitialized")
+
+        link_count, class_count = map(operator.index, (link_count, class_count))
+        if link_count < 0 or class_count < 0:
+            raise ValueError("link_count and class_count must be nonnegative")
+
+        names = _validate_selection_names(set_names)
+        self.link_count = link_count
+        self.class_count = class_count
+        self.set_count = len(names)
+        self.link_loads_buffer = array[double]((self.set_count, link_count, class_count), True, 0)
+        self.set_names = names
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef CppSelectLinkLoadingOutputsView[double] view(self) noexcept nogil:
+        cdef CppSelectLinkLoadingOutputsView[double] output
+        output.set_count = self.set_count
+        output.link_count = self.link_count
+        output.class_count = self.class_count
+
+        if self.set_count and self.link_count and self.class_count:
+            output.data = &self.link_loads_buffer[0, 0, 0]
+
+        return output
+
+    def reset(self):
+        with nogil:
+            self.view().reset()
+
+    @property
+    def link_loads(self):
+        return readonly_view(self.link_loads_buffer)
+
+    @property
+    def loads(self):
+        """Named, read-only [links, classes] views without copying data."""
+        values = self.link_loads
+        return {name: values[index] for index, name in enumerate(self.set_names)}
+
+
+cdef class SelectLinkODOutputs:
+    """Own matching demand in [origins, sets, destinations, classes] order.
+
+    A call replaces one origin block. Workers may share this output only when
+    writing different origin rows. Reset clears all rows, including skipped ones.
+    """
+
+    def __init__(self, origin_count, destination_count, class_count, set_names):
+        if self.set_names is not None:
+            raise RuntimeError("SelectLinkODOutputs cannot be reinitialized")
+
+        origin_count, destination_count, class_count = map(
+            operator.index, (origin_count, destination_count, class_count)
+        )
+        if origin_count < 0 or destination_count < 0 or class_count < 0:
+            raise ValueError("origin_count, destination_count and class_count must be nonnegative")
+
+        names = _validate_selection_names(set_names)
+        self.origin_count = origin_count
+        self.destination_count = destination_count
+        self.class_count = class_count
+        self.set_count = len(names)
+        self.demand_buffer = array[double](
+            (origin_count, self.set_count, destination_count, class_count), True, 0
+        )
+        self.set_names = names
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef CppSelectLinkODOutputsView[double] view(self) noexcept nogil:
+        cdef CppSelectLinkODOutputsView[double] output
+        output.origin_count = self.origin_count
+        output.set_count = self.set_count
+        output.destination_count = self.destination_count
+        output.class_count = self.class_count
+
+        if self.origin_count and self.set_count and self.destination_count and self.class_count:
+            output.data = &self.demand_buffer[0, 0, 0, 0]
+
+        return output
+
+    def reset(self):
+        with nogil:
+            self.view().reset()
+
+    @property
+    def demand(self):
+        return readonly_view(self.demand_buffer)
+
+    @property
+    def matrices(self):
+        """Named [origins, destinations, classes] views; these may be strided."""
+        values = self.demand
+        return {name: values[:, index] for index, name in enumerate(self.set_names)}
+
+
+cdef class SelectLinkOutputs:
+    """Allocate optional loading and OD components without coupling their use.
+
+    Each component can be passed to the operation on its own and can outlive
+    this group. Disabling both leaves no numeric output allocations.
+    """
+
+    def __init__(self, link_count, destination_count, class_count, set_names, *,
+                 origin_count=1, link_loads=True, od=True):
+        if self.initialized:
+            raise RuntimeError("SelectLinkOutputs cannot be reinitialized")
+
+        link_count, destination_count, class_count, origin_count = map(
+            operator.index, (link_count, destination_count, class_count, origin_count)
+        )
+        if min(link_count, destination_count, class_count, origin_count) < 0:
+            raise ValueError("output dimensions must be nonnegative")
+
+        names = _validate_selection_names(set_names)
+        if link_loads:
+            self.loading = SelectLinkLoadingOutputs(link_count, class_count, names)
+        if od:
+            self.od = SelectLinkODOutputs(origin_count, destination_count, class_count, names)
+
+        self.initialized = True
+
+    def reset(self):
+        """Clear only the components allocated by this group."""
+        if self.loading is not None:
+            self.loading.reset()
+
+        if self.od is not None:
+            self.od.reset()

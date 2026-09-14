@@ -18,14 +18,14 @@ exts = [
     'skimming_core',
     'vdf_core',
     'new_path_finding',
-    'graph_context',
+    'context',
     'search_results',
     'queries',
     'workspaces',
     'outputs',
     'network_loading',
-    'skimming_context',
     'skimming',
+    'select_link_loading',
     'dijkstra',
 ]
 

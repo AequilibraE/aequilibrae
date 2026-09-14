@@ -3,7 +3,7 @@
 import numpy as np
 
 from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.cython.graph_context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 
@@ -75,7 +75,7 @@ def path_walk_outputs(context, demand, fields=(), penalty_fields=(), selected_li
     loads = np.zeros((context.link_count, classes))
     skims = np.full((zones, len(fields), zones), np.inf)
     selected_loads = np.zeros((len(selected_links), context.link_count, classes))
-    selected_od = np.zeros((len(selected_links), zones, zones, classes))
+    selected_od = np.zeros((zones, len(selected_links), zones, classes))
     total = 0.0
     results = allocate_results(context)
     for origin in range(zones):
@@ -98,7 +98,7 @@ def path_walk_outputs(context, demand, fields=(), penalty_fields=(), selected_li
                 loads[link] += row
             for selection, members in enumerate(selected_links):
                 if any(link in members for link in links):
-                    selected_od[selection, origin, destination] = row
+                    selected_od[origin, selection, destination] = row
                     for link in links:
                         selected_loads[selection, link] += row
     return loads, skims, total, selected_loads, selected_od

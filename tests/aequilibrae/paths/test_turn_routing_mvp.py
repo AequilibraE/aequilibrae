@@ -4,7 +4,7 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from aequilibrae.paths.cython.graph_context import TurnBasedContext
+from aequilibrae.paths.cython.context import TurnBasedContext
 from .routing_helpers import allocate_results, assert_state_tree, history_context, make_context, search
 
 

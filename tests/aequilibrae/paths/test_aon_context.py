@@ -15,7 +15,8 @@ from aequilibrae.paths.cython.queries import LoadingQuery
 from aequilibrae.paths.cython.outputs import LoadingOutputs
 from aequilibrae.paths.cython.network_loading import network_loading
 from aequilibrae.paths.cython.workspaces import LoadingWorkspace
-from aequilibrae.paths.cython.skimming_context import SkimmingContext
+from aequilibrae.paths.cython.context import SkimmingContext
+from aequilibrae.paths.cython.context import SelectLinkContext
 from .routing_helpers import history_context, make_context, path_walk_outputs, search
 
 
@@ -28,7 +29,7 @@ def test_selected_full_paths_and_output_rotation(turn, cores):
     fields = [np.ones(context.link_count)]
     skims = SkimmingContext(context.link_count, link_fields_with_turn_costs={"time": fields[0]})
     prepared = PreparedAoN(context, demand, costs=context.costs, cores=cores,
-                           selected_links=selections, skimming=skims)
+                           selected_links=SelectLinkContext(context.link_count, selections), skimming=skims)
     previous, current = prepared.make_outputs(), prepared.make_outputs()
     retained = previous.link_loads
     for iteration in range(4):
@@ -67,7 +68,8 @@ def test_random_selected_loading_against_path_walks(turn, seed):
     selected = {"first": list(range(0, context.link_count, 3)), "second": list(range(1, context.link_count, 2))}
     fields = [rng.random(context.link_count)]
     skims = SkimmingContext(context.link_count, link_fields={"distance": fields[0]})
-    prepared = PreparedAoN(context, demand, costs=context.costs, cores=3, selected_links=selected, skimming=skims)
+    prepared = PreparedAoN(context, demand, costs=context.costs, cores=3,
+                           selected_links=SelectLinkContext(context.link_count, selected), skimming=skims)
     out = prepared.run(prepared.make_outputs())
     expected = path_walk_outputs(context, demand, fields, selected_links=list(selected.values()))
     np.testing.assert_allclose(out.link_loads, expected[0])
@@ -116,11 +118,11 @@ def test_repeated_runs_do_not_rebuild_inputs(monkeypatch):
     demand = np.ones((4, 4, 1))
     skims = SkimmingContext(context.link_count, link_fields={"distance": np.ones(4)})
     prepared = PreparedAoN(context, demand, costs=context.costs, skimming=skims,
-                           selected_links={"set": [0, 3]}, cores=3)
+                           selected_links=SelectLinkContext(4, {"set": [0, 3]}), cores=3)
     out = prepared.make_outputs()
     def unexpected(*args, **kwargs):
         raise AssertionError("setup should not run inside an iteration")
-    for name in ("borrow_input", "make_destination_masks", "make_select_link_masks"):
+    for name in ("borrow_input", "make_destination_masks"):
         monkeypatch.setattr(f"aequilibrae.paths.cython.aon_context.{name}", unexpected)
     for _ in range(3):
         prepared.run(out)
@@ -129,7 +131,8 @@ def test_repeated_runs_do_not_rebuild_inputs(monkeypatch):
 @pytest.mark.parametrize("turn", [False, True])
 def test_no_active_origins_resets_outputs(turn):
     context = make_context([0, 0, 0], [], [], turn=turn)
-    prepared = PreparedAoN(context, np.zeros((2, 2, 1)), costs=context.costs, selected_links={"empty": []})
+    prepared = PreparedAoN(context, np.zeros((2, 2, 1)), costs=context.costs,
+                           selected_links=SelectLinkContext(0, {"empty": []}))
     out = prepared.run(prepared.make_outputs())
     assert out.total_turn_penalty == 0
     assert np.all(out.select_link_od == 0)

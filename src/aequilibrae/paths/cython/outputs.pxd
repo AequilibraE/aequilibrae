@@ -26,6 +26,33 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         CppSkimmingOriginView[T] origin(size_t index) noexcept
         void reset() noexcept
 
+    cdef cppclass CppSelectLinkLoadingOutputsView "aequilibrae::paths::cpp::mvp::SelectLinkLoadingOutputsView"[T]:
+        CppSelectLinkLoadingOutputsView() noexcept
+        size_t set_count
+        size_t link_count
+        size_t class_count
+        T *data
+        CppLoadingOutputs[T] selection(size_t index) noexcept
+        void reset() noexcept
+
+    cdef cppclass CppSelectLinkODOriginView "aequilibrae::paths::cpp::mvp::SelectLinkODOriginView"[T]:
+        CppSelectLinkODOriginView() noexcept
+        size_t set_count
+        size_t destination_count
+        size_t class_count
+        T *data
+        T *selection_data(size_t index) noexcept
+
+    cdef cppclass CppSelectLinkODOutputsView "aequilibrae::paths::cpp::mvp::SelectLinkODOutputsView"[T]:
+        CppSelectLinkODOutputsView() noexcept
+        size_t origin_count
+        size_t set_count
+        size_t destination_count
+        size_t class_count
+        T *data
+        CppSelectLinkODOriginView[T] origin(size_t index) noexcept
+        void reset() noexcept
+
 
 cdef class LoadingOutputs:
     cdef readonly size_t link_count, class_count
@@ -38,3 +65,23 @@ cdef class SkimmingOutputs:
     cdef readonly tuple field_names
     cdef double[:, :, ::1] skims_buffer
     cdef CppSkimmingOutputsView[double] view(self) noexcept nogil
+
+
+cdef class SelectLinkLoadingOutputs:
+    cdef readonly size_t set_count, link_count, class_count
+    cdef readonly tuple set_names
+    cdef double[:, :, ::1] link_loads_buffer
+    cdef CppSelectLinkLoadingOutputsView[double] view(self) noexcept nogil
+
+
+cdef class SelectLinkODOutputs:
+    cdef readonly size_t origin_count, set_count, destination_count, class_count
+    cdef readonly tuple set_names
+    cdef double[:, :, :, ::1] demand_buffer
+    cdef CppSelectLinkODOutputsView[double] view(self) noexcept nogil
+
+
+cdef class SelectLinkOutputs:
+    cdef readonly SelectLinkLoadingOutputs loading
+    cdef readonly SelectLinkODOutputs od
+    cdef bint initialized

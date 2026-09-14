@@ -61,4 +61,64 @@ template <typename T> struct SkimmingOutputsView {
   }
 };
 
+// Selected link loads have the same per-set layout as ordinary link loads.
+template <typename T> struct SelectLinkLoadingOutputsView {
+  std::size_t set_count = 0;
+  std::size_t link_count = 0;
+  std::size_t class_count = 0;
+  T *data = nullptr; // [sets, links, classes]
+
+  LoadingOutputs<T> selection(std::size_t index) const noexcept {
+    T *values = nullptr;
+    if (link_count && class_count) {
+      values = data + index * link_count * class_count;
+    }
+    return {link_count, class_count, values};
+  }
+
+  void reset() const noexcept {
+    if (set_count && link_count && class_count) {
+      std::fill_n(data, set_count * link_count * class_count, T{0});
+    }
+  }
+};
+
+// An origin corresponds to a contiguous block.
+template <typename T> struct SelectLinkODOriginView {
+  std::size_t set_count = 0;
+  std::size_t destination_count = 0;
+  std::size_t class_count = 0;
+  T *data = nullptr;
+
+  T *selection_data(std::size_t index) const noexcept {
+    return destination_count && class_count
+               ? data + index * destination_count * class_count
+               : nullptr;
+  }
+};
+
+template <typename T> struct SelectLinkODOutputsView {
+  std::size_t origin_count = 0;
+  std::size_t set_count = 0;
+  std::size_t destination_count = 0;
+  std::size_t class_count = 0;
+  T *data = nullptr; // [origins, sets, destinations, classes]
+
+  SelectLinkODOriginView<T> origin(std::size_t index) const noexcept {
+    T *values = nullptr;
+    if (set_count && destination_count && class_count) {
+      values = data + index * set_count * destination_count * class_count;
+    }
+    return {set_count, destination_count, class_count, values};
+  }
+
+  void reset() const noexcept {
+    if (origin_count && set_count && destination_count && class_count) {
+      std::fill_n(data,
+                  origin_count * set_count * destination_count * class_count,
+                  T{0});
+    }
+  }
+};
+
 } // namespace aequilibrae::paths::cpp::mvp

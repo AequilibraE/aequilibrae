@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.cython.graph_context import NodeBasedContext
+from aequilibrae.paths.cython.context import NodeBasedContext
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 

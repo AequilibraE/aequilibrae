@@ -12,7 +12,7 @@ from aequilibrae.paths.cython.network_loading import sum_weighted_turn_costs
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.queries import LoadingQuery
 from aequilibrae.paths.cython.skimming import skimming
-from aequilibrae.paths.cython.skimming_context import SkimmingContext
+from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
 from .routing_helpers import allocate_results, history_context, make_context, path_walk_outputs, search
 

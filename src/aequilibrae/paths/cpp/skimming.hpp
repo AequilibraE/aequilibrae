@@ -7,7 +7,7 @@
 
 #include "outputs.hpp"
 #include "search_results.hpp"
-#include "skimming_context.hpp"
+#include "context.hpp"
 #include "workspaces.hpp"
 
 namespace aequilibrae::paths::cpp::mvp {

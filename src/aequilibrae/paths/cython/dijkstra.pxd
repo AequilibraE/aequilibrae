@@ -1,4 +1,4 @@
-from aequilibrae.paths.cython.graph_context cimport (
+from aequilibrae.paths.cython.context cimport (
     CppNodeBasedContext, CppTurnBasedContext, NodeBasedContext, TurnBasedContext,
 )
 from aequilibrae.paths.cython.queries cimport CppSearchQuery, SearchQuery

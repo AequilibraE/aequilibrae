@@ -5,7 +5,7 @@
 #include <limits>
 #include <type_traits>
 
-#include "graph_context.hpp"
+#include "context.hpp"
 #include "pq_heap_base.hpp"
 #include "queries.hpp"
 #include "search_results.hpp"
