@@ -13,7 +13,7 @@
 namespace aequilibrae::paths::cpp::mvp {
 
 inline void reset_search(const SearchQuery &query, std::size_t root,
-                         MutableSearchResults results) noexcept {
+                         const MutableSearchResults &results) noexcept {
   auto &metadata = *results.metadata;
   metadata = SearchMetadata{};
   metadata.origin = query.origin;
@@ -39,10 +39,10 @@ inline bool reached_last_target(const SearchQuery &query, std::size_t node,
 }
 
 // Contexts and queries contain only inputs. The result view writes through to
-// its Cython owner's arrays and metadata, even when the view is copied locally.
+// its Cython owner's arrays and metadata without changing the view itself.
 template <class Queue>
 void dijkstra(const NodeBasedContext &context, const SearchQuery &query,
-              MutableSearchResults results) noexcept {
+              const MutableSearchResults &results) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   reset_search(query, query.origin, results);
   auto &metadata = *results.metadata;
@@ -104,7 +104,7 @@ void dijkstra(const NodeBasedContext &context, const SearchQuery &query,
 
 template <class Queue>
 void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
-              MutableSearchResults results) noexcept {
+              const MutableSearchResults &results) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   const auto &graph = context.graph;
   // Link states preserve incoming-link history. One virtual root lets first

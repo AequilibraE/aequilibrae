@@ -15,8 +15,9 @@ namespace aequilibrae::paths::cpp::mvp {
 // receive demand from all their children before loading their own connector.
 // Preserves turn arrival history.
 template <typename T>
-void cascade_loads(const SearchResults &results, LoadingWorkspace<T> workspace,
-                   LoadingOutputs<T> output) noexcept {
+void cascade_loads(const SearchResults &results,
+                   const LoadingWorkspace<T> &workspace,
+                   const LoadingOutputs<T> &output) noexcept {
   const auto classes = workspace.class_count;
   if (classes == 0) {
     return;
@@ -43,8 +44,8 @@ void cascade_loads(const SearchResults &results, LoadingWorkspace<T> workspace,
 // across origins. Missing terminals and intrazonal demand are ignored.
 template <typename T>
 void network_loading(const SearchResults &results, const LoadingQuery<T> &query,
-                     LoadingWorkspace<T> workspace,
-                     LoadingOutputs<T> output) noexcept {
+                     const LoadingWorkspace<T> &workspace,
+                     const LoadingOutputs<T> &output) noexcept {
   static_assert(std::is_floating_point_v<T>);
   const auto classes = query.class_count;
   if (classes == 0) {
@@ -88,7 +89,7 @@ T sum_weighted_turn_costs(const SearchResults &results,
 template <typename T>
 void reduce_loading_outputs(const LoadingOutputs<T> *workers,
                             std::size_t worker_count,
-                            LoadingOutputs<T> output) noexcept {
+                            const LoadingOutputs<T> &output) noexcept {
   output.reset();
   const auto size = output.link_count * output.class_count;
 

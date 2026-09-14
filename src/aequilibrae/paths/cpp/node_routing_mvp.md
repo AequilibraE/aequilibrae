@@ -179,7 +179,20 @@ Routing accepts `context.view()`, `query.view()` and `results.view()` without th
 GIL. Downstream kernels use `results.read_view()`, which has const buffer pointers.
 Neither result view retains inputs. The metadata record belongs to the Cython
 results object; views point to it rather than copying its counters. This ensures
-that searches performed through local view copies still update the owner.
+that searches performed through locally constructed views still update the owner.
+
+Operation arguments use `const View &` when they do not change the descriptor's
+pointers or dimensions. This includes workspace and output views: their mutable
+buffer pointers still allow writes to the underlying storage. Read-only result
+views also have const buffer pointers, so downstream kernels cannot change paths.
+A mutable `View &` is used only when a call changes fields inside the descriptor,
+such as the worker's turn-total scalar.
+
+View construction still returns values: `view()`, `read_view()`, `origin()`,
+`subfields()` and `selection()` produce new descriptors. Prepared tables and
+run-local routing views store these values so they do not retain references to
+temporary return values. Subsequent calls borrow them by reference. A temporary
+view may bind to a const reference for a call; no kernel retains that reference.
 
 The routing kernels live in `dijkstra.hpp`. Legacy production algorithms remain
 in `path_finding.hpp`. The new kernels still allocate their own four-ary heap on
@@ -287,11 +300,11 @@ accumulators before each iteration, and reduces them using the same C++ reductio
 as the standalone entry point. Queries borrow already prepared origin rows, so
 the origin loop builds no Python query objects or numeric buffers.
 
-`AoNOutputs.loading` is an independent `LoadingOutputs`; `AoNOutputs.link_loads`
-forwards its read-only view. Skimming is now another independent component,
-described below. Select-link outputs are also independent components.
-The old aggregate `copy()` / `copy_to()` and thread-load cube accessor are removed.
-Output rotation remains ordinary reference rotation.
+`AoNOutputs.loading` is an independent `LoadingOutputs`. Read its buffer at
+`output.loading.link_loads`. Skimming and select-link outputs are also independent
+components, described below. The aggregate has no array-forwarding properties,
+`copy()` / `copy_to()` methods or thread-load cube accessor. Output rotation
+remains ordinary reference rotation.
 
 ## Third slice: named skimming inputs and outputs
 
@@ -432,11 +445,10 @@ skimming, causes the driver to prepare all centroid targets and, by default, all
 origins. Only additive fields allocate per-worker skim scratch.
 
 `AoNOutputs.skimming` is an independent `SkimmingOutputs`, or `None` when no fields
-are requested. `AoNOutputs.skims` forwards its `[origins, fields, destinations]`
-array view; named matrices are at
-`AoNOutputs.skimming.matrices`. The driver resets all rows before each run so
-skipped origins remain infinity. An output with different names or order is
-rejected before reset. Components can outlive the aggregate and be used standalone.
+are requested. Read its array at `output.skimming.skims` and named matrices at
+`output.skimming.matrices`. The driver resets all rows before each run so skipped
+origins remain infinity. An output with different names or order is rejected
+before reset. Components can outlive the aggregate and be used standalone.
 
 ### Demand-weighted turn totals
 
@@ -568,13 +580,124 @@ Only requested operations allocate membership scratch. Ordinary loading can
 reuse its cascade workspace for selected loading.
 
 `AoNOutputs.select_link` is a `SelectLinkOutputs` group, or `None` when there are
-no sets. The `select_link_loads` and `select_link_od` properties forward component
-views, or return `None` when that component is absent. The OD layout is now
-origin-major; there is no transposed compatibility view. `make_outputs()` allocates
-the configured components. `run()` checks their presence, dimensions and names
-before resetting anything. It clears skipped OD rows, calls the standalone C++
-operation with worker-local loads and disjoint OD origin views, then reduces
-selected loads. The old thread-load cube and its accessor are removed.
+no sets or both selected outputs are disabled. Read allocated components at
+`output.select_link.loading.link_loads` and `output.select_link.od.demand`.
+The OD layout is origin-major; there is no transposed compatibility view.
+`make_outputs()` allocates the configured components. `run()` checks their
+presence, dimensions and names before resetting anything. It clears skipped OD
+rows, calls the standalone C++ operation with worker-local loads and disjoint OD
+origin views, then reduces selected loads. The old thread-load cube and its
+accessor are removed.
+
+## Fifth slice: output allocation and assignment orchestration
+
+### Aggregate outputs
+
+`AoNOutputs` lives in `outputs.pyx` / `outputs.pxd` with the smaller output owners.
+It allocates components rather than accepting existing ones:
+
+```python
+from aequilibrae.paths.cython.outputs import AoNOutputs
+
+output = AoNOutputs(
+    links=4,
+    zones=4,
+    classes=2,
+    skim_names=("objective",),
+    select_link_names=("screenline",),
+    select_link_loads=True,
+    select_link_od=True,
+)
+```
+
+Ordinary loading is always allocated. Empty skim names omit skimming. Empty set
+names or disabling both selected outputs omit the selection group. Dimensions
+are nonnegative; empty axes are supported, as in the smaller owners. The driver
+itself still requires at least one zone and class.
+
+The group owns no second copy of component dimensions or names. There is no
+aggregate `shape` record or forwarding array API: inspect the components directly.
+The read-only scalar `turn_cost_total` holds the demand-weighted turn total.
+`reset()` clears link and selected OD outputs to zero, skims to infinity, and the
+scalar to zero. It changes no allocations. Components cannot be replaced after
+construction, and can outlive the group.
+
+`view()` borrows only the component buffer views. The scalar stays on the Cython
+owner and is assigned once after worker reduction; it does not need a shared
+pointer. This group view is only for the assignment driver. Each operation still
+receives its own small views, not an aggregate output object.
+
+### Caller-owned routing configuration
+
+`PreparedAoN` retains the supplied routing context directly. It does not clone
+that context or accept separate `costs` or `block_centroids` arguments. Set
+centroid blocking on the routing context at construction. There are no driver
+`costs` or `update_costs` proxies.
+
+```python
+from aequilibrae.paths.cython.aon_context import PreparedAoN
+
+# An independent binding is explicit. Topology is shared, not copied again.
+routing = context.with_costs(costs)
+assignment = PreparedAoN(routing, demand, cores=3)
+output = assignment.make_outputs()
+assignment.run(output)
+
+# In assignment, the VDF supplies these next costs from output.loading.link_loads.
+next_costs = np.full(routing.link_count, 2.0, dtype=np.float64)
+routing.update_costs(next_costs)
+assignment.run(output)
+```
+
+`update_costs()` validates and rebinds without copying. A failed update keeps the
+previous binding. Alternatively, the VDF can write valid costs into the currently
+borrowed buffer without rebinding. In-place writes are not automatically validated;
+calling `update_costs()` with that same buffer validates its new values.
+Neither updates nor writes may happen during a run.
+
+Every run takes a fresh routing view so rebinding cannot leave a stale cost pointer
+in the driver. All workers in that run see the same binding. Other consumers of
+that context also see its updates. To give them independent bindings, callers
+create separate contexts with `with_costs()`. Sharing a cost array still shares
+its in-place changes, even between independently bound contexts.
+
+### Fixed inputs and reusable workers
+
+Demand, topology, restrictions, origins, targets and operation configuration stay
+fixed throughout an assignment. Only routing costs change between iterations.
+Demand is borrowed without changing caller writeability; callers must not mutate
+it. Origin selection and target masks are prepared once. Objective-only or
+turn-only skimming still requests all centroid targets.
+
+Each private worker owner groups its `SearchResults`, `AoNWorkspace`, ordinary
+loading output and optional selected loading output. Worker views borrow those
+owners. The turn-total scalar lives directly in the persistent worker-view table,
+not behind a pointer. Each origin call takes its thread's table entry by mutable
+reference, so contributions accumulate in that entry until reduction. The next
+run resets it. No second copy of the scalar is kept on the Cython worker owner.
+
+Small contiguous tables of loading views serve the existing standalone reduction
+kernels. No per-worker OD cubes are allocated. Search/loading query views are
+prepared once per chosen origin and borrow demand and masks. These tables remain
+fixed alongside the numeric scratch allocations.
+
+`run(output)` performs five steps:
+
+1. Validate component presence, dimensions and ordered names before any writes.
+2. Refresh the routing view and reset worker accumulators and all OD output rows.
+3. Search origins in parallel and call the independent operations on each result.
+4. Replace link outputs with worker reductions and sum the turn-total scalars.
+5. Return the supplied output without retaining it.
+
+The origin loop uses borrowed C++ views, not Cython owner objects. Searches and
+operations replace their own scratch. Output link buffers are cleared by reduction,
+not redundantly at the beginning of the run. Skipped skim rows remain infinity;
+skipped selected OD rows remain zero. Empty origin lists still replace all output.
+
+This driver is assignment-specific: ordinary loading and weighted turn accounting
+always run. A future skim-only method will use the skimming components directly,
+not add a generic operation scheduler here. Routing heap persistence is still
+separate work; the heap currently allocates on each search.
 
 ## Remaining downstream work
 
@@ -582,12 +705,10 @@ selected loads. The old thread-load cube and its accessor are removed.
 Standalone loading, skimming and select-link operations now use independent input,
 workspace and output owners, shared with assignment.
 
-`PreparedAoN` remains a testable consumer rather than the final integration API.
-It borrows demand, routing costs and skim fields, and uses context-owned cost
-bindings and centroid blocking. Target masks and origin selection are prepared
-once: changing demand magnitudes is possible, but introducing new search targets
-requires new preparation. Further work can finish the aggregate/driver cleanup
-before production integration; routing heap persistence remains deferred.
+The aggregate and driver now compose these same owners. `PreparedAoN` remains a
+testable assignment consumer rather than the final production integration API.
+Production integration, a separate skim-only driver and routing heap persistence
+remain deferred.
 
 `aon_graph.py`, its adapter exports and legacy integration tests have been removed.
 Production dispatch is unchanged.
@@ -628,4 +749,8 @@ output choices, named origin-major views, copied masks, turn-state histories,
 full-path loading, partial searches, empty dimensions, nonfinite demand,
 validation before writes, buffer reuse and lifetimes. Concurrent workers share
 OD rows and reduce only link accumulators; assignment is checked against the
-standalone operation for every output combination.
+standalone operation for every output combination. Driver tests also check
+caller-owned context lifetimes, rebinding after the old cost buffer is released,
+in-place cost updates, shared contexts with separate concurrent drivers, unchanged
+search/workspace/output buffer addresses, aggregate reset and component lifetimes.
+Mismatched output components are rejected before any values are reset.

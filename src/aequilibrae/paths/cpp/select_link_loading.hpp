@@ -11,7 +11,7 @@ namespace aequilibrae::paths::cpp::mvp {
 // A path matches once it has used any state in this set.
 inline void mark_selected_paths(const SearchResults &results,
                                 const bool *selected_links,
-                                SelectLinkWorkspace workspace) noexcept {
+                                const SelectLinkWorkspace &workspace) noexcept {
   std::fill_n(workspace.selected_paths, workspace.state_count, false);
   for (std::size_t i = 0; i < results.metadata->settled_count; ++i) {
     const auto state = results.settlement_order[i];
@@ -25,7 +25,7 @@ inline void mark_selected_paths(const SearchResults &results,
 
 inline bool selected_terminal(const SearchResults &results,
                               std::size_t terminal,
-                              SelectLinkWorkspace selection) noexcept {
+                              const SelectLinkWorkspace &selection) noexcept {
   return terminal != invalid_state && terminal != results.metadata->root &&
          selection.selected_paths[terminal];
 }
@@ -33,7 +33,7 @@ inline bool selected_terminal(const SearchResults &results,
 template <typename T>
 void write_selected_od(const SearchResults &results,
                        const LoadingQuery<T> &query,
-                       SelectLinkWorkspace selection, T *od) noexcept {
+                       const SelectLinkWorkspace &selection, T *od) noexcept {
   if (query.class_count == 0) {
     return;
   }
@@ -55,9 +55,9 @@ void write_selected_od(const SearchResults &results,
 template <typename T>
 void load_selected_paths(const SearchResults &results,
                          const LoadingQuery<T> &query,
-                         SelectLinkWorkspace selection,
-                         LoadingWorkspace<T> loading,
-                         LoadingOutputs<T> output) noexcept {
+                         const SelectLinkWorkspace &selection,
+                         const LoadingWorkspace<T> &loading,
+                         const LoadingOutputs<T> &output) noexcept {
   const auto classes = query.class_count;
   if (classes == 0) {
     return;
@@ -84,10 +84,10 @@ template <typename T>
 void select_link_loading(const SearchResults &results,
                          const LoadingQuery<T> &query,
                          const SelectLinkContext &context,
-                         SelectLinkWorkspace selection,
-                         LoadingWorkspace<T> loading,
-                         SelectLinkLoadingOutputsView<T> loads,
-                         SelectLinkODOriginView<T> od) noexcept {
+                         const SelectLinkWorkspace &selection,
+                         const LoadingWorkspace<T> &loading,
+                         const SelectLinkLoadingOutputsView<T> &loads,
+                         const SelectLinkODOriginView<T> &od) noexcept {
   if (loads.set_count == 0 && od.set_count == 0) {
     return;
   }
@@ -109,7 +109,7 @@ void select_link_loading(const SearchResults &results,
 template <typename T>
 void reduce_select_link_loading_outputs(
     const SelectLinkLoadingOutputsView<T> *workers, std::size_t worker_count,
-    SelectLinkLoadingOutputsView<T> output) noexcept {
+    const SelectLinkLoadingOutputsView<T> &output) noexcept {
   output.reset();
 
   const auto size = output.set_count * output.link_count * output.class_count;

@@ -286,3 +286,72 @@ cdef class SelectLinkOutputs:
 
         if self.od is not None:
             self.od.reset()
+
+
+cdef class AoNOutputs:
+    """Allocate the independent outputs needed by an assignment iteration.
+
+    Components own their buffers and can outlive this group. Access arrays and
+    names through the components; the group keeps no second copy of their shape.
+    The demand-weighted turn total is a scalar, independent of skimming.
+    """
+
+    def __init__(
+        self,
+        links,
+        zones,
+        classes,
+        *,
+        skim_names=(),
+        select_link_names=(),
+        select_link_loads=True,
+        select_link_od=True,
+    ):
+        if self.loading is not None:
+            raise RuntimeError("AoNOutputs cannot be reinitialized")
+
+        links, zones, classes = map(operator.index, (links, zones, classes))
+        if min(links, zones, classes) < 0:
+            raise ValueError("output dimensions must be nonnegative")
+
+        skim_names = _validate_skim_names(skim_names)
+        select_link_names = _validate_selection_names(select_link_names)
+
+        self.loading = LoadingOutputs(links, classes)
+
+        if skim_names:
+            self.skimming = SkimmingOutputs(zones, zones, skim_names)
+
+        if select_link_names and (select_link_loads or select_link_od):
+            self.select_link = SelectLinkOutputs(
+                links,
+                zones,
+                classes,
+                select_link_names,
+                origin_count=zones,
+                link_loads=select_link_loads,
+                od=select_link_od,
+            )
+
+    cdef CppAoNOutputsView view(self) noexcept nogil:
+        cdef CppAoNOutputsView output
+
+        output.loading = self.loading.view()
+
+        if self.skimming is not None:
+            output.skimming = self.skimming.view()
+
+        if self.select_link is not None:
+            if self.select_link.loading is not None:
+                output.selected_loading = self.select_link.loading.view()
+            if self.select_link.od is not None:
+                output.selected_od = self.select_link.od.view()
+
+        return output
+
+    def reset(self):
+        """Clear all components and the scalar without replacing any storage."""
+        with nogil:
+            self.view().reset()
+
+        self.turn_cost_total = 0

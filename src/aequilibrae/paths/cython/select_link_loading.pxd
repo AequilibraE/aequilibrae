@@ -13,11 +13,17 @@ from aequilibrae.paths.cython.workspaces cimport (
 
 cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
     void cpp_select_link_loading "aequilibrae::paths::cpp::mvp::select_link_loading"[T](
-        const CppSearchResults &results, const CppLoadingQuery[T] &query,
-        const CppSelectLinkContext &context, CppSelectLinkWorkspace selection,
-        CppLoadingWorkspace[T] loading, CppSelectLinkLoadingOutputsView[T] loads,
-        CppSelectLinkODOriginView[T] od) noexcept
+        const CppSearchResults &results,
+        const CppLoadingQuery[T] &query,
+        const CppSelectLinkContext &context,
+        const CppSelectLinkWorkspace &selection,
+        const CppLoadingWorkspace[T] &loading,
+        const CppSelectLinkLoadingOutputsView[T] &loads,
+        const CppSelectLinkODOriginView[T] &od,
+    ) noexcept
 
     void cpp_reduce_select_link_loading_outputs "aequilibrae::paths::cpp::mvp::reduce_select_link_loading_outputs"[T](
-        const CppSelectLinkLoadingOutputsView[T] *workers, size_t worker_count,
-        CppSelectLinkLoadingOutputsView[T] output) noexcept
+        const CppSelectLinkLoadingOutputsView[T] *workers,
+        size_t worker_count,
+        const CppSelectLinkLoadingOutputsView[T] &output,
+    ) noexcept

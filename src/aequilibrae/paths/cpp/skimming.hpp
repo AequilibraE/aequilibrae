@@ -18,7 +18,7 @@ namespace aequilibrae::paths::cpp::mvp {
 template <typename T>
 void sum_skim_fields(const SearchResults &results,
                      const SkimmingContext<T> &context,
-                     SkimmingWorkspace<T> workspace) noexcept {
+                     const SkimmingWorkspace<T> &workspace) noexcept {
   const auto width = context.additive_field_count;
   const T infinity = std::numeric_limits<T>::infinity();
 
@@ -49,9 +49,10 @@ void sum_skim_fields(const SearchResults &results,
 
 // Project a group of link sums after the shared state-tree pass.
 template <typename T, bool IncludeTurnCost>
-void skim_fields(const SearchResults &results, SkimmingWorkspace<T> workspace,
+void skim_fields(const SearchResults &results,
+                 const SkimmingWorkspace<T> &workspace,
                  std::size_t first_state_field,
-                 SkimmingOriginView<T> output) noexcept {
+                 const SkimmingOriginView<T> &output) noexcept {
   const T infinity = std::numeric_limits<T>::infinity();
 
   for (std::size_t field = 0; field < output.field_count; ++field) {
@@ -113,8 +114,8 @@ void skim_turn_costs(const SearchResults &results,
 // Overwrite one output row using finalised paths.
 template <typename T>
 void skimming(const SearchResults &results, const SkimmingContext<T> &context,
-              SkimmingWorkspace<T> workspace,
-              SkimmingOriginView<T> output) noexcept {
+              const SkimmingWorkspace<T> &workspace,
+              const SkimmingOriginView<T> &output) noexcept {
   static_assert(std::is_floating_point_v<T>);
 
   if (context.needs_state_sums()) {

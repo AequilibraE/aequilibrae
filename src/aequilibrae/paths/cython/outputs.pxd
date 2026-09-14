@@ -53,6 +53,14 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         CppSelectLinkODOriginView[T] origin(size_t index) noexcept
         void reset() noexcept
 
+    cdef cppclass CppAoNOutputsView "aequilibrae::paths::cpp::mvp::AoNOutputsView":
+        CppAoNOutputsView() noexcept
+        CppLoadingOutputs[double] loading
+        CppSkimmingOutputsView[double] skimming
+        CppSelectLinkLoadingOutputsView[double] selected_loading
+        CppSelectLinkODOutputsView[double] selected_od
+        void reset() noexcept
+
 
 cdef class LoadingOutputs:
     cdef readonly size_t link_count, class_count
@@ -85,3 +93,11 @@ cdef class SelectLinkOutputs:
     cdef readonly SelectLinkLoadingOutputs loading
     cdef readonly SelectLinkODOutputs od
     cdef bint initialized
+
+
+cdef class AoNOutputs:
+    cdef readonly LoadingOutputs loading
+    cdef readonly SkimmingOutputs skimming
+    cdef readonly SelectLinkOutputs select_link
+    cdef readonly double turn_cost_total
+    cdef CppAoNOutputsView view(self) noexcept nogil

@@ -18,8 +18,7 @@ from .routing_helpers import allocate_results, history_context, make_context, pa
 
 
 def workspace_for(context, inputs):
-    return (SkimmingWorkspace(context.state_count, inputs.additive_field_count)
-            if inputs.additive_field_count else None)
+    return SkimmingWorkspace(context.state_count, inputs.additive_field_count) if inputs.additive_field_count else None
 
 
 def path_walk_skims(results, inputs, destination_count, turn_fields=(), cost_name=None, turn_cost_name=None):
@@ -43,7 +42,7 @@ def path_walk_skims(results, inputs, destination_count, turn_fields=(), cost_nam
 
 
 @pytest.mark.parametrize("turn", [False, True])
-@pytest.mark.parametrize("penalty", [0.5, 10., np.inf])
+@pytest.mark.parametrize("penalty", [0.5, 10.0, np.inf])
 @pytest.mark.parametrize("width", [0, 1, 3, 37])
 def test_skim_state_tree_against_path_sums_and_assignment(turn, penalty, width):
     context = history_context(penalty, turn=turn)
@@ -51,10 +50,15 @@ def test_skim_state_tree_against_path_sums_and_assignment(turn, penalty, width):
     split = width // 2
     plain = {f"plain_{i}": field for i, field in enumerate(fields[:split])}
     with_turns = {f"turn_{i}": field for i, field in enumerate(fields[split:])}
-    inputs = SkimmingContext(context.link_count, link_fields=plain, link_fields_with_turn_costs=with_turns,
-                             cost_name="objective", turn_cost_name="penalty")
+    inputs = SkimmingContext(
+        context.link_count,
+        link_fields=plain,
+        link_fields_with_turn_costs=with_turns,
+        cost_name="objective",
+        turn_cost_name="penalty",
+    )
     demand = np.ones((4, 4, 2))
-    prepared = PreparedAoN(context, demand, costs=context.costs, skimming=inputs, cores=3)
+    prepared = PreparedAoN(context, demand, skimming=inputs, cores=3)
     assigned = prepared.run(prepared.make_outputs())
     output = inputs.make_outputs(4, origin_count=4)
     scratch = workspace_for(context, inputs)
@@ -64,7 +68,7 @@ def test_skim_state_tree_against_path_sums_and_assignment(turn, penalty, width):
         assert skimming(results, inputs, scratch, output, origin_row=origin) is output
         expected = path_walk_skims(results, inputs, 4, with_turns, "objective", "penalty")
         np.testing.assert_allclose(output.skims[origin], expected)
-    np.testing.assert_allclose(output.skims, assigned.skims)
+    np.testing.assert_allclose(output.skims, assigned.skimming.skims)
     expected_fields = path_walk_outputs(context, demand, fields, [i >= split for i in range(width)])[1]
     np.testing.assert_allclose(output.skims[:, :width], expected_fields)
 
@@ -74,11 +78,16 @@ def test_skim_state_tree_against_path_sums_and_assignment(turn, penalty, width):
 @pytest.mark.parametrize("cost", [False, True])
 @pytest.mark.parametrize("turn_cost", [False, True])
 def test_each_combination_of_skim_groups(plain, penalized, cost, turn_cost):
-    context = history_context(.5)
-    link_fields = {"distance": np.ones(4), "toll": np.full(4, 2.)} if plain else {}
-    turn_fields = {"time": np.full(4, 3.), "weight": np.full(4, 4.)} if penalized else {}
-    inputs = SkimmingContext(4, link_fields=link_fields, link_fields_with_turn_costs=turn_fields,
-                             cost_name="cost" if cost else None, turn_cost_name="turns" if turn_cost else None)
+    context = history_context(0.5)
+    link_fields = {"distance": np.ones(4), "toll": np.full(4, 2.0)} if plain else {}
+    turn_fields = {"time": np.full(4, 3.0), "weight": np.full(4, 4.0)} if penalized else {}
+    inputs = SkimmingContext(
+        4,
+        link_fields=link_fields,
+        link_fields_with_turn_costs=turn_fields,
+        cost_name="cost" if cost else None,
+        turn_cost_name="turns" if turn_cost else None,
+    )
     output = inputs.make_outputs(3, origin_count=2)
     scratch = workspace_for(context, inputs)
     results = allocate_results(context)
@@ -87,16 +96,21 @@ def test_each_combination_of_skim_groups(plain, penalized, cost, turn_cost):
         saved_other_row = output.skims[1 - row].copy()
         search(context, origin, results=results)
         skimming(results, inputs, scratch, output, origin_row=row)
-        np.testing.assert_array_equal(output.skims[row], path_walk_skims(
-            results, inputs, 3, turn_fields, "cost", "turns"))
+        np.testing.assert_array_equal(
+            output.skims[row], path_walk_skims(results, inputs, 3, turn_fields, "cost", "turns")
+        )
         np.testing.assert_array_equal(output.skims[1 - row], saved_other_row)
 
 
 def test_names_order_and_one_shot_allocation():
-    context = history_context(.5)
-    inputs = SkimmingContext(4, link_fields={"distance": np.ones(4)},
-                             link_fields_with_turn_costs={"time": np.ones(4)},
-                             cost_name="objective", turn_cost_name="penalty")
+    context = history_context(0.5)
+    inputs = SkimmingContext(
+        4,
+        link_fields={"distance": np.ones(4)},
+        link_fields_with_turn_costs={"time": np.ones(4)},
+        cost_name="objective",
+        turn_cost_name="penalty",
+    )
     assert inputs.field_names == ("distance", "time", "objective", "penalty")
     assert inputs.additive_field_count == 2
     output = inputs.make_outputs(context.node_count)
@@ -121,10 +135,14 @@ def test_names_order_and_one_shot_allocation():
 
 
 def test_origin_major_layout_with_rectangular_od_matrices():
-    context = history_context(.5)
-    inputs = SkimmingContext(4, link_fields={"distance": np.ones(4)},
-                             link_fields_with_turn_costs={"time": np.full(4, 2.)},
-                             cost_name="objective", turn_cost_name="penalty")
+    context = history_context(0.5)
+    inputs = SkimmingContext(
+        4,
+        link_fields={"distance": np.ones(4)},
+        link_fields_with_turn_costs={"time": np.full(4, 2.0)},
+        cost_name="objective",
+        turn_cost_name="penalty",
+    )
     output = inputs.make_outputs(2, origin_count=3)
     scratch = workspace_for(context, inputs)
     assert output.skims.shape == (3, 4, 2)
@@ -159,25 +177,30 @@ def test_origin_major_layout_with_rectangular_od_matrices():
 
 @pytest.mark.parametrize("turn", [False, True])
 def test_borrowing_and_field_meanings_survive_objective_rebinding(turn):
-    context = history_context(.5, turn=turn)
+    context = history_context(0.5, turn=turn)
     # Sharing the objective buffer does not turn a link field into a label field.
     field = context.costs
-    inputs = SkimmingContext(4, link_fields={"links": field},
-                             link_fields_with_turn_costs={"links_and_turns": field},
-                             cost_name="objective", turn_cost_name="penalty")
+    inputs = SkimmingContext(
+        4,
+        link_fields={"links": field},
+        link_fields_with_turn_costs={"links_and_turns": field},
+        cost_name="objective",
+        turn_cost_name="penalty",
+    )
     assert np.shares_memory(inputs.fields["links"], field)
     results = search(context, 0)
     output = inputs.make_outputs(4)
     scratch = workspace_for(context, inputs)
     skimming(results, inputs, scratch, output)
     previous = output.skims.copy()
-    context.update_costs(np.full(4, 2.))
+    context.update_costs(np.full(4, 2.0))
     skimming(results, inputs, scratch, output)
     np.testing.assert_array_equal(output.skims, previous)
     search(context, 0, results=results)
     skimming(results, inputs, scratch, output)
-    np.testing.assert_array_equal(output.skims[0], path_walk_skims(
-        results, inputs, 4, ("links_and_turns",), "objective", "penalty"))
+    np.testing.assert_array_equal(
+        output.skims[0], path_walk_skims(results, inputs, 4, ("links_and_turns",), "objective", "penalty")
+    )
     assert output.matrices["objective"][0, 1] == 2
     assert output.matrices["links"][0, 1] == 1
 
@@ -195,7 +218,7 @@ def test_input_updates_do_not_change_writeability_or_allocate_output():
     output_pointer = retained_output.ctypes.data
     scratch_pointer = retained_scratch.ctypes.data
     tree = results.predecessors.copy()
-    for value in (1., 2., -3.):
+    for value in (1.0, 2.0, -3.0):
         field[:] = value
         skimming(results, inputs, scratch, output)
         assert retained_output[0, 0, 3] == 3 * value
@@ -209,9 +232,13 @@ def test_input_updates_do_not_change_writeability_or_allocate_output():
 
 def test_partial_and_presearch_replace_only_the_requested_row():
     context = history_context()
-    inputs = SkimmingContext(4, link_fields={"links": np.ones(4)},
-                             link_fields_with_turn_costs={"time": np.ones(4)},
-                             cost_name="objective", turn_cost_name="penalty")
+    inputs = SkimmingContext(
+        4,
+        link_fields={"links": np.ones(4)},
+        link_fields_with_turn_costs={"time": np.ones(4)},
+        cost_name="objective",
+        turn_cost_name="penalty",
+    )
     scratch = workspace_for(context, inputs)
     output = inputs.make_outputs(4, origin_count=2)
     results = search(context, 0)
@@ -222,7 +249,7 @@ def test_partial_and_presearch_replace_only_the_requested_row():
     np.testing.assert_array_equal(output.skims[0], saved)
     assert np.all(np.isinf(output.skims[1, :, 3]))
     unfinalized = np.ones(context.state_count, dtype=bool)
-    unfinalized[results.settlement_order[:results.settled_count]] = False
+    unfinalized[results.settlement_order[: results.settled_count]] = False
     assert np.all(np.isinf(scratch.state_skims[unfinalized]))
     skimming(allocate_results(context), inputs, scratch, output, origin_row=1)
     assert np.all(np.isinf(output.skims[1]))
@@ -244,19 +271,27 @@ def test_centroid_skims_use_intermediate_states(turn):
 @pytest.mark.parametrize("turn", [False, True])
 def test_zero_cost_cycle_and_nonfinite_link_fields(turn):
     context = make_context([0, 2, 3, 5, 5], [1, 2, 2, 1, 3], [0, 0, 0, 0, 1], turn=turn)
-    inputs = SkimmingContext(5, link_fields={"signed": np.array([-2., -3., -1., -1., -4.]),
-                                           "nan": np.full(5, np.nan), "inf": np.full(5, np.inf)},
-                             cost_name="objective", turn_cost_name="penalty")
+    inputs = SkimmingContext(
+        5,
+        link_fields={
+            "signed": np.array([-2.0, -3.0, -1.0, -1.0, -4.0]),
+            "nan": np.full(5, np.nan),
+            "inf": np.full(5, np.inf),
+        },
+        cost_name="objective",
+        turn_cost_name="penalty",
+    )
     results = search(context, 0)
     output = inputs.make_outputs(4)
     skimming(results, inputs, workspace_for(context, inputs), output)
-    np.testing.assert_allclose(output.skims[0], path_walk_skims(
-        results, inputs, 4, cost_name="objective", turn_cost_name="penalty"))
+    np.testing.assert_allclose(
+        output.skims[0], path_walk_skims(results, inputs, 4, cost_name="objective", turn_cost_name="penalty")
+    )
     assert np.all(output.skims[0, :, 0] == 0)
 
 
 def test_cost_projection_preserves_labels_exactly():
-    context = make_context([0, 1, 2, 3, 3], [1, 2, 3], [.1, .2, .3], {(0, 1): .4, (1, 2): .5})
+    context = make_context([0, 1, 2, 3, 3], [1, 2, 3], [0.1, 0.2, 0.3], {(0, 1): 0.4, (1, 2): 0.5})
     inputs = SkimmingContext(3, cost_name="objective", turn_cost_name="penalty")
     results = search(context, 0)
     output = inputs.make_outputs(4)
@@ -293,8 +328,9 @@ def test_zero_links_and_empty_dimensions(turn):
         skimming(results, inputs, scratch, no_rows)
 
 
-@pytest.mark.parametrize("bad", [np.ones(4, dtype=np.float32), np.ones(8)[::2], [1.] * 4,
-                                 np.ones((4, 1)), np.ones(3), None])
+@pytest.mark.parametrize(
+    "bad", [np.ones(4, dtype=np.float32), np.ones(8)[::2], [1.0] * 4, np.ones((4, 1)), np.ones(3), None]
+)
 def test_invalid_input_buffers(bad):
     with pytest.raises((TypeError, ValueError)):
         SkimmingContext(4, link_fields={"bad": bad})
@@ -311,13 +347,18 @@ def test_unaligned_and_readonly_inputs():
     assert np.shares_memory(inputs.fields["readonly"], field)
 
 
-@pytest.mark.parametrize("options", [
-    {"link_fields": {"same": np.ones(4)}, "cost_name": "same"},
-    {"link_fields": {"same": np.ones(4)}, "link_fields_with_turn_costs": {"same": np.ones(4)}},
-    {"cost_name": "same", "turn_cost_name": "same"},
-    {"cost_name": ""}, {"turn_cost_name": 1}, {"link_fields": {1: np.ones(4)}},
-    {"link_fields": [np.ones(4)]},
-])
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"link_fields": {"same": np.ones(4)}, "cost_name": "same"},
+        {"link_fields": {"same": np.ones(4)}, "link_fields_with_turn_costs": {"same": np.ones(4)}},
+        {"cost_name": "same", "turn_cost_name": "same"},
+        {"cost_name": ""},
+        {"turn_cost_name": 1},
+        {"link_fields": {1: np.ones(4)}},
+        {"link_fields": [np.ones(4)]},
+    ],
+)
 def test_invalid_field_declarations(options):
     with pytest.raises((TypeError, ValueError)):
         SkimmingContext(4, **options)
@@ -349,7 +390,9 @@ def test_fixed_dimensions_and_reinitialization():
             inputs.make_outputs(destinations, origin_count=origins)
 
 
-@pytest.mark.parametrize("bad", ["row", "negative_row", "destinations", "link_count", "names", "order", "states", "width", "missing"])
+@pytest.mark.parametrize(
+    "bad", ["row", "negative_row", "destinations", "link_count", "names", "order", "states", "width", "missing"]
+)
 def test_dimension_validation_precedes_writes(bad):
     context = history_context()
     inputs = SkimmingContext(4, link_fields={"distance": np.ones(4)}, cost_name="objective")
@@ -403,41 +446,50 @@ def test_output_and_retained_views_do_not_retain_inputs():
 
 @pytest.mark.parametrize("labels_only", [False, True])
 def test_shared_inputs_and_disjoint_output_rows(labels_only):
-    context = history_context(.5)
-    inputs = SkimmingContext(4, link_fields=None if labels_only else {"distance": np.ones(4)},
-                             cost_name="objective", turn_cost_name="penalty")
+    context = history_context(0.5)
+    inputs = SkimmingContext(
+        4,
+        link_fields=None if labels_only else {"distance": np.ones(4)},
+        cost_name="objective",
+        turn_cost_name="penalty",
+    )
     outputs = inputs.make_outputs(4, origin_count=4)
     results = [search(context, origin) for origin in range(4)]
     scratch = [workspace_for(context, inputs) for _ in results]
+
     def run(origin):
         return skimming(results[origin], inputs, scratch[origin], outputs, origin_row=origin)
+
     with ThreadPoolExecutor(max_workers=4) as pool:
         for _ in range(3):
             assert all(out is outputs for out in pool.map(run, range(4)))
     for origin in range(4):
-        np.testing.assert_array_equal(outputs.skims[origin], path_walk_skims(
-            results[origin], inputs, 4, cost_name="objective", turn_cost_name="penalty"))
+        np.testing.assert_array_equal(
+            outputs.skims[origin],
+            path_walk_skims(results[origin], inputs, 4, cost_name="objective", turn_cost_name="penalty"),
+        )
 
 
 @pytest.mark.parametrize("turn", [False, True])
 @pytest.mark.parametrize("label", ["cost_name", "turn_cost_name"])
 def test_label_only_assignment_searches_zero_demand_and_resets_skipped_rows(turn, label):
-    context = history_context(.5, turn=turn)
+    context = history_context(0.5, turn=turn)
     inputs = SkimmingContext(4, **{label: "label"})
     demand = np.zeros((4, 4, 1))
-    prepared = PreparedAoN(context, demand, costs=context.costs, skimming=inputs, cores=3)
+    prepared = PreparedAoN(context, demand, skimming=inputs, cores=3)
     np.testing.assert_array_equal(prepared.origins, np.arange(4))
     np.testing.assert_array_equal(prepared.destination_counts, [4])
     output = prepared.run(prepared.make_outputs())
-    assert np.all(np.diag(output.skims[:, 0, :]) == 0)
-    assert np.isfinite(output.skims[0, 0, 3])
-    subset = PreparedAoN(context, demand, costs=context.costs, skimming=inputs, origins=[2])
+    retained = output.skimming.skims
+    assert np.all(np.diag(retained[:, 0, :]) == 0)
+    assert np.isfinite(retained[0, 0, 3])
+    subset = PreparedAoN(context, demand, skimming=inputs, origins=[2])
     subset.run(output)
-    assert np.all(np.isinf(output.skims[[0, 1, 3]]))
-    assert output.skims[2, 0, 2] == 0
+    assert np.all(np.isinf(retained[[0, 1, 3]]))
+    assert retained[2, 0, 2] == 0
     component = output.skimming
     assert isinstance(component, SkimmingOutputs)
-    assert np.shares_memory(output.skims, component.skims)
+    assert np.shares_memory(retained, component.skims)
     del output, prepared, subset
     component.reset()
     skimming(search(context, 0), inputs, None, component, origin_row=3)
@@ -447,30 +499,27 @@ def test_label_only_assignment_searches_zero_demand_and_resets_skipped_rows(turn
 def test_assignment_rejects_mismatched_names_before_reset():
     context = history_context()
     demand = np.ones((4, 4, 1))
-    first = PreparedAoN(context, demand, costs=context.costs,
-                        skimming=SkimmingContext(4, cost_name="first"))
-    second = PreparedAoN(context, demand, costs=context.costs,
-                         skimming=SkimmingContext(4, cost_name="second"))
+    first = PreparedAoN(context, demand, skimming=SkimmingContext(4, cost_name="first"))
+    second = PreparedAoN(context, demand, skimming=SkimmingContext(4, cost_name="second"))
     out = first.run(first.make_outputs())
-    saved_skims, saved_loads = out.skims.copy(), out.link_loads.copy()
+    saved_skims, saved_loads = out.skimming.skims.copy(), out.loading.link_loads.copy()
     with pytest.raises(ValueError, match="names"):
         second.run(out)
-    np.testing.assert_array_equal(out.skims, saved_skims)
-    np.testing.assert_array_equal(out.link_loads, saved_loads)
+    np.testing.assert_array_equal(out.skimming.skims, saved_skims)
+    np.testing.assert_array_equal(out.loading.link_loads, saved_loads)
     with pytest.raises(ValueError, match="link_count"):
-        PreparedAoN(context, demand, costs=context.costs, skimming=SkimmingContext(5, cost_name="bad"))
+        PreparedAoN(context, demand, skimming=SkimmingContext(5, cost_name="bad"))
 
 
 @pytest.mark.parametrize("turn", [False, True])
 def test_weighted_turn_costs_are_independent_of_skimming(turn):
-    context = history_context(.5, turn=turn)
-    demand = np.array([[np.nan, np.inf], [2., -1.], [4., 3.], [5., 6.]])
+    context = history_context(0.5, turn=turn)
+    demand = np.array([[np.nan, np.inf], [2.0, -1.0], [4.0, 3.0], [5.0, 6.0]])
     query = LoadingQuery(demand)
     results = allocate_results(context)
     assert sum_weighted_turn_costs(results, query) == 0
     search(context, 0, results=results)
-    expected = sum(demand[node, cls] * results.path_turn_cost_to(node)
-                   for node in range(1, 4) for cls in range(2))
+    expected = sum(demand[node, cls] * results.path_turn_cost_to(node) for node in range(1, 4) for cls in range(2))
     labels = results.turn_costs.copy()
     assert sum_weighted_turn_costs(results, query) == expected
     np.testing.assert_array_equal(results.turn_costs, labels)

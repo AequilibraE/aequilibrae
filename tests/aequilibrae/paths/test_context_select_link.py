@@ -7,15 +7,20 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pytest
 
-from aequilibrae.paths.cython.aon_context import AoNOutputs, PreparedAoN
+from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.paths.cython.outputs import AoNOutputs
 from aequilibrae.paths.cython.network_loading import network_loading
 from aequilibrae.paths.cython.outputs import (
-    LoadingOutputs, SelectLinkLoadingOutputs, SelectLinkODOutputs, SelectLinkOutputs,
+    LoadingOutputs,
+    SelectLinkLoadingOutputs,
+    SelectLinkODOutputs,
+    SelectLinkOutputs,
 )
 from aequilibrae.paths.cython.queries import LoadingQuery
 from aequilibrae.paths.cython.context import SelectLinkContext
 from aequilibrae.paths.cython.select_link_loading import (
-    select_link_loading, reduce_select_link_loading_outputs,
+    select_link_loading,
+    reduce_select_link_loading_outputs,
 )
 from aequilibrae.paths.cython.workspaces import LoadingWorkspace, SelectLinkWorkspace
 from .routing_helpers import allocate_results, history_context, make_context, path_walk_outputs, search
@@ -69,8 +74,10 @@ def test_optional_outputs_reuse_buffers_and_match_path_walks(turn, classes, link
         old_paths = results.predecessors.copy(), results.distances.copy(), results.settled_count
         if od:
             other_row = output.od.demand[0].copy()
-        assert select_link_loading(results, query, inputs, flags, loading,
-                                   output.loading, output.od, origin_row=1) == (output.loading, output.od)
+        assert select_link_loading(results, query, inputs, flags, loading, output.loading, output.od, origin_row=1) == (
+            output.loading,
+            output.od,
+        )
         expected_loads, expected_od = walk_selected_paths(results, demand, selections)
         accumulated += expected_loads
         if link_loads:
@@ -105,7 +112,7 @@ def test_partial_presearch_and_empty_queries_replace_scratch_and_od(turn):
     output = inputs.make_outputs(4, 1)
     flags, loading = SelectLinkWorkspace(context.state_count), LoadingWorkspace(context.state_count, 1)
     results = allocate_results(context)
-    query = LoadingQuery(np.array([[100.], [2.], [3.], [4.]]))
+    query = LoadingQuery(np.array([[100.0], [2.0], [3.0], [4.0]]))
     # Fill buffers, then use a fresh pre-search result to expose stale data.
     select_link_loading(search(context, 0), query, inputs, flags, loading, output.loading, output.od)
     saved_loads = output.loading.link_loads.copy()
@@ -121,15 +128,14 @@ def test_partial_presearch_and_empty_queries_replace_scratch_and_od(turn):
     np.testing.assert_array_equal(output.loading.link_loads[0, :, 0], [2, 0, 0, 0])
     np.testing.assert_array_equal(output.od.demand[0, 0, :, 0], [0, 2, 0, 0])
     assert not results.reachable_to(3)
-    finalized = results.settlement_order[:results.settled_count]
+    finalized = results.settlement_order[: results.settled_count]
     expected_flags = np.zeros(context.state_count, dtype=bool)
     expected_flags[finalized[1:]] = True
     np.testing.assert_array_equal(flags.selected_paths, expected_flags)
     assert loading.state_loads[results.root, 0] == 2
 
     empty_od = inputs.make_outputs(0, 1, link_loads=False).od
-    select_link_loading(results, LoadingQuery(np.empty((0, 1))), inputs, flags, loading,
-                        output.loading, empty_od)
+    select_link_loading(results, LoadingQuery(np.empty((0, 1))), inputs, flags, loading, output.loading, empty_od)
     assert not np.any(loading.state_loads)
     np.testing.assert_array_equal(output.loading.link_loads[0, :, 0], [2, 0, 0, 0])
     np.testing.assert_array_equal(flags.selected_paths, expected_flags)
@@ -140,9 +146,15 @@ def test_selected_paths_outside_destination_prefix_and_full_ancestor_loading(tur
     context = make_context([0, 1, 1, 2], [2, 1], [1, 1], turn=turn)
     inputs = SelectLinkContext(2, {"last": [1]})
     output = inputs.make_outputs(2, 1)
-    select_link_loading(search(context, 0), LoadingQuery(np.array([[100.], [5.]])), inputs,
-                        SelectLinkWorkspace(context.state_count), LoadingWorkspace(context.state_count, 1),
-                        output.loading, output.od)
+    select_link_loading(
+        search(context, 0),
+        LoadingQuery(np.array([[100.0], [5.0]])),
+        inputs,
+        SelectLinkWorkspace(context.state_count),
+        LoadingWorkspace(context.state_count, 1),
+        output.loading,
+        output.od,
+    )
     np.testing.assert_array_equal(output.loading.link_loads[0, :, 0], [5, 5])
     np.testing.assert_array_equal(output.od.demand[0, 0, :, 0], [0, 5])
 
@@ -153,8 +165,15 @@ def test_membership_uses_turn_state_history_not_intermediate_terminal():
     inputs = SelectLinkContext(4, {"cheap_arrival": [0], "through_arrival": [3]})
     output = inputs.make_outputs(4, 1)
     flags = SelectLinkWorkspace(context.state_count)
-    select_link_loading(results, LoadingQuery(np.ones((4, 1))), inputs, flags,
-                        LoadingWorkspace(context.state_count, 1), output.loading, output.od)
+    select_link_loading(
+        results,
+        LoadingQuery(np.ones((4, 1))),
+        inputs,
+        flags,
+        LoadingWorkspace(context.state_count, 1),
+        output.loading,
+        output.od,
+    )
     np.testing.assert_array_equal(output.od.demand[0, :, :, 0], [[0, 1, 0, 0], [0, 0, 0, 1]])
     assert not flags.selected_paths[results.terminal_states[1]]
     assert flags.selected_paths[results.terminal_states[3]]
@@ -168,8 +187,15 @@ def test_zero_cost_cycles_and_nonfinite_demand(turn):
     results = search(context, 0)
     query = LoadingQuery(np.array([[np.nan, np.inf], [np.nan, -3], [np.inf, 2], [4, -np.inf]]))
     output = inputs.make_outputs(4, 2)
-    select_link_loading(results, query, inputs, SelectLinkWorkspace(context.state_count),
-                        LoadingWorkspace(context.state_count, 2), output.loading, output.od)
+    select_link_loading(
+        results,
+        query,
+        inputs,
+        SelectLinkWorkspace(context.state_count),
+        LoadingWorkspace(context.state_count, 2),
+        output.loading,
+        output.od,
+    )
     expected = walk_selected_paths(results, query.demand, {"cycle": [0, 2, 3, 4], "branch": [1], "empty": []})
     np.testing.assert_array_equal(output.loading.link_loads, expected[0])
     np.testing.assert_array_equal(output.od.demand[0], expected[1])
@@ -183,9 +209,15 @@ def test_empty_links_sets_classes_and_origin_rows(turn, classes, selections):
     context = make_context([0, 0, 0], [], [], turn=turn)
     inputs = SelectLinkContext(0, selections)
     output = inputs.make_outputs(2, classes)
-    select_link_loading(search(context, 0), LoadingQuery(np.ones((2, classes))), inputs,
-                        SelectLinkWorkspace(context.state_count), LoadingWorkspace(context.state_count, classes),
-                        output.loading, output.od)
+    select_link_loading(
+        search(context, 0),
+        LoadingQuery(np.ones((2, classes))),
+        inputs,
+        SelectLinkWorkspace(context.state_count),
+        LoadingWorkspace(context.state_count, classes),
+        output.loading,
+        output.od,
+    )
     assert output.loading.link_loads.shape == (len(selections), 0, classes)
     assert output.od.demand.shape == (1, len(selections), 2, classes)
     assert not np.any(output.od.demand)
@@ -193,8 +225,13 @@ def test_empty_links_sets_classes_and_origin_rows(turn, classes, selections):
     empty_rows = inputs.make_outputs(2, classes, origin_count=0)
     empty_rows.reset()
     with pytest.raises(ValueError, match="origin_row"):
-        select_link_loading(search(context, 0), LoadingQuery(np.ones((2, classes))), inputs,
-                            SelectLinkWorkspace(context.state_count), od_output=empty_rows.od)
+        select_link_loading(
+            search(context, 0),
+            LoadingQuery(np.ones((2, classes))),
+            inputs,
+            SelectLinkWorkspace(context.state_count),
+            od_output=empty_rows.od,
+        )
     reduce_select_link_loading_outputs([output.loading], empty_rows.loading)
 
 
@@ -209,11 +246,25 @@ def test_od_only_does_not_touch_loading_scratch_and_zero_classes_still_marks_pat
     select_link_loading(results, query, inputs, flags, loading, od_output=inputs.make_outputs(4, 1).od)
     np.testing.assert_array_equal(loading.state_loads, before)
     zero_classes = inputs.make_outputs(4, 0)
-    select_link_loading(results, LoadingQuery(np.empty((4, 0))), inputs, flags,
-                        LoadingWorkspace(context.state_count, 0), zero_classes.loading, zero_classes.od)
+    select_link_loading(
+        results,
+        LoadingQuery(np.empty((4, 0))),
+        inputs,
+        flags,
+        LoadingWorkspace(context.state_count, 0),
+        zero_classes.loading,
+        zero_classes.od,
+    )
     assert np.any(flags.selected_paths)
-    select_link_loading(allocate_results(context), LoadingQuery(np.empty((4, 0))), inputs, flags,
-                        LoadingWorkspace(context.state_count, 0), zero_classes.loading, zero_classes.od)
+    select_link_loading(
+        allocate_results(context),
+        LoadingQuery(np.empty((4, 0))),
+        inputs,
+        flags,
+        LoadingWorkspace(context.state_count, 0),
+        zero_classes.loading,
+        zero_classes.od,
+    )
     assert not np.any(flags.selected_paths)
 
 
@@ -237,9 +288,16 @@ def test_owned_masks_named_views_and_independent_lifetimes():
     assert input_ref() is None  # Outputs did not retain selection inputs.
     inputs = SelectLinkContext(4, {"first": [0, 3], "second": [2]})
     context = history_context()
-    select_link_loading(search(context, 0), LoadingQuery(np.ones((4, 2))), inputs,
-                        SelectLinkWorkspace(context.state_count), LoadingWorkspace(context.state_count, 2),
-                        loading, od, origin_row=2)
+    select_link_loading(
+        search(context, 0),
+        LoadingQuery(np.ones((4, 2))),
+        inputs,
+        SelectLinkWorkspace(context.state_count),
+        LoadingWorkspace(context.state_count, 2),
+        loading,
+        od,
+        origin_row=2,
+    )
     loads, matrices = loading.loads, od.matrices
     assert list(loads) == list(matrices) == ["first", "second"]
     assert loading.link_loads.flags.c_contiguous and od.demand.flags.c_contiguous
@@ -259,19 +317,24 @@ def test_owned_masks_named_views_and_independent_lifetimes():
         np.testing.assert_array_equal(view, expected)
 
 
-@pytest.mark.parametrize("selections", [[], None, {"": []}, {3: []}, {"a": [-1]}, {"a": [4]},
-                                          {"a": [1.5]}, {"a": [True]}, {"a": [np.bool_(False)]}])
+@pytest.mark.parametrize(
+    "selections",
+    [[], None, {"": []}, {3: []}, {"a": [-1]}, {"a": [4]}, {"a": [1.5]}, {"a": [True]}, {"a": [np.bool_(False)]}],
+)
 def test_invalid_selection_inputs(selections):
     with pytest.raises((TypeError, ValueError)):
         SelectLinkContext(4, selections)
 
 
-@pytest.mark.parametrize("factory,args", [
-    (SelectLinkContext, (0, {})),
-    (SelectLinkLoadingOutputs, (0, 0, ())),
-    (SelectLinkODOutputs, (0, 0, 0, ())),
-    (SelectLinkOutputs, (0, 0, 0, ())),
-])
+@pytest.mark.parametrize(
+    "factory,args",
+    [
+        (SelectLinkContext, (0, {})),
+        (SelectLinkLoadingOutputs, (0, 0, ())),
+        (SelectLinkODOutputs, (0, 0, 0, ())),
+        (SelectLinkOutputs, (0, 0, 0, ())),
+    ],
+)
 def test_select_link_fixed_owners_cannot_be_reinitialized(factory, args):
     owner = factory(*args)
     with pytest.raises(RuntimeError):
@@ -280,19 +343,27 @@ def test_select_link_fixed_owners_cannot_be_reinitialized(factory, args):
 
 @pytest.mark.parametrize("names", ["set", [""], [None], [1], ["same", "same"]])
 def test_invalid_output_names(names):
-    for factory, args in ((SelectLinkLoadingOutputs, (4, 1, names)),
-                          (SelectLinkODOutputs, (1, 4, 1, names)),
-                          (SelectLinkOutputs, (4, 4, 1, names))):
+    for factory, args in (
+        (SelectLinkLoadingOutputs, (4, 1, names)),
+        (SelectLinkODOutputs, (1, 4, 1, names)),
+        (SelectLinkOutputs, (4, 4, 1, names)),
+    ):
         with pytest.raises((TypeError, ValueError)):
             factory(*args)
 
 
-@pytest.mark.parametrize("factory,args", [
-    (SelectLinkContext, (-1, {})),
-    (SelectLinkLoadingOutputs, (-1, 1, ())), (SelectLinkLoadingOutputs, (1, -1, ())),
-    (SelectLinkODOutputs, (-1, 1, 1, ())), (SelectLinkODOutputs, (1, -1, 1, ())),
-    (SelectLinkODOutputs, (1, 1, -1, ())), (SelectLinkOutputs, (-1, 1, 1, ())),
-])
+@pytest.mark.parametrize(
+    "factory,args",
+    [
+        (SelectLinkContext, (-1, {})),
+        (SelectLinkLoadingOutputs, (-1, 1, ())),
+        (SelectLinkLoadingOutputs, (1, -1, ())),
+        (SelectLinkODOutputs, (-1, 1, 1, ())),
+        (SelectLinkODOutputs, (1, -1, 1, ())),
+        (SelectLinkODOutputs, (1, 1, -1, ())),
+        (SelectLinkOutputs, (-1, 1, 1, ())),
+    ],
+)
 def test_invalid_output_dimensions(factory, args):
     with pytest.raises(ValueError):
         factory(*args)
@@ -305,8 +376,15 @@ def test_validation_precedes_all_scratch_and_output_writes():
     output = inputs.make_outputs(4, 2)
     flags, loading = SelectLinkWorkspace(context.state_count), LoadingWorkspace(context.state_count, 2)
     query = LoadingQuery(np.ones((4, 2)))
-    good = dict(results=results, query=query, context=inputs, selection_workspace=flags,
-                loading_workspace=loading, loading_output=output.loading, od_output=output.od)
+    good = {
+        "results": results,
+        "query": query,
+        "context": inputs,
+        "selection_workspace": flags,
+        "loading_workspace": loading,
+        "loading_output": output.loading,
+        "od_output": output.od,
+    }
     select_link_loading(**good)
     buffers = [flags.selected_paths, loading.state_loads, output.loading.link_loads, output.od.demand]
     snapshots = [buffer.copy() for buffer in buffers]
@@ -323,7 +401,9 @@ def test_validation_precedes_all_scratch_and_output_writes():
         {"od_output": SelectLinkODOutputs(1, 3, 2, inputs.set_names)},
         {"od_output": SelectLinkODOutputs(1, 4, 1, inputs.set_names)},
         {"od_output": SelectLinkODOutputs(1, 4, 2, inputs.set_names[::-1])},
-        {"origin_row": -1}, {"origin_row": 1}, {"origin_row": 1.5},
+        {"origin_row": -1},
+        {"origin_row": 1},
+        {"origin_row": 1.5},
     ]
     for change in bad_arguments:
         with pytest.raises((ValueError, TypeError)):
@@ -346,8 +426,9 @@ def test_workers_share_od_rows_and_reduce_only_link_loads(turn):
         worker = SelectLinkLoadingOutputs(4, 2, inputs.set_names)
         for origin in origins:
             search(context, origin, results=results)
-            select_link_loading(results, LoadingQuery(demand[origin]), inputs, flags, loading,
-                                worker, output.od, origin_row=origin)
+            select_link_loading(
+                results, LoadingQuery(demand[origin]), inputs, flags, loading, worker, output.od, origin_row=origin
+            )
         return worker
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -363,10 +444,14 @@ def test_workers_share_od_rows_and_reduce_only_link_loads(turn):
         np.testing.assert_array_equal(output.od.demand, od_snapshot)
         for worker, snapshot in zip(workers, snapshots, strict=True):
             np.testing.assert_array_equal(worker.link_loads, snapshot)
-    for invalid in ([output.loading], [workers[0], None], [object()],
-                    [SelectLinkLoadingOutputs(3, 2, inputs.set_names)],
-                    [SelectLinkLoadingOutputs(4, 3, inputs.set_names)],
-                    [SelectLinkLoadingOutputs(4, 2, inputs.set_names[::-1])]):
+    for invalid in (
+        [output.loading],
+        [workers[0], None],
+        [object()],
+        [SelectLinkLoadingOutputs(3, 2, inputs.set_names)],
+        [SelectLinkLoadingOutputs(4, 3, inputs.set_names)],
+        [SelectLinkLoadingOutputs(4, 2, inputs.set_names[::-1])],
+    ):
         with pytest.raises((ValueError, TypeError)):
             reduce_select_link_loading_outputs(invalid, output.loading)
         np.testing.assert_array_equal(retained, expected[3])
@@ -381,12 +466,12 @@ def test_assignment_optional_components_match_standalone_and_outlive_driver(turn
     context = history_context(turn=turn)
     inputs = SelectLinkContext(4, {"first": [0, 3], "last": [2]})
     demand = np.ones((4, 4, 2))
-    prepared = PreparedAoN(context, demand, costs=context.costs, cores=3, selected_links=inputs,
-                           select_link_loads=link_loads, select_link_od=od, origins=[0, 2])
+    prepared = PreparedAoN(
+        context, demand, cores=3, selected_links=inputs, select_link_loads=link_loads, select_link_od=od, origins=[0, 2]
+    )
     assigned = prepared.make_outputs()
     # Start with all rows populated; the subset run must clear the skipped ones.
-    full = PreparedAoN(context, demand, costs=context.costs, selected_links=inputs,
-                       select_link_loads=link_loads, select_link_od=od)
+    full = PreparedAoN(context, demand, selected_links=inputs, select_link_loads=link_loads, select_link_od=od)
     full.run(assigned)
     standalone = inputs.make_outputs(4, 2, origin_count=4, link_loads=link_loads, od=od)
     flags, loading = SelectLinkWorkspace(context.state_count), LoadingWorkspace(context.state_count, 2)
@@ -395,47 +480,67 @@ def test_assignment_optional_components_match_standalone_and_outlive_driver(turn
         standalone.reset()
         prepared.run(assigned)
         for origin in (0, 2):
-            select_link_loading(search(context, origin), LoadingQuery(demand[origin]), inputs, flags,
-                                loading if link_loads else None, standalone.loading, standalone.od,
-                                origin_row=origin)
+            select_link_loading(
+                search(context, origin),
+                LoadingQuery(demand[origin]),
+                inputs,
+                flags,
+                loading if link_loads else None,
+                standalone.loading,
+                standalone.od,
+                origin_row=origin,
+            )
         if link_loads:
-            np.testing.assert_array_equal(assigned.select_link_loads, standalone.loading.link_loads)
+            np.testing.assert_array_equal(assigned.select_link.loading.link_loads, standalone.loading.link_loads)
         else:
-            assert assigned.select_link_loads is None
+            assert assigned.select_link is None or assigned.select_link.loading is None
         if od:
-            np.testing.assert_array_equal(assigned.select_link_od, standalone.od.demand)
-            assert not np.any(assigned.select_link_od[[1, 3]])
+            np.testing.assert_array_equal(assigned.select_link.od.demand, standalone.od.demand)
+            assert not np.any(assigned.select_link.od.demand[[1, 3]])
         else:
-            assert assigned.select_link_od is None
+            assert assigned.select_link is None or assigned.select_link.od is None
     component = assigned.select_link
     del prepared, full, assigned
+    if not link_loads and not od:
+        assert component is None
+        return
     component.reset()
-    select_link_loading(search(context, 0), LoadingQuery(demand[0]), inputs, flags,
-                        loading if link_loads else None, component.loading, component.od)
+    select_link_loading(
+        search(context, 0),
+        LoadingQuery(demand[0]),
+        inputs,
+        flags,
+        loading if link_loads else None,
+        component.loading,
+        component.od,
+    )
     if link_loads:
-        np.testing.assert_array_equal(component.loading.link_loads,
-                                      walk_selected_paths(search(context, 0), demand[0], {"first": [0, 3], "last": [2]})[0])
+        np.testing.assert_array_equal(
+            component.loading.link_loads,
+            walk_selected_paths(search(context, 0), demand[0], {"first": [0, 3], "last": [2]})[0],
+        )
 
 
 def test_assignment_checks_selection_configuration_before_resetting_output():
     context = history_context()
     inputs = SelectLinkContext(4, {"first": [0, 3], "last": [2]})
     demand = np.ones((4, 4, 1))
-    prepared = PreparedAoN(context, demand, costs=context.costs, selected_links=inputs)
+    prepared = PreparedAoN(context, demand, selected_links=inputs)
     out = prepared.run(prepared.make_outputs())
-    snapshots = out.link_loads.copy(), out.select_link_loads.copy(), out.select_link_od.copy()
-    incompatible = PreparedAoN(context, demand, costs=context.costs, selected_links=inputs, select_link_loads=False)
+    views = out.loading.link_loads, out.select_link.loading.link_loads, out.select_link.od.demand
+    snapshots = [values.copy() for values in views]
+    incompatible = PreparedAoN(context, demand, selected_links=inputs, select_link_loads=False)
     with pytest.raises(ValueError, match="components"):
         incompatible.run(out)
-    for values, expected in zip((out.link_loads, out.select_link_loads, out.select_link_od), snapshots, strict=True):
+    for values, expected in zip(views, snapshots, strict=True):
         np.testing.assert_array_equal(values, expected)
     reversed_names = AoNOutputs(4, 4, 1, select_link_names=inputs.set_names[::-1])
     with pytest.raises(ValueError, match="names"):
         prepared.run(reversed_names)
     with pytest.raises(ValueError, match="link_count"):
-        PreparedAoN(context, demand, costs=context.costs, selected_links=SelectLinkContext(5, {}))
+        PreparedAoN(context, demand, selected_links=SelectLinkContext(5, {}))
     with pytest.raises(TypeError):
-        PreparedAoN(context, demand, costs=context.costs, selected_links={"first": [0]})
+        PreparedAoN(context, demand, selected_links={"first": [0]})
 
 
 def test_no_outputs_or_no_sets_leaves_scratch_unchanged():
@@ -451,8 +556,7 @@ def test_no_outputs_or_no_sets_leaves_scratch_unchanged():
     select_link_loading(empty_results, query, inputs, flags, loading)
     empty_inputs = SelectLinkContext(4, {})
     empty_output = empty_inputs.make_outputs(4, 1)
-    select_link_loading(empty_results, query, empty_inputs, flags, loading,
-                        empty_output.loading, empty_output.od)
+    select_link_loading(empty_results, query, empty_inputs, flags, loading, empty_output.loading, empty_output.od)
     np.testing.assert_array_equal(flags.selected_paths, flag_snapshot)
     np.testing.assert_array_equal(loading.state_loads, load_snapshot)
 
@@ -461,7 +565,7 @@ def test_masks_are_retained_by_driver_but_not_its_outputs():
     context = history_context()
     inputs = TrackedSelectLinkContext(4, {"all": range(4)})
     input_ref = weakref.ref(inputs)
-    prepared = PreparedAoN(context, np.ones((4, 4, 1)), costs=context.costs, selected_links=inputs)
+    prepared = PreparedAoN(context, np.ones((4, 4, 1)), selected_links=inputs)
     del inputs
     gc.collect()
     assert input_ref() is not None
@@ -469,7 +573,7 @@ def test_masks_are_retained_by_driver_but_not_its_outputs():
     del prepared
     gc.collect()
     assert input_ref() is None
-    assert np.any(out.select_link_loads)
+    assert np.any(out.select_link.loading.link_loads)
 
 
 @pytest.mark.parametrize("turn", [False, True])
@@ -477,13 +581,15 @@ def test_masks_are_retained_by_driver_but_not_its_outputs():
 def test_no_active_origins_clears_reused_selected_outputs(turn, link_loads, od):
     context = history_context(turn=turn)
     inputs = SelectLinkContext(4, {"all": range(4)})
-    active = PreparedAoN(context, np.ones((4, 4, 1)), costs=context.costs, selected_links=inputs,
-                        select_link_loads=link_loads, select_link_od=od, cores=3)
+    active = PreparedAoN(
+        context, np.ones((4, 4, 1)), selected_links=inputs, select_link_loads=link_loads, select_link_od=od, cores=3
+    )
     out = active.run(active.make_outputs())
-    empty = PreparedAoN(context, np.zeros((4, 4, 1)), costs=context.costs, selected_links=inputs,
-                       select_link_loads=link_loads, select_link_od=od, cores=3)
+    empty = PreparedAoN(
+        context, np.zeros((4, 4, 1)), selected_links=inputs, select_link_loads=link_loads, select_link_od=od, cores=3
+    )
     empty.run(out)
     if link_loads:
-        assert not np.any(out.select_link_loads)
+        assert not np.any(out.select_link.loading.link_loads)
     if od:
-        assert not np.any(out.select_link_od)
+        assert not np.any(out.select_link.od.demand)

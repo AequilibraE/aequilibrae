@@ -6,5 +6,8 @@ from aequilibrae.paths.cython.outputs cimport SkimmingOutputs, CppSkimmingOrigin
 
 cdef extern from "skimming.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
     void cpp_skimming "aequilibrae::paths::cpp::mvp::skimming"[T](
-        const CppSearchResults &results, const CppSkimmingContext[T] &context,
-        CppSkimmingWorkspace[T] workspace, CppSkimmingOriginView[T] output) noexcept
+        const CppSearchResults &results,
+        const CppSkimmingContext[T] &context,
+        const CppSkimmingWorkspace[T] &workspace,
+        const CppSkimmingOriginView[T] &output,
+    ) noexcept

@@ -121,4 +121,20 @@ template <typename T> struct SelectLinkODOutputsView {
   }
 };
 
+// Borrow the assignment's components for one run. This is a driver view;
+// individual operation kernels receive only the component they write.
+struct AoNOutputsView {
+  LoadingOutputs<double> loading;
+  SkimmingOutputsView<double> skimming;
+  SelectLinkLoadingOutputsView<double> selected_loading;
+  SelectLinkODOutputsView<double> selected_od;
+
+  void reset() const noexcept {
+    loading.reset();
+    skimming.reset();
+    selected_loading.reset();
+    selected_od.reset();
+  }
+};
+
 } // namespace aequilibrae::paths::cpp::mvp

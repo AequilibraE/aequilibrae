@@ -16,41 +16,47 @@ from .routing_helpers import allocate_results, history_context, make_context, pa
 
 
 @pytest.mark.parametrize("turn", [False, True])
-@pytest.mark.parametrize("penalty", [0.5, 10., np.inf])
+@pytest.mark.parametrize("penalty", [0.5, 10.0, np.inf])
 @pytest.mark.parametrize("cores", [1, 3])
 def test_loading_and_turn_totals_against_path_walks(turn, penalty, cores):
     context = history_context(penalty, turn=turn)
     demand = np.arange(48, dtype=np.float64).reshape(4, 4, 3) - 10
-    prepared = PreparedAoN(context, demand, costs=context.costs, cores=cores)
+    prepared = PreparedAoN(context, demand, cores=cores)
     out = prepared.make_outputs()
     expected, _, total, _, _ = path_walk_outputs(context, demand)
     for _ in range(3):
         assert prepared.run(out) is out
-        np.testing.assert_allclose(out.link_loads, expected)
-        assert out.total_turn_penalty == total
+        np.testing.assert_allclose(out.loading.link_loads, expected)
+        assert out.turn_cost_total == total
 
 
-def test_borrowed_demand_values_are_used_without_copying():
+def test_fixed_demand_is_retained_without_changing_writeability():
     context = history_context()
     demand = np.ones((4, 4, 1))
-    prepared = PreparedAoN(context, demand, costs=context.costs)
-    out = prepared.run(prepared.make_outputs())
-    first = out.link_loads.copy()
+    reference = weakref.ref(demand)
+    prepared = PreparedAoN(context, demand)
+    expected = path_walk_outputs(context, demand)[0]
     assert demand.flags.writeable
-    # Keep the prepared target set unchanged; only demand magnitudes change here.
-    demand *= 2
-    prepared.run(out)
-    np.testing.assert_array_equal(out.link_loads, first * 2)
+    del demand
+    gc.collect()
+    assert reference() is not None
+    out = prepared.make_outputs()
+    for _ in range(3):
+        prepared.run(out)
+        np.testing.assert_array_equal(out.loading.link_loads, expected)
+    del prepared
+    gc.collect()
+    assert reference() is None
 
 
 @pytest.mark.parametrize("turn", [False, True])
 def test_edgeless_network_and_intrazonal_demand(turn):
     context = make_context([0, 0, 0], [], [], turn=turn)
     demand = np.ones((2, 2, 1))
-    prepared = PreparedAoN(context, demand, costs=context.costs, cores=3)
+    prepared = PreparedAoN(context, demand, cores=3)
     out = prepared.run(prepared.make_outputs())
-    assert out.link_loads.shape == (0, 1)
-    assert out.total_turn_penalty == 0
+    assert out.loading.link_loads.shape == (0, 1)
+    assert out.turn_cost_total == 0
 
 
 @pytest.mark.parametrize("turn", [False, True])
@@ -58,11 +64,11 @@ def test_demand_classes_do_not_cancel_target_selection(turn):
     context = history_context(turn=turn)
     demand = np.zeros((4, 4, 2))
     demand[0, 3] = [1, -1]
-    prepared = PreparedAoN(context, demand, costs=context.costs)
+    prepared = PreparedAoN(context, demand)
     out = prepared.run(prepared.make_outputs())
     expected = path_walk_outputs(context, demand)[0]
     assert np.any(expected)
-    np.testing.assert_array_equal(out.link_loads, expected)
+    np.testing.assert_array_equal(out.loading.link_loads, expected)
 
 
 @pytest.mark.parametrize("turn", [False, True])
@@ -100,7 +106,7 @@ def test_before_search_partial_search_and_empty_demand(turn):
     results = allocate_results(context)
     workspace = LoadingWorkspace(context.state_count, 1)
     output = LoadingOutputs(context.link_count, 1)
-    query = LoadingQuery(np.array([[100.], [2.], [3.], [4.]]))
+    query = LoadingQuery(np.array([[100.0], [2.0], [3.0], [4.0]]))
     network_loading(results, query, workspace, output)
     assert not np.any(output.link_loads)
     assert not np.any(workspace.state_loads)
@@ -121,7 +127,7 @@ def test_destination_prefix_can_use_states_outside_output_rows(turn):
     results = search(context, 0)
     workspace = LoadingWorkspace(context.state_count, 1)
     output = LoadingOutputs(2, 1)
-    network_loading(results, LoadingQuery(np.array([[7.], [5.]])), workspace, output)
+    network_loading(results, LoadingQuery(np.array([[7.0], [5.0]])), workspace, output)
     np.testing.assert_array_equal(output.link_loads[:, 0], [5, 5])
 
 
@@ -140,7 +146,7 @@ def test_standalone_edgeless_and_nonfinite_demand(turn):
     results = search(branches, 0)
     workspace = LoadingWorkspace(branches.state_count, 1)
     output = LoadingOutputs(2, 1)
-    network_loading(results, LoadingQuery(np.array([[np.inf], [np.nan], [-3.]])), workspace, output)
+    network_loading(results, LoadingQuery(np.array([[np.inf], [np.nan], [-3.0]])), workspace, output)
     assert np.isnan(output.link_loads[0, 0])
     assert output.link_loads[1, 0] == -3  # NaN does not spread to a sibling path.
 
@@ -216,33 +222,53 @@ def test_workspace_group_allocates_only_requested_operations():
             values.flags.writeable = True
 
 
-@pytest.mark.parametrize("factory, args", [
-    (LoadingWorkspace, (5, 2)), (SkimmingWorkspace, (5, 3)),
-    (SelectLinkWorkspace, (5,)), (AoNWorkspace, (5,)),
-    (LoadingOutputs, (0, 0)), (LoadingQuery, (np.empty((0, 0)),)),
-])
+@pytest.mark.parametrize(
+    "factory, args",
+    [
+        (LoadingWorkspace, (5, 2)),
+        (SkimmingWorkspace, (5, 3)),
+        (SelectLinkWorkspace, (5,)),
+        (AoNWorkspace, (5,)),
+        (LoadingOutputs, (0, 0)),
+        (LoadingQuery, (np.empty((0, 0)),)),
+    ],
+)
 def test_fixed_layout_cannot_be_reinitialized(factory, args):
     owner = factory(*args)
     with pytest.raises(RuntimeError):
         owner.__init__(*args)
 
 
-@pytest.mark.parametrize("factory, args", [
-    (LoadingWorkspace, (0, 2)), (LoadingWorkspace, (5, -1)),
-    (SkimmingWorkspace, (0, 2)), (SkimmingWorkspace, (5, -1)),
-    (SelectLinkWorkspace, (0,)), (AoNWorkspace, (0,)),
-    (LoadingOutputs, (-1, 0)), (LoadingOutputs, (0, -1)),
-])
+@pytest.mark.parametrize(
+    "factory, args",
+    [
+        (LoadingWorkspace, (0, 2)),
+        (LoadingWorkspace, (5, -1)),
+        (SkimmingWorkspace, (0, 2)),
+        (SkimmingWorkspace, (5, -1)),
+        (SelectLinkWorkspace, (0,)),
+        (AoNWorkspace, (0,)),
+        (LoadingOutputs, (-1, 0)),
+        (LoadingOutputs, (0, -1)),
+    ],
+)
 def test_invalid_dimensions(factory, args):
     with pytest.raises(ValueError):
         factory(*args)
 
 
-@pytest.mark.parametrize("bad", [
-    None, [[1.]], np.ones(3), np.ones((2, 3), dtype=np.float32),
-    np.ones((4, 3))[::2], np.ones((2, 6))[:, ::2],
-    np.ndarray((2, 3), dtype=np.float64, buffer=bytearray(49), offset=1),
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        None,
+        [[1.0]],
+        np.ones(3),
+        np.ones((2, 3), dtype=np.float32),
+        np.ones((4, 3))[::2],
+        np.ones((2, 6))[:, ::2],
+        np.ndarray((2, 3), dtype=np.float64, buffer=bytearray(49), offset=1),
+    ],
+)
 def test_invalid_demand_layout(bad):
     with pytest.raises((TypeError, ValueError)):
         LoadingQuery(bad)
@@ -274,6 +300,7 @@ def test_loading_validates_dimensions_before_any_writes():
 def test_worker_outputs_reduce_without_changing_workers(turn):
     context = history_context(turn=turn)
     demand = np.arange(32, dtype=np.float64).reshape(4, 4, 2)
+
     def run(origins):
         results = allocate_results(context)
         workspace = LoadingWorkspace(context.state_count, 2)
@@ -282,6 +309,7 @@ def test_worker_outputs_reduce_without_changing_workers(turn):
             search(context, origin, results=results)
             network_loading(results, LoadingQuery(demand[origin]), workspace, output)
         return output
+
     with ThreadPoolExecutor(max_workers=2) as pool:
         workers = list(pool.map(run, ([0, 2], [1, 3])))
     snapshots = [worker.link_loads.copy() for worker in workers]
@@ -301,8 +329,7 @@ def test_worker_outputs_reduce_without_changing_workers(turn):
 def test_reduction_validation_precedes_reset():
     context = history_context()
     output = LoadingOutputs(context.link_count, 1)
-    network_loading(search(context, 0), LoadingQuery(np.ones((4, 1))),
-                    LoadingWorkspace(context.state_count, 1), output)
+    network_loading(search(context, 0), LoadingQuery(np.ones((4, 1))), LoadingWorkspace(context.state_count, 1), output)
     before = output.link_loads.copy()
     for workers in ([output], [LoadingOutputs(3, 1)], [LoadingOutputs(4, 2)], [None], [object()]):
         with pytest.raises((TypeError, ValueError)):
