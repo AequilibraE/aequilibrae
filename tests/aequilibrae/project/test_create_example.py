@@ -1,6 +1,7 @@
 import pytest
-from aequilibrae.utils.create_example import create_example
+
 from aequilibrae.parameters import Parameters
+from aequilibrae.utils.create_example import create_example
 
 
 @pytest.fixture(params=["nauru", "sioux_falls", "coquimbo"])

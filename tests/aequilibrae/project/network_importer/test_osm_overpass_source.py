@@ -1,0 +1,378 @@
+"""Overpass-source tests with a mocked osmnx fetch (no network access)."""
+
+import json
+
+import geopandas as gpd
+import networkx as nx
+import pytest
+from shapely.geometry import LineString, MultiPolygon, Point, box
+
+from aequilibrae.project.network.importer.download_cache import DownloadCache
+from aequilibrae.project.network.importer.exceptions import ImporterError
+from aequilibrae.project.network.importer.sources.osm.impl import (
+    _OSMNX_EMPTY_RESPONSE,
+    _OSMNX_NO_NODES_IN_POLYGON,
+    _configure_osmnx,
+    _subdivide_model_area,
+    acquire_overpass,
+)
+
+osmnx = pytest.importorskip("osmnx")
+
+
+def _fake_graph():
+    g = nx.MultiDiGraph(crs="EPSG:4326")
+    g.add_node(1, x=0.0, y=0.0)
+    g.add_node(2, x=0.001, y=0.0)
+    g.add_node(3, x=0.001, y=0.001)
+    g.add_edge(
+        1,
+        2,
+        key=0,
+        osmid=100,
+        highway="residential",
+        oneway=False,
+        length=111.0,
+        geometry=LineString([(0.0, 0.0), (0.001, 0.0)]),
+    )
+    g.add_edge(
+        2,
+        3,
+        key=0,
+        osmid=101,
+        highway="primary",
+        oneway=True,
+        maxspeed="50",
+        length=111.0,
+        geometry=LineString([(0.001, 0.0), (0.001, 0.001)]),
+    )
+    return g
+
+
+def _graph_with_zero_length_edge():
+    g = _fake_graph()
+    g.add_node(4, x=0.0005, y=0.0005)
+    g.add_node(5, x=0.0005, y=0.0005)
+    g.add_edge(
+        4,
+        5,
+        key=0,
+        osmid=200,
+        highway="residential",
+        oneway=False,
+        length=0.0,
+        geometry=LineString([(0.0005, 0.0005), (0.0005, 0.0005)]),
+    )
+    return g
+
+
+def _graph_with_missing_node():
+    g = _fake_graph()
+    g.add_edge(2, 999, key=0, osmid=300, highway="primary", oneway=True)
+    return g
+
+
+@pytest.fixture
+def cache(tmp_path):
+    return DownloadCache(project_base_path=tmp_path, source_name="osm-overpass", tag="test")
+
+
+def _place_boundary(place="Testville"):
+    return gpd.GeoDataFrame({"display_name": [place]}, geometry=[box(-0.01, -0.01, 0.01, 0.01)], crs="EPSG:4326")
+
+
+def test_acquire_overpass_builds_staged_network_and_cache(monkeypatch, cache):
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _fake_graph())
+
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(-0.001, -0.001, 0.002, 0.002))
+    net.validate()
+    assert len(net.links) == 2
+    assert net.source_meta["source"] == "osm"
+    assert net.source_meta["backend"] == "osmnx-overpass"
+    assert net.source_meta["source_url"].startswith("overpass:bbox=")
+    assert set(net.links["link_type"]) == {"residential", "primary"}
+    assert sorted(net.links["direction"]) == [0, 1]
+    assert net.links.loc[net.links["link_type"] == "primary", "speed_ab"].iloc[0] == 50.0
+
+    assert (cache.folder / "osm.parquet").exists()
+    manifest = json.loads((cache.folder / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["n_nodes"] == 3
+    assert manifest["n_edges"] == 2
+    assert manifest["sha256"]["osm.parquet"]
+
+
+def test_acquire_overpass_by_place_name(monkeypatch, cache):
+    captured = {}
+
+    def fake_geocode(place):
+        captured["place"] = place
+        return _place_boundary(place)
+
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", fake_geocode)
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _fake_graph())
+    net = acquire_overpass(modes=("car",), download_cache=cache, place_name="Testville")
+    assert captured["place"] == "Testville"
+    assert net.source_meta["source_url"] == "overpass:place=Testville"
+
+
+def test_place_without_polygon_uses_nominatim_bbox(monkeypatch, cache, caplog):
+    calls = []
+
+    def fake_geocode(place, **kwargs):
+        calls.append(kwargs)
+        if not kwargs:
+            raise TypeError(f"Nominatim did not geocode query {place!r} to a geometry of type (Multi)Polygon.")
+        return gpd.GeoDataFrame(
+            {"bbox_west": [-0.01], "bbox_south": [-0.01], "bbox_east": [0.01], "bbox_north": [0.01]},
+            geometry=[Point(0, 0)],
+            crs="EPSG:4326",
+        )
+
+    fetched = []
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", fake_geocode)
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: fetched.append(area) or _fake_graph())
+
+    net = acquire_overpass(modes=("car",), download_cache=cache, place_name="Pointville")
+
+    assert calls == [{}, {"which_result": 1}]
+    assert fetched[0].bounds == pytest.approx((-0.01, -0.01, 0.01, 0.01))
+    assert len(net.links) == 2
+    assert "returned no polygon" in caplog.text
+
+
+def test_place_geocode_unrelated_type_error_propagates(monkeypatch, cache):
+    def fail(place, **kwargs):
+        raise TypeError("bug")
+
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", fail)
+
+    with pytest.raises(TypeError, match="bug"):
+        acquire_overpass(modes=("car",), download_cache=cache, place_name="Broken")
+
+
+def test_acquire_overpass_requires_exactly_one_selector(cache):
+    with pytest.raises(ImporterError, match="exactly one"):
+        acquire_overpass(modes=("car",), download_cache=cache)
+    with pytest.raises(ImporterError, match="exactly one"):
+        acquire_overpass(modes=("car",), download_cache=cache, model_area=box(0, 0, 1, 1), place_name="x")
+
+
+def test_acquire_overpass_wraps_insufficient_response(monkeypatch, cache):
+    from osmnx._errors import InsufficientResponseError
+
+    def boom(area, **kw):
+        raise InsufficientResponseError("nothing here")
+
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", lambda place: _place_boundary(place))
+    monkeypatch.setattr(osmnx, "graph_from_polygon", boom)
+    with pytest.raises(ImporterError, match="empty or partial response"):
+        acquire_overpass(modes=("car",), download_cache=cache, place_name="Nowhere")
+
+
+def test_acquire_overpass_wraps_request_failure(monkeypatch, cache):
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+
+    def boom(area, **kw):
+        raise RequestsConnectionError("no route to host")
+
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", lambda place: _place_boundary(place))
+    monkeypatch.setattr(osmnx, "graph_from_polygon", boom)
+    with pytest.raises(ImporterError, match="request failed"):
+        acquire_overpass(modes=("car",), download_cache=cache, place_name="Nowhere")
+
+
+def test_acquire_overpass_empty_graph_raises(monkeypatch, cache):
+    monkeypatch.setattr(osmnx, "geocode_to_gdf", lambda place: _place_boundary(place))
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: nx.MultiDiGraph(crs="EPSG:4326"))
+    with pytest.raises(ImporterError, match="no edges"):
+        acquire_overpass(modes=("car",), download_cache=cache, place_name="Empty")
+
+
+def test_acquire_overpass_drops_zero_length_edge(monkeypatch, cache, caplog):
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _graph_with_zero_length_edge())
+
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(-0.001, -0.001, 0.002, 0.002))
+
+    net.validate()
+    assert len(net.links) == 2
+    assert (net.links["distance"] > 0).all()
+    assert "osmid': 200" in caplog.text
+
+
+def test_acquire_overpass_drops_edges_with_nodes_missing_from_response(monkeypatch, cache, caplog):
+    def fake_polygon(area, **kw):
+        return osmnx.distance.add_edge_lengths(_graph_with_missing_node())
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", fake_polygon)
+
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(-0.001, -0.001, 0.002, 0.002))
+
+    net.validate()
+    assert len(net.links) == 2
+    assert "osmid': 300" in caplog.text
+    assert "nodes absent from the Overpass response" in caplog.text
+
+
+def test_large_model_area_is_tiled_and_deduplicated(monkeypatch, cache):
+    query_areas = []
+    fetch_options = []
+
+    def fake_polygon(area, **kw):
+        query_areas.append(area)
+        fetch_options.append(kw)
+        return _fake_graph()
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", fake_polygon)
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(0, 0, 0.2, 0.2))
+
+    assert len(query_areas) > 1
+    assert all(options["truncate_by_edge"] for options in fetch_options)
+    assert len(net.links) == 2
+
+
+def test_tiled_import_does_not_cache_a_partial_result(monkeypatch, cache):
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+
+    attempts = 0
+
+    def fail_second_part(area, **kw):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RequestsConnectionError("tile failed")
+        return _fake_graph()
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", fail_second_part)
+    with pytest.raises(ImporterError, match="part 2/"):
+        acquire_overpass(modes=("car",), download_cache=cache, model_area=box(0, 0, 0.2, 0.2))
+
+    assert cache.relative_path is None
+
+
+def test_tiled_import_skips_a_part_without_nodes(monkeypatch, cache):
+    attempts = 0
+
+    def empty_second_part(area, **kw):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise ValueError("Found no graph nodes within the requested polygon.")
+        return _fake_graph()
+
+    monkeypatch.setattr(osmnx, "graph_from_polygon", empty_second_part)
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(0, 0, 0.2, 0.2))
+
+    assert attempts > 2
+    assert len(net.links) == 2
+    assert cache.relative_path is not None
+
+
+def test_osmnx_still_reports_an_empty_polygon_the_way_we_match_on():
+    """Test that osmnx's no-nodes message still contains the text _fetch_graph skips an empty tile on."""
+    with pytest.raises(ValueError, match=_OSMNX_NO_NODES_IN_POLYGON):
+        osmnx.truncate.truncate_graph_polygon(_fake_graph(), box(50.0, 50.0, 51.0, 51.0))
+
+
+def test_osmnx_still_reports_an_empty_response_the_way_we_match_on():
+    """Test that osmnx's empty-response message still contains the text _fetch_graph skips an empty tile on."""
+    from osmnx._errors import InsufficientResponseError
+
+    with pytest.raises(InsufficientResponseError, match=_OSMNX_EMPTY_RESPONSE):
+        osmnx.graph._create_graph([{"elements": []}], bidirectional=False)
+
+
+def test_subdivision_preserves_disconnected_coverage():
+    model_area = MultiPolygon([box(0, 0, 0.2, 0.2), box(1, 1, 1.02, 1.02)])
+    max_area = 100_000_000
+    parts = _subdivide_model_area(model_area, max_area)
+    projected_parts = gpd.GeoSeries(parts, crs="EPSG:4326").to_crs("EPSG:6933")
+    projected_model = gpd.GeoSeries([model_area], crs="EPSG:4326").to_crs("EPSG:6933").iloc[0]
+
+    assert len(parts) > 2
+    assert projected_parts.area.max() <= max_area * 1.001
+    assert projected_parts.union_all().area == pytest.approx(projected_model.area, rel=1e-6)
+
+
+def _pin_settings(monkeypatch):
+    """Snapshot the osmnx globals we mutate so monkeypatch restores them."""
+    for attr in ("overpass_url", "nominatim_url", "requests_timeout", "http_accept_language",
+                 "overpass_rate_limit"):
+        monkeypatch.setattr(osmnx.settings, attr, getattr(osmnx.settings, attr))
+
+
+def test_configure_osmnx_applies_project_parameters(monkeypatch):
+    _pin_settings(monkeypatch)
+
+    _configure_osmnx(osmnx)
+    assert "nominatim" in osmnx.settings.nominatim_url
+    # osmnx 2.x reads ``requests_timeout``; ``timeout`` is a dead attribute.
+    assert osmnx.settings.requests_timeout == 540
+    assert osmnx.settings.http_accept_language == "en"
+
+
+def test_overpass_url_is_a_base_url_not_the_interpreter_endpoint(monkeypatch):
+    """osmnx appends '/interpreter' itself; appending it here too 403s every request."""
+    import aequilibrae.parameters as params_mod
+
+    _pin_settings(monkeypatch)
+
+    custom = "http://192.168.0.10:12345/api"
+
+    class _StubParameters:
+        # Trailing slash included: it must be normalised away, not doubled up.
+        parameters = {"osm": {"overpass_endpoint": custom + "/"}}
+
+    monkeypatch.setattr(params_mod, "Parameters", _StubParameters)
+
+    _configure_osmnx(osmnx)
+    assert osmnx.settings.overpass_url == custom
+    assert not osmnx.settings.overpass_url.endswith("/interpreter")
+    # What osmnx will actually request must contain exactly one '/interpreter'.
+    effective = osmnx.settings.overpass_url.rstrip("/") + "/interpreter"
+    assert effective.count("/interpreter") == 1
+
+
+def test_overpass_rate_limit_is_configurable(monkeypatch):
+    """Self-hosted servers with an unlimited rate limit need client-side limiting off."""
+    import aequilibrae.parameters as params_mod
+
+    _pin_settings(monkeypatch)
+    monkeypatch.setattr(osmnx.settings, "overpass_rate_limit", True)
+
+    class _StubParameters:
+        parameters = {"osm": {"overpass_rate_limit": False}}
+
+    monkeypatch.setattr(params_mod, "Parameters", _StubParameters)
+    _configure_osmnx(osmnx)
+    assert osmnx.settings.overpass_rate_limit is False
+
+
+def _reciprocal_graph():
+    """Two-way street (reciprocal pair) + a oneway=-1 street (reversed only)."""
+    g = nx.MultiDiGraph(crs="EPSG:4326")
+    for nid, (x, y) in {1: (0.0, 0.0), 2: (0.001, 0.0), 3: (0.002, 0.0)}.items():
+        g.add_node(nid, x=x, y=y)
+    fwd = LineString([(0.0, 0.0), (0.001, 0.0)])
+    g.add_edge(1, 2, key=0, osmid=100, highway="residential", oneway=False, reversed=False,
+               length=111.0, geometry=fwd)
+    g.add_edge(2, 1, key=0, osmid=100, highway="residential", oneway=False, reversed=True,
+               length=111.0, geometry=LineString(list(fwd.coords)[::-1]))
+    # An ``oneway=-1`` way: osmnx normalises it to oneway=True and emits a single
+    # already-reversed edge whose geometry runs in the direction of travel.
+    g.add_edge(3, 2, key=0, osmid=200, highway="primary", oneway=True, reversed=True,
+               length=111.0, geometry=LineString([(0.002, 0.0), (0.001, 0.0)]))
+    return g
+
+
+def test_reciprocal_two_way_edges_are_collapsed(monkeypatch, cache):
+    monkeypatch.setattr(osmnx, "graph_from_polygon", lambda area, **kw: _reciprocal_graph())
+    net = acquire_overpass(modes=("car",), download_cache=cache, model_area=box(-0.01, -0.01, 0.01, 0.01))
+    net.validate()
+
+    # One row for the two-way street, one for the oneway=-1 street.
+    assert len(net.links) == 2
+    assert sorted(net.links["source_id"].astype(str)) == ["100", "200"]
+
+    # No (a,b)/(b,a) pair may survive: that would double capacity and length.
+    pairs = {(int(a), int(b)) for a, b in zip(net.links["a_node"], net.links["b_node"], strict=True)}
+    assert not any((b, a) in pairs for a, b in pairs)

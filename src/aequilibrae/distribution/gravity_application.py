@@ -6,11 +6,11 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class GravityApplication:
         >>> vectors = df[["productions", "attractions"]]
 
         # Balance the vectors
-        >>> vectors.loc[:, "attractions"] *= vectors["productions"].sum() / vectors["attractions"].sum()
+        >>> vectors["attractions"] *= vectors["productions"].sum() / vectors["attractions"].sum()
 
         # Create the problem object
         >>> args = {"impedance": matrix,
@@ -201,13 +201,15 @@ class GravityApplication:
         """
 
         project = project or get_active_project()
-        mats = project.matrices
-        record = mats.new_record(name, file_name, self.output)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Synthetic gravity trip distribution"
-        record.description = f"Synthetic gravity trip distribution. {self.model.function}"
-        record.save()
+        project.matrices.create(
+            name,
+            file_name,
+            self.output,
+            procedure="Synthetic gravity trip distribution",
+            procedure_id=self.procedure_id,
+            timestamp=self.procedure_date,
+            description=f"Synthetic gravity trip distribution. {self.model.function}",
+        )
 
     def __get_parameters(self):
         par = self.project.parameters if self.project else Parameters().parameters
@@ -257,7 +259,7 @@ class GravityApplication:
             raise ValueError("Vectors are not balanced")
         else:
             # guarantees that they are precisely balanced
-            self.vectors.loc[:, self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
+            self.vectors[self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
 
         self.__check_parameters()
 

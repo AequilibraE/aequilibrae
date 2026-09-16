@@ -20,7 +20,6 @@ def p_results(sioux_falls_example):
     matrix = project.matrices.get_matrix("demand_omx")
     matrix.computational_view()
     yield {"project": project, "g": g, "matrix": matrix}
-    project.close()
     matrix.close()
 
 
@@ -203,4 +202,3 @@ def test_compute_paths_centroid_last_node_id(st_varent):
     g.set_graph("distance")
     g.set_skimming("distance")
     PathResults(g, 387, 1067)
-    st_varent.close()

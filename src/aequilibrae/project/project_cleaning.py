@@ -9,7 +9,7 @@ def clean(project: "Project") -> None:
     # extraneous nodes at a few key moments (i.e. opening and closing the model)
     with project.db_connection as conn:
         sqls = [
-            """DELETE from Nodes where is_centroid=0 and
+            """DELETE FROM nodes WHERE is_centroid=0 AND
                                         (SELECT count(*) FROM links WHERE a_node = node_id OR b_node = node_id) = 0;"""
         ]
 

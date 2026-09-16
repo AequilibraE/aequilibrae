@@ -27,10 +27,9 @@ def skimming_parallel(graph, result, long cores):
         long long zones = graph.num_zones
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long skims = result.num_skims
-        Py_ssize_t i, j, n_b = graph.compact_graph.b_node.shape[0]
+        Py_ssize_t i
         long long oi, w
         int tid
-
 
     # Pre-resolve centroids -> compact indices on the Python side. We also
     # filter out any centroid that has no outgoing edges so the parallel
@@ -112,6 +111,7 @@ def skimming_parallel(graph, result, long cores):
                                         b_nodes_mat[tid], original_b_nodes_view)
 
     return skipped
+
 
 def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     """
@@ -207,6 +207,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                                     original_b_nodes_view)
     return orig
 
+
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)  # turn of bounds-checking for entire function
@@ -247,6 +248,7 @@ cpdef void skim_multiple_fields(long origin,
         for j in range(skims):
             final_skims[i, j] = node_skims[i, j]
 
+
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
@@ -262,6 +264,7 @@ cpdef void _copy_skims(
     for i in range(N):
         for j in range(skims):
             final_skim_matrix[i, j] = skim_matrix[i, j]
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)

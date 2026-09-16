@@ -1,20 +1,16 @@
 thisdir = 'aequilibrae/project'
 
 pyfiles = [
+  'project_table.py',
   '__init__.py',
   '__main__.py',
   'about.py',
-  'basic_table.py',
-  'data_loader.py',
   'database_connection.py',
   'field_editor.py',
   'project.py',
   'project_cleaning.py',
   'project_creation.py',
   'scenario.py',
-  'table_loader.py',
-  'zone.py',
-  'zoning.py',
 ]
 
 pkgs = [

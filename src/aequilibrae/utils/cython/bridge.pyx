@@ -51,8 +51,9 @@ cdef class Bridge:
         self.c.c_level = self.__logger.level
         if logger is None:
             self.__logger.warning(
-                "AequilibraE Bridge is using the root logger. To prevent broken progress bars, ensure either progress "
-                "bars are disabled (set AEQ_SHOW_PROGRESS=FALSE), or all StreamHandlers utilise AequilibraEStreamHandler"
+                "AequilibraE Bridge is using the root logger. To prevent broken progress bars, ensure either "
+                "progress bars are disabled (set AEQ_SHOW_PROGRESS=FALSE), or all StreamHandlers utilise "
+                "AequilibraEStreamHandler"
             )
 
         self.__exception_queue = queue.SimpleQueue()
@@ -126,8 +127,8 @@ cdef class Bridge:
         try:
             while not self.should_stop():
                 with nogil:
-                     msleep(500)
-                     lock.lock()
+                    msleep(500)
+                    lock.lock()
 
                 self.__unsafe_consume_log_queue()
 
@@ -185,4 +186,3 @@ cdef class Bridge:
             raise e
         except queue.Empty:
             pass
-

@@ -161,10 +161,11 @@ Conical (Spiess)
 **Mathematical Formula:**
 
 .. math:: t = t_0 \left(2 + \sqrt{\alpha^2\left(1-\frac{v}{c}\right)^2 + \beta^2} - \alpha\left(1-\frac{v}{c}\right) - \beta\right)
+With :math:`\beta = \frac{2 \alpha-1}{2 \alpha-2}`
 
 **Standard Parameters:**
-  * :math:`\alpha = 0.15`
-  * :math:`\beta = 4.0`
+  * :math:`\alpha = 2.0` (must be :math:`\alpha > 1`)
+  * :math:`\beta = 1.5`, according to the above relation
 
 **Origin and Background:**
 
@@ -374,17 +375,17 @@ attributes:
 .. code-block:: python
 
     from aequilibrae.paths import TrafficAssignment
+    from aequilibrae.paths.vdf import bpr
 
     assig = TrafficAssignment()
-    assig.set_vdf('BPR')
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
 
 **Link-specific parameters:**
 
 .. code-block:: python
 
     # Parameters can reference field names in your network
-    assig.set_vdf_parameters({"alpha": "alpha_field", "beta": "beta_field"})
+    assig.set_vdf(bpr, {"alpha": "alpha_field", "beta": "beta_field"})
 
 This flexibility allows you to:
 
@@ -444,17 +445,17 @@ Basic Usage
 
 .. code-block:: python
 
-    from aequilibrae.paths import TrafficAssignment, TrafficClass, VDF
+    from aequilibrae.paths import TrafficAssignment, TrafficClass
+    from aequilibrae.paths.vdf import bpr, bpr2, akcelik, builtin_vdfs
 
     # Check available VDF functions
-    vdf = VDF()
-    print(vdf.functions_available())
-    # Output: ['bpr', 'bpr2', 'conical', 'inrets', 'akcelik']
+    vdfs = builtin_vdfs()
+    print(vdfs.keys())
+    # Output: dict_keys(['bpr', 'bpr2', 'conical', 'inrets', 'akcelik'])
 
     # Setup traffic assignment with BPR
     assig = TrafficAssignment()
-    assig.set_vdf('BPR')
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(vdfs["bpr"], {"alpha": 0.15, "beta": 4.0})
 
 Using Different VDFs
 ~~~~~~~~~~~~~~~~~~~~
@@ -462,16 +463,13 @@ Using Different VDFs
 .. code-block:: python
 
     # Highway network - standard BPR
-    assig.set_vdf('BPR')
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
 
     # Urban network with signals - Akcelik
-    assig.set_vdf('AKCELIK')
-    assig.set_vdf_parameters({"alpha": 0.25, "tau": 0.8, "legnth": "distance"})
+    assig.set_vdf(akcelik, {"alpha": 0.25, "tau": 0.8, "length": "distance"})
     
     # Network with strong capacity constraints - BPR2
-    assig.set_vdf('BPR2')
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr2, {"alpha": 0.15, "beta": 4.0})
 
 Link-Specific Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -480,8 +478,7 @@ Link-Specific Parameters
 
     # Assume your network has fields 'alpha_field' and 'beta_field'
     # with values calibrated for each link
-    assig.set_vdf('BPR')
-    assig.set_vdf_parameters({"alpha": "alpha_field", "beta": "beta_field"})
+    assig.set_vdf(bpr, {"alpha": "alpha_field", "beta": "beta_field"})
 
 References and Further Reading
 -------------------------------

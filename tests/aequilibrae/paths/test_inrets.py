@@ -29,14 +29,14 @@
 # work developed with the software.
 # ---------------------------------------------------------------------------------------------------------------------
 
-from multiprocessing import cpu_count
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 import numpy as np
 from aequilibrae.paths.cython.vdf_core import inrets, delta_inrets
 
 
 def test_inrets_function():
-    cores = cpu_count()
+    cores = omp_get_max_threads()
 
     alpha = np.zeros(11)
     fftime = np.ones(11)
@@ -47,7 +47,7 @@ def test_inrets_function():
     alpha.fill(0.95)
     link_flows = np.arange(11).astype(float) * 0.2
 
-    inrets(congested_times, link_flows, capacity, fftime, alpha, cores)
+    inrets(congested_times, link_flows, fftime, capacity, cores, alpha)
 
     should_be = np.array(
         [
@@ -74,8 +74,8 @@ def test_inrets_function():
         link_flows.fill(1 * 0.1001 * i)
 
         link_flows += np.arange(11) * dx
-        inrets(congested_times, link_flows, capacity, fftime, alpha, cores)
-        delta_inrets(delta, link_flows, capacity, fftime, alpha, cores)
+        inrets(congested_times, link_flows, fftime, capacity, cores, alpha)
+        delta_inrets(delta, link_flows, fftime, capacity, cores, alpha)
 
         # The derivative needs to be monotonically increasing.
         assert min(delta[1:] - delta[:-1]) > 0, "Delta is not increasing as it should"

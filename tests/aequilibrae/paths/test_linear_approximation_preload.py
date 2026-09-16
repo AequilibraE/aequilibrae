@@ -29,19 +29,17 @@
 # work developed with the software.
 # ---------------------------------------------------------------------------------------------------------------------
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
-from types import SimpleNamespace
 
 import aequilibrae.paths.linear_approximation as linear_approximation
 from aequilibrae.paths.linear_approximation import LinearApproximation
 
 
 class DummyVDF:
-    def __init__(self):
-        self.last_link_flows = None
-
-    def apply_vdf(self, congested_time, link_flows, capacity, fftime, scale, offset, cores):
+    def apply_vdf(self, *, congested_time, link_flows, fftime, capacity, cores, offset, scale):
         del capacity, cores
         self.last_link_flows = link_flows.copy()
         congested_time[:] = fftime + scale * link_flows + offset
@@ -51,24 +49,24 @@ class DummyDerivativeVDF:
     def __init__(self, derivative):
         self.derivative = derivative
 
-    def apply_derivative(self, output, *_args):
-        output[:] = self.derivative
+    def apply_derivative(self, *, delta, link_flows, fftime, capacity, cores, **kwargs):
+        del link_flows, fftime, capacity, cores, kwargs
+        delta[:] = self.derivative
 
 
-def test_stepsize_derivative_uses_fw_total_flow_state():
+def test_stepsize_derivative_uses_total_flow_state():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
     assignment.elementwise_cores = 1
     assignment.threading_threshold = 10000
     assignment.preload = np.array([10.0, 20.0])
     assignment.current_assigned_flow = np.array([3.0, 4.0])
-    assignment.fw_total_flow = assignment.current_assigned_flow + assignment.preload
-    assigned_direction = np.array([7.0, 8.0])
-    assignment.step_direction_flow = assigned_direction + assignment.preload
+    assignment.total_flow = assignment.current_assigned_flow + assignment.preload
+    assignment.step_direction_flow = np.array([7.0, 8.0])
     assignment.congested_value = np.zeros(2)
     assignment.capacity = np.ones(2)
     assignment.free_flow_tt = np.zeros(2)
-    assignment.vdf_parameters = [1.0, 0.0]
+    assignment.vdf_parameters = {"scale": 1.0, "offset": 0.0}
     assignment.vdf = DummyVDF()
     assignment.aon_total_turn_cost = 0.0
     assignment.fw_total_turn_cost = 0.0
@@ -76,12 +74,8 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
     stepsize = 0.25
     derivative = assignment._LinearApproximation__derivative_of_objective_stepsize_dependent(stepsize, 0.0)
 
-    candidate_total_flow = (
-        assignment.preload
-        + assignment.current_assigned_flow
-        + stepsize * (assigned_direction - assignment.current_assigned_flow)
-    )
-    expected = np.sum(candidate_total_flow * (assignment.step_direction_flow - assignment.fw_total_flow))
+    candidate_total_flow = assignment.total_flow + stepsize * (assignment.step_direction_flow - assignment.total_flow)
+    expected = np.sum(candidate_total_flow * (assignment.step_direction_flow - assignment.total_flow))
 
     assert np.isclose(derivative, expected)
     np.testing.assert_array_equal(assignment.vdf.last_link_flows, candidate_total_flow)
@@ -91,10 +85,12 @@ def test_stepsize_derivative_uses_fw_total_flow_state():
 def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10_000
     assignment.preload = np.array([10.0, 20.0])
     current_assigned_flow = np.array([3.0, 4.0])
     assigned_direction = np.array([7.0, 8.0])
-    assignment.fw_total_flow = current_assigned_flow + assignment.preload
+    assignment.total_flow = current_assigned_flow + assignment.preload
     assignment.step_direction_flow = assigned_direction + assignment.preload
     assignment.congested_time = np.zeros(2)
     assignment._trap_new_flow = np.zeros(2)
@@ -102,7 +98,7 @@ def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
     assignment._trap_avg_cost = np.zeros(2)
     assignment.capacity = np.ones(2)
     assignment.free_flow_tt = np.zeros(2)
-    assignment.vdf_parameters = [1.0, 0.0]
+    assignment.vdf_parameters = {"scale": 1.0, "offset": 0.0}
     assignment.vdf = DummyVDF()
 
     assignment._LinearApproximation__objective_change_at_stepsize(0.0, stepsize)
@@ -113,6 +109,7 @@ def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
 
 def test_relative_gap_ignores_constant_preload():
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.iteration_issue = []
     assignment.congested_time = np.array([2.0, 3.0])
     assignment.aon_total_turn_cost = 0.0
     assignment.fw_total_turn_cost = 0.0
@@ -126,11 +123,12 @@ def test_relative_gap_ignores_constant_preload():
     assignment.traffic_classes = [cls]
     assignment.step_direction = {"car": SimpleNamespace(total_link_loads=np.array([9.0, 1.5]))}
 
-    # Preload contributes to VDF calculations via fw_total_flow but should not affect rgap.
+    # Preload contributes to VDF calculations via total_flow but should not affect rgap.
     assignment.preload = np.array([100.0, 100.0])
-    assignment.fw_total_flow = cls.results.total_link_loads + assignment.preload
+    assignment.total_flow = cls.results.total_link_loads + assignment.preload
     assignment.rgap_target = 0.1
     assignment.stepsize = 0.1  # not 1.0
+    assignment.iter = 1
 
     assert assignment.check_convergence()
 
@@ -341,12 +339,14 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
 def test_cfw_zero_denominator_falls_back_to_fw():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10_000
     assignment.vdf = DummyDerivativeVDF(np.ones(2))
     assignment.vdf_der = np.zeros(2)
-    assignment.fw_total_flow = np.ones(2)
+    assignment.total_flow = np.ones(2)
     assignment.capacity = np.ones(2)
     assignment.free_flow_tt = np.ones(2)
-    assignment.vdf_parameters = []
+    assignment.vdf_parameters = {}
     assignment.conjugate_direction_max = 0.99999
     assignment.conjugate_stepsize = 0.5
     assignment.betas = np.array([0.5, 0.5, 0.0])
@@ -377,12 +377,14 @@ def test_cfw_zero_denominator_falls_back_to_fw():
 def test_bfw_nonfinite_coefficient_falls_back_to_fw():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10_000
     assignment.vdf = DummyDerivativeVDF(np.array([np.nan, 1.0]))
     assignment.vdf_der = np.zeros(2)
-    assignment.fw_total_flow = np.ones(2)
+    assignment.total_flow = np.ones(2)
     assignment.capacity = np.ones(2)
     assignment.free_flow_tt = np.ones(2)
-    assignment.vdf_parameters = []
+    assignment.vdf_parameters = {}
     assignment.stepsize = 0.5
     assignment.conjugate_stepsize = 0.5
     assignment.betas = np.array([0.2, 0.3, 0.5])
@@ -501,12 +503,14 @@ def _multiclass_fixture(num_links=4, num_classes=3, num_cores=2, seed=None):
 
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
+    assignment.elementwise_cores = 1
+    assignment.threading_threshold = 10_000
     assignment.vdf = DummyDerivativeVDF(vdf_der)
     assignment.vdf_der = np.zeros(num_links)
-    assignment.fw_total_flow = np.ones(num_links)
+    assignment.total_flow = np.ones(num_links)
     assignment.capacity = np.ones(num_links)
     assignment.free_flow_tt = np.ones(num_links)
-    assignment.vdf_parameters = []
+    assignment.vdf_parameters = {}
     assignment.conjugate_direction_max = 0.99999
     assignment.conjugate_stepsize = 0.0
     assignment.betas = np.array([1.0, 0.0, 0.0])

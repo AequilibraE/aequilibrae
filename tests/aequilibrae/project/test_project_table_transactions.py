@@ -1,0 +1,128 @@
+import sqlite3
+from dataclasses import fields
+
+import pandas as pd
+import pytest
+
+from aequilibrae.project.project_table import NonSpatialProjectTable
+from aequilibrae.utils.db_utils import ConnectionClosure
+
+
+class Things(NonSpatialProjectTable):
+    name = "things"
+    key = "thing_id"
+    record_name = "ThingRecord"
+    has_numeric_key = True
+
+
+@pytest.fixture
+def things():
+    closure = ConnectionClosure(":memory:")
+    project_connection = closure.db_connection
+    project_connection._connection.execute("CREATE TABLE things (thing_id INTEGER PRIMARY KEY, value INTEGER NOT NULL)")
+    yield Things(project_connection), project_connection
+    closure.close()
+
+
+def test_standalone_writes_commit_and_data_includes_key_column(things):
+    table, project_connection = things
+    table.insert(thing_id=1, value=10)
+
+    assert not project_connection.in_transaction
+    assert table.get(1).value == 10
+    assert "thing_id" in table.data.columns
+    assert table.data.loc[0, "thing_id"] == 1
+
+
+def test_user_fields_are_available_in_generated_records(things):
+    table, project_connection = things
+    project_connection._connection.execute("ALTER TABLE things ADD COLUMN user_note TEXT")
+    table.insert(thing_id=1, value=10, user_note="custom")
+
+    record = table.get(1)
+    assert type(record).__name__ == "ThingRecord"
+    assert [field.name for field in fields(record)] == ["thing_id", "value", "user_note"]
+    assert type(record).__annotations__ == {"thing_id": int, "value": int, "user_note": str | None}
+    assert record.user_note == "custom"
+    assert table.data.loc[0, "user_note"] == "custom"
+
+
+def test_table_mutation_is_a_savepoint(things):
+    table, project_connection = things
+    table.insert(thing_id=1, value=10)
+
+    with project_connection.transaction():
+        table.update(1, value=20)
+        try:
+            with project_connection.transaction():
+                table.update(1, value=30)
+                raise ValueError("discard nested scope")
+        except ValueError:
+            pass
+        assert table.get(1).value == 20
+
+    assert table.get(1).value == 20
+
+
+def test_bulk_insert_generates_numeric_keys_without_mutating_the_frame(things):
+    table, _ = things
+    additions = pd.DataFrame({"value": [10, 20]})
+    original = additions.copy()
+
+    assert table.insert_from(additions) == [1, 2]
+    pd.testing.assert_frame_equal(additions, original)
+    assert table.data.to_dict("list") == {"thing_id": [1, 2], "value": [10, 20]}
+
+
+def test_update_from_uses_the_key_column(things):
+    table, _ = things
+    table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
+    updates = pd.DataFrame({"thing_id": [1, 2], "value": [11, 21]})
+    original = updates.copy()
+
+    table.update_from(updates)
+
+    pd.testing.assert_frame_equal(updates, original)
+    assert [table.get(key).value for key in updates.thing_id] == [11, 21]
+
+
+def test_update_with_missing_id_raises(things):
+    table, _ = things
+    table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
+    updates = pd.DataFrame({"thing_id": range(15), "value": range(15)})
+
+    original = table.data
+
+    with pytest.raises(ValueError, match=r"update contained keys which do not exist: \[(?:\d+, )+?\.\.\.\]"):
+        table.update_from(updates)
+
+    pd.testing.assert_frame_equal(original, table.data)
+
+
+def test_bulk_update(things):
+    table, _ = things
+    table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
+    updates = pd.DataFrame({"thing_id": [1, 2], "value": [11, 21]})
+
+    table.update_from(updates)
+
+    assert table.get(1).value == 11 and table.get(2).value == 21
+
+
+def test_get(things):
+    table, _ = things
+    table.insert_from(pd.DataFrame({"thing_id": [1, 2], "value": [10, 20]}))
+
+    assert table.get(1) == table.record_type(thing_id=1, value=10)
+    assert table.get(2) == table.record_type(thing_id=2, value=20)
+
+    sentinal = object()
+    assert table.get(123, default=sentinal) is sentinal
+    assert table.get(1, column="value") == 10 and table.get(2, column="value") == 20
+    assert table.get(123, column="value", default=sentinal) is sentinal
+
+    with pytest.raises(sqlite3.OperationalError, match="no such column: bad"):
+        table.get(123, column="bad")
+
+    with pytest.raises(sqlite3.OperationalError, match="no such column: bad"):
+        table.get(123, column="bad column", default=sentinal)

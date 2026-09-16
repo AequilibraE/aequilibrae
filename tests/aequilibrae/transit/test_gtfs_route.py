@@ -22,7 +22,7 @@ def data_dict():
         "route_color": randomword(randint(0, 40)),
         "route_text_color": randomword(randint(0, 40)),
         "route_sort_order": randint(0, 2000),
-        "agency_id": randint(0, 1000),
+        "agency_id": 1,  # Agency ID must exist
     }
 
 

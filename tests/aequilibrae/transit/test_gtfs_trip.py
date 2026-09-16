@@ -1,10 +1,10 @@
 from copy import copy
-from random import randint, choice
+from random import choice, randint
 
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.transit_elements import Trip
+
 from .random_word import randomword
 
 
@@ -44,15 +44,15 @@ def test_save_to_database(build_gtfs_project, data):
     r = Trip()
     r._populate(tuple(data.values()), list(data.keys()))
     times = list(range(randint(5, 15)))
-    patid = randint(15, 2500000)
+    patid = 10001001000  # Pattern ID must exist
 
     r.arrivals = copy(times)
     r.departures = copy(times)
     r.pattern_id = patid
     r.source_time = [0] * len(times)
 
-    with database_connection("transit") as transit_conn:
-        r.save_to_database(transit_conn)
+    with build_gtfs_project.project.transit_connection as transit_conn:
+        r.save_to_database(transit_conn, commit=False)
         result = transit_conn.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
 
         records, counter = transit_conn.execute(

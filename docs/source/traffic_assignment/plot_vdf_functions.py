@@ -1,7 +1,7 @@
 """
 Generate VDF comparison charts for documentation
 """
-from aequilibrae.paths.cython.AoN import (
+from aequilibrae.paths.cython.vdf_core import (
     akcelik,
     bpr,
     bpr2,
@@ -39,9 +39,9 @@ def function_apply(func, link_flows, par1, par2: float | None = None):
     par1s = np.ones(size, dtype=np.float64) * par1
     if par2 is not None:
         par2s = np.ones(size, dtype=np.float64) * par2
-        func(congested_times, link_flows, capacity, fftime, par1s, par2s, 1)
+        func(congested_times, link_flows, fftime, capacity, 1, par1s, par2s)
     else:
-        func(congested_times, link_flows, capacity, fftime, par1s, 1)
+        func(congested_times, link_flows, fftime, capacity, 1, par1s)
     return congested_times
 
 
@@ -53,9 +53,9 @@ def derivative_apply(delta_func, link_flows, par1, par2: float | None = None):
     par1s = np.ones(size, dtype=np.float64) * par1
     if par2 is not None:
         par2s = np.ones(size, dtype=np.float64) * par2
-        delta_func(derivative, link_flows, capacity, fftime, par1s, par2s, 1)
+        delta_func(derivative, link_flows, fftime, capacity, 1, par1s, par2s)
     else:
-        delta_func(derivative, link_flows, capacity, fftime, par1s, 1)
+        delta_func(derivative, link_flows, fftime, capacity, 1, par1s)
     return derivative
 
 # Create the main comparison plot

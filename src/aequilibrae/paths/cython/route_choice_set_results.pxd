@@ -17,8 +17,9 @@ cdef class RouteChoiceSetResults:
         double cutoff_prob
         double beta
         double[:] cost_view
-        unsigned int [:] mapping_idx
-        int64_t [::] mapping_data
+        const unsigned int [:] mapping_idx
+        const int64_t [::] mapping_data
+        const int64_t [::] link_id_direction
 
         vector[shared_ptr[RouteVec_t]] __route_vecs
         vector[vector[long long] *] __link_union_set

@@ -18,7 +18,10 @@ def test_load_data(build_gtfs_project, test_data_path):
 
     df = cap[cap.city == "Coquimbo"]
     df.loc[df.min_distance < 100, "speed"] = 10
-    dict_speeds = dict(iter(df.groupby(["mode"])))
+    dict_speeds = dict(iter(df.groupby("mode")))
+    # GTFSReader looks these up by scalar route_type, so a tuple-keyed dict would silently disable
+    # the max speed enforcement instead of failing
+    assert all(not isinstance(k, tuple) for k in dict_speeds)
     with build_gtfs_project.project.transit_connection as conn:
         gtfs = GTFSReader(conn)
 

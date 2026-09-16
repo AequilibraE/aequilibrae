@@ -19,6 +19,5 @@ create TABLE IF NOT EXISTS fare_rules (
 	origin      TEXT,
 	destination TEXT,
 	contains    INTEGER,
-	FOREIGN KEY(fare_id) REFERENCES fare_attributes(fare_id) deferrable initially deferred,
-	FOREIGN KEY(route_id) REFERENCES routes(route_id) deferrable initially deferred
+	FOREIGN KEY(fare_id) REFERENCES fare_attributes(fare_id) deferrable initially deferred
 );

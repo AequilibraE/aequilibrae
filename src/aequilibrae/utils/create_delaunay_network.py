@@ -7,7 +7,8 @@ import pandas as pd
 from scipy.spatial import Delaunay
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
+from aequilibrae.paths import Graph, TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 DELAUNAY_TABLE = "delaunay_network"
 
@@ -45,7 +46,6 @@ class DelaunayAnalysis:
                     raise ValueError("Delaunay network already exist. Use the overwrite flag to re-run it")
                 conn.execute(f"DROP TABLE {DELAUNAY_TABLE}")
                 conn.execute("delete from geometry_columns where f_table_name=?", [DELAUNAY_TABLE])
-                conn.commit()
 
             zone_sql = "select zone_id node_id, X(st_centroid(geometry)) x, Y(st_centroid(geometry)) y from zones"
             network_sql = "select node_id, X(geometry) x, Y(geometry) y from nodes where is_centroid=1"
@@ -107,8 +107,7 @@ class DelaunayAnalysis:
         ta.set_classes([tc])
         ta.set_time_field("distance")
         ta.set_capacity_field("capacity")
-        ta.set_vdf("BPR")
-        ta.set_vdf_parameters({"alpha": 0, "beta": 1.0})
+        ta.set_vdf(bpr, {"alpha": 0, "beta": 1.0})
         ta.set_algorithm("all-or-nothing")
         ta.execute()
 
@@ -118,12 +117,12 @@ class DelaunayAnalysis:
         df = ta.results()[cols]
 
         report = {"setup": str(ta.info())}
-        record = self.project.results.new_record(
+        return self.project.results.create(
             table_name=result_name,
+            data=df,
             procedure="Delaunay assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=ta.procedure_date,
             description="",
         )
-        record.set_data(df)

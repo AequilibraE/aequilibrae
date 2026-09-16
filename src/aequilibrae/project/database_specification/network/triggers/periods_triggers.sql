@@ -8,7 +8,7 @@ CREATE TRIGGER aequilibrae_default_period_update BEFORE UPDATE ON periods
 
 --#
 CREATE TRIGGER aequilibrae_default_period_delete BEFORE DELETE ON periods
-  WHEN new.period_id = 1
+  WHEN old.period_id = 1
   BEGIN
        SELECT RAISE(ABORT,'Cannot delete default period');
   END;

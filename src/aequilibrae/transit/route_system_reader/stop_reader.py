@@ -13,8 +13,8 @@ def read_stops(conn: sqlite3.Connection, transformer):
     data.geo = data.geo.apply(shapely.wkb.loads)
     if transformer:
         lons, lats = transformer.transform(data.X.values, data.Y.values)
-        data.loc[:, "X"] = lons[:]
-        data.loc[:, "Y"] = lats[:]
+        data["X"] = lons[:]
+        data["Y"] = lats[:]
 
     data.drop(columns=["moved_by_matching", "Z"], inplace=True)
     data.rename(

@@ -26,6 +26,7 @@ cpdef void skim_single_path(long origin,
                             double[:, :] graph_costs,
                             long long[:] reached_first,
                             long found) noexcept nogil
+
 cpdef void skim_single_path_with_turn_penalties(long origin,
                                                 long nodes,
                                                 long skims,

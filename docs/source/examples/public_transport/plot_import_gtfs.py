@@ -27,7 +27,6 @@ import folium
 import geopandas as gpd
 import pandas as pd
 
-from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_import_gtfs.png'
@@ -41,8 +40,11 @@ project = create_example(fldr, "coquimbo")
 
 # %%
 # As the Coquimbo example already has a complete GTFS model, we shall remove its public transport
-# database for the sake of this example.
+# database for the sake of this example. Close its open connection before removing
+# the database, then reopen the project and create a fresh transit database.
+project.close()
 remove(join(fldr, "public_transport.sqlite"))
+project.open(fldr)
 
 # %%
 # Let's import the GTFS feed.
@@ -52,7 +54,7 @@ dest_path = join(fldr, "gtfs_coquimbo.zip")
 # Now we create our Transit object and import the GTFS feed into our model.
 # This will automatically create a new public transport database.
 
-data = Transit(project)
+data = project.scenario.create_transit_database()
 
 transit = data.new_gtfs_builder(agency="Lisanco", file_path=dest_path)
 

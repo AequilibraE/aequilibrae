@@ -8,12 +8,12 @@ assignment model for transit networks. Transportation Research Part B 23(2),
 
 cimport cython
 import numpy as np
-from libc.stdint cimport int64_t, uint8_t, uint32_t, uint64_t
+from libc.stdint cimport int64_t, uint8_t, uint32_t
 
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
-from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure, log, aeq_format_string as f
+from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
 from aequilibrae.utils.cython.bar cimport Bar
 
 ctypedef double DATATYPE_t
@@ -58,7 +58,7 @@ cdef int _compare(const_void *a, const_void *b) noexcept nogil:
     else:
         return 1
 
-from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, ElementState, IN_HEAP, NOT_IN_HEAP, SCANNED
+from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, ElementState, NOT_IN_HEAP, SCANNED
 
 
 @cython.boundscheck(False)
@@ -91,7 +91,7 @@ cdef void _coo_tocsc_uint32(
     Bp[<size_t>n_vert] = <uint32_t>n_edge
 
     for i in range(n_edge):
-        col  = <size_t>Aj[i]
+        col = <size_t>Aj[i]
         dest = <size_t>Bp[col]
         Bi[dest] = Ai[i]
         Bx[dest] = Ax[i]
@@ -256,22 +256,22 @@ cdef void compute_SF_in_parallel(
     cdef Bar bar = bridge.new_bar("{}/{} destinations processed" + (" (skimming)" if skimming else ""), total=total)
 
     with nogil, parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
-        thread_demand_origins = <uint32_t  *> malloc(sizeof(uint32_t)  * d_vert_ids_view.shape[0])
-        thread_demand_values  = <double *> malloc(sizeof(double) * d_vert_ids_view.shape[0])
+        thread_demand_origins = <uint32_t *> malloc(sizeof(uint32_t) * d_vert_ids_view.shape[0])
+        thread_demand_values = <double *> malloc(sizeof(double) * d_vert_ids_view.shape[0])
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
         # we can safely read and write without collisions.
-        thread_edge_volume  = &edge_volume[threadid() * edge_count]
+        thread_edge_volume = &edge_volume[threadid() * edge_count]
         thread_u_i_vec = &u_i_vec_out[threadid() * vertex_count]
 
         thread_skim_i_vec = &skim_i_vec_out[threadid() * vertex_count * n_skim_cols]
 
-        thread_f_i_vec      = <double *> malloc(sizeof(double) * vertex_count)
-        thread_u_j_c_a_vec  = <double *> malloc(sizeof(double) * edge_count)
-        thread_v_i_vec      = <double *> malloc(sizeof(double) * vertex_count)
-        thread_h_a_vec      = <uint8_t   *> malloc(sizeof(uint8_t)   * edge_count)
-        thread_edge_indices = <uint32_t  *> malloc(sizeof(uint32_t)  * edge_count)
+        thread_f_i_vec = <double *> malloc(sizeof(double) * vertex_count)
+        thread_u_j_c_a_vec = <double *> malloc(sizeof(double) * edge_count)
+        thread_v_i_vec = <double *> malloc(sizeof(double) * vertex_count)
+        thread_h_a_vec = <uint8_t *> malloc(sizeof(uint8_t) * edge_count)
+        thread_edge_indices = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
         thread_hyperpath_order = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
-        thread_hyperpath_ids   = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
+        thread_hyperpath_ids = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
 
         thread_skim_j_vec = <double *> calloc(edge_count, sizeof(double) * n_skim_cols)
 
@@ -418,8 +418,6 @@ cdef void compute_SF_in(
         DATATYPE_t u_r, u_i
         size_t i, j, h_a_count
         uint32_t vert_idx
-        int cent_dest
-        double tmp
 
     # initialization
     for i in range(vertex_count):
@@ -617,7 +615,7 @@ cdef void _SF_in_first_pass_full(
 
                 skim_i_new = (beta_skim + f_a * skim_j) / (f_i + f_a)
 
-                skim_i_vec[tail_vert_idx  + j * vertex_count] = skim_i_new
+                skim_i_vec[tail_vert_idx + j * vertex_count] = skim_i_new
                 skim_i_new_vec[j] = skim_i_new
 
             # update f_i

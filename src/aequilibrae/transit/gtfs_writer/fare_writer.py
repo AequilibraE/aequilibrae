@@ -21,7 +21,6 @@ def write_fares(folder_path: str, conn):
     frls = frls[["fare_id", "route_id", "origin_id", "destination_id", "contains_id"]]
 
     for fld in ["origin_id", "destination_id"]:
-        frls[fld].fillna(-99999, inplace=True)
-        frls[fld] = frls[fld].astype(int).astype(str)
+        frls[fld] = frls[fld].fillna(-99999).astype(int).astype(str)
         frls.loc[frls[fld] == "-99999", fld] = pd.NA
     frls.to_csv(join(folder_path, "fare_rules.txt"), quoting=csv.QUOTE_NONNUMERIC, index=False)

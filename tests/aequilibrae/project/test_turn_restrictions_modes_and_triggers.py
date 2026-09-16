@@ -40,7 +40,7 @@ def test_turn_restrictions_has_modes_column(sioux_falls_example):
 
 
 def test_turn_restriction_geometry_is_populated(sioux_falls_example):
-    # Upgraded projects get their triggers from migration 003 rather than from add_triggers,
+    # Upgraded projects get their triggers from migration 009 rather than from add_triggers,
     # so this also covers the geometry triggers being installed on the migration path.
     with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
@@ -200,8 +200,8 @@ def test_turn_restriction_api_stores_infinite_penalty_as_prohibition(sioux_falls
         assert pair is not None
         from_node, via_node, to_node = pair
 
-    restriction_id = sioux_falls_example.network.turn_restrictions.add_restriction(
-        from_node, via_node, to_node, penalty=float("inf"), modes="c"
+    restriction_id = sioux_falls_example.network.turn_restrictions.insert(
+        from_node=from_node, via_node=via_node, to_node=to_node, penalty=float("inf"), modes="c"
     )
 
     with sioux_falls_example.db_connection_spatial as conn:
@@ -220,8 +220,8 @@ def test_turn_restriction_api_rejects_negative_penalty(sioux_falls_example):
         from_node, via_node, to_node = pair
 
     with pytest.raises(ValueError, match="Negative turn penalties"):
-        sioux_falls_example.network.turn_restrictions.add_restriction(
-            from_node, via_node, to_node, penalty=-1.0, modes="c"
+        sioux_falls_example.network.turn_restrictions.insert(
+            from_node=from_node, via_node=via_node, to_node=to_node, penalty=-1.0, modes="c"
         )
 
 
@@ -232,9 +232,9 @@ def test_turn_restriction_api_update_can_set_prohibition(sioux_falls_example):
         from_node, via_node, to_node = pair
 
     turns = sioux_falls_example.network.turn_restrictions
-    restriction_id = turns.add_restriction(from_node, via_node, to_node, penalty=8.0, modes="c")
+    restriction_id = turns.insert(from_node=from_node, via_node=via_node, to_node=to_node, penalty=8.0, modes="c")
 
-    assert turns.update_restriction(restriction_id, penalty=None)
+    turns.update(restriction_id, penalty=None)
 
     with sioux_falls_example.db_connection_spatial as conn:
         stored_penalty = conn.execute(

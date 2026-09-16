@@ -3,7 +3,7 @@ import zipfile
 import logging
 from copy import deepcopy
 from datetime import datetime
-from os.path import splitext, basename
+from os.path import basename, splitext
 from typing import Dict
 
 import numpy as np
@@ -12,10 +12,10 @@ from pyproj import Transformer
 from shapely.geometry import LineString
 
 from aequilibrae.transit.column_order import column_order
-from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
+from aequilibrae.transit.date_tools import create_days_between, format_date, to_seconds
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
-from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
+from aequilibrae.transit.transit_elements import Agency, Fare, FareRule, Route, Service, Stop, Trip
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
@@ -124,7 +124,7 @@ class GTFSReader(WorkerThread):
 
                     if not stop_times.arrival_time.is_monotonic_increasing:
                         stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = np.nan
-                        stop_times.arrival_time.fillna(method="ffill", inplace=True)
+                        stop_times["arrival_time"] = stop_times.arrival_time.ffill()
                     diffs = np.diff(stop_times.arrival_time.values)
 
                     stop_geos = [self.stops[x].geo for x in trip.stops]
@@ -178,13 +178,16 @@ class GTFSReader(WorkerThread):
                             source_time[1:] = df.source_time[:]
                             times[1:] += df.add_time[:].astype(int)
 
-                    assert min(times[1:] - times[:-1]) > 0
-                    stop_times.loc[:, "arrival_time"] = times[:].astype(int)
-                    stop_times.loc[:, "departure_time"] = times[:].astype(int)
-                    stop_times.loc[:, "source_time"] = source_time[:].astype(int)
+                    times = pd.to_numeric(times, errors="coerce")
+                    source_time = pd.to_numeric(source_time, errors="coerce")
+
+                    cleaned_times = stop_times["arrival_time"].ffill().astype(int)
+                    assert cleaned_times.diff().min(skipna=True) > 0
+                    stop_times["arrival_time"] = cleaned_times
+                    stop_times["departure_time"] = cleaned_times
+                    stop_times["source_time"] = np.nan_to_num(source_time, nan=0).astype(int)
                     trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
                     trip.departures = stop_times.departure_time.to_numpy(copy=True)
-
         if total_fast:
             logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
 
@@ -302,8 +305,8 @@ class GTFSReader(WorkerThread):
                 cleaner = stop_times.assign(seqkey=stop_times.stop.shift(-1) + "#####" + stop_times.stop)
                 cleaner.drop_duplicates(["seqkey"], inplace=True, keep="first")
                 stop_times = cleaner.drop(columns=["seqkey"])
-                stop_times.loc[:, "arrival_time"] = stop_times.arrival_time.astype(int)
-                stop_times.loc[:, "departure_time"] = stop_times.departure_time.astype(int)
+                stop_times["arrival_time"] = stop_times.arrival_time.astype(int)
+                stop_times["departure_time"] = stop_times.departure_time.astype(int)
                 self.stop_times[trip.trip] = stop_times
                 trip.stops = list(stop_times.stop_id.values)
                 m = hashlib.md5()
@@ -355,8 +358,8 @@ class GTFSReader(WorkerThread):
                     shift = step * headway
                     new_trip = template.copy()
                     new_trip_str = f"{trip}-{new_trip.arrival_time.values[0]}".replace(":", "")
-                    new_trip.loc[:, "arrival_time"] += shift
-                    new_trip.loc[:, "departure_time"] += shift
+                    new_trip["arrival_time"] += shift
+                    new_trip["departure_time"] += shift
                     self.stop_times[new_trip_str] = new_trip
                     trip_replacements[trip].append(new_trip_str)
         return trip_replacements
@@ -379,8 +382,7 @@ class GTFSReader(WorkerThread):
             df2.loc[df2.h.str.len() < 1, "h"] = "0"
             df2.loc[df2.m.str.len() < 1, "m"] = "0"
             df2.loc[df2.s.str.len() < 1, "s"] = "0"
-            df2 = df2.assign(sec=0)
-            df2.loc[:, "sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
+            df2["sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
             stoptimes[col] = df2.sec.values
 
         trips = stoptimes["trip_id"].astype(str)
@@ -391,8 +393,8 @@ class GTFSReader(WorkerThread):
 
         df = pd.DataFrame(stoptimes)
 
-        df.loc[:, "arrival_time"] = df.loc[:, ["arrival_time", "departure_time"]].max(axis=1)
-        df.loc[:, "departure_time"] = df.loc[:, "arrival_time"]
+        df["arrival_time"] = df.loc[:, ["arrival_time", "departure_time"]].max(axis=1)
+        df["departure_time"] = df["arrival_time"]
 
         counter = df.shape[0]
         df = df.assign(other_stop=df.stop_id.shift(-1), other_trip=df.trip_id.shift(-1))
@@ -410,7 +412,7 @@ class GTFSReader(WorkerThread):
 
         msg = "Loading stop times (Step: 3/12)"
         for trip_id, data in simple_progress(df.groupby(df["trip_id"]), self.signal, msg):
-            data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
+            data["stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
 
     def __load_stops_table(self):

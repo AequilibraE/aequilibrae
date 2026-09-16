@@ -31,7 +31,7 @@
 
 CREATE TABLE IF NOT EXISTS stops (
 	stop_id           TEXT    PRIMARY KEY,
-	stop              TEXT    NOT NULL ,
+	stop              TEXT    NOT NULL,
 	agency_id         INTEGER NOT NULL,
 	link              INTEGER,
 	dir               INTEGER,

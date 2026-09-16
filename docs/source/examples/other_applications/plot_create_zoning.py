@@ -36,13 +36,13 @@ part of this notebook.
 # %%
 # .. admonition:: References
 # 
-#   * :ref:`Accessing project zones <project_zoning>`
+#   * :ref:`Accessing project zones <project_zones>`
 
 # %%
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.zoning`
+#     * :func:`aequilibrae.project.network.zones`
 #     * :func:`aequilibrae.project.network.nodes` 
 
 # %%
@@ -124,20 +124,17 @@ grid = [p for p in grid.geoms if p.intersects(geo)]
 # centroids to go from 1 to N.
 nodes = network.nodes
 for i in range(1, 301):
-    nd = nodes.get(i)
-    nd.renumber(i + 1300)
+    nodes.renumber(i, i + 1300)
 
 # %%
 
 # Now we can add them to the model and add centroids to them while we are at it.
-zoning = project.zoning
+zone_table = project.network.zones
 for i, zone_geo in enumerate(simple_progress(grid, s, "Add zone centroids")):
-    zone = zoning.new(i + 1)
-    zone.geometry = zone_geo
-    zone.save()
-    # None means that the centroid will be added in the geometric point of the zone
-    # But we could provide a Shapely point as an alternative
-    zone.add_centroid(None)
+    zone_id = i + 1
+    zone_table.insert(zone_id=zone_id, geometry=zone_geo)
+    # Omitting the point adds the centroid at the geometric center of the zone.
+    zone_table.add_centroid(zone_id)
 
 # %%
 # Centroid connectors
@@ -145,16 +142,16 @@ for i, zone_geo in enumerate(simple_progress(grid, s, "Add zone centroids")):
 # Let's connect our zone centroids to the network.
 
 # %%
-for zone_id, zone in zoning.all_zones().items():
+for zone in zone_table:
     # We will connect for walk, with 1 connector per zone
-    zone.connect_mode(mode_id="w", connectors=1)
+    nodes.connect_mode(zone.zone_id, mode_id="w", connectors=1, area=zone.geometry)
 
     # And for cars, for cars with 2 connectors per zone
     # We also specify the link types we accept to connect to (can be used to avoid connection to ramps or freeways)
-    zone.connect_mode(mode_id="c", link_types="ytrusP", connectors=2)
+    nodes.connect_mode(zone.zone_id, mode_id="c", link_types="ytrusP", connectors=2, area=zone.geometry)
 
     # This takes a few minutes to compute, so we will break after processing the first 10 zones
-    if zone_id >= 10:
+    if zone.zone_id >= 10:
         break
 
 # %%
@@ -165,14 +162,13 @@ for zone_id, zone in zoning.all_zones().items():
 
 # %%
 # Let's use some silly number for its ID, like 10,000, just so we can easily differentiate it
-airport = nodes.new_centroid(10000)
-airport.geometry = Point(166.91749582, -0.54472590)
-airport.save()
+airport = Point(166.91749582, -0.54472590)
+nodes.new_centroid(10000, airport)
 
 # %%
 # When connecting a centroid not associated with a zone, we need to tell AequilibraE what is the initial area around
 # the centroid that needs to be considered when looking for candidate nodes.
-airport.connect_mode(mode_id="c", link_types="ytrusP", connectors=1)
+nodes.connect_mode(10000, mode_id="c", link_types="ytrusP", connectors=1, area=airport.buffer(0.01))
 
 # %%
 project.close()

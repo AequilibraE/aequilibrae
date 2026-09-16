@@ -8,6 +8,7 @@ exts = [
   'array_allocations',
   'bar',
   'bridge',
+  'openmp_helper',
 ]
 
 py.install_sources(

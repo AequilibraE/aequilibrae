@@ -5,13 +5,12 @@ from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, St
 from aequilibrae.paths.cython.path_finding cimport (
     dijkstra as cpp_dijkstra,
     a_star as cpp_a_star,
-    Heuristic,
     HeuristicFn,
     haversine_heuristic,
     equirectangular_heuristic,
     SENTINEL,
 )
-from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, msleep
+from aequilibrae.utils.cython.bridge cimport Bridge
 
 from aequilibrae.utils.logging_utils import basic_config
 
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_dijkstra_example(type_of_heap: str = "FourAryHeap",
-                          destination: int | None = None):
+                         destination: int | None = None):
 
     basic_config(level=logging.DEBUG)
     cdef:
@@ -131,7 +130,6 @@ def run_a_star_example(type_of_heap: str = "FourAryHeap", heuristic: str = "have
         double lats[4]
         double lons[4]
         size_t nodes_to_indices[4]
-        Heuristic heur_enum
         HeuristicFn heur_fn
         void* heur_data
         double cos_lat1

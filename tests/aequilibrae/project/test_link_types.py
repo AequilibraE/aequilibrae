@@ -1,98 +1,90 @@
-from copy import copy, deepcopy
-from random import randint
+from dataclasses import FrozenInstanceError
+from string import ascii_letters, ascii_lowercase, ascii_uppercase
 
+import pandas as pd
 import pytest
 
-
-def test_get(sioux_falls_test):
-    links = sioux_falls_test.network.links
-    with pytest.raises(ValueError):
-        _ = links.get(123456)
-
-    link = links.get(1)
-    assert link.capacity_ab == 25900.20064, "Did not populate link correctly"
+from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
-def test_new(sioux_falls_test):
-    links = sioux_falls_test.network.links
-    new_link = links.new()
-
-    with sioux_falls_test.db_connection as conn:
-        id = conn.execute("Select max(link_id) + 1 from Links").fetchone()[0]
-    assert new_link.link_id == id, "Did not populate new link ID properly"
-    assert new_link.geometry is None, "Did not populate new geometry properly"
-
-
-def test_copy_link(sioux_falls_test):
-    links = sioux_falls_test.network.links
-
-    with pytest.raises(ValueError):
-        _ = links.copy_link(11111)
-
-    new_link = links.copy_link(11)
-    old_link = links.get(11)
-
-    assert new_link.geometry == old_link.geometry
-    assert new_link.a_node == old_link.a_node
-    assert new_link.b_node == old_link.b_node
-    assert new_link.direction == old_link.direction
-    assert new_link.distance == old_link.distance
-    assert new_link.modes == old_link.modes
-    assert new_link.link_type == old_link.link_type
-    new_link.save()
-
-
-def test_delete(sioux_falls_test):
-    links = sioux_falls_test.network.links
-
-    _ = links.get(10)
-
-    with sioux_falls_test.db_connection as conn:
-        tot = conn.execute("Select count(*) from Links").fetchone()[0]
-        links.delete(10)
-        links.delete(11)
-        tot2 = conn.execute("Select count(*) from Links").fetchone()[0]
-
-    assert tot == tot2 + 2, "Did not delete the link properly"
-
-    with pytest.raises(ValueError):
-        links.delete(123456)
-
-    with pytest.raises(ValueError):
-        _ = links.get(10)
+@pytest.fixture
+def link_types():
+    manager = NestedTransactionManager(":memory:")
+    manager._connection.executescript(
+        """
+        CREATE TABLE link_types (
+            link_type TEXT UNIQUE NOT NULL,
+            link_type_id TEXT UNIQUE NOT NULL CHECK (length(link_type_id) = 1),
+            description TEXT,
+            lanes NUMERIC,
+            lane_capacity NUMERIC,
+            speed NUMERIC
+        );
+        CREATE TABLE attributes_documentation (
+            name_table TEXT NOT NULL,
+            attribute TEXT NOT NULL,
+            description TEXT,
+            PRIMARY KEY (name_table, attribute)
+        );
+        INSERT INTO link_types
+            (link_type, link_type_id, description, lanes, lane_capacity)
+        VALUES
+            ('centroid_connector', 'z', 'Virtual connectors', 10, 10000),
+            ('default', 'y', 'Default link type', 2, 900);
+        """
+    )
+    yield LinkTypes(manager)
+    manager.close()
 
 
-def test_fields(sioux_falls_test):
-    links = sioux_falls_test.network.links
-    f_editor = links.fields
+def test_container_and_name_lookup_interfaces(link_types):
+    assert len(link_types) == 2
+    assert "y" in link_types
+    assert {record.link_type_id for record in link_types} == {"y", "z"}
+    assert link_types.get("y") == link_types.get_by_name("default")
 
-    fields = sorted(f_editor.all_fields())
-    with sioux_falls_test.db_connection as conn:
-        dt = conn.execute("pragma table_info(links)").fetchall()
-
-    actual_fields = sorted({x[1].replace("_ab", "").replace("_ba", "") for x in dt if x[1] != "ogc_fid"})
-    assert fields == actual_fields, "Table editor is weird for table links"
-
-
-def test_refresh(sioux_falls_test):
-    links = sioux_falls_test.network.links
-
-    link1 = links.get(1)
-    val = randint(1, 99999999)
-    original_value = link1.capacity_ba
-
-    link1.capacity_ba = val
-    link1_again = links.get(1)
-    assert link1_again.capacity_ba == val, "Did not preserve correctly"
-
-    links.refresh()
-    link1 = links.get(1)
-    assert link1.capacity_ba == original_value, "Did not reset correctly"
+    with pytest.raises(ValueError, match="link_types has no record with link_type_id='x'"):
+        link_types.get("x")
+    with pytest.raises(ValueError, match="Link type motorway does not exist"):
+        link_types.get_by_name("motorway")
 
 
-def test_copy(sioux_falls_test):
-    nodes = sioux_falls_test.network.nodes
-    with pytest.raises(Exception):
-        _ = copy(nodes)
-    with pytest.raises(Exception):
-        _ = deepcopy(nodes)
+def test_crud_and_immutable_record(link_types):
+    assert (
+        link_types.insert(link_type_id="a", link_type="arterial", description="Arterial", lanes=3, lane_capacity=1200)
+        == "a"
+    )
+    record = link_types.get("a")
+
+    link_types.update("a", speed=60, description="Major arterial")
+    assert record.speed is None
+    assert link_types.get("a").speed == 60
+    with pytest.raises(FrozenInstanceError, match="cannot assign to field 'speed'"):
+        record.speed = 30
+
+    link_types.delete("a")
+    assert "a" not in link_types
+
+
+def test_bulk_and_fields_interfaces(link_types):
+    additions = pd.DataFrame(
+        {
+            "link_type_id": ["a", "l"],
+            "link_type": ["arterial", "local"],
+            "lanes": [3, 1],
+        }
+    )
+    assert link_types.insert_from(additions) == ["a", "l"]
+    assert link_types.update_from(pd.DataFrame({"link_type_id": ["a", "l"], "speed": [60, 30]})) == 2
+    assert link_types.get_by_name("local").speed == 30
+
+    editor = link_types.fields
+    assert set(editor.all_fields()) == set(link_types.columns)
+
+
+def test_available_ids(link_types):
+    assert set(link_types.available_ids()) == set(ascii_letters) - {"y", "z"}
+    assert set(link_types.available_ids(full_list=ascii_lowercase)) == set(ascii_lowercase) - {"y", "z"}
+    assert set(link_types.available_ids(full_list=ascii_uppercase)) == set(ascii_uppercase)
+    assert set(link_types.available_ids(full_list=[])) == set()

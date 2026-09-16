@@ -1,9 +1,10 @@
-import pytest
 from os.path import join
 
-from aequilibrae.transit import Transit
+import pytest
+
 from aequilibrae.context import activate_project
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import read_and_close
 
 
@@ -20,6 +21,7 @@ def test_connection_with_new_project(empty_project):
 
 
 def test_connection_with_transit(empty_project):
+    empty_project.scenario.create_transit_database()
     Transit(empty_project)
     with read_and_close(join(empty_project.project_base_path, "public_transport.sqlite")) as conn:
         routes = conn.execute("select count(*) from routes").fetchone()[0]
