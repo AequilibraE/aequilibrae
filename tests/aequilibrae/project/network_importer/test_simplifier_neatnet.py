@@ -208,8 +208,6 @@ def test_unknown_kwargs_are_rejected():
         run_neatnet_simplify(_single_link_net(), consolidation_tolerance=5.0)
 
 
-
-
 def _net_from(coords, edges, link_type="residential"):
     """Build a StagedNetwork from explicit coordinates and (from, to) index pairs."""
     n = len(edges)

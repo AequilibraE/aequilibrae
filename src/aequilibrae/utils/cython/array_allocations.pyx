@@ -27,8 +27,8 @@ cpdef object array(shape, bint fill=True, ArrayElement fill_value=0):
         "unsigned long": "L",
         "long long": "q",
         "unsigned long long": "Q",
-        "ssize_t": "q", # HACK: should be "n" but cython doesn't support it for some reason
-        "size_t": "Q", # HACK: should be "N" but cython doesn't support it for some reason
+        "ssize_t": "q",  # HACK: should be "n" but cython doesn't support it for some reason
+        "size_t": "Q",  # HACK: should be "N" but cython doesn't support it for some reason
         "float": "f",
         "double": "d",
     }[cython.typeof(fill_value)]

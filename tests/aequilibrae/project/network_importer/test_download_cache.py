@@ -35,8 +35,6 @@ def test_write_geoparquet_creates_folder_and_round_trips(tmp_path):
     assert list(back["name"]) == ["a", "b"]
 
 
-
-
 def test_write_json_round_trips(tmp_path):
     cache = DownloadCache(tmp_path, "osm-overpass", "test")
     path = cache.write_json("notes", {"hello": "world"})

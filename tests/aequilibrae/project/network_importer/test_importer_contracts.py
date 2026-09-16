@@ -77,7 +77,6 @@ def test_missing_release_is_allowed_but_missing_other_keys_rejected():
             _normalize_source_meta(_minimal_net(meta))
 
 
-
 def test_run_forwards_consolidate_tolerance_to_any_simplifier(empty_project):
     from aequilibrae.project.network.importer.importer import NetworkImporter
 

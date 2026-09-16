@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <cstddef>
 
-#include "network_loading.hpp"
 #include "context.hpp"
+#include "network_loading.hpp"
 
 namespace aequilibrae::paths::cpp::mvp {
 

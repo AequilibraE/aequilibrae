@@ -57,8 +57,9 @@ struct MutableSearchResults {
   SearchMetadata *metadata = nullptr;
 
   SearchResults read_view() const noexcept {
-    return {node_count, state_count, link_count, predecessors, connectors,
-            settlement_order, terminal_states, distances, turn_costs, metadata};
+    return {node_count, state_count,      link_count,      predecessors,
+            connectors, settlement_order, terminal_states, distances,
+            turn_costs, metadata};
   }
 };
 

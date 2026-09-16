@@ -99,15 +99,19 @@ def _seg(seg_id, connectors, geometry, **over):
 def _degenerate_segments():
     """One usable segment plus the three malformed shapes seen in real Overture data."""
     rows = [
-        _seg("good", [{"connector_id": "c0", "at": 0.0}, {"connector_id": "c1", "at": 1.0}],
-             LineString([(0, 0), (0, 0.001)])),
+        _seg(
+            "good",
+            [{"connector_id": "c0", "at": 0.0}, {"connector_id": "c1", "at": 1.0}],
+            LineString([(0, 0), (0, 0.001)]),
+        ),
         # Identical 'at' offsets: no consecutive pair can be split (the Quito case).
-        _seg("no-splits", [{"connector_id": "c1", "at": 0.5}, {"connector_id": "c2", "at": 0.5}],
-             LineString([(0, 0.001), (0, 0.002)])),
-        _seg("one-connector", [{"connector_id": "c2", "at": 0.0}],
-             LineString([(0, 0.002), (0, 0.003)])),
-        _seg("empty-geom", [{"connector_id": "c0", "at": 0.0}, {"connector_id": "c1", "at": 1.0}],
-             LineString()),
+        _seg(
+            "no-splits",
+            [{"connector_id": "c1", "at": 0.5}, {"connector_id": "c2", "at": 0.5}],
+            LineString([(0, 0.001), (0, 0.002)]),
+        ),
+        _seg("one-connector", [{"connector_id": "c2", "at": 0.0}], LineString([(0, 0.002), (0, 0.003)])),
+        _seg("empty-geom", [{"connector_id": "c0", "at": 0.0}, {"connector_id": "c1", "at": 1.0}], LineString()),
     ]
     geoms = [r.pop("geometry") for r in rows]
     return gpd.GeoDataFrame(rows, geometry=geoms, crs="EPSG:4326")

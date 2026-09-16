@@ -30,8 +30,18 @@ def test_results_are_only_path_storage(context):
     assert not results.reachable_to(0)
     assert results.path_links_to(0).size == 0
     assert np.isinf(results.path_cost_to(0))
-    for name in ("context", "workspace", "prepared_skims", "destination_mask", "path_nodes_to",
-                 "path_nodes", "path_cost", "network_loading", "skim_fields", "select_link_loading"):
+    for name in (
+        "context",
+        "workspace",
+        "prepared_skims",
+        "destination_mask",
+        "path_nodes_to",
+        "path_nodes",
+        "path_cost",
+        "network_loading",
+        "skim_fields",
+        "select_link_loading",
+    ):
         assert not hasattr(results, name)
     for name in ("predecessors", "connectors", "settlement_order", "terminal_states"):
         values = getattr(results, name)
@@ -166,9 +176,19 @@ def test_topology_is_copied_costs_are_borrowed_and_rebound():
     assert np.shares_memory(context.costs, new_costs)
 
 
-@pytest.mark.parametrize("bad", [None, [1.0], np.ones(2), np.array([-1.0]), np.array([np.nan]),
-                                      np.ones(1, dtype=np.float32), np.ones(4)[::2],
-                                      np.ndarray((1,), dtype=np.float64, buffer=bytearray(9), offset=1)])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        None,
+        [1.0],
+        np.ones(2),
+        np.array([-1.0]),
+        np.array([np.nan]),
+        np.ones(1, dtype=np.float32),
+        np.ones(4)[::2],
+        np.ndarray((1,), dtype=np.float64, buffer=bytearray(9), offset=1),
+    ],
+)
 def test_invalid_cost_update_keeps_previous_binding(bad):
     context = make_context([0, 1, 1], [1], [3])
     before = context.costs
@@ -202,8 +222,15 @@ def test_readonly_views_and_reinitialization(turn):
     context = make_context([0, 1, 1], [1], [3], turn=turn)
     results = search(context, 0)
     query = SearchQuery(2, 0, np.array([False, True]))
-    for view in (context.fs, context.heads, context.costs, query.target_mask,
-                 results.predecessors, results.distances, results.terminal_states):
+    for view in (
+        context.fs,
+        context.heads,
+        context.costs,
+        query.target_mask,
+        results.predecessors,
+        results.distances,
+        results.terminal_states,
+    ):
         with pytest.raises(ValueError):
             view[0] = 0
         with pytest.raises(ValueError):
@@ -231,24 +258,37 @@ def test_centroid_blocking_is_a_search_input(turn):
 def test_shared_context_separate_workers(turn):
     n = 500
     context = make_context(np.r_[np.arange(n), n - 1], np.arange(1, n), np.ones(n - 1), turn=turn)
+
     def run(origin):
         results = allocate_results(context)
         query = SearchQuery(n, origin)
         for _ in range(5):
             dijkstra(context, query, results)
         return results.path_links_to(n - 1)
+
     with ThreadPoolExecutor(max_workers=4) as pool:
         paths = list(pool.map(run, range(8)))
     for origin, path in enumerate(paths):
         np.testing.assert_array_equal(path, np.arange(origin, n - 1))
 
 
-@pytest.mark.parametrize("fs, heads", [
-    ([], []), ([0], []), ([[0, 1]], [0]), ([0., 1.], [0]),
-    ([0, 1], [[0]]), ([0, 1], [0.0]), ([0, 1], [-1]),
-    ([-1, 1], [0]), ([1, 1], [0]), ([0, 2], [0]),
-    ([0, 2, 1], [0]), ([0, 1], [1]),
-])
+@pytest.mark.parametrize(
+    "fs, heads",
+    [
+        ([], []),
+        ([0], []),
+        ([[0, 1]], [0]),
+        ([0.0, 1.0], [0]),
+        ([0, 1], [[0]]),
+        ([0, 1], [0.0]),
+        ([0, 1], [-1]),
+        ([-1, 1], [0]),
+        ([1, 1], [0]),
+        ([0, 2], [0]),
+        ([0, 2, 1], [0]),
+        ([0, 1], [1]),
+    ],
+)
 def test_invalid_topology(fs, heads):
     with pytest.raises(ValueError):
         NodeBasedContext(fs, heads, np.ones(len(heads)))
@@ -266,8 +306,7 @@ def test_zero_cost_parallel_links_and_infinite_link(turn):
 @pytest.mark.parametrize("destination", [-1, 5, 2**100, True, 1.5, None])
 def test_invalid_path_query(context, destination):
     results = search(context, 0)
-    for operation in (results.reachable_to, results.path_links_to,
-                      results.path_cost_to, results.path_turn_cost_to):
+    for operation in (results.reachable_to, results.path_links_to, results.path_cost_to, results.path_turn_cost_to):
         with pytest.raises((ValueError, TypeError)):
             operation(destination)
 
@@ -276,8 +315,9 @@ def test_invalid_path_query(context, destination):
 def test_random_multigraph_against_networkx(seed):
     rng = np.random.default_rng(seed)
     n = 12
-    edges = [(a, b, float(rng.integers(0, 10))) for a in range(n) for b in range(n)
-             for _ in range(2) if rng.random() < 0.08]
+    edges = [
+        (a, b, float(rng.integers(0, 10))) for a in range(n) for b in range(n) for _ in range(2) if rng.random() < 0.08
+    ]
     graph = nx.MultiDiGraph()
     graph.add_nodes_from(range(n))
     graph.add_weighted_edges_from(edges)

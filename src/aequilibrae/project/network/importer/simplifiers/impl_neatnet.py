@@ -261,8 +261,21 @@ def _transfer_attributes(simplified: gpd.GeoDataFrame, original: gpd.GeoDataFram
 # nearest original, which stops e.g. footway/cycleway modes bleeding onto roads.
 _LINK_TYPE_FAMILIES = (
     {"motorway", "motorway_link", "trunk", "trunk_link"},
-    {"primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
-     "unclassified", "residential", "living_street", "service", "road", "busway", "bus_guideway"},
+    {
+        "primary",
+        "primary_link",
+        "secondary",
+        "secondary_link",
+        "tertiary",
+        "tertiary_link",
+        "unclassified",
+        "residential",
+        "living_street",
+        "service",
+        "road",
+        "busway",
+        "bus_guideway",
+    },
     {"footway", "pedestrian", "steps", "path", "corridor", "elevator", "escalator", "bridleway"},
     {"cycleway"},
 )
@@ -458,4 +471,3 @@ def _ordered_source_ids(candidates: list[tuple[str, float]]) -> list[str]:
         if source_id and source_id not in source_ids:
             source_ids.append(source_id)
     return source_ids
-

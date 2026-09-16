@@ -83,9 +83,7 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
 
     df["link_id"] = np.arange(1, len(df) + 1, dtype=np.int64)
     df["_source_ids"] = df["_source_refs"].apply(lambda refs: _base_source_ids(refs, oriented_src_attrs))
-    df[SOURCE_ID_COL] = [
-        ids[0] if ids else str(lid) for ids, lid in zip(df["_source_ids"], df["link_id"], strict=True)
-    ]
+    df[SOURCE_ID_COL] = [ids[0] if ids else str(lid) for ids, lid in zip(df["_source_ids"], df["link_id"], strict=True)]
 
     edge_modes = df["modes"].apply(_coerce_modes) if "modes" in df.columns else pd.Series("c", index=df.index)
     df["modes"] = [_aggregate_modes(sids, src_attrs, m) for sids, m in zip(df["_source_ids"], edge_modes, strict=True)]
@@ -212,9 +210,7 @@ def _normalize_source_refs(df: pd.DataFrame) -> pd.Series:
     if _SOURCE_REF_COL in df.columns:
         return df[_SOURCE_REF_COL].apply(_as_str_list)
     if SOURCE_ID_COL in df.columns:
-        return df[SOURCE_ID_COL].apply(
-            lambda values: [f"{value}::ab" for value in _as_str_list(values)]
-        )
+        return df[SOURCE_ID_COL].apply(lambda values: [f"{value}::ab" for value in _as_str_list(values)])
     return pd.Series([[] for _ in range(len(df))], index=df.index)
 
 

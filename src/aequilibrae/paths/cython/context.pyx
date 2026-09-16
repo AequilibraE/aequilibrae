@@ -17,36 +17,36 @@ from aequilibrae.utils.cython.array_allocations import readonly_view
 
 def validate_index_array(value, name):
     """Copy node or link indices, rejecting negative and non-integer values."""
-    array = np.asarray(value)
-    if array.ndim != 1:
+    index_array = np.asarray(value)
+    if index_array.ndim != 1:
         raise ValueError(f"{name} must be one-dimensional")
 
-    if array.size:
-        if array.dtype.kind not in "iu":
+    if index_array.size:
+        if index_array.dtype.kind not in "iu":
             raise ValueError(f"{name} must contain integers")
 
-        if np.any(array < 0) or np.any(array > np.iinfo(np.uintp).max):
+        if np.any(index_array < 0) or np.any(index_array > np.iinfo(np.uintp).max):
             raise ValueError(f"{name} contains an invalid index")
 
-    return np.array(array, dtype=np.uintp, order="C", copy=True)
+    return np.array(index_array, dtype=np.uintp, order="C", copy=True)
 
 
 def validate_offsets(value, name, expected_end, end_description, expected_size=None):
     """Copy row offsets and check their length, order and endpoints."""
-    array = validate_index_array(value, name)
+    offsets = validate_index_array(value, name)
 
     if expected_size is None:
-        if array.size < 2:
+        if offsets.size < 2:
             raise ValueError(f"{name} must describe at least one node")
-    elif array.size != expected_size:
+    elif offsets.size != expected_size:
         raise ValueError(f"{name} must have {expected_size} entries")
 
-    if array[0] != 0 or array[-1] != expected_end:
+    if offsets[0] != 0 or offsets[-1] != expected_end:
         raise ValueError(f"{name} must start at zero and end at {end_description}")
 
-    if np.any(array[1:] < array[:-1]):
+    if np.any(offsets[1:] < offsets[:-1]):
         raise ValueError(f"{name} must be non-decreasing")
-    return array
+    return offsets
 
 
 cdef class GraphContext:

@@ -23,7 +23,7 @@ def test_array_rejects_invalid_shapes(shape, error):
 
 @pytest.mark.parametrize("buffer_kind", ["numpy", "python", "cython"])
 def test_readonly_view_retains_shared_data(buffer_kind):
-    source = array["double"]((2, 3), True, 7) if buffer_kind == "cython" else np.full((2, 3), 7.)
+    source = array["double"]((2, 3), True, 7) if buffer_kind == "cython" else np.full((2, 3), 7.0)
     if buffer_kind == "python":
         source = memoryview(source)
     writable = np.asarray(source)

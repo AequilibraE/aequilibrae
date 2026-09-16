@@ -15,8 +15,9 @@ def make_context(fs, heads, costs, turns=None, *, turn=False, **options):
     turns = {} if turns is None else turns
     pairs = sorted(turns)
     offsets = np.r_[0, np.cumsum(np.bincount([a for a, _ in pairs], minlength=len(heads)))]
-    return TurnBasedContext(fs, heads, costs, offsets, [b for _, b in pairs],
-                            [turns[pair] for pair in pairs], **options)
+    return TurnBasedContext(
+        fs, heads, costs, offsets, [b for _, b in pairs], [turns[pair] for pair in pairs], **options
+    )
 
 
 def history_context(penalty=10.0, *, turn=True):
@@ -41,7 +42,7 @@ def search(context, origin, targets=None, results=None):
 
 
 def assert_state_tree(context, results):
-    order = results.settlement_order[:results.settled_count]
+    order = results.settlement_order[: results.settled_count]
     rank = {int(state): i for i, state in enumerate(order)}
     assert len(rank) == results.settled_count
     assert order[0] == results.root
@@ -59,7 +60,7 @@ def assert_state_tree(context, results):
     assert np.all(results.connectors[unfinalized] == results.sentinel)
     assert np.all(np.isinf(results.distances[unfinalized]))
     assert np.all(np.isinf(results.turn_costs[unfinalized]))
-    assert np.all(results.settlement_order[results.settled_count:] == results.sentinel)
+    assert np.all(results.settlement_order[results.settled_count :] == results.sentinel)
     for node, terminal in enumerate(results.terminal_states):
         if terminal != results.sentinel:
             assert int(terminal) in rank

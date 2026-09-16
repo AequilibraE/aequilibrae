@@ -39,6 +39,7 @@ import pandas as pd
 
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.utils.create_example import create_example
 
 
@@ -48,8 +49,7 @@ def run_assignment(graph, matrix):
 
     assignment = TrafficAssignment()
     assignment.set_classes([traffic_class])
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.set_algorithm("bfw")

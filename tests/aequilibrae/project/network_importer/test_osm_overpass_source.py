@@ -295,8 +295,7 @@ def test_subdivision_preserves_disconnected_coverage():
 
 def _pin_settings(monkeypatch):
     """Snapshot the osmnx globals we mutate so monkeypatch restores them."""
-    for attr in ("overpass_url", "nominatim_url", "requests_timeout", "http_accept_language",
-                 "overpass_rate_limit"):
+    for attr in ("overpass_url", "nominatim_url", "requests_timeout", "http_accept_language", "overpass_rate_limit"):
         monkeypatch.setattr(osmnx.settings, attr, getattr(osmnx.settings, attr))
 
 
@@ -353,14 +352,31 @@ def _reciprocal_graph():
     for nid, (x, y) in {1: (0.0, 0.0), 2: (0.001, 0.0), 3: (0.002, 0.0)}.items():
         g.add_node(nid, x=x, y=y)
     fwd = LineString([(0.0, 0.0), (0.001, 0.0)])
-    g.add_edge(1, 2, key=0, osmid=100, highway="residential", oneway=False, reversed=False,
-               length=111.0, geometry=fwd)
-    g.add_edge(2, 1, key=0, osmid=100, highway="residential", oneway=False, reversed=True,
-               length=111.0, geometry=LineString(list(fwd.coords)[::-1]))
+    g.add_edge(1, 2, key=0, osmid=100, highway="residential", oneway=False, reversed=False, length=111.0, geometry=fwd)
+    g.add_edge(
+        2,
+        1,
+        key=0,
+        osmid=100,
+        highway="residential",
+        oneway=False,
+        reversed=True,
+        length=111.0,
+        geometry=LineString(list(fwd.coords)[::-1]),
+    )
     # An ``oneway=-1`` way: osmnx normalises it to oneway=True and emits a single
     # already-reversed edge whose geometry runs in the direction of travel.
-    g.add_edge(3, 2, key=0, osmid=200, highway="primary", oneway=True, reversed=True,
-               length=111.0, geometry=LineString([(0.002, 0.0), (0.001, 0.0)]))
+    g.add_edge(
+        3,
+        2,
+        key=0,
+        osmid=200,
+        highway="primary",
+        oneway=True,
+        reversed=True,
+        length=111.0,
+        geometry=LineString([(0.002, 0.0), (0.001, 0.0)]),
+    )
     return g
 
 

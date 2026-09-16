@@ -85,10 +85,16 @@ def test_edgeless_and_intrazonal(turn, nodes):
 
 
 @pytest.mark.parametrize("cost", [0, 1])
-@pytest.mark.parametrize("allow_uturns, override, reachable", [
-    (True, None, True), (False, None, False), (False, 0, True),
-    (False, 2, True), (True, np.inf, False),
-])
+@pytest.mark.parametrize(
+    "allow_uturns, override, reachable",
+    [
+        (True, None, True),
+        (False, None, False),
+        (False, 0, True),
+        (False, 2, True),
+        (True, np.inf, False),
+    ],
+)
 def test_uturn_policy_and_zero_cost_cycles(cost, allow_uturns, override, reachable):
     turns = {(0, 2): np.inf}
     if override is not None:
@@ -107,12 +113,15 @@ def test_turn_topology_copied_then_shared_by_independent_objectives():
     offsets = np.array([0, 99, 1, 99, 1])[::2]
     links = np.array([1, 99])[::2]
     penalties = np.array([2.5, 99])[::2]
-    context = TurnBasedContext([0, 1, 2, 2], [1, 2], np.array([1., 2.]), offsets, links, penalties)
-    for source, output in ((offsets, context.turn_fs), (links, context.turn_to_links),
-                           (penalties, context.turn_penalties)):
+    context = TurnBasedContext([0, 1, 2, 2], [1, 2], np.array([1.0, 2.0]), offsets, links, penalties)
+    for source, output in (
+        (offsets, context.turn_fs),
+        (links, context.turn_to_links),
+        (penalties, context.turn_penalties),
+    ):
         assert not np.shares_memory(source, output)
         source[:] = 99
-    other = context.with_costs(np.array([2., 3.]))
+    other = context.with_costs(np.array([2.0, 3.0]))
     for name in ("fs", "heads", "tails", "turn_fs", "turn_to_links", "turn_penalties"):
         assert np.shares_memory(getattr(context, name), getattr(other, name))
     assert search(context, 0).path_cost_to(2) == 5.5
@@ -120,13 +129,22 @@ def test_turn_topology_copied_then_shared_by_independent_objectives():
     assert search(other, 0).path_cost_to(2) == 7.5
 
 
-@pytest.mark.parametrize("offsets, links, penalties", [
-    ([0, 0], [], []), ([1, 1, 1], [1], [0]), ([0, 2, 1], [1], [0]),
-    ([0, 1, 1], [2], [0]), ([0, 1, 1], [-1], [0]), ([0, 1, 1], [1.0], [0]),
-    ([0, 1, 1], [1], [-1]), ([0, 1, 1], [1], [np.nan]),
-    ([0, 2, 2], [1, 1], [0, 0]), ([0, 1, 1], [0], [0]),
-    ([0, 1, 1], None, [0]),
-])
+@pytest.mark.parametrize(
+    "offsets, links, penalties",
+    [
+        ([0, 0], [], []),
+        ([1, 1, 1], [1], [0]),
+        ([0, 2, 1], [1], [0]),
+        ([0, 1, 1], [2], [0]),
+        ([0, 1, 1], [-1], [0]),
+        ([0, 1, 1], [1.0], [0]),
+        ([0, 1, 1], [1], [-1]),
+        ([0, 1, 1], [1], [np.nan]),
+        ([0, 2, 2], [1, 1], [0, 0]),
+        ([0, 1, 1], [0], [0]),
+        ([0, 1, 1], None, [0]),
+    ],
+)
 def test_invalid_turn_tables(offsets, links, penalties):
     with pytest.raises(ValueError):
         TurnBasedContext([0, 1, 2, 2], [1, 2], np.ones(2), offsets, links, penalties)
@@ -162,8 +180,9 @@ def expanded_oracle(context, turns, origin):
 def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
     rng = np.random.default_rng(seed)
     n = 8
-    edges = [(a, b, float(rng.integers(0, 8))) for a in range(n) for b in range(n)
-             for _ in range(2) if rng.random() < 0.12]
+    edges = [
+        (a, b, float(rng.integers(0, 8))) for a in range(n) for b in range(n) for _ in range(2) if rng.random() < 0.12
+    ]
     turns = {}
     for incoming, (_, via, _) in enumerate(edges):
         for outgoing, (tail, _, _) in enumerate(edges):
@@ -175,13 +194,22 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
     for origin in range(n):
         oracle = expanded_oracle(context, turns, origin)
         for destination in range(n):
-            expected = 0 if origin == destination else min(
-                (oracle.get(link, np.inf) for link in range(context.link_count)
-                 if context.heads[link] == destination), default=np.inf)
+            expected = (
+                0
+                if origin == destination
+                else min(
+                    (
+                        oracle.get(link, np.inf)
+                        for link in range(context.link_count)
+                        if context.heads[link] == destination
+                    ),
+                    default=np.inf,
+                )
+            )
             search(context, origin, destination, results)
             assert results.path_cost_to(destination) == expected
             assert_state_tree(context, results)
-            for state in results.settlement_order[:results.settled_count]:
+            for state in results.settlement_order[: results.settled_count]:
                 assert results.distances[state] == oracle[state]
             if not results.reachable_to(destination):
                 continue

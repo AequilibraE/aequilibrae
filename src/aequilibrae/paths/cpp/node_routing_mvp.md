@@ -33,7 +33,9 @@ from aequilibrae.paths.cython.dijkstra import dijkstra
 # Links: 0: 0->1, 1: 0->2, 2: 1->3, 3: 2->1.
 costs = np.ones(4, dtype=np.float64)
 context = TurnBasedContext(
-    [0, 2, 3, 4, 4], [1, 2, 3, 1], costs,
+    [0, 2, 3, 4, 4],
+    [1, 2, 3, 1],
+    costs,
     turn_fs=[0, 1, 1, 1, 1],
     turn_to_links=[2],
     turn_penalties=[10.0],
@@ -223,7 +225,10 @@ that wrote them. Zero class and field widths produce empty buffers.
 from aequilibrae.paths.cython.workspaces import AoNWorkspace
 
 workspace = AoNWorkspace(
-    context.state_count, class_count=2, field_count=3, select_links=True,
+    context.state_count,
+    class_count=2,
+    field_count=3,
+    select_links=True,
 )
 loading_scratch = workspace.loading
 skim_scratch = workspace.skimming
@@ -265,7 +270,7 @@ loads = LoadingOutputs(results.link_count, 2)
 
 network_loading(results, loading_query, loading_scratch, loads)
 link_loads = loads.link_loads  # Read-only, zero-copy view.
-loads.reset()                # Clear once before the next iteration's origins.
+loads.reset()  # Clear once before the next iteration's origins.
 ```
 
 `network_loading(results, query, workspace, output)` checks dimensions before
@@ -514,15 +519,21 @@ from aequilibrae.paths.cython.select_link_loading import select_link_loading
 from aequilibrae.paths.cython.workspaces import SelectLinkWorkspace, LoadingWorkspace
 
 selection_inputs = SelectLinkContext(
-    results.link_count, {"screenline": [0, 3], "other": [2]},
+    results.link_count,
+    {"screenline": [0, 3], "other": [2]},
 )
 selected = selection_inputs.make_outputs(results.node_count, class_count=2)
 flags = SelectLinkWorkspace(results.state_count)
 cascade = LoadingWorkspace(results.state_count, 2)
 
 select_link_loading(
-    results, LoadingQuery(demand), selection_inputs, flags, cascade,
-    selected.loading, selected.od,
+    results,
+    LoadingQuery(demand),
+    selection_inputs,
+    flags,
+    cascade,
+    selected.loading,
+    selected.od,
 )
 selected_loads = selected.loading.loads["screenline"]
 selected_demand = selected.od.matrices["screenline"]
@@ -530,7 +541,10 @@ selected_demand = selected.od.matrices["screenline"]
 # OD-only analysis needs neither link accumulators nor loading scratch.
 od_only = selection_inputs.make_outputs(results.node_count, 2, link_loads=False)
 select_link_loading(
-    results, LoadingQuery(demand), selection_inputs, flags,
+    results,
+    LoadingQuery(demand),
+    selection_inputs,
+    flags,
     od_output=od_only.od,
 )
 ```

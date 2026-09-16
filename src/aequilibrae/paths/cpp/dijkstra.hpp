@@ -108,7 +108,8 @@ void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   const auto &graph = context.graph;
   // Link states preserve incoming-link history. One virtual root lets first
-  // links leave the origin without paying a turn cost, including edgeless graphs.
+  // links leave the origin without paying a turn cost, including edgeless
+  // graphs.
   const auto root = graph.link_count;
   reset_search(query, root, results);
   auto &metadata = *results.metadata;
@@ -143,8 +144,9 @@ void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
       if (queue.effective_state(next) == SCANNED) {
         continue;
       }
-      // Sorted turn rows can be merged with outgoing links without materializing
-      // an expanded graph or looking up a turn in a Python mapping.
+      // Sorted turn rows can be merged with outgoing links without
+      // materializing an expanded graph or looking up a turn in a Python
+      // mapping.
       while (turn < turn_end && context.turn_to_links[turn] < next) {
         ++turn;
       }

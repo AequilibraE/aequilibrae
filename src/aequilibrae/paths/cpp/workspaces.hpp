@@ -12,7 +12,8 @@ template <typename T> struct LoadingWorkspace {
   T *state_loads = nullptr; // [states, classes]
 };
 
-// Only additive fields need state sums. Direct cost projection needs no scratch.
+// Only additive fields need state sums. Direct cost projection needs no
+// scratch.
 template <typename T> struct SkimmingWorkspace {
   std::size_t state_count = 0;
   std::size_t field_count = 0;

@@ -123,4 +123,3 @@ def _base_source_id(rec: dict) -> str:
     if source_id is None:
         return str(rec["link_id"])
     return str(source_id)
-

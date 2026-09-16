@@ -68,7 +68,7 @@ Each item in the 'nodes' table is an immutable ``NodeRecord``.
 
     # We can check the existing fields for each node in the 'nodes' table
     >>> project_nodes.columns
-    ('node_id', 'is_centroid', 'modes', 'link_types', 'geometry', 'osm_id')
+    ('node_id', 'is_centroid', 'modes', 'link_types', 'geometry', 'osm_id', 'other_attributes')
 
     # Let's renumber this node
     >>> project_nodes.renumber(node_id=10070, new_id=1000)

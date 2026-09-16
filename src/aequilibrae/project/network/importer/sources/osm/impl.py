@@ -56,6 +56,7 @@ _RESERVED_LINK_COLS = {
 }
 _NON_TAG_COLS = {"u", "v", "key", "a_node", "b_node", "geometry", "distance", "osmid", "osm_id"}
 
+
 def acquire_overpass(
     *,
     modes: Sequence[str],

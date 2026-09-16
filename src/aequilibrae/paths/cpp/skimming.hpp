@@ -5,9 +5,9 @@
 #include <limits>
 #include <type_traits>
 
+#include "context.hpp"
 #include "outputs.hpp"
 #include "search_results.hpp"
-#include "context.hpp"
 #include "workspaces.hpp"
 
 namespace aequilibrae::paths::cpp::mvp {
