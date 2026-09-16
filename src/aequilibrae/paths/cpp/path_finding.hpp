@@ -1,6 +1,7 @@
 #pragma once
 #include "aeq_log.hpp"
 #include "pq_heap_base.hpp"
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <type_traits>

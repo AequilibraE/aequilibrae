@@ -97,10 +97,14 @@ res.milepost
 res = graph.compute_path(32343, 22041, early_exit=True)
 
 # %%
-# If you prefer to find a potentially non-optimal path to the destination faster, 
-# provide ``a_star=True`` to use `A*` with a heuristic. This method always recomputes the 
-# path's nodes, links, skims, and mileposts with ``update_trace``. 
-# Note that a_star takes precedence over early_exit.
+# If you prefer to find a potentially non-optimal path to the destination faster,
+# provide ``a_star=True`` to use `A*` with a heuristic. This method always recomputes the
+# path's nodes, links, skims, and mileposts with ``update_trace``.
+# A* is not compatible with active turn restrictions, so clear them and turn off
+# centroid-flow blocking for this separate demonstration. Note that a_star takes
+# precedence over early_exit.
+graph.clear_turn_restrictions()
+graph.set_blocked_centroid_flows(False)
 res = graph.compute_path(32343, 22041, a_star=True)
 
 # %%

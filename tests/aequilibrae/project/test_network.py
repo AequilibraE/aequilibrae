@@ -2,6 +2,7 @@ import pytest
 
 from shapely.geometry import Polygon
 
+
 def test_import_from_osm_via_pbf(empty_project):
     pytest.importorskip("pyrosm")
     from pyrosm import get_data

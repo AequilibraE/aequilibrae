@@ -43,6 +43,7 @@ def test_about_keys_updated_in_place_on_reimport(empty_project, pbf_path):
     second_ts = _about(empty_project.path_to_file)["network_source_fetched_at"]
     assert first_ts != second_ts
 
+
 def test_about_not_written_when_db_write_fails(empty_project, pbf_path, monkeypatch):
     from aequilibrae.project.network.importer import db_writer
 

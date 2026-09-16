@@ -28,6 +28,16 @@ class MultiThreadedAoN:
         self.temp_sl_link_loading = np.array([])
         # Maps the names of the SL link sets to array indices
         self.sl_idx = {}
+        # Arc predecessors for turn restrictions (arc-based path finding)
+        self.arc_predecessors = np.array([])
+        # Node-level turn penalties for arc-based skimming
+        self.node_turn_penalties = np.array([])
+        # Arc-level turn penalties for network loading (path reconstruction)
+        self.arc_turn_penalties = np.array([])
+        # Total turn penalty accumulator (per thread)
+        self.turn_penalty_accumulator = np.array([])
+        # Arc-based node label costs (per thread)
+        self.node_label_costs = np.array([])
 
     # In case we want to do by hand, we can prepare each method individually
 
@@ -35,10 +45,25 @@ class MultiThreadedAoN:
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
         compact_b_nodes = graph.compact_graph.b_node.to_numpy(copy=False)
+        self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
+
+        # Allocate arc predecessors if turn restrictions are present
+        size_nodes = results.compact_nodes if graph.has_turn_restrictions else 1
+        self.node_label_costs = np.zeros((results.cores, size_nodes), dtype=ftype)
+        self.node_turn_penalties = np.zeros((results.cores, size_nodes), dtype=ftype)
+
+        self.turn_penalty_accumulator = np.zeros(results.cores, dtype=ftype)
+
+        size_links = graph.compact_num_links + 1 if graph.has_turn_restrictions else 1
+        self.arc_predecessors = np.zeros((results.cores, size_links), dtype=itype)
+        self.arc_turn_penalties = np.zeros((results.cores, size_links), dtype=ftype)
 
         if results.save_path_file:
-            self.predecessors = np.zeros((graph.num_zones, results.compact_nodes), dtype=itype)
-            self.connectors = np.zeros((graph.num_zones, results.compact_nodes), dtype=itype)
+            # Keep output rows separate from per-thread routing scratch. Otherwise
+            # thread 0 overwrites the tree stored for origin 0 on its next origin.
+            rows = graph.num_zones + results.cores
+            self.predecessors = np.zeros((rows, results.compact_nodes), dtype=itype)
+            self.connectors = np.zeros((rows, results.compact_nodes), dtype=itype)
         else:
             self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
             self.connectors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
@@ -82,11 +107,16 @@ class MultiThreadedAoN:
         b_nodes = graph.graph["b_node"].to_numpy()
 
         mapping_idx, mapping_data, _ = graph.create_compressed_link_network_mapping()
+        # The compression mapping stores stable supernetwork IDs, while path
+        # serialization indexes the current graph row order.
+        supernet_ids = graph.graph["__supernet_id__"].to_numpy()
+        row_by_supernet = np.empty(graph.num_links, dtype=np.int64)
+        row_by_supernet[supernet_ids] = np.arange(graph.num_links)
         counts = np.diff(mapping_idx).astype(int)
 
         all_preds = self.predecessors
         all_conns = self.connectors
-        num_origins = all_preds.shape[0]
+        num_origins = graph.num_zones
         num_network_nodes = len(graph.all_nodes)
 
         # Scratch buffers reused per origin
@@ -123,14 +153,14 @@ class MultiThreadedAoN:
                 conns = all_conns[origin]
 
                 # Which compact nodes / compressed links are used?
-                valid = preds != -1
+                valid = (preds != -1) & (conns >= 0)
                 used_clinks = np.unique(conns[valid])
 
                 is_used = np.zeros(len(mapping_idx) - 1, dtype=bool)
                 is_used[used_clinks] = True
 
                 expanded_mask = np.repeat(is_used, counts)
-                graph_idxs = mapping_data[expanded_mask]
+                graph_idxs = row_by_supernet[mapping_data[expanded_mask]]
 
                 tail = b_nodes[graph_idxs]
                 head = a_nodes[graph_idxs]

@@ -70,11 +70,11 @@ _RULE_ARRAY_KEYS = frozenset(_OTHER_ATTRIBUTE_KEYS[-4:])
 
 
 def build_staged_from_overture(
-        *,
-        connectors: gpd.GeoDataFrame,
-        segments: gpd.GeoDataFrame,
-        modes: Sequence[str],
-        source_meta: dict,
+    *,
+    connectors: gpd.GeoDataFrame,
+    segments: gpd.GeoDataFrame,
+    modes: Sequence[str],
+    source_meta: dict,
 ) -> StagedNetwork:
     if len(segments) == 0:
         raise ImporterError("Overture returned no segments in the requested area")
@@ -110,8 +110,9 @@ def build_staged_from_overture(
         link_rows.extend(rows)
 
     if synthetic_nodes:
-        connectors = pd.concat([connectors, gpd.GeoDataFrame(synthetic_nodes, geometry="geometry", crs="EPSG:4326")],
-                               ignore_index=True)
+        connectors = pd.concat(
+            [connectors, gpd.GeoDataFrame(synthetic_nodes, geometry="geometry", crs="EPSG:4326")], ignore_index=True
+        )
         logger.info(f"Synthesized {len(synthetic_nodes)} Overture connectors from segment geometries")
 
     logger.info(f"Mode filter removed {skipped.get('mode_filter', 0)} Overture segments")
@@ -148,13 +149,13 @@ def build_staged_from_overture(
 
 
 def _segment_to_links(
-        seg: dict,
-        geom,
-        gers_to_node: dict,
-        requested_codes: set,
-        synthetic_nodes: list,
-        next_node_id: int,
-        skipped: dict,
+    seg: dict,
+    geom,
+    gers_to_node: dict,
+    requested_codes: set,
+    synthetic_nodes: list,
+    next_node_id: int,
+    skipped: dict,
 ) -> tuple[list, int]:
     """Convert one Overture segment into staged link rows.
 
@@ -358,4 +359,3 @@ def _normalize_segments(segments: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         if col not in segments.columns:
             segments[col] = default
     return segments
-

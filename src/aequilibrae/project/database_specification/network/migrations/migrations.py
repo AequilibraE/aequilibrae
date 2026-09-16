@@ -2,7 +2,7 @@ import pathlib
 
 path = pathlib.Path(__file__).parent
 
-migrations: tuple[int, pathlib.Path] = [
+migrations: list[pathlib.Path] = [
     path / "000_initial_migration.py",
     path / "001_add_cols_to_results.py",
     path / "002_add_scenario_table.py",
@@ -12,4 +12,5 @@ migrations: tuple[int, pathlib.Path] = [
     path / "006_add_about_table.py",
     path / "007_add_zones_table.py",
     path / "008_add_other_attributes.py",
+    path / "009_add_turn_restrictions.py",
 ]

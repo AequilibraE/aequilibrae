@@ -23,7 +23,6 @@ _OTHER_LINK_TYPE = "other_link_types"
 
 
 class SpatialiteWriter:
-
     def __init__(self, project: "Project"):
         self.project = project
         self.path = project.path_to_file

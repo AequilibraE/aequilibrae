@@ -1,30 +1,31 @@
 thisdir = 'aequilibrae/project/network'
 
 pyfiles = [
-  '__init__.py',
-  'connector_creation.py',
-  'gmns_builder.py',
-  'gmns_exporter.py',
-  'importers.py',
-  'link_types.py',
-  'links.py',
-  'modes.py',
-  'network.py',
-  'nodes.py',
-  'periods.py',
-  'zones.py',
+    '__init__.py',
+    'connector_creation.py',
+    'gmns_builder.py',
+    'gmns_exporter.py',
+    'importers.py',
+    'link_types.py',
+    'links.py',
+    'modes.py',
+    'network.py',
+    'nodes.py',
+    'periods.py',
+    'turn_restrictions.py',
+    'zones.py',
 ]
 
 pkgs = [
-  'importer',
+    'importer',
 ]
 
 py.install_sources(
-  pyfiles,
-  pure: false,
-  subdir: thisdir,
+    pyfiles,
+    pure: false,
+    subdir: thisdir,
 )
 
 foreach pkg : pkgs
-  subdir(pkg)
+    subdir(pkg)
 endforeach

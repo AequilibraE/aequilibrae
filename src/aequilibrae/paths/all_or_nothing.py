@@ -49,21 +49,28 @@ class allOrNothing(WorkerThread):
 
         Dispatches all origins to a single OpenMP-parallel Cython kernel
         (``aon_parallel``). This avoids the per-origin Python pool dispatch
-        overhead the previous ThreadPool-based path paid. Path file saving
-        requires the GIL, so that case keeps the per-origin thread pool.
+        overhead the previous ThreadPool-based path paid. Graphs with turn
+        restrictions are handled there too, by the arc-based branch of that
+        kernel. Path file saving requires the GIL, so it is the only case that
+        still falls back to the per-origin thread pool over ``one_to_all``.
         """
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
         self.signal.emit(["set_text", msg])
         self.report = []
         self.cumulative = 0
         self.aux_res.prepare(self.graph, self.results)
+        # Reset turn penalty accumulator for this iteration
+        if self.graph.has_turn_restrictions and self.aux_res.turn_penalty_accumulator.size > 0:
+            self.aux_res.turn_penalty_accumulator.fill(0.0)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape(
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
         )
         with debug_bridge(logger) as bridge:
-            skipped = aon_parallel(
-                self.matrix, self.graph, self.results, self.aux_res, self.results.cores, bridge=bridge
-            )
+            # Path-file snapshots retain an origin-indexed predecessor tree.
+            # Keep that mode serial; ordinary assignments retain their configured
+            # OpenMP parallelism.
+            cores = 1 if self.results.save_path_file else self.results.cores
+            skipped = aon_parallel(self.matrix, self.graph, self.results, self.aux_res, cores, bridge=bridge)
             self.report.extend(skipped)
         val = self.matrix.index.shape[0]
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {val}/{self.matrix.zones}"

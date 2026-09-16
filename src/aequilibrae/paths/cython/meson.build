@@ -1,36 +1,47 @@
 thisdir = 'aequilibrae/paths/cython'
 
 pyfiles = [
-  '__init__.py',
+    '__init__.py',
 ]
 
 exts = [
-  'AoN',
-  'basic_path_finding',
-  'graph_building',
-  'parallel_numpy',
-  'public_transport',
-  'route_choice_link_loading_results',
-  'route_choice_set',
-  'route_choice_set_results',
-  'skimming_core',
-  'vdf_core',
-  'new_path_finding'
+    'AoN',
+    'aon_context',
+    'basic_path_finding',
+    'graph_building',
+    'parallel_numpy',
+    'public_transport',
+    'route_choice_link_loading_results',
+    'route_choice_set',
+    'route_choice_set_results',
+    'skimming_core',
+    'vdf_core',
+    'new_path_finding',
+    'context',
+    'search_results',
+    'queries',
+    'workspaces',
+    'outputs',
+    'network_loading',
+    'skimming',
+    'select_link_loading',
+    'dijkstra',
 ]
 
 py.install_sources(
-  pyfiles,
-  pure: false,
-  subdir: thisdir,
+    pyfiles,
+    pure: false,
+    subdir: thisdir,
 )
 
 foreach ext : exts
-  py.extension_module(
-    ext,
-    ext + '.pyx',
-    dependencies: deps,
-    install: true,
-    subdir: thisdir,
-    include_directories: incdir,
-  )
+    sources = [ext + '.pyx']
+    py.extension_module(
+        ext,
+        sources,
+        dependencies: deps,
+        install: true,
+        subdir: thisdir,
+        include_directories: incdir,
+    )
 endforeach

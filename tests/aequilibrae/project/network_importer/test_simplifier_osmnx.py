@@ -32,6 +32,7 @@ def test_simplify_osmnx_runs_and_reduces(empty_project, pbf_path):
     assert n_links > 0
     assert n_nodes > 0
 
+
 def test_simplify_osmnx_with_consolidation(empty_project, pbf_path):
     empty_project.network.importer.osm(
         pbf_path=pbf_path,
@@ -178,8 +179,6 @@ def test_graph_to_staged_reorients_reverse_one_way_as_forward_row_geometry():
     assert row["speed_ba"] is None
     assert row["lanes_ab"] == 1
     assert row["lanes_ba"] is None
-
-
 
 
 def _linear_net(direction, **link_overrides):

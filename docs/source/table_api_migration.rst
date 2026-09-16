@@ -8,7 +8,7 @@ new API are immutable records, and the removed classes and methods have no
 compatibility aliases.
 
 The same table workflow is used by ``links``, ``nodes``, ``modes``,
-``link_types``, ``periods``, ``zones``, ``matrices``, and ``results``. The
+``link_types``, ``periods``, ``turn_restrictions``, ``zones``, ``matrices``, and ``results``. The
 zones table has moved from ``project.zoning`` to ``project.network.zones``.
 The table class is now ``Zones`` in ``aequilibrae.project.network.zones``.
 
@@ -328,6 +328,42 @@ ID:
         end=9 * 60 * 60,
         description="Morning peak",
     )
+
+Turn restrictions
+-----------------
+
+Turn restrictions now use the same spatial-table API:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Previous method
+     - Table API
+   * - ``add_restriction(...)``
+     - ``insert(from_node=..., via_node=..., to_node=..., modes=..., ...)``
+   * - ``add_restrictions_from_dataframe(frame)``
+     - ``insert_from(frame)``
+   * - ``get_restriction(key)``
+     - ``get(key, default=None)`` (an immutable record, not a dictionary)
+   * - ``update_restriction(key, ...)``
+     - ``update(key, ...)``
+   * - ``remove_restriction(key)``
+     - ``delete(key)``
+   * - ``count()``
+     - ``len(turns)``
+
+``clear_restrictions()`` still deletes all turns and returns the count.
+``update()`` and ``delete()`` return nothing and raise ``ValueError`` for missing
+keys. Connection arguments are gone; group writes with ``project.transaction()``.
+
+Both scalar and bulk inserts now require explicit modes. Database triggers
+reject missing, empty, unknown or repeated mode IDs and overlapping restrictions
+with ``sqlite3.IntegrityError``. Modes are stored as supplied, without sorting
+or removing duplicates. Updates leave omitted fields unchanged; setting
+``modes=None`` is rejected rather than selecting all modes.
+
+Scalar and bulk writes still normalize penalties. ``None``, ``NaN`` and positive
+infinity penalties prohibit the turn.
 
 Transactions and custom table integrations
 -------------------------------------------

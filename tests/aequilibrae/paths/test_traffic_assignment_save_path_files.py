@@ -98,11 +98,17 @@ def test_save_path_files(assignment_setup):
             dest_mask = matrix.matrix_view[o_idx, :, 0] > 0
             dest_nodes = np.where(dest_mask)[0]
 
-            for dest_compact_idx in dest_nodes:
-                demand = matrix.matrix_view[o_idx, dest_compact_idx, 0]
-                path = _trace_path(predecessors, connectors, dest_compact_idx, origin_node_idx)
-                assert len(path) > 0, f"Empty path from {origin} to dest idx {dest_compact_idx}"
-                _assert_valid_path(path, a_nodes, b_nodes, origin_node_idx, dest_compact_idx)
+            for dest_matrix_idx in dest_nodes:
+                demand = matrix.matrix_view[o_idx, dest_matrix_idx, 0]
+                destination = matrix.index[dest_matrix_idx]
+                dest_node_idx = graph.nodes_to_indices[destination]
+                path = _trace_path(predecessors, connectors, dest_node_idx, origin_node_idx)
+                if dest_node_idx == origin_node_idx:
+                    assert not path
+                    continue
+
+                assert path, f"Empty path from {origin} to destination {destination}"
+                _assert_valid_path(path, a_nodes, b_nodes, origin_node_idx, dest_node_idx)
 
                 for conn in path:
                     reconstructed[conn] += demand

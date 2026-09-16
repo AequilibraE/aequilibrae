@@ -6,11 +6,17 @@ from cython.parallel cimport parallel, prange, threadid
 from libc.string cimport memset
 from libc.stdint cimport int64_t
 
-from aequilibrae.paths.cython.skimming_core cimport skim_single_path, _copy_skims
+from aequilibrae.paths.cython.skimming_core cimport (
+    skim_single_path,
+    skim_single_path_with_turn_penalties,
+    _copy_skims,
+)
 from aequilibrae.paths.cython.basic_path_finding cimport (
     blocking_centroid_flows,
     path_finding,
     path_finding_a_star,
+    path_finding_arc_based,
+    _path_finding_arc_based_core,
     HeapType,
 )
 from aequilibrae.paths.cython.path_finding cimport Heuristic
@@ -40,6 +46,19 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     Each OpenMP thread uses its own slice of the per-thread aux arrays
     (indexed by ``threadid()``), mirroring ``skimming_parallel``.
 
+    Path file saving requires the GIL and is not supported here; callers must
+    dispatch to ``one_to_all`` when ``result.save_path_file`` is set.
+
+    Graphs with turn restrictions take the arc-based branch of the loop body.
+    Two properties of that branch are easy to lose track of:
+
+    * Centroid flow blocking is *not* applied through ``blocking_centroid_flows``.
+      It is already encoded as connector-to-connector prohibitions in the turn
+      CSR, so the arc branch reads the shared, unpatched b-nodes and ignores
+      ``block_centroid_flows``.
+    * ``result._heap`` is ignored under turn restrictions, because the arc-based
+      kernel hardcodes the 4-ary heap. This mirrors ``one_to_all``.
+
     Returns a list of messages for any centroid that could not be processed.
     """
     if result._graph_id != graph._id:
@@ -52,9 +71,15 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
         int skims = len(graph.skim_fields)
         long classes = matrix.matrix_view.shape[2]
         bint select_link = bool(result._selected_links)
+        bint use_turn_restrictions = bool(graph.has_turn_restrictions)
+        bint allow_uturns = bool(graph.allow_path_uturns)
+        bint turn_penalty_skims = False
         Py_ssize_t i
         long long j, k, oi, w, nnz_destinations
         double demand_sum
+        # Assigned inside the prange body so Cython emits it as lastprivate,
+        # giving each thread its own storage.
+        double origin_turn_penalty
         int tid
         long long tid_or_origin
 
@@ -104,12 +129,60 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
     cdef double [:, :] graph_skim_view = gskim
     cdef double [:, :, :] final_skim_view = fskm
 
+    # Turn restriction views (shared, read-only across threads).
+    #
+    # The dummy-array idiom is required here, not just tidy: the compact turn
+    # arrays are initialised to a bare ``np.array([])`` (float64) when unset,
+    # which cannot bind to an integer typed memoryview.
+    if use_turn_restrictions:
+        # ``_has_turn_restrictions`` ORs in the *full-graph* CSR, so the flag can be
+        # True while the compact CSR was never sized. Without this guard the kernel
+        # would read ``turn_fs[current_arc + 1]`` out of bounds.
+        if graph.compact_turn_fs.shape[0] < graph.compact_num_links + 1:
+            raise ValueError("Turn restriction CSR is not sized for the compact graph. Re-run Graph.prepare_graph()")
+        turn_fs = graph.compact_turn_fs
+        turn_to = graph.compact_turn_to_arcs if graph.compact_turn_to_arcs.size else np.zeros(1, dtype=np.int64)
+        turn_pen = graph.compact_turn_penalties if graph.compact_turn_penalties.size else np.zeros(1, dtype=np.float64)
+
+        # Which skim fields receive turn penalties. An empty turn_skim_fields falls
+        # back to [cost_field] for backward compatibility - same rule as one_to_all.
+        _pen_fields = graph.turn_skim_fields if graph.turn_skim_fields else (
+            [graph.cost_field] if graph.cost_field else []
+        )
+        pen_idx = np.array(
+            [graph.skim_fields.index(f) for f in _pen_fields if f in graph.skim_fields], dtype=np.int64
+        )
+        turn_penalty_skims = skims > 0 and pen_idx.shape[0] > 0
+        if pen_idx.shape[0] == 0:
+            pen_idx = np.zeros(1, dtype=np.int64)
+    else:
+        turn_fs = np.zeros(1, dtype=np.int64)
+        turn_to = np.zeros(1, dtype=np.int64)
+        turn_pen = np.zeros(1, dtype=np.float64)
+        pen_idx = np.zeros(1, dtype=np.int64)
+
+    cdef const long long [::1] turn_fs_view = turn_fs
+    cdef const long long [::1] turn_to_arcs_view = turn_to
+    cdef const double [::1] turn_penalties_view = turn_pen
+    cdef const long long [::1] penalty_skim_indices_view = pen_idx
+    # Strided, not [::1]: a single pandas column is not guaranteed contiguous.
+    cdef const long long [:] a_nodes_view = graph.compact_graph.a_node.to_numpy(copy=False)
+
     # Per-thread aux state (sliced by threadid inside the parallel region)
     cdef long long [:, ::1] reached_first_mat = aux_result.reached_first
     cdef long long [:, ::1] b_nodes_mat = aux_result.temp_b_nodes
     cdef double [:, :, :] link_loads_mat = aux_result.temp_link_loads
     cdef double [:, :, :] temp_skims_mat = aux_result.temporary_skims
     cdef unsigned char [:, ::1] destinations_mat = np.zeros((cores, nodes), dtype=np.uint8)
+
+    # Arc-based per-thread aux state. Bound unconditionally: ``prepare()`` sizes these
+    # (cores, 1) rather than skipping them when there are no turn restrictions, so the
+    # views are always valid and are simply never read by the node branch.
+    cdef long long [:, ::1] arc_pred_mat = aux_result.arc_predecessors
+    cdef double [:, ::1] arc_turn_pen_mat = aux_result.arc_turn_penalties
+    cdef double [:, ::1] node_turn_pen_mat = aux_result.node_turn_penalties
+    cdef double [:, ::1] node_costs_mat = aux_result.node_label_costs
+    cdef double [::1] turn_pen_acc_view = aux_result.turn_penalty_accumulator
 
     # If not result.save_path_file, then these are by threadid, otherwise they are by origin
     cdef long long [:, ::1] predecessors_mat = aux_result.predecessors
@@ -135,10 +208,10 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
         for i in prange(n_origins, schedule="guided"):
             oi = origin_idx_view[i]
 
-            if save_path_file:
-                tid_or_origin = oi
-            else:
-                tid_or_origin = tid
+            # Path finding and loading must use the same thread-local tree.
+            # Path-file output rows occupy [0, zones); keep scratch trees after
+            # those rows so a later origin cannot overwrite a saved tree.
+            tid_or_origin = zones + tid if save_path_file else tid
 
             # Destination set: every destination with non-zero (or NaN, matching
             # numpy's nonzero semantics) demand from this origin. When skimming
@@ -161,44 +234,118 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                 if nnz_destinations == 0:
                     nnz_destinations = -1
 
-            if block_flows_through_centroids:  # Unblocks the centroid if that is the case
-                blocking_centroid_flows(0, oi, zones, graph_fs_view,
-                                        b_nodes_mat[tid], original_b_nodes_view)
+            if use_turn_restrictions:
+                # Reads the shared, *unpatched* b-nodes: centroid flow blocking is
+                # already encoded as connector-to-connector prohibitions in the turn
+                # CSR, so blocking_centroid_flows must not run here. This kernel
+                # hardcodes the 4-ary heap and takes no log closure, so heap_type and
+                # closure do not apply.
+                w = _path_finding_arc_based_core(oi,
+                                                 destinations_mat[tid],
+                                                 nnz_destinations,
+                                                 g_view,
+                                                 original_b_nodes_view,
+                                                 graph_fs_view,
+                                                 arc_pred_mat[tid],
+                                                 ids_graph_view,
+                                                 a_nodes_view,
+                                                 predecessors_mat[tid_or_origin],
+                                                 connectors_mat[tid_or_origin],
+                                                 reached_first_mat[tid],
+                                                 node_turn_pen_mat[tid],
+                                                 turn_fs_view,
+                                                 turn_to_arcs_view,
+                                                 turn_penalties_view,
+                                                 allow_uturns,
+                                                 arc_turn_pen_mat[tid],
+                                                 &node_costs_mat[tid, 0])
+            else:
+                if block_flows_through_centroids:  # Unblocks the centroid if that is the case
+                    blocking_centroid_flows(0, oi, zones, graph_fs_view,
+                                            b_nodes_mat[tid], original_b_nodes_view)
 
-            w = path_finding(oi,
-                             destinations_mat[tid],
-                             nnz_destinations,
-                             g_view,
-                             b_nodes_mat[tid],
-                             graph_fs_view,
-                             predecessors_mat[tid_or_origin],
-                             ids_graph_view,
-                             connectors_mat[tid_or_origin],
-                             reached_first_mat[tid],
-                             heap_type,
-                             closure)
+                w = path_finding(oi,
+                                 destinations_mat[tid],
+                                 nnz_destinations,
+                                 g_view,
+                                 b_nodes_mat[tid],
+                                 graph_fs_view,
+                                 predecessors_mat[tid_or_origin],
+                                 ids_graph_view,
+                                 connectors_mat[tid_or_origin],
+                                 reached_first_mat[tid],
+                                 heap_type,
+                                 closure)
 
-            if block_flows_through_centroids:  # Re-blocks the centroid if that is the case
-                blocking_centroid_flows(1, oi, zones, graph_fs_view,
-                                        b_nodes_mat[tid], original_b_nodes_view)
+                if block_flows_through_centroids:  # Re-blocks the centroid if that is the case
+                    blocking_centroid_flows(1, oi, zones, graph_fs_view,
+                                            b_nodes_mat[tid], original_b_nodes_view)
 
             if skims > 0:
-                skim_single_path(oi,
-                                 nodes,
-                                 skims,
-                                 temp_skims_mat[tid],
-                                 predecessors_mat[tid_or_origin],
-                                 connectors_mat[tid_or_origin],
-                                 graph_skim_view,
-                                 reached_first_mat[tid],
-                                 w)
+                if turn_penalty_skims:
+                    skim_single_path_with_turn_penalties(oi,
+                                                         nodes,
+                                                         skims,
+                                                         temp_skims_mat[tid],
+                                                         predecessors_mat[tid_or_origin],
+                                                         connectors_mat[tid_or_origin],
+                                                         graph_skim_view,
+                                                         reached_first_mat[tid],
+                                                         w,
+                                                         node_turn_pen_mat[tid],
+                                                         penalty_skim_indices_view)
+                else:
+                    skim_single_path(oi,
+                                     nodes,
+                                     skims,
+                                     temp_skims_mat[tid],
+                                     predecessors_mat[tid_or_origin],
+                                     connectors_mat[tid_or_origin],
+                                     graph_skim_view,
+                                     reached_first_mat[tid],
+                                     w)
                 _copy_skims(temp_skims_mat[tid],
                             final_skim_view[oi])
 
+            # The HDF5 writer consumes one tree per compact-origin index.
+            # Preserve the completed thread-local tree before loading uses its
+            # scratch buffers for cascading assignment.
+            if save_path_file:
+                for j in range(nodes):
+                    predecessors_mat[oi, j] = predecessors_mat[tid_or_origin, j]
+                    connectors_mat[oi, j] = connectors_mat[tid_or_origin, j]
+
             # If we aren't doing SL analysis we use a fast cascade assignment in the
             # 'network_loading' method. If we are, the link loading happens concurrently
-            # with the SL loading while walking each OD path.
-            if select_link:
+            # with the SL loading while walking each OD path (see one_to_all).
+            origin_turn_penalty = 0.0
+            if use_turn_restrictions:
+                if select_link:
+                    sl_arc_based_network_loading(link_list,
+                                                 demand_view[oi],
+                                                 arc_pred_mat[tid],
+                                                 connectors_mat[tid],
+                                                 link_loads_mat[tid],
+                                                 sl_od_matrix_mat[tid, :, oi, :, :],
+                                                 sl_link_loading_mat[tid],
+                                                 has_flow_mask_mat[tid],
+                                                 classes,
+                                                 arc_turn_pen_mat[tid],
+                                                 &origin_turn_penalty)
+                else:
+                    arc_based_network_loading(classes,
+                                              demand_view[oi],
+                                              arc_pred_mat[tid],
+                                              connectors_mat[tid],
+                                              link_loads_mat[tid],
+                                              arc_turn_pen_mat[tid],
+                                              &origin_turn_penalty)
+                # One write per origin. Passing &turn_pen_acc_view[tid] straight into
+                # the loading kernels would also be race-free, but those kernels do
+                # ``total[0] +=`` inside the zone x class loop - that would false-share
+                # a cache line across all threads on every OD pair.
+                turn_pen_acc_view[tid] = turn_pen_acc_view[tid] + origin_turn_penalty
+            elif select_link:
                 sl_network_loading(link_list,
                                    demand_view[oi],
                                    predecessors_mat[tid_or_origin],
@@ -227,11 +374,22 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
     cdef int64_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long skims, block_flows_through_centroids
     cdef bint early_exit_bint = results.early_exit
+    cdef bint use_turn_restrictions = False
+    cdef bint allow_uturns = False
+    cdef long long [:] penalty_skim_indices_view
     results.origin = origin
     results.destination = destination
     orig = origin
     dest = destination
     graph = results.graph
+
+    # A* currently relies on node states + geometric heuristic and is not combined
+    # with arc-state turn restrictions in this implementation.
+    if graph.has_turn_restrictions and not results.a_star:
+        use_turn_restrictions = True
+        allow_uturns = graph.allow_path_uturns
+    elif graph.has_turn_restrictions and results.a_star:
+        raise RuntimeError("Turn restrictions and A* are not compatible.")
     origin_index = graph.nodes_to_indices[orig]
     dest_index = graph.nodes_to_indices[dest]
 
@@ -259,6 +417,7 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
     cdef long long [::1] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
     cdef const long long [::1] ids_graph_view = graph.graph.id.to_numpy(copy=False)
+    cdef const long long [:] a_nodes_view = graph.graph.a_node.to_numpy(copy=False)
     block_flows_through_centroids = graph.block_centroid_flows
 
     cdef long long [::1] predecessors_view = results.predecessors
@@ -268,6 +427,37 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
 
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [::1] b_nodes_view = new_b_nodes
+
+    # Turn restriction state (full graph CSR structures + per-call scratch arrays)
+    cdef long long [:] turn_fs_view
+    cdef long long [:] turn_to_arcs_view
+    cdef double [:] turn_penalties_view
+    cdef long long [:] arc_pred_view
+    cdef double [:] node_turn_penalties_view
+    cdef double [:] arc_turn_penalties_view
+
+    if use_turn_restrictions:
+        arc_pred = np.empty(graph.num_links, dtype=graph.default_types('int'))
+        arc_pred_view = arc_pred
+        node_turn_penalties = np.empty(graph.num_nodes, dtype=graph.default_types('float'))
+        node_turn_penalties_view = node_turn_penalties
+        arc_turn_penalties = np.empty(graph.num_links, dtype=graph.default_types('float'))
+        arc_turn_penalties_view = arc_turn_penalties
+
+        turn_fs_view = graph.turn_fs
+        turn_to_arcs_view = graph.turn_to_arcs
+        turn_penalties_view = graph.turn_penalties
+
+        # Compute which skim fields receive turn penalties.
+        # Default (empty turn_skim_fields) falls back to [cost_field] for backward compatibility.
+        _pen_fields = graph.turn_skim_fields if graph.turn_skim_fields else (
+            [graph.cost_field] if graph.cost_field else []
+        )
+        _pen_idx = np.array(
+            [graph.skim_fields.index(f) for f in _pen_fields if f in graph.skim_fields],
+            dtype=np.int64,
+        )
+        penalty_skim_indices_view = _pen_idx
 
     cdef HeapType heap_type = _resolve_heap(results)
     cdef Bridge br = bridge
@@ -294,7 +484,9 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
 
     # Now we do all procedures with NO GIL
     with nogil:
-        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
+        if block_flows_through_centroids and not use_turn_restrictions:
+            # Unblocks the centroid if that is the case. With turn restrictions the
+            # automatic connector-to-connector turn bans replace b-node patching.
             b = 0
             blocking_centroid_flows(b,
                                     origin_index,
@@ -320,6 +512,29 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
                 heap_type,
                 closure
             )
+        elif use_turn_restrictions:
+            # Arc-based shortest path reconstruction still writes node-level
+            # predecessor/connectors for compatibility with existing result APIs.
+            w = path_finding_arc_based(
+                origin_index,
+                destinations,
+                1 if early_exit_bint else -1,
+                g_view,
+                original_b_nodes_view,
+                graph_fs_view,
+                arc_pred_view,
+                ids_graph_view,
+                a_nodes_view,
+                predecessors_view,
+                conn_view,
+                reached_first_view,
+                node_turn_penalties_view,
+                turn_fs_view,
+                turn_to_arcs_view,
+                turn_penalties_view,
+                allow_uturns,
+                arc_turn_penalties_view,
+            )
         else:
             w = path_finding(origin_index,
                              destinations,
@@ -335,17 +550,31 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
                              closure)
 
         if skims > 0 and not a_star_bint:
-            skim_single_path(origin_index,
-                             nodes,
-                             skims,
-                             skim_matrix_view,
-                             predecessors_view,
-                             conn_view,
-                             graph_skim_view,
-                             reached_first_view,
-                             w)
+            if use_turn_restrictions and penalty_skim_indices_view.shape[0] > 0:
+                skim_single_path_with_turn_penalties(origin_index,
+                                                     nodes,
+                                                     skims,
+                                                     skim_matrix_view,
+                                                     predecessors_view,
+                                                     conn_view,
+                                                     graph_skim_view,
+                                                     reached_first_view,
+                                                     w,
+                                                     node_turn_penalties_view,
+                                                     penalty_skim_indices_view)
+            else:
+                skim_single_path(origin_index,
+                                 nodes,
+                                 skims,
+                                 skim_matrix_view,
+                                 predecessors_view,
+                                 conn_view,
+                                 graph_skim_view,
+                                 reached_first_view,
+                                 w)
 
-        if block_flows_through_centroids:  # Unblocks the centroid if that is the case
+        if block_flows_through_centroids and not use_turn_restrictions:
+            # Restores the b-nodes if they were patched for centroid blocking
             b = 1
             blocking_centroid_flows(b,
                                     origin_index,
@@ -368,25 +597,39 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
         link_directions = []
         all_nodes = [dest_index]
         mileposts = []
-        p = dest_index
-        if p != origin_index:
-            while p != origin_index:
-                p = predecessors_view[p]
-                connector = conn_view[dest_index]
+
+        if use_turn_restrictions:
+            # Arc-based backtracking: walk predecessor arcs until the origin
+            # sentinel (< 0) is reached.
+            connector = conn_view[dest_index]
+            while connector >= 0:
                 all_connectors.append(link_ids[connector])
                 link_directions.append(directions[connector])
                 mileposts.append(g_view[connector])
-                all_nodes.append(p)
-                dest_index = p
+                all_nodes.append(a_nodes_view[connector])
+                connector = arc_pred[connector]
+        else:
+            p = dest_index
+            if p != origin_index:
+                while p != origin_index:
+                    p = predecessors_view[p]
+                    connector = conn_view[dest_index]
+                    all_connectors.append(link_ids[connector])
+                    link_directions.append(directions[connector])
+                    mileposts.append(g_view[connector])
+                    all_nodes.append(p)
+                    dest_index = p
+
+        if all_connectors:
             path = np.asarray(all_connectors, graph.default_types('int'))[::-1]
             path_nodes = graph.all_nodes[np.asarray(all_nodes, graph.default_types('int'))][::-1]
             path_link_directions = np.asarray(link_directions, graph.default_types('int'))[::-1]
             mileposts.append(0)
             milepost = np.cumsum(mileposts[::-1])
 
-            del all_nodes
-            del all_connectors
-            del mileposts
+        del all_nodes
+        del all_connectors
+        del mileposts
 
     return path, path_nodes, path_link_directions, milepost
 
@@ -416,6 +659,11 @@ def update_path_trace(results, destination, graph):
         # one we just didn't see yet. We need to recompute the tree with the new destination If `a_star` was enabled
         # then the stored tree has no guarantees and may not be useful due to the heuristic used TODO: revisit with
         # heuristic specific reuse logic
+        # With turn restrictions, the node-level shortest path tree is not reusable for
+        # arc-level path reconstruction. Always recompute to guarantee legal turn sequences.
+        if graph.has_turn_restrictions:
+            results.compute_path(results.origin, destination, early_exit=results.early_exit, a_star=results.a_star)
+            return
         if results.predecessors[dest_index] == -1 and results._early_exit or results._a_star:
             results.compute_path(results.origin, destination, early_exit=results.early_exit, a_star=results.a_star)
 
@@ -558,3 +806,120 @@ cdef void sl_network_loading(
                     sl_link_loading[i, connection, k] += demand[j, k]
                 connection = conn[predecessor]
                 predecessor = pred[predecessor]
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cdef void arc_based_network_loading(
+    long classes,
+    double[:, :] demand,
+    long long [:] arc_pred,
+    long long [:] connectors,
+    double[:, :] link_loads,
+    double [:] arc_turn_penalties,
+    double *total_turn_penalty
+) noexcept nogil:
+    """
+    Network loading using arc-based predecessor information.
+
+    Arguments:
+        classes: Number of demand classes
+        demand: Demand matrix (zones x classes)
+        arc_pred: Predecessor arc for each arc
+        connectors: Last arc index for each destination node (connectors array)
+        link_loads: Output link loads
+        arc_turn_penalties: Cumulative turn penalty to enter each arc
+        total_turn_penalty: Pointer to variable to accumulate total turn cost
+    """
+    cdef long long i, j, current_arc
+    cdef long long zones = demand.shape[0]
+
+    for i in range(zones):
+        # Start backtracking from the last arc that reached the destination zone
+        current_arc = connectors[i]
+
+        if current_arc >= 0:
+            for j in range(classes):
+                # arc_turn_penalties is cumulative along the path, so the final
+                # arc's value is the total turn cost paid by this OD pair.
+                total_turn_penalty[0] += demand[i, j] * arc_turn_penalties[current_arc]
+
+        while current_arc >= 0:
+            for j in range(classes):
+                link_loads[current_arc, j] += demand[i, j]
+
+            # Move to predecessor arc.
+            # Origin arcs have arc_pred = ORIGIN_ARC_SENTINEL, which stops the loop (>= 0 condition).
+            current_arc = arc_pred[current_arc]
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cdef void sl_arc_based_network_loading(
+    long long [:, :] selected_links,
+    double [:, :] demand,
+    long long [:] arc_pred,
+    long long [:] connectors,
+    double [:, :] link_loads,
+    double [:, :, :] sl_od_matrix,
+    double [:, :, :] sl_link_loading,
+    unsigned char [:] has_flow_mask,
+    long classes,
+    double [:] arc_turn_penalties,
+    double *total_turn_penalty
+) noexcept nogil:
+    """
+    Select link analysis with arc-based path finding.
+    """
+    cdef:
+        int i, j, k, m, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
+        long long current_arc
+        bint found
+
+    for j in range(dests):
+        # Reset flow mask for this OD pair
+        memset(&has_flow_mask[0], 0, xshape * sizeof(unsigned char))
+
+        # 1. Backtrack to load links and mark used links
+        current_arc = connectors[j]
+
+        if current_arc >= 0:
+            for k in range(classes):
+                # arc_turn_penalties is cumulative along the path, so the final
+                # arc's value is the total turn cost paid by this OD pair.
+                total_turn_penalty[0] += demand[j, k] * arc_turn_penalties[current_arc]
+
+        while current_arc >= 0:
+            for k in range(classes):
+                link_loads[current_arc, k] += demand[j, k]
+
+            has_flow_mask[current_arc] = 1
+            current_arc = arc_pred[current_arc]
+
+        # 2. Check selected link matches
+        for i in range(selected_links.shape[0]):
+            found = 0
+            m = 0
+            # Check if any link in the selected set was used
+            while m < selected_links.shape[1] and found == 0:
+                if selected_links[i][m] == -1:
+                    break
+                if has_flow_mask[selected_links[i][m]] != 0:
+                    found = 1
+                m += 1
+
+            if found == 0:
+                continue
+
+            # 3. Add to SL matrices if match found
+            for k in range(classes):
+                sl_od_matrix[i, j, k] = demand[j, k]
+
+            # Backtrack again to add to sl_link_loading
+            current_arc = connectors[j]
+            while current_arc >= 0:
+                for k in range(classes):
+                    sl_link_loading[i, current_arc, k] += demand[j, k]
+                current_arc = arc_pred[current_arc]

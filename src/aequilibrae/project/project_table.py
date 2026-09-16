@@ -365,7 +365,7 @@ class ProjectTable(ABC):
                 )
 
         with self._connection.transaction() as conn:
-            conn.executemany(self._delete_sql, keys)
+            conn.executemany(self._delete_sql, [(key,) for key in keys])
 
         self._invalidate()
         return len(keys)

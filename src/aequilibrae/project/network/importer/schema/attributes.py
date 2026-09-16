@@ -75,7 +75,10 @@ def _merge_json(existing: pd.Series, extras: pd.Series) -> pd.Series:
     )
 
 
-def split_attributes(gdf: gpd.GeoDataFrame, table_cols: Iterable[str], ) -> tuple[gpd.GeoDataFrame, pd.Series]:
+def split_attributes(
+    gdf: gpd.GeoDataFrame,
+    table_cols: Iterable[str],
+) -> tuple[gpd.GeoDataFrame, pd.Series]:
     """Route the columns of ``gdf`` for write into a spatialite table."""
     col_set = set(table_cols)
     cols = list(gdf.columns)

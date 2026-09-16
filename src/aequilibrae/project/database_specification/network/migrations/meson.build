@@ -10,6 +10,7 @@ pyfiles = [
     '006_add_about_table.py',
     '007_add_zones_table.py',
     '008_add_other_attributes.py',
+    '009_add_turn_restrictions.py',
     'migrations.py',
 ]
 
