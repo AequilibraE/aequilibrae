@@ -4,9 +4,26 @@ import operator
 
 import numpy as np
 cimport cython
+from libc.math cimport isfinite
+from libcpp.algorithm cimport copy_n
 
+from aequilibrae.paths.cython.parallel_numpy cimport (
+    assign_link_loads,
+    linear_combination,
+    triple_linear_combination,
+)
 from aequilibrae.utils.cython.array_allocations cimport array
 from aequilibrae.utils.cython.array_allocations import readonly_view
+
+
+cdef void _validate_loading_source(LoadingOutputs output, LoadingOutputs source) except *:
+    if source.link_count != output.link_count or source.class_count != output.class_count:
+        raise ValueError("source and output loading dimensions must match")
+
+
+cdef void _validate_loading_cores(int cores) except *:
+    if cores < 1:
+        raise ValueError("cores must be positive")
 
 
 cdef class LoadingOutputs:
@@ -14,6 +31,16 @@ cdef class LoadingOutputs:
 
     Loads start at zero. Loading accumulates into them; reset explicitly before
     another iteration. Read-only views keep storage alive and reflect reuse.
+
+    Copy and blend methods replace this object's contents and return it. Sources
+    must have matching dimensions, link/column ordering and units; only the
+    dimensions can be checked here. No PCE conversion or summing is performed.
+    The destination may also be a source. Callers must prevent concurrent reads
+    or writes of the destination while an operation is running.
+
+    Two-way weights must be finite and in [0, 1]. All operations require positive
+    cores; a negative threading_threshold disables threading. Load values follow
+    the numeric helpers' ordinary floating-point arithmetic, including NaN/inf.
     """
 
     def __cinit__(self):
@@ -44,9 +71,152 @@ cdef class LoadingOutputs:
         return output
 
     def reset(self):
-        """Clear this iteration's accumulation without replacing its allocation."""
+        """Clear this iteration's buffers."""
         with nogil:
             self.view().reset()
+
+    def copy_from(self, LoadingOutputs source not None):
+        """Copy the data from source to self."""
+        _validate_loading_source(self, source)
+
+        cdef size_t count = self.link_count * self.class_count
+        if count:
+            copy_n(&source.link_loads_buffer[0, 0], count, &self.link_loads_buffer[0, 0])
+
+        return self
+
+    def copy_from_compact(
+        self,
+        LoadingOutputs source not None,
+        const long long[::1] crosswalk,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """Copy the data from source to self projected through crosswalk
+        """
+        _validate_loading_cores(cores)
+
+        if crosswalk.shape[0] != self.link_count:
+            raise ValueError("crosswalk must have shape (link_count,)")
+        elif self.class_count != source.class_count:
+            raise ValueError("source and output must have the same number of classes")
+
+        if self.link_count and self.class_count and source.link_count:
+            with nogil:
+                assign_link_loads[double](
+                    self.link_loads_buffer,
+                    source.link_loads_buffer,
+                    crosswalk,
+                    cores,
+                    threading_threshold,
+                )
+
+        return self
+
+    def blend_cfw(
+        self,
+        LoadingOutputs aon not None,
+        LoadingOutputs previous_direction not None,
+        double conjugate_weight,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """Replace loads with a conjugate Frank-Wolfe direction.
+
+        self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon
+        """
+
+        # blend_result gives its weight to its first source. Rotating the CFW
+        # sources makes that source the previous direction
+        return self.blend_result(
+            previous_direction,
+            aon,
+            conjugate_weight,
+            cores=cores,
+            threading_threshold=threading_threshold,
+        )
+
+    def blend_bfw(
+        self,
+        LoadingOutputs aon not None,
+        LoadingOutputs previous_direction not None,
+        LoadingOutputs older_direction not None,
+        weights,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """Replace loads with a bi-conjugate Frank-Wolfe direction.
+
+        self = weights[0] * aon + weights[1] * previous_direction + weights[2] * older_direction
+
+        Weights must be three finite values in [0, 1], summing to one.
+        """
+        cdef const double[::1] coefficients
+
+        _validate_loading_source(self, aon)
+        _validate_loading_source(self, previous_direction)
+        _validate_loading_source(self, older_direction)
+        _validate_loading_cores(cores)
+
+        values = np.array(weights, dtype=np.float64, order="C", copy=True)
+        if values.shape != (3,):
+            raise ValueError("BFW weights must contain exactly three values")
+        if (
+            not np.all(np.isfinite(values))
+            or np.any(values < 0.0)
+            or np.any(values > 1.0)
+        ):
+            raise ValueError("BFW weights must be finite and between zero and one")
+        if not np.isclose(values.sum(), 1.0, rtol=0.0, atol=1e-12):
+            raise ValueError("BFW weights must sum to one")
+        coefficients = values
+
+        with nogil:
+            triple_linear_combination[double](
+                self.link_loads_buffer,
+                aon.link_loads_buffer,
+                previous_direction.link_loads_buffer,
+                older_direction.link_loads_buffer,
+                coefficients,
+                cores,
+                threading_threshold,
+            )
+        return self
+
+    def blend_result(
+        self,
+        LoadingOutputs direction not None,
+        LoadingOutputs previous_result not None,
+        double stepsize,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """Replace loads with the next accepted result (or a trial result).
+
+        self = stepsize * direction + (1 - stepsize) * previous_result
+
+        Pass self as previous_result to update the accepted result in place.
+        """
+        _validate_loading_source(self, direction)
+        _validate_loading_source(self, previous_result)
+        _validate_loading_cores(cores)
+        if not isfinite(stepsize) or stepsize < 0.0 or stepsize > 1.0:
+            raise ValueError("blend weight must be finite and between zero and one")
+
+        with nogil:
+            linear_combination[double](
+                self.link_loads_buffer,
+                direction.link_loads_buffer,
+                previous_result.link_loads_buffer,
+                stepsize,
+                cores,
+                threading_threshold,
+            )
+        return self
 
     @property
     def link_loads(self):

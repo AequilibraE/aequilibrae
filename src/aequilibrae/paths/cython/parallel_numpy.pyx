@@ -274,8 +274,8 @@ cpdef cython.floating[:, ::1] assign_link_loads(
     assert compressed.shape[1] == n, "mismatched shape"
 
     for i in prange(links, nogil=True, num_threads=cores, use_threads_if=use_threads):
+        k = crosswalk[i]
         for j in range(n):
-            k = crosswalk[i]
             actual[i, j] = compressed[k, j]
 
     return actual
