@@ -11,7 +11,7 @@ from libc.math cimport isfinite
 from libcpp.algorithm cimport copy_n
 
 from aequilibrae.paths.cython.parallel_numpy cimport (
-    assign_link_loads,
+    project_link_loads,
     linear_combination,
     linear_combination_skims,
     triple_linear_combination,
@@ -190,9 +190,16 @@ cdef class LoadingOutputs:
         elif self.class_count != source.class_count:
             raise ValueError("source and output must have the same number of classes")
 
-        if self.link_count and self.class_count and source.link_count:
+        # The source link count is the sentinel for a removed network link.
+        indices = np.asarray(crosswalk)
+        if np.any(indices < 0) or np.any(indices > source.link_count):
+            raise ValueError("crosswalk contains an invalid compact link")
+        if source is self:
+            raise ValueError("projection requires distinct source and output storage")
+
+        if self.link_count and self.class_count:
             with nogil:
-                assign_link_loads[double](
+                project_link_loads[double](
                     self.link_loads_buffer,
                     source.link_loads_buffer,
                     crosswalk,

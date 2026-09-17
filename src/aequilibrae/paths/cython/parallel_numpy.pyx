@@ -279,3 +279,32 @@ cpdef cython.floating[:, ::1] assign_link_loads(
             actual[i, j] = compressed[k, j]
 
     return actual
+
+
+cpdef cython.floating[:, ::1] project_link_loads(
+    cython.floating[:, ::1] actual,
+    const cython.floating[:, ::1] compressed,
+    const long long[::1] crosswalk,
+    int cores,
+    Py_ssize_t threading_threshold=10000,
+) except * nogil:
+    """Project compact loads into distinct storage; the link-count sentinel is zero."""
+    cdef Py_ssize_t i, j, k
+    cdef Py_ssize_t links = actual.shape[0]
+    cdef Py_ssize_t classes = actual.shape[1]
+    cdef bool use_threads = links * classes > threading_threshold and threading_threshold >= 0
+
+    if cores < 1:
+        raise ValueError("cores must be positive")
+    if crosswalk.shape[0] != links or compressed.shape[1] != classes:
+        raise ValueError("projection dimensions must match")
+    for i in range(links):
+        if crosswalk[i] < 0 or crosswalk[i] > compressed.shape[0]:
+            raise ValueError("crosswalk contains an invalid compact link")
+
+    for i in prange(links, nogil=True, num_threads=cores, use_threads_if=use_threads):
+        k = crosswalk[i]
+        for j in range(classes):
+            actual[i, j] = compressed[k, j] if k < compressed.shape[0] else 0
+
+    return actual

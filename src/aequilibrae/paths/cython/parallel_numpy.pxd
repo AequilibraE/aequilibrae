@@ -92,6 +92,14 @@ cpdef cython.floating[:, ::1] assign_link_loads(
     Py_ssize_t threading_threshold=*,
 ) noexcept nogil
 
+cpdef cython.floating[:, ::1] project_link_loads(
+    cython.floating[:, ::1] actual,
+    const cython.floating[:, ::1] compressed,
+    const long long[::1] crosswalk,
+    int cores,
+    Py_ssize_t threading_threshold=*,
+) except * nogil
+
 cpdef cython.floating[:] aggregate_link_costs(
     const cython.floating[::1] actual,
     cython.floating[:] compressed,

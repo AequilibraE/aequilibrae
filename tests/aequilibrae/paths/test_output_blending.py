@@ -418,6 +418,31 @@ def test_project_to_network_uses_crosswalk_for_each_network_link():
     np.testing.assert_array_equal(output.link_loads, compact.link_loads[[2, 0, 2, 1]])
 
 
+def test_project_to_network_zeroes_removed_links_without_a_dummy_source_row():
+    compact = loaded_output([[2, 4], [7, 1]])
+    output = loaded_output([[99, 99], [99, 99], [99, 99]])
+    output.copy_from_compact(compact, np.array([1, 2, 0], dtype=np.int64))
+    np.testing.assert_array_equal(output.link_loads, [[7, 1], [0, 0], [2, 4]])
+
+
+@pytest.mark.parametrize("classes", [0, 2])
+def test_project_empty_compact_network(classes):
+    compact = LoadingOutputs(0, classes)
+    output = LoadingOutputs(3, classes)
+    output.copy_from_compact(compact, np.zeros(3, dtype=np.int64))
+    assert not np.any(output.link_loads)
+
+
+@pytest.mark.parametrize("bad_index", [-1, 4])
+def test_project_rejects_bad_index_before_any_writes(bad_index):
+    output = loaded_output([[1], [2], [3]])
+    compact = loaded_output([[9], [8], [7]])
+    before = output.link_loads.copy()
+    with pytest.raises(ValueError, match="invalid compact link"):
+        output.copy_from_compact(compact, np.array([0, 1, bad_index], dtype=np.int64))
+    np.testing.assert_array_equal(output.link_loads, before)
+
+
 @pytest.mark.parametrize("crosswalk", ([[-1]], [3], [0.5]))
 def test_project_to_network_rejects_invalid_crosswalk(crosswalk):
     output = LoadingOutputs(3, 1)
