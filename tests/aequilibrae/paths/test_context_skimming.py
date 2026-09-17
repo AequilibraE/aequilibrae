@@ -375,7 +375,7 @@ def test_fixed_dimensions_and_reinitialization():
     output = inputs.make_outputs(4)
     with pytest.raises(RuntimeError, match="reinitialized"):
         inputs.__init__(4, turn_cost_name="replacement")
-    with pytest.raises(RuntimeError, match="reinitialized"):
+    with pytest.raises(RuntimeError, match="reinitiali[sz]ed"):
         output.__init__(2, 4, ("replacement",))
     with pytest.raises(AttributeError):
         inputs.field_names = ("replacement",)

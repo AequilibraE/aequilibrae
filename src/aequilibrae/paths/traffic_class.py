@@ -113,6 +113,7 @@ class TrafficClass(TransportClassBase):
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
         self.congested_time = np.array([])
+        self.congested_skims = None
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -185,7 +186,7 @@ class TrafficClass(TransportClassBase):
             **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
             Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
-        for name, link_set in links.items():
+        for name, link_set in (links or {}).items():
             if len(name.split(" ")) != 1:
                 warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
                 name = str.join("_", name.split(" "))
@@ -222,15 +223,19 @@ class TrafficClass(TransportClassBase):
         :Arguments:
             **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
         """
-        self.graph.graph = self.graph.graph.assign(
-            __assignment_cost__=self.graph.cost, __congested_time__=self.congested_time
+        from aequilibrae.paths.assignment_context import AssignmentInputs
+
+        if self.congested_time.size == 0:
+            raise RuntimeError("Run the assignment before skimming congested costs")
+        fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
+        inputs = AssignmentInputs(
+            self.graph, self.matrix, "__congested_time__", {}, self.results.cores,
+            skim_fields=fields + ["__congested_time__"], cost_name="__assignment_cost__",
         )
-        skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]
-        pre_fields = self.graph.skim_fields
-        self.graph.set_skimming(skims)
-        skimmer = self.graph.compute_skims()
-        self.graph.set_skimming(pre_fields)
-        return skimmer
+        inputs.update_costs(self.congested_time, self.fixed_cost)
+        # FIXME: Use a separate skim-only driver when one is available.
+        self.congested_skims = inputs.driver.run(inputs.driver.make_outputs()).skimming
+        return self.congested_skims
 
     def __setattr__(self, key, value):
         if key not in [
@@ -250,6 +255,7 @@ class TrafficClass(TransportClassBase):
             "_selected_links",
             "_config",
             "congested_time",
+            "congested_skims",
         ]:
             raise KeyError(f"Traffic Class does not have '{key}'")
         self.__dict__[key] = value

@@ -141,8 +141,8 @@ procedure.
 Skimming while assigning
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-AequilibraE allows for skimming to be performed during assignnment, and maintains both the skimming
-of the final iteration, as well as the blended skim for all iterations.
+AequilibraE can skim during assignment and keeps both the latest all-or-nothing
+skims and the blended skims for the accepted solution.
 
 This is the case because, strictly speaking, the equilibrium travel time is the one resulting
 at the end of the last assignment iteration, while the most correct distance and toll skims, for example,
@@ -158,6 +158,35 @@ for easy identification.
   >>> assig.execute() # doctest: +SKIP
   >>> assig.save_skims("one_matrix_name")
 
+
+Working with assignment outputs
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Assignment skims are ``SkimmingOutputs`` objects, not ``AequilibraeMatrix`` objects.
+Use ``traffic_class.results.skims.matrices["distance"]`` for a named OD matrix.
+The whole ``skims`` array has axes ``[origin, field, destination]``. Views are
+read-only and reflect later changes to the same output; use ``.copy()`` for a snapshot.
+When no skim fields are requested, ``results.skims`` is ``None``.
+
+Selected OD matrices are available at
+``traffic_class.results.select_link_od.matrices[selection_name]`` with axes
+``[origin, destination, demand_column]``. Selected OD export writes every demand
+column, using names of the form ``selection_trafficClass_demandColumn``.
+
+Ordinary and selected loads remain in original demand units. PCE is used for
+optimizer calculations, not applied to the stored demand or result arrays.
+``results.link_loads`` returns a full-network reporting snapshot in supernetwork
+order; ``results.compact_link_loads`` is a view of the compact output storage.
+The assignment uses ``AequilibraeMatrix`` only when exporting matrices.
+
+Demand must be finite and nonnegative. Unreachable demand is reported but not
+loaded. ``traffic_class._aon_results.unassigned_demand`` gives the latest AoN total,
+excluding intrazonal demand. ``traffic_class.results.unassigned_demand`` gives the
+total carried by the accepted solution.
+
+Assignment path-file saving and heaps other than the four-ary heap are not yet
+supported by the prepared assignment driver. Requests for these features raise
+an error rather than being ignored.
 
 Assigning sparse matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -186,7 +215,9 @@ of zones and over 100 iterations of assignment.
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment
 cost from the last iteration of the assignment by default. These matrices are named *__congested_time__*
-and *__assignment_cost__* respectively.
+and *__assignment_cost__* respectively. The returned values are ``SkimmingOutputs``
+objects, also stored in ``traffic_class.congested_skims``. They do not replace the
+latest AoN skims. ``save_skims`` uses them for the final matrices when present.
 
 See the the example :ref:`example_assign_sparse` for a more practical explanation of this feature.
 

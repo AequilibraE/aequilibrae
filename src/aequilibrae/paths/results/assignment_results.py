@@ -1,365 +1,161 @@
 from abc import ABC, abstractmethod
-from typing import List
 
 import numpy as np
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
-from aequilibrae.paths.cython.basic_path_finding import HEAP_MAP
-from aequilibrae.paths.cython.parallel_numpy import assign_link_loads, sum_axis1
-from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph, _get_graph_to_network_mapping
+from aequilibrae.paths.graph import _get_graph_to_network_mapping
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores, resolve_elementwise_cores
 from aequilibrae.utils.core_setter import resolve_threading_threshold
 
-"""
-TO-DO:
-1. Make the writing to SQL faster by disabling all checks before the actual writing
-"""
-
 
 class AssignmentResultsBase(ABC):
-    """Assignment results base class for traffic and transit assignments."""
+    """Shared reporting and thread settings for traffic and transit results."""
 
     def __init__(self):
-        self.link_loads = np.array([])  # The actual results for assignment
-        self.no_path = None  # The list os paths
-        self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
-        sys_params = Parameters().parameters["system"]
-        self._system_parameters = sys_params
-        self.set_cores(resolve_cores(sys_params), resolve_threading_threshold(sys_params))
+        self._system_parameters = Parameters().parameters["system"]
+        self.set_cores(resolve_cores(self._system_parameters), resolve_threading_threshold(self._system_parameters))
 
-        self.nodes = -1
-        self.zones = -1
-        self.links = -1
-
-        self.lids = None
-
-    @abstractmethod
-    def prepare(self, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
-        pass
-
-    @abstractmethod
-    def reset(self) -> None:
-        pass
-
-    def set_cores(
-        self, cores: int, threading_threshold: int | None = None, elementwise_cores: int | None = None
-    ) -> None:
-        """
-        Sets number of cores (threads) to be used in computation
-
-        Value of zero sets number of threads to all available in the system, while negative values indicate the number
-        of threads to be left out of the computational effort.
-
-        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
-        inputs result in values outside those limits
-
-        :Arguments:
-            **cores** (:obj:`int`): Number of cores to be used in computation
-
-            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
-            operations to be threaded. Negative values disable threading for those operations. When not provided,
-            the current value is kept
-
-            **elementwise_cores** (:obj:`int`, `Optional`): Number of cores for elementwise
-            (``parallel_numpy``/VDF) operations, following the same zero/negative conventions as **cores**.
-            When not provided, it is resolved from the ``AEQ_ELEMENTWISE_CPUS`` environment variable or
-            ``parameters.yml``, defaulting to at most 8 threads
-        """
-
-        cores = clamp_cores(cores)
-
+    def set_cores(self, cores, threading_threshold=None, elementwise_cores=None):
+        """Set thread counts without reallocating or clearing existing results."""
+        self.cores = clamp_cores(cores)
         if threading_threshold is not None:
             if not isinstance(threading_threshold, int):
                 raise ValueError("Threading threshold needs to be an integer")
             self.threading_threshold = threading_threshold
+        self.elementwise_cores = (
+            clamp_cores(elementwise_cores)
+            if elementwise_cores is not None
+            else resolve_elementwise_cores(self._system_parameters, self.cores)
+        )
 
-        self.cores = cores
-
-        if elementwise_cores is not None:
-            self.elementwise_cores = clamp_cores(elementwise_cores)
-        else:
-            self.elementwise_cores = resolve_elementwise_cores(self._system_parameters, self.cores)
-
-        if self.link_loads.shape[0]:
-            self.__redim()
+    @abstractmethod
+    def reset(self):
+        pass
 
 
 class AssignmentResults(AssignmentResultsBase):
-    """
-    Assignment result holder for a single :obj:`TrafficClass` with multiple user classes
+    """Public results for one traffic class, backed by compact output owners.
+
+    Skims and selected OD demand are the routing output objects. Full-network
+    link loads are reporting snapshots, not a second mutable assignment state.
+    Every load and turn total is in the original demand units, without PCE.
     """
 
     def __init__(self):
         super().__init__()
-        self.compact_link_loads = np.array([])  # Results for assignment on simplified graph
-        self.compact_total_link_loads = np.array([])  # Results for all user classes summed on simplified graph
-        self.crosswalk = np.array([])  # crosswalk between compact graph link IDs and actual link IDs
-        self.skims = AequilibraeMatrix()  # The array of skims
-        self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
-
-        self.compact_links = -1
-        self.compact_nodes = -1
-
-        self.direcs = None
-
-        self.classes = {"number": 1, "names": ["flow"]}
-
-        self._selected_links = {}
-        self.select_link_od = None
-        self.select_link_loading = {}
-
-        self._graph_id = None
-        self.__float_type = None
-        self.__integer_type = None
-
-        # save path files. Need extra metadata for file paths
-        self.save_path_file = False
-        self.path_file_dir = None
-        self.write_feather = True  # we use feather as default, parquet is slower but with better compression
-
-        # Turn penalty cost accumulator for equilibrium assignment convergence
-        self.total_turn_penalty = 0.0
-
+        self._state = None
+        self.classes = {"number": 0, "names": ()}
         self._heap = "4ary"
+        self.save_path_file = False
+        self.write_feather = True
 
-    def set_heap(self, heap: str) -> None:
-        """
-        Set the priority queue implementation used for path computation. Must be one of ``get_heaps()``.
+    def bind(self, state, class_names):
+        """Attach the accepted or latest AoN state at the start of execution."""
+        self._state = state
+        self.classes = {"number": len(class_names), "names": tuple(class_names)}
 
-        :Arguments:
-            **heap** (:obj:`str`): Heap to use.
-        """
-        if heap not in HEAP_MAP:
-            raise ValueError(f"heap must be one of {self.get_heaps()}")
+    @property
+    def state(self):
+        if self._state is None:
+            raise RuntimeError("Assignment results are not prepared")
+        return self._state
 
+    @property
+    def output(self):
+        return self.state.output
+
+    @property
+    def link_loads(self):
+        """Read-only snapshot of loads in supernetwork order."""
+        return self.state.mapping.full_loads(self.output.loading.link_loads)
+
+    @property
+    def compact_link_loads(self):
+        return self.output.loading.link_loads
+
+    @property
+    def total_link_loads(self):
+        values = self.state.total_link_loads.view()
+        values.flags.writeable = False
+        return values
+
+    @property
+    def skims(self):
+        return self.output.skimming
+
+    @property
+    def select_link_od(self):
+        selected = self.output.select_link
+        return None if selected is None else selected.od
+
+    @property
+    def select_link_loading(self):
+        selected = self.output.select_link
+        return {} if selected is None or selected.loading is None else selected.loading.loads
+
+    @property
+    def total_turn_penalty(self):
+        return self.output.turn_cost_total
+
+    @property
+    def unassigned_demand(self):
+        return self.output.unassigned_demand
+
+    def reset(self):
+        self.output.reset()
+        self.state.update_totals()
+
+    def set_heap(self, heap):
+        # FIXME: Add assignment heap selection to PreparedAoN.
+        if heap != "4ary":
+            raise NotImplementedError("Assignment currently supports only the 4ary heap")
         self._heap = heap
 
     @staticmethod
-    def get_heaps() -> List[str]:
-        """Return the available priority queue implementations."""
-        return list(HEAP_MAP.keys())
-
-    # In case we want to do by hand, we can prepare each method individually
-    def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
-        """
-        Prepares the object with dimensions corresponding to the assignment matrix and graph objects
-
-        :Arguments:
-            **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
-
-            **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
-            ``matrix.computational_view(:obj:`list`)``
-        """
-
-        self.__float_type = graph.default_types("float")
-        self.__integer_type = graph.default_types("int")
-
-        if matrix.view_names is None:
-            raise ValueError("Please set the matrix_procedures computational view")
-        self.classes["number"] = 1
-        if len(matrix.matrix_view.shape) > 2:
-            self.classes["number"] = matrix.matrix_view.shape[2]
-        self.classes["names"] = matrix.view_names
-
-        if graph is None:
-            raise ValueError("Please provide a graph")
-        self.compact_nodes = graph.compact_num_nodes
-        self.compact_links = graph.compact_num_links
-
-        self.nodes = graph.num_nodes
-        self.zones = graph.num_zones
-        self.centroids = graph.centroids
-        self.links = graph.num_links
-        self.num_skims = len(graph.skim_fields)
-        self.skim_names = list(graph.skim_fields)
-        self.lids = graph.graph.link_id.to_numpy(copy=False)
-        self.direcs = graph.graph.direction.to_numpy(copy=False)
-        self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
-        supernet_ids = graph.graph.__supernet_id__.to_numpy(copy=False)
-        compressed_ids = graph.graph.__compressed_id__.to_numpy(copy=False)
-        self.crosswalk[supernet_ids] = compressed_ids
-        self._graph_ids = supernet_ids
-        self._graph_compressed_ids = compressed_ids
-        self.__redim()
-        self._graph_id = graph._id
-
-        if self._selected_links:
-            self.select_link_od = AequilibraeMatrix()
-            self.select_link_od.create_empty(
-                memory_only=True,
-                zones=matrix.zones,
-                matrix_names=list(self._selected_links.keys()),
-                index_names=matrix.index_names,
-            )
-
-            self.select_link_loading = {}
-            # Combine each set of selected links into one large matrix that can be parsed into Cython
-            # Each row corresponds a link set, and the equivalent rows in temp_sl_od_matrix and temp_sl_link_loading
-            # Correspond to that set
-            self.select_links = np.full(
-                (len(self._selected_links), max([len(x) for x in self._selected_links.values()])),
-                -1,
-                dtype=graph.default_types("int"),
-            )
-
-            sl_idx = {}
-            for i, (name, arr) in enumerate(self._selected_links.items()):
-                sl_idx[name] = i
-                # Filling select_links array with linksets. Note the default value is -1, which is used as a placeholder
-                # It also denotes when the given row has no more selected links, since Cython cannot handle
-                # Multidimensional arrays where each row has different lengths
-                self.select_links[i][: len(arr)] = arr
-                # Correctly sets the dimensions for the final output matrices
-                self.select_link_od.matrix[name] = np.zeros(
-                    (graph.num_zones, graph.num_zones, self.classes["number"]),
-                    dtype=graph.default_types("float"),
-                )
-                self.select_link_loading[name] = np.zeros(
-                    (graph.compact_num_links, self.classes["number"]),
-                    dtype=graph.default_types("float"),
-                )
-
-            # Overwrites previous arrays on assignment results level with the index to access that array in Cython
-            self._selected_links = sl_idx
-
-    def reset(self) -> None:
-        """
-        Resets object to prepared and pre-computation state
-        """
-        if self.num_skims > 0:
-            self.skims.matrices.fill(0)
-        if self.link_loads is not None:
-            self.no_path.fill(0)
-            self.link_loads.fill(0)
-            self.total_link_loads.fill(0)
-            self.compact_link_loads.fill(0)
-            self.compact_total_link_loads.fill(0)
-        else:
-            raise ValueError("Exception: Assignment results object was not yet prepared/initialized")
-
-    def __redim(self):
-        self.compact_link_loads = np.zeros((self.compact_links + 1, self.classes["number"]), self.__float_type)
-        self.compact_total_link_loads = np.zeros(self.compact_links, self.__float_type)
-
-        self.link_loads = np.zeros((self.links, self.classes["number"]), self.__float_type)
-        self.total_link_loads = np.zeros(self.links, self.__float_type)
-        self.no_path = np.zeros((self.zones, self.zones), dtype=self.__integer_type)
-
-        if self.num_skims > 0:
-            self.skims = AequilibraeMatrix()
-
-            self.skims.create_empty(file_name=self.skims.random_name(), zones=self.zones, matrix_names=self.skim_names)
-            self.skims.index[:] = self.centroids[:]
-            self.skims.computational_view()
-            if len(self.skims.matrix_view.shape[:]) == 2:
-                self.skims.matrix_view = self.skims.matrix_view.reshape((self.zones, self.zones, 1))
-        else:
-            self.skims = AequilibraeMatrix()
-            self.skims.matrix_view = np.array((1, 1, 1))
-
-        self.reset()
-
-    def total_flows(self) -> None:
-        """
-        Totals all link flows for this class into a single link load
-
-        Results are placed into *total_link_loads* class member
-        """
-        sum_axis1(self.total_link_loads, self.link_loads, self.elementwise_cores, self.threading_threshold)
+    def get_heaps():
+        return ["4ary"]
 
     def get_graph_to_network_mapping(self):
-        return _get_graph_to_network_mapping(self.lids, self.direcs)
+        mapping = self.state.mapping
+        return _get_graph_to_network_mapping(mapping.link_ids, mapping.directions)
 
-    def get_load_results(self) -> pd.DataFrame:
-        """
-        Translates the assignment results from the graph format into the network format
+    def _load_frame(self, compact, prefix=""):
+        mapping = self.state.mapping
+        network = self.get_graph_to_network_mapping()
+        loads = mapping.full_loads(compact)[mapping.graph_ids]
+        link_ids = np.unique(mapping.link_ids)
+        columns = {}
+        for index, name in enumerate(self.classes["names"]):
+            ab = np.zeros(len(link_ids), dtype=np.float64)
+            ba = np.zeros(len(link_ids), dtype=np.float64)
+            ab[network.network_ab_idx] = loads[network.graph_ab_idx, index]
+            ba[network.network_ba_idx] = loads[network.graph_ba_idx, index]
+            columns[f"{prefix}{name}_ab"] = ab
+            columns[f"{prefix}{name}_ba"] = ba
+            columns[f"{prefix}{name}_tot"] = ab + ba
+        return pd.DataFrame(columns, index=link_ids)
 
-        :Returns:
-            **dataset** (:obj:`pd.DataFrame`): Pandas DataFrame data with the traffic class assignment results
-        """
+    def get_load_results(self):
+        """Return directional link loads in external network link order."""
+        return self._load_frame(self.output.loading.link_loads)
 
-        # Get a mapping from the compressed graph to/from the network graph
-        m = self.get_graph_to_network_mapping()
-
-        recs = np.unique(self.lids).shape[0]
-
-        # Link flows
-        link_flows = self.link_loads[self._graph_ids, :]
-        aux = {}
-        for i, n in enumerate(self.classes["names"]):
-            # Directional Flows
-            aux[n + "_ab"] = np.zeros(recs, self.__float_type)
-            aux[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
-
-            aux[n + "_ba"] = np.zeros(recs, self.__float_type)
-            aux[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
-
-            # Tot Flow
-            aux[n + "_tot"] = np.nan_to_num(aux[n + "_ab"]) + np.nan_to_num(aux[n + "_ba"])
-
-        return pd.DataFrame(aux, index=np.unique(self.lids))
-
-    def get_sl_results(self) -> pd.DataFrame:
-        # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
-        # for each subclass contained in the TrafficClass
-        fields = [
-            e
-            for name in self._selected_links.keys()
-            for n in self.classes["names"]
-            for e in [f"{name}_{n}_ab", f"{name}_{n}_ba", f"{name}_{n}_tot"]
-        ]
-
-        res = pd.DataFrame([], columns=fields, index=np.unique(self.lids))
-
-        m = self.get_graph_to_network_mapping()
-        for name in self._selected_links.keys():
-            # Link flows initialised
-            link_flows = np.full((self.links, self.classes["number"]), np.nan)
-            # maps link flows from the compressed graph to the uncompressed graph
-            assign_link_loads(
-                link_flows,
-                self.select_link_loading[name],
-                self._graph_compressed_ids,
-                self.elementwise_cores,
-                self.threading_threshold,
-            )
-            for i, n in enumerate(self.classes["names"]):
-                # Directional Flows
-                flow_ab = res[f"{name}_{n}_ab"].to_numpy(copy=True)
-                flow_ba = res[f"{name}_{n}_ba"].to_numpy(copy=True)
-                flow_ab[m.network_ab_idx] = link_flows[m.graph_ab_idx, i]
-                flow_ba[m.network_ba_idx] = link_flows[m.graph_ba_idx, i]
-                res[f"{name}_{n}_ab"] = flow_ab
-                res[f"{name}_{n}_ba"] = flow_ba
-
-                # Tot Flow
-                res[f"{name}_{n}_tot"] = np.nansum(res[[f"{name}_{n}_ab", f"{name}_{n}_ba"]].to_numpy(), axis=1)
-
-        return res
+    def get_sl_results(self):
+        """Return directional link loads for each selection and demand column."""
+        frames = [self._load_frame(loads, f"{name}_") for name, loads in self.select_link_loading.items()]
+        if frames:
+            return pd.concat(frames, axis=1)
+        return pd.DataFrame(index=np.unique(self.state.mapping.link_ids))
 
 
 class TransitAssignmentResults(AssignmentResultsBase):
-    """
-    Assignment result holder for a single :obj:`Transit`
-    """
+    """Transit loads are owned by the hyperpath computation."""
 
     def __init__(self):
         super().__init__()
-
         self.link_loads = np.array([])
 
-    def prepare(self, graph: TransitGraph, matrix: AequilibraeMatrix) -> None:
-        """
-        Prepares the object with dimensions corresponding to the assignment matrix and graph objects
-
-        :Arguments:
-            **graph** (:obj:`TransitGraph`): Needs to have been set with number of centroids
-
-            **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
-            ``matrix.computational_view(:obj:`list`)``
-        """
+    def prepare(self, graph, matrix):
         self.reset()
         self.nodes = graph.num_nodes
         self.zones = graph.num_zones
@@ -367,23 +163,10 @@ class TransitAssignmentResults(AssignmentResultsBase):
         self.links = graph.num_links
         self.lids = graph.graph.link_id.to_numpy(copy=False)
 
-    def reset(self) -> None:
-        """
-        Resets object to prepared and pre-computation state
-        """
-
-        # Since all memory for the assignment is managed by the HyperpathGenerating
-        # object we don't need to do much here
+    def reset(self):
         self.link_loads.fill(0)
 
-    def get_load_results(self) -> pd.DataFrame:
-        """
-        Translates the assignment results from the graph format into the network format
-
-        :Returns:
-            **dataset** (:obj:`pd.DataFrame`): DataFrame data with the transit class assignment results
-        """
+    def get_load_results(self):
         if not self.link_loads.shape[0]:
             raise ValueError("Transit assignment has not been executed yet")
-
         return pd.DataFrame({"volume": self.link_loads}, index=self.lids)

@@ -56,16 +56,8 @@ def test_multiple_link_sets(select_link_setup):
         od_mask, link_loading = create_od_mask(
             assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
         )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_od.matrix[key][:, :, 0],
-            od_mask,
-            err_msg=f"OD SL matrix for: {key} does not match",
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_loading[key],
-            link_loading,
-            err_msg=f"Link loading SL matrix for: {key} does not match",
-        )
+        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
     # Test if files are saved in the right place
     assignment.save_select_link_results("select_link_analysis")
@@ -101,16 +93,8 @@ def test_equals_demand_one_origin(select_link_setup):
         od_mask, link_loading = create_od_mask(
             assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
         )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_od.matrix[key][:, :, 0],
-            od_mask,
-            err_msg=f"OD SL matrix for: {key} does not match",
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_loading[key],
-            link_loading,
-            err_msg=f"Link loading SL matrix for: {key} does not match",
-        )
+        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
 
 def test_single_demand(select_link_setup):
@@ -134,16 +118,8 @@ def test_single_demand(select_link_setup):
         od_mask, link_loading = create_od_mask(
             assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
         )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_od.matrix[key][:, :, 0],
-            od_mask,
-            err_msg=f"OD SL matrix for: {key} does not match",
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_loading[key],
-            link_loading,
-            err_msg=f"Link loading SL matrix for: {key} does not match",
-        )
+        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
 
 def test_select_link_network_loading(select_link_setup):
@@ -284,6 +260,7 @@ def test_multi_iteration(select_link_setup, algorithm):
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
+    demand = demand.reshape(graph.num_zones, graph.num_zones, -1)
     # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
     graph.set_graph("free_flow_time")
 

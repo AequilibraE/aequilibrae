@@ -632,13 +632,17 @@ itself still requires at least one zone and class.
 The group owns no second copy of component dimensions or names. There is no
 aggregate `shape` record or forwarding array API: inspect the components directly.
 The read-only scalar `turn_cost_total` holds the demand-weighted turn total.
-`reset()` clears link and selected OD outputs to zero, skims to infinity, and the
-scalar to zero. It changes no allocations. Components cannot be replaced after
+`unassigned_demand` holds demand with no finalized path, excluding intrazonal
+demand. The assignment driver searches every destination with demand, so these
+missing paths are unreachable rather than omitted targets. With explicit origin
+selection, only searched origins contribute to this scalar.
+`reset()` clears link and selected OD outputs to zero, skims to infinity, and both
+scalars to zero. It changes no allocations. Components cannot be replaced after
 construction, and can outlive the group.
 
-`view()` borrows only the component buffer views. The scalar stays on the Cython
-owner and is assigned once after worker reduction; it does not need a shared
-pointer. This group view is only for the assignment driver. Each operation still
+`view()` borrows only the component buffer views. The scalars stay on the Cython
+owner and are assigned once after worker reduction; they do not need shared
+pointers. This group view is only for the assignment driver. Each operation still
 receives its own small views, not an aggregate output object.
 
 ### Caller-owned routing configuration
@@ -685,10 +689,11 @@ turn-only skimming still requests all centroid targets.
 
 Each private worker owner groups its `SearchResults`, `AoNWorkspace`, ordinary
 loading output and optional selected loading output. Worker views borrow those
-owners. The turn-total scalar lives directly in the persistent worker-view table,
-not behind a pointer. Each origin call takes its thread's table entry by mutable
-reference, so contributions accumulate in that entry until reduction. The next
-run resets it. No second copy of the scalar is kept on the Cython worker owner.
+owners. The turn and unassigned-demand totals live directly in the persistent worker-view
+table, not behind pointers. Each origin call takes its thread's table entry by
+mutable reference, so contributions accumulate in that entry until reduction.
+The next run resets them. No second copy of these scalars is kept on the Cython
+worker owner.
 
 Small contiguous tables of loading views serve the existing standalone reduction
 kernels. No per-worker OD cubes are allocated. Search/loading query views are
@@ -700,7 +705,7 @@ fixed alongside the numeric scratch allocations.
 1. Validate component presence, dimensions and ordered names before any writes.
 2. Refresh the routing view and reset worker accumulators and all OD output rows.
 3. Search origins in parallel and call the independent operations on each result.
-4. Replace link outputs with worker reductions and sum the turn-total scalars.
+4. Replace link outputs with worker reductions and sum the turn and unassigned-demand totals.
 5. Return the supplied output without retaining it.
 
 The origin loop uses borrowed C++ views, not Cython owner objects. Searches and
@@ -713,19 +718,94 @@ always run. A future skim-only method will use the skimming components directly,
 not add a generic operation scheduler here. Routing heap persistence is still
 separate work; the heap currently allocates on each search.
 
-## Remaining downstream work
+## Production assignment integration
 
-`SearchResults` has no loading, skimming, select-link or preparation methods.
-Standalone loading, skimming and select-link operations now use independent input,
-workspace and output owners, shared with assignment.
+`LinearApproximation` uses `PreparedAoN` for every traffic class. The former
+`allOrNothing` and `MultiThreadedAoN` drivers and legacy assignment kernels have
+been removed. Public path queries and standalone network skimming still use
+their existing drivers.
 
-The aggregate and driver now compose these same owners. `PreparedAoN` remains a
-testable assignment consumer rather than the final production integration API.
-Production integration, a separate skim-only driver and routing heap persistence
-remain deferred.
+### Entry boundary
 
-`aon_graph.py`, its adapter exports and legacy integration tests have been removed.
-Production dispatch is unchanged.
+`assignment_context.py` translates `Graph` and the matrix computational view at
+the start of each execution. It uses the existing compact topology and turn CSR;
+it does not recompress the graph or attach contexts to `Graph`. Each class owns
+its routing context, packed demand snapshot, named skim fields, selection masks,
+cost buffers and prepared workers. Classes sharing a `Graph` do not share mutable
+routing costs or time-skim buffers. Assignment does not reshape the caller's
+matrix or update the graph's cost and skim arrays.
+
+Demand must be finite and nonnegative. A single matrix becomes a one-column
+demand cube; strided computational views are copied once. Matrix indices must
+match centroid order. Unreachable demand is not loaded or treated as an error.
+Each AoN run reports its unassigned total in original demand units.
+
+`AssignmentMapping` keeps fixed external IDs and a supernetwork-to-compact
+crosswalk. The compact link count marks a removed link. Cost aggregation skips
+these links and load projection writes zero for them. Routing output owners have
+exactly the actual link count, without a dummy link row.
+
+### Working state and result access
+
+`AssignmentState` contains an `AoNOutputs` and cached link totals. Outputs remain
+compact; totals are projected into supernetwork order for optimizer calculations.
+The latest AoN, accepted solution and direction history use the same output
+layout. CFW needs a current and spare direction; BFW also needs an older direction.
+Only the required history is allocated. Whole states rotate, so selected outputs
+and turn totals cannot drift away from ordinary loads.
+
+The output owners provide these in-place operations:
+
+- `copy_from(source)` copies matching components.
+- `blend_cfw(aon, previous, weight)` gives `weight` to the previous direction.
+- `blend_bfw(aon, previous, older, weights)` uses the three weights in that order.
+- `blend_result(direction, previous, stepsize)` gives `stepsize` to the direction.
+
+Group methods validate every component before writing. They blend both scalars
+with the same weights as the arrays. Sources may include the destination. Buffer
+addresses do not change. Skim blending retains ordinary floating-point arithmetic:
+a zero weight with an infinite skim can produce NaN and logs a warning.
+
+`AssignmentResults` is the public reporting object, not the routing workspace:
+
+- `output` is its compact output group.
+- `compact_link_loads` is a read-only view of the compact loading output.
+- `link_loads` produces a read-only reporting snapshot in supernetwork order.
+- `total_link_loads` exposes the cached supernetwork totals.
+- `skims` is a `SkimmingOutputs`, or `None`.
+- `select_link_od` is a `SelectLinkODOutputs`, or `None`.
+- `select_link_loading` provides named compact load views.
+- `total_turn_penalty` and `unassigned_demand` expose the output scalars.
+
+All loads and weighted totals stay in original demand units. PCE is applied when
+forming optimizer flows, conjugacy contractions, fixed-cost contributions and
+turn-cost contributions. Preload affects VDF flows but is not assigned demand.
+Both exact and trapezoidal line search include the turn-cost change.
+
+Skim access uses `results.skims.matrices[name]`; selected OD access uses
+`results.select_link_od.matrices[name]`. Their layouts remain those of the new
+owners. `AequilibraeMatrix` is created only for export. Selected OD export writes
+every demand column with a name of the form `selection_trafficClass_demandColumn`.
+Congested skimming retains a separate `TrafficClass.congested_skims` owner rather
+than replacing the last AoN output.
+
+### Deferred changes
+
+- FIXME: Preserve the existing centroid-blocking branches. The turn branch uses
+  Graph's connector-to-connector bans with no blocked centroid prefix. The node
+  branch uses the blocked prefix. Reconciling these rules is separate work.
+- FIXME: Assume Graph's compact turn CSR is correct. Checking or repairing turn
+  restrictions across compression is separate work.
+- FIXME: Assignment path saving is unsupported and raises when requested. A new
+  format must preserve turn-state paths.
+- FIXME: Assignment currently supports only the four-ary heap. Other requested
+  heaps raise rather than being silently ignored.
+- FIXME: Congested skimming currently reuses PreparedAoN. A separate skim-only
+  driver and persistent routing heaps remain separate work.
+
+This translation boundary should be removed when Graph owns routing contexts
+directly. `SearchResults` remains independent of loading, skimming, selection,
+assignment preparation and external network mappings.
 
 ## Validation
 
@@ -742,6 +822,10 @@ python -m pytest -q -s \
     tests/aequilibrae/paths/test_context_network_loading.py \
     tests/aequilibrae/paths/test_context_select_link.py \
     tests/aequilibrae/paths/test_aon_context.py \
+    tests/aequilibrae/paths/test_output_blending.py \
+    tests/aequilibrae/paths/test_assignment_integration.py \
+    tests/aequilibrae/paths/test_linear_approximation_preload.py \
+    tests/aequilibrae/paths/test_traffic_assignment_equilibration.py \
     tests/aequilibrae/utils/test_array_allocations.py
 ```
 
