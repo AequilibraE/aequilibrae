@@ -1,5 +1,8 @@
-"""Buffers produced by downstream operations on routing results."""
+"""
+Output buffers for routing related results.
+"""
 
+import logging
 import operator
 
 import numpy as np
@@ -10,10 +13,15 @@ from libcpp.algorithm cimport copy_n
 from aequilibrae.paths.cython.parallel_numpy cimport (
     assign_link_loads,
     linear_combination,
+    linear_combination_skims,
     triple_linear_combination,
+    triple_linear_combination_skims,
 )
 from aequilibrae.utils.cython.array_allocations cimport array
 from aequilibrae.utils.cython.array_allocations import readonly_view
+
+
+logger = logging.getLogger(__name__)
 
 
 cdef void _validate_loading_source(LoadingOutputs output, LoadingOutputs source) except *:
@@ -21,26 +29,107 @@ cdef void _validate_loading_source(LoadingOutputs output, LoadingOutputs source)
         raise ValueError("source and output loading dimensions must match")
 
 
-cdef void _validate_loading_cores(int cores) except *:
+cdef void _validate_cores(int cores) except *:
     if cores < 1:
         raise ValueError("cores must be positive")
 
 
+cdef void _validate_blend(double weight, int cores) except *:
+    _validate_cores(cores)
+    if not isfinite(weight) or weight < 0.0 or weight > 1.0:
+        raise ValueError("blend weight must be finite and between zero and one")
+
+
+cdef object _bfw_weights(weights, int cores):
+    _validate_cores(cores)
+
+    # A private copy gives every component in a grouped blend the same weights.
+    values = np.array(weights, dtype=np.float64, order="C", copy=True)
+    if values.shape != (3,):
+        raise ValueError("BFW weights must contain exactly three values")
+    if not np.all(np.isfinite(values)) or np.any(values < 0.0) or np.any(values > 1.0):
+        raise ValueError("BFW weights must be finite and between zero and one")
+    if not np.isclose(values.sum(), 1.0, rtol=0.0, atol=1e-12):
+        raise ValueError("BFW weights must sum to one")
+    return values
+
+
+cdef void _warn_zero_weight_skim_blend(bint zero_weight) except *:
+    if zero_weight:
+        # Skims use infinity for unreachable and unwritten entries. A zero-weight
+        # blend can yield NaN through floating-point arithmetic, so it logs a warning.
+        logger.warning("zero weight blend: infinite skim values may produce NaN")
+
+
+cdef void _validate_skimming_source(SkimmingOutputs output, SkimmingOutputs source) except *:
+    if output.origin_count != source.origin_count or output.destination_count != source.destination_count:
+        raise ValueError("source and output skimming dimensions must match")
+    if output.field_names != source.field_names:
+        raise ValueError("source and output skim field names and order must match")
+
+
+cdef void _validate_selected_loading_source(
+    SelectLinkLoadingOutputs output, SelectLinkLoadingOutputs source
+) except *:
+    if output.link_count != source.link_count or output.class_count != source.class_count:
+        raise ValueError("source and output select-link loading dimensions must match")
+    if output.set_names != source.set_names:
+        raise ValueError("source and output selection names and order must match")
+
+
+cdef void _validate_selected_od_source(SelectLinkODOutputs output, SelectLinkODOutputs source) except *:
+    if (
+        output.origin_count != source.origin_count
+        or output.destination_count != source.destination_count
+        or output.class_count != source.class_count
+    ):
+        raise ValueError("source and output select-link OD dimensions must match")
+    if output.set_names != source.set_names:
+        raise ValueError("source and output selection names and order must match")
+
+
+cdef void _validate_selected_source(SelectLinkOutputs output, SelectLinkOutputs source) except *:
+    if (output.loading is None) != (source.loading is None) or (output.od is None) != (source.od is None):
+        raise ValueError("source and output select-link components must match")
+    if output.loading is not None:
+        _validate_selected_loading_source(output.loading, source.loading)
+    if output.od is not None:
+        _validate_selected_od_source(output.od, source.od)
+
+
+cdef void _validate_aon_source(AoNOutputs output, AoNOutputs source) except *:
+    if (
+        (output.skimming is None) != (source.skimming is None)
+        or (output.select_link is None) != (source.select_link is None)
+    ):
+        raise ValueError("source and output AoN components must match")
+    _validate_loading_source(output.loading, source.loading)
+    if output.skimming is not None:
+        _validate_skimming_source(output.skimming, source.skimming)
+    if output.select_link is not None:
+        _validate_selected_source(output.select_link, source.select_link)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef double[:, :, ::1] _selected_od_blend_view(SelectLinkODOutputs output):
+    """Fold adjacent origin and set axes without copying. The caller excludes empty buffers."""
+    cdef Py_ssize_t rows = output.origin_count * output.set_count
+    cdef Py_ssize_t destinations = output.destination_count
+    cdef Py_ssize_t classes = output.class_count
+
+    # Contiguous storage lets one 3D view distribute work across every origin
+    # and selection set rather than loop over the 4th axis.
+    return <double[:rows, :destinations, :classes]> &output.demand_buffer[0, 0, 0, 0]
+
+
 cdef class LoadingOutputs:
-    """Own fixed-size link loads, without demand, scratch or a graph reference.
+    """Holds the link-by-class loads produced during an assignment.
 
-    Loads start at zero. Loading accumulates into them; reset explicitly before
-    another iteration. Read-only views keep storage alive and reflect reuse.
-
-    Copy and blend methods replace this object's contents and return it. Sources
-    must have matching dimensions, link/column ordering and units; only the
-    dimensions can be checked here. No PCE conversion or summing is performed.
-    The destination may also be a source. Callers must prevent concurrent reads
-    or writes of the destination while an operation is running.
-
-    Two-way weights must be finite and in [0, 1]. All operations require positive
-    cores; a negative threading_threshold disables threading. Load values follow
-    the numeric helpers' ordinary floating-point arithmetic, including NaN/inf.
+    Routing adds demand to this table as it loads links. The table starts at
+    zero and can be cleared for the next iteration, copied into another output,
+    or combined with other compatible load tables. Its ``link_loads`` property
+    provides a read-only view of the current values.
     """
 
     def __cinit__(self):
@@ -48,7 +137,7 @@ cdef class LoadingOutputs:
 
     def __init__(self, link_count, class_count):
         if self.link_loads_buffer is not None:
-            raise RuntimeError("LoadingOutputs cannot be reinitialized")
+            raise RuntimeError("LoadingOutputs cannot be reinitialised")
 
         link_count, class_count = map(operator.index, (link_count, class_count))
         if link_count < 0 or class_count < 0:
@@ -80,7 +169,7 @@ cdef class LoadingOutputs:
         _validate_loading_source(self, source)
 
         cdef size_t count = self.link_count * self.class_count
-        if count:
+        if count and source is not self:
             copy_n(&source.link_loads_buffer[0, 0], count, &self.link_loads_buffer[0, 0])
 
         return self
@@ -93,9 +182,8 @@ cdef class LoadingOutputs:
         int cores=1,
         Py_ssize_t threading_threshold=10000,
     ):
-        """Copy the data from source to self projected through crosswalk
-        """
-        _validate_loading_cores(cores)
+        """Copy the data from source to self projected through crosswalk."""
+        _validate_cores(cores)
 
         if crosswalk.shape[0] != self.link_count:
             raise ValueError("crosswalk must have shape (link_count,)")
@@ -128,8 +216,7 @@ cdef class LoadingOutputs:
         self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon
         """
 
-        # blend_result gives its weight to its first source. Rotating the CFW
-        # sources makes that source the previous direction
+        # CFW gives the conjugate weight to the previous direction.
         return self.blend_result(
             previous_direction,
             aon,
@@ -159,20 +246,7 @@ cdef class LoadingOutputs:
         _validate_loading_source(self, aon)
         _validate_loading_source(self, previous_direction)
         _validate_loading_source(self, older_direction)
-        _validate_loading_cores(cores)
-
-        values = np.array(weights, dtype=np.float64, order="C", copy=True)
-        if values.shape != (3,):
-            raise ValueError("BFW weights must contain exactly three values")
-        if (
-            not np.all(np.isfinite(values))
-            or np.any(values < 0.0)
-            or np.any(values > 1.0)
-        ):
-            raise ValueError("BFW weights must be finite and between zero and one")
-        if not np.isclose(values.sum(), 1.0, rtol=0.0, atol=1e-12):
-            raise ValueError("BFW weights must sum to one")
-        coefficients = values
+        coefficients = _bfw_weights(weights, cores)
 
         with nogil:
             triple_linear_combination[double](
@@ -203,9 +277,7 @@ cdef class LoadingOutputs:
         """
         _validate_loading_source(self, direction)
         _validate_loading_source(self, previous_result)
-        _validate_loading_cores(cores)
-        if not isfinite(stepsize) or stepsize < 0.0 or stepsize > 1.0:
-            raise ValueError("blend weight must be finite and between zero and one")
+        _validate_blend(stepsize, cores)
 
         with nogil:
             linear_combination[double](
@@ -238,21 +310,18 @@ def _validate_skim_names(field_names):
 
 
 cdef class SkimmingOutputs:
-    """Own one ordered skim array, without inputs or scratch references.
+    """Holds the skim values calculated between origins and destinations.
 
-    Storage is [origin rows, fields, destinations]. Each skimming call replaces
-    one contiguous origin block. Reset explicitly to clear all blocks to infinity.
-    Named matrices are strided views of this storage and keep it alive after the
-    wrapper is deleted.
-
-    The layout of [origin rows, fields, destinations] allows contiguous origin and
-    field slices. Given the skimming happens as for each origin, for each field,
-    skim all destinations, this makes sense, although odd.
+    The values are arranged by origin, skim field, and destination, with one
+    named matrix for each requested field. Routing fills the values for each
+    origin, and resetting the output marks every entry as infinity until it is
+    calculated again. The ``skims`` and ``matrices`` properties provide
+    read-only views of the current results.
     """
 
     def __init__(self, origin_count, destination_count, field_names):
         if self.field_names is not None:
-            raise RuntimeError("SkimmingOutputs cannot be reinitialized")
+            raise RuntimeError("SkimmingOutputs cannot be reinitialised")
 
         origin_count = operator.index(origin_count)
         destination_count = operator.index(destination_count)
@@ -264,8 +333,6 @@ cdef class SkimmingOutputs:
         self.destination_count = destination_count
         self.field_count = len(names)
 
-        # Each origin gets one contiguous block of fields and destinations.
-        # Infinity also marks origin rows that have not been written yet.
         self.skims_buffer = array[double](
             (origin_count, self.field_count, destination_count), True, np.inf
         )
@@ -279,16 +346,99 @@ cdef class SkimmingOutputs:
         output.destination_count = self.destination_count
         output.field_count = self.field_count
 
-        # Empty buffers have no first element to take an address from.
+        # Can't obtain a pointer if there's no values
         if self.origin_count and self.destination_count and self.field_count:
             output.data = &self.skims_buffer[0, 0, 0]
 
         return output
 
     def reset(self):
-        """Clear all rows without replacing their allocation."""
+        """Clear outputs."""
         with nogil:
             self.view().reset()
+
+    def copy_from(self, SkimmingOutputs source not None):
+        """Copy skims with matching dimensions and ordered field names."""
+        _validate_skimming_source(self, source)
+
+        cdef size_t count = self.origin_count * self.field_count * self.destination_count
+        if count and source is not self:
+            with nogil:
+                copy_n(&source.skims_buffer[0, 0, 0], count, &self.skims_buffer[0, 0, 0])
+
+        return self
+
+    def blend_cfw(
+        self,
+        SkimmingOutputs aon not None,
+        SkimmingOutputs previous_direction not None,
+        double conjugate_weight,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon."""
+        return self.blend_result(
+            previous_direction, aon, conjugate_weight,
+            cores=cores, threading_threshold=threading_threshold,
+        )
+
+    def blend_bfw(
+        self,
+        SkimmingOutputs aon not None,
+        SkimmingOutputs previous_direction not None,
+        SkimmingOutputs older_direction not None,
+        weights,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = weights[0] * aon + weights[1] * previous_direction + weights[2] * older_direction.
+
+        Weights must be finite, nonnegative and sum to one. Zero value weights will produce NaNs
+        for inaccessible zones.
+        """
+        _validate_skimming_source(self, aon)
+        _validate_skimming_source(self, previous_direction)
+        _validate_skimming_source(self, older_direction)
+        cdef const double[::1] coefficients = _bfw_weights(weights, cores)
+        _warn_zero_weight_skim_blend(
+            coefficients[0] == 0.0 or coefficients[1] == 0.0 or coefficients[2] == 0.0
+        )
+
+        with nogil:
+            triple_linear_combination_skims[double](
+                self.skims_buffer, aon.skims_buffer,
+                previous_direction.skims_buffer, older_direction.skims_buffer,
+                coefficients, cores, threading_threshold,
+            )
+        return self
+
+    def blend_result(
+        self,
+        SkimmingOutputs direction not None,
+        SkimmingOutputs previous_result not None,
+        double stepsize,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = stepsize * direction + (1 - stepsize) * previous_result.
+
+        The weight must be finite and in [0, 1]. Zero value weights will produce NaNs
+        for inaccessible zones.
+        """
+        _validate_skimming_source(self, direction)
+        _validate_skimming_source(self, previous_result)
+        _validate_blend(stepsize, cores)
+        _warn_zero_weight_skim_blend(stepsize == 0.0 or stepsize == 1.0)
+
+        with nogil:
+            linear_combination_skims[double](
+                self.skims_buffer, direction.skims_buffer, previous_result.skims_buffer,
+                stepsize, cores, threading_threshold,
+            )
+        return self
 
     @property
     def skims(self):
@@ -300,8 +450,7 @@ cdef class SkimmingOutputs:
         """Named [origin rows, destinations] views, which may be non-contiguous."""
         skims = self.skims
 
-        # Slicing the read-only array keeps both its storage and read-only
-        # guarantee. No matrix data is copied when building this dictionary.
+        # These slices preserve the array's read-only storage for each matrix.
         return {name: skims[:, field, :] for field, name in enumerate(self.field_names)}
 
 
@@ -309,24 +458,28 @@ def _validate_selection_names(set_names):
     """Match names as well as sizes so sets cannot silently exchange outputs."""
     if isinstance(set_names, str):
         raise TypeError("set_names must be a sequence of names, not a string")
+
     names = tuple(set_names)
     if any(not isinstance(name, str) or not name for name in names):
         raise ValueError("selection names must be nonempty strings")
     if len(set(names)) != len(names):
         raise ValueError("selection names must be unique")
+
     return names
 
 
 cdef class SelectLinkLoadingOutputs:
-    """Own [sets, links, classes] accumulators, without inputs or scratch.
+    """Holds selected-link loads for each named selection set, link, and class.
 
-    Loading adds to existing values. Reset once before processing the origins
-    of an iteration. Each worker needs its own accumulator.
+    As routes are loaded, this table accumulates the demand associated with each
+    selected-link set. Reset it at the start of an assignment iteration to begin
+    a fresh set of totals. The ``loads`` property presents the current values by
+    selection name.
     """
 
     def __init__(self, link_count, class_count, set_names):
         if self.set_names is not None:
-            raise RuntimeError("SelectLinkLoadingOutputs cannot be reinitialized")
+            raise RuntimeError("SelectLinkLoadingOutputs cannot be reinitialised")
 
         link_count, class_count = map(operator.index, (link_count, class_count))
         if link_count < 0 or class_count < 0:
@@ -360,23 +513,100 @@ cdef class SelectLinkLoadingOutputs:
     def link_loads(self):
         return readonly_view(self.link_loads_buffer)
 
+    def copy_from(self, SelectLinkLoadingOutputs source not None):
+        """Copy selected loads with matching dimensions and ordered set names."""
+        _validate_selected_loading_source(self, source)
+
+        cdef size_t count = self.set_count * self.link_count * self.class_count
+        if count and source is not self:
+            with nogil:
+                copy_n(&source.link_loads_buffer[0, 0, 0], count, &self.link_loads_buffer[0, 0, 0])
+        return self
+
+    def blend_cfw(
+        self,
+        SelectLinkLoadingOutputs aon not None,
+        SelectLinkLoadingOutputs previous_direction not None,
+        double conjugate_weight,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon."""
+        return self.blend_result(
+            previous_direction, aon, conjugate_weight,
+            cores=cores, threading_threshold=threading_threshold,
+        )
+
+    def blend_bfw(
+        self,
+        SelectLinkLoadingOutputs aon not None,
+        SelectLinkLoadingOutputs previous_direction not None,
+        SelectLinkLoadingOutputs older_direction not None,
+        weights,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = weights[0] * aon + weights[1] * previous_direction + weights[2] * older_direction.
+
+        Weights must be finite, nonnegative and sum to one.
+        """
+        _validate_selected_loading_source(self, aon)
+        _validate_selected_loading_source(self, previous_direction)
+        _validate_selected_loading_source(self, older_direction)
+        cdef const double[::1] coefficients = _bfw_weights(weights, cores)
+
+        with nogil:
+            triple_linear_combination_skims[double](
+                self.link_loads_buffer, aon.link_loads_buffer,
+                previous_direction.link_loads_buffer, older_direction.link_loads_buffer,
+                coefficients, cores, threading_threshold,
+            )
+        return self
+
+    def blend_result(
+        self,
+        SelectLinkLoadingOutputs direction not None,
+        SelectLinkLoadingOutputs previous_result not None,
+        double stepsize,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = stepsize * direction + (1 - stepsize) * previous_result.
+
+        The weight must be finite and in [0, 1].
+        """
+        _validate_selected_loading_source(self, direction)
+        _validate_selected_loading_source(self, previous_result)
+        _validate_blend(stepsize, cores)
+
+        with nogil:
+            linear_combination_skims[double](
+                self.link_loads_buffer, direction.link_loads_buffer, previous_result.link_loads_buffer,
+                stepsize, cores, threading_threshold,
+            )
+        return self
+
     @property
     def loads(self):
-        """Named, read-only [links, classes] views without copying data."""
+        """Named, read-only [links, classes] read only views."""
         values = self.link_loads
         return {name: values[index] for index, name in enumerate(self.set_names)}
 
 
 cdef class SelectLinkODOutputs:
-    """Own matching demand in [origins, sets, destinations, classes] order.
+    """Holds selected-link demand by origin, selection set, destination, and class.
 
-    A call replaces one origin block. Workers may share this output only when
-    writing different origin rows. Reset clears all rows, including skipped ones.
+    Each named selection set receives a demand matrix showing the trips whose
+    routes meet that selection. Routing writes the results one origin at a time,
+    and ``matrices`` provides the current matrix for each selection name.
     """
 
     def __init__(self, origin_count, destination_count, class_count, set_names):
         if self.set_names is not None:
-            raise RuntimeError("SelectLinkODOutputs cannot be reinitialized")
+            raise RuntimeError("SelectLinkODOutputs cannot be reinitialised")
 
         origin_count, destination_count, class_count = map(
             operator.index, (origin_count, destination_count, class_count)
@@ -412,28 +642,114 @@ cdef class SelectLinkODOutputs:
         with nogil:
             self.view().reset()
 
+    def copy_from(self, SelectLinkODOutputs source not None):
+        """Copy selected demand with matching dimensions and ordered set names."""
+        _validate_selected_od_source(self, source)
+
+        cdef size_t count = self.origin_count * self.set_count * self.destination_count * self.class_count
+        if count and source is not self:
+            with nogil:
+                copy_n(&source.demand_buffer[0, 0, 0, 0], count, &self.demand_buffer[0, 0, 0, 0])
+        return self
+
+    def blend_cfw(
+        self,
+        SelectLinkODOutputs aon not None,
+        SelectLinkODOutputs previous_direction not None,
+        double conjugate_weight,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon."""
+        return self.blend_result(
+            previous_direction, aon, conjugate_weight,
+            cores=cores, threading_threshold=threading_threshold,
+        )
+
+    def blend_bfw(
+        self,
+        SelectLinkODOutputs aon not None,
+        SelectLinkODOutputs previous_direction not None,
+        SelectLinkODOutputs older_direction not None,
+        weights,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = weights[0] * aon + weights[1] * previous_direction + weights[2] * older_direction.
+
+        Weights must be finite, nonnegative and sum to one.
+        """
+        _validate_selected_od_source(self, aon)
+        _validate_selected_od_source(self, previous_direction)
+        _validate_selected_od_source(self, older_direction)
+        cdef const double[::1] coefficients = _bfw_weights(weights, cores)
+        cdef double[:, :, ::1] target, first, second, third
+
+        if self.origin_count and self.set_count and self.destination_count and self.class_count:
+            target = _selected_od_blend_view(self)
+            first = _selected_od_blend_view(aon)
+            second = _selected_od_blend_view(previous_direction)
+            third = _selected_od_blend_view(older_direction)
+            with nogil:
+                triple_linear_combination_skims[double](
+                    target, first, second, third, coefficients, cores, threading_threshold,
+                )
+        return self
+
+    def blend_result(
+        self,
+        SelectLinkODOutputs direction not None,
+        SelectLinkODOutputs previous_result not None,
+        double stepsize,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = stepsize * direction + (1 - stepsize) * previous_result.
+
+        The weight must be finite and in [0, 1].
+        """
+        _validate_selected_od_source(self, direction)
+        _validate_selected_od_source(self, previous_result)
+        _validate_blend(stepsize, cores)
+        cdef double[:, :, ::1] target, first, second
+
+        if self.origin_count and self.set_count and self.destination_count and self.class_count:
+            target = _selected_od_blend_view(self)
+            first = _selected_od_blend_view(direction)
+            second = _selected_od_blend_view(previous_result)
+            with nogil:
+                linear_combination_skims[double](
+                    target, first, second, stepsize, cores, threading_threshold,
+                )
+        return self
+
     @property
     def demand(self):
         return readonly_view(self.demand_buffer)
 
     @property
     def matrices(self):
-        """Named [origins, destinations, classes] views; these may be strided."""
+        """Named [origins, destinations, classes] views. These may be strided."""
         values = self.demand
         return {name: values[:, index] for index, name in enumerate(self.set_names)}
 
 
 cdef class SelectLinkOutputs:
-    """Allocate optional loading and OD components without coupling their use.
+    """Groups the selected-link load and origin-destination outputs for an assignment.
 
-    Each component can be passed to the operation on its own and can outlive
-    this group. Disabling both leaves no numeric output allocations.
+    It creates the requested result tables for a shared set of selection names
+    and lets them be reset, copied, or blended together. The loading component
+    records selected-link volumes, while the OD component records selected-trip
+    demand.
     """
 
     def __init__(self, link_count, destination_count, class_count, set_names, *,
                  origin_count=1, link_loads=True, od=True):
-        if self.initialized:
-            raise RuntimeError("SelectLinkOutputs cannot be reinitialized")
+        if self.initialised:
+            raise RuntimeError("SelectLinkOutputs cannot be reinitialised")
 
         link_count, destination_count, class_count, origin_count = map(
             operator.index, (link_count, destination_count, class_count, origin_count)
@@ -447,7 +763,7 @@ cdef class SelectLinkOutputs:
         if od:
             self.od = SelectLinkODOutputs(origin_count, destination_count, class_count, names)
 
-        self.initialized = True
+        self.initialised = True
 
     def reset(self):
         """Clear only the components allocated by this group."""
@@ -457,13 +773,109 @@ cdef class SelectLinkOutputs:
         if self.od is not None:
             self.od.reset()
 
+    def copy_from(self, SelectLinkOutputs source not None):
+        """Copy matching enabled components, checking the entire group first."""
+        _validate_selected_source(self, source)
+        if self.loading is not None:
+            self.loading.copy_from(source.loading)
+        if self.od is not None:
+            self.od.copy_from(source.od)
+        return self
+
+    def blend_cfw(
+        self,
+        SelectLinkOutputs aon not None,
+        SelectLinkOutputs previous_direction not None,
+        double conjugate_weight,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon."""
+        _validate_selected_source(self, aon)
+        _validate_selected_source(self, previous_direction)
+        _validate_blend(conjugate_weight, cores)
+
+        if self.loading is not None:
+            self.loading.blend_cfw(
+                aon.loading, previous_direction.loading, conjugate_weight,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        if self.od is not None:
+            self.od.blend_cfw(
+                aon.od, previous_direction.od, conjugate_weight,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        return self
+
+    def blend_bfw(
+        self,
+        SelectLinkOutputs aon not None,
+        SelectLinkOutputs previous_direction not None,
+        SelectLinkOutputs older_direction not None,
+        weights,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """Blend each component with three finite, nonnegative weights summing to one.
+
+        self = weights[0] * aon + weights[1] * previous_direction + weights[2] * older_direction
+        """
+        _validate_selected_source(self, aon)
+        _validate_selected_source(self, previous_direction)
+        _validate_selected_source(self, older_direction)
+        coefficients = _bfw_weights(weights, cores)
+
+        if self.loading is not None:
+            self.loading.blend_bfw(
+                aon.loading, previous_direction.loading, older_direction.loading, coefficients,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        if self.od is not None:
+            self.od.blend_bfw(
+                aon.od, previous_direction.od, older_direction.od, coefficients,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        return self
+
+    def blend_result(
+        self,
+        SelectLinkOutputs direction not None,
+        SelectLinkOutputs previous_result not None,
+        double stepsize,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = stepsize * direction + (1 - stepsize) * previous_result.
+
+        The weight must be finite and in [0, 1].
+        """
+        _validate_selected_source(self, direction)
+        _validate_selected_source(self, previous_result)
+        _validate_blend(stepsize, cores)
+
+        if self.loading is not None:
+            self.loading.blend_result(
+                direction.loading, previous_result.loading, stepsize,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        if self.od is not None:
+            self.od.blend_result(
+                direction.od, previous_result.od, stepsize,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        return self
+
 
 cdef class AoNOutputs:
-    """Allocate the independent outputs needed by an assignment iteration.
+    """Collects the results produced by an all-or-nothing assignment.
 
-    Components own their buffers and can outlive this group. Access arrays and
-    names through the components; the group keeps no second copy of their shape.
-    The demand-weighted turn total is a scalar, independent of skimming.
+    It always contains link loads and may also contain skim matrices and
+    selected-link results. The object keeps these results together while an
+    assignment is reset, copied, or blended, and stores the demand-weighted
+    total turn cost alongside them.
     """
 
     def __init__(
@@ -478,7 +890,7 @@ cdef class AoNOutputs:
         select_link_od=True,
     ):
         if self.loading is not None:
-            raise RuntimeError("AoNOutputs cannot be reinitialized")
+            raise RuntimeError("AoNOutputs cannot be reinitialised")
 
         links, zones, classes = map(operator.index, (links, zones, classes))
         if min(links, zones, classes) < 0:
@@ -520,8 +932,136 @@ cdef class AoNOutputs:
         return output
 
     def reset(self):
-        """Clear all components and the scalar without replacing any storage."""
+        """Clear output."""
         with nogil:
             self.view().reset()
 
         self.turn_cost_total = 0
+
+    def copy_from(self, AoNOutputs source not None):
+        """Copy matching components and the turn total."""
+        _validate_aon_source(self, source)
+
+        self.loading.copy_from(source.loading)
+
+        if self.skimming is not None:
+            self.skimming.copy_from(source.skimming)
+
+        if self.select_link is not None:
+            self.select_link.copy_from(source.select_link)
+
+        self.turn_cost_total = source.turn_cost_total
+
+        return self
+
+    def blend_cfw(
+        self,
+        AoNOutputs aon not None,
+        AoNOutputs previous_direction not None,
+        double conjugate_weight,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon.
+
+        Turn cost uses the same weights as every array component.
+        """
+        _validate_aon_source(self, aon)
+        _validate_aon_source(self, previous_direction)
+        _validate_blend(conjugate_weight, cores)
+
+        self.loading.blend_cfw(
+            aon.loading, previous_direction.loading, conjugate_weight,
+            cores=cores, threading_threshold=threading_threshold,
+        )
+        if self.skimming is not None:
+            self.skimming.blend_cfw(
+                aon.skimming, previous_direction.skimming, conjugate_weight,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        if self.select_link is not None:
+            self.select_link.blend_cfw(
+                aon.select_link, previous_direction.select_link, conjugate_weight,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        self.turn_cost_total = (
+            conjugate_weight * previous_direction.turn_cost_total
+            + (1.0 - conjugate_weight) * aon.turn_cost_total
+        )
+        return self
+
+    def blend_bfw(
+        self,
+        AoNOutputs aon not None,
+        AoNOutputs previous_direction not None,
+        AoNOutputs older_direction not None,
+        weights,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """Blend components and turn cost with finite, nonnegative weights summing to one.
+
+        self = weights[0] * aon + weights[1] * previous_direction + weights[2] * older_direction
+        """
+        _validate_aon_source(self, aon)
+        _validate_aon_source(self, previous_direction)
+        _validate_aon_source(self, older_direction)
+        coefficients = _bfw_weights(weights, cores)
+
+        self.loading.blend_bfw(
+            aon.loading, previous_direction.loading, older_direction.loading, coefficients,
+            cores=cores, threading_threshold=threading_threshold,
+        )
+        if self.skimming is not None:
+            self.skimming.blend_bfw(
+                aon.skimming, previous_direction.skimming, older_direction.skimming, coefficients,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        if self.select_link is not None:
+            self.select_link.blend_bfw(
+                aon.select_link, previous_direction.select_link, older_direction.select_link, coefficients,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        self.turn_cost_total = (
+            coefficients[0] * aon.turn_cost_total
+            + coefficients[1] * previous_direction.turn_cost_total
+            + coefficients[2] * older_direction.turn_cost_total
+        )
+        return self
+
+    def blend_result(
+        self,
+        AoNOutputs direction not None,
+        AoNOutputs previous_result not None,
+        double stepsize,
+        *,
+        int cores=1,
+        Py_ssize_t threading_threshold=10000,
+    ):
+        """self = stepsize * direction + (1 - stepsize) * previous_result.
+
+        Applies to every component and the turn total. The weight must be
+        finite and in [0, 1]. Pass self as previous_result for an in-place update.
+        """
+        _validate_aon_source(self, direction)
+        _validate_aon_source(self, previous_result)
+        _validate_blend(stepsize, cores)
+
+        self.loading.blend_result(
+            direction.loading, previous_result.loading, stepsize,
+            cores=cores, threading_threshold=threading_threshold,
+        )
+        if self.skimming is not None:
+            self.skimming.blend_result(
+                direction.skimming, previous_result.skimming, stepsize,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        if self.select_link is not None:
+            self.select_link.blend_result(
+                direction.select_link, previous_result.select_link, stepsize,
+                cores=cores, threading_threshold=threading_threshold,
+            )
+        self.turn_cost_total = stepsize * direction.turn_cost_total + (1.0 - stepsize) * previous_result.turn_cost_total
+        return self

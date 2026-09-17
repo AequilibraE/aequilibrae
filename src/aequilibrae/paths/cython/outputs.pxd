@@ -92,7 +92,7 @@ cdef class SelectLinkODOutputs:
 cdef class SelectLinkOutputs:
     cdef readonly SelectLinkLoadingOutputs loading
     cdef readonly SelectLinkODOutputs od
-    cdef bint initialized
+    cdef bint initialised
 
 
 cdef class AoNOutputs:
