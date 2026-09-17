@@ -28,6 +28,7 @@ from aequilibrae.paths.cython.network_loading cimport (
     cpp_network_loading,
     cpp_reduce_loading_outputs,
     cpp_sum_weighted_turn_costs,
+    cpp_sum_unassigned_demand,
 )
 from aequilibrae.paths.cython.outputs cimport (
     AoNOutputs,
@@ -376,6 +377,7 @@ cdef class PreparedAoN:
         cdef CppNodeBasedContext nodes
         cdef CppTurnBasedContext turns
         cdef double turn_cost_total = 0
+        cdef double unassigned_demand = 0
         cdef bint node_based = isinstance(self.context, NodeBasedContext)
 
         self.validate_outputs(out)
@@ -415,8 +417,10 @@ cdef class PreparedAoN:
 
             for worker in range(self.worker_views.size()):
                 turn_cost_total += self.worker_views[worker].turn_cost_total
+                unassigned_demand += self.worker_views[worker].unassigned_demand
 
         out.turn_cost_total = turn_cost_total
+        out.unassigned_demand = unassigned_demand
         return out
 
 
@@ -463,6 +467,7 @@ cdef void assign_origin(
     )
 
     worker.turn_cost_total += cpp_sum_weighted_turn_costs[double](search, query.loading)
+    worker.unassigned_demand += cpp_sum_unassigned_demand[double](search, query.loading)
 
 
 cdef void assign_origins(

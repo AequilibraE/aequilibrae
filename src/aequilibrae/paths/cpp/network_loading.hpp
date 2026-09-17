@@ -85,6 +85,24 @@ T sum_weighted_turn_costs(const SearchResults &results,
   return total;
 }
 
+// Assignment searches every destination with demand. Missing terminals here
+// therefore mean unreachable demand, not targets omitted by an early stop.
+template <typename T>
+T sum_unassigned_demand(const SearchResults &results,
+                        const LoadingQuery<T> &query) noexcept {
+  T total = 0;
+  for (std::size_t node = 0; node < query.destination_count; ++node) {
+    if (node == results.metadata->origin ||
+        results.terminal_states[node] != invalid_state) {
+      continue;
+    }
+    for (std::size_t cls = 0; cls < query.class_count; ++cls) {
+      total += query.demand[node * query.class_count + cls];
+    }
+  }
+  return total;
+}
+
 // Reduce a set of LoadingOutputs into a single LoadingOutputs.
 template <typename T>
 void reduce_loading_outputs(const LoadingOutputs<T> *workers,

@@ -33,11 +33,13 @@ struct AoNWorkerView {
   // Unlike the borrowed buffers, this scalar lives in the worker table itself.
   // Origin calls take that table entry by reference so additions persist.
   double turn_cost_total = 0;
+  double unassigned_demand = 0;
 
   void reset() noexcept {
     loading.reset();
     selected_loading.reset();
     turn_cost_total = 0;
+    unassigned_demand = 0;
     // Search and operation kernels replace their own scratch when called.
   }
 };

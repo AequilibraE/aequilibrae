@@ -16,6 +16,9 @@ cdef extern from "network_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" 
     T cpp_sum_weighted_turn_costs "aequilibrae::paths::cpp::mvp::sum_weighted_turn_costs"[T](
         const CppSearchResults &results, const CppLoadingQuery[T] &query) noexcept
 
+    T cpp_sum_unassigned_demand "aequilibrae::paths::cpp::mvp::sum_unassigned_demand"[T](
+        const CppSearchResults &results, const CppLoadingQuery[T] &query) noexcept
+
     void cpp_reduce_loading_outputs "aequilibrae::paths::cpp::mvp::reduce_loading_outputs"[T](
         const CppLoadingOutputs[T] *workers,
         size_t worker_count,

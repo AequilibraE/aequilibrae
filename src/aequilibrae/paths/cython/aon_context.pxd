@@ -35,4 +35,5 @@ cdef extern from "aon.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         CppLoadingOutputs[double] loading
         CppSelectLinkLoadingOutputsView[double] selected_loading
         double turn_cost_total
+        double unassigned_demand
         void reset() noexcept

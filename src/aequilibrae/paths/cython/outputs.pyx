@@ -937,6 +937,7 @@ cdef class AoNOutputs:
             self.view().reset()
 
         self.turn_cost_total = 0
+        self.unassigned_demand = 0
 
     def copy_from(self, AoNOutputs source not None):
         """Copy matching components and the turn total."""
@@ -951,6 +952,7 @@ cdef class AoNOutputs:
             self.select_link.copy_from(source.select_link)
 
         self.turn_cost_total = source.turn_cost_total
+        self.unassigned_demand = source.unassigned_demand
 
         return self
 
@@ -988,6 +990,10 @@ cdef class AoNOutputs:
         self.turn_cost_total = (
             conjugate_weight * previous_direction.turn_cost_total
             + (1.0 - conjugate_weight) * aon.turn_cost_total
+        )
+        self.unassigned_demand = (
+            conjugate_weight * previous_direction.unassigned_demand
+            + (1.0 - conjugate_weight) * aon.unassigned_demand
         )
         return self
 
@@ -1029,6 +1035,11 @@ cdef class AoNOutputs:
             + coefficients[1] * previous_direction.turn_cost_total
             + coefficients[2] * older_direction.turn_cost_total
         )
+        self.unassigned_demand = (
+            coefficients[0] * aon.unassigned_demand
+            + coefficients[1] * previous_direction.unassigned_demand
+            + coefficients[2] * older_direction.unassigned_demand
+        )
         return self
 
     def blend_result(
@@ -1064,4 +1075,7 @@ cdef class AoNOutputs:
                 cores=cores, threading_threshold=threading_threshold,
             )
         self.turn_cost_total = stepsize * direction.turn_cost_total + (1.0 - stepsize) * previous_result.turn_cost_total
+        self.unassigned_demand = (
+            stepsize * direction.unassigned_demand + (1.0 - stepsize) * previous_result.unassigned_demand
+        )
         return self

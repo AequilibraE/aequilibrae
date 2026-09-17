@@ -99,5 +99,5 @@ cdef class AoNOutputs:
     cdef readonly LoadingOutputs loading
     cdef readonly SkimmingOutputs skimming
     cdef readonly SelectLinkOutputs select_link
-    cdef readonly double turn_cost_total
+    cdef readonly double turn_cost_total, unassigned_demand
     cdef CppAoNOutputsView view(self) noexcept nogil
