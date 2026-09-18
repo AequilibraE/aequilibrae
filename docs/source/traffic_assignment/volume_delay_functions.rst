@@ -214,7 +214,7 @@ After capacity (:math:`v > c`):
 .. math:: t = t_0 \frac{1.1 - \alpha}{0.1} \left(\frac{v}{c}\right)^2
 
 **Standard Parameters:**
-  * :math:`\alpha = 1.0` (must be :math:`<= 1.0`)
+  * :math:`\alpha = 1.0` (must be :math:`\leq 1.0`)
 
 **Origin and Background:**
 
@@ -241,7 +241,7 @@ for French urban networks and reflects European traffic flow characteristics.
 
 **Limitations:**
 
-* Restricted parameter range (:math:`\alpha <= 1.0`)
+* Restricted parameter range (:math:`\alpha \leq 1.0`)
 * Non-differentiable at V/C = 1
 * Less widely used outside of Europe
 * May require local calibration
@@ -340,7 +340,7 @@ General Recommendations
 **For INRETS:**
 
 * :math:`\alpha = 1.0` is standard
-* Must satisfy :math:`\alpha <= 1.0`
+* Must satisfy :math:`\alpha \leq 1.0`
 * Higher values create steeper curves before capacity
 
 **For Akcelik:**
