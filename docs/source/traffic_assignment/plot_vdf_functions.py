@@ -1,20 +1,20 @@
 """
 Generate VDF comparison charts for documentation
 """
-# from aequilibrae.paths.cython.vdf_core import (
-#     akcelik,
-#     bpr,
-#     bpr2,
-#     conical,
-#     inrets,
-#     delta_akcelik,
-#     delta_bpr,
-#     delta_bpr2,
-#     delta_conical,
-#     delta_inrets,
-# )
+from aequilibrae.paths.cython.vdf_core import (
+    akcelik,
+    bpr,
+    bpr2,
+    conical,
+    inrets,
+    delta_akcelik,
+    delta_bpr,
+    delta_bpr2,
+    delta_conical,
+    delta_inrets,
+)
 
-from aequilibrae.paths.vdf import bpr, bpr2, conical, inrets, akcelik
+# from aequilibrae.paths.vdf import bpr, bpr2, conical, inrets, akcelik
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
@@ -33,7 +33,7 @@ from_voc, to_voc = 0, 3
 link_flows = np.linspace(from_voc, to_voc, array_size)
 
 
-def function_apply(func, link_flows, par1, par2: float | None = None):
+def function_apply(func, link_flows, par1, par2: float | None = None, par3: float | None = None):
     size = link_flows.shape[0]
     congested_times = np.zeros(size, dtype=np.float64)
     capacity = np.ones(size, dtype=np.float64)
@@ -41,13 +41,17 @@ def function_apply(func, link_flows, par1, par2: float | None = None):
     par1s = np.ones(size, dtype=np.float64) * par1
     if par2 is not None:
         par2s = np.ones(size, dtype=np.float64) * par2
-        func(congested_times, link_flows, fftime, capacity, 1, par1s, par2s)
+        if par3 is not None:
+            par3s = np.ones(size, dtype=np.float64) * par3
+            func(congested_times, link_flows, fftime, capacity, 1, par1s, par2s, par3s)
+        else:
+            func(congested_times, link_flows, fftime, capacity, 1, par1s, par2s)
     else:
         func(congested_times, link_flows, fftime, capacity, 1, par1s)
     return congested_times
 
 
-def derivative_apply(delta_func, link_flows, par1, par2: float | None = None):
+def derivative_apply(delta_func, link_flows, par1, par2: float | None = None, par3: float | None = None):
     size = link_flows.shape[0]
     derivative = np.zeros(size, dtype=np.float64)
     capacity = np.ones(size, dtype=np.float64)
@@ -55,7 +59,11 @@ def derivative_apply(delta_func, link_flows, par1, par2: float | None = None):
     par1s = np.ones(size, dtype=np.float64) * par1
     if par2 is not None:
         par2s = np.ones(size, dtype=np.float64) * par2
-        delta_func(derivative, link_flows, fftime, capacity, 1, par1s, par2s)
+        if par3 is not None:
+            par3s = np.ones(size, dtype=np.float64) * par3
+            delta_func(derivative, link_flows, fftime, capacity, 1, par1s, par2s, par3s)
+        else:
+            delta_func(derivative, link_flows, fftime, capacity, 1, par1s, par2s)
     else:
         delta_func(derivative, link_flows, fftime, capacity, 1, par1s)
     return derivative
@@ -64,10 +72,10 @@ def derivative_apply(delta_func, link_flows, par1, par2: float | None = None):
 fig, ax = plt.subplots(figsize=(10, 6))
 
 # Plot each VDF
-ax.plot(link_flows, function_apply(akcelik, link_flows, 0.35, 8.0), label='Akcelik (α=0.35, τ=8.0)', linewidth=2)
+ax.plot(link_flows, function_apply(akcelik, link_flows, 0.35, 8.0, 1.0), label='Akcelik (α=0.35, τ=8.0)', linewidth=2)
 ax.plot(link_flows, function_apply(bpr, link_flows, 0.15, 4.0), label='BPR (α=0.15, β=4.0)', linewidth=2)
 ax.plot(link_flows, function_apply(bpr2, link_flows, 0.15, 4.0), label='BPR2 (α=0.15, β=4.0)', linewidth=2)
-ax.plot(link_flows, function_apply(conical, link_flows, 1.2, 3.0), label='Conical (α=1.2, β=3.0)', linewidth=2)
+ax.plot(link_flows, function_apply(conical, link_flows, 1.2, 3.5), label='Conical (α=1.2, β=3.5)', linewidth=2)
 ax.plot(link_flows, function_apply(inrets, link_flows, 0.9), label='INRETS (α=0.9)', linewidth=2)  # beta not used
 
 # Add vertical line at capacity
@@ -94,19 +102,19 @@ plt.close()
 
 # Create individual plots for each VDF with more detail
 vdfs = [
-    ('BPR', bpr, delta_bpr, 0.15, 4.0, 'Standard BPR function with α=0.15, β=4.0'),
-    ('BPR2', bpr2, delta_bpr2, 0.15, 4.0, 'Modified BPR: β before capacity, 2β after'),
-    ('Conical', conical, delta_conical, 1.2, 3.0, 'Spiess Conical with α=1.2, β=3.0'),
-    ('INRETS', inrets, delta_inrets, 0.9, None, 'French INRETS with α=0.9'),
-    ('Akcelik', akcelik, delta_akcelik, 0.35, 8.0, 'Akcelik function with α=0.35, τ=8.0')
+    ('BPR', bpr, delta_bpr, 0.15, 4.0, None, 'Standard BPR function with α=0.15, β=4.0'),
+    ('BPR2', bpr2, delta_bpr2, 0.15, 4.0, None, 'Modified BPR: β before capacity, 2β after'),
+    ('Conical', conical, delta_conical, 1.2, 3.5, None, 'Spiess Conical with α=1.2, β=3.5'),
+    ('INRETS', inrets, delta_inrets, 0.9, None, None, 'French INRETS with α=0.9'),
+    ('Akcelik', akcelik, delta_akcelik, 0.35, 8.0, 1.0, 'Akcelik function with α=0.35, τ=8.0')
 ]
 
 voc_range = np.linspace(from_voc, to_voc, array_size)
 
-for name, func, delta_func, par1, par2, description in vdfs:
+for name, func, delta_func, par1, par2, par3, description in vdfs:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
-    function_values = function_apply(func, voc_range, par1, par2)
-    derivative_values = derivative_apply(delta_func, voc_range, par1, par2)
+    function_values = function_apply(func, voc_range, par1, par2, par3)
+    derivative_values = derivative_apply(delta_func, voc_range, par1, par2, par3)
     
     # Left plot: Function values
     ax1.plot(voc_range, function_values, linewidth=2.5, color='#1f77b4')
@@ -143,10 +151,10 @@ for name, func, delta_func, par1, par2, description in vdfs:
 fig, ax = plt.subplots(figsize=(10, 6))
 
 voc_near = np.linspace(0.5, 1.5, 200)
-ax.plot(voc_near, function_apply(akcelik, voc_near, 0.35, 8.0), label='Akcelik (α=0.35, τ=8.0)', linewidth=2.5)
+ax.plot(voc_near, function_apply(akcelik, voc_near, 0.35, 8.0, 1.0), label='Akcelik (α=0.35, τ=8.0)', linewidth=2.5)
 ax.plot(voc_near, function_apply(bpr, voc_near, 0.15, 4.0), label='BPR (α=0.15, β=4.0)', linewidth=2.5)
 ax.plot(voc_near, function_apply(bpr2, voc_near, 0.15, 4.0), label='BPR2 (α=0.15, β=4.0)', linewidth=2.5, linestyle='--')
-ax.plot(voc_near, function_apply(conical, voc_near, 1.2, 3.0), label='Conical (α=1.2, β=3.0)', linewidth=2.5)
+ax.plot(voc_near, function_apply(conical, voc_near, 1.2, 3.5), label='Conical (α=1.2, β=3.5)', linewidth=2.5)
 ax.plot(voc_near, function_apply(inrets, voc_near, 0.9), label='INRETS (α=0.9)', linewidth=2.5)
 
 ax.axvline(x=1.0, color='red', linestyle=':', linewidth=2, alpha=0.7, label='Capacity (V/C = 1)')
