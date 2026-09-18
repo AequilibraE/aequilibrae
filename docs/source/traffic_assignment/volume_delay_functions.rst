@@ -482,7 +482,7 @@ Link-Specific Parameters
 Creating Custom VDFs
 --------------------
 
-Custom VDFs can be created and accessed many different ways. The VDF function and its derivative can be input as either a ``Callable``, or as a string to be interpreted by NumExpr. 
+Custom VDFs can be created in three different ways. When using the python constructor of the VDF object, the VDF function and its derivative can be input as either a ``Callable``, or as a string to be interpreted by NumExpr. Alternatively, the string representation and other data can be placed in a project's yaml file. In all cases, if the derivative is not supplied, then it will be computed numerically using the central difference scheme. 
 
 Note that the VDF and its derivative place their result in the first argument, assumed to be an array. The exact way they will be called is given by the following methods in the ``VDF`` class:
 
@@ -498,7 +498,7 @@ This implies that VDFs implemented in python must take in the arguments ``delta,
 
 
 
-The following shows a custom VDF, the SANDAG modified two-part additive formulation (https://tfresource.org/topics/SANDAG_C04Report.pdf), being created by defining the functions in python. Note that if a function for the derivative of the VDF is not specified, when required the derivative will be computed numerically via finite difference.
+The following shows a custom VDF, the SANDAG modified two-part additive formulation (https://tfresource.org/topics/SANDAG_C04Report.pdf), being created by defining the functions in python. 
 
 .. code-block:: python
 
@@ -611,6 +611,53 @@ The following shows the SANDAG modified two-part additive formulation being crea
       derivative_SANDAG_string_representation
     )
 
+This VDF could also be read in from a project's yaml file. The "vdfs" entry of the parameters file
+would contain:
+
+.. code-block:: yaml
+
+    vdfs:
+      SANDAG:
+        functional_form: >
+          fftime * (1.0 + alpha_1 * (link_flows/capacity)**beta_1) +
+          0.5 * cycle_time * (1 - green_to_cycle_ratio)**2 * (1.0 + alpha_2 * (link_flows/capacity)**beta_2)
+        derivative_functional_form: >
+          (fftime * alpha_1 * beta_1 * (link_flows / capacity) ** (beta_1 - 1) / capacity
+          + 0.5 * cycle_time * (1 - green_to_cycle_ratio) ** 2
+          * alpha_2 * beta_2 * (link_flows / capacity) ** (beta_2 - 1) / capacity)
+        spec:
+          alpha_1:
+            fill_NA: 0.15
+            bounds: [0.0, .inf]
+          beta_1:
+            fill_NA: 4.0
+            bounds: [1.0, .inf]
+          alpha_2:
+            fill_NA: 0.15
+            bounds: [0.0, .inf]
+          beta_2:
+            fill_NA: 4.0
+            bounds: [1.0, .inf]
+          green_to_cycle_ratio:
+            bounds: [0.0, 1.0]
+          cycle_time:
+            bounds: [0.0, .inf]
+          intersection_capacity:
+            bounds: [0.0, .inf]
+
+This can then be loaded with:
+
+.. code-block:: python
+
+    # includes every built in preset VDF (bpr, bpr2, conical, inrets, akcelik) as well
+    all_vdfs = project.project_parameters.get_vdfs()
+
+    # only the VDFs explicitly defined in the parameters file
+    custom_vdfs = project.project_parameters.get_vdfs(exclude_builtins=True)
+    sandag_yaml_vdf = custom_vdfs["SANDAG"]
+
+If a name in the "vdfs" entry collides with one of the built in presets (for example "bpr"),
+``get_vdfs`` raises a ``ValueError``.
 
 Checking Custom VDFs
 ~~~~~~~~~~~~~~~~~~~~
@@ -621,7 +668,7 @@ Spiess, 1990 specified qualities of a "Well Behaved Congestion Function". The fu
  2. (part of) For no volume on the link, the congested time is the free flow travel time
  3. The VDF's derivative exists and is strictly increasing, to ensure that it is convex
 
-It acheives this by evalulating the VDF and its derivative at a specified number of points between a volume / capacity from 0 to 3. It then finds the values of volume / capacity where these were violated, and prints out the result. 
+It acheives this by evalulating the VDF and its derivative at a specified number of values of volume between 0 and 3, with a capacity assumed to be 1. It then finds the values of volume / capacity where these conditions were violated, and prints out the result. 
 
 For example, the built-in INRETS VDF is non-convex:
 
