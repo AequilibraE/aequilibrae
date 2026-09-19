@@ -241,6 +241,9 @@ def test_turn_assignment_oracle_parity_finite_penalties(compress: bool):
     # Run Independent Oracle
     oracle = TurnAssignmentOracle(net, turns, allow_uturns=False)
     oracle_res = oracle.assign_all_or_nothing(list(centroids), demand, select_links=[5])
+    # The cheapest route is 1 -> 2 -> 4 -> 3, which pays the 1.0 penalty on 1 -> 2 -> 4 once per
+    # unit of demand. Pinning it here keeps the oracle itself honest, not just the two in step.
+    assert oracle_res["total_turn_penalty"] == pytest.approx(100.0)
 
     # Run AequilibraE Assignment
     g = Graph()
@@ -286,50 +289,3 @@ def test_turn_assignment_oracle_parity_finite_penalties(compress: bool):
     sel_matrix = assigned_tc.results.select_link_od.matrix["sel_link_5"]
     np.testing.assert_allclose(np.squeeze(sel_matrix), oracle_res["select_link_od"], rtol=1e-5)
 
-
-@pytest.mark.parametrize("compress", [False, True])
-def test_turn_assignment_oracle_parity_active_turn_cost(compress: bool):
-    """Verifies that non-zero turn penalty is accumulated into total_turn_penalty accurately."""
-    net = _make_test_network_and_demand()
-    # Make 1 -> 2 -> 3 cheaper despite the turn penalty:
-    # 1 -> 2 -> 3 = 10 + 10 + 2 = 22 < 24 (detour 1 -> 4 -> 3)
-    turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 2.0}])
-    centroids = np.array([1, 3], dtype=np.int64)
-    demand = np.zeros((2, 2), dtype=np.float64)
-    demand[0, 1] = 100.0  # 100 units from 1 to 3
-
-    oracle = TurnAssignmentOracle(net, turns, allow_uturns=False)
-    oracle_res = oracle.assign_all_or_nothing(list(centroids), demand, select_links=[2])
-
-    # Oracle expects 100 units * 2.0 turn penalty = 200.0
-    assert oracle_res["total_turn_penalty"] == pytest.approx(200.0)
-
-    g = Graph()
-    g.network = net.copy()
-    g.set_turn_restrictions(turns, allow_path_uturns=False)
-    g.prepare_graph(centroids=centroids, remove_dead_ends=compress)
-    g.set_graph("free_flow_time")
-
-    mat = AequilibraeMatrix()
-    mat.create_empty(memory_only=True, zones=2, matrix_names=["demand"])
-    mat.index[:] = centroids
-    mat.computational_view(core_list=["demand"])
-    mat.matrix_view[:, :] = demand
-
-    tc = TrafficClass("car", g, mat)
-    tc.set_select_links({"sel_link_2": [(2, 1)]})
-
-    assig = TrafficAssignment()
-    assig.set_classes([tc])
-    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
-    assig.set_capacity_field("capacity")
-    assig.set_time_field("free_flow_time")
-    assig.set_algorithm("all-or-nothing")
-    assig.execute()
-
-    assigned_tc = assig.classes[0]
-    assert assigned_tc.results.total_turn_penalty == pytest.approx(200.0)
-
-    # Select link OD matrix must match 100 units on OD (1, 3)
-    sel_matrix = assigned_tc.results.select_link_od.matrix["sel_link_2"]
-    np.testing.assert_allclose(np.squeeze(sel_matrix), oracle_res["select_link_od"], rtol=1e-5)

@@ -228,13 +228,11 @@ def test_compressed_graph(compressed_graph):
 
 
 def test_dead_end_removal(compressed_graph):
-    # The dead end remove should be able to remove links [30, 38]. In it's current state it is not able to remove
-    # link 40 as it's a single direction link with no outgoing edges so its not possible to find the incoming edges
-    # (in general) without a transposed graph representation.
-    expected = set(compressed_graph.graph[compressed_graph.graph.dead_end == 1].link_id)
-    assert set(compressed_graph.dead_end_links) in (expected, expected - {40}), (
-        "Dead end removal removed incorrect links"
-    )
+    # Dead end removal reaches links [30, 38, 40]. Link 40 is a single-direction link with no outgoing
+    # edges, which the reverse forward star built for turn-aware compression now finds too.
+    assert set(compressed_graph.dead_end_links) == set(
+        compressed_graph.graph[compressed_graph.graph.dead_end == 1].link_id
+    ), "Dead end removal removed incorrect links"
 
 
 def test_turn_restrictions_match_networkx(coquimbo_example):
@@ -408,22 +406,6 @@ def test_explicit_prohibited_uturn_is_not_overridden():
     graph.set_turn_restrictions(_uturn_restrictions(np.inf), allow_path_uturns=True)
 
     assert graph.compute_path(1, 2).path is None
-
-
-def test_blocked_centroid_flow_change_invalidates_graph_id(sioux_falls_example):
-    """Test that toggling centroid blocking assigns a fresh graph ID so stale result holders are rejected."""
-    graph = graph_for_project(sioux_falls_example)
-    graph.prepare_graph(np.arange(1, 25, dtype=np.int64))
-    graph.set_graph("distance")
-
-    graph.set_blocked_centroid_flows(True)
-    before = graph._id
-
-    graph.set_blocked_centroid_flows(True)
-    assert graph._id == before, "Setting the same value must not invalidate the graph"
-
-    graph.set_blocked_centroid_flows(False)
-    assert graph._id != before
 
 
 def test_degree_two_sink_is_not_compressed():

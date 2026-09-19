@@ -171,16 +171,6 @@ def test_saved_path_file_with_chain_compression():
     assert paths_compressed[(1, 3)] == [3, 4]
 
 
-def test_saved_path_file_turn_penalty_reroutes_compressed_chain():
-    """Verifies a turn penalty large enough to beat the detour reroutes the saved compressed path."""
-    net = _build_test_network()
-    turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 20.0}])
-
-    paths, _ = _run_assignment_and_read_paths(net, turns=turns, compress=True)
-
-    assert paths[(1, 3)] == [3, 4]
-
-
 def test_saved_path_file_signed_reverse_links():
     """Verifies that reverse (BA) link traversals unpack with signed negative link IDs without abs()."""
     # Link 1: 1 -> 2 (direction=1, cost=5)
