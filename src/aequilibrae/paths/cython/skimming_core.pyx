@@ -8,7 +8,6 @@ import numpy as np
 from aequilibrae.paths.cython.basic_path_finding cimport (
     blocking_centroid_flows,
     path_finding,
-    path_finding_hybrid,
     _path_finding_hybrid_core,
 )
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
