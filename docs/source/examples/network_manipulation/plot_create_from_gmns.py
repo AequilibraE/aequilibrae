@@ -34,7 +34,7 @@ The source files of this network are publicly available in the
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.network.Network.create_from_gmns`
+#     * :func:`aequilibrae.project.network.importers.Importer.gmns`
 
 # %%
 
@@ -88,7 +88,7 @@ par.write_back()
 # As it is specified that the geometries are in the coordinate system EPSG:32619,
 # which is different than the system supported by AequilibraE (EPSG:4326), we inform
 # the srid in the method call:
-project.network.create_from_gmns(
+project.network.importer.gmns(
     link_file_path=link_file, node_file_path=node_file, use_group_path=use_group_file, srid=32619
 )
 

@@ -231,9 +231,7 @@ def test_finding_3_empty_network_total_exclusion_and_zero_roots(tmp_path):
     res.prepare(graph_excluded, mat)
     aon = allOrNothing("demand", mat, graph_excluded, res)
     aon.execute()
-    # The mode has no active arcs, but assignment result vectors remain in the
-    # original project-wide supernet index space.
-    assert res.link_loads.shape == (graph_excluded.supernet_size, 1)
+    assert res.link_loads.shape == (0, 1)
 
     # 3. Save to disk and load from disk on excluded graph (and verify fresh UUID is kept)
     save_file = str(tmp_path / "excluded_graph.aeq")

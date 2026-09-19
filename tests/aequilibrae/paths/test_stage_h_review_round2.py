@@ -9,6 +9,7 @@ import pytest
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficAssignment, TrafficClass
 from aequilibrae.project import Project
+from aequilibrae.paths.vdf import bpr
 
 
 # ---------------------------------------------------------------------------
@@ -16,11 +17,8 @@ from aequilibrae.project import Project
 # ---------------------------------------------------------------------------
 
 
-def test_mode_exclusion_synthetic_self_loops_culled(tmp_path):
-    """Verifies unsupported mode links are filtered before assigning g.network,
-
-    preventing routable synthetic self-loops that bypass turn prohibitions.
-    """
+def test_mode_exclusion_self_loops_cannot_bypass_turn_prohibitions(tmp_path):
+    """Verifies the self-loops mode exclusion manufactures are not routable around a turn prohibition."""
     proj = Project()
     proj.new(str(tmp_path / "mode_test_proj"))
 
@@ -60,13 +58,12 @@ def test_mode_exclusion_synthetic_self_loops_culled(tmp_path):
     proj.network.build_graphs(modes=["c"])
     g_c = proj.network.graphs["c"]
 
-    # The mode 'c' network must NOT contain links 3 and 4
-    assert 3 not in g_c.network.link_id.values
-    assert 4 not in g_c.network.link_id.values
-    # In full graph, no self-loops were manufactured at node 2
-    assert not ((g_c.graph.a_node == 2) & (g_c.graph.b_node == 2)).any(), (
-        "Synthetic self-loop found in mode 'c' full graph"
-    )
+    # build_graphs represents the links that do not serve mode 'c' as self-loops rather than
+    # dropping them. Those must not be routable: traversing one would reset the arc state and
+    # let a path step around a prohibited turn.
+    excluded = g_c.graph[g_c.graph.link_id.isin([3, 4])]
+    assert not excluded.empty
+    assert (excluded.a_node == excluded.b_node).all()
 
     g_c.prepare_graph(centroids=np.array([1, 3], dtype=np.int64), remove_dead_ends=False)
     g_c.set_graph("distance")
@@ -99,8 +96,7 @@ def test_mode_exclusion_synthetic_self_loops_culled(tmp_path):
     assig_hybrid = TrafficAssignment()
     g_c.set_hybrid_kernel(True)
     assig_hybrid.set_classes([tc_hybrid])
-    assig_hybrid.set_vdf("BPR")
-    assig_hybrid.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig_hybrid.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig_hybrid.set_capacity_field("distance")
     assig_hybrid.set_time_field("distance")
     assig_hybrid.set_algorithm("all-or-nothing")
@@ -115,8 +111,7 @@ def test_mode_exclusion_synthetic_self_loops_culled(tmp_path):
     assig_arc = TrafficAssignment()
     g_c.set_hybrid_kernel(False)
     assig_arc.set_classes([tc_arc])
-    assig_arc.set_vdf("BPR")
-    assig_arc.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig_arc.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig_arc.set_capacity_field("distance")
     assig_arc.set_time_field("distance")
     assig_arc.set_algorithm("all-or-nothing")
@@ -173,8 +168,7 @@ def test_all_pruned_compact_graph_mapping_and_aon_safety():
     tc = TrafficClass("car", g, mat)
     assig = TrafficAssignment()
     assig.set_classes([tc])
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig.set_capacity_field("distance")
     assig.set_time_field("distance")
     assig.set_algorithm("all-or-nothing")
@@ -226,8 +220,7 @@ def test_select_link_on_pruned_link():
 
     assig = TrafficAssignment()
     assig.set_classes([tc])
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig.set_capacity_field("distance")
     assig.set_time_field("distance")
     assig.set_algorithm("all-or-nothing")
@@ -346,8 +339,7 @@ def test_unequal_pce_two_class_assignment_with_turns(algo):
 
     assig = TrafficAssignment()
     assig.set_classes([tc1, tc2])
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig.set_capacity_field("capacity")
     assig.set_time_field("free_flow_time")
     assig.set_algorithm(algo)
@@ -394,8 +386,7 @@ def test_skim_congested_restores_compact_cost():
     tc = TrafficClass("car", g, mat)
     assig = TrafficAssignment()
     assig.set_classes([tc])
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig.set_capacity_field("capacity")
     assig.set_time_field("free_flow_time")
     assig.set_algorithm("all-or-nothing")

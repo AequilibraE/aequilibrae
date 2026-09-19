@@ -91,10 +91,10 @@ cpdef int path_finding_arc_based(
     const double [:] turn_penalties,
     bint allow_uturns,
     double [:] arc_turn_penalties,
-    bint block_centroid_flows=*,
-    long long num_zones=*,
-    const long long [:] first_ctx=*,
-    const long long [:] last_ctx=*,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
 ) noexcept nogil
 
 cpdef int path_finding_hybrid(
@@ -124,5 +124,3 @@ cpdef int path_finding_hybrid(
     const long long [:] last_ctx,
     long long [:] settled_count=*,
 ) noexcept nogil
-
-

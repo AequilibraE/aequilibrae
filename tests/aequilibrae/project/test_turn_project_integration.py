@@ -43,7 +43,7 @@ def test_project_mode_filtering_and_empty_restrictions(sioux_falls_example):
         ).fetchone()
 
     assert pair is not None
-    net.turn_restrictions.add_restriction(pair[0], pair[1], pair[2], penalty=5.0, modes="x")
+    net.turn_restrictions.insert(from_node=pair[0], via_node=pair[1], to_node=pair[2], penalty=5.0, modes="x")
 
     # Build graphs for mode 'c' (car) - the restriction with modes='x' must be filtered out!
     net.build_graphs(modes=["c"])

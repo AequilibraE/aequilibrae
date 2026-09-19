@@ -25,12 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 def _require_bool(value, name: str) -> bool:
-    """Validates that value is a Python or NumPy boolean.
+    """Accepts a Python or NumPy boolean and rejects anything else.
 
-    ``np.bool_`` has to be accepted: it is what ``Series.any()``, ``np.all`` and array
-    comparisons return, and it is not an instance of ``bool``. A bare isinstance check turns
-    ordinary user code away, and reports "got bool" while doing it, because that is the name
-    NumPy's scalar carries.
+    ``np.True_`` is what ``Series.any()``, ``np.all`` and array comparisons return, and it is
+    not an instance of ``bool``, so a bare isinstance check rejects ordinary user code - with a
+    message that reads "must be a boolean, got bool", since NumPy's scalar reports that name.
     """
     if isinstance(value, (bool, np.bool_)):
         return bool(value)
@@ -94,7 +93,6 @@ class GraphBase(ABC):  # noqa: B024
         self._compact_turn_penalties_master = None
 
         self.description = "No description added so far"
-        self.supernet_size: Optional[int] = None
         self.__graph_groupby = None
 
         self.num_links = -1
@@ -287,16 +285,10 @@ class GraphBase(ABC):  # noqa: B024
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
-        if "__supernet_id" in self.graph.columns:
-            self.graph["__supernet_id__"] = self.graph.pop("__supernet_id").astype(self.__int_type)
-        elif "__supernet_id__" not in self.graph.columns or self.graph["__supernet_id__"].duplicated().any():
+        if "__supernet_id__" not in self.graph.columns:
             self.graph.sort_values(by=["link_id", "direction"], inplace=True)
             self.graph["__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__int_type)
         self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
-
-        supernet_max = int(self.graph["__supernet_id__"].max() + 1) if not self.graph.empty else 0
-        if self.supernet_size is None or self.supernet_size < supernet_max:
-            self.supernet_size = supernet_max
 
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
@@ -332,12 +324,6 @@ class GraphBase(ABC):  # noqa: B024
         Clears every full, compact, turn, DAG, cost, skim, and winner array
         into a consistent zero-arc state.
         """
-        # ``supernet_size`` may have been assigned by ``Network.build_graphs`` and
-        # describes the project-wide directed-arc index space, not merely the arcs
-        # that remain in this mode graph.  Emptying a graph must not discard that
-        # shared indexing contract.
-        configured_supernet_size = max(int(self.supernet_size or 0), 0)
-
         empty_props = self._build_directed_graph(
             self.network, self.centroids if self.centroids is not None else np.empty(0, dtype=self.__int_type)
         )
@@ -349,7 +335,6 @@ class GraphBase(ABC):  # noqa: B024
         self.graph["__compressed_id__"] = np.empty(0, dtype=np.int64)
         self.graph["__supernet_id__"] = np.empty(0, dtype=self.__int_type)
         self.num_links = 0
-        self.supernet_size = configured_supernet_size
         self.cost = np.zeros(0, dtype=self.__float_type)
         if self.skim_fields:
             self.skims = np.zeros((1, len(self.skim_fields) + 1), dtype=self.__float_type)
@@ -375,7 +360,7 @@ class GraphBase(ABC):  # noqa: B024
         else:
             self.compact_skims = None
         self.dead_end_links = np.empty(0, dtype=np.int64)
-        self._crosswalk = np.zeros(configured_supernet_size, dtype=self.__int_type)
+        self._crosswalk = None
         self.__graph_groupby = None
 
         # Turn restrictions
@@ -723,20 +708,13 @@ class GraphBase(ABC):  # noqa: B024
 
     def _build_crosswalk(self) -> None:
         """Maps every __supernet_id__ onto the compressed link that absorbed it."""
-        if "__compressed_id__" not in self.graph.columns:
+        if self.graph.empty or "__compressed_id__" not in self.graph.columns:
             self._crosswalk = None
             return
-        supernet_ids = (
-            self.graph.__supernet_id__.to_numpy(copy=False)
-            if "__supernet_id__" in self.graph.columns
-            else np.arange(self.graph.shape[0], dtype=self.__int_type)
-        )
+        supernet_ids = self.graph.__supernet_id__.to_numpy(copy=False)
         compressed_ids = self.graph.__compressed_id__.to_numpy(copy=False)
-        if supernet_ids.size > 0 and supernet_ids.min() < 0:
-            raise ValueError("__supernet_id__ values must be non-negative")
-        indexed_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else 0
-        configured_size = max(int(self.supernet_size or 0), 0)
-        size = max(self.graph.shape[0], indexed_size, configured_size)
+        supernet_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else self.graph.shape[0]
+        size = max(self.graph.shape[0], supernet_size)
         crosswalk = np.full(size, self.compact_num_links, dtype=self.__int_type)
         crosswalk[supernet_ids] = compressed_ids
         self._crosswalk = crosswalk
@@ -745,28 +723,19 @@ class GraphBase(ABC):  # noqa: B024
         """Updates compact_cost from link costs indexed by __supernet_id__.
 
         link_costs must be a 1D array of non-negative numeric values whose length
-        matches either the number of links in this mode graph or its project-wide
-        ``supernet_size``. ``+inf`` is allowed and marks an unusable link; ``NaN``
-        values are coerced to ``+inf``; negative values and ``-inf`` are rejected.
+        matches the number of links in the graph. ``+inf`` is allowed and marks an
+        unusable link; ``NaN`` values are coerced to ``+inf``; negative values and
+        ``-inf`` are rejected.
         """
-        supernet_ids = (
-            self.graph.__supernet_id__.to_numpy(copy=False)
-            if "__supernet_id__" in self.graph.columns
-            else np.arange(self.graph.shape[0], dtype=self.__int_type)
-        )
-        indexed_size = int(supernet_ids.max() + 1) if supernet_ids.size > 0 else 0
-        configured_size = max(int(self.supernet_size or 0), 0)
-        required_crosswalk_size = max(self.graph.shape[0], indexed_size, configured_size)
-        if self._crosswalk is None or len(self._crosswalk) != required_crosswalk_size:
-            self._build_crosswalk()
-
         if self.compact_num_links > 0:
             costs_arr = np.asarray(link_costs, dtype=self.__float_type)
+            if self._crosswalk is None:
+                self._build_crosswalk()
             expected_len = len(self._crosswalk) if self._crosswalk is not None else self.graph.shape[0]
             if costs_arr.shape[0] not in (self.graph.shape[0], expected_len):
                 raise ValueError(
                     f"link_costs array length {costs_arr.shape[0]} does not match "
-                    f"graph link count {self.graph.shape[0]} or supernet size {expected_len}"
+                    f"graph link count {self.graph.shape[0]}"
                 )
             if np.isneginf(costs_arr).any():
                 raise ValueError("link_costs contains -inf values.")
@@ -913,9 +882,10 @@ class GraphBase(ABC):  # noqa: B024
         if self.graph.empty:
             return {int(v) for v in self._turn_restrictions["via_node"].dropna().unique()}
 
-        # Cached by generation counters, which update whenever turn restrictions or topology
-        # change. Do not add a cheap content fingerprint here: a summed node id was tried and is
-        # permutation invariant, so it cannot separate two same-shaped topologies.
+        # _graph_generation is bumped wherever self.graph is replaced (prepare_graph and
+        # _initialize_empty_topology are the only two), so it already separates same-shaped
+        # topologies. A summed-node-id fingerprint would not: it is permutation invariant and
+        # blind to swapping one edge for another with the same endpoint total.
         cache_key = (
             self._turn_restrictions_generation,
             self._graph_generation,
@@ -1041,7 +1011,11 @@ class GraphBase(ABC):  # noqa: B024
 
         mvmt_cols = ["from_node", "via_node", "to_node"]
         if not normalised.empty and normalised.duplicated(subset=mvmt_cols).any():
-            # Resolve duplicate movements: prohibitions take precedence; conflicting penalties raise.
+            # Resolve each repeated movement in place: a prohibition anywhere in the group wins,
+            # and finite penalties that disagree are an input error rather than a silent pick.
+            # Keep the first row of each group so the caller's other columns - modes,
+            # restriction_id, geometry - survive. Rebuilding the frame from the four required
+            # columns would make the schema depend on whether duplicates happened to exist.
             resolved = []
             for mvmt, group in normalised.groupby(mvmt_cols, sort=False):
                 pens = group["penalty"].to_numpy(dtype=np.float64)
@@ -1560,7 +1534,7 @@ class GraphBase(ABC):  # noqa: B024
         key_to_penalty: dict[tuple[int, int], float] = {}
         prohibited_keys: set[tuple[int, int]] = set()
 
-        # Prohibitions override finite penalties
+        # First collect all prohibited keys so prohibition dominance wins unconditionally
         for f_arc, t_arc, penalty in zip(restricted_from_arcs, restricted_to_arcs, restricted_penalties, strict=True):
             f_arc = int(f_arc)
             t_arc = int(t_arc)
@@ -1638,7 +1612,6 @@ class GraphBase(ABC):  # noqa: B024
         mygraph["compact_graph"] = self.compact_graph
         mygraph["description"] = self.description
         mygraph["num_links"] = self.num_links
-        mygraph["supernet_size"] = self.supernet_size
         mygraph["turn_penalty_dimension"] = self.turn_penalty_dimension
         mygraph["turn_skim_fields"] = self.turn_skim_fields
         mygraph["all_nodes"] = self.all_nodes
@@ -1693,10 +1666,6 @@ class GraphBase(ABC):  # noqa: B024
         if isinstance(self.network, np.ndarray):
             self.network = pd.DataFrame(self.network)
         self.mode = mygraph.get("mode", "")
-        # Older graph files pre-date the project-wide supernet index.  Leaving
-        # this unset lets ``prepare_graph`` derive the local size as before.
-        saved_supernet_size = mygraph.get("supernet_size", None)
-        self.supernet_size = int(saved_supernet_size) if saved_supernet_size is not None else None
         self.use_hybrid = mygraph.get("use_hybrid", True)
         self.turn_penalty_dimension = mygraph.get("turn_penalty_dimension", "time")
         self.centroids = mygraph.get("centroids", None)
@@ -1716,7 +1685,7 @@ class GraphBase(ABC):  # noqa: B024
         elif not self.network.empty:
             self._reprepare(None)
         else:
-            self._initialize_empty_topology()
+            self.__build_derived_properties()
 
         self.__build_derived_properties()
 

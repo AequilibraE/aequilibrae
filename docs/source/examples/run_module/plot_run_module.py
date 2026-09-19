@@ -26,7 +26,6 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = '../source/_images/data_pipeline.png'
 
@@ -95,7 +94,7 @@ with open(join(folder, "run", "__init__.py"), "a") as file:
 # %%
 # Now we add new parameters to our model
 
-p = Parameters()
+p = project.project_parameters
 p.parameters["run"]["create_delaunay"] = {}
 p.parameters["run"]["create_delaunay"]["source"] = "zones"
 p.parameters["run"]["create_delaunay"]["name"] = "demand_omx"

@@ -11,7 +11,7 @@ def initial_state(coquimbo_example):
     return {
         "nodes": project.network.nodes.data,
         "links": project.network.links.data,
-        "zones": project.zoning.data,
+        "zones": project.network.zones.data,
         "initial_connectors": project.network.links.data[project.network.links.data.link_type == "centroid_connector"],
     }
 

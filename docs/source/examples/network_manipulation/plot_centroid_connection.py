@@ -14,7 +14,7 @@ We use Folium to visualize the resulting network.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.zoning`
+#     * :func:`aequilibrae.project.network.zones`
 
 # %%
 
@@ -52,7 +52,7 @@ with project.db_connection as conn:
 print("Current number of centroids: ", centroids)
 
 # %%
-zoning = project.zoning
+zones = project.network.zones
 
 # %%
 # This centroid connector creation is effective because it uses the existing
@@ -62,7 +62,7 @@ zoning = project.zoning
 # at the geographic centroid of the zone, using ``add_centroids()``, which has a
 # ``robust`` argument set to ``True`` as default. This means that it will automatically
 # move the centroid location around to avoid conflicts with existing nodes.
-zoning.add_centroids()
+zones.add_centroids()
 
 # %%
 # Let's connect the mode ``c``, that stands for car.
@@ -74,7 +74,7 @@ mode = "c"
 # wants to allow the connection to links in other zones. By setting ``limit_to_zone=False``,
 # we allow the centroid of one zone to be connected to a link outside the zone itself.
 
-zoning.connect_mode(mode_id=mode, connectors=1, limit_to_zone=False)
+zones.connect_mode(mode_id=mode, connectors=1, limit_to_zone=False)
 
 # %%
 # It is possible to repeat the process above for a different mode, with different
@@ -92,7 +92,7 @@ nodes = nodes[nodes["is_centroid"] == 1]
 
 # %%
 map = folium.Map(location=[-29.9568, -71.3456], zoom_start=14)
-zoning.data.explore(m=map, color="blue", style_kwds={"fillOpacity": 0.05}, name="zones")
+zones.data.explore(m=map, color="blue", style_kwds={"fillOpacity": 0.05}, name="zones")
 centroids.explore(m=map, color="black", style_kwds={"weight": 2.5}, name="centroid_connector")
 links.explore(m=map, color="gray", style_kwds={"weight": 1}, name="links")
 nodes.explore(m=map, color="red", style_kwds={"radius": 3, "fillOpacity": 1.0}, name="centroid")

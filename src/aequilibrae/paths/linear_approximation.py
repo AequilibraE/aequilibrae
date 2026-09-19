@@ -1,13 +1,14 @@
+from __future__ import annotations
+
 import logging
 import os
 import time
 from functools import partial
-from pathlib import Path
 from tempfile import gettempdir
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.optimize import root_scalar
+from scipy.optimize import minimize_scalar, root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.cython.parallel_numpy import (
@@ -38,13 +39,14 @@ class LinearApproximation(WorkerThread):
     assignment = SIGNAL(object)
     signal = SIGNAL(object)
 
-    def __init__(self, assig_spec, algorithm, project=None) -> None:
+    def __init__(self, assig_spec: TrafficAssignment, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
         self.signal.emit(["set_text", "Linear Approximation"])
 
         self.project_path = project.project_base_path if project else gettempdir()
 
         self.algorithm = algorithm
+        self.line_search = getattr(assig_spec, "line_search", "trapezoidal")  # CFW, BFW only
         self.bfw_conjugacy = getattr(assig_spec, "bfw_conjugacy", "approximate")  # BFW only
         # Conjugacy diagnostics for the iteration in progress; see _record_conjugacy_diagnostics.
         self.conjugacy_prev = np.nan
@@ -78,30 +80,32 @@ class LinearApproximation(WorkerThread):
 
         self.assig: TrafficAssignment = assig_spec
 
-        if None in [
-            assig_spec.classes,
-            assig_spec.vdf,
-            assig_spec.capacity_field,
-            assig_spec.time_field,
-            assig_spec.vdf_parameters,
-        ]:
-            all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
-            raise Exception(
-                "Parameter missing. Setting the algorithm is the last thing to do "
-                f"when assigning. Check if you have all of these: {all_par}"
+        if assig_spec.classes is None:
+            raise ValueError(
+                "Traffic classes parameter missing. Setting the algorithm is the last thing to do when assigning."
             )
+        elif assig_spec.vdf is None:
+            raise ValueError(
+                "vdf has not been specified. Setting the algorithm is the last thing to do when assigning."
+            )
+        elif assig_spec.vdf_parameters is None:
+            raise ValueError("vdf_parameters missing. Setting the algorithm is the last thing to do when assigning.")
+        elif assig_spec.capacity_field is None:
+            raise ValueError("capacity field is not set in TrafficAssignment.")
+        elif assig_spec.time_field is None:
+            raise ValueError("time field is not set in TrafficAssignment.")
 
         self.traffic_classes: list[TrafficClass] = assig_spec.classes
         self.num_classes = len(assig_spec.classes)
 
-        self.cap_field = assig_spec.capacity_field
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
-        self.procedure_id = assig_spec.procedure_id
+        self.capacity = assig_spec.capacity
+        self.procedure_id: str = assig_spec.procedure_id
 
         self.iter = 0
-        self.rgap = np.inf
+        self.rgap: int | float = np.inf
         self.stepsize = 1.0
         self.conjugate_stepsize = 0.0
         self.fw_class_flow = 0
@@ -121,9 +125,6 @@ class LinearApproximation(WorkerThread):
         # BFW specific stuff
         self.betas = np.array([1.0, 0.0, 0.0])
 
-        # Instantiates the arrays that we will use over and over
-        self.capacity = assig_spec.capacity
-
         # Creates preload vector from preloads
         self.preload = None
         if assig_spec.preloads is not None:
@@ -131,10 +132,22 @@ class LinearApproximation(WorkerThread):
             self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
 
         self.free_flow_tt = assig_spec.free_flow_tt
-        self.fw_total_flow = assig_spec.total_flow
+        self.total_flow = assig_spec.total_flow
         self.congested_time = assig_spec.congested_time
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
+
+        # Private scratch buffers for the trapezoidal Beckmann line search
+        # (``__objective_change_at_stepsize``). Kept separate from
+        # ``self.congested_value`` (which is the analytic-derivative line
+        # search's scratch buffer) so that the trapezoidal helper does not
+        # clobber the public-looking attribute as a side effect, and so that
+        # the per-call ``congested_time + congested_value`` sum can be
+        # written into a pre-allocated buffer instead of allocating fresh
+        # each call.
+        self._trap_new_flow = np.zeros_like(self.congested_time)
+        self._trap_new_cost = np.zeros_like(self.congested_time)
+        self._trap_avg_cost = np.zeros_like(self.congested_time)
 
         # Turn penalty cost tracking for convergence calculation
         self.fw_total_turn_cost = 0.0
@@ -148,10 +161,9 @@ class LinearApproximation(WorkerThread):
 
         self.aons = {}
 
-        supernet_size = self.congested_time.shape[0]
         for c in self.traffic_classes:
             r = AssignmentResults()
-            r.prepare(c.graph, c.matrix, supernet_size=supernet_size)
+            r.prepare(c.graph, c.matrix)
             self.step_direction[c._id] = r
             self.step_direction_turn_cost[c._id] = 0.0
             self.previous_step_direction_turn_cost[c._id] = 0.0
@@ -160,19 +172,19 @@ class LinearApproximation(WorkerThread):
             for c in self.traffic_classes:
                 for d in [self.step_direction, self.previous_step_direction, self.temp_step_direction_for_copy]:
                     r = AssignmentResults()
-                    r.prepare(c.graph, c.matrix, supernet_size=supernet_size)
+                    r.prepare(c.graph, c.matrix)
                     r.compact_link_loads = np.zeros([])
                     r.compact_total_link_loads = np.zeros([])
                     d[c._id] = r
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
-            self.vdf_der,
-            self.fw_total_flow,
-            self.capacity,
-            self.free_flow_tt,
-            *self.vdf_parameters,
-            self.elementwise_cores,
+            delta=self.vdf_der,
+            link_flows=self.total_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
         # The PCE transformation makes the volume-dependent cost identical across classes, so each link's Hessian
         # block is rank one, H_a = t'_a * ones(M, M). Every contraction therefore separates over the class indices,
@@ -235,12 +247,12 @@ class LinearApproximation(WorkerThread):
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
-            self.vdf_der,
-            self.fw_total_flow,
-            self.capacity,
-            self.free_flow_tt,
-            *self.vdf_parameters,
-            self.elementwise_cores,
+            delta=self.vdf_der,
+            link_flows=self.total_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
         # Class-aggregated vectors; see calculate_conjugate_stepsize for why the class pairs factor out. Following
         # appendix A of Mitradjieva & Lindberg, x_ is the residual direction d_{k-2}, z_ is d_{k-1}, y_ is the
@@ -451,16 +463,16 @@ class LinearApproximation(WorkerThread):
         total = np.array(link_flows, dtype=np.float64, copy=True)
         if self.preload is not None:
             total += self.preload
-        self.fw_total_flow = total
+        self.total_flow = total
 
     def _refresh_congested_costs(self):
         self.vdf.apply_vdf(
-            self.congested_time,
-            self.fw_total_flow,
-            self.capacity,
-            self.free_flow_tt,
-            *self.vdf_parameters,
-            self.elementwise_cores,
+            congested_time=self.congested_time,
+            link_flows=self.total_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
 
         for c in self.traffic_classes:
@@ -520,7 +532,7 @@ class LinearApproximation(WorkerThread):
                     for name, idx in c._aon_results._selected_links.items():
                         copy_two_dimensions(
                             self.sl_step_dir_ll[c._id][name]["sdr"],
-                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, : c.graph.compact_num_links, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             self.elementwise_cores,
                             self.threading_threshold,
                         )
@@ -566,9 +578,10 @@ class LinearApproximation(WorkerThread):
 
                 # Update turn cost with the same conjugate stepsize
                 self.previous_step_direction_turn_cost[c._id] = self.step_direction_turn_cost[c._id]
-                self.step_direction_turn_cost[c._id] = self.conjugate_stepsize * self.step_direction_turn_cost[
-                    c._id
-                ] + (1.0 - self.conjugate_stepsize) * c._aon_results.total_turn_penalty
+                self.step_direction_turn_cost[c._id] = (
+                    self.conjugate_stepsize * self.step_direction_turn_cost[c._id]
+                    + (1.0 - self.conjugate_stepsize) * c._aon_results.total_turn_penalty
+                )
 
                 if c._selected_links:
                     aux_res = self.aons[c._id].aux_res
@@ -579,7 +592,7 @@ class LinearApproximation(WorkerThread):
                         linear_combination(
                             sl_step_dir_ll["temp_prev_sdr"],
                             sl_step_dir_ll["sdr"],
-                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, : c.graph.compact_num_links, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             self.conjugate_stepsize,
                             self.elementwise_cores,
                             self.threading_threshold,
@@ -653,7 +666,7 @@ class LinearApproximation(WorkerThread):
 
                         triple_linear_combination(
                             sl_step_dir_ll["temp_prev_sdr"],
-                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, : c.graph.compact_num_links, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             sl_step_dir_ll["sdr"],
                             sl_step_dir_ll["prev_sdr"],
                             self.betas,
@@ -711,17 +724,6 @@ class LinearApproximation(WorkerThread):
         self.__calculate_step_direction()
         self.calculate_stepsize()
 
-    def __maybe_create_path_file_directories(self):
-        path_base_dir = os.path.join(self.project_path, "path_files", self.procedure_id)
-        for c in self.traffic_classes:
-            if c._aon_results.save_path_file:
-                c._aon_results.path_file_dir = os.path.join(
-                    path_base_dir, f"iter{self.iter}", f"path_c{c.mode}_{c._id}"
-                )
-                Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
-                if self.iter == 1:  # save simplified graph correspondences, this could change after assignment
-                    c.graph.save_compressed_correspondence(path_base_dir, c.mode, c._id)
-
     def doWork(self):
         self.execute()
 
@@ -764,9 +766,8 @@ class LinearApproximation(WorkerThread):
                 }
 
             # Sizes the temporary objects used for the results
-            supernet_size = self.congested_time.shape[0]
-            c.results.prepare(c.graph, c.matrix, supernet_size=supernet_size)
-            c._aon_results.prepare(c.graph, c.matrix, supernet_size=supernet_size)
+            c.results.prepare(c.graph, c.matrix)
+            c._aon_results.prepare(c.graph, c.matrix)
             c.results.reset()
 
             # Prepares the fixed cost to be used
@@ -784,7 +785,7 @@ class LinearApproximation(WorkerThread):
 
             self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
-        self._apply_assigned_flow(np.zeros_like(self.capacity))
+        self._apply_assigned_flow(np.zeros_like(self.congested_time))
         self._refresh_congested_costs()
 
         logger.info(f"{self.algorithm} Assignment stats")
@@ -801,8 +802,6 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
 
-            self.__maybe_create_path_file_directories()
-
             for c in self.traffic_classes:  # type: TrafficClass
                 msg = f"All-or-Nothing - Traffic Class: {c._id}"
                 self.signal.emit(["set_text", msg])
@@ -816,6 +815,14 @@ class LinearApproximation(WorkerThread):
                 aon.signal = self.signal
 
                 aon.execute()
+
+                if aon.results.save_path_file:
+                    aon.aux_res.save_path_files(
+                        os.path.join(self.project_path, "path_files.h5"),
+                        aon.graph,
+                        self.iter,
+                    )
+
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
                 aon_flows.append(c._aon_results.total_link_loads)
@@ -868,10 +875,9 @@ class LinearApproximation(WorkerThread):
                                 self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
-                            sl_loads = np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)
                             copy_two_dimensions(
                                 c.results.select_link_loading[name],  # output matrix
-                                sl_loads[idx, : c.graph.compact_num_links, :],  # matrix 1
+                                np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
                                 self.elementwise_cores,  # core count
                                 self.threading_threshold,
                             )
@@ -937,7 +943,10 @@ class LinearApproximation(WorkerThread):
                         + (1.0 - self.stepsize) * cls_res.total_turn_penalty
                     )
 
-                # Convex combination of turn penalty costs tracking the flow solution
+                # Update aggregate turn cost with the same stepsize used for flows.
+                # Turn penalties are fixed costs (not flow-dependent VDF outputs), so this
+                # convex combination tracks the weighted-average turn cost of the current
+                # flow solution - analogous to how link flows are combined.
                 direction_turn_cost = sum(c.pce * self.step_direction_turn_cost[c._id] for c in self.traffic_classes)
                 self.fw_total_turn_cost = (
                     self.stepsize * direction_turn_cost + (1.0 - self.stepsize) * self.fw_total_turn_cost
@@ -957,7 +966,7 @@ class LinearApproximation(WorkerThread):
                     if self.time_field not in c.graph.skim_fields:
                         continue
                     idx = c.graph.skim_fields.index(self.time_field)
-                    c.graph.skims[:, idx] = self.congested_time[c.graph.graph.__supernet_id__]
+                    c.graph.skims[:, idx] = self.congested_time[:]
 
             msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
             self.signal.emit(["set_text", msg])
@@ -976,18 +985,23 @@ class LinearApproximation(WorkerThread):
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
         the corresponding contribution needs to be passed in"""
-        x = np.zeros_like(self.fw_total_flow)
+        x = np.zeros_like(self.total_flow)
         linear_combination_1d(
-            x, self.step_direction_flow, self.fw_total_flow, stepsize, self.elementwise_cores, self.threading_threshold
+            x, self.step_direction_flow, self.total_flow, stepsize, self.elementwise_cores, self.threading_threshold
         )
-        # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
+        # x = self.total_flow + stepsize * (self.step_direction_flow - self.total_flow)
         self.vdf.apply_vdf(
-            self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.elementwise_cores
+            congested_time=self.congested_value,
+            link_flows=x,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
         )
         link_cost_term = sum_a_times_b_minus_c(
             self.congested_value,
             self.step_direction_flow,
-            self.fw_total_flow,
+            self.total_flow,
             self.elementwise_cores,
             self.threading_threshold,
         )
@@ -1009,6 +1023,54 @@ class LinearApproximation(WorkerThread):
             class_specific_term += class_link_costs
         return class_specific_term
 
+    def __objective_change_at_stepsize(
+        self, derivative_of_objective_stepsize_independent: np.ndarray, stepsize: float
+    ) -> float:
+        """Heuristic trapezoidal approximation of the Beckmann objective change
+        ``Z(x + α·d) − Z(x)`` for a given line-search step ``α = stepsize``.
+
+        This one-panel approximation is not the exact Beckmann integral except for affine link costs.
+        However, experiments suggest that
+        on large congested networks (e.g. Chicago, BPR β=4), this trapezoidal line search picks smaller,
+        more conservative α values than the analytic-derivative line search and yields materially better
+        BFW convergence because the smaller α reduces the magnitude of the ``μ·α/(1-α)`` bias term in
+        the next iteration's BFW formula.
+
+        All intermediate buffers are pre-allocated on the instance (``self._trap_new_flow``, ``self._trap_new_cost``,
+        ``self._trap_avg_cost``) so that this helper does NOT clobber ``self.congested_value`` (which the
+        analytic-derivative line search uses as scratch) and does NOT allocate fresh arrays on every Brent probe.
+        """
+        linear_combination_1d(
+            self._trap_new_flow,
+            self.step_direction_flow,
+            self.total_flow,
+            stepsize,
+            self.elementwise_cores,
+            self.threading_threshold,
+        )
+        self.vdf.apply_vdf(
+            congested_time=self._trap_new_cost,
+            link_flows=self._trap_new_flow,
+            fftime=self.free_flow_tt,
+            capacity=self.capacity,
+            cores=self.elementwise_cores,
+            **self.vdf_parameters,
+        )
+        np.add(self.congested_time, self._trap_new_cost, out=self._trap_avg_cost)
+        link_term = (
+            0.5
+            * stepsize
+            * sum_a_times_b_minus_c(
+                self._trap_avg_cost,
+                self.step_direction_flow,
+                self.total_flow,
+                self.elementwise_cores,
+                self.threading_threshold,
+            )
+        )
+        fixed_cost_term = stepsize * derivative_of_objective_stepsize_independent
+        return link_term + fixed_cost_term
+
     def __clip_stepsize(self, stepsize: float, upper_bound: float = 1.0) -> float:
         if not np.isfinite(stepsize):
             raise ValueError(f"Non-finite stepsize {stepsize} encountered")
@@ -1026,66 +1088,253 @@ class LinearApproximation(WorkerThread):
             self.stepsize = self.__clip_stepsize(1.0 / self.iter)
             return
 
-        # Root-find the directional derivative of the Beckmann objective over [0, 1]. This is the traditional
-        # optimal line search used by Frank-Wolfe and its conjugate-direction variants.
+        # With line_search == "trapezoidal", CFW and BFW use a heuristic bounded minimization of a one-panel
+        # trapezoidal approximation to the Beckmann objective change instead of root-finding the exact
+        # directional derivative. Selected via TrafficAssignment.set_line_search; "exact" falls through to the
+        # root_scalar branch below, which is the line search the conjugate-direction theory assumes.
+        #
+        # Two cooperating mechanisms vs. the analytic root_scalar approach:
+        #
+        # (1) The trapezoidal objective is exact for affine link costs and approximate otherwise;
+        #     the two diverge significantly when the BPR exponent is large (β=4 on Chicago test network).
+        # (2) For BFW only: a cap α_max = 1/sqrt(iter) prevents the line search from
+        #     returning α = 1.0, which would collapse the BFW history (s^{k-1} onto x^k)
+        #     and cause the μ·α/(1-α) bias term in calculate_biconjugate_direction to blow up.
+        #     CFW has neither concern and uses α_max = 1.0 (uncapped).
+        #
+        # BFW Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
+        if self.algorithm in ("bfw", "cfw") and self.line_search == "trapezoidal":
+            # The 1/sqrt(iter) cap is only needed for BFW: it bounds the mu*alpha/(1-alpha) bias
+            # term in calculate_biconjugate_direction and prevents alpha=1.0 from collapsing the
+            # BFW history. CFW has no such term and no restart state sensitive to large steps, so
+            # capping CFW at 1/sqrt(iter) degrades it to MSA-like convergence without any benefit.
+            alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5) if self.algorithm == "bfw" else 1.0
+            derivative_of_objective_stepsize_independent = self.__derivative_of_objective_stepsize_independent()
+            res = minimize_scalar(
+                partial(
+                    self.__objective_change_at_stepsize,
+                    derivative_of_objective_stepsize_independent,
+                ),
+                bounds=(0.0, alpha_max),
+                method="Bounded",
+                options={"xatol": 1e-4, "maxiter": 10},
+            )
+
+            def use_tiny_step(message: str):
+                tiny_step = 1e-2 / self.iter
+                if message:
+                    self.iteration_issue.append(message)
+                    log_message = f"# Alert bfw trap: {message} Adding {tiny_step} as step size to make it non-zero."
+                else:
+                    log_message = f"# Alert bfw trap: Adding {tiny_step} as step size to make it non-zero."
+                logger.debug(log_message)
+                self.stepsize = self.__clip_stepsize(tiny_step, alpha_max)
+
+            try:
+                candidate = self.__clip_stepsize(res.x, alpha_max)
+            except ValueError as e:
+                msg = f"BFW/CFW line search returned an invalid stepsize. {e.args}"
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
+            # Brent's bounded method does not evaluate the endpoints exactly.
+            # Compare the interior optimum against α_max explicitly so a true
+            # boundary case (descent throughout the cap interval) still picks
+            # α_max instead of a value just inside it.
+            z_interior = float(res.fun)
+            if not np.isfinite(z_interior):
+                msg = f"BFW/CFW line search returned a non-finite objective value ({z_interior}); falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
+            z_at_max = self.__objective_change_at_stepsize(derivative_of_objective_stepsize_independent, alpha_max)
+            if not np.isfinite(z_at_max):
+                msg = f"BFW/CFW line search returned a non-finite boundary objective ({z_at_max}); falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step(msg)
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+
+            if z_at_max < z_interior and z_at_max < 0.0:
+                self.stepsize = self.__clip_stepsize(alpha_max, alpha_max)
+            elif z_interior < 0.0:
+                self.stepsize = candidate
+            else:
+                msg = "BFW/CFW direction yielded no improvement; falling back to FW."
+                if self.current_direction == "fw":
+                    use_tiny_step("")
+                else:
+                    self.__retry_with_fw_direction(msg)
+                return
+            assert 0 <= self.stepsize <= alpha_max + 1e-12
+            return
+
+        # Exact line search: root-find the directional derivative of the Beckmann objective over [0, 1]. Used by
+        # Frank-Wolfe always, and by CFW/BFW when line_search == "exact". No step cap is applied here.
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
-        turn_derivative = (
-            sum(c.pce * self.step_direction_turn_cost[c._id] for c in self.traffic_classes) - self.fw_total_turn_cost
-        )
-        # Shift line search derivative by turn penalty cost differential
+        # TODO: optimize aggregation
+        turn_derivative = sum(self.step_direction_turn_cost.values()) - self.fw_total_turn_cost
+        # Turn penalties are constant w.r.t. stepsize (they don't depend on flows or VDF),
+        # so they shift the derivative by a fixed amount. Including them here ensures the
+        # line search accounts for turn costs when finding the optimal stepsize.
         derivative_of_objective = partial(
             self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term + turn_derivative
         )
-        derivative_cache = {}
-
-        def evaluate_derivative(stepsize: float) -> float:
-            # ``root_scalar`` evaluates both endpoints itself. Cache those
-            # vector-wide VDF evaluations after checking them below.
-            key = float(stepsize)
-            if key not in derivative_cache:
-                derivative_cache[key] = derivative_of_objective(key)
-            return derivative_cache[key]
 
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
-        def recover_from_invalid_direction(detail: str) -> None:
-            if self.current_direction == "fw" or self.algorithm == "frank-wolfe":
-                # Use a fraction of the MSA step. A fixed 1e-4 works well in
-                # practice, but scaling it avoids an excessive late-iteration step.
-                tiny_step = 1e-2 / self.iter
-                logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {detail}")
-                self.stepsize = self.__clip_stepsize(tiny_step)
-            else:
-                self.__retry_with_fw_direction(
-                    f"Found bad conjugate direction step. Performing FW search. {detail}"
-                )
+        try:
+            min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
+            self.stepsize = self.__clip_stepsize(min_res.root)
+            if not min_res.converged:
+                logger.warning("Descent direction stepsize finder has not converged")
 
-        derivative_at_zero = evaluate_derivative(0.0)
-        derivative_at_one = evaluate_derivative(1.0)
+        except ValueError as e:
+            # `root_scalar` raises ValueError when the derivative does not change sign in [0, 1].
+            # There are two genuinely distinct cases:
+            #   * derivative(0) < 0  ⇒  direction is descent at the current point. Since the
+            #     derivative is monotone non-decreasing along the (convex) line, descent
+            #     persists throughout [0, 1] and the optimum sits at α = 1 (or beyond).
+            #     This is a perfectly valid line-search outcome and only happens because we
+            #     bracket the search to the feasible interval. We must NOT treat it as a
+            #     "reset" - the resulting solution is fine and convergence may be checked.
+            #   * derivative(0) >= 0 ⇒  direction is *not* a descent direction. We then need
+            #     to reset to a Frank-Wolfe step (or, if FW itself failed, take a tiny MSA
+            #     step to avoid stalling).
+            d0_for_branch = derivative_of_objective(0.0)
 
-        if np.isnan(derivative_at_zero) or np.isnan(derivative_at_one):
-            recover_from_invalid_direction("Line-search derivative is NaN at a feasible-interval endpoint.")
-        elif derivative_at_zero > 0.0:
-            recover_from_invalid_direction("The direction is not a descent direction at alpha=0.")
-        elif derivative_at_zero == 0.0:
-            self.stepsize = 0.0
-        elif derivative_at_one <= 0.0:
-            # The convex objective is still decreasing at the far endpoint, so
-            # the constrained optimum is the full feasible step.
-            self.stepsize = 1.0
-            logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
-        else:
-            try:
-                min_res = root_scalar(evaluate_derivative, bracket=[0, 1], xtol=x_tol)
-            except (RuntimeError, ValueError) as exc:
-                recover_from_invalid_direction(f"Line-search root finder failed: {exc}")
-            else:
-                if not min_res.converged or not np.isfinite(min_res.root):
-                    recover_from_invalid_direction("Line-search root finder did not return a finite converged root.")
+            if d0_for_branch >= 0:
+                if self.current_direction == "fw" or self.algorithm == "frank-wolfe":
+                    # For the Frank-Wolfe direction this derivative is exactly the negated gap, so
+                    # a non-negative value means the same impossibility the convergence check
+                    # guards against. Explain it before papering over it with a nominal step.
+                    # congested_value holds C(x) from the derivative evaluation just above.
+                    direction = self.step_direction_flow - self.total_flow
+                    derivative_scale = float(np.sum(np.abs(self.congested_value * direction)))
+                    for c in self.traffic_classes:
+                        derivative_scale += float(
+                            np.sum(
+                                np.abs(
+                                    c.fixed_cost
+                                    * (self.step_direction[c._id].total_link_loads - c.results.total_link_loads)
+                                )
+                            )
+                        )
+                    self._diagnose_negative_gap("line search", -float(d0_for_branch), derivative_scale)
+
+                    tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
+                    # works well in practice, however for a large number of iterations this might be too much so
+                    # use this heuristic instead.
+                    logger.warning(f"# Alert fw ex: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    self.stepsize = self.__clip_stepsize(tiny_step)
                 else:
-                    self.stepsize = self.__clip_stepsize(min_res.root)
+                    msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
+                    self.__retry_with_fw_direction(msg)
+            else:
+                # derivative(0) < 0 (and derivative(1) must also be ≤ 0, otherwise the bracket
+                # search would have succeeded). The objective is still decreasing at α = 1, so
+                # the constrained optimum on [0, 1] is α = 1. Take the full step; do NOT mark
+                # this as a reset - convergence checking remains valid.
+                self.stepsize = self.__clip_stepsize(1.0)
+                logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
 
         assert 0 <= self.stepsize <= 1.0
+
+    # Accumulated tolerance for the cost sums. numpy's pairwise summation gives an error of order
+    # log2(links) * eps * sum|terms|; 64 eps is comfortably above that for any realistic network
+    # while still being ~1e-14 relative, far below any error worth reporting.
+    _GAP_NOISE_FACTOR = 64.0
+
+    def _diagnose_negative_gap(self, where: str, signed: float, scale: float) -> bool:
+        """Explain an all-or-nothing solution that costs more than the current one.
+
+        The all-or-nothing assignment minimises ``C(x)^T z`` over the feasible set, so ``aon_cost``
+        can never exceed ``current_cost`` and the Frank-Wolfe direction can never fail to be a
+        descent direction. If it does, either the gap has reached the precision floor of the cost
+        sums, or the cost handed to the shortest path is not the gradient of the objective being
+        minimised. The second is a modelling or configuration error and the user needs to know.
+
+        ``signed`` is the quantity that must be non-negative, and ``scale`` is the sum of the
+        magnitudes of the terms it was accumulated from -- the cancellation scale. The scale has to
+        come from the caller: the size of a difference says nothing about the rounding error of the
+        sums that produced it.
+
+        Returns ``True`` when the violation is real rather than rounding. Costs nothing unless a
+        violation has already been detected by the caller.
+        """
+        tolerance = self._GAP_NOISE_FACTOR * np.finfo(np.float64).eps * scale
+        if -signed <= tolerance:
+            # Indistinguishable from zero: the iterate is optimal to the precision available.
+            logger.info(
+                f"Gap is negative by {-signed:.3e} at iteration {self.iter}, within the "
+                f"{tolerance:.3e} noise floor of the cost sums. Treating as converged."
+            )
+            return False
+
+        # self._negative_gap_iterations += 1
+        # if self._negative_gap_iterations > 1:
+        #    # Already explained once; do not repeat the full report every iteration.
+        self.iteration_issue.append("All-or-nothing solution costs more than the current one.")
+        #    return True
+
+        relative = -signed / scale if scale else float("nan")
+        detail = [
+            f"the all-or-nothing solution costs MORE than the current one, by "
+            f"{-signed:.6e} ({relative:.3e} relative), which is "
+            f"{-signed / tolerance if tolerance else float('inf'):.3g} times the numerical "
+            f"noise floor.",
+            "This is not possible when the cost minimised by the shortest path is the gradient of "
+            "the objective, so the two have diverged. The assignment will continue but the "
+            "relative gap is no longer meaningful.",
+        ]
+
+        congested = np.asarray(self.congested_time, dtype=np.float64)
+        nonfinite = int((~np.isfinite(congested)).sum())
+        if nonfinite:
+            detail.append(
+                f"CAUSE: {nonfinite} link(s) have a non-finite congested time (max finite value "
+                f"{np.nanmax(congested[np.isfinite(congested)]) if nonfinite < congested.size else float('nan'):.6g}). "
+                f"Input fields are validated at setup but the volume-delay function output is not, "
+                f"so this is an overflow during the run. A large BPR exponent combined with a "
+                f"volume well above capacity will do it; check the exponent and the capacity units."
+            )
+        else:
+            worst_id, worst_amount = None, 0.0
+            for c in self.traffic_classes:
+                unit = congested + np.asarray(c.fixed_cost, dtype=np.float64)
+                violation = float(
+                    np.sum(unit * c._aon_results.total_link_loads) - np.sum(unit * c.results.total_link_loads)
+                )
+                if violation > worst_amount:
+                    worst_id, worst_amount = c._id, violation
+                negative = int((unit < 0).sum())
+                if negative:
+                    detail.append(
+                        f"CAUSE: class '{c._id}' has {negative} link(s) with negative total cost "
+                        f"(minimum {unit.min():.6g}). Shortest-path search assumes non-negative "
+                        f"arc costs, so its solution is not a lower bound."
+                    )
+            if worst_id is not None and len(self.traffic_classes) > 1:
+                detail.append(f"The violation is largest for class '{worst_id}'.")
+            if not any(d.startswith("CAUSE") for d in detail):
+                detail.append(
+                    "Costs are finite and non-negative, so check for a term present on one side "
+                    "only: a fixed cost scaled by a value of time, a toll or distance term added "
+                    "to the graph cost but not to the objective, or a volume-delay function whose "
+                    "derivative is inconsistent with the integral the objective uses."
+                )
+
+        message = f"Iteration {self.iter} ({where}): " + " ".join(detail)
+        logger.warning(message)
+        self.iteration_issue.append("All-or-nothing solution costs more than the current one.")
+        return True
 
     def check_convergence(self):
         """Calculate relative gap and return ``True`` if it is smaller than desired precision.
@@ -1108,6 +1357,12 @@ class LinearApproximation(WorkerThread):
             current_cost += np.sum((self.congested_time + c.fixed_cost) * current_class_flow)
 
         if current_cost != 0.0:
+            # abs() below keeps the historical reporting convention, but a negative difference is
+            # not a small gap -- it is impossible, so check the sign before discarding it.
+            if current_cost < aon_cost:
+                self._diagnose_negative_gap(
+                    "convergence check", current_cost - aon_cost, abs(current_cost) + abs(aon_cost)
+                )
             self.rgap = abs(current_cost - aon_cost) / current_cost
             # ``step_direction`` is populated by ``__calculate_step_direction``
             # which only runs when ``self.iter > 1`` (and not for the

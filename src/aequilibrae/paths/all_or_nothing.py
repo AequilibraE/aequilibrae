@@ -1,11 +1,9 @@
 import logging
-import threading
-from multiprocessing.dummy import Pool as ThreadPool
 
 import numpy as np
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
-from aequilibrae.paths.cython.AoN import aon_parallel, one_to_all
+from aequilibrae.paths.cython.AoN import aon_parallel
 from aequilibrae.paths.cython.parallel_numpy import assign_link_loads
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.results import AssignmentResults
@@ -43,8 +41,6 @@ class allOrNothing(WorkerThread):
         elif not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
-        self._thread_lock = threading.Lock()
-
     def doWork(self):
         self.execute()
 
@@ -55,8 +51,8 @@ class allOrNothing(WorkerThread):
         (``aon_parallel``). This avoids the per-origin Python pool dispatch
         overhead the previous ThreadPool-based path paid. Graphs with turn
         restrictions are handled there too, by the arc-based branch of that
-        kernel. Path file saving requires the GIL, so it is the only case that
-        still falls back to the per-origin thread pool over ``one_to_all``.
+        kernel. Path file saving keeps one predecessor tree per origin, so that
+        case runs the same kernel on a single core.
         """
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: 0/{self.matrix.zones}"
         self.signal.emit(["set_text", msg])
@@ -70,16 +66,16 @@ class allOrNothing(WorkerThread):
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
         )
         with debug_bridge(logger) as bridge:
-            if self.results.save_path_file:
-                self.__execute_pooled(bridge)  # FIXME: remove this, find another way to write out path files
-            else:
-                skipped = aon_parallel(
-                    self.matrix, self.graph, self.results, self.aux_res, self.results.cores, bridge=bridge
-                )
-                self.report.extend(skipped)
+            # Path-file snapshots retain an origin-indexed predecessor tree.
+            # Keep that mode serial; ordinary assignments retain their configured
+            # OpenMP parallelism.
+            cores = 1 if self.results.save_path_file else self.results.cores
+            skipped = aon_parallel(self.matrix, self.graph, self.results, self.aux_res, cores, bridge=bridge)
+            self.report.extend(skipped)
         val = self.matrix.index.shape[0]
         msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {val}/{self.matrix.zones}"
         self.signal.emit(["set_text", msg])
+
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
@@ -94,51 +90,3 @@ class allOrNothing(WorkerThread):
             self.results.total_turn_penalty = float(np.sum(self.aux_res.turn_penalty_accumulator))
         else:
             self.results.total_turn_penalty = 0.0
-
-    def __execute_pooled(self, bridge):
-        mat = self.matrix.matrix_view
-        # Path saving under turn restrictions expands compressed arcs through the
-        # link-network mapping. Build it once here rather than letting every pooled worker
-        # race to populate the graph-level cache.
-        if self.graph.has_turn_restrictions:
-            self.graph.create_compressed_link_network_mapping()
-        pool = ThreadPool(self.results.cores)
-        all_threads = {"count": 0}
-        async_results = []
-        for orig in self.matrix.index:
-            i = int(self.graph.nodes_to_indices[orig])
-            c_i = (
-                int(self.graph.compact_nodes_to_indices[orig])
-                if 0 <= orig < len(self.graph.compact_nodes_to_indices)
-                else -1
-            )
-            if np.nansum(mat[i, :, :]) > 0 or self.results.num_skims > 0:
-                if (
-                    c_i < 0
-                    or c_i >= len(self.graph.compact_fs) - 1
-                    or self.graph.compact_fs[c_i] == self.graph.compact_fs[c_i + 1]
-                ):
-                    self.report.append("Centroid " + str(orig) + " is not connected")
-                else:
-                    ar = pool.apply_async(self.func_assig_thread, args=(orig, all_threads, bridge))
-                    async_results.append(ar)
-        pool.close()
-        pool.join()
-        for ar in async_results:
-            ar.get()
-
-    def func_assig_thread(self, origin, all_threads, bridge=None):
-        thread_id = threading.get_ident()
-        with self._thread_lock:
-            if thread_id not in all_threads:
-                all_threads[thread_id] = all_threads["count"]
-                all_threads["count"] += 1
-            th = all_threads[thread_id]
-
-        x = one_to_all(origin, self.matrix, self.graph, self.results, self.aux_res, th, bridge=bridge)
-        with self._thread_lock:
-            self.cumulative += 1
-            if x != origin:
-                self.report.append(x)
-        msg = f"All-or-Nothing - Traffic Class: {self.class_name} - Zones: {self.cumulative}/{self.matrix.zones}"
-        self.signal.emit(["set_text", msg])

@@ -1,232 +1,246 @@
 import json
-import sqlite3
 import logging
-from typing import Optional
+import uuid
+from typing import Any
 
 import pandas as pd
 
-from aequilibrae.project.data.result_record import ResultRecord
-from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.project_table import _CREATE_INDEX_SQL, NonSpatialProjectTable
+from aequilibrae.utils.db_utils import NestedTransactionManager, df_sqlite_types, escape_identifier
 
 logger = logging.getLogger(__name__)
 
 
-class Results:
-    """Gateway into the results available/recorded in the model"""
+class Results(NonSpatialProjectTable):
+    """Result metadata table."""
+
+    name = "results"
+    key = "table_name"
+    record_name = "ResultRecord"
+    defaults = {"procedure": "", "procedure_id": "", "procedure_report": "null"}
 
     def __init__(
         self,
-        project,
-        project_conn: Optional[sqlite3.Connection] = None,
-        results_conn: Optional[sqlite3.Connection] = None,
-    ):
-        """Initialise the Results object.
+        project_connection: NestedTransactionManager,
+        results_connection: NestedTransactionManager,
+    ) -> None:
+        """Create the result table.
 
-        Arguments:
-            **project**: Project instance this Results object belongs to
-            **project_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
-                database to use for the results table.
-            **results_conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to the
-                results database
+        :Arguments:
+            **project_connection** (:obj:`NestedTransactionManager`): Manager for
+            result metadata in the project database.
+
+            **results_connection** (:obj:`NestedTransactionManager`): Manager for
+            result tables.
         """
-        self.project = project
-        self.__items = {}
-        self.__fields = []
+        super().__init__(project_connection)
+        self._results_connection = results_connection
 
-        self.__project_conn = project_conn
-        self.__results_conn = results_conn
-
-        tl = TableLoader()
-        with self.__project_conn or self.project.db_connection as conn:
-            results_list = tl.load_table(conn, "results")
-        self.__fields = list(tl.fields)
-        if results_list:
-            self.__properties = list(results_list[0].keys())
-
-        with self.__project_conn or self.project.db_connection as conn:
-            for lt in results_list:
-                table_name = lt["table_name"]
-                if table_name in self.__items:
-                    if not self.__items[table_name]._exists:
-                        del self.__items[table_name]
-
-                if table_name not in self.__items:
-                    if conn.execute("SELECT COUNT(*) FROM results WHERE table_name=?", (table_name,)).fetchone()[0]:
-                        self.__items[table_name] = ResultRecord(
-                            lt, project, project_conn=self.__project_conn, results_conn=self.__results_conn
-                        )
-
-    def reload(self) -> None:
-        """Reloads the results from the database."""
-        self.__items.clear()
-        self.__init__(self.project, self.__project_conn, self.__results_conn)
-
-    def clear_database(self) -> None:
-        """Removes records from the results table that do not exist in the results database."""
-
-        with (
-            self.__project_conn or self.project.db_connection as project_conn,
-            self.__results_conn or self.project.results_connection as results_conn,
-        ):
-            mats = [x[0] for x in project_conn.execute("SELECT table_name FROM results").fetchall()]
-
-            remove = set(mats) - {
-                name
-                for name in mats
-                if results_conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
-                is not None
-            }
-            if remove:
-                logger.warning(f"Results records not found in results database: {','.join(remove)}")
-
-                project_conn.executemany("DELETE FROM results WHERE table_name=?;", [(x,) for x in remove])
-            else:
-                logger.info("No result records to remove")
-
-    def update_database(self) -> None:
-        """Adds records to the results table for results found in the results database."""
-        with (
-            self.__project_conn or self.project.db_connection as project_conn,
-            self.__results_conn or self.project.results_connection as results_conn,
-        ):
-            existing_results = {
-                x[0] for x in results_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-            }
-            existing_records = {x[0] for x in project_conn.execute("SELECT table_name FROM results").fetchall()}
-
-        new_results = existing_results - existing_records
-
-        if new_results:
-            logger.warning(f"New results found in the results database. Added to the database: {','.join(new_results)}")
-            for table in new_results:
-                rec = self.new_record(table)
-                rec.save()
-        else:
-            logger.info("No new result records to add")
-
-    def list(self) -> pd.DataFrame:
-        """List of all results available.
-
-        Arguments:
-            **conn** (:obj:`Optional[sqlite3.Connection]`): Optional connection to use
-
-        Returns:
-            **df** (:obj:`pd.DataFrame`): Pandas DataFrame listing all results available in the model
-        """
-
-        with self.__project_conn or self.project.db_connection as conn:
-            return pd.read_sql_query("SELECT * FROM results;", conn)
-
-    def get_results(self, table_name: str) -> pd.DataFrame:
-        """Returns a DataFrame containing the results.
-
-        Raises an error if results do not exist.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the results to be loaded
-
-        Returns:
-            **results** (:obj:`pd.DataFrame`): Results as a DataFrame
-
-        Raises:
-            **ValueError**: If the result doesn't exist
-        """
-
-        return self.get_record(table_name).get_data()
-
-    def get_record(self, table_name: str) -> ResultRecord:
-        """Returns a model ResultsRecord for manipulation in memory.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the result record to retrieve
-
-        Returns:
-            **record** (:obj:`ResultRecord`): The requested result record
-
-        Raises:
-            **ValueError**: If the result doesn't exist or was deleted
-        """
-
-        if table_name not in self.__items:
-            raise ValueError("There is no results record with that name")
-
-        if not self.__items[table_name]._exists:
-            raise ValueError("This result was deleted during this session")
-
-        return self.__items[table_name]
-
-    def check_exists(self, table_name: str) -> bool:
-        """Checks whether a result with a given name exists.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the result to check
-
-        Returns:
-            **exists** (:obj:`bool`): Does the result exist?
-        """
-        return table_name in self.__items and self.__items[table_name]._exists
-
-    def delete_record(self, table_name: str) -> None:
-        """Deletes a ResultRecord from the model and attempts to remove it from the results database.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the result to delete
-
-        Raises:
-            **ValueError**: If the result doesn't exist
-        """
-        rr = self.get_record(table_name)
-        rr.delete()
-        del self.__items[table_name]
-
-    def new_record(
+    def create(
         self,
         table_name: str,
-        procedure: str = None,
-        procedure_id: str = None,
-        procedure_report: dict = None,
-        timestamp: str = None,
-        description: str = None,
-        scenario: str = None,
-        year: str = None,
+        data: pd.DataFrame,
+        *,
+        index: bool = True,
+        procedure: str | None = None,
+        procedure_id: str | None = None,
+        procedure_report: dict[str, Any] | None = None,
+        timestamp: str | None = None,
+        description: str | None = None,
+        scenario: str | None = None,
+        year: str | None = None,
         reference_table: str = "links",
-    ) -> ResultRecord:
-        """Creates a new record for a result.
-
-        Arguments:
-            **table_name** (:obj:`str`): Name of the table
-            **procedure** (:obj:`str`, optional): Name of the procedure
-            **procedure_id** (:obj:`str`, optional): ID of the procedure
-            **procedure_report** (:obj:`dict`, optional): Report associated with the procedure
-            **timestamp** (:obj:`str`, optional): Timestamp for the record
-            **description** (:obj:`str`, optional): Description of the record
-
-        Returns:
-            **result_record** (:obj:`ResultRecord`): A result record that can be manipulated in memory before saving
-
-        Raises:
-            **ValueError**: If a result with the same name already exists
+        dtype: dict[str, str] | None = None,
+    ) -> Any:
         """
-        if table_name in self.__items:
-            raise ValueError(f"There is already a result of name ({table_name}). It must be unique.")
+        Create one table and its metadata record.
 
-        tp = {
-            "scenario": scenario,
-            "year": year,
-            "table_name": table_name,
-            "procedure": procedure,
-            "procedure_id": procedure_id,
-            "procedure_report": json.dumps(procedure_report),
-            "timestamp": timestamp,
-            "description": description,
-            "reference_table": reference_table,
+        :Arguments:
+            **table_name** (:obj:`str`): Unique SQLite table name.
+
+            **data** (:obj:`pandas.DataFrame`): Result values to persist.
+
+            **index** (:obj:`bool`, *Optional*): Include the index of the DataFrame in the table, creates a SQLite index
+              if enabled.
+
+            **procedure** (:obj:`str`, *Optional*): Producing procedure name.
+
+            **procedure_id** (:obj:`str`, *Optional*): Producing procedure ID.
+
+            **procedure_report** (:obj:`dict`, *Optional*): JSON-serialisable
+            procedure report.
+
+            **timestamp** (:obj:`str`, *Optional*): Result timestamp.
+
+            **description** (:obj:`str`, *Optional*): Human-readable description.
+
+            **scenario** (:obj:`str`, *Optional*): Scenario label.
+
+            **year** (:obj:`str`, *Optional*): Model-year label.
+
+            **reference_table** (:obj:`str`): Referenced project table.
+
+            **dtype** (:obj:`dict`, *Optional*): SQLite type overrides by column.
+
+        :Returns:
+            **result record** (:obj:`Any`): Generated frozen metadata record.
+        """
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("data must be a pandas DataFrame")
+        if table_name in self or self.table_exists(table_name):
+            raise ValueError(f"A result record or table named {table_name!r} already exists")
+
+        frame, index_names = format_dataframe(data, include_index=index)
+        table = escape_identifier(table_name)
+
+        columns_to_types = df_sqlite_types(frame, dtype or {})
+        columns_to_escaped = {col: escape_identifier(col) for col in columns_to_types.keys()}
+
+        # Reorder to match
+        frame = frame[list(columns_to_types.keys())]
+
+        definitions = ", ".join(f"{columns_to_escaped[column]} {dtype}" for column, dtype in columns_to_types.items())
+        placeholders = ",".join("?" for _ in columns_to_types)
+        insert_sql = f"INSERT INTO {table} ({','.join(columns_to_escaped.values())}) VALUES ({placeholders})"
+
+        with self._results_connection.transaction() as conn:
+            conn.execute(f"CREATE TABLE {table} ({definitions})")
+            conn.executemany(insert_sql, frame.itertuples(index=False, name=None))
+
+            if index:
+                index_columns = ", ".join(escape_identifier(col) for col in index_names)
+                index_name = escape_identifier(f"aeq_{table_name}_idx")
+
+                conn.execute(_CREATE_INDEX_SQL.format(index=index_name, table=table, columns=index_columns))
+
+        try:
+            self.insert(
+                table_name=table_name,
+                procedure=procedure,
+                procedure_id=procedure_id,
+                procedure_report=json.dumps(procedure_report),
+                timestamp=timestamp,
+                description=description,
+                scenario=scenario,
+                year=year,
+                reference_table=reference_table,
+            )
+        except BaseException as primary:
+            try:
+                with self._results_connection.transaction() as conn:
+                    conn.execute(f"DROP TABLE {table}")
+            except BaseException as cleanup:
+                primary.add_note(f"unregistered result table {table_name!r} remains: {cleanup!r}")
+            raise
+
+        return self.get(table_name)
+
+    def get_results(self, table_name: str) -> pd.DataFrame:
+        """Read a result table into a DataFrame.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Registered table name.
+
+        :Returns:
+            **results** (:obj:`pandas.DataFrame`): Stored result values.
+        """
+        record = self.get(table_name)
+        return pd.read_sql_query(
+            f"SELECT * FROM {escape_identifier(record.table_name)}", self._results_connection._connection
+        )
+
+    def delete_result(self, table_name: str) -> None:
+        """Delete result metadata and its table.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Registered result name to delete.
+        """
+        table = escape_identifier(table_name)
+        tombstone = f"__aeq_deleted_{uuid.uuid4().hex}"
+        move = self.table_exists(table_name)
+
+        if move:
+            with self._results_connection.transaction() as conn:
+                conn.execute(f"ALTER TABLE {table} RENAME TO {tombstone}")
+
+        try:
+            super().delete(table_name)
+        except BaseException as primary:
+            if move:
+                try:
+                    with self._results_connection.transaction() as conn:
+                        conn.execute(f"ALTER TABLE {tombstone} RENAME TO {table}")
+                except BaseException as cleanup:
+                    primary.add_note(f"result table is stranded as {tombstone!r}: {cleanup!r}")
+            raise
+
+        if move:
+            with self._results_connection.transaction() as conn:
+                conn.execute(f"DROP TABLE {tombstone}")
+
+    def clear_database(self) -> None:
+        """Remove metadata for absent tables."""
+        with self._connection.transaction() as conn:
+            names = [row[0] for row in conn.execute("SELECT table_name FROM results").fetchall()]
+            missing = [(name,) for name in names if not self.table_exists(name)]
+
+            if missing:
+                conn.executemany("DELETE FROM results WHERE table_name=?", missing)
+
+        self._invalidate()
+
+    def update_database(self) -> None:
+        """Register existing, unrecorded tables."""
+        result_tables = {
+            row[0]
+            for row in self._results_connection._connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
         }
-        rr = ResultRecord(tp, self.project, project_conn=self.__project_conn, results_conn=self.__results_conn)
-        rr.save()
-        self.__items[table_name] = rr
-        logger.warning("ResultRecord has been saved to the database")
-        return rr
+        records = {row[0] for row in self._connection._connection.execute("SELECT table_name FROM results").fetchall()}
+        for table_name in sorted(result_tables - records):
+            self.insert(table_name=table_name)
 
-    def _clear(self) -> None:
-        """Eliminates records from memory. For internal use only."""
-        self.__items.clear()
+    def sync(self) -> None:
+        """Remove metadata for absent tables, and register unrecorded tables."""
+        self.clear_database()
+        self.update_database()
+
+    def list(self) -> pd.DataFrame:
+        return pd.read_sql_query("SELECT * FROM results", self._connection._connection)
+
+    def table_exists(self, table_name: str) -> bool:
+        return (
+            self._results_connection._connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
+            ).fetchone()
+            is not None
+        )
+
+
+def format_dataframe(data: pd.DataFrame, include_index: bool) -> tuple[pd.DataFrame, list[str]]:
+    if any(not isinstance(column, str) for column in data.columns):
+        raise ValueError("result columns must all be strings")
+    elif not data.columns.is_unique:
+        raise ValueError("result columns must be unique")
+
+    names = []
+    used = set(data.columns)
+
+    if not include_index:
+        return data, names
+
+    for level, name in enumerate(data.index.names):
+        label = name if name is not None else f"index_level_{level}"
+
+        if not isinstance(label, str):
+            raise ValueError("result index names must be strings")
+        elif label in used or label in names:
+            raise ValueError(f"result index label {label!r} collides with another data column")
+
+        names.append(label)
+
+    frame = data.copy(deep=False)
+    frame.index = frame.index.set_names(names)
+
+    return frame.reset_index(), names

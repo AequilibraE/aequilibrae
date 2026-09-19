@@ -112,7 +112,7 @@ mat.computational_view()
 # quadratically with the number of links cut.
 
 zones_of_interest = [29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 49, 50, 51, 52, 57, 58, 59, 60]
-zones = project.zoning.data.set_index("zone_id")
+zones = project.network.zones.data.set_index("zone_id")
 zones = zones.loc[zones_of_interest]
 zones.head()
 

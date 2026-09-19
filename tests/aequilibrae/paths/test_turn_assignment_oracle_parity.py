@@ -9,6 +9,7 @@ import pytest
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 
 class TurnAssignmentOracle:
@@ -261,8 +262,7 @@ def test_turn_assignment_oracle_parity_finite_penalties(compress: bool, use_hybr
 
     assig = TrafficAssignment()
     assig.set_classes([tc])
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig.set_capacity_field("capacity")
     assig.set_time_field("free_flow_time")
     assig.set_algorithm("all-or-nothing")
@@ -324,8 +324,7 @@ def test_turn_assignment_oracle_parity_active_turn_cost(compress: bool):
 
     assig = TrafficAssignment()
     assig.set_classes([tc])
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assig.set_capacity_field("capacity")
     assig.set_time_field("free_flow_time")
     assig.set_algorithm("all-or-nothing")

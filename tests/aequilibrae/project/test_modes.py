@@ -1,51 +1,88 @@
-import random
-import string
-from sqlite3 import IntegrityError
+import sqlite3
+from dataclasses import FrozenInstanceError
+from string import ascii_letters, ascii_lowercase, ascii_uppercase
 
 import pytest
 
-from aequilibrae.project.network.mode import Mode
-from aequilibrae.utils.db_utils import read_and_close
+from aequilibrae.project.network.modes import Modes
+from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
-def test_add(sioux_falls_example):
-    new_mode = Mode("F", sioux_falls_example)
-    name = "".join([random.choice(string.ascii_letters + "_") for _ in range(random.randint(1, 20))])
-    new_mode.mode_name = name
-    sioux_falls_example.network.modes.add(new_mode)
-
-    with read_and_close(sioux_falls_example.path_to_file) as conn:
-        mode = conn.execute('select mode_name from modes where mode_id="F"').fetchone()[0]
-
-    assert mode == name, "Could not save the mode properly to the database"
-
-
-def test_drop(sioux_falls_example):
-    sioux_falls_example.network.modes.delete("b")
-
-    with pytest.raises(IntegrityError):
-        sioux_falls_example.network.modes.delete("c")
-
-
-def test_get(sioux_falls_example):
-    c = sioux_falls_example.network.modes.get("c")
-    assert c.description == "All motorized vehicles"
-    del c
-
-    with pytest.raises(ValueError):
-        _ = sioux_falls_example.network.modes.get("f")
-
-
-def test_new(sioux_falls_example):
-    modes = sioux_falls_example.network.modes
-    assert isinstance(modes.new("h"), Mode), "Returned wrong type"
-
-    m = list(modes.all_modes().keys())[0]
-    with pytest.raises(ValueError):
-        modes.new(m)
+@pytest.fixture
+def modes():
+    manager = NestedTransactionManager(":memory:")
+    manager._connection.executescript(
+        """
+        CREATE TABLE modes (
+            mode_name TEXT UNIQUE NOT NULL,
+            mode_id TEXT UNIQUE NOT NULL PRIMARY KEY CHECK (length(mode_id) = 1),
+            description TEXT,
+            pce NUMERIC NOT NULL DEFAULT 1.0,
+            vot NUMERIC NOT NULL DEFAULT 0,
+            ppv NUMERIC NOT NULL DEFAULT 1.0
+        );
+        CREATE TABLE attributes_documentation (
+            name_table TEXT NOT NULL,
+            attribute TEXT NOT NULL,
+            description TEXT,
+            PRIMARY KEY (name_table, attribute)
+        );
+        INSERT INTO modes (mode_name, mode_id, description)
+        VALUES ('car', 'c', 'All motorized vehicles'), ('walk', 'w', 'Walking links');
+        """
+    )
+    yield Modes(manager)
+    manager.close()
 
 
-def test_fields(sioux_falls_example):
-    fields = sioux_falls_example.network.modes.fields
-    fields.all_fields()
-    assert fields._table == "modes", "Returned wrong table handler"
+def test_container_and_lookup_interfaces(modes):
+    assert len(modes) == 2
+    assert "c" in modes
+    assert "x" not in modes
+    assert {mode.mode_id for mode in modes} == {"c", "w"}
+    assert modes.get("c") == modes.get_by_name("car")
+
+    with pytest.raises(ValueError, match="modes has no record with mode_id='x'"):
+        modes.get("x")
+    with pytest.raises(ValueError, match="Mode hovercraft does not exist"):
+        modes.get_by_name("hovercraft")
+
+
+def test_insert_update_delete_and_record_immutability(modes):
+    key = modes.insert(mode_id="b", mode_name="bicycle", description="Human powered")
+    assert key == "b"
+    assert modes.get(key).pce == 1
+
+    record = modes.get(key)
+    modes.update(key, description="Bikes")
+    assert record.description == "Human powered"
+    assert modes.get(key).description == "Bikes"
+    with pytest.raises(FrozenInstanceError, match="cannot assign to field 'description'"):
+        record.description = "mutable"
+
+    modes.delete(key)
+    assert key not in modes
+    with pytest.raises(ValueError, match="modes has no record with mode_id='b'"):
+        modes.delete(key)
+
+
+def test_mode_constraints_and_fields_interface(modes):
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK constraint failed"):
+        modes.insert(mode_id="ab", mode_name="invalid")
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE constraint failed: modes.mode_name"):
+        modes.insert(mode_id="x", mode_name="car")
+
+    editor = modes.fields
+    assert editor._table == "modes"
+    assert set(editor.all_fields()) == set(modes.columns)
+
+    editor.add("fare", "Typical fare", "NUMERIC")
+    modes.update("c", fare=2.5)
+    assert modes.get("c").fare == 2.5
+
+
+def test_available_ids(modes):
+    assert set(modes.available_ids()) == set(ascii_letters) - {"c", "w"}
+    assert set(modes.available_ids(full_list=ascii_lowercase)) == set(ascii_lowercase) - {"c", "w"}
+    assert set(modes.available_ids(full_list=ascii_uppercase)) == set(ascii_uppercase)
+    assert set(modes.available_ids(full_list=[])) == set()

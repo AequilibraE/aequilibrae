@@ -36,7 +36,7 @@ def _sample_od_pairs(centroids: np.ndarray, sample_size: int, rng: np.random.Gen
         destinations[same] = rng.choice(centroids, size=int(np.sum(same)), replace=True)
         same = origins == destinations
 
-    return [(int(o), int(d)) for o, d in zip(origins, destinations)]
+    return [(int(o), int(d)) for o, d in zip(origins, destinations, strict=False)]
 
 
 def _prepare_graph(model_path: Path, mode: str):
@@ -70,7 +70,7 @@ def _build_arc_index(graph):
         b_node = int(row.b_node)
         link_id = int(row.link_id)
         direction = int(row.direction)
-        distance = float(getattr(row, "distance"))
+        distance = float(row.distance)
 
         arc_lookup[(a_node, b_node, link_id)] = (arc_id, direction, distance)
         arc_meta[arc_id] = {
@@ -85,11 +85,12 @@ def _build_arc_index(graph):
 
     return graph_df, arc_lookup, arc_meta, outgoing, incoming
 
+
 def _build_turn_bans(
-        graph,
-        od_pairs: Sequence[Tuple[int, int]],
-        arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]],
-        rng: np.random.Generator,
+    graph,
+    od_pairs: Sequence[Tuple[int, int]],
+    arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]],
+    rng: np.random.Generator,
 ) -> Tuple[pd.DataFrame, int, int]:
     prohibited: set[DirectedTurn] = set()
     computed = 0
@@ -136,7 +137,7 @@ def _build_networkx_equivalent_digraph(graph_df: pd.DataFrame):
     weights = graph_df["distance"].to_numpy(dtype=np.float64)
 
     for a_node, b_node, arc_id, link_id, direction, weight in zip(
-            a_nodes, b_nodes, ids, link_ids, directions, weights
+        a_nodes, b_nodes, ids, link_ids, directions, weights, strict=False
     ):
         g.add_edge(
             a_node,
@@ -150,12 +151,12 @@ def _build_networkx_equivalent_digraph(graph_df: pd.DataFrame):
 
 
 def _build_state_transitions(
-        arc_meta: ArcMeta,
-        incoming: Dict[int, List[int]],
-        outgoing: Dict[int, List[int]],
-        penalty_lookup: Dict[DirectedTurn, float],
-        prohibited: set[DirectedTurn],
-        allow_uturns: bool,
+    arc_meta: ArcMeta,
+    incoming: Dict[int, List[int]],
+    outgoing: Dict[int, List[int]],
+    penalty_lookup: Dict[DirectedTurn, float],
+    prohibited: set[DirectedTurn],
+    allow_uturns: bool,
 ) -> Dict[int, List[Tuple[int, float]]]:
     transitions: Dict[int, List[Tuple[int, float]]] = defaultdict(list)
 
@@ -186,12 +187,12 @@ def _build_state_transitions(
 
 
 def _state_shortest_path(
-        origin: int,
-        destination: int,
-        arc_meta: ArcMeta,
-        incoming: Dict[int, List[int]],
-        outgoing: Dict[int, List[int]],
-        transitions: Dict[int, List[Tuple[int, float]]],
+    origin: int,
+    destination: int,
+    arc_meta: ArcMeta,
+    incoming: Dict[int, List[int]],
+    outgoing: Dict[int, List[int]],
+    transitions: Dict[int, List[Tuple[int, float]]],
 ) -> Optional[Tuple[List[DirectedLink], float]]:
     start_arcs = outgoing.get(origin, [])
     end_arcs = incoming.get(destination, [])
@@ -241,13 +242,13 @@ def _state_shortest_path(
 
 
 def run_benchmark(
-        model_path: Path,
-        mode: str,
-        turn_ban_sample: int,
-        comparison_sample: int,
-        seed: int,
-        allow_uturns: bool,
-        output_csv: Optional[Path],
+    model_path: Path,
+    mode: str,
+    turn_ban_sample: int,
+    comparison_sample: int,
+    seed: int,
+    allow_uturns: bool,
+    output_csv: Optional[Path],
 ) -> None:
     rng = np.random.default_rng(seed)
     project, graph, centroids, chosen_cost = _prepare_graph(model_path, mode)
@@ -285,7 +286,7 @@ def run_benchmark(
         penalties = pd.to_numeric(turn_bans_df["penalty"], errors="coerce").to_numpy(dtype=np.float64)
 
         penalty_lookup: Dict[DirectedTurn, float] = {}
-        for from_node, via_node, to_node, penalty in zip(from_nodes, via_nodes, to_nodes, penalties):
+        for from_node, via_node, to_node, penalty in zip(from_nodes, via_nodes, to_nodes, penalties, strict=False):
             penalty_lookup[(int(from_node), int(via_node), int(to_node))] = float(penalty)
         prohibited = {key for key, penalty in penalty_lookup.items() if math.isnan(penalty) or penalty < 0}
 
@@ -418,21 +419,16 @@ if __name__ == "__main__":
     main()
 
 
-
-
 def _aeq_directed_path(
-        path_nodes: Sequence[int], path_links: Sequence[int],
-        arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]]
+    path_nodes: Sequence[int], path_links: Sequence[int], arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]]
 ) -> Tuple[List[DirectedLink], float]:
     directed: List[DirectedLink] = []
     total_cost = 0.0
 
-    for a_node, b_node, link_id in zip(path_nodes[:-1], path_nodes[1:], path_links):
+    for a_node, b_node, link_id in zip(path_nodes[:-1], path_nodes[1:], path_links, strict=False):
         key = (int(a_node), int(b_node), int(link_id))
         _, direction, cost = arc_lookup[key]
         directed.append((int(link_id), int(direction)))
         total_cost += cost
 
     return directed, total_cost
-
-

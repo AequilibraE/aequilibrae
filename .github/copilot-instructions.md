@@ -11,7 +11,7 @@ AequilibraE is an open-source transportation modeling library for Python. It pro
 - **Matrix operations**: OMX support, sparse and compressed matrices
 - **QGIS plugin**: QAequilibraE for visualization (flow maps, desire lines, scenario comparison)
 
-Python 3.10+ is required. Performance-critical components are compiled with Cython to C++17 using OpenMP for multi-threading.
+Python 3.11+ is required. Performance-critical components are compiled with Cython to C++17 using OpenMP for multi-threading.
 
 ## Repository Structure
 
@@ -67,7 +67,7 @@ ruff check aequilibrae/
 
 Config lives in `pyproject.toml` under `[tool.ruff]`. Key settings:
 - Line length: 120 characters
-- Python target: 3.10+
+- Python target: 3.11+
 - Selected rules: B, C, E, F, W (flake8-style)
 - Max McCabe complexity: 20
 

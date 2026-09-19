@@ -6,9 +6,11 @@ from pathlib import Path
 import tempfile
 import numpy as np
 import pandas as pd
+import tables
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph, TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 
 def _build_test_network():
@@ -83,43 +85,45 @@ def _run_assignment_and_read_paths(
     with tempfile.TemporaryDirectory() as tmpdir:
         assig = TrafficAssignment()
         assig.set_classes([TrafficClass("car", g, mat)])
-        assig.set_vdf("BPR")
-        assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
         assig.set_capacity_field("capacity")
         assig.set_time_field("free_flow_time")
         assig.set_save_path_files(True)
-        assig.set_path_file_format("parquet")
         assig.set_algorithm("all-or-nothing")
 
         # Point assignment path output to tmpdir
-        assig.assignment.project_path = Path(tmpdir)
+        assig.assignment.project_path = tmpdir
         assig.execute()
 
-        path_files = list(Path(tmpdir).rglob("o0.parquet"))
-        assert len(path_files) > 0, f"No path files found in {list(Path(tmpdir).rglob('*'))}"
-        path_dir = path_files[0].parent
+        h5_path = Path(tmpdir) / "path_files.h5"
+        assert h5_path.is_file(), f"No path file found in {list(Path(tmpdir).rglob('*'))}"
 
-        paths = {}
-        for o_idx, o_val in enumerate(centroids):
-            path_file = path_dir / f"o{o_idx}.parquet"
-            idx_file = path_dir / f"o{o_idx}_indexdata.parquet"
-            if not path_file.exists() or not idx_file.exists():
+        with tables.open_file(h5_path, mode="r") as h5:
+            grp = h5.root.iteration_1
+            predecessors = grp.predecessors[:]
+            connectors = grp.connectors[:]
+
+    # The path file stores graph row indices; the tests speak in signed link IDs.
+    signed_links = (g.graph.link_id.to_numpy(copy=False) * g.graph.direction.to_numpy(copy=False)).astype(np.int64)
+
+    paths = {}
+    for o_idx, o_val in enumerate(centroids):
+        origin_idx = int(g.nodes_to_indices[o_val])
+        for d_val in centroids:
+            if d_val == o_val:
                 continue
-            df_path = pd.read_parquet(path_file)
-            df_idx = pd.read_parquet(idx_file)
-
-            path_data = df_path["data"].to_numpy()
-            idx_data = df_idx["data"].to_numpy()
-
-            for d_idx, d_val in enumerate(centroids):
-                if o_idx == d_idx:
-                    continue
-                start = 0 if d_idx == 0 else int(idx_data[d_idx - 1])
-                end = int(idx_data[d_idx])
-                if start < end:
-                    # Stored in destination-to-origin order, reverse to origin-to-destination
-                    seq = [int(x) for x in reversed(path_data[start:end])]
-                    paths[(int(o_val), int(d_val))] = seq
+            node = int(g.nodes_to_indices[d_val])
+            seq = []
+            while node != origin_idx:
+                conn = int(connectors[o_idx, node])
+                pred = int(predecessors[o_idx, node])
+                if conn < 0 or pred < 0:
+                    seq = []
+                    break
+                seq.append(int(signed_links[conn]))
+                node = pred
+            if seq:
+                paths[(int(o_val), int(d_val))] = list(reversed(seq))
 
     return paths, g
 

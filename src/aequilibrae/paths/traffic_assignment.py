@@ -4,21 +4,20 @@ import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
-from numpy import nan_to_num
+from numpy import dtype, nan_to_num, ndarray
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import _get_graph_to_network_mapping
+from aequilibrae.parameters import Parameters
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
-from aequilibrae.paths.vdf import VDF, all_vdf_functions
+from aequilibrae.paths.vdf import VDF
 from aequilibrae.utils.core_setter import clamp_cores
 
 
@@ -159,39 +158,18 @@ class AssignmentBase(ABC):
             if field not in c.graph.graph.columns:
                 raise ValueError(f"'{field}' not in graph for '{c._id}'")
 
-            values = c.graph.graph[field].to_numpy(copy=False)
-            # An empty mode graph has no value that can violate the field
-            # contract. It still participates using the project-wide extent.
-            if values.size == 0:
-                continue
-            if np.any(np.isnan(values)):
+            if np.any(np.isnan(c.graph.graph[field].values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            if values.min() <= 0 and not allow_zeros:
+            if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
-
-    def _get_supernet_size(self) -> int:
-        if not self.classes:
-            return 0
-        return max(
-            c.graph.supernet_size
-            if c.graph.supernet_size is not None
-            else (
-                int(c.graph.graph.__supernet_id__.max() + 1)
-                if "__supernet_id__" in c.graph.graph.columns and not c.graph.graph.empty
-                else c.graph.graph.shape[0]
-            )
-            for c in self.classes
-        )
 
     def set_time_field(self, time_field: str) -> None:
         self._check_field(time_field)
-        supernet_size = self._get_supernet_size()
-        c0 = self.classes[0]
-        self.free_flow_tt = np.zeros(supernet_size, c0.graph.default_types("float"))
-        for c in self.classes:
-            self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
-        self.total_flow = np.zeros(supernet_size, np.float64)
+        c = self.classes[0]
+        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
+        self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
 
     def get_skim_results(self) -> list:
@@ -211,7 +189,7 @@ class TrafficAssignment(AssignmentBase):
     .. code-block:: python
 
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
-
+        >>> from aequilibrae.paths.vdf import bpr
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
@@ -236,15 +214,12 @@ class TrafficAssignment(AssignmentBase):
         # The first thing to do is to add at list of traffic classes to be assigned
         >>> assig.set_classes([assigclass])
 
-        # Then we set the volume delay function
-        >>> assig.set_vdf("BPR")  # This is not case-sensitive
+        # Then we set the volume delay function and its parameters
+        >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
-        # And its parameters
-        >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
-        # The capacity and free flow travel times as they exist in the graph
-        >>> assig.set_capacity_field("capacity")
+        # The free flow travel times and capacities as they exist in the graph
         >>> assig.set_time_field("free_flow_time")
+        >>> assig.set_capacity_field("capacity")
 
         # And the algorithm we want to use to assign
         >>> assig.set_algorithm('bfw')
@@ -275,10 +250,12 @@ class TrafficAssignment(AssignmentBase):
 
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
+    all_line_searches = ["exact", "trapezoidal"]
     all_bfw_conjugacies = ["approximate", "exact"]
 
     # Attributes restricted to a fixed set of strings, as {name: (allowed values, description for the error)}.
     __choice_attributes = {
+        "line_search": (all_line_searches, "Line search"),
         "bfw_conjugacy": (all_bfw_conjugacies, "BFW conjugacy"),
     }
 
@@ -291,7 +268,7 @@ class TrafficAssignment(AssignmentBase):
         "save_path_files": (bool, "boolean"),
     }
 
-    def __init__(self, project=None) -> None:
+    def __init__(self, project=None) -> None:  # should have classes, vdfs in arguments avoiding 2 stage initialisation
         """"""
         self.__dict__["_TrafficAssignment__initalised"] = False
         super().__init__(project=project)
@@ -303,7 +280,7 @@ class TrafficAssignment(AssignmentBase):
 
         self.rgap_target = parameters["rgap"]
         self.max_iter = parameters["maximum_iterations"]
-        self.vdf = VDF()
+        self.vdf = None  # type: VDF
         self.vdf_parameters = None  # type: list
         self.capacity_field = None  # type: str
         self.capacity = None  # type: np.ndarray
@@ -312,6 +289,10 @@ class TrafficAssignment(AssignmentBase):
         self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
+
+        # Line search used by CFW and BFW. "trapezoidal" preserves the historical AequilibraE behaviour; see
+        # set_line_search for the trade-off.
+        self.line_search = "trapezoidal"  # type: str
 
         # How BFW solves for its direction coefficients. "approximate" preserves the historical behaviour.
         self.bfw_conjugacy = "approximate"  # type: str
@@ -341,11 +322,8 @@ class TrafficAssignment(AssignmentBase):
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
         elif instance == "vdf":
-            v = value.lower()
-            if v not in all_vdf_functions:
-                return False, value, f"Volume-delay function {value} is not available"
-            value = VDF()
-            value.function = v
+            if not isinstance(value, VDF):
+                raise ValueError
         elif instance == "classes":
             if isinstance(value, TrafficClass):
                 value = [value]
@@ -378,28 +356,21 @@ class TrafficAssignment(AssignmentBase):
             setattr(self.assignment, instance, value)
         return True, value, ""
 
-    def set_vdf(self, vdf_function: str) -> None:
+    def set_vdf(self, vdf: VDF, name_mapping: dict | None = None) -> None:
         """
-        Sets the Volume-delay function to be used
+        Sets the Volume-delay function to be used, along with the name mapping between the VDF's inputs
+        and columns in the dataframe.
 
         :Arguments:
-            **vdf_function** (:obj:`str`): Name of the VDF to be used
+            **vdf** (:obj:`VDF`): VDF to be used
+            **name_mapping** (:obj:`dict`, *optional*): Mapping between the VDF's argument names (e.g. "alpha",
+            "beta") and the corresponding column names in the dataframe/graph holding their values. Defaults to
+            ``None``, in which case the VDF's argument names are assumed to match the dataframe's columns directly.
         """
-        self.vdf = vdf_function
 
-    def _sync_classes_supernet_size(self) -> None:
-        supernet_size = self._get_supernet_size()
-        for c in self.classes:
-            previous_size = c.graph.supernet_size
-            c.graph.supernet_size = supernet_size
-            if previous_size != supernet_size:
-                # Compact-link aggregation is indexed in global supernet space.
-                # Rebuild lazily after enlarging a mode graph's global extent.
-                c.graph._crosswalk = None
-            if c.fixed_cost.shape[0] < supernet_size:
-                fc = np.zeros(supernet_size, c.graph.default_types("float"))
-                fc[: c.fixed_cost.shape[0]] = c.fixed_cost
-                c.fixed_cost = fc
+        self.vdf = vdf
+
+        self._set_vdf_link_attributes(name_mapping if name_mapping is not None else {})
 
     def set_classes(self, classes: List[TrafficClass]) -> None:
         """
@@ -413,7 +384,6 @@ class TrafficAssignment(AssignmentBase):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
-        self._sync_classes_supernet_size()
 
     def add_class(self, traffic_class: TrafficClass) -> None:
         """
@@ -428,7 +398,6 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
-        self._sync_classes_supernet_size()
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
@@ -457,11 +426,34 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
+        self.assignment.line_search = self.line_search
         self.assignment.bfw_conjugacy = self.bfw_conjugacy
         self._config["Algorithm"] = algo
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
+        self._config["Line search"] = self.line_search
         self._config["BFW conjugacy"] = self.bfw_conjugacy
+
+    def set_line_search(self, line_search: str) -> None:
+        """
+        Chooses the line search used to pick the step size for CFW and BFW. Ignored by the other algorithms:
+        MSA uses ``1/iteration`` and Frank-Wolfe always uses the exact line search.
+
+        * ``"exact"`` - root-find the exact directional derivative of the Beckmann objective,
+          ``sum_a c_a(x + alpha*d)*d_a = 0``, over ``[0, 1]``. This is the line search assumed by the
+          conjugate-direction theory in Mitradjieva & Lindberg, and the step is not capped.
+
+        * ``"trapezoidal"`` (default) - minimize a one-panel trapezoidal approximation of the objective change,
+          additionally capping BFW at ``1/sqrt(iteration)``. The approximation is exact only for affine link costs;
+          for convex costs it overestimates the integral and therefore returns shorter steps than the true
+          minimizer. This is a numerical heuristic, not the line search in the source algorithm, and is the
+          default only because it is the historical AequilibraE behaviour.
+
+        :Arguments:
+            **line_search** (:obj:`str`): One of ``"exact"`` or ``"trapezoidal"``
+        """
+        self.line_search = line_search
+        self._config["Line search"] = self.line_search
 
     def set_bfw_conjugacy(self, bfw_conjugacy: str) -> None:
         """
@@ -489,77 +481,63 @@ class TrafficAssignment(AssignmentBase):
         self.bfw_conjugacy = bfw_conjugacy
         self._config["BFW conjugacy"] = self.bfw_conjugacy
 
-    def set_vdf_parameters(self, par: dict) -> None:
+    def _set_vdf_link_attributes(self, par: dict[str, str | float]):
         """
-        Sets the parameters for the Volume-delay function.
+        Sets vdf_link_attributes as a dict of {name: value}
+        Input parameter par:
+        {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
-        Parameter values can be scalars (same values for the entire network) or network field names
-        (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
-
-        The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it.
-        Users should supply ``8 * tau`` to match other common usages. Additionally the standard
-        ``0.25`` factor can be overridden by supplying the 'alpha' parameter.
-
-        :Arguments:
-            **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
         """
-        if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-            raise RuntimeError(
-                "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
-            )
-
-        # In literature 0.25 is not provided as a parameter. We allow it but default to 0.25 if it wasn't provided.
-        if self.vdf.function == "AKCELIK":
-            par["alpha"] = par.get("alpha", 0.25)
-
-        self.__dict__["vdf_parameters"] = par
-        self._config["VDF parameters"] = par
-        pars = []
-
-        if self.vdf.function in ["BPR", "BPR2", "CONICAL"]:
-            parameter_bounds = {"alpha": (0.0, float("inf")), "beta": (1.0, float("inf"))}
-        elif self.vdf.function == "INRETS":
-            parameter_bounds = {"alpha": (0.0, 1.0)}
-        elif self.vdf.function == "AKCELIK":
-            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf")), "length": (0.0, float("inf"))}
-        else:
-            raise ValueError(f"unknown vdf function {self.vdf.function}")
-
-        for p1, (minimum, maximum) in parameter_bounds.items():
-            if p1 not in par:
-                raise ValueError(f"{p1} should exist in the set of parameters provided")
-            p = par[p1]
-            supernet_size = self._get_supernet_size()
-            c0 = self.classes[0]
-            if isinstance(self.vdf_parameters[p1], str):
-                # Mode-specific graphs may not cover the full project supernet.
-                # Initialise absent arcs with a valid neutral bound (notably
-                # beta=1), and validate only arcs active in at least one class.
-                array = np.full(supernet_size, minimum, dtype=c0.graph.default_types("float"))
-                active = np.zeros(supernet_size, dtype=bool)
-                for c in self.classes:
-                    if p not in c.graph.graph.columns:
-                        raise ValueError(f"'{p}' not in graph for '{c._id}'")
-                    ids = c.graph.graph.__supernet_id__.to_numpy(copy=False)
-                    if ids.size:
-                        array[ids] = c.graph.graph[p].to_numpy(copy=False)
-                        active[ids] = True
-                values_to_validate = array[active]
+        assert self.vdf is not None
+        vdf_link_attributes: dict[str, np.ndarray] = {}
+        for attribute_name, settings in self.vdf.spec.items():
+            if attribute_name in par:
+                value = par[attribute_name]
+            elif "fill_NA" in settings:
+                value = settings["fill_NA"]
+                print(f"Using default value for {attribute_name} of {value}")
             else:
-                array = np.zeros(supernet_size, np.float64)
-                array.fill(self.vdf_parameters[p1])
-                values_to_validate = array
-            pars.append(array)
+                raise ValueError(f"{attribute_name} should exist in the set of parameters provided")
 
-            if np.any(np.isnan(values_to_validate)):
-                raise ValueError(f"At least one {p1} is NaN")
-            elif values_to_validate.size and values_to_validate.min() < minimum:
-                raise ValueError(f"At least one {p1} is less than {minimum}")
-            elif values_to_validate.size and values_to_validate.max() > maximum:
-                raise ValueError(f"At least one {p1} is greater than {maximum}")
+            if isinstance(value, str):
+                # value is the name of a column
+                c = self.classes[0]
+                array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+                array[c.graph.graph.__supernet_id__] = c.graph.graph[value]
+            else:
+                array: np.ndarray = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+                array.fill(value)
+            vdf_link_attributes[attribute_name] = array
 
-        self.__dict__["vdf_parameters"] = pars
-        self._config["VDF function"] = self.vdf.function.lower()
+        self.vdf_parameters: dict[str, ndarray[tuple[Any, ...], dtype[Any]]] = vdf_link_attributes
+        # vdf parameters
+        self._config["VDF parameters"] = par
+        self._config["VDF function"] = self.vdf.name
+
+        # check bounds
+        for parameter_name, parameter_data in self.vdf.spec.items():
+            if "bounds" not in parameter_data:
+                continue
+
+            minimum, maximum = parameter_data["bounds"]
+            array = vdf_link_attributes[parameter_name]
+
+            if np.any(np.isnan(array)):
+                raise ValueError(f"At least one {parameter_name} is NaN")
+
+            if parameter_data.get("inclusive_lower", True):
+                if array.min() < minimum:
+                    raise ValueError(f"At least one {parameter_name} is less than {minimum}")
+            else:
+                if array.min() <= minimum:
+                    raise ValueError(f"At least one {parameter_name} is less than or equal to {minimum}")
+
+            if parameter_data.get("inclusive_upper", True):
+                if array.max() > maximum:
+                    raise ValueError(f"At least one {parameter_name} is greater than {maximum}")
+            else:
+                if array.max() >= maximum:
+                    raise ValueError(f"At least one {parameter_name} is greater than or equal to {maximum}")
 
     def set_cores(
         self, cores: int, threading_threshold: int | None = None, elementwise_cores: int | None = None
@@ -637,38 +615,21 @@ class TrafficAssignment(AssignmentBase):
     def set_capacity_field(self, capacity_field: str) -> None:
         """
         Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
-
         :Arguments:
             **capacity_field** (:obj:`str`): Field name
         """
         super()._check_field(capacity_field)
-        supernet_size = self._get_supernet_size()
         c = self.classes[0]
-
         self.cores = c.results.cores
-        self.elementwise_cores = c.results.elementwise_cores
-        self.threading_threshold = c.results.threading_threshold
-        self.capacity = np.zeros(supernet_size, c.graph.default_types("float"))
-        for cl in self.classes:
-            self.capacity[cl.graph.graph.__supernet_id__] = cl.graph.graph[capacity_field]
+        self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
-    def _get_supernet_arcs(self) -> tuple[np.ndarray, np.ndarray, bool]:
-        supernet_size = self._get_supernet_size()
-        link_ids = np.full(supernet_size, -1, dtype=np.int64)
-        directions = np.zeros(supernet_size, dtype=np.int64)
-        populated = False
-        for c in self.classes:
-            g = c.graph.graph
-            if g.empty or "__supernet_id__" not in g.columns:
-                continue
-            sn = g.__supernet_id__.to_numpy(copy=False)
-            link_ids[sn] = g.link_id.to_numpy(copy=False)
-            directions[sn] = g.direction.to_numpy(copy=False)
-            populated = True
-        return link_ids, directions, populated
+        # also set threading cores
+        self.elementwise_cores = c.results.elementwise_cores
+        self.threading_threshold = c.results.threading_threshold
 
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
@@ -678,6 +639,11 @@ class TrafficAssignment(AssignmentBase):
             **preload** (:obj:`pd.DataFrame`): dataframe mapping 'link_id' & 'direction' to 'preload'
             **name** (:obj:`str`): Name for particular preload (optional - default name will be chosen if not specified)
         """
+        # Create preloads dataframe in correct order if not already initialised
+        if self.preloads is None:
+            g = self.classes[0].graph.graph
+            self.preloads = g.sort_values(by="__supernet_id__")[["link_id", "direction"]].copy()
+
         # Check that columns of preload are link_id, direction, preload:
         expected = {"link_id", "direction", "preload"}
         missing = expected - set(preload.columns)
@@ -693,31 +659,16 @@ class TrafficAssignment(AssignmentBase):
         if len(preload) == 0:
             raise ValueError("Cannot set empty preload!")
 
-        duplicate_keys = preload.duplicated(subset=["link_id", "direction"], keep=False)
-        if duplicate_keys.any():
-            duplicates = preload.loc[duplicate_keys, ["link_id", "direction"]].drop_duplicates()
-            raise ValueError(
-                "Input preload dataframe contains duplicate (link_id, direction) keys: "
-                f"{duplicates.to_dict(orient='records')}"
-            )
-
-        if self.preloads is None:
-            link_ids, directions, populated = self._get_supernet_arcs()
-            if populated:
-                self.preloads = pd.DataFrame({"link_id": link_ids, "direction": directions})
-            else:
-                self.preloads = self.classes[0].graph.graph[["link_id", "direction"]].copy()
-
         # Check name is not already used (generate new name if needed):
         name = (
             name if name else f"preload_{len(self.preloads.columns) - 1}"
         )  # -1 -> remove keys to get 1 indexed preload columns
         if name in self.preloads.columns:
-            raise ValueError(f"New preload has duplicate name - already used names are: {self.preloads.columns}")
-        named_preload = preload.rename(columns={"preload": name})
+            raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
+        preload.rename(columns={"preload": name}, inplace=True)
 
         # Merge onto current preload dataframe
-        self.preloads = pd.merge(self.preloads, named_preload, on=["link_id", "direction"], how="left")
+        self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
         self.preloads[name] = self.preloads[name].fillna(0)
 
         # Enable preload to be added before or after specifying the algorithm
@@ -725,7 +676,7 @@ class TrafficAssignment(AssignmentBase):
             if self.assignment.preload is None:
                 self.assignment.preload = self.preloads[name].to_numpy()
             else:
-                self.assignment.preload += self.preloads[name].to_numpy()
+                self.assignment.preload += self.preloads[name]
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
@@ -760,10 +711,6 @@ class TrafficAssignment(AssignmentBase):
         if self.vdf == "":
             raise ValueError("First you need to set the Volume-Delay Function to use")
 
-        par = list(kwargs.keys())
-        q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
-        if len(q) > 0:
-            raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
     def log_specification(self):
@@ -796,15 +743,16 @@ class TrafficAssignment(AssignmentBase):
             project = self.project or get_active_project()
 
         report = {"convergence": self.assignment.convergence_report, "setup": self.info()}
-        record = project.results.new_record(
+        record = project.results.create(
             table_name=table_name,
+            data=df,
             procedure="traffic assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
+        return record
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -813,29 +761,21 @@ class TrafficAssignment(AssignmentBase):
             **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on `link_id`
         """
 
-        link_ids, directions, populated = self._get_supernet_arcs()
-        if not populated:
-            raise ValueError(
-                "Assignment results require graphs prepared with prepare_graph(): no traffic class "
-                "carries a __supernet_id__ column, and every aggregate below is indexed by it."
-            )
-        # graph_ab_idx / graph_ba_idx are boolean masks over the arcs handed to the mapping, so
-        # they have to be turned back into supernet ids before they can index the flow, cost and
-        # capacity vectors, which all span the whole supernet.
-        valid = link_ids >= 0
-        valid_sn = np.where(valid)[0]
-        valid_lids = link_ids[valid]
-        valid_direcs = directions[valid]
-        m = _get_graph_to_network_mapping(valid_lids, valid_direcs)
-        sn_ab = valid_sn[m.graph_ab_idx]
-        sn_ba = valid_sn[m.graph_ba_idx]
-        unique_lids = np.unique(valid_lids)
+        idx = self.classes[0].graph.graph.__supernet_id__
+        assig_results = [cls.results.get_load_results() for cls in self.classes]
 
-        tot_flow = self.assignment.fw_total_flow
-        voc = np.divide(tot_flow, self.capacity, out=np.zeros_like(tot_flow), where=self.capacity > 0)
-        congested_time = self.congested_time
-        free_flow_tt = self.free_flow_tt
-        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
+        class1 = self.classes[0]
+        res1 = assig_results[0]
+
+        tot_flow = self.assignment.total_flow[idx]
+        capacity = self.capacity
+        voc = tot_flow / capacity[idx]
+        congested_time = self.congested_time[idx]
+        free_flow_tt = self.free_flow_tt[idx]
+        if self.assignment.preload is None:
+            preload = np.full(len(tot_flow), np.nan)
+        else:
+            preload = self.assignment.preload
 
         fields = [
             "Preload_AB",
@@ -855,33 +795,37 @@ class TrafficAssignment(AssignmentBase):
             "PCE_tot",
         ]
 
-        agg = pd.DataFrame([], columns=fields, index=unique_lids).astype(float)
+        agg = pd.DataFrame([], columns=fields, index=res1.index[:]).astype(float)
         agg.fillna(0.0, inplace=True)
+
+        # Use the first class to get a graph -> network link ID mapping
+        m = class1.results.get_graph_to_network_mapping()
+        graph_ab_idx, graph_ba_idx = m.graph_ab_idx, m.graph_ba_idx
 
         _assign_aggregation_fields(
             agg,
             "Preload_AB",
             "Preload_BA",
-            preload[sn_ab],
-            preload[sn_ba],
+            preload[m.graph_ab_idx],
+            preload[m.graph_ba_idx],
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
+        agg["Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
             "Congested_Time_AB",
             "Congested_Time_BA",
-            congested_time[sn_ab],
-            congested_time[sn_ba],
+            congested_time[m.graph_ab_idx],
+            congested_time[m.graph_ba_idx],
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
+        agg["Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
 
-        delay_factor_ab = _safe_delay_factor(congested_time[sn_ab], free_flow_tt[sn_ab])
-        delay_factor_ba = _safe_delay_factor(congested_time[sn_ba], free_flow_tt[sn_ba])
+        delay_factor_ab = _safe_delay_factor(congested_time[graph_ab_idx], free_flow_tt[graph_ab_idx])
+        delay_factor_ba = _safe_delay_factor(congested_time[graph_ba_idx], free_flow_tt[graph_ba_idx])
         _assign_aggregation_fields(
             agg,
             "Delay_factor_AB",
@@ -891,33 +835,32 @@ class TrafficAssignment(AssignmentBase):
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
+        agg["Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
             "VOC_AB",
             "VOC_BA",
-            voc[sn_ab],
-            voc[sn_ba],
+            voc[m.graph_ab_idx],
+            voc[m.graph_ba_idx],
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
+        agg["VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
 
         _assign_aggregation_fields(
             agg,
             "PCE_AB",
             "PCE_BA",
-            tot_flow[sn_ab],
-            tot_flow[sn_ba],
+            tot_flow[m.graph_ab_idx],
+            tot_flow[m.graph_ba_idx],
             m.network_ab_idx,
             m.network_ba_idx,
         )
-        agg.loc[:, "PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
+        agg["PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
 
-        assig_results = [cls.results.get_load_results() for cls in self.classes]
         assig_results.append(agg)
-        return pd.concat(assig_results, axis=1).fillna(0.0).rename_axis("link_id")
+        return pd.concat(assig_results, axis=1).rename_axis("link_id")
 
     def info(self) -> dict:
         """Returns information for the traffic assignment procedure
@@ -992,12 +935,12 @@ class TrafficAssignment(AssignmentBase):
         for cls in self.classes:
             file_name = f"{matrix_name}_{cls._id}.{mat_format}"
 
-            export_name = path.join(mats.fldr, file_name)
+            export_name = mats.folder / file_name
 
             if path.isfile(export_name):
                 raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-            if mats.check_exists(matrix_name):
+            if mats.get(matrix_name, default=None) is not None:
                 raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
             avg_skims = cls.results.skims  # type: AequilibraeMatrix
@@ -1051,12 +994,16 @@ class TrafficAssignment(AssignmentBase):
             out_skims.description = f"Skimming for assignment procedure. Class {cls._id}"
             # Now we create the appropriate record
 
-            record = mats.new_record(f"{matrix_name}_{cls._id}", file_name)
-            record.procedure_id = self.procedure_id
-            record.timestamp = self.procedure_date
-            record.procedure = "Traffic Assignment"
-            record.description = out_skims.description
-            record.save()
+            record = mats.create(
+                name=f"{matrix_name}_{cls._id}",
+                file_name=file_name,
+                procedure_id=self.procedure_id,
+                timestamp=self.procedure_date,
+                procedure="Traffic Assignment",
+                description=out_skims.description,
+            )
+
+            return record
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
@@ -1092,15 +1039,15 @@ class TrafficAssignment(AssignmentBase):
 
         report = {}
         description = f"Select link analysis from {self.procedure_id}"
-        record = project.results.new_record(
+        project.results.create(
             table_name=table_name,
+            data=df,
             procedure="traffic select link",
             procedure_id=f"{self.procedure_id}_sl",
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=description,
         )
-        record.set_data(df)
 
     def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
@@ -1120,12 +1067,12 @@ class TrafficAssignment(AssignmentBase):
 
         file_name = f"{matrix_name}.omx"
 
-        export_name = path.join(mats.fldr, file_name)
+        export_name = mats.folder / file_name
 
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        if mats.check_exists(matrix_name):
+        if mats.get(matrix_name, default=False):
             raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
         names = [f"{key}_{cls._id}" for cls in self.classes for key in cls._selected_links.keys()]
@@ -1287,15 +1234,15 @@ class TransitAssignment(AssignmentBase):
             project = project or get_active_project()
 
         report = {"setup": self.info()}
-        record = project.results.new_record(
+        project.results.create(
             table_name=table_name,
+            data=df,
             procedure="transit assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame

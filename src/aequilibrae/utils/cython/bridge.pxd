@@ -68,6 +68,3 @@ cdef extern from *:
     #endif
     """
     void msleep "aeq_sleep"(int milliseconds) noexcept nogil
-
-
-

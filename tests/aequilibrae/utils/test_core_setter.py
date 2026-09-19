@@ -1,4 +1,4 @@
-import multiprocessing as mp
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 from aequilibrae.utils.core_setter import (
     DEFAULT_THREADING_THRESHOLD,
@@ -12,29 +12,29 @@ from aequilibrae.utils.core_setter import (
 class TestResolveCores:
     def test_reads_parameters(self, monkeypatch):
         monkeypatch.delenv("AEQ_CPUS", raising=False)
-        assert resolve_cores({"cpus": 12}) == min(12, mp.cpu_count())
+        assert resolve_cores({"cpus": 12}) == min(12, omp_get_max_threads())
 
     def test_env_var_wins_over_parameters(self, monkeypatch):
         monkeypatch.setenv("AEQ_CPUS", "4")
-        assert resolve_cores({"cpus": 12}) == min(4, mp.cpu_count())
+        assert resolve_cores({"cpus": 12}) == min(4, omp_get_max_threads())
 
     def test_values_are_clamped(self, monkeypatch):
         monkeypatch.setenv("AEQ_CPUS", "0")
-        assert resolve_cores({}) == mp.cpu_count()
+        assert resolve_cores({}) == omp_get_max_threads()
 
         monkeypatch.setenv("AEQ_CPUS", "-2")
-        assert resolve_cores({}) == max(1, mp.cpu_count() - 2)
+        assert resolve_cores({}) == max(1, omp_get_max_threads() - 2)
 
     def test_missing_key_resolves_to_all_cores(self, monkeypatch):
         monkeypatch.delenv("AEQ_CPUS", raising=False)
-        assert resolve_cores({}) == mp.cpu_count()
+        assert resolve_cores({}) == omp_get_max_threads()
 
     def test_unparseable_values_resolve_to_all_cores(self, monkeypatch):
         monkeypatch.setenv("AEQ_CPUS", "garbage")
-        assert resolve_cores({"cpus": 12}) == mp.cpu_count()
+        assert resolve_cores({"cpus": 12}) == omp_get_max_threads()
 
         monkeypatch.delenv("AEQ_CPUS")
-        assert resolve_cores({"cpus": None}) == mp.cpu_count()
+        assert resolve_cores({"cpus": None}) == omp_get_max_threads()
 
 
 class TestResolveThreadingThreshold:
@@ -74,10 +74,10 @@ class TestResolveElementwiseCores:
 
     def test_explicit_values_follow_set_cores_conventions(self, monkeypatch):
         monkeypatch.setenv("AEQ_ELEMENTWISE_CPUS", "0")
-        assert resolve_elementwise_cores({}, 16) == mp.cpu_count()
+        assert resolve_elementwise_cores({}, 16) == omp_get_max_threads()
 
         monkeypatch.setenv("AEQ_ELEMENTWISE_CPUS", "-2")
-        assert resolve_elementwise_cores({}, 16) == max(1, mp.cpu_count() - 2)
+        assert resolve_elementwise_cores({}, 16) == max(1, omp_get_max_threads() - 2)
 
     def test_unparseable_values_resolve_to_default(self, monkeypatch):
         monkeypatch.setenv("AEQ_ELEMENTWISE_CPUS", "garbage")
@@ -95,7 +95,7 @@ class TestAssignmentResultsResolution:
         monkeypatch.setenv("AEQ_THREADING_THRESHOLD", "5000")
         monkeypatch.setenv("AEQ_ELEMENTWISE_CPUS", "3")
         res = AssignmentResults()
-        assert res.cores == max(1, mp.cpu_count() - 2)
+        assert res.cores == max(1, omp_get_max_threads() - 2)
         assert res.threading_threshold == 5000
         assert res.elementwise_cores == 3
 
@@ -127,7 +127,7 @@ class TestAssignmentResultsResolution:
         assert res.elementwise_cores == 2
 
         res.set_cores(0)
-        assert res.elementwise_cores == min(mp.cpu_count(), ELEMENTWISE_CORES_CAP)
+        assert res.elementwise_cores == min(omp_get_max_threads(), ELEMENTWISE_CORES_CAP)
 
         res.set_cores(0, elementwise_cores=1)
         assert res.elementwise_cores == 1

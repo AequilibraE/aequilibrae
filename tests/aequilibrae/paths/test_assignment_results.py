@@ -1,4 +1,4 @@
-import multiprocessing as mp
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 import pytest
 
@@ -13,7 +13,7 @@ def test_set_cores():
         a.set_cores(1.3)
 
     a.set_cores(-2)
-    assert a.cores == max(1, mp.cpu_count() - 2)
+    assert a.cores == max(1, omp_get_max_threads() - 2)
 
 
 def test_set_save_path_file():

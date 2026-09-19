@@ -19,7 +19,7 @@ def read_stop_times(conn: sqlite3.Connection):
     first_nodes = links[["pattern_id", "from_node", "index"]].rename(columns={"from_node": "stop_id"})
     last_nodes = links.sort_values("index", ascending=False).drop_duplicates(subset=["pattern_id"], keep="first")
     last_nodes = last_nodes[["pattern_id", "to_node", "index"]].rename(columns={"to_node": "stop_id"})
-    last_nodes.loc[:, "index"] += 1
+    last_nodes["index"] += 1
 
     links = pd.concat([first_nodes, last_nodes], ignore_index=True).set_index(["pattern_id", "index"])
     stop_times = trip_stops.set_index(["pattern_id", "index"]).join(links).reset_index()
@@ -37,7 +37,7 @@ def read_stop_times(conn: sqlite3.Connection):
         s = pad(s % 60)
         stop_times[field] = h + ":" + m + ":" + s
 
-    stop_times.loc[:, "stop_sequence"] += 1
+    stop_times["stop_sequence"] += 1
 
     stop_times.stop_id = stop_times.stop_id.astype(str)
 

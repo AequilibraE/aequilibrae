@@ -27,7 +27,7 @@ def test_create_from_gmns(empty_project, test_data_path):
     par.parameters["network"]["gmns"]["node"]["fields"].update(new_node_fields)
     par.write_back()
 
-    empty_project.network.create_from_gmns(
+    empty_project.network.importer.gmns(
         link_file_path=link_file, node_file_path=node_file, use_group_path=use_group_file, srid=32619
     )
 

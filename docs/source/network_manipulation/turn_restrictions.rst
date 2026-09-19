@@ -21,7 +21,7 @@ Database Schema
 
 Turn restrictions are stored in the ``turn_restrictions`` table with the following columns:
 
-- **restriction_id**: Unique identifier for the restriction (auto-increment)
+- **restriction_id**: Unique identifier for the restriction (generated if omitted)
 - **from_node**: Incoming movement origin node
 - **via_node**: The turn node
 - **to_node**: Outgoing movement destination node
@@ -69,7 +69,16 @@ Usage
 Managing Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Turn restrictions can be managed through the ``TurnRestrictions`` class:
+Turn restrictions use the same table API as links and nodes. ``get()`` returns
+an immutable record, ``data`` returns a GeoDataFrame, and ``len(turns)`` counts
+records. Missing keys raise ``ValueError`` unless ``get()`` is given a default.
+
+Supply ``modes`` on insert. Database triggers reject missing, empty, unknown or
+repeated mode IDs, and overlapping restrictions for the same turn. These errors
+raise ``sqlite3.IntegrityError``. Modes are stored in the supplied order.
+
+Updates leave omitted fields unchanged; ``penalty=None`` prohibits the turn.
+Use ``project.transaction()`` to group writes.
 
 .. code-block:: python
 
@@ -79,16 +88,19 @@ Turn restrictions can be managed through the ``TurnRestrictions`` class:
     >>> turns = project.network.turn_restrictions
 
     # Add a prohibited turn (penalty=None means prohibited)
-    >>> turns.add_restriction(from_node=1, via_node=2, to_node=3)
+    >>> restriction_id = turns.insert(from_node=1, via_node=2, to_node=3, modes="c")
 
     # Add a turn with a 30-second penalty
-    >>> turns.add_restriction(from_node=3, via_node=4, to_node=5, penalty=30.0)
+    >>> other_id = turns.insert(from_node=3, via_node=4, to_node=5, penalty=30.0, modes="c")
 
-    # Get all restrictions as a DataFrame
-    >>> df = turns.get_restrictions()
+    # Change only the penalty
+    >>> turns.update(restriction_id, penalty=10.0)
+
+    # Get all restrictions, including their generated geometry
+    >>> df = turns.data
 
     # Remove a specific restriction
-    >>> turns.remove_restriction(restriction_id=1)
+    >>> turns.delete(restriction_id)
 
     # Clear all restrictions
     >>> turns.clear_restrictions()
@@ -98,7 +110,11 @@ Turn restrictions can be managed through the ``TurnRestrictions`` class:
 Bulk Loading from DataFrame
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Turn restrictions can also be loaded in bulk from a DataFrame:
+Use ``insert_from()`` to load turns from a DataFrame. It returns the inserted
+IDs. Use ``update_from()`` with a ``restriction_id`` column to change existing
+turns. Include a ``modes`` column when inserting. Both methods normalize
+penalties just like single-record writes and leave mode validation to the
+database. They roll back the whole batch if a row fails.
 
 .. code-block:: python
 
@@ -108,10 +124,11 @@ Turn restrictions can also be loaded in bulk from a DataFrame:
     ...     'from_node': [1, 2, 3],
     ...     'via_node': [2, 3, 4],
     ...     'to_node': [3, 4, 5],
+    ...     'modes': ['c', 'c', 'c'],
     ...     'penalty': [None, 15.0, 30.0],  # None or +inf = prohibited
     ... })
 
-    >>> turns.add_restrictions_from_dataframe(restrictions_df)
+    >>> restriction_ids = turns.insert_from(restrictions_df)
 
 Setting Global U-Turn Permission
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

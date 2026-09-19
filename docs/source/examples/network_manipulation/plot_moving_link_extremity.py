@@ -46,16 +46,12 @@ links = project.network.links
 link = links.get(1)
 node = all_nodes.get(1)
 new_extremity = Point(node.geometry.x + 0.02, node.geometry.y - 0.02)
-link.geometry = LineString([node.geometry, new_extremity])
+links.update(1, geometry=LineString([node.geometry, new_extremity]))
 
 # and the link that goes from node 2 to node 1
 link = links.get(3)
 node2 = all_nodes.get(2)
-link.geometry = LineString([new_extremity, node2.geometry])
-
-# We save the changes and refresh the links in memory for usage
-links.save()
-links.refresh()
+links.update(3, geometry=LineString([new_extremity, node2.geometry]))
 
 # %%
 # Because each link is unidirectional, you can no longer go from node 1 to node 2, obviously.

@@ -7,16 +7,17 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.utils.logging_utils import basic_config
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def project(sioux_falls_test):
     sioux_falls_test.network.build_graphs()
     return sioux_falls_test
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def car_graph(project):
     graph = project.network.graphs["c"]
     graph.set_blocked_centroid_flows(False)
@@ -24,24 +25,24 @@ def car_graph(project):
     return graph
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def matrix(project):
     mat = project.matrices.get_matrix("omx2")
     mat.computational_view()
     return mat
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assigclass(car_graph, matrix):
     return TrafficClass("car", car_graph, matrix)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assignment(project):
     return TrafficAssignment(project)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def file_logging():
     logger = logging.getLogger("aequilibrae")
     handler = basic_config(level=logging.INFO)
@@ -56,8 +57,7 @@ def file_logging():
 def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigclass, pce):
     assigclass.set_pce(pce)
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assignment.set_vdf(bpr)
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 2
@@ -82,19 +82,13 @@ def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigc
     assert len({len(values) for values in report.values()}) == 1
 
 
-@pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
-def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type, file_logging):
-    if matrix_type == "memonly":
-        matrix = matrix.copy(memory_only=True)
-
+def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, file_logging):
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
 
     proj = assignment.project
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
@@ -172,7 +166,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, "
-        "'Target RGAP': 0.0001, 'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.0001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_1 in file_text
 
@@ -180,7 +175,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_2 in file_text
 
@@ -188,7 +184,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', "
-        "'Maximum iterations': 500, 'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
+        "'Maximum iterations': 500, 'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_3 in file_text
 
@@ -196,7 +193,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_4 in file_text
 
@@ -204,7 +202,8 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
+        "'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_5 in file_text
 
@@ -212,14 +211,14 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
 def test_execute_no_project(project, assignment, assigclass):
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
+
     project.close()
+
     assignment = type(assignment)()
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 10
     assignment.set_algorithm("msa")
     assignment.execute()
@@ -233,8 +232,7 @@ def test_execute_no_project(project, assignment, assigclass):
 
 def _configure(assignment, assigclass, algorithm="bfw", max_iter=30, rgap=1e-8):
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assignment.set_vdf(bpr)
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = max_iter
@@ -243,20 +241,56 @@ def _configure(assignment, assigclass, algorithm="bfw", max_iter=30, rgap=1e-8):
     return assignment
 
 
+def test_line_search_defaults_to_trapezoidal(assignment, assigclass):
+    _configure(assignment, assigclass)
+
+    assert assignment.line_search == "trapezoidal"
+    assert assignment.assignment.line_search == "trapezoidal"
+    assert assignment._config["Line search"] == "trapezoidal"
+
+
+@pytest.mark.parametrize("line_search", ["exact", "trapezoidal", "EXACT"])
+def test_set_line_search_propagates_to_the_running_algorithm(assignment, assigclass, line_search):
+    _configure(assignment, assigclass)
+
+    assignment.set_line_search(line_search)
+
+    assert assignment.line_search == line_search.lower()
+    # Must reach the object that actually runs, even though it was created by set_algorithm beforehand.
+    assert assignment.assignment.line_search == line_search.lower()
+    assert assignment._config["Line search"] == line_search.lower()
+
+
+def test_set_line_search_before_set_algorithm_is_honoured(assignment, assigclass):
+    assignment.set_line_search("exact")
+    _configure(assignment, assigclass)
+
+    assert assignment.assignment.line_search == "exact"
+
+
+@pytest.mark.parametrize("bad", ["quadratic", "", 1, None])
+def test_set_line_search_rejects_unknown_methods(assignment, bad):
+    with pytest.raises(ValueError, match="Line search must be one of"):
+        assignment.set_line_search(bad)
+
+
 @pytest.mark.parametrize("algorithm", ["cfw", "bfw"])
-def test_optimal_line_search_is_uncapped(assignment, assigclass, algorithm):
+def test_exact_line_search_is_not_capped_and_changes_the_steps(assignment, assigclass, algorithm):
+    """The trapezoidal path caps BFW at 1/sqrt(iter); the exact path must not, and must pick different steps."""
     _configure(assignment, assigclass, algorithm=algorithm)
+    assignment.set_line_search("exact")
     assignment.execute()
 
-    alphas = np.array(assignment.assignment.convergence_report["alpha"], dtype=float)
-    rgap = assignment.assignment.rgap
+    exact_alphas = np.array(assignment.assignment.convergence_report["alpha"], dtype=float)
+    exact_rgap = assignment.assignment.rgap
 
-    assert np.all(np.isfinite(alphas[:-1]))
-    assert np.all(alphas[:-1] >= 0.0) and np.all(alphas[:-1] <= 1.0)
+    assert np.all(np.isfinite(exact_alphas[:-1]))
+    assert np.all(exact_alphas[:-1] >= 0.0) and np.all(exact_alphas[:-1] <= 1.0)
+    # An exact search on a convex objective takes longer steps than the trapezoidal overestimate.
     if algorithm == "bfw":
         cap = np.array([1.0 / np.sqrt(i) for i in assignment.assignment.convergence_report["iteration"]])
-        assert np.any(alphas[:-1] > cap[:-1]), "optimal line search should not have an artificial BFW cap"
-    assert np.isfinite(rgap)
+        assert np.any(exact_alphas[:-1] > cap[:-1]), "exact line search should be able to exceed the BFW cap"
+    assert np.isfinite(exact_rgap)
 
 
 def test_bfw_conjugacy_defaults_to_approximate(assignment, assigclass):

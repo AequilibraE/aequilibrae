@@ -1,4 +1,4 @@
-import multiprocessing as mp
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from typing import List
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
@@ -36,7 +36,7 @@ class SkimResults:
 
     def __init__(self):
         self.skims = AequilibraeMatrix()
-        self.cores = mp.cpu_count()
+        self.cores = omp_get_max_threads()
 
         self.links = -1
         self.nodes = -1

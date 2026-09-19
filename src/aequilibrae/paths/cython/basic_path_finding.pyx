@@ -3,18 +3,15 @@ Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by
 <francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
 """
 
-"""
-TODO:
-LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS. ARBITRARY NUMBERING
-- Checks of weather the centroid we are computing path from is a centroid and/or exists in the graph
-- Re-write function **network_loading** on the part of loading flows to centroids
-"""
+# TODO:
+# LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS. ARBITRARY NUMBERING
+# - Checks of weather the centroid we are computing path from is a centroid and/or exists in the graph
+# - Re-write function **network_loading** on the part of loading flows to centroids
 cimport cython
-from libc.math cimport INFINITY, sin, cos, asin, sqrt, pi
-from libc.stdlib cimport malloc, free
+from libc.math cimport cos, pi, INFINITY
 from libc.stddef cimport size_t
-from libc.stdint cimport int64_t
 from libcpp.vector cimport vector
+from libc.stdlib cimport malloc, free
 
 from aequilibrae.paths.cython.pq_heap_types cimport (
     FourAryHeap,
@@ -48,6 +45,7 @@ cdef int[:] return_an_int_view(input) noexcept nogil:
     cdef int [:] critical_links_view = input
     return critical_links_view
 
+
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
@@ -76,6 +74,7 @@ cdef void blocking_centroid_flows(int action,
 # Path tracking arrays and skim arrays were also added to it
 ########################################################################################################################
 # ######################################################################################################################
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -112,14 +111,17 @@ cdef int path_finding(
         return <int>dijkstra[PairingHeap](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
                                           ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
     elif heap == STD_PRIORITY_QUEUE:
-        return <int>dijkstra[StdPriorityQueueAdapter](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
-                                                      ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
+        return <int>dijkstra[StdPriorityQueueAdapter](
+            origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr, ids_ptr, conn_ptr, reached_ptr, dest_ptr,
+            destination_count, closure
+        )
     else:
         return <int>dijkstra[FourAryHeap](origin_vert, max_size, costs_ptr, csr_ptr, fs_ptr, pred_ptr,
                                           ids_ptr, conn_ptr, reached_ptr, dest_ptr, destination_count, closure)
 
 cdef int _HAVERSINE = 0
 cdef int _EQUIRECTANGULAR = 1
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -155,7 +157,6 @@ cpdef void dfs(long origin,
                 visited.push_back(head_vert_idx)
 
     visited.clear()
-
 
 
 @cython.wraparound(False)
@@ -443,18 +444,16 @@ cpdef int path_finding_arc_based(
     const double [:] turn_penalties,
     bint allow_uturns,
     double [:] arc_turn_penalties,
-    bint block_centroid_flows=False,
-    long long num_zones=0,
-    const long long [:] first_ctx=None,
-    const long long [:] last_ctx=None,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
 ) noexcept nogil:
     """Arc-based Dijkstra wrapper that allocates its own node label cost scratch array."""
     cdef unsigned int num_nodes = node_pred.shape[0]
     cdef:
         double *node_costs = <double *>malloc(num_nodes * sizeof(double))
         int found = 0
-        const long long [:] eff_first_ctx = csr_indices if first_ctx is None else first_ctx
-        const long long [:] eff_last_ctx = a_nodes if last_ctx is None else last_ctx
 
     if node_costs == NULL:
         return 0
@@ -481,8 +480,8 @@ cpdef int path_finding_arc_based(
         node_costs,
         block_centroid_flows,
         num_zones,
-        eff_first_ctx,
-        eff_last_ctx,
+        first_ctx,
+        last_ctx,
     )
 
     free(node_costs)
@@ -596,7 +595,7 @@ cpdef int path_finding_hybrid(
         destinations[origin_vert] = 0
         destination_count = destination_count - 1
         if destination_count == 0:
-            if settled_count is not None and settled_count.shape[0] > 0:
+            if settled_count is not None:
                 settled_count[0] = labels_settled
             # Every exit reports settled nodes excluding the origin, which is seeded into
             # reached_first[0] before the search starts.
@@ -705,7 +704,7 @@ cpdef int path_finding_hybrid(
         if node_pred[i] == -1 and i != origin_vert:
             connectors[i] = -1
 
-    if settled_count is not None and settled_count.shape[0] > 0:
+    if settled_count is not None:
         settled_count[0] = labels_settled
 
     return found - 1

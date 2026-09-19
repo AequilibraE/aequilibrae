@@ -105,19 +105,8 @@ class TrafficClass(TransportClassBase):
         self.pce = 1.0
         self.vot = 1.0
         self.mode = graph.mode
-        supernet_ids = (
-            graph.graph.__supernet_id__.to_numpy(copy=False)
-            if graph is not None and not graph.graph.empty and "__supernet_id__" in graph.graph.columns
-            else None
-        )
-        supernet_size = graph.supernet_size if graph is not None else None
-        if supernet_size is None:
-            supernet_size = (
-                int(supernet_ids.max() + 1)
-                if supernet_ids is not None and supernet_ids.size > 0
-                else (graph.graph.shape[0] if graph is not None else 0)
-            )
-        self.fixed_cost = np.zeros(supernet_size, graph.default_types("float")) if graph is not None else np.array([])
+        self.class_flow: np.array  # FIXME: Is this ever access?
+        self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
         self.results = AssignmentResults()
@@ -162,11 +151,10 @@ class TrafficClass(TransportClassBase):
 
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
-        values = self.graph.graph[field_name].to_numpy(copy=False)
-        if values.size and np.any(np.isnan(values)):
+        if np.any(np.isnan(self.graph.graph[field_name].values)):
             logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
-        if values.size and values.min() < 0:
+        if self.graph.graph[field_name].min() < 0:
             msg = f"Cost field {field_name} has negative values. That is not allowed"
             logger.error(msg)
             raise ValueError(msg)
@@ -255,6 +243,8 @@ class TrafficClass(TransportClassBase):
             pre_turn_fields = list(self.graph.turn_skim_fields) if self.graph.turn_skim_fields else []
             try:
                 self.graph.set_skimming(skims)
+                # Turn penalties are part of the cost the assignment minimised, so the
+                # generalised cost skim has to carry them as well as the link costs.
                 if pre_turn_fields:
                     if "__assignment_cost__" not in self.graph.turn_skim_fields:
                         self.graph.turn_skim_fields.append("__assignment_cost__")

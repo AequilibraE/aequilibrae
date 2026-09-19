@@ -89,8 +89,8 @@ def test_connector_method_without_missing(coquimbo_example):
     )
 
 
-def test_saving_loading_removing(coquimbo_example):
-    data = Transit(coquimbo_example)
+def test_saving_loading_removing(build_gtfs_project):
+    data = build_gtfs_project
     # create and save
     graph1 = data.create_graph(
         with_outer_stop_transfers=False,
@@ -125,7 +125,7 @@ def test_saving_loading_removing(coquimbo_example):
     # save multiple transit graph
     graph = data.graphs[1]
     for i in range(10, 13):
-        data.periods.new_period(i, 0, 0).save()
+        data.project.network.periods.insert(period_id=i, period_start=0, period_end=0, period_description="")
         graph.period_id = i
         graph.save()
 

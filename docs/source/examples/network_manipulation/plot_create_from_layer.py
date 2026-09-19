@@ -13,7 +13,7 @@ We use Folium to visualize the resulting network.
 
 # %%
 # .. admonition:: References
-# 
+#
 #   * :doc:`../../aequilibrae_project/project_components`
 
 # %%
@@ -21,22 +21,25 @@ We use Folium to visualize the resulting network.
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.project.network.links`
-#     * :func:`aequilibrae.project.network.nodes` 
+#     * :func:`aequilibrae.project.network.nodes`
 #     * :func:`aequilibrae.project.network.modes`
-#     * :func:`aequilibrae.project.network.link_types` 
+#     * :func:`aequilibrae.project.network.link_types`
 
 # %%
 
 # Imports
-from uuid import uuid4
 import urllib.request
+from os.path import join
 from string import ascii_lowercase
 from tempfile import gettempdir
-from os.path import join
-from shapely.wkt import loads as load_wkt
+from uuid import uuid4
+
+import geopandas as gpd
 import pandas as pd
+from shapely.wkt import loads as load_wkt
 
 from aequilibrae import Project
+
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_from_layer.png'
 
 # %%
@@ -55,6 +58,7 @@ dest_path = join(fldr, "queluz.csv")
 urllib.request.urlretrieve("https://aequilibrae.com/data/queluz.csv", dest_path)
 
 df = pd.read_csv(dest_path)
+df = gpd.GeoDataFrame(df.drop(columns=["fid", "WKT"]), geometry=gpd.GeoSeries.from_wkt(df["WKT"]))
 
 # %%
 # Let's see if we have to add new link_types to the model before we add links
@@ -64,8 +68,7 @@ link_types = df.link_type.unique()
 # %%
 # And the existing link types are
 lt = project.network.link_types
-lt_dict = lt.all_types()
-existing_types = [ltype.link_type for ltype in lt_dict.values()]
+existing_types = [link_type.link_type for link_type in lt]
 
 # %%
 # We could also get it directly from the project database
@@ -82,16 +85,16 @@ existing_types = [ltype.link_type for ltype in lt_dict.values()]
 # %%
 types_to_add = [ltype for ltype in link_types if ltype not in existing_types]
 for i, ltype in enumerate(types_to_add):
-    new_type = lt.new(ascii_lowercase[i])
-    new_type.link_type = ltype
-    # new_type.description = 'Your custom description here if you have one'
-    new_type.save()
+    lt.insert(
+        link_type_id=ascii_lowercase[i],
+        link_type=ltype,
+        # description='Your custom description here if you have one',
+    )
 
 # %%
 # We need to use a similar process for modes
 md = project.network.modes
-md_dict = md.all_modes()
-existing_modes = {k: v.mode_name for k, v in md_dict.items()}
+existing_modes = {mode.mode_id: mode.mode_name for mode in md}
 
 # %%
 # Now let's see the modes we have in the network that we DON'T have already in
@@ -109,15 +112,10 @@ all_modes = set(all_variations_string)
 # %%
 # Now let's add any new mode to the project
 modes_to_add = [mode for mode in all_modes if mode not in existing_modes]
-for i, mode_id in enumerate(modes_to_add):
-    new_mode = md.new(mode_id)
+for mode_id in modes_to_add:
     # You would need to figure out the right name for each one, but this will do
-    new_mode.mode_name = f"Mode_from_original_data_{mode_id}"
-    # new_type.description = 'Your custom description here if you have one'
-
-    # It is a little different because you need to add it to the project
-    project.network.modes.add(new_mode)
-    new_mode.save()
+    md.insert(mode_id=mode_id, mode_name=f"Mode_from_original_data_{mode_id}")
+    # description='Your custom description here if you have one'
 
 # %%
 # We cannot use the existing link_id, so we create a new field to not loose
@@ -128,22 +126,9 @@ link_data = links.fields
 # Create the field and add a good description for it
 link_data.add("source_id", "link_id from the data source")
 
-# We need to refresh the fields so the adding method can see it
-links.refresh_fields()
-
 # %%
 # We can now add all links to the project!
-for idx, record in df.iterrows():
-    new_link = links.new()
-
-    # Now let's add all the fields we had
-    new_link.source_id = record.link_id
-    new_link.direction = record.direction
-    new_link.modes = record.modes
-    new_link.link_type = record.link_type
-    new_link.name = record.name
-    new_link.geometry = load_wkt(record.WKT)
-    new_link.save()
+links.insert_from(df.assign(source_id=df["link_id"]))
 
 # %%
 # We grab all the links data as a geopandas GeoDataFrame so we can process it easier

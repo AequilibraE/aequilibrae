@@ -6,7 +6,7 @@ from aequilibrae.utils.simwrapper.simwrapper_panel import AequilibraEResultsMapP
 
 def test_find_project_title_prefers_model_name(sioux_falls_example):
     prj = sioux_falls_example
-    prj.about.model_name = "My Model"
+    prj.about.update("model_name", infovalue="My Model")
     gen = SimwrapperConfigGenerator(prj)
     assert gen._find_project_title() == "My Model"
 

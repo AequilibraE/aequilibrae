@@ -1,6 +1,7 @@
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.transit import Transit
 
 
@@ -43,11 +44,9 @@ def _assignment(
     # Create assignment and set parameters
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
-
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assignment.set_time_field("travel_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 1  # AON assignment
     assignment.set_algorithm("msa")
 
@@ -81,9 +80,7 @@ def test_building_pt_preload(graph: Graph, demand: AequilibraeMatrix, transit: T
     assignment.add_preload(preloads[0])
 
     # After adding the preload to the assignment object it should be expanded to cover ALL links
-    # One row per directed arc of the whole project network, not per link of this mode's
-    # graph: the preload vector is added onto supernet-indexed flows.
-    assert len(assignment.preloads) == graph.supernet_size
+    assert len(assignment.preloads) == len(graph.graph)
 
 
 def test_run(graph: Graph, demand: AequilibraeMatrix, transit: Transit):

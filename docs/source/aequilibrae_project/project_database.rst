@@ -34,6 +34,72 @@ other changes to the layers or preventing the changes.
    implementation requires a complete overahaul of the path-building code, so
    that is still a long-term goal, barred specific development efforts.
 
+.. _links_nodes_consistency_triggers:
+
+Consistency triggers
+^^^^^^^^^^^^^^^^^^^^
+
+The **links** and **nodes** tables are kept consistent with each other, and
+with the geometries they carry, through the use of database triggers.
+
+.. _link_endpoints_must_match_geometry:
+
+Link endpoints must match their geometry
+++++++++++++++++++++++++++++++++++++++++
+
+The **a_node** and **b_node** fields on a link must always identify the nodes
+located at that link's start and end points, respectively. Any update that
+would leave one of these fields pointing at a node whose geometry does not
+match the corresponding endpoint is rejected, whether that update targets
+**a_node**/**b_node** directly or is an indirect consequence of some other
+edit. A no-op update, where the value does not actually change, is always
+allowed, since this is how AequilibraE's own maintenance triggers keep these
+fields up to date after a geometry or node identity change.
+
+.. _editing_link_geometry:
+
+Editing a link's geometry
++++++++++++++++++++++++++
+
+Moving one of a link's endpoints to a location with no existing node creates
+a new node there. Moving it on top of an existing node reattaches the link to
+that node instead. If the node the link used to be attached to is left with
+no other links connected to it, it is deleted, including when it is a
+centroid.
+
+.. _moving_and_merging_nodes:
+
+Moving and merging nodes
+++++++++++++++++++++++++
+
+Moving a node's geometry on top of another node's location merges the two:
+every link attached to the node being replaced is reattached to the moving
+node, the replaced node is deleted, and the geometry of any link that was
+attached to either node is updated to match the moving node's new location.
+
+.. _centroids_cannot_be_merged:
+
+Centroids cannot be merged
+++++++++++++++++++++++++++
+
+A centroid can never be the node that gets replaced by a merge, nor can it be
+merged into another node, regardless of whether the other node is itself a
+centroid. Attempting to move a centroid on top of another node, or another
+node on top of a centroid, fails the transaction.
+
+An empty centroid, i.e. one with no links attached to it, must be demoted
+(``is_centroid`` set to ``0``) in a separate statement from any change to its
+geometry, since demoting an empty centroid deletes it.
+
+.. _node_identity_changes:
+
+Node identity changes
++++++++++++++++++++++
+
+A node's **node_id** cannot be changed in the same statement as its
+**geometry**. Renumbering a node updates every link that referenced its old
+**node_id** to point at the new one instead.
+
 .. seealso::
 
    * :ref:`links_network_data_model`

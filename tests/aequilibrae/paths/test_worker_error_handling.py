@@ -1,15 +1,13 @@
-"""Tests verifying worker concurrency, exception propagation, and turn penalty accounting (H5)."""
+"""Tests verifying turn penalty accounting across assignment results and congested skims (H5)."""
 
 from __future__ import annotations
 
-from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
 
@@ -45,27 +43,6 @@ def test_assignment_results_reset_clears_total_turn_penalty():
     res.total_turn_penalty = 123.45
     res.reset()
     assert res.total_turn_penalty == 0.0
-
-
-def test_worker_failure_injection_bubbles_up():
-    """Verifies that exceptions raised inside one_to_all workers bubble up via r.get() rather than hanging."""
-    graph = _build_simple_turn_graph()
-    mat = AequilibraeMatrix()
-    mat.create_empty(file_name=AequilibraeMatrix().random_name(), zones=2, matrix_names=["matrix"])
-    mat.index[:] = graph.centroids[:]
-    mat.computational_view(core_list=["matrix"])
-    mat.matrix_view[:, :] = 1.0
-
-    res = AssignmentResults()
-    res.cores = 2
-    res.save_path_file = True
-    res.path_file_dir = "."
-    res.prepare(graph, mat)
-    aon = allOrNothing("car", mat, graph, res)
-
-    with patch("aequilibrae.paths.all_or_nothing.one_to_all", side_effect=RuntimeError("Injected worker failure")):
-        with pytest.raises(RuntimeError, match="Injected worker failure"):
-            aon.execute()
 
 
 def test_traffic_class_skim_congested_turn_penalties():
