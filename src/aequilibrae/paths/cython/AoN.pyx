@@ -3,8 +3,11 @@ cimport cython
 
 import numpy as np
 from cython.parallel cimport parallel, prange, threadid
+from libc.stddef cimport size_t
 from libc.string cimport memset
 from libc.stdint cimport int64_t
+from libcpp.memory cimport unique_ptr
+from libcpp.vector cimport vector
 
 from aequilibrae.paths.cython.skimming_core cimport (
     skim_single_path,
@@ -17,9 +20,11 @@ from aequilibrae.paths.cython.basic_path_finding cimport (
     path_finding,
     path_finding_a_star,
     path_finding_hybrid,
+    _path_finding_hybrid_core,
     HeapType,
 )
 from aequilibrae.paths.cython.path_finding cimport Heuristic
+from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
 
 from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
 
@@ -236,6 +241,16 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
         sl_link_loading_mat = aux_result.temp_sl_link_loading
         link_list = aux_result.select_links[:, :]  # Read only, shared across threads
 
+    # Each worker keeps one arc-label heap for the entire batch. The heap's epoch
+    # reset is O(1), avoiding allocation and arc-sized initialisation per origin.
+    cdef vector[unique_ptr[FourAryHeap]] hybrid_heaps
+    cdef FourAryHeap *hybrid_heap
+    if use_turn_restrictions:
+        for j in range(cores):
+            hybrid_heaps.emplace_back(new FourAryHeap())
+            hybrid_heap = hybrid_heaps[j].get()
+            hybrid_heap.alloc_heap(<size_t>g_view.shape[0])
+
     with nogil, parallel(num_threads=cores):
         tid = threadid()
 
@@ -274,7 +289,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                 # blocking_centroid_flows must not patch them here. The kernel also
                 # hardcodes the 4-ary heap and takes no log closure, so heap_type and
                 # closure do not apply.
-                w = path_finding_hybrid(
+                w = _path_finding_hybrid_core(
                     oi,
                     destinations_mat[tid],
                     nnz_destinations,
@@ -299,6 +314,7 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                     zones,
                     first_ctx_view,
                     last_ctx_view,
+                    hybrid_heaps[tid].get(),
                 )
             else:
                 if block_flows_through_centroids:  # Unblocks the centroid if that is the case

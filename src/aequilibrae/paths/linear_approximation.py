@@ -1180,7 +1180,12 @@ class LinearApproximation(WorkerThread):
         # Frank-Wolfe always, and by CFW/BFW when line_search == "exact". No step cap is applied here.
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
         # TODO: optimize aggregation
-        turn_derivative = sum(self.step_direction_turn_cost.values()) - self.fw_total_turn_cost
+        # Link flows are kept in PCE units throughout equilibration, so the fixed
+        # turn-cost contribution has to use the same units.  The per-class turn
+        # totals come from AoN in demand units and therefore need their class PCE
+        # factor here, just as they do when ``fw_total_turn_cost`` is updated.
+        direction_turn_cost = sum(c.pce * self.step_direction_turn_cost[c._id] for c in self.traffic_classes)
+        turn_derivative = direction_turn_cost - self.fw_total_turn_cost
         # Turn penalties are constant w.r.t. stepsize (they don't depend on flows or VDF),
         # so they shift the derivative by a fixed amount. Including them here ensures the
         # line search accounts for turn costs when finding the optimal stepsize.

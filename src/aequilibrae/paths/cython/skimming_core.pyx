@@ -1,12 +1,17 @@
 cimport cython
 from libc.math cimport INFINITY
+from libc.stddef cimport size_t
 from cython.parallel cimport parallel, prange, threadid
+from libcpp.memory cimport unique_ptr
+from libcpp.vector cimport vector
 import numpy as np
 from aequilibrae.paths.cython.basic_path_finding cimport (
     blocking_centroid_flows,
     path_finding,
     path_finding_hybrid,
+    _path_finding_hybrid_core,
 )
+from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
 
 
 def skimming_parallel(graph, result, long cores):
@@ -163,6 +168,16 @@ def skimming_parallel(graph, result, long cores):
     truncated_arr = np.zeros(cores, dtype=np.int64)
     cdef long long [::1] truncated_view = truncated_arr
 
+    # Allocate the arc-label heap once per worker. Subsequent origins only bump
+    # the heap epoch, which is O(1), instead of rebuilding arc-sized storage.
+    cdef vector[unique_ptr[FourAryHeap]] hybrid_heaps
+    cdef FourAryHeap *hybrid_heap
+    if use_turn_restrictions:
+        for i in range(cores):
+            hybrid_heaps.emplace_back(new FourAryHeap())
+            hybrid_heap = hybrid_heaps[i].get()
+            hybrid_heap.alloc_heap(<size_t>g_view.shape[0])
+
     with nogil, parallel(num_threads=cores):
         tid = threadid()
 
@@ -170,7 +185,7 @@ def skimming_parallel(graph, result, long cores):
             oi = origin_idx_view[i]
 
             if use_turn_restrictions:
-                w = path_finding_hybrid(
+                w = _path_finding_hybrid_core(
                     oi,
                     destinations,
                     -1,
@@ -195,6 +210,7 @@ def skimming_parallel(graph, result, long cores):
                     zones,
                     first_ctx_view,
                     last_ctx_view,
+                    hybrid_heaps[tid].get(),
                 )
                 truncated_view[tid] += skim_arc_based_paths(
                     oi,

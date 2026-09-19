@@ -2,6 +2,8 @@ import pytest
 
 from shapely.geometry import Polygon
 
+from aequilibrae.paths import Graph
+
 
 def test_import_from_osm_via_pbf(empty_project):
     pytest.importorskip("pyrosm")
@@ -66,3 +68,21 @@ def test_build_graphs_without_polygons(sioux_falls_test):
     assert g.num_nodes == 24
     assert g.num_links == 76
     assert list(g.centroids) == list(range(1, 25))
+
+
+def test_build_graphs_applies_turn_policy_before_preparation(sioux_falls_test, monkeypatch):
+    with sioux_falls_test.db_connection as conn:
+        conn.execute("UPDATE about SET infovalue='1' WHERE infoname='allow_uturns'")
+
+    observed_policy = []
+    prepare_graph = Graph.prepare_graph
+
+    def record_policy(graph, *args, **kwargs):
+        observed_policy.append(graph.allow_path_uturns)
+        return prepare_graph(graph, *args, **kwargs)
+
+    monkeypatch.setattr(Graph, "prepare_graph", record_policy)
+
+    sioux_falls_test.network.build_graphs(modes=["c"])
+
+    assert observed_policy == [True]

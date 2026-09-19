@@ -214,7 +214,7 @@ cdef void path_finding_a_star(long origin,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cpdef int path_finding_hybrid(
+cdef int _path_finding_hybrid_core(
     long origin,
     unsigned char [:] destinations,
     long long destination_count,
@@ -239,6 +239,7 @@ cpdef int path_finding_hybrid(
     long long num_zones,
     const long long [:] first_ctx,
     const long long [:] last_ctx,
+    FourAryHeap *pqueue,
     long long [:] settled_count=None,
 ) noexcept nogil:
     """Hybrid node/arc-state Dijkstra: arc labels only where the incoming arc can matter.
@@ -284,13 +285,11 @@ cpdef int path_finding_hybrid(
     # with bounds checking off, overrun it instead of protecting anything. Callers are
     # responsible for passing companion arrays of the right length.
     cdef unsigned int num_nodes = node_pred.shape[0]
-    cdef unsigned int num_arcs = graph_costs.shape[0]
     cdef:
         size_t label, next_label, idx, turn_idx
         size_t restriction_start, restriction_end
         long long cur_arc, next_arc, cur_node, head
         double current_cost, next_cost, turn_penalty, current_turn_cost
-        FourAryHeap pqueue
         ElementState st
         size_t origin_vert = <size_t>origin
         int found = 0
@@ -303,11 +302,10 @@ cpdef int path_finding_hybrid(
         connectors[i] = -1
         node_costs[i] = INFINITY
 
-    for i in range(num_arcs):
-        arc_pred[i] = -1
-        arc_turn_penalties[i] = 0.0
-
-    pqueue.init_heap(<size_t>num_arcs)
+    # The caller owns one heap per worker and reuses it across origins. Epoch
+    # reset is O(1); allocating and initialising an arc-sized heap for every
+    # origin would erase much of the hybrid kernel's performance advantage.
+    pqueue.reset_heap()
 
     node_costs[origin_vert] = 0.0
     node_turn_penalties[origin_vert] = 0.0
@@ -431,3 +429,63 @@ cpdef int path_finding_hybrid(
         settled_count[0] = labels_settled
 
     return found - 1
+
+
+cpdef int path_finding_hybrid(
+    long origin,
+    unsigned char [:] destinations,
+    long long destination_count,
+    double[:] graph_costs,
+    const long long [:] csr_indices,
+    const long long [:] graph_fs,
+    const long long [:] a_nodes,
+    const unsigned char [:] stateful,
+    const long long [:] rep_arc,
+    long long [:] node_pred,
+    long long [:] connectors,
+    long long [:] reached_first,
+    double [:] node_costs,
+    double [:] node_turn_penalties,
+    long long [:] arc_pred,
+    double [:] arc_turn_penalties,
+    const long long [:] turn_fs,
+    const long long [:] turn_to_arcs,
+    const double [:] turn_penalties,
+    bint allow_uturns,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
+    long long [:] settled_count=None,
+) noexcept nogil:
+    """Python-callable single-origin wrapper around the reusable-heap kernel."""
+    cdef FourAryHeap pqueue
+    pqueue.init_heap(<size_t>graph_costs.shape[0])
+    return _path_finding_hybrid_core(
+        origin,
+        destinations,
+        destination_count,
+        graph_costs,
+        csr_indices,
+        graph_fs,
+        a_nodes,
+        stateful,
+        rep_arc,
+        node_pred,
+        connectors,
+        reached_first,
+        node_costs,
+        node_turn_penalties,
+        arc_pred,
+        arc_turn_penalties,
+        turn_fs,
+        turn_to_arcs,
+        turn_penalties,
+        allow_uturns,
+        block_centroid_flows,
+        num_zones,
+        first_ctx,
+        last_ctx,
+        &pqueue,
+        settled_count,
+    )

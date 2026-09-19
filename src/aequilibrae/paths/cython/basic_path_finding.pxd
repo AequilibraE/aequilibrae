@@ -1,5 +1,6 @@
 from aequilibrae.utils.cython.bridge cimport AeqLogClosure
 from aequilibrae.paths.cython.path_finding cimport Heuristic
+from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
 
 cdef void blocking_centroid_flows(int action,
                                   long long orig,
@@ -72,5 +73,35 @@ cpdef int path_finding_hybrid(
     long long num_zones,
     const long long [:] first_ctx,
     const long long [:] last_ctx,
+    long long [:] settled_count=*,
+) noexcept nogil
+
+
+cdef int _path_finding_hybrid_core(
+    long origin,
+    unsigned char [:] destinations,
+    long long destination_count,
+    double[:] graph_costs,
+    const long long [:] csr_indices,
+    const long long [:] graph_fs,
+    const long long [:] a_nodes,
+    const unsigned char [:] stateful,
+    const long long [:] rep_arc,
+    long long [:] node_pred,
+    long long [:] connectors,
+    long long [:] reached_first,
+    double [:] node_costs,
+    double [:] node_turn_penalties,
+    long long [:] arc_pred,
+    double [:] arc_turn_penalties,
+    const long long [:] turn_fs,
+    const long long [:] turn_to_arcs,
+    const double [:] turn_penalties,
+    bint allow_uturns,
+    bint block_centroid_flows,
+    long long num_zones,
+    const long long [:] first_ctx,
+    const long long [:] last_ctx,
+    FourAryHeap *pqueue,
     long long [:] settled_count=*,
 ) noexcept nogil

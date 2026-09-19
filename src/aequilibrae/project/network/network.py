@@ -257,17 +257,17 @@ class Network(WorkerThread):
                 mode_turns = turn_restrictions_df[
                     turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
                 ].copy()
-                g._turn_restrictions = mode_turns
+
+            # Turn restrictions affect which nodes may be compressed, and the U-turn
+            # setting is part of that topology policy. Install both before preparing
+            # the graph so the topology is built once with the final policy.
+            g.set_turn_restrictions(mode_turns, allow_path_uturns=allow_uturns)
 
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)
             if centroids is None:
                 logger.warning("Your graph has no centroids")
             g.lonlat_index = lonlat.loc[g.all_nodes]
-
-            # Applied unconditionally: allow_uturns is a project-wide policy and has to reach
-            # the graph even when there is no turn_restrictions table to read movements from.
-            g.set_turn_restrictions(mode_turns, allow_path_uturns=allow_uturns)
 
             self.graphs[m] = g
 

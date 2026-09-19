@@ -1,12 +1,15 @@
 import logging
 from os.path import isfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+import aequilibrae.paths.linear_approximation as linear_approximation_module
+from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.utils.logging_utils import basic_config
 
@@ -291,6 +294,38 @@ def test_exact_line_search_is_not_capped_and_changes_the_steps(assignment, assig
         cap = np.array([1.0 / np.sqrt(i) for i in assignment.assignment.convergence_report["iteration"]])
         assert np.any(exact_alphas[:-1] > cap[:-1]), "exact line search should be able to exceed the BFW cap"
     assert np.isfinite(exact_rgap)
+
+
+def test_exact_line_search_turn_derivative_uses_pce(monkeypatch):
+    captured = {}
+    algorithm = SimpleNamespace(
+        algorithm="frank-wolfe",
+        traffic_classes=[SimpleNamespace(_id="truck", pce=2.5)],
+        step_direction_turn_cost={"truck": 8.0},
+        fw_total_turn_cost=4.0,
+        rgap=1.0,
+        iteration_issue=[],
+    )
+    algorithm._LinearApproximation__derivative_of_objective_stepsize_independent = lambda: 3.0
+
+    def derivative(_stepsize, const_term):
+        captured["const_term"] = const_term
+        return -1.0
+
+    algorithm._LinearApproximation__derivative_of_objective_stepsize_dependent = derivative
+    algorithm._LinearApproximation__clip_stepsize = lambda value, upper_bound=1.0: value
+
+    def fake_root_scalar(fn, bracket, xtol):
+        fn(0.0)
+        return SimpleNamespace(root=0.25, converged=True)
+
+    monkeypatch.setattr(linear_approximation_module, "root_scalar", fake_root_scalar)
+
+    LinearApproximation.calculate_stepsize(algorithm)
+
+    # Fixed link cost (3) + PCE-weighted direction turn cost (2.5 * 8)
+    # - current PCE-weighted turn cost (4).
+    assert captured["const_term"] == pytest.approx(19.0)
 
 
 def test_bfw_conjugacy_defaults_to_approximate(assignment, assigclass):
