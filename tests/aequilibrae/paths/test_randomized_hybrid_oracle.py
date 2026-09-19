@@ -332,6 +332,36 @@ def test_skimming_oracle_parity(seed: int):
             assert mat_hybrid[i, j] == pytest.approx(expected[0], abs=1e-5), f"seed {seed}: {origin} -> {dest}"
 
 
+@pytest.mark.parametrize("seed", list(range(5)))
+def test_turn_aware_assignment_link_loads_match_oracle(seed: int):
+    """Verifies turn-aware network loading puts unit demand on exactly the arcs the oracle routes it over."""
+    centroids = np.array([1, 2, 3, 4], dtype=np.int64)
+    graph, links_df, turns_df, _ = _prepared_graph(seed, centroids=centroids)
+    assert graph.has_turn_restrictions
+    # The oracle prices movements only; it has no notion of centroid blocking.
+    graph.set_blocked_centroid_flows(False)
+    oracle = ArcStateDijkstraOracle(links_df, turns_df, allow_uturns=False)
+
+    # _assign puts one unit on every OD pair, so each arc carries one unit per path that uses it.
+    expected = {int(lid): 0.0 for lid in links_df.link_id}
+    for origin in centroids:
+        for dest in centroids:
+            if origin == dest:
+                continue
+            found = oracle.shortest_path(int(origin), int(dest))
+            if found is None:
+                continue
+            for lid in found[2]:
+                expected[int(lid)] += 1.0
+
+    loads = _assign(graph, cores=1).reshape(-1)
+    for row_idx, sup_id in enumerate(graph.graph.__supernet_id__.to_numpy(copy=False)):
+        lid = int(graph.graph.iloc[row_idx]["link_id"])
+        assert loads[sup_id] == pytest.approx(expected[lid]), f"seed {seed}: link {lid}"
+
+    assert loads.sum() > 0
+
+
 def test_assignment_link_loads_are_thread_count_invariant():
     """Verifies a multi-threaded turn-aware assignment produces the same link loads as a single-threaded run."""
     graph, _, _, _ = _prepared_graph(seed=1, centroids=np.array([1, 2, 3, 4], dtype=np.int64))

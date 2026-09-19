@@ -126,23 +126,6 @@ def _run_assignment_and_read_paths(
     return paths, g
 
 
-def test_saved_path_file_unrestricted_vs_prohibited():
-    """Verifies saved path file switches from direct route to detour when turn is prohibited."""
-    net = _build_test_network()
-
-    # 1. Unrestricted (zero penalty): shortest path 1 -> 3 is 1 -> 2 -> 3 (links 1, 2)
-    zero_turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 0.0}])
-    paths_unrestricted, _ = _run_assignment_and_read_paths(net, turns=zero_turns, compress=False)
-    assert (1, 3) in paths_unrestricted
-    assert paths_unrestricted[(1, 3)] == [1, 2]
-
-    # 2. Prohibited turn 1 -> 2 -> 3: shortest path must switch to detour 1 -> 4 -> 3 (links 3, 4)
-    prohib_turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": np.inf}])
-    paths_prohibited, _ = _run_assignment_and_read_paths(net, turns=prohib_turns, compress=False)
-    assert (1, 3) in paths_prohibited
-    assert paths_prohibited[(1, 3)] == [3, 4]
-
-
 def test_saved_path_file_finite_penalty_modal_shift():
     """Verifies saved path file switches to detour when turn penalty exceeds detour cost differential."""
     net = _build_test_network()

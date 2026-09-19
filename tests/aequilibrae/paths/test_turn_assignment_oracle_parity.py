@@ -289,3 +289,13 @@ def test_turn_assignment_oracle_parity_finite_penalties(compress: bool):
     sel_matrix = assigned_tc.results.select_link_od.matrix["sel_link_5"]
     np.testing.assert_allclose(np.squeeze(sel_matrix), oracle_res["select_link_od"], rtol=1e-5)
 
+    # Compare select-link loading, which the OD matrix above does not exercise: it is written by a
+    # second backtrack over the same path and can be wrong while the OD matrix is right.
+    sel_loading = np.asarray(assigned_tc.results.select_link_loading["sel_link_5"]).reshape(-1)
+    reconstructed_sel = np.zeros(len(net), dtype=np.float64)
+    for row_idx, sup_id in enumerate(supernet_ids):
+        lid = g.graph.iloc[row_idx]["link_id"]
+        net_idx = int(np.flatnonzero(net.link_id == lid)[0])
+        reconstructed_sel[net_idx] = sel_loading[sup_id]
+
+    np.testing.assert_allclose(reconstructed_sel, oracle_res["select_link_loads"], rtol=1e-5)

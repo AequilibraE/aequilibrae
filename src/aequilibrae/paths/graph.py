@@ -1598,10 +1598,10 @@ class GraphBase(ABC):  # noqa: B024
         self.mode = mygraph.get("mode", "")
         self.turn_penalty_dimension = mygraph.get("turn_penalty_dimension", "time")
         self.centroids = mygraph.get("centroids", None)
-        self._remove_dead_ends = mygraph.get("_remove_dead_ends", mygraph.get("remove_dead_ends", True))
+        self._remove_dead_ends = mygraph.get("_remove_dead_ends", True)
         self._allow_uturns_everywhere = mygraph.get("allow_uturns_everywhere", mygraph.get("allow_uturns", False))
         self._allow_path_uturns = mygraph.get("allow_path_uturns", False)
-        self._turn_restrictions = mygraph.get("turn_restrictions", mygraph.get("_turn_restrictions", None))
+        self._turn_restrictions = mygraph.get("turn_restrictions", None)
 
         # Installed before re-preparation so _reprepare restores them from self.
         self.cost_field = mygraph.get("cost_field", False)
