@@ -5,27 +5,10 @@ Turn-aware path computation
 
 Classic shortest-path algorithms treat a road network as a graph whose states are *nodes*: the
 cost of arriving at a node is all that a label needs to carry, because what a path may do next
-depends only on where it is. Real road networks violate that assumption. A left turn may be
-banned, a movement through a signalised intersection may cost twenty seconds, and a U-turn may be
-illegal everywhere except at one designated median opening. Whether a movement is allowed, and
-what it costs, depends on **how the path arrived** — not just on where it is.
-
-AequilibraE supports this through *turn restrictions*: directed movement triples
-``from_node -> via_node -> to_node``, each carrying a penalty in the same unit as the graph's cost
-field, with ``+inf`` (or ``None``/``NaN``) denoting a prohibited movement.
-
-.. code-block:: python
-
-    >>> turns = pd.DataFrame(
-    ...     [
-    ...         {"from_node": 12, "via_node": 13, "to_node": 27, "penalty": np.inf},  # banned
-    ...         {"from_node": 12, "via_node": 13, "to_node": 41, "penalty": 15.0},    # 15 s delay
-    ...     ]
-    ... )
-    >>> graph.set_turn_restrictions(turns, allow_path_uturns=False)  # doctest: +SKIP
-
-This page describes the algorithm AequilibraE uses to honour those restrictions, why it is
-correct, and what it costs.
+depends only on where it is. :ref:`Turn restrictions <turn_restrictions>` violate that
+assumption — whether a movement is allowed, and what it costs, depends on **how the path
+arrived**. This page describes the kernel AequilibraE uses to honour them, why it is correct, and
+what it costs.
 
 The state-space problem
 -----------------------
@@ -33,10 +16,10 @@ The state-space problem
 The textbook way to handle turn costs is to change what a label represents. Instead of labelling
 nodes, label **arcs** (directed links): a state is "the path has just traversed arc *a*", and the
 transition from *a* to *a'* — legal only when ``head(a) == tail(a')`` — costs
-:math:`c(a') + p(a, a')`, where :math:`p` is the turn penalty. This is the *line graph* (or
-*dual graph*) construction, introduced for exactly this purpose by Caldwell (1961) and developed
-by Kirby & Potts (1969); Winter (2002) gives the modern treatment. Dijkstra's algorithm
-(Dijkstra, 1959) runs unchanged on that expanded graph, and the result is exact.
+:math:`c(a') + p(a, a')`, where :math:`p` is the turn penalty. This is the *line graph*
+construction, introduced for exactly this purpose by Caldwell (1961) and developed by Kirby &
+Potts (1969). Dijkstra's algorithm (Dijkstra, 1959) runs unchanged on that expanded graph, and
+the result is exact.
 
 It is also expensive. The number of labels goes from :math:`|V|` to :math:`|A|`, and on a dense
 urban network the arcs-per-node ratio is typically between 3 and 4. Every heap operation, every
@@ -65,8 +48,8 @@ AequilibraE therefore partitions the nodes. Let
   and out-neighbours).
 
 Nodes in :math:`S` are **stateful**; every other node is **plain**. The kernel
-(:func:`path_finding_hybrid` in ``basic_path_finding.pyx``) keeps labels in the arc index space,
-so the heap is sized exactly as the arc-based kernel's, but:
+(``path_finding_hybrid`` in ``basic_path_finding.pyx``) keeps labels in the arc index space, so
+the heap is sized exactly as the arc-based kernel's, but:
 
 * at a **stateful** node, each incoming arc keeps its own label — full arc-based behaviour;
 * at a **plain** node, every incoming arc collapses onto that node's *representative arc*
@@ -84,6 +67,11 @@ of restricted intersections, :math:`|S| \ll |V|` and the extra work is proportio
 of restrictions, not to the size of the network. Only when a large fraction of intersections
 carry controls does the cost approach that of the full arc-based kernel — which is the price the
 model has genuinely asked for.
+
+The kernel in use can be inspected with ``graph.selected_kernel``, which returns ``"node-based"``
+when no turn restriction is active, and otherwise ``"hybrid"`` or ``"arc-based"``.
+``graph.set_hybrid_kernel(False)`` forces the arc-based kernel, which is useful for comparing the
+two.
 
 Why the collapse is safe
 ------------------------
@@ -121,13 +109,11 @@ earns its keep: it is precisely the inclusion of :math:`N(R)` that guarantees th
 :math:`u` carries no explicit control. Restricting :math:`S` to :math:`R` alone would break the
 feasibility half of the argument.
 
-Two corollaries are worth stating explicitly:
-
-* When U-turns are permitted globally (``allow_path_uturns=True``), nothing is forbidden at a plain
-  node at all, so the collapse is trivially lossless.
-* At a stateful node no collapse happens, so restricted intersections retain exact arc-based
-  semantics — including the case where an optimal path genuinely must U-turn because a prohibition
-  leaves it no alternative.
+At a stateful node no collapse happens, so restricted intersections retain exact arc-based
+semantics — including the case where an optimal path genuinely must U-turn because a prohibition
+leaves it no alternative. And when U-turns are permitted globally
+(``allow_path_uturns=True``), nothing is forbidden at a plain node at all, so the collapse is
+trivially lossless.
 
 U-turn semantics on a compressed graph
 --------------------------------------
@@ -152,30 +138,20 @@ two shortcuts happen to share an endpoint.
 Two further rules complete the semantics:
 
 * **An explicit turn entry overrides the global U-turn ban.** The kernel skips the U-turn test
-  when the movement has an explicit entry in the turn table (``has_explicit_entry``), so a
-  modeller can permit — and price — one legal U-turn at a designated median opening while U-turns
-  remain banned everywhere else. A finite penalty on such a movement is honoured; ``+inf`` still
-  prohibits it.
+  when the movement has an explicit entry in the turn table, so a modeller can permit — and
+  price — one legal U-turn at a designated median opening while U-turns remain banned everywhere
+  else. A finite penalty on such a movement is honoured; ``+inf`` still prohibits it.
 * **Effective via nodes are protected from contraction.** A turn restriction has nowhere to attach
   if its via node has been absorbed into a shortcut, so contraction preserves the via nodes that
   actually map onto arcs of the graph. Restrictions naming nodes or legs that do not exist in the
-  graph ("phantom" restrictions, common when a restriction table is shared across traffic classes
-  whose mode does not serve every link) are filtered out first: they neither protect nodes nor
-  perturb the graph topology, so a class that cannot use a restricted movement pays nothing for
-  its existence.
-
-Centroid-flow blocking is handled differently from the classic node-based kernel, which patches
-the b-node array to sever outgoing edges at centroids. The hybrid kernel reads the *unpatched*
-b-nodes and enforces blocking itself, by refusing to expand out of any centroid that is not the
-origin of the search. Blocking is therefore a run-time flag: it is never baked into the graph
-topology or into the turn table, which is why toggling it invalidates cached results but requires
-no rebuild.
+  graph — common when a restriction table is shared across traffic classes whose mode does not
+  serve every link — are filtered out first, so a class that cannot use a restricted movement pays
+  nothing for its existence.
 
 Complexity
 ----------
 
-Let :math:`d` be the average out-degree and :math:`t` the average number of explicit turn entries
-per restricted arc.
+Let :math:`t` be the average number of explicit turn entries per restricted arc.
 
 .. list-table::
    :header-rows: 1
@@ -207,82 +183,21 @@ choice for the arc-density of road networks.
 Measured performance
 --------------------
 
-The figures below were measured on the Arkansas statewide model (approximately 265,000 directed
-graph links) against the reference implementation, with the same compact graph, the same cost
-field and identical results.
+Measured on the Arkansas statewide model (approximately 265,000 directed graph links), against the
+reference implementation, with the same compact graph, the same cost field and identical results:
+BFW assignment over 50 iterations on 16 threads falls from **404.44 s to 175.20 s**, a **2.31x**
+speed-up.
 
-.. list-table::
-   :header-rows: 1
-   :widths: 46 18 18 18
-
-   * - Workload
-     - Reference
-     - Turn-aware
-     - Speed-up
-   * - BFW assignment, 50 iterations, 16 threads
-     - 404.44 s
-     - 175.20 s
-     - 2.31x
-
-The comparison was run with the turn-aware branch configured exactly as the reference is — one
-label space, the same compressed graph — so the difference is attributable to the path-finding
-change set rather than to any difference in graph preparation.
-
-.. note::
-
-    Both sides of that comparison include a fix to ``Graph.set_skimming`` that was a far larger
-    effect than anything measured here: testing skim field membership against a
-    ``DataFrameGroupBy`` object iterates its *groups*, which on Arkansas materialised 264,562
-    DataFrame slices (72 s) on every call and always answered "missing", so the cached groupby was
-    never reused. Graph preparation fell from 79.7 s to 6.4 s once that was corrected. Benchmarks
-    taken before that fix are not comparable with these.
-
-Kernel Specification and Operational Invariants
------------------------------------------------
-
-The hybrid kernel adheres to seven strict operational invariants:
-
-1. **Kernel Selection API:** The shortest-path kernel can be inspected via ``graph.selected_kernel`` (returning ``"hybrid"``, ``"arc-based"``, or ``"node-based"``) and toggled via ``graph.set_hybrid_kernel(use_hybrid: bool)``. When turn restrictions are inactive, the engine automatically selects ``"node-based"``.
-2. **Sparse Early Exit:** When searching for a sparse subset of destinations (``destination_count > 0``), the heap extraction loop terminates immediately once all requested destinations are settled, decrementing the destination count and avoiding scanning the remainder of the network.
-3. **Centroid Stopping:** Centroid through-flows are prevented at run time when ``block_centroid_flows=True``. The expansion loop halts outgoing edge exploration from any non-origin centroid, ensuring centroid connectors cannot serve as intermediate shortcuts.
-4. **Settled Label Counter:** The kernel tracks the exact number of labels settled from the priority queue via the ``labels_settled`` output parameter, enabling direct empirical verification of label efficiency against the arc-state reference kernel.
-5. **Unreachable Connector Cleanup:** Any destination node unreachable from the origin is guaranteed to have its connector and predecessor initialized to ``-1`` upon kernel completion, eliminating stale pointers during backtracking.
-6. **Tie-breaking Policy:** In the presence of equal-cost paths, transitions follow the first-seen insertion order in the 4-ary heap.
-7. **Result and Turn Penalty Accounting:** Cumulative turn penalties paid along paths are tracked per origin-destination pair. When computing assignment skims via ``TrafficClass.skim_congested()``, turn penalties are automatically incorporated into the generalized assignment cost (``__assignment_cost__``), and ``AssignmentResults.reset()`` resets the cumulative turn penalty accumulator to zero.
-
-Global U-Turn Policy (Outcome 3 Disposition)
---------------------------------------------
-
-When ``allow_path_uturns=True`` is set, U-turns are permitted unconditionally at every node without requiring explicit turn entries. On large-scale regional models (such as the Arkansas statewide model), permitting global U-turns introduces a significant combinatorial expansion of valid transitions, as vehicles can reverse direction at any intermediate junction. In contrast, the standard default ``allow_path_uturns=False`` enforces standard transportation modeling conventions: U-turns are forbidden throughout the network unless explicitly permitted by an entry in the turn table. Modellers requiring turnaround maneuvers are encouraged to specify localized turn entries rather than enabling global U-turns statewide.
-
-Limitations
------------
-
-* Turn penalties are expressed in the unit of the cost field, and AequilibraE does not convert
-  between units. A penalty table built for a travel-time field is meaningless against a distance
-  field; keeping them consistent is the modeller's responsibility.
-* Which skim fields accumulate turn penalties is controlled by ``Graph.turn_skim_fields``. When it
-  is left empty, penalties accumulate into the cost field's skim only.
-* Turn penalties must be non-negative. The kernel relies on non-negativity both for Dijkstra's own
-  correctness and for the excision argument above.
+Turn penalties must be non-negative. The kernel relies on non-negativity both for Dijkstra's own
+correctness and for the excision argument above.
 
 References
 ----------
 
 * Caldwell, T. (1961). On finding minimum routes in a network with turn penalties.
   *Communications of the ACM*, 4(2), 107-108.
-* Delling, D., Goldberg, A. V., Pajor, T., & Werneck, R. F. (2017). Customizable route planning in
-  road networks. *Transportation Science*, 51(2), 566-591.
 * Dijkstra, E. W. (1959). A note on two problems in connexion with graphs.
   *Numerische Mathematik*, 1, 269-271.
-* Geisberger, R., Sanders, P., Schultes, D., & Delling, D. (2008). Contraction hierarchies: faster
-  and simpler hierarchical routing in road networks. *Experimental Algorithms (WEA 2008)*, LNCS
-  5038, 319-333.
-* Geisberger, R., & Vetter, C. (2011). Efficient routing in road networks with turn costs.
-  *Experimental Algorithms (SEA 2011)*, LNCS 6630, 100-111.
-* Gutierrez, E., & Medaglia, A. L. (2008). Labeling algorithm for the shortest path problem with
-  turn prohibitions with application to large-scale road networks. *Annals of Operations
-  Research*, 157(1), 169-182.
 * Johnson, D. B. (1975). Priority queues with update and finding minimum spanning trees.
   *Information Processing Letters*, 4(3), 53-57.
 * Kirby, R. F., & Potts, R. B. (1969). The minimum route problem for networks with turn penalties
@@ -293,7 +208,7 @@ References
 
 .. seealso::
 
-    * :func:`aequilibrae.paths.graph.Graph.set_turn_restrictions`
-        Class documentation
+    * :ref:`turn_restrictions`
+        Setting turn restrictions on a project
     * :ref:`aequilibrae-graphs`
         Graph compression, which turn restrictions interact with

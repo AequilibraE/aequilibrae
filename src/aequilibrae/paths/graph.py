@@ -1231,54 +1231,32 @@ class GraphBase(ABC):  # noqa: B024
         else the kernel keeps a single label per node, collapsed onto ``rep_arc``. See
         ``path_finding_hybrid`` for why that collapse preserves optimality.
         """
-        if num_nodes <= 0:
-            return np.empty(0, dtype=np.uint8), np.empty(0, dtype=np.int64)
+        rep_arc = np.zeros(max(num_nodes, 0), dtype=np.int64)
+        stateful = np.zeros(max(num_nodes, 0), dtype=np.uint8)
+        if num_nodes <= 0 or num_arcs <= 0:
+            return stateful, rep_arc
 
-        rep_arc = np.full(num_nodes, -1, dtype=np.int64)
-        if num_arcs > 0 and csr_indices.shape[0] >= num_arcs:
-            valid_arcs = (csr_indices[:num_arcs] >= 0) & (csr_indices[:num_arcs] < num_nodes)
-            if np.any(valid_arcs):
-                v_nodes = csr_indices[:num_arcs][valid_arcs]
-                arc_ids = np.arange(num_arcs, dtype=np.int64)[valid_arcs]
-                unq_nodes, first_idx = np.unique(v_nodes, return_index=True)
-                rep_arc[unq_nodes] = arc_ids[first_idx]
-            rep_arc[rep_arc == -1] = 0
+        heads = csr_indices[:num_arcs]
+        # The first arc entering a node is the label every plain arrival collapses onto.
+        # Nodes with no incoming arc keep arc 0; nothing ever reads their label.
+        reached, first_arc = np.unique(heads, return_index=True)
+        rep_arc[reached] = first_arc
 
-        stateful = np.zeros(num_nodes, dtype=np.uint8)
-        if turn_fs.shape[0] > 1 and num_arcs > 0 and csr_indices.shape[0] >= num_arcs:
-            max_arc = min(num_arcs, turn_fs.shape[0] - 1)
-            has_turns = turn_fs[1 : max_arc + 1] > turn_fs[:max_arc]
-            active_arcs = np.flatnonzero(has_turns)
-            if active_arcs.size > 0:
-                v_nodes = csr_indices[active_arcs]
-                v_valid = (v_nodes >= 0) & (v_nodes < num_nodes)
-                via_nodes = np.unique(v_nodes[v_valid])
-                if via_nodes.size > 0:
-                    stateful[via_nodes] = 1
+        if turn_fs.shape[0] <= 1:
+            return stateful, rep_arc
 
-                    # Out-neighbors of via nodes
-                    via_in_range = via_nodes[via_nodes < graph_fs.shape[0] - 1]
-                    if via_in_range.size > 0:
-                        starts = graph_fs[via_in_range]
-                        ends = graph_fs[via_in_range + 1]
-                        diffs = ends - starts
-                        has_out = diffs > 0
-                        if np.any(has_out):
-                            out_ranges = [
-                                np.arange(s, e, dtype=np.int64)
-                                for s, e in zip(starts[has_out], ends[has_out], strict=True)
-                            ]
-                            out_arcs = np.concatenate(out_ranges)
-                            out_arcs = out_arcs[out_arcs < num_arcs]
-                            w = csr_indices[out_arcs]
-                            w_valid = (w >= 0) & (w < num_nodes)
-                            stateful[w[w_valid]] = 1
+        max_arc = min(num_arcs, turn_fs.shape[0] - 1)
+        restricted_arcs = np.flatnonzero(turn_fs[1 : max_arc + 1] > turn_fs[:max_arc])
+        if restricted_arcs.size == 0:
+            return stateful, rep_arc
 
-                    # In-neighbors of via nodes: incoming arcs where csr_indices[arc] in via_nodes
-                    via_mask = np.isin(csr_indices[:num_arcs], via_nodes)
-                    in_a = a_nodes[:num_arcs][via_mask]
-                    in_a_valid = (in_a >= 0) & (in_a < num_nodes)
-                    stateful[in_a[in_a_valid]] = 1
+        via_nodes = np.unique(heads[restricted_arcs])
+        stateful[via_nodes] = 1
+        # Both neighbourhoods of a via node are stateful too: a prohibition there can force a
+        # reversal, which is the one thing a collapsed label cannot express.
+        out_arcs = np.concatenate([np.arange(graph_fs[v], graph_fs[v + 1], dtype=np.int64) for v in via_nodes])
+        stateful[heads[out_arcs]] = 1
+        stateful[a_nodes[:num_arcs][np.isin(heads, via_nodes)]] = 1
 
         return stateful, rep_arc
 
@@ -1307,14 +1285,13 @@ class GraphBase(ABC):  # noqa: B024
                 np.empty(0, dtype=np.float64),
             )
 
+        # compact_all_nodes holds node IDs of the full graph, so nodes_to_indices maps them all.
         nodes = compact_all_nodes[: int(compact_num_nodes)].astype(np.int64, copy=False)
-        in_range = (nodes >= 0) & (nodes < nodes_to_indices.shape[0])
-        full_idx = np.where(in_range, nodes_to_indices[np.clip(nodes, 0, nodes_to_indices.shape[0] - 1)], -1)
-        mappable = in_range & (full_idx >= 0)
+        full_idx = nodes_to_indices[nodes]
 
-        max_full = int(full_idx[mappable].max()) if np.any(mappable) else 0
+        max_full = int(full_idx.max()) if full_idx.size else 0
         full_to_compact = np.full(max_full + 1, -1, dtype=np.int64)
-        full_to_compact[full_idx[mappable]] = np.flatnonzero(mappable)
+        full_to_compact[full_idx] = np.arange(full_idx.shape[0], dtype=np.int64)
 
         stride = (
             int(
