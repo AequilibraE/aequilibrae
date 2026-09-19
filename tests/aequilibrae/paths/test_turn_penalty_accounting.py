@@ -1,4 +1,4 @@
-"""Tests verifying turn penalty accounting across assignment results and congested skims (H5)."""
+"""Tests verifying turn penalty accounting across assignment results and congested skims."""
 
 from __future__ import annotations
 

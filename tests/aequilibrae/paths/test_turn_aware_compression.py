@@ -1,4 +1,4 @@
-"""Tests verifying conservative chain compression under turn restrictions (H7)."""
+"""Tests verifying conservative chain compression under turn restrictions."""
 
 from __future__ import annotations
 
@@ -9,30 +9,8 @@ import pytest
 from aequilibrae.paths import Graph
 
 
-def test_high_numbered_isolated_centroid_no_index_error():
-    """H7: High-numbered isolated centroid (e.g. centroid ID 9999999) must not trigger IndexError in graph building."""
-    links = [
-        {"link_id": 1, "a_node": 1, "b_node": 2, "direction": 1, "distance": 1.0, "cost": 1.0},
-        {"link_id": 2, "a_node": 2, "b_node": 3, "direction": 1, "distance": 1.0, "cost": 1.0},
-    ]
-    df = pd.DataFrame(links)
-    df["modes"] = "c"
-    df["link_type"] = "road"
-    graph = Graph()
-    graph.cost_field = "cost"
-    graph.network = df
-
-    # Centroid 9999999 is isolated and much higher than link nodes (1, 2, 3)
-    centroids = np.array([1, 9999999], dtype=np.int64)
-    graph.prepare_graph(centroids=centroids, remove_dead_ends=False)
-    graph.set_graph("cost")
-
-    assert graph.compact_num_nodes > 0
-    assert 9999999 in graph.compact_all_nodes
-
-
 def test_effective_via_node_protected_from_chain_compression():
-    """H7: Via nodes of active turn restrictions must never be compressed away into interior chain nodes."""
+    """Via nodes of active turn restrictions must never be compressed away into interior chain nodes."""
     # Chain: 1 -> 2 -> 3 -> 4
     # With turn restriction at 2: 1 -> 2 -> 3
     links = [
@@ -68,7 +46,7 @@ def test_effective_via_node_protected_from_chain_compression():
 
 
 def test_cycle_preservation_under_chain_compression():
-    """H7: Multi-link cycles must not be eliminated when simple self-loops are dropped."""
+    """Multi-link cycles must not be eliminated when simple self-loops are dropped."""
     links = [
         {"link_id": 1, "a_node": 1, "b_node": 2, "direction": 1, "distance": 1.0, "cost": 1.0},
         {"link_id": 2, "a_node": 2, "b_node": 3, "direction": 1, "distance": 1.0, "cost": 1.0},

@@ -1,4 +1,4 @@
-"""Randomized small-network full-versus-hybrid oracle parity test suite across 25 diverse seeds."""
+"""Randomized small-network parity between the hybrid kernel, the arc-based kernel and a Python oracle."""
 
 from __future__ import annotations
 
@@ -8,7 +8,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph
+from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.paths.cython.basic_path_finding import path_finding_hybrid
+from aequilibrae.paths.network_skimming import NetworkSkimming
+from aequilibrae.paths.results import AssignmentResults
 
 
 class ArcStateDijkstraOracle:
@@ -140,6 +145,35 @@ def _generate_random_network(seed: int, num_nodes: int = 8, num_links: int = 18)
     return links_df, turns_df, nodes
 
 
+
+def _prepared_graph(seed: int, centroids=None, num_nodes: int = 8, num_links: int = 18):
+    """Builds a prepared, turn-restricted Graph from one randomized network."""
+    links_df, turns_df, nodes = _generate_random_network(seed, num_nodes=num_nodes, num_links=num_links)
+    graph = Graph()
+    graph.network = links_df.copy()
+    if not turns_df.empty:
+        graph.set_turn_restrictions(turns_df, allow_path_uturns=False)
+    graph.prepare_graph(centroids=centroids, remove_dead_ends=False)
+    graph.set_graph("free_flow_time")
+    return graph, links_df, turns_df, nodes
+
+
+def _assign(graph, use_hybrid: bool, cores: int = 1):
+    """Runs an all-or-nothing assignment on `graph` with the requested kernel."""
+    graph.set_hybrid_kernel(use_hybrid)
+    mat = AequilibraeMatrix()
+    mat.create_empty(file_name=AequilibraeMatrix().random_name(), zones=len(graph.centroids), matrix_names=["matrix"])
+    mat.index[:] = graph.centroids[:]
+    mat.computational_view(core_list=["matrix"])
+    mat.matrix_view[:, :] = 1.0
+
+    res = AssignmentResults()
+    res.cores = cores
+    res.prepare(graph, mat)
+    allOrNothing("car", mat, graph, res).execute()
+    return np.array(res.link_loads, copy=True)
+
+
 @pytest.mark.parametrize("seed", list(range(20)))
 def test_randomized_small_network_oracle_parity(seed: int):
     """Property test verifying 100% parity between Python oracle, arc-based kernel, and hybrid kernel."""
@@ -212,3 +246,134 @@ def test_randomized_small_network_oracle_parity(seed: int):
                         recomputed_cost += pen
 
                 assert recomputed_cost == pytest.approx(expected_cost, abs=1e-5)
+
+
+def test_hybrid_settled_label_efficiency_and_early_exit():
+    """Verifies the hybrid kernel settles at most one label per plain node, and that early exit settles fewer."""
+    # Big enough that the restricted intersections are a small minority of the network,
+    # which is the regime the collapse is supposed to pay off in.
+    graph, _, _, nodes = _prepared_graph(seed=3, num_nodes=30, num_links=90)
+    assert graph.has_turn_restrictions
+
+    num_nodes = graph.num_nodes
+    num_arcs = graph.num_links
+    csr_indices = graph.graph["b_node"].to_numpy(np.int64, copy=False)
+    a_nodes = graph.graph["a_node"].to_numpy(np.int64, copy=False)
+    graph_costs = graph.cost.astype(np.float64)
+    graph_fs = graph.fs.astype(np.int64)
+
+    origin_idx = graph.nodes_to_indices[nodes[0]]
+    dest_idx = graph.nodes_to_indices[nodes[-1]]
+
+    def run(destinations, destination_count, stateful):
+        settled = np.zeros(1, dtype=np.int64)
+        path_finding_hybrid(
+            origin_idx,
+            destinations,
+            destination_count,
+            graph_costs,
+            csr_indices,
+            graph_fs,
+            a_nodes,
+            stateful,
+            graph.rep_arc,
+            np.full(num_nodes, -1, dtype=np.int64),
+            np.full(num_nodes, -1, dtype=np.int64),
+            np.zeros(num_nodes, dtype=np.int64),
+            np.full(num_nodes, np.inf, dtype=np.float64),
+            np.zeros(num_nodes, dtype=np.float64),
+            np.full(num_arcs, -1, dtype=np.int64),
+            np.zeros(num_arcs, dtype=np.float64),
+            graph.turn_fs,
+            graph.turn_to_arcs,
+            graph.turn_penalties,
+            False,
+            False,
+            0,
+            csr_indices,
+            a_nodes,
+            settled,
+        )
+        return int(settled[0])
+
+    single_destination = np.zeros(num_nodes, dtype=np.uint8)
+    single_destination[dest_idx] = 1
+
+    settled_full = run(np.zeros(0, dtype=np.uint8), -1, graph.stateful)
+    settled_early = run(single_destination, 1, graph.stateful)
+    # Marking every node stateful disables the collapse, which is exactly the arc-based kernel.
+    settled_arc = run(np.zeros(0, dtype=np.uint8), -1, np.ones_like(graph.stateful))
+
+    assert settled_full > 0
+    assert settled_early > 0
+    assert settled_early <= settled_full
+    assert settled_full < settled_arc, "the collapse settled no fewer labels than full arc state"
+
+    # The design claim is that only stateful nodes hold more than one live label: every other
+    # node collapses onto its representative arc. A plain arc-based kernel would settle up to
+    # num_arcs labels, so bound the hybrid by the label space it is supposed to occupy.
+    in_degree = np.bincount(csr_indices[:num_arcs], minlength=num_nodes)[:num_nodes]
+    label_budget = int(np.where(graph.stateful[:num_nodes].astype(bool), np.maximum(in_degree, 1), 1).sum())
+    assert settled_full <= label_budget, (
+        f"hybrid settled {settled_full} labels but only {label_budget} are reachable under the state-collapse rule"
+    )
+
+
+@pytest.mark.parametrize("seed", list(range(5)))
+def test_skimming_oracle_parity(seed: int):
+    """Verifies turn-aware skimming matches the Python oracle, not only the arc-based kernel."""
+    centroids = np.array([1, 2, 3, 4], dtype=np.int64)
+    graph, links_df, turns_df, _ = _prepared_graph(seed, centroids=centroids)
+    # The oracle prices movements only; it has no notion of centroid blocking.
+    graph.set_blocked_centroid_flows(False)
+    graph.set_skimming("free_flow_time")
+    oracle = ArcStateDijkstraOracle(links_df, turns_df, allow_uturns=False)
+
+    graph.set_hybrid_kernel(True)
+    skm_hybrid = NetworkSkimming(graph)
+    skm_hybrid.execute()
+    mat_hybrid = np.array(skm_hybrid.results.skims.free_flow_time[:, :], copy=True)
+    index = np.array(skm_hybrid.results.skims.index[:], copy=True)
+
+    graph.set_hybrid_kernel(False)
+    skm_arc = NetworkSkimming(graph)
+    skm_arc.execute()
+    mat_arc = np.array(skm_arc.results.skims.free_flow_time[:, :], copy=True)
+
+    # The two kernels must agree with each other ...
+    np.testing.assert_allclose(mat_hybrid, mat_arc, equal_nan=True)
+
+    # ... and with an independent oracle, which is the part that makes this a parity test.
+    for i, origin in enumerate(index):
+        for j, dest in enumerate(index):
+            if origin == dest:
+                continue
+            expected = oracle.shortest_path(int(origin), int(dest))
+            if expected is None:
+                assert not np.isfinite(mat_hybrid[i, j]) or mat_hybrid[i, j] == 0.0
+                continue
+            assert mat_hybrid[i, j] == pytest.approx(expected[0], abs=1e-5), f"seed {seed}: {origin} -> {dest}"
+
+
+@pytest.mark.parametrize("seed", list(range(5)))
+def test_assignment_link_load_parity_between_kernels(seed: int):
+    """Verifies all-or-nothing link loads are identical under the hybrid and arc-based kernels."""
+    graph, _, _, _ = _prepared_graph(seed, centroids=np.array([1, 2, 3, 4], dtype=np.int64))
+    assert graph.has_turn_restrictions
+
+    loads_hybrid = _assign(graph, use_hybrid=True)
+    loads_arc = _assign(graph, use_hybrid=False)
+
+    assert loads_hybrid.sum() > 0
+    np.testing.assert_allclose(loads_hybrid, loads_arc)
+
+
+def test_assignment_link_loads_are_thread_count_invariant():
+    """Verifies a multi-threaded assignment produces the same link loads as a single-threaded run."""
+    graph, _, _, _ = _prepared_graph(seed=1, centroids=np.array([1, 2, 3, 4], dtype=np.int64))
+
+    single = _assign(graph, use_hybrid=True, cores=1)
+    pooled = _assign(graph, use_hybrid=True, cores=4)
+
+    assert single.sum() > 0
+    np.testing.assert_allclose(single, pooled)
