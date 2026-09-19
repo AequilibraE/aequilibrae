@@ -24,18 +24,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _require_bool(value, name: str) -> bool:
-    """Accepts a Python or NumPy boolean and rejects anything else.
-
-    ``np.True_`` is what ``Series.any()``, ``np.all`` and array comparisons return, and it is
-    not an instance of ``bool``, so a bare isinstance check rejects ordinary user code - with a
-    message that reads "must be a boolean, got bool", since NumPy's scalar reports that name.
-    """
-    if isinstance(value, (bool, np.bool_)):
-        return bool(value)
-    raise TypeError(f"{name} must be a boolean, got {type(value).__module__}.{type(value).__name__}")
-
-
 @dataclasses.dataclass
 class NetworkGraphIndices:
     network_ab_idx: np.ndarray
@@ -168,7 +156,6 @@ class GraphBase(ABC):  # noqa: B024
         self._crosswalk = None
 
         # Hybrid node/arc-state Dijkstra structures
-        self.use_hybrid: bool = True
         self.stateful = np.empty(0, dtype=np.uint8)
         self.rep_arc = np.empty(0, dtype=np.int64)
         self.compact_stateful = np.empty(0, dtype=np.uint8)
@@ -244,9 +231,6 @@ class GraphBase(ABC):  # noqa: B024
                 ``graph.set_turn_restrictions`` to allow U-turns at intersections. This options takes effect after dead
                 end link removal.
         """
-        remove_dead_ends = _require_bool(remove_dead_ends, "remove_dead_ends")
-        allow_uturns_everywhere = _require_bool(allow_uturns_everywhere, "allow_uturns_everywhere")
-
         self._remove_dead_ends = remove_dead_ends
         self._allow_uturns_everywhere = allow_uturns_everywhere
         self._effective_vias_cache = None
@@ -623,10 +607,10 @@ class GraphBase(ABC):  # noqa: B024
         """
         Sets the field to be used for path computation
 
-        The field must be numeric and every value must be non-negative: shortest path search
-        relies on non-negative arc costs, and a negative entry would silently return a wrong
-        path rather than fail. ``+inf`` is allowed and marks an unusable link; ``NaN`` values
-        are coerced to ``+inf`` with a warning; negative values and ``-inf`` are rejected.
+        Every value must be non-negative: shortest path search relies on non-negative arc
+        costs, and a negative entry would silently return a wrong path rather than fail.
+        ``+inf`` is allowed and marks an unusable link; ``NaN`` values are coerced to ``+inf``
+        with a warning; negative values and ``-inf`` are rejected.
 
         :Arguments:
             **cost_field** (:obj:`str`): Field name. Must be numeric and non-negative
@@ -639,13 +623,7 @@ class GraphBase(ABC):  # noqa: B024
             )
 
         if not self.graph.empty:
-            raw_series = self.graph[cost_field]
-            converted = pd.to_numeric(raw_series, errors="coerce")
-            # If conversion yielded NaN where input was not already NA/null/NaN, it was invalid non-numeric text
-            if (converted.isna() & ~raw_series.isna()).any():
-                raise ValueError(f"Cost field '{cost_field}' contains non-numeric values.")
-
-            raw_costs = converted.to_numpy(np.float64, copy=True)
+            raw_costs = self.graph[cost_field].to_numpy(np.float64, copy=True)
             # A negative or -inf cost breaks the assumption every shortest path routine here
             # rests on, and there is no reading of it that produces a usable graph.
             if np.isneginf(raw_costs).any():
@@ -821,7 +799,8 @@ class GraphBase(ABC):  # noqa: B024
         :Arguments:
             **block_centroid_flows** (:obj:`bool`): Whether to block flow through centroids.
         """
-        block_centroid_flows = _require_bool(block_centroid_flows, "block_centroid_flows")
+        if not isinstance(block_centroid_flows, bool):
+            raise TypeError("block_centroid_flows needs to be boolean")
         if self.num_zones == 0:
             logger.warning("No centroids in the model. Nothing to block")
             return
@@ -836,17 +815,6 @@ class GraphBase(ABC):  # noqa: B024
     def has_turn_restrictions(self) -> bool:
         """Returns True if the graph has turn restrictions loaded and active."""
         return self._has_turn_restrictions
-
-    @property
-    def selected_kernel(self) -> str:
-        """Returns the active shortest path kernel name ('node-based', 'arc-based', or 'hybrid')."""
-        if not self._has_turn_restrictions:
-            return "node-based"
-        return "hybrid" if self.use_hybrid else "arc-based"
-
-    def set_hybrid_kernel(self, use_hybrid: bool) -> None:
-        """Sets whether to use the hybrid node/arc-state Dijkstra kernel for turn-restricted routing."""
-        self.use_hybrid = _require_bool(use_hybrid, "use_hybrid")
 
     @property
     def allow_uturns_everywhere(self) -> bool:
@@ -960,8 +928,6 @@ class GraphBase(ABC):  # noqa: B024
                 U-turns are node-based transitions that return to the tail node of the
                 current directed arc. Default is ``False``.
         """
-        allow_path_uturns = _require_bool(allow_path_uturns, "allow_path_uturns")
-
         if turn_restrictions is None:
             self._turn_restrictions = None
             self._allow_path_uturns = allow_path_uturns
@@ -987,21 +953,6 @@ class GraphBase(ABC):  # noqa: B024
                 f"Turn restrictions table missing required columns: {missing}. "
                 "Run project.upgrade() to update the schema."
             )
-
-        # Validate node IDs: finite, integral, non-negative int64
-        for col in ["from_node", "via_node", "to_node"] if not turn_restrictions.empty else []:
-            vals = turn_restrictions[col]
-            if vals.isnull().any():
-                raise ValueError(f"Turn restrictions column '{col}' contains null/NaN values.")
-            numeric_vals = pd.to_numeric(vals, errors="coerce")
-            if numeric_vals.isnull().any() or not np.all(np.isfinite(numeric_vals)):
-                raise ValueError(f"Turn restrictions column '{col}' contains non-numeric or non-integer values.")
-            if not np.all(numeric_vals == np.floor(numeric_vals)):
-                raise ValueError(f"Turn restrictions column '{col}' contains non-integer values.")
-            if (numeric_vals < 0).any():
-                raise ValueError(f"Turn restrictions column '{col}' contains negative node IDs.")
-            if (numeric_vals > np.iinfo(np.int64).max).any():
-                raise ValueError(f"Turn restrictions column '{col}' contains values exceeding int64 maximum.")
 
         normalised = turn_restrictions.copy()
         normalised["from_node"] = normalised["from_node"].astype(np.int64)
@@ -1622,7 +1573,6 @@ class GraphBase(ABC):  # noqa: B024
             else self.compact_turn_penalties
         )
 
-        mygraph["use_hybrid"] = self.use_hybrid
         mygraph["_remove_dead_ends"] = self._remove_dead_ends
 
         with open(filename, "wb") as f:
@@ -1639,11 +1589,13 @@ class GraphBase(ABC):  # noqa: B024
             mygraph = pickle.load(f)
 
         self.description = mygraph.get("description", "No description added so far")
+        # Graph files written before the network became a DataFrame store it as a record
+        # array, and this load path re-prepares the graph from it rather than trusting
+        # the saved derived arrays.
         self.network = mygraph["network"]
         if isinstance(self.network, np.ndarray):
             self.network = pd.DataFrame(self.network)
         self.mode = mygraph.get("mode", "")
-        self.use_hybrid = mygraph.get("use_hybrid", True)
         self.turn_penalty_dimension = mygraph.get("turn_penalty_dimension", "time")
         self.centroids = mygraph.get("centroids", None)
         self._remove_dead_ends = mygraph.get("_remove_dead_ends", mygraph.get("remove_dead_ends", True))

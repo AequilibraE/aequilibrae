@@ -68,11 +68,6 @@ of restrictions, not to the size of the network. Only when a large fraction of i
 carry controls does the cost approach that of the full arc-based kernel — which is the price the
 model has genuinely asked for.
 
-The kernel in use can be inspected with ``graph.selected_kernel``, which returns ``"node-based"``
-when no turn restriction is active, and otherwise ``"hybrid"`` or ``"arc-based"``.
-``graph.set_hybrid_kernel(False)`` forces the arc-based kernel, which is useful for comparing the
-two.
-
 Why the collapse is safe
 ------------------------
 

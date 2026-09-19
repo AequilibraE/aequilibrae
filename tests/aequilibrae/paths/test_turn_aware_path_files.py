@@ -64,7 +64,6 @@ def _run_assignment_and_read_paths(
     net: pd.DataFrame,
     turns: pd.DataFrame | None,
     compress: bool,
-    use_hybrid: bool,
 ) -> tuple[dict[tuple[int, int], list[int]], Graph]:
     centroids = np.array([1, 3], dtype=np.int64)
     g = Graph()
@@ -73,7 +72,6 @@ def _run_assignment_and_read_paths(
         g.set_turn_restrictions(turns)
     g.prepare_graph(centroids=centroids, remove_dead_ends=compress)
     g.set_graph("free_flow_time")
-    g.set_hybrid_kernel(use_hybrid)
 
     mat = AequilibraeMatrix()
     mat.create_empty(memory_only=True, zones=2, matrix_names=["demand"])
@@ -134,13 +132,13 @@ def test_saved_path_file_unrestricted_vs_prohibited():
 
     # 1. Unrestricted (zero penalty): shortest path 1 -> 3 is 1 -> 2 -> 3 (links 1, 2)
     zero_turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 0.0}])
-    paths_unrestricted, _ = _run_assignment_and_read_paths(net, turns=zero_turns, compress=False, use_hybrid=True)
+    paths_unrestricted, _ = _run_assignment_and_read_paths(net, turns=zero_turns, compress=False)
     assert (1, 3) in paths_unrestricted
     assert paths_unrestricted[(1, 3)] == [1, 2]
 
     # 2. Prohibited turn 1 -> 2 -> 3: shortest path must switch to detour 1 -> 4 -> 3 (links 3, 4)
     prohib_turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": np.inf}])
-    paths_prohibited, _ = _run_assignment_and_read_paths(net, turns=prohib_turns, compress=False, use_hybrid=True)
+    paths_prohibited, _ = _run_assignment_and_read_paths(net, turns=prohib_turns, compress=False)
     assert (1, 3) in paths_prohibited
     assert paths_prohibited[(1, 3)] == [3, 4]
 
@@ -151,12 +149,12 @@ def test_saved_path_file_finite_penalty_modal_shift():
     # Direct route cost: 10. Detour cost: 14.
     # Turn penalty 3.0: 10 + 3 = 13 < 14 -> stays on direct route [1, 2]
     turns_cheap = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 3.0}])
-    paths_cheap, _ = _run_assignment_and_read_paths(net, turns=turns_cheap, compress=False, use_hybrid=True)
+    paths_cheap, _ = _run_assignment_and_read_paths(net, turns=turns_cheap, compress=False)
     assert paths_cheap[(1, 3)] == [1, 2]
 
     # Turn penalty 5.0: 10 + 5 = 15 > 14 -> switches to detour [3, 4]
     turns_expensive = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 5.0}])
-    paths_expensive, _ = _run_assignment_and_read_paths(net, turns=turns_expensive, compress=False, use_hybrid=True)
+    paths_expensive, _ = _run_assignment_and_read_paths(net, turns=turns_expensive, compress=False)
     assert paths_expensive[(1, 3)] == [3, 4]
 
 
@@ -166,23 +164,21 @@ def test_saved_path_file_with_chain_compression():
     # With compress=True, 1 -> 4 -> 3 has node 4 with in=1, out=1, so it compresses into a single compact link
     # Turn restriction on 1 -> 2 -> 3 forces path through compressed chain 1 -> 4 -> 3
     prohib_turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": np.inf}])
-    paths_compressed, g = _run_assignment_and_read_paths(net, turns=prohib_turns, compress=True, use_hybrid=True)
+    paths_compressed, g = _run_assignment_and_read_paths(net, turns=prohib_turns, compress=True)
 
     assert (1, 3) in paths_compressed
     # 1 -> 4 -> 3 compressed into one compact arc, so the path file must unpack both original links
     assert paths_compressed[(1, 3)] == [3, 4]
 
 
-def test_saved_path_file_hybrid_vs_arc_parity():
-    """Verifies that saved path files produced by hybrid and arc-based kernels are identical."""
+def test_saved_path_file_turn_penalty_reroutes_compressed_chain():
+    """Verifies a turn penalty large enough to beat the detour reroutes the saved compressed path."""
     net = _build_test_network()
     turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 20.0}])
 
-    paths_hybrid, _ = _run_assignment_and_read_paths(net, turns=turns, compress=True, use_hybrid=True)
-    paths_arc, _ = _run_assignment_and_read_paths(net, turns=turns, compress=True, use_hybrid=False)
+    paths, _ = _run_assignment_and_read_paths(net, turns=turns, compress=True)
 
-    assert paths_hybrid == paths_arc
-    assert paths_hybrid[(1, 3)] == [3, 4]
+    assert paths[(1, 3)] == [3, 4]
 
 
 def test_saved_path_file_signed_reverse_links():
@@ -225,6 +221,6 @@ def test_saved_path_file_signed_reverse_links():
 
     # Route 1 -> 3 traverses link 1 (AB: +1) then link 2 in reverse (BA: -2)
     turns = pd.DataFrame([{"from_node": 1, "via_node": 2, "to_node": 3, "penalty": 0.0}])
-    paths, _ = _run_assignment_and_read_paths(df, turns=turns, compress=False, use_hybrid=True)
+    paths, _ = _run_assignment_and_read_paths(df, turns=turns, compress=False)
     assert (1, 3) in paths
     assert paths[(1, 3)] == [1, -2]

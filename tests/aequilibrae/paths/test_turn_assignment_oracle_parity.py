@@ -220,8 +220,7 @@ def _make_test_network_and_demand():
 
 
 @pytest.mark.parametrize("compress", [False, True])
-@pytest.mark.parametrize("use_hybrid", [True, False])
-def test_turn_assignment_oracle_parity_finite_penalties(compress: bool, use_hybrid: bool):
+def test_turn_assignment_oracle_parity_finite_penalties(compress: bool):
     """Verifies link loads, turn penalty totals, and select-link against pure-Python oracle."""
     net = _make_test_network_and_demand()
     # Path options from 1 to 3:
@@ -249,7 +248,6 @@ def test_turn_assignment_oracle_parity_finite_penalties(compress: bool, use_hybr
     g.set_turn_restrictions(turns, allow_path_uturns=False)
     g.prepare_graph(centroids=centroids, remove_dead_ends=compress)
     g.set_graph("free_flow_time")
-    g.set_hybrid_kernel(use_hybrid)
 
     mat = AequilibraeMatrix()
     mat.create_empty(memory_only=True, zones=len(centroids), matrix_names=["demand"])
@@ -311,7 +309,6 @@ def test_turn_assignment_oracle_parity_active_turn_cost(compress: bool):
     g.set_turn_restrictions(turns, allow_path_uturns=False)
     g.prepare_graph(centroids=centroids, remove_dead_ends=compress)
     g.set_graph("free_flow_time")
-    g.set_hybrid_kernel(True)
 
     mat = AequilibraeMatrix()
     mat.create_empty(memory_only=True, zones=2, matrix_names=["demand"])

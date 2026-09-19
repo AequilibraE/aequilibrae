@@ -157,9 +157,8 @@ def _prepared_graph(seed: int, centroids=None, num_nodes: int = 8, num_links: in
     return graph, links_df, turns_df, nodes
 
 
-def _assign(graph, use_hybrid: bool, cores: int = 1):
-    """Runs an all-or-nothing assignment on `graph` with the requested kernel."""
-    graph.set_hybrid_kernel(use_hybrid)
+def _assign(graph, cores: int = 1):
+    """Runs an all-or-nothing assignment on `graph`."""
     mat = AequilibraeMatrix()
     mat.create_empty(file_name=AequilibraeMatrix().random_name(), zones=len(graph.centroids), matrix_names=["matrix"])
     mat.index[:] = graph.centroids[:]
@@ -202,27 +201,16 @@ def test_randomized_small_network_oracle_parity(seed: int):
                 continue
 
             oracle_res = oracle.shortest_path(orig, dest)
-
-            # Arc-based Dijkstra
-            g.set_hybrid_kernel(False)
-            arc_res = g.compute_path(orig, dest)
-
-            # Hybrid kernel
-            g.set_hybrid_kernel(True)
             hybrid_res = g.compute_path(orig, dest)
 
             if oracle_res is None:
-                # Must be unreachable in both
-                assert arc_res.path is None, f"Seed {seed}: {orig} -> {dest} expected unreachable in arc-based"
                 assert hybrid_res.path is None, f"Seed {seed}: {orig} -> {dest} expected unreachable in hybrid"
             else:
                 expected_cost, _, _ = oracle_res
 
-                assert arc_res.path is not None, f"Seed {seed}: {orig} -> {dest} unreachable in arc-based"
                 assert hybrid_res.path is not None, f"Seed {seed}: {orig} -> {dest} unreachable in hybrid"
 
                 # Cost parity
-                assert arc_res.milepost[-1] == pytest.approx(expected_cost, abs=1e-5), f"Seed {seed}: {orig} -> {dest}"
                 assert hybrid_res.milepost[-1] == pytest.approx(expected_cost, abs=1e-5), (
                     f"Seed {seed}: {orig} -> {dest}"
                 )
@@ -328,21 +316,11 @@ def test_skimming_oracle_parity(seed: int):
     graph.set_skimming("free_flow_time")
     oracle = ArcStateDijkstraOracle(links_df, turns_df, allow_uturns=False)
 
-    graph.set_hybrid_kernel(True)
-    skm_hybrid = NetworkSkimming(graph)
-    skm_hybrid.execute()
-    mat_hybrid = np.array(skm_hybrid.results.skims.free_flow_time[:, :], copy=True)
-    index = np.array(skm_hybrid.results.skims.index[:], copy=True)
+    skimmer = NetworkSkimming(graph)
+    skimmer.execute()
+    mat_hybrid = np.array(skimmer.results.skims.free_flow_time[:, :], copy=True)
+    index = np.array(skimmer.results.skims.index[:], copy=True)
 
-    graph.set_hybrid_kernel(False)
-    skm_arc = NetworkSkimming(graph)
-    skm_arc.execute()
-    mat_arc = np.array(skm_arc.results.skims.free_flow_time[:, :], copy=True)
-
-    # The two kernels must agree with each other ...
-    np.testing.assert_allclose(mat_hybrid, mat_arc, equal_nan=True)
-
-    # ... and with an independent oracle, which is the part that makes this a parity test.
     for i, origin in enumerate(index):
         for j, dest in enumerate(index):
             if origin == dest:
@@ -354,25 +332,13 @@ def test_skimming_oracle_parity(seed: int):
             assert mat_hybrid[i, j] == pytest.approx(expected[0], abs=1e-5), f"seed {seed}: {origin} -> {dest}"
 
 
-@pytest.mark.parametrize("seed", list(range(5)))
-def test_assignment_link_load_parity_between_kernels(seed: int):
-    """Verifies all-or-nothing link loads are identical under the hybrid and arc-based kernels."""
-    graph, _, _, _ = _prepared_graph(seed, centroids=np.array([1, 2, 3, 4], dtype=np.int64))
+def test_assignment_link_loads_are_thread_count_invariant():
+    """Verifies a multi-threaded turn-aware assignment produces the same link loads as a single-threaded run."""
+    graph, _, _, _ = _prepared_graph(seed=1, centroids=np.array([1, 2, 3, 4], dtype=np.int64))
     assert graph.has_turn_restrictions
 
-    loads_hybrid = _assign(graph, use_hybrid=True)
-    loads_arc = _assign(graph, use_hybrid=False)
-
-    assert loads_hybrid.sum() > 0
-    np.testing.assert_allclose(loads_hybrid, loads_arc)
-
-
-def test_assignment_link_loads_are_thread_count_invariant():
-    """Verifies a multi-threaded assignment produces the same link loads as a single-threaded run."""
-    graph, _, _, _ = _prepared_graph(seed=1, centroids=np.array([1, 2, 3, 4], dtype=np.int64))
-
-    single = _assign(graph, use_hybrid=True, cores=1)
-    pooled = _assign(graph, use_hybrid=True, cores=4)
+    single = _assign(graph, cores=1)
+    pooled = _assign(graph, cores=4)
 
     assert single.sum() > 0
     np.testing.assert_allclose(single, pooled)

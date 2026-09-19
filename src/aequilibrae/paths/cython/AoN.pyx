@@ -16,8 +16,6 @@ from aequilibrae.paths.cython.basic_path_finding cimport (
     blocking_centroid_flows,
     path_finding,
     path_finding_a_star,
-    path_finding_arc_based,
-    _path_finding_arc_based_core,
     path_finding_hybrid,
     HeapType,
 )
@@ -180,11 +178,9 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
 
     cdef const unsigned char [:] stateful_view
     cdef const long long [:] rep_arc_view
-    cdef bint use_hybrid = False
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = bool(graph.use_hybrid)
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -278,57 +274,32 @@ def aon_parallel(matrix, graph, result, aux_result, long cores, bridge=None):
                 # blocking_centroid_flows must not patch them here. The kernel also
                 # hardcodes the 4-ary heap and takes no log closure, so heap_type and
                 # closure do not apply.
-                if use_hybrid:
-                    w = path_finding_hybrid(
-                        oi,
-                        destinations_mat[tid],
-                        nnz_destinations,
-                        g_view,
-                        original_b_nodes_view,
-                        graph_fs_view,
-                        a_nodes_view,
-                        stateful_view,
-                        rep_arc_view,
-                        predecessors_mat[tid_or_origin],
-                        connectors_mat[tid_or_origin],
-                        reached_first_mat[tid],
-                        node_costs_mat[tid],
-                        node_turn_pen_mat[tid],
-                        arc_pred_mat[tid],
-                        arc_turn_pen_mat[tid],
-                        turn_fs_view,
-                        turn_to_arcs_view,
-                        turn_penalties_view,
-                        allow_uturns,
-                        block_flows_through_centroids,
-                        zones,
-                        first_ctx_view,
-                        last_ctx_view,
-                    )
-                else:
-                    w = _path_finding_arc_based_core(oi,
-                                                     destinations_mat[tid],
-                                                     nnz_destinations,
-                                                     g_view,
-                                                     original_b_nodes_view,
-                                                     graph_fs_view,
-                                                     arc_pred_mat[tid],
-                                                     ids_graph_view,
-                                                     a_nodes_view,
-                                                     predecessors_mat[tid_or_origin],
-                                                     connectors_mat[tid_or_origin],
-                                                     reached_first_mat[tid],
-                                                     node_turn_pen_mat[tid],
-                                                     turn_fs_view,
-                                                     turn_to_arcs_view,
-                                                     turn_penalties_view,
-                                                     allow_uturns,
-                                                     arc_turn_pen_mat[tid],
-                                                     &node_costs_mat[tid, 0],
-                                                     block_flows_through_centroids,
-                                                     zones,
-                                                     first_ctx_view,
-                                                     last_ctx_view)
+                w = path_finding_hybrid(
+                    oi,
+                    destinations_mat[tid],
+                    nnz_destinations,
+                    g_view,
+                    original_b_nodes_view,
+                    graph_fs_view,
+                    a_nodes_view,
+                    stateful_view,
+                    rep_arc_view,
+                    predecessors_mat[tid_or_origin],
+                    connectors_mat[tid_or_origin],
+                    reached_first_mat[tid],
+                    node_costs_mat[tid],
+                    node_turn_pen_mat[tid],
+                    arc_pred_mat[tid],
+                    arc_turn_pen_mat[tid],
+                    turn_fs_view,
+                    turn_to_arcs_view,
+                    turn_penalties_view,
+                    allow_uturns,
+                    block_flows_through_centroids,
+                    zones,
+                    first_ctx_view,
+                    last_ctx_view,
+                )
             else:
                 if block_flows_through_centroids:  # Unblocks the centroid if that is the case
                     blocking_centroid_flows(0, oi, zones, graph_fs_view,
@@ -536,7 +507,6 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
     cdef const unsigned char [:] stateful_view = np.zeros(1, dtype=np.uint8)
     cdef const long long [:] rep_arc_view = np.zeros(1, dtype=np.int64)
     cdef double [:] node_label_costs_view = np.zeros(1, dtype=np.float64)
-    cdef bint use_hybrid = False
 
     cdef unsigned int n_nodes = results.predecessors.shape[0]
     if use_turn_restrictions:
@@ -551,12 +521,10 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
         turn_to_arcs_view = graph.turn_to_arcs
         turn_penalties_view = graph.turn_penalties
 
-        use_hybrid = bool(graph.use_hybrid)
-        if use_hybrid:
-            stateful_view = graph.stateful
-            rep_arc_view = graph.rep_arc
-            node_label_costs = np.empty(n_nodes, dtype=graph.default_types('float'))
-            node_label_costs_view = node_label_costs
+        stateful_view = graph.stateful
+        rep_arc_view = graph.rep_arc
+        node_label_costs = np.empty(n_nodes, dtype=graph.default_types('float'))
+        node_label_costs_view = node_label_costs
 
         # Compute which skim fields receive turn penalties.
         # Default (empty turn_skim_fields) falls back to [cost_field] for backward compatibility.
@@ -632,60 +600,32 @@ def path_computation(origin: int, destination: int, results, bridge: Bridge | No
                 closure
             )
         elif use_turn_restrictions:
-            if use_hybrid:
-                w = path_finding_hybrid(
-                    origin_index,
-                    destinations,
-                    1 if early_exit_bint else -1,
-                    g_view,
-                    original_b_nodes_view,
-                    graph_fs_view,
-                    a_nodes_view,
-                    stateful_view,
-                    rep_arc_view,
-                    predecessors_view,
-                    conn_view,
-                    reached_first_view,
-                    node_label_costs_view,
-                    node_turn_penalties_view,
-                    arc_pred_view,
-                    arc_turn_penalties_view,
-                    turn_fs_view,
-                    turn_to_arcs_view,
-                    turn_penalties_view,
-                    allow_uturns,
-                    block_flows_through_centroids,
-                    zones,
-                    original_b_nodes_view,
-                    a_nodes_view,
-                )
-            else:
-                # Arc-based shortest path reconstruction still writes node-level
-                # predecessor/connectors for compatibility with existing result APIs.
-                w = path_finding_arc_based(
-                    origin_index,
-                    destinations,
-                    1 if early_exit_bint else -1,
-                    g_view,
-                    original_b_nodes_view,
-                    graph_fs_view,
-                    arc_pred_view,
-                    ids_graph_view,
-                    a_nodes_view,
-                    predecessors_view,
-                    conn_view,
-                    reached_first_view,
-                    node_turn_penalties_view,
-                    turn_fs_view,
-                    turn_to_arcs_view,
-                    turn_penalties_view,
-                    allow_uturns,
-                    arc_turn_penalties_view,
-                    block_flows_through_centroids,
-                    zones,
-                    original_b_nodes_view,
-                    a_nodes_view,
-                )
+            w = path_finding_hybrid(
+                origin_index,
+                destinations,
+                1 if early_exit_bint else -1,
+                g_view,
+                original_b_nodes_view,
+                graph_fs_view,
+                a_nodes_view,
+                stateful_view,
+                rep_arc_view,
+                predecessors_view,
+                conn_view,
+                reached_first_view,
+                node_label_costs_view,
+                node_turn_penalties_view,
+                arc_pred_view,
+                arc_turn_penalties_view,
+                turn_fs_view,
+                turn_to_arcs_view,
+                turn_penalties_view,
+                allow_uturns,
+                block_flows_through_centroids,
+                zones,
+                original_b_nodes_view,
+                a_nodes_view,
+            )
         else:
             w = path_finding(origin_index,
                              destinations,

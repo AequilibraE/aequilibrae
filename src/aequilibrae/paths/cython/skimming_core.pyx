@@ -5,7 +5,6 @@ import numpy as np
 from aequilibrae.paths.cython.basic_path_finding cimport (
     blocking_centroid_flows,
     path_finding,
-    _path_finding_arc_based_core,
     path_finding_hybrid,
 )
 
@@ -17,7 +16,7 @@ def skimming_parallel(graph, result, long cores):
     block, eliminating the per-origin Python ThreadPool dispatch overhead
     that ``NetworkSkimming.execute`` paid before. Each OpenMP thread uses
     its own slice of the per-thread aux arrays (indexed by ``threadid()``),
-    while ``path_finding`` or ``_path_finding_arc_based_core`` is invoked
+    while ``path_finding`` or ``path_finding_hybrid`` is invoked
     once per origin within the parallel loop.
 
     Returns a list of (origin, message) tuples for any centroid that could
@@ -142,11 +141,9 @@ def skimming_parallel(graph, result, long cores):
 
     cdef const unsigned char [:] stateful_view
     cdef const long long [:] rep_arc_view
-    cdef bint use_hybrid = False
     if use_turn_restrictions:
         stateful_view = graph.compact_stateful
         rep_arc_view = graph.compact_rep_arc
-        use_hybrid = bool(graph.use_hybrid)
     else:
         stateful_view = np.zeros(1, dtype=np.uint8)
         rep_arc_view = np.zeros(1, dtype=np.int64)
@@ -173,59 +170,32 @@ def skimming_parallel(graph, result, long cores):
             oi = origin_idx_view[i]
 
             if use_turn_restrictions:
-                if use_hybrid:
-                    w = path_finding_hybrid(
-                        oi,
-                        destinations,
-                        -1,
-                        g_view,
-                        original_b_nodes_view,
-                        graph_fs_view,
-                        a_nodes_view,
-                        stateful_view,
-                        rep_arc_view,
-                        predecessors_mat[tid],
-                        connectors_mat[tid],
-                        reached_first_mat[tid],
-                        node_costs_mat[tid],
-                        node_turn_pen_mat[tid],
-                        arc_pred_mat[tid],
-                        arc_turn_pen_mat[tid],
-                        turn_fs_view,
-                        turn_to_arcs_view,
-                        turn_penalties_view,
-                        allow_uturns,
-                        block_flows_through_centroids,
-                        zones,
-                        first_ctx_view,
-                        last_ctx_view,
-                    )
-                else:
-                    w = _path_finding_arc_based_core(
-                        oi,
-                        destinations,
-                        -1,
-                        g_view,
-                        original_b_nodes_view,
-                        graph_fs_view,
-                        arc_pred_mat[tid],
-                        ids_graph_view,
-                        a_nodes_view,
-                        predecessors_mat[tid],
-                        connectors_mat[tid],
-                        reached_first_mat[tid],
-                        node_turn_pen_mat[tid],
-                        turn_fs_view,
-                        turn_to_arcs_view,
-                        turn_penalties_view,
-                        allow_uturns,
-                        arc_turn_pen_mat[tid],
-                        &node_costs_mat[tid, 0],
-                        block_flows_through_centroids,
-                        zones,
-                        first_ctx_view,
-                        last_ctx_view,
-                    )
+                w = path_finding_hybrid(
+                    oi,
+                    destinations,
+                    -1,
+                    g_view,
+                    original_b_nodes_view,
+                    graph_fs_view,
+                    a_nodes_view,
+                    stateful_view,
+                    rep_arc_view,
+                    predecessors_mat[tid],
+                    connectors_mat[tid],
+                    reached_first_mat[tid],
+                    node_costs_mat[tid],
+                    node_turn_pen_mat[tid],
+                    arc_pred_mat[tid],
+                    arc_turn_pen_mat[tid],
+                    turn_fs_view,
+                    turn_to_arcs_view,
+                    turn_penalties_view,
+                    allow_uturns,
+                    block_flows_through_centroids,
+                    zones,
+                    first_ctx_view,
+                    last_ctx_view,
+                )
                 truncated_view[tid] += skim_arc_based_paths(
                     oi,
                     zones,
