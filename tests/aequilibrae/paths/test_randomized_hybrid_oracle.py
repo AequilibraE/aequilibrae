@@ -145,7 +145,6 @@ def _generate_random_network(seed: int, num_nodes: int = 8, num_links: int = 18)
     return links_df, turns_df, nodes
 
 
-
 def _prepared_graph(seed: int, centroids=None, num_nodes: int = 8, num_links: int = 18):
     """Builds a prepared, turn-restricted Graph from one randomized network."""
     links_df, turns_df, nodes = _generate_random_network(seed, num_nodes=num_nodes, num_links=num_links)
