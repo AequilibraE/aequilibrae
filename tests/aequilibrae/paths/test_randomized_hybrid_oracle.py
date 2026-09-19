@@ -158,7 +158,7 @@ def _prepared_graph(seed: int, centroids=None, num_nodes: int = 8, num_links: in
 
 
 def _assign(graph, cores: int = 1):
-    """Runs an all-or-nothing assignment on `graph`."""
+     """Runs an all-or-nothing assignment on `graph` and returns its results object."""
     mat = AequilibraeMatrix()
     mat.create_empty(file_name=AequilibraeMatrix().random_name(), zones=len(graph.centroids), matrix_names=["matrix"])
     mat.index[:] = graph.centroids[:]
@@ -169,7 +169,7 @@ def _assign(graph, cores: int = 1):
     res.cores = cores
     res.prepare(graph, mat)
     allOrNothing("car", mat, graph, res).execute()
-    return np.array(res.link_loads, copy=True)
+    return res
 
 
 @pytest.mark.parametrize("seed", list(range(20)))
@@ -344,6 +344,7 @@ def test_turn_aware_assignment_link_loads_match_oracle(seed: int):
 
     # _assign puts one unit on every OD pair, so each arc carries one unit per path that uses it.
     expected = {int(lid): 0.0 for lid in links_df.link_id}
+    expected_turn_penalty = 0.0
     for origin in centroids:
         for dest in centroids:
             if origin == dest:
@@ -353,13 +354,23 @@ def test_turn_aware_assignment_link_loads_match_oracle(seed: int):
                 continue
             for lid in found[2]:
                 expected[int(lid)] += 1.0
+            path_nodes = found[1]
+            for k in range(1, len(path_nodes) - 1):
+                expected_turn_penalty += oracle.turn_lookup.get(
+                    (path_nodes[k - 1], path_nodes[k], path_nodes[k + 1]), 0.0
+                )
 
-    loads = _assign(graph, cores=1).reshape(-1)
+    results = _assign(graph, cores=1)
+    loads = np.asarray(results.link_loads).reshape(-1)
     for row_idx, sup_id in enumerate(graph.graph.__supernet_id__.to_numpy(copy=False)):
         lid = int(graph.graph.iloc[row_idx]["link_id"])
         assert loads[sup_id] == pytest.approx(expected[lid]), f"seed {seed}: link {lid}"
 
     assert loads.sum() > 0
+
+    # One worker serves every origin in turn and reuses its heap and arc arrays between them,
+    # so a total that is right for one origin can still be wrong once several share the state.
+    assert results.total_turn_penalty == pytest.approx(expected_turn_penalty), f"seed {seed}"
 
 
 def test_assignment_link_loads_are_thread_count_invariant():
@@ -367,8 +378,8 @@ def test_assignment_link_loads_are_thread_count_invariant():
     graph, _, _, _ = _prepared_graph(seed=1, centroids=np.array([1, 2, 3, 4], dtype=np.int64))
     assert graph.has_turn_restrictions
 
-    single = _assign(graph, cores=1)
-    pooled = _assign(graph, cores=4)
+    single = np.asarray(_assign(graph, cores=1).link_loads)
+    pooled = np.asarray(_assign(graph, cores=4).link_loads)
 
     assert single.sum() > 0
     np.testing.assert_allclose(single, pooled)
