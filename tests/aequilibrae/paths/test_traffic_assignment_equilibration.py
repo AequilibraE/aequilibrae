@@ -166,8 +166,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, "
-        "'Target RGAP': 0.0001, 'Line search': 'trapezoidal', "
-        "'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.0001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_1 in file_text
 
@@ -175,8 +174,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
-        "'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_2 in file_text
 
@@ -184,8 +182,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', "
-        "'Maximum iterations': 500, 'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
-        "'BFW conjugacy': 'approximate'}}"
+        "'Maximum iterations': 500, 'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_3 in file_text
 
@@ -193,8 +190,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
-        "'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_4 in file_text
 
@@ -202,8 +198,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001, 'Line search': 'trapezoidal', "
-        "'BFW conjugacy': 'approximate'}}"
+        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_5 in file_text
 
@@ -241,56 +236,20 @@ def _configure(assignment, assigclass, algorithm="bfw", max_iter=30, rgap=1e-8):
     return assignment
 
 
-def test_line_search_defaults_to_trapezoidal(assignment, assigclass):
-    _configure(assignment, assigclass)
-
-    assert assignment.line_search == "trapezoidal"
-    assert assignment.assignment.line_search == "trapezoidal"
-    assert assignment._config["Line search"] == "trapezoidal"
-
-
-@pytest.mark.parametrize("line_search", ["exact", "trapezoidal", "EXACT"])
-def test_set_line_search_propagates_to_the_running_algorithm(assignment, assigclass, line_search):
-    _configure(assignment, assigclass)
-
-    assignment.set_line_search(line_search)
-
-    assert assignment.line_search == line_search.lower()
-    # Must reach the object that actually runs, even though it was created by set_algorithm beforehand.
-    assert assignment.assignment.line_search == line_search.lower()
-    assert assignment._config["Line search"] == line_search.lower()
-
-
-def test_set_line_search_before_set_algorithm_is_honoured(assignment, assigclass):
-    assignment.set_line_search("exact")
-    _configure(assignment, assigclass)
-
-    assert assignment.assignment.line_search == "exact"
-
-
-@pytest.mark.parametrize("bad", ["quadratic", "", 1, None])
-def test_set_line_search_rejects_unknown_methods(assignment, bad):
-    with pytest.raises(ValueError, match="Line search must be one of"):
-        assignment.set_line_search(bad)
-
-
 @pytest.mark.parametrize("algorithm", ["cfw", "bfw"])
-def test_exact_line_search_is_not_capped_and_changes_the_steps(assignment, assigclass, algorithm):
-    """The trapezoidal path caps BFW at 1/sqrt(iter); the exact path must not, and must pick different steps."""
+def test_line_search_is_exact_and_uncapped(assignment, assigclass, algorithm):
+    """Test that CFW and BFW take exact line-search steps in [0, 1] that are free to exceed the old 1/sqrt(iter) cap."""
     _configure(assignment, assigclass, algorithm=algorithm)
-    assignment.set_line_search("exact")
     assignment.execute()
 
-    exact_alphas = np.array(assignment.assignment.convergence_report["alpha"], dtype=float)
-    exact_rgap = assignment.assignment.rgap
+    alphas = np.array(assignment.assignment.convergence_report["alpha"], dtype=float)
 
-    assert np.all(np.isfinite(exact_alphas[:-1]))
-    assert np.all(exact_alphas[:-1] >= 0.0) and np.all(exact_alphas[:-1] <= 1.0)
-    # An exact search on a convex objective takes longer steps than the trapezoidal overestimate.
+    assert np.all(np.isfinite(alphas[:-1]))
+    assert np.all(alphas[:-1] >= 0.0) and np.all(alphas[:-1] <= 1.0)
     if algorithm == "bfw":
         cap = np.array([1.0 / np.sqrt(i) for i in assignment.assignment.convergence_report["iteration"]])
-        assert np.any(exact_alphas[:-1] > cap[:-1]), "exact line search should be able to exceed the BFW cap"
-    assert np.isfinite(exact_rgap)
+        assert np.any(alphas[:-1] > cap[:-1]), "the exact line search must be able to exceed the old BFW cap"
+    assert np.isfinite(assignment.assignment.rgap)
 
 
 def test_bfw_conjugacy_defaults_to_approximate(assignment, assigclass):
