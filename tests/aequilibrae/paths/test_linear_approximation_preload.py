@@ -81,32 +81,6 @@ def test_stepsize_derivative_uses_total_flow_state():
     np.testing.assert_array_equal(assignment.vdf.last_link_flows, candidate_total_flow)
 
 
-@pytest.mark.parametrize("stepsize", [0.0, 0.25, 1.0])
-def test_trapezoidal_stepsize_keeps_constant_preload(stepsize):
-    assignment = LinearApproximation.__new__(LinearApproximation)
-    assignment.cores = 1
-    assignment.elementwise_cores = 1
-    assignment.threading_threshold = 10_000
-    assignment.preload = np.array([10.0, 20.0])
-    current_assigned_flow = np.array([3.0, 4.0])
-    assigned_direction = np.array([7.0, 8.0])
-    assignment.total_flow = current_assigned_flow + assignment.preload
-    assignment.step_direction_flow = assigned_direction + assignment.preload
-    assignment.congested_time = np.zeros(2)
-    assignment._trap_new_flow = np.zeros(2)
-    assignment._trap_new_cost = np.zeros(2)
-    assignment._trap_avg_cost = np.zeros(2)
-    assignment.capacity = np.ones(2)
-    assignment.free_flow_tt = np.zeros(2)
-    assignment.vdf_parameters = {"scale": 1.0, "offset": 0.0}
-    assignment.vdf = DummyVDF()
-
-    assignment._LinearApproximation__objective_change_at_stepsize(0.0, stepsize)
-
-    expected = assignment.preload + current_assigned_flow + stepsize * (assigned_direction - current_assigned_flow)
-    np.testing.assert_array_equal(assignment.vdf.last_link_flows, expected)
-
-
 def test_relative_gap_ignores_constant_preload():
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.iteration_issue = []
@@ -161,17 +135,21 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
     assert np.isinf(assignment.rgap)
 
 
+def _raise_no_sign_change(*_args, **_kwargs):
+    raise ValueError("f(a) and f(b) must have different signs")
+
+
 def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
+    """Test that a non-descent BFW direction is dropped and the Frank-Wolfe step is searched in the same iteration."""
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
     assignment.iter = 4
     assignment.rgap = np.inf
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
     assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
+    assignment.step_direction_turn_cost = {}
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
     monkeypatch.setattr(
@@ -179,19 +157,19 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
         "_LinearApproximation__derivative_of_objective_stepsize_independent",
         lambda: 0.0,
     )
-
+    # A non-negative derivative at alpha = 0 is what marks the direction as non-descent.
     monkeypatch.setattr(
         assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0 if assignment.current_direction == "bfw" else -0.5,
+        "_LinearApproximation__derivative_of_objective_stepsize_dependent",
+        lambda _stepsize, const_term=0.0: 1.0 if assignment.current_direction == "bfw" else -1.0,
     )
 
-    def fake_minimize_scalar(*_args, **_kwargs):
+    def fake_root_scalar(*_args, **_kwargs):
         if assignment.current_direction == "bfw":
-            return SimpleNamespace(x=0.3, fun=1.0)
-        return SimpleNamespace(x=0.25, fun=-0.5)
+            raise ValueError("f(a) and f(b) must have different signs")
+        return SimpleNamespace(root=0.25, converged=True)
 
-    monkeypatch.setattr(linear_approximation, "minimize_scalar", fake_minimize_scalar)
+    monkeypatch.setattr(linear_approximation, "root_scalar", fake_root_scalar)
 
     def fake_calculate_step_direction():
         assert assignment.next_direction == "fw"
@@ -205,21 +183,26 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assert assignment.current_direction == "fw"
     assert assignment.next_direction == "cfw"
     assert assignment.stepsize == 0.25
-    assert assignment.iteration_issue == ["BFW/CFW direction yielded no improvement; falling back to FW."]
+    assert len(assignment.iteration_issue) == 1
+    assert assignment.iteration_issue[0].startswith("Found bad conjugate direction step. Performing FW search.")
     np.testing.assert_array_equal(assignment.betas, np.array([1.0, 0.0, 0.0]))
 
 
 def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
+    """Test that a failed line search on the Frank-Wolfe direction takes a tiny step rather than recursing."""
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
     assignment.iter = 5
     assignment.rgap = np.inf
     assignment.current_direction = "fw"
     assignment.next_direction = "cfw"
     assignment.iteration_issue = []
     assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
+    assignment.step_direction_turn_cost = {}
+    assignment.congested_value = np.ones(2)
+    assignment.step_direction_flow = np.array([2.0, 3.0])
+    assignment.total_flow = np.array([1.0, 1.0])
+    assignment.traffic_classes = []
 
     monkeypatch.setattr(
         assignment,
@@ -228,14 +211,11 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     )
     monkeypatch.setattr(
         assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0,
+        "_LinearApproximation__derivative_of_objective_stepsize_dependent",
+        lambda _stepsize, const_term=0.0: 1.0,
     )
-    monkeypatch.setattr(
-        linear_approximation,
-        "minimize_scalar",
-        lambda *_args, **_kwargs: SimpleNamespace(x=0.3, fun=1.0),
-    )
+    monkeypatch.setattr(assignment, "_diagnose_negative_gap", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(linear_approximation, "root_scalar", _raise_no_sign_change)
 
     assignment.calculate_stepsize()
 
@@ -244,17 +224,17 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assert assignment.iteration_issue == []
 
 
-def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
+def test_failed_bfw_direction_clips_retry_stepsize_to_one(monkeypatch):
+    """Test that a Frank-Wolfe retry returning a root above one is clipped to one and the clipping is reported."""
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
     assignment.iter = 4
     assignment.rgap = np.inf
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
     assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
+    assignment.step_direction_turn_cost = {}
     assignment.betas = np.array([1.0, 0.0, 0.0])
 
     monkeypatch.setattr(
@@ -262,19 +242,18 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
         "_LinearApproximation__derivative_of_objective_stepsize_independent",
         lambda: 0.0,
     )
-
     monkeypatch.setattr(
         assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0 if assignment.current_direction == "bfw" else -0.5,
+        "_LinearApproximation__derivative_of_objective_stepsize_dependent",
+        lambda _stepsize, const_term=0.0: 1.0 if assignment.current_direction == "bfw" else -1.0,
     )
 
-    def fake_minimize_scalar(*_args, **_kwargs):
+    def fake_root_scalar(*_args, **_kwargs):
         if assignment.current_direction == "bfw":
-            return SimpleNamespace(x=0.3, fun=1.0)
-        return SimpleNamespace(x=1.25, fun=-0.5)
+            raise ValueError("f(a) and f(b) must have different signs")
+        return SimpleNamespace(root=1.25, converged=True)
 
-    monkeypatch.setattr(linear_approximation, "minimize_scalar", fake_minimize_scalar)
+    monkeypatch.setattr(linear_approximation, "root_scalar", fake_root_scalar)
 
     def fake_calculate_step_direction():
         assignment.current_direction = "fw"
@@ -286,22 +265,26 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
 
     assert assignment.current_direction == "fw"
     assert assignment.next_direction == "cfw"
-    assert assignment.stepsize == 0.5
-    assert any("clipping to 0.5" in msg for msg in assignment.iteration_issue)
+    assert assignment.stepsize == 1.0
+    assert any("clipping to 1.0" in msg for msg in assignment.iteration_issue)
 
 
 def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch):
+    """Test that a non-finite root on the Frank-Wolfe retry still yields a positive step size."""
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
-    assignment.line_search = "trapezoidal"
     assignment.iter = 4
     assignment.rgap = np.inf
     assignment.current_direction = "bfw"
     assignment.next_direction = None
     assignment.iteration_issue = []
     assignment.fw_total_turn_cost = 0.0
-    assignment.logger = SimpleNamespace(warning=lambda *_args, **_kwargs: None, debug=lambda *_args, **_kwargs: None)
+    assignment.step_direction_turn_cost = {}
     assignment.betas = np.array([1.0, 0.0, 0.0])
+    assignment.congested_value = np.ones(2)
+    assignment.step_direction_flow = np.array([2.0, 3.0])
+    assignment.total_flow = np.array([1.0, 1.0])
+    assignment.traffic_classes = []
 
     monkeypatch.setattr(
         assignment,
@@ -310,16 +293,17 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
     )
     monkeypatch.setattr(
         assignment,
-        "_LinearApproximation__objective_change_at_stepsize",
-        lambda _const, _alpha: 1.0 if assignment.current_direction == "bfw" else -0.5,
+        "_LinearApproximation__derivative_of_objective_stepsize_dependent",
+        lambda _stepsize, const_term=0.0: 1.0,
     )
+    monkeypatch.setattr(assignment, "_diagnose_negative_gap", lambda *_args, **_kwargs: True)
 
-    def fake_minimize_scalar(*_args, **_kwargs):
+    def fake_root_scalar(*_args, **_kwargs):
         if assignment.current_direction == "bfw":
-            return SimpleNamespace(x=0.3, fun=1.0)
-        return SimpleNamespace(x=np.nan, fun=-0.5)
+            raise ValueError("f(a) and f(b) must have different signs")
+        return SimpleNamespace(root=np.nan, converged=True)
 
-    monkeypatch.setattr(linear_approximation, "minimize_scalar", fake_minimize_scalar)
+    monkeypatch.setattr(linear_approximation, "root_scalar", fake_root_scalar)
 
     def fake_calculate_step_direction():
         assignment.current_direction = "fw"
@@ -333,7 +317,7 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
     assert assignment.next_direction == "cfw"
     assert assignment.stepsize == 1e-2 / assignment.iter
     assert assignment.stepsize > 0.0
-    assert any("invalid stepsize" in msg for msg in assignment.iteration_issue)
+    assert any("Found bad conjugate direction step" in msg for msg in assignment.iteration_issue)
 
 
 def test_cfw_zero_denominator_falls_back_to_fw():

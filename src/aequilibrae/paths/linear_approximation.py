@@ -8,7 +8,7 @@ from tempfile import gettempdir
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.optimize import minimize_scalar, root_scalar
+from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.cython.parallel_numpy import (
@@ -46,7 +46,6 @@ class LinearApproximation(WorkerThread):
         self.project_path = project.project_base_path if project else gettempdir()
 
         self.algorithm = algorithm
-        self.line_search = getattr(assig_spec, "line_search", "trapezoidal")  # CFW, BFW only
         self.bfw_conjugacy = getattr(assig_spec, "bfw_conjugacy", "approximate")  # BFW only
         # Conjugacy diagnostics for the iteration in progress; see _record_conjugacy_diagnostics.
         self.conjugacy_prev = np.nan
@@ -136,18 +135,6 @@ class LinearApproximation(WorkerThread):
         self.congested_time = assig_spec.congested_time
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
-
-        # Private scratch buffers for the trapezoidal Beckmann line search
-        # (``__objective_change_at_stepsize``). Kept separate from
-        # ``self.congested_value`` (which is the analytic-derivative line
-        # search's scratch buffer) so that the trapezoidal helper does not
-        # clobber the public-looking attribute as a side effect, and so that
-        # the per-call ``congested_time + congested_value`` sum can be
-        # written into a pre-allocated buffer instead of allocating fresh
-        # each call.
-        self._trap_new_flow = np.zeros_like(self.congested_time)
-        self._trap_new_cost = np.zeros_like(self.congested_time)
-        self._trap_avg_cost = np.zeros_like(self.congested_time)
 
         # Turn penalty cost tracking for convergence calculation
         self.fw_total_turn_cost = 0.0
@@ -1017,61 +1004,13 @@ class LinearApproximation(WorkerThread):
             class_specific_term += class_link_costs
         return class_specific_term
 
-    def __objective_change_at_stepsize(
-        self, derivative_of_objective_stepsize_independent: np.ndarray, stepsize: float
-    ) -> float:
-        """Heuristic trapezoidal approximation of the Beckmann objective change
-        ``Z(x + α·d) − Z(x)`` for a given line-search step ``α = stepsize``.
-
-        This one-panel approximation is not the exact Beckmann integral except for affine link costs.
-        However, experiments suggest that
-        on large congested networks (e.g. Chicago, BPR β=4), this trapezoidal line search picks smaller,
-        more conservative α values than the analytic-derivative line search and yields materially better
-        BFW convergence because the smaller α reduces the magnitude of the ``μ·α/(1-α)`` bias term in
-        the next iteration's BFW formula.
-
-        All intermediate buffers are pre-allocated on the instance (``self._trap_new_flow``, ``self._trap_new_cost``,
-        ``self._trap_avg_cost``) so that this helper does NOT clobber ``self.congested_value`` (which the
-        analytic-derivative line search uses as scratch) and does NOT allocate fresh arrays on every Brent probe.
-        """
-        linear_combination_1d(
-            self._trap_new_flow,
-            self.step_direction_flow,
-            self.total_flow,
-            stepsize,
-            self.elementwise_cores,
-            self.threading_threshold,
-        )
-        self.vdf.apply_vdf(
-            congested_time=self._trap_new_cost,
-            link_flows=self._trap_new_flow,
-            fftime=self.free_flow_tt,
-            capacity=self.capacity,
-            cores=self.elementwise_cores,
-            **self.vdf_parameters,
-        )
-        np.add(self.congested_time, self._trap_new_cost, out=self._trap_avg_cost)
-        link_term = (
-            0.5
-            * stepsize
-            * sum_a_times_b_minus_c(
-                self._trap_avg_cost,
-                self.step_direction_flow,
-                self.total_flow,
-                self.elementwise_cores,
-                self.threading_threshold,
-            )
-        )
-        fixed_cost_term = stepsize * derivative_of_objective_stepsize_independent
-        return link_term + fixed_cost_term
-
-    def __clip_stepsize(self, stepsize: float, upper_bound: float = 1.0) -> float:
+    def __clip_stepsize(self, stepsize: float) -> float:
         if not np.isfinite(stepsize):
             raise ValueError(f"Non-finite stepsize {stepsize} encountered")
 
-        clipped = min(max(float(stepsize), 0.0), upper_bound)
+        clipped = min(max(float(stepsize), 0.0), 1.0)
         if clipped != stepsize:
-            msg = f"Stepsize {stepsize} outside [0, {upper_bound}]; clipping to {clipped}."
+            msg = f"Stepsize {stepsize} outside [0, 1]; clipping to {clipped}."
             logger.debug(msg)
             self.iteration_issue.append(msg)
         return clipped
@@ -1082,96 +1021,9 @@ class LinearApproximation(WorkerThread):
             self.stepsize = self.__clip_stepsize(1.0 / self.iter)
             return
 
-        # With line_search == "trapezoidal", CFW and BFW use a heuristic bounded minimization of a one-panel
-        # trapezoidal approximation to the Beckmann objective change instead of root-finding the exact
-        # directional derivative. Selected via TrafficAssignment.set_line_search; "exact" falls through to the
-        # root_scalar branch below, which is the line search the conjugate-direction theory assumes.
-        #
-        # Two cooperating mechanisms vs. the analytic root_scalar approach:
-        #
-        # (1) The trapezoidal objective is exact for affine link costs and approximate otherwise;
-        #     the two diverge significantly when the BPR exponent is large (β=4 on Chicago test network).
-        # (2) For BFW only: a cap α_max = 1/sqrt(iter) prevents the line search from
-        #     returning α = 1.0, which would collapse the BFW history (s^{k-1} onto x^k)
-        #     and cause the μ·α/(1-α) bias term in calculate_biconjugate_direction to blow up.
-        #     CFW has neither concern and uses α_max = 1.0 (uncapped).
-        #
-        # BFW Chicago-50 rgap: 1.14e-3 (was 1.54e-3 at HEAD baseline).
-        if self.algorithm in ("bfw", "cfw") and self.line_search == "trapezoidal":
-            # The 1/sqrt(iter) cap is only needed for BFW: it bounds the mu*alpha/(1-alpha) bias
-            # term in calculate_biconjugate_direction and prevents alpha=1.0 from collapsing the
-            # BFW history. CFW has no such term and no restart state sensitive to large steps, so
-            # capping CFW at 1/sqrt(iter) degrades it to MSA-like convergence without any benefit.
-            alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5) if self.algorithm == "bfw" else 1.0
-            derivative_of_objective_stepsize_independent = self.__derivative_of_objective_stepsize_independent()
-            res = minimize_scalar(
-                partial(
-                    self.__objective_change_at_stepsize,
-                    derivative_of_objective_stepsize_independent,
-                ),
-                bounds=(0.0, alpha_max),
-                method="Bounded",
-                options={"xatol": 1e-4, "maxiter": 10},
-            )
-
-            def use_tiny_step(message: str):
-                tiny_step = 1e-2 / self.iter
-                if message:
-                    self.iteration_issue.append(message)
-                    log_message = f"# Alert bfw trap: {message} Adding {tiny_step} as step size to make it non-zero."
-                else:
-                    log_message = f"# Alert bfw trap: Adding {tiny_step} as step size to make it non-zero."
-                logger.debug(log_message)
-                self.stepsize = self.__clip_stepsize(tiny_step, alpha_max)
-
-            try:
-                candidate = self.__clip_stepsize(res.x, alpha_max)
-            except ValueError as e:
-                msg = f"BFW/CFW line search returned an invalid stepsize. {e.args}"
-                if self.current_direction == "fw":
-                    use_tiny_step(msg)
-                else:
-                    self.__retry_with_fw_direction(msg)
-                return
-
-            # Brent's bounded method does not evaluate the endpoints exactly.
-            # Compare the interior optimum against α_max explicitly so a true
-            # boundary case (descent throughout the cap interval) still picks
-            # α_max instead of a value just inside it.
-            z_interior = float(res.fun)
-            if not np.isfinite(z_interior):
-                msg = f"BFW/CFW line search returned a non-finite objective value ({z_interior}); falling back to FW."
-                if self.current_direction == "fw":
-                    use_tiny_step(msg)
-                else:
-                    self.__retry_with_fw_direction(msg)
-                return
-
-            z_at_max = self.__objective_change_at_stepsize(derivative_of_objective_stepsize_independent, alpha_max)
-            if not np.isfinite(z_at_max):
-                msg = f"BFW/CFW line search returned a non-finite boundary objective ({z_at_max}); falling back to FW."
-                if self.current_direction == "fw":
-                    use_tiny_step(msg)
-                else:
-                    self.__retry_with_fw_direction(msg)
-                return
-
-            if z_at_max < z_interior and z_at_max < 0.0:
-                self.stepsize = self.__clip_stepsize(alpha_max, alpha_max)
-            elif z_interior < 0.0:
-                self.stepsize = candidate
-            else:
-                msg = "BFW/CFW direction yielded no improvement; falling back to FW."
-                if self.current_direction == "fw":
-                    use_tiny_step("")
-                else:
-                    self.__retry_with_fw_direction(msg)
-                return
-            assert 0 <= self.stepsize <= alpha_max + 1e-12
-            return
-
-        # Exact line search: root-find the directional derivative of the Beckmann objective over [0, 1]. Used by
-        # Frank-Wolfe always, and by CFW/BFW when line_search == "exact". No step cap is applied here.
+        # Exact line search: root-find the directional derivative of the Beckmann objective over [0, 1].
+        # This is the line search the conjugate-direction theory of Mitradjieva & Lindberg assumes, and it
+        # is used by every descent algorithm here. No step cap is applied.
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
         # TODO: optimize aggregation
         turn_derivative = sum(self.step_direction_turn_cost.values()) - self.fw_total_turn_cost

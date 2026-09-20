@@ -250,12 +250,10 @@ class TrafficAssignment(AssignmentBase):
 
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
-    all_line_searches = ["exact", "trapezoidal"]
     all_bfw_conjugacies = ["approximate", "exact"]
 
     # Attributes restricted to a fixed set of strings, as {name: (allowed values, description for the error)}.
     __choice_attributes = {
-        "line_search": (all_line_searches, "Line search"),
         "bfw_conjugacy": (all_bfw_conjugacies, "BFW conjugacy"),
     }
 
@@ -289,10 +287,6 @@ class TrafficAssignment(AssignmentBase):
         self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
-
-        # Line search used by CFW and BFW. "trapezoidal" preserves the historical AequilibraE behaviour; see
-        # set_line_search for the trade-off.
-        self.line_search = "trapezoidal"  # type: str
 
         # How BFW solves for its direction coefficients. "approximate" preserves the historical behaviour.
         self.bfw_conjugacy = "approximate"  # type: str
@@ -426,34 +420,11 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
-        self.assignment.line_search = self.line_search
         self.assignment.bfw_conjugacy = self.bfw_conjugacy
         self._config["Algorithm"] = algo
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
-        self._config["Line search"] = self.line_search
         self._config["BFW conjugacy"] = self.bfw_conjugacy
-
-    def set_line_search(self, line_search: str) -> None:
-        """
-        Chooses the line search used to pick the step size for CFW and BFW. Ignored by the other algorithms:
-        MSA uses ``1/iteration`` and Frank-Wolfe always uses the exact line search.
-
-        * ``"exact"`` - root-find the exact directional derivative of the Beckmann objective,
-          ``sum_a c_a(x + alpha*d)*d_a = 0``, over ``[0, 1]``. This is the line search assumed by the
-          conjugate-direction theory in Mitradjieva & Lindberg, and the step is not capped.
-
-        * ``"trapezoidal"`` (default) - minimize a one-panel trapezoidal approximation of the objective change,
-          additionally capping BFW at ``1/sqrt(iteration)``. The approximation is exact only for affine link costs;
-          for convex costs it overestimates the integral and therefore returns shorter steps than the true
-          minimizer. This is a numerical heuristic, not the line search in the source algorithm, and is the
-          default only because it is the historical AequilibraE behaviour.
-
-        :Arguments:
-            **line_search** (:obj:`str`): One of ``"exact"`` or ``"trapezoidal"``
-        """
-        self.line_search = line_search
-        self._config["Line search"] = self.line_search
 
     def set_bfw_conjugacy(self, bfw_conjugacy: str) -> None:
         """
