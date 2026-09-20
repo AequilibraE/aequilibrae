@@ -135,11 +135,8 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
     assert np.isinf(assignment.rgap)
 
 
-def _raise_no_sign_change(*_args, **_kwargs):
-    raise ValueError("f(a) and f(b) must have different signs")
-
-
-def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
+@pytest.mark.parametrize("bad_derivative", [0.0, 1.0])
+def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch, bad_derivative):
     """Test that a non-descent BFW direction is dropped and the Frank-Wolfe step is searched in the same iteration."""
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
@@ -161,12 +158,11 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     monkeypatch.setattr(
         assignment,
         "_LinearApproximation__derivative_of_objective_stepsize_dependent",
-        lambda _stepsize, const_term=0.0: 1.0 if assignment.current_direction == "bfw" else -1.0,
+        lambda stepsize, const_term=0.0: (bad_derivative if assignment.current_direction == "bfw" else stepsize - 0.25),
     )
 
     def fake_root_scalar(*_args, **_kwargs):
-        if assignment.current_direction == "bfw":
-            raise ValueError("f(a) and f(b) must have different signs")
+        assert assignment.current_direction == "fw"
         return SimpleNamespace(root=0.25, converged=True)
 
     monkeypatch.setattr(linear_approximation, "root_scalar", fake_root_scalar)
@@ -215,7 +211,11 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
         lambda _stepsize, const_term=0.0: 1.0,
     )
     monkeypatch.setattr(assignment, "_diagnose_negative_gap", lambda *_args, **_kwargs: True)
-    monkeypatch.setattr(linear_approximation, "root_scalar", _raise_no_sign_change)
+    monkeypatch.setattr(
+        linear_approximation,
+        "root_scalar",
+        lambda *_args, **_kwargs: pytest.fail("root_scalar should not be called for a non-descent direction"),
+    )
 
     assignment.calculate_stepsize()
 
@@ -224,8 +224,8 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assert assignment.iteration_issue == []
 
 
-def test_failed_bfw_direction_clips_retry_stepsize_to_one(monkeypatch):
-    """Test that a Frank-Wolfe retry returning a root above one is clipped to one and the clipping is reported."""
+def test_nonconverged_fw_retry_uses_tiny_step(monkeypatch):
+    """Test that an unconverged Frank-Wolfe root search is not accepted after retrying a BFW direction."""
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
     assignment.iter = 4
@@ -245,13 +245,12 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_one(monkeypatch):
     monkeypatch.setattr(
         assignment,
         "_LinearApproximation__derivative_of_objective_stepsize_dependent",
-        lambda _stepsize, const_term=0.0: 1.0 if assignment.current_direction == "bfw" else -1.0,
+        lambda stepsize, const_term=0.0: 1.0 if assignment.current_direction == "bfw" else stepsize - 0.25,
     )
 
     def fake_root_scalar(*_args, **_kwargs):
-        if assignment.current_direction == "bfw":
-            raise ValueError("f(a) and f(b) must have different signs")
-        return SimpleNamespace(root=1.25, converged=True)
+        assert assignment.current_direction == "fw"
+        return SimpleNamespace(root=0.25, converged=False)
 
     monkeypatch.setattr(linear_approximation, "root_scalar", fake_root_scalar)
 
@@ -265,12 +264,12 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_one(monkeypatch):
 
     assert assignment.current_direction == "fw"
     assert assignment.next_direction == "cfw"
-    assert assignment.stepsize == 1.0
-    assert any("clipping to 1.0" in msg for msg in assignment.iteration_issue)
+    assert assignment.stepsize == 1e-2 / assignment.iter
+    assert any("Found bad conjugate direction step" in msg for msg in assignment.iteration_issue)
 
 
-def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch):
-    """Test that a non-finite root on the Frank-Wolfe retry still yields a positive step size."""
+def test_nonfinite_fw_retry_derivative_uses_tiny_step_instead_of_zero(monkeypatch):
+    """Test that a non-finite derivative on the Frank-Wolfe retry still yields a positive step size."""
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.algorithm = "bfw"
     assignment.iter = 4
@@ -294,16 +293,13 @@ def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch)
     monkeypatch.setattr(
         assignment,
         "_LinearApproximation__derivative_of_objective_stepsize_dependent",
-        lambda _stepsize, const_term=0.0: 1.0,
+        lambda _stepsize, const_term=0.0: 1.0 if assignment.current_direction == "bfw" else np.nan,
     )
-    monkeypatch.setattr(assignment, "_diagnose_negative_gap", lambda *_args, **_kwargs: True)
-
-    def fake_root_scalar(*_args, **_kwargs):
-        if assignment.current_direction == "bfw":
-            raise ValueError("f(a) and f(b) must have different signs")
-        return SimpleNamespace(root=np.nan, converged=True)
-
-    monkeypatch.setattr(linear_approximation, "root_scalar", fake_root_scalar)
+    monkeypatch.setattr(
+        linear_approximation,
+        "root_scalar",
+        lambda *_args, **_kwargs: pytest.fail("root_scalar should not be called with a non-finite endpoint"),
+    )
 
     def fake_calculate_step_direction():
         assignment.current_direction = "fw"

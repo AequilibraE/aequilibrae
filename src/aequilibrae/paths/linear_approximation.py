@@ -1036,60 +1036,90 @@ class LinearApproximation(WorkerThread):
 
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
-        try:
-            min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
-            self.stepsize = self.__clip_stepsize(min_res.root)
-            if not min_res.converged:
-                logger.warning("Descent direction stepsize finder has not converged")
+        def handle_failed_search(reason: str, derivative_at_zero: float = np.nan):
+            if self.current_direction != "fw" and self.algorithm != "frank-wolfe":
+                self.__retry_with_fw_direction(f"Found bad conjugate direction step. Performing FW search. {reason}")
+                return
 
-        except ValueError as e:
-            # `root_scalar` raises ValueError when the derivative does not change sign in [0, 1].
-            # There are two genuinely distinct cases:
-            #   * derivative(0) < 0  ⇒  direction is descent at the current point. Since the
-            #     derivative is monotone non-decreasing along the (convex) line, descent
-            #     persists throughout [0, 1] and the optimum sits at α = 1 (or beyond).
-            #     This is a perfectly valid line-search outcome and only happens because we
-            #     bracket the search to the feasible interval. We must NOT treat it as a
-            #     "reset" - the resulting solution is fine and convergence may be checked.
-            #   * derivative(0) >= 0 ⇒  direction is *not* a descent direction. We then need
-            #     to reset to a Frank-Wolfe step (or, if FW itself failed, take a tiny MSA
-            #     step to avoid stalling).
-            d0_for_branch = derivative_of_objective(0.0)
-
-            if d0_for_branch >= 0:
-                if self.current_direction == "fw" or self.algorithm == "frank-wolfe":
-                    # For the Frank-Wolfe direction this derivative is exactly the negated gap, so
-                    # a non-negative value means the same impossibility the convergence check
-                    # guards against. Explain it before papering over it with a nominal step.
-                    # congested_value holds C(x) from the derivative evaluation just above.
-                    direction = self.step_direction_flow - self.total_flow
-                    derivative_scale = float(np.sum(np.abs(self.congested_value * direction)))
-                    for c in self.traffic_classes:
-                        derivative_scale += float(
-                            np.sum(
-                                np.abs(
-                                    c.fixed_cost
-                                    * (self.step_direction[c._id].total_link_loads - c.results.total_link_loads)
-                                )
+            if np.isfinite(derivative_at_zero) and derivative_at_zero >= 0.0:
+                # For the Frank-Wolfe direction this derivative is exactly the negated gap, so
+                # a non-negative value means the same impossibility the convergence check
+                # guards against. Explain it before papering over it with a nominal step.
+                # congested_value holds C(x) from the derivative evaluation just above.
+                direction = self.step_direction_flow - self.total_flow
+                derivative_scale = float(np.sum(np.abs(self.congested_value * direction)))
+                for c in self.traffic_classes:
+                    derivative_scale += float(
+                        np.sum(
+                            np.abs(
+                                c.fixed_cost
+                                * (self.step_direction[c._id].total_link_loads - c.results.total_link_loads)
                             )
                         )
-                    self._diagnose_negative_gap("line search", -float(d0_for_branch), derivative_scale)
+                    )
+                self._diagnose_negative_gap("line search", -derivative_at_zero, derivative_scale)
 
-                    tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
-                    # works well in practice, however for a large number of iterations this might be too much so
-                    # use this heuristic instead.
-                    logger.warning(f"# Alert fw ex: Adding {tiny_step} as step size to make it non-zero. {e.args}")
-                    self.stepsize = self.__clip_stepsize(tiny_step)
-                else:
-                    msg = f"Found bad conjugate direction step. Performing FW search. {e.args}"
-                    self.__retry_with_fw_direction(msg)
-            else:
-                # derivative(0) < 0 (and derivative(1) must also be ≤ 0, otherwise the bracket
-                # search would have succeeded). The objective is still decreasing at α = 1, so
-                # the constrained optimum on [0, 1] is α = 1. Take the full step; do NOT mark
-                # this as a reset - convergence checking remains valid.
-                self.stepsize = self.__clip_stepsize(1.0)
-                logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
+            tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
+            # works well in practice, however for a large number of iterations this might be too much so
+            # use this heuristic instead.
+            logger.warning(f"# Alert fw ex: Adding {tiny_step} as step size to make it non-zero. {reason}")
+            self.stepsize = self.__clip_stepsize(tiny_step)
+
+        try:
+            derivative_at_zero = float(derivative_of_objective(0.0))
+        except (ValueError, FloatingPointError, OverflowError) as e:
+            handle_failed_search(f"Could not evaluate the derivative at alpha=0: {e}")
+            return
+
+        if not np.isfinite(derivative_at_zero):
+            handle_failed_search(
+                f"Line-search derivative at alpha=0 is non-finite ({derivative_at_zero}).",
+                derivative_at_zero,
+            )
+            return
+
+        if derivative_at_zero >= 0.0:
+            handle_failed_search(
+                f"Direction is not descent at alpha=0 (derivative={derivative_at_zero}).",
+                derivative_at_zero,
+            )
+            return
+
+        try:
+            derivative_at_one = float(derivative_of_objective(1.0))
+        except (ValueError, FloatingPointError, OverflowError) as e:
+            handle_failed_search(f"Could not evaluate the derivative at alpha=1: {e}", derivative_at_zero)
+            return
+
+        if not np.isfinite(derivative_at_one):
+            handle_failed_search(
+                f"Line-search derivative at alpha=1 is non-finite ({derivative_at_one}).",
+                derivative_at_zero,
+            )
+            return
+
+        if derivative_at_one <= 0.0:
+            # The objective is still decreasing at alpha=1, so the constrained optimum on [0, 1]
+            # is the boundary. This is a valid line-search result and must not reset the direction.
+            self.stepsize = 1.0
+            logger.info("Line-search optimum at the boundary (alpha = 1.0); descent throughout [0, 1]")
+            return
+
+        try:
+            min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
+            candidate = float(min_res.root)
+        except (TypeError, ValueError, FloatingPointError, OverflowError) as e:
+            handle_failed_search(f"Line-search root finder failed: {e}", derivative_at_zero)
+            return
+
+        if not min_res.converged or not np.isfinite(candidate) or not 0.0 < candidate < 1.0:
+            handle_failed_search(
+                f"Line-search root finder returned root={candidate}, converged={min_res.converged}.",
+                derivative_at_zero,
+            )
+            return
+
+        self.stepsize = candidate
 
         assert 0 <= self.stepsize <= 1.0
 
