@@ -167,7 +167,7 @@ class AssignmentBase(ABC):
     def set_time_field(self, time_field: str) -> None:
         self._check_field(time_field)
         c = self.classes[0]
-        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], "float64")
         self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field

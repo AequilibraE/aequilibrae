@@ -1,13 +1,13 @@
-import warnings
 import logging
-from copy import deepcopy
-from typing import Union, List, Tuple, Dict
+import warnings
 from abc import ABC
+from copy import deepcopy
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
+from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class TransportClassBase(ABC):  # noqa: B024
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
-        if matrix.matrix_view.dtype != graph.default_types("float"):
+        if matrix.matrix_view.dtype != "float64":
             raise TypeError("Matrix's computational view need to be of type np.float64")
         self._config = {}
         self.graph = graph
@@ -229,8 +229,13 @@ class TrafficClass(TransportClassBase):
             raise RuntimeError("Run the assignment before skimming congested costs")
         fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
         inputs = AssignmentInputs(
-            self.graph, self.matrix, "__congested_time__", {}, self.results.cores,
-            skim_fields=fields + ["__congested_time__"], cost_name="__assignment_cost__",
+            self.graph,
+            self.matrix,
+            "__congested_time__",
+            {},
+            self.results.cores,
+            skim_fields=fields + ["__congested_time__"],
+            cost_name="__assignment_cost__",
         )
         inputs.update_costs(self.congested_time, self.fixed_cost)
         # FIXME: Use a separate skim-only driver when one is available.

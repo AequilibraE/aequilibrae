@@ -9,9 +9,9 @@ from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
 from aequilibrae import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.transit import Transit
 
 logger = logging.getLogger(__name__)
