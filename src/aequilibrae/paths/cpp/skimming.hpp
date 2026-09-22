@@ -12,9 +12,7 @@
 
 namespace aequilibrae::paths::cpp::mvp {
 
-// Both additive groups need the same link sums. Walk the state tree once;
-// adding turn costs later leaves this inner loop identical for every field.
-// The caller requests this pass only when inputs need state sums.
+// Sum all supplied link fields in one walk of the state tree.
 template <typename T>
 void sum_skim_fields(const SearchResults &results,
                      const SkimmingContext<T> &context,
@@ -47,17 +45,15 @@ void sum_skim_fields(const SearchResults &results,
   }
 }
 
-// Project a group of link sums after the shared state-tree pass.
-template <typename T, bool IncludeTurnCost>
+// Copy each node's link sums from its terminal state.
+template <typename T>
 void skim_fields(const SearchResults &results,
                  const SkimmingWorkspace<T> &workspace,
-                 std::size_t first_state_field,
                  const SkimmingOriginView<T> &output) noexcept {
   const T infinity = std::numeric_limits<T>::infinity();
 
   for (std::size_t field = 0; field < output.field_count; ++field) {
     T *row = output.field_data(field);
-    const auto state_field = first_state_field + field;
 
     for (std::size_t node = 0; node < output.destination_count; ++node) {
       const auto terminal = results.terminal_states[node];
@@ -68,14 +64,8 @@ void skim_fields(const SearchResults &results,
         continue;
       }
 
-      const auto state_offset = terminal * workspace.field_count + state_field;
-
-      if (IncludeTurnCost == true) {
-        row[node] =
-            workspace.state_skims[state_offset] + results.turn_costs[terminal];
-      } else {
-        row[node] = workspace.state_skims[state_offset];
-      }
+      const auto state_offset = terminal * workspace.field_count + field;
+      row[node] = workspace.state_skims[state_offset];
     }
   }
 }
@@ -120,17 +110,8 @@ void skimming(const SearchResults &results, const SkimmingContext<T> &context,
 
   if (context.needs_state_sums()) {
     sum_skim_fields(results, context, workspace);
-  }
-
-  if (context.has_link_fields()) {
-    const auto fields = output.subfields(0, context.plain_field_count);
-    skim_fields<T, false>(results, workspace, 0, fields);
-  }
-
-  if (context.has_link_fields_with_turn_costs()) {
-    const auto fields =
-        output.subfields(context.turn_field_offset, context.turn_field_count);
-    skim_fields<T, true>(results, workspace, context.turn_field_offset, fields);
+    const auto fields = output.subfields(0, context.additive_field_count);
+    skim_fields(results, workspace, fields);
   }
 
   if (context.has_cost_field()) {

@@ -345,6 +345,35 @@ cdef class SkimmingOutputs:
         )
         self.field_names = names
 
+    @classmethod
+    def from_matrices(cls, dict matrices):
+        """Create a SkimmingOutputs from a dictionary of matrices."""
+        if not matrices:
+            raise ValueError("Provide at least one skim matrix")
+
+        arrays = []
+        shape = None
+        for matrix in matrices.values():
+            matrix = np.asarray(matrix)
+            if matrix.ndim != 2:
+                raise ValueError(f"Skim matrices must be two-dimensional, got {matrix.ndim}")
+
+            if shape is None:
+                shape = matrix.shape
+
+            if matrix.shape != shape:
+                raise ValueError(f"Skim matrices must have the same shape, expected {shape}, got {matrix.shape}")
+
+            arrays.append(matrix)
+
+        cdef SkimmingOutputs output = cls(*shape, tuple(matrices.keys()))
+        values = np.asarray(output.skims_buffer)
+
+        for field, matrix in enumerate(arrays):
+            np.copyto(values[:, field, :], matrix)
+
+        return output
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef CppSkimmingOutputsView[double] view(self) noexcept nogil:

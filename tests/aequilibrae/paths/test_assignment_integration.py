@@ -205,7 +205,8 @@ def test_shared_graph_classes_have_independent_cost_buffers():
     first.update_costs(np.ones(graph.num_links), np.zeros(graph.num_links))
     second.update_costs(np.full(graph.num_links, 3.0), np.zeros(graph.num_links))
     assert not np.shares_memory(first.costs, second.costs)
-    assert not np.shares_memory(first.time_skim, second.time_skim)
+    assert first.time_skim is second.time_skim is None
+    assert "time" not in first.skimming.fields
     np.testing.assert_array_equal(first.routing.costs, np.ones(graph.compact_num_links))
     np.testing.assert_array_equal(second.routing.costs, np.full(graph.compact_num_links, 3.0))
 
@@ -407,3 +408,72 @@ def test_congested_skims_use_final_costs_without_replacing_aon_or_graph_fields()
     shortest = min(by_link[71] + by_link[12] + 0.5, by_link[55] + by_link[24])
     assert output.matrices["__assignment_cost__"][0, 3] == pytest.approx(shortest)
     assert output.matrices["__congested_time__"][0, 3] == pytest.approx(shortest)
+
+
+@pytest.mark.parametrize("turn", [False, True])
+def test_assignment_time_skim_copies_search_distances(turn):
+    from .routing_helpers import search
+
+    graph = diamond(turn)
+    inputs = AssignmentInputs(graph, matrix_for(graph), "time", {}, 1)
+    full = np.empty(graph.num_links)
+    full[inputs.mapping.graph_ids] = graph.graph.time.to_numpy()
+    fixed = np.full(graph.num_links, 0.25)
+    inputs.update_costs(full, fixed)
+    output = inputs.driver.run(inputs.driver.make_outputs()).skimming
+
+    assert inputs.time_skim is None
+    assert inputs.skimming.additive_field_count == 1  # Distance only.
+    assert output.matrices["time"][0, 3] == (3.0 if turn else 2.5)
+
+    for origin in range(graph.num_zones):
+        results = search(inputs.routing, origin)
+        for destination in range(graph.num_zones):
+            assert output.matrices["time"][origin, destination] == results.path_cost_to(destination)
+
+
+@pytest.mark.parametrize("turn", [False, True])
+def test_congested_time_excludes_tolls_but_keeps_turn_delay(turn):
+    graph = diamond(turn)
+    graph.graph.loc[graph.graph.link_id == 71, "toll"] = 2.0
+    assignment, traffic = assignment_for(graph)
+    traffic.set_fixed_cost("toll")
+    traffic.set_vot(2.0)
+    assignment.set_vdf(bpr, {"alpha": 0.0, "beta": 1.0})
+    assignment.set_algorithm("all-or-nothing")
+    assignment.execute()
+
+    output = traffic.skim_congested("distance")
+    matrices = output.matrices
+    time = matrices["__congested_time__"]
+    cost = matrices["__assignment_cost__"]
+
+    assert set(matrices) == {"distance", "__congested_time__", "__assignment_cost__"}
+    assert time[0, 3] == (2.5 if turn else 2.0)
+    assert cost[0, 3] == time[0, 3] + 1.0
+    assert matrices["distance"][0, 3] == 7.0
+    assert cost[0, 0] == time[0, 0] == 0.0
+    assert np.isinf(time[3, 0])
+    assert np.isinf(cost[3, 0])
+    assert not time.flags.writeable
+
+
+def test_congested_skim_reporting_does_not_add_turn_delay_twice():
+    graph = diamond(True)
+    inputs = AssignmentInputs(
+        graph, matrix_for(graph), "time", {}, 1, cost_name="assignment_cost"
+    )
+    full = np.empty(graph.num_links)
+    full[inputs.mapping.graph_ids] = graph.graph.time.to_numpy()
+    inputs.update_costs(full, np.zeros_like(full))
+    raw = inputs.driver.run(inputs.driver.make_outputs()).skimming
+    original = raw.skims.copy()
+    first = inputs.report_skims(raw)
+    second = inputs.report_skims(raw)
+
+    assert raw.matrices["time"][0, 3] == 2.0
+    assert first.matrices["time"][0, 3] == 2.5
+    np.testing.assert_array_equal(first.skims, second.skims)
+    np.testing.assert_array_equal(raw.skims, original)
+    raw.reset()
+    assert first.matrices["time"][0, 3] == 2.5

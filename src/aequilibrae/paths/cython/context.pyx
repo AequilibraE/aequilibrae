@@ -273,9 +273,9 @@ cdef class TurnBasedContext(GraphContext):
 cdef class SkimmingContext:
     """Retain field meanings and borrow additive link buffers without copying.
 
-    Output order is link_fields, link_fields_with_turn_costs, cost_name, then
-    turn_cost_name. Mappings preserve their insertion order; names must be
-    unique across all four groups. Label fields need no supplied array.
+    Output order is link_fields, cost_name, then turn_cost_name. Link fields
+    keep their insertion order. Names must be unique across all three groups.
+    Label fields need no supplied array.
 
     Link buffers must be aligned, contiguous float64 vectors in local link
     order. Values may change between calls, but not during a call. Binding
@@ -288,13 +288,11 @@ cdef class SkimmingContext:
         link_count,
         *,
         link_fields=None,
-        link_fields_with_turn_costs=None,
         cost_name=None,
         turn_cost_name=None,
     ):
         cdef const double[::1] values
         cdef vector[const double *] pointers
-        cdef size_t plain_field_count = 0
         cdef CppSkimmingContext[double] configuration
 
         if self.field_names is not None:
@@ -307,16 +305,11 @@ cdef class SkimmingContext:
         names = []
         buffers = []
 
-        # Keep the two additive groups together. Each projection can then read
-        # a range of fields without checking individual field types.
-        for group_index, group in enumerate((link_fields, link_fields_with_turn_costs)):
-            if group is None:
-                continue
+        if link_fields is not None:
+            if not isinstance(link_fields, Mapping):
+                raise TypeError("link_fields must be a mapping of names to buffers")
 
-            if not isinstance(group, Mapping):
-                raise TypeError("link fields must be mappings of names to buffers")
-
-            for name, buffer in group.items():
+            for name, buffer in link_fields.items():
                 # Require a usable buffer rather than silently copying a list
                 # or converting its dtype. The typed view checks the layout.
                 data = np.asarray(memoryview(buffer))
@@ -330,9 +323,6 @@ cdef class SkimmingContext:
                 names.append(name)
                 buffers.append(values)
                 pointers.push_back(const_array_pointer(values))
-
-            if group_index == 0:
-                plain_field_count = len(buffers)
 
         # Label fields name outputs only; their values come from the search.
         for name in (cost_name, turn_cost_name):
@@ -354,11 +344,6 @@ cdef class SkimmingContext:
         configuration.field_count = self.field_count
         configuration.additive_field_count = self.additive_field_count
         configuration.link_fields = self.field_pointers.data()
-
-        # Scratch and output use the same field order for the additive groups.
-        configuration.plain_field_count = plain_field_count
-        configuration.turn_field_offset = plain_field_count
-        configuration.turn_field_count = self.additive_field_count - plain_field_count
 
         # Work out label positions once, not while processing each origin.
         # Each label contributes either one matrix or none.

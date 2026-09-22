@@ -45,7 +45,7 @@ def test_selected_full_paths_and_output_rotation(turn, cores):
     demand = np.ones((4, 4, 2))
     selections = {"screenline": [0, 3, 3], "other": [2], "empty": []}
     fields = [np.ones(context.link_count)]
-    skims = SkimmingContext(context.link_count, link_fields_with_turn_costs={"time": fields[0]})
+    skims = SkimmingContext(context.link_count, link_fields={"time": fields[0]})
     prepared = PreparedAoN(
         context, demand, cores=cores, selected_links=SelectLinkContext(context.link_count, selections), skimming=skims
     )
@@ -53,7 +53,7 @@ def test_selected_full_paths_and_output_rotation(turn, cores):
     retained = output_arrays(previous)
     for iteration in range(4):
         context.update_costs(np.array([1.0, 1.0 + iteration * 5, 1.0, 1.0]))
-        expected = path_walk_outputs(context, demand, fields, [True], list(selections.values()))
+        expected = path_walk_outputs(context, demand, fields, selected_links=list(selections.values()))
         saved = [values.copy() for values in output_arrays(previous)]
         saved_total = previous.turn_cost_total
         assert prepared.run(current) is current

@@ -28,17 +28,12 @@ cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         size_t field_count
         size_t additive_field_count
         const T *const *link_fields
-        size_t plain_field_count
-        size_t turn_field_offset
-        size_t turn_field_count
         size_t cost_field_index
         size_t turn_cost_field_index
         size_t cost_field_count
         size_t turn_cost_field_count
 
         cpp_bool needs_state_sums() noexcept
-        cpp_bool has_link_fields() noexcept
-        cpp_bool has_link_fields_with_turn_costs() noexcept
         cpp_bool has_cost_field() noexcept
         cpp_bool has_turn_cost_field() noexcept
 

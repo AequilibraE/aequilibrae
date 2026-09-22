@@ -216,9 +216,10 @@ class TrafficClass(TransportClassBase):
 
     def skim_congested(self, skim_fields=None):
         """
-        Skims the congested network. The user can add a list of skims to be computed, which
-        will be added to the congested time and the assignment cost from the last iteration of
-        the assignment.
+        Skims the congested network using the final assignment costs.
+
+        Congested time includes link travel time and turn delay. Assignment cost
+        also includes fixed costs, such as tolls converted to time units.
 
         :Arguments:
             **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
@@ -239,7 +240,8 @@ class TrafficClass(TransportClassBase):
         )
         inputs.update_costs(self.congested_time, self.fixed_cost)
         # FIXME: Use a separate skim-only driver when one is available.
-        self.congested_skims = inputs.driver.run(inputs.driver.make_outputs()).skimming
+        output = inputs.driver.run(inputs.driver.make_outputs()).skimming
+        self.congested_skims = inputs.report_skims(output)
         return self.congested_skims
 
     def __setattr__(self, key, value):

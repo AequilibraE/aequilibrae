@@ -218,6 +218,10 @@ cost from the last iteration of the assignment by default. These matrices are na
 and *__assignment_cost__* respectively. The returned values are ``SkimmingOutputs``
 objects, also stored in ``traffic_class.congested_skims``. They do not replace the
 latest AoN skims. ``save_skims`` uses them for the final matrices when present.
+Congested time includes link travel time and turn delay, but excludes fixed costs.
+Assignment cost includes those fixed costs, converted to time units. Both are
+measured on paths chosen using assignment cost. Additional skim fields sum link
+values without adding turn costs.
 
 See the the example :ref:`example_assign_sparse` for a more practical explanation of this feature.
 
