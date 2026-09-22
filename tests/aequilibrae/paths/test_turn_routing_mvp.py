@@ -17,6 +17,10 @@ def test_nonterminal_arrival_history(penalty):
     assert results.predecessors[results.terminal_states[3]] == 3
     np.testing.assert_array_equal(results.path_links_to(1), [0])
     np.testing.assert_array_equal(results.path_links_to(3), [1, 3, 2])
+    states = results.path_states_to(3)
+    np.testing.assert_array_equal(states, [results.root, 1, 3, 2])
+    np.testing.assert_array_equal(results.distances[states], [0, 1, 2, 3])
+    np.testing.assert_array_equal(results.path_states_to(1), [results.root, 0])
     assert results.path_cost_to(3) == 3
     assert results.path_turn_cost_to(3) == 0
     assert results.reached_target_count == 2

@@ -109,6 +109,95 @@ def test_reuse_updates_metadata_and_retained_views(context):
     assert_state_tree(context, results)
 
 
+@pytest.mark.parametrize("turn", [False, True])
+@pytest.mark.parametrize("targets", [None, [2], [2, 3]])
+def test_reset_clears_results_in_place(turn, targets):
+    turns = {(0, 1): 0.5} if turn else None
+    context = make_context([0, 1, 2, 2, 2], [1, 2], [1, 2], turns)
+    results = search(context, 0, targets)
+    index_names = ("predecessors", "connectors", "settlement_order", "terminal_states")
+    label_names = ("distances", "turn_costs")
+    views = {name: getattr(results, name) for name in index_names + label_names}
+    assert results.path_cost_to(2) == (3.5 if turn else 3.0)
+
+    for _ in range(2):
+        results.reset()
+        assert results.origin is results.root is None
+        assert results.settled_count == results.target_count == results.reached_target_count == 0
+        assert not results.exhausted
+        assert not results.all_targets_reached
+        for name, view in views.items():
+            assert np.shares_memory(view, getattr(results, name))
+            assert not view.flags.writeable
+            expected = results.sentinel if name in index_names else np.inf
+            np.testing.assert_array_equal(view, expected)
+        for node in range(context.node_count):
+            assert not results.reachable_to(node)
+            assert results.path_links_to(node).size == 0
+            assert results.path_cost_to(node) == results.path_turn_cost_to(node) == np.inf
+
+    search(context, 1, 2, results)
+    assert results.origin == 1
+    assert results.root == (context.link_count if turn else 1)
+    assert results.target_count == results.reached_target_count == 1
+    assert results.all_targets_reached and not results.exhausted
+    assert results.path_cost_to(2) == 2.0
+    assert results.path_turn_cost_to(2) == 0.0
+    for name, view in views.items():
+        assert np.shares_memory(view, getattr(results, name))
+    assert_state_tree(context, results)
+
+
+@pytest.mark.parametrize("turn", [False, True])
+def test_reset_fresh_and_edgeless_results(turn):
+    context = make_context([0, 0], [], [], turn=turn)
+    results = allocate_results(context)
+    results.reset()
+    assert results.origin is results.root is None
+    search(context, 0, results=results)
+    assert results.path_cost_to(0) == 0.0
+    results.reset()
+    assert results.origin is results.root is None
+    assert results.settled_count == 0
+    assert not results.exhausted
+    assert not results.reachable_to(0)
+    assert results.path_cost_to(0) == np.inf
+
+
+@pytest.mark.parametrize("turn", [False, True])
+def test_path_states_include_root_and_preserve_path_order(turn):
+    context = make_context([0, 1, 2, 2, 2], [1, 2], [1, 2], turn=turn)
+    results = search(context, 0)
+    states = results.path_states_to(2)
+    expected = [2, 0, 1] if turn else [0, 1, 2]
+    assert states.dtype == np.uintp
+    np.testing.assert_array_equal(states, expected)
+    np.testing.assert_array_equal(results.connectors[states[1:]], results.path_links_to(2))
+    np.testing.assert_array_equal(results.distances[states], [0, 1, 3])
+    np.testing.assert_array_equal(results.path_states_to(0), [results.root])
+    assert results.path_links_to(0).size == 0
+    assert results.path_states_to(3).size == 0
+
+    # Returned paths own their storage and survive another search or reset.
+    search(context, 1, results=results)
+    np.testing.assert_array_equal(states, expected)
+    results.reset()
+    np.testing.assert_array_equal(states, expected)
+    assert results.path_states_to(0).size == 0
+
+
+@pytest.mark.parametrize("turn", [False, True])
+def test_path_states_require_a_finalized_destination(turn):
+    context = make_context([0, 1, 2, 2], [1, 2], [1, 2], turn=turn)
+    results = allocate_results(context)
+    assert results.path_states_to(0).size == 0
+    search(context, 0, 1, results)
+    assert not results.exhausted
+    assert results.path_states_to(2).size == 0
+    assert results.path_states_to(2).dtype == np.uintp
+    assert results.path_links_to(2).size == 0
+
+
 def test_results_reuse_depends_on_dimensions_not_context_identity(context):
     results = search(context, 0)
     other = context.with_costs(np.ones(context.link_count))
@@ -306,7 +395,13 @@ def test_zero_cost_parallel_links_and_infinite_link(turn):
 @pytest.mark.parametrize("destination", [-1, 5, 2**100, True, 1.5, None])
 def test_invalid_path_query(context, destination):
     results = search(context, 0)
-    for operation in (results.reachable_to, results.path_links_to, results.path_cost_to, results.path_turn_cost_to):
+    for operation in (
+        results.reachable_to,
+        results.path_states_to,
+        results.path_links_to,
+        results.path_cost_to,
+        results.path_turn_cost_to,
+    ):
         with pytest.raises((ValueError, TypeError)):
             operation(destination)
 

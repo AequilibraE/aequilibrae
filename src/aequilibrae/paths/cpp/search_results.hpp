@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <limits>
 
@@ -55,6 +56,17 @@ struct MutableSearchResults {
   double *distances = nullptr;
   double *turn_costs = nullptr;
   SearchMetadata *metadata = nullptr;
+
+  void reset() const noexcept {
+    *metadata = SearchMetadata{};
+    const auto infinity = std::numeric_limits<double>::infinity();
+    std::fill_n(predecessors, state_count, invalid_state);
+    std::fill_n(connectors, state_count, invalid_state);
+    std::fill_n(settlement_order, state_count, invalid_state);
+    std::fill_n(terminal_states, node_count, invalid_state);
+    std::fill_n(distances, state_count, infinity);
+    std::fill_n(turn_costs, state_count, infinity);
+  }
 
   SearchResults read_view() const noexcept {
     return {node_count, state_count,      link_count,      predecessors,

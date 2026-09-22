@@ -1,13 +1,13 @@
-import logging
-from typing import List, Union
-
 import numpy as np
 
-from aequilibrae.paths.cython.AoN import HEAP_MAP, HEURISTIC_MAP, path_computation, update_path_trace
+from aequilibrae.paths.cython.context import SkimmingContext
+from aequilibrae.paths.cython.dijkstra import dijkstra
+from aequilibrae.paths.cython.queries import SearchQuery
+from aequilibrae.paths.cython.search_results import SearchResults
+from aequilibrae.paths.cython.skimming import skimming
+from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
 from aequilibrae.paths.graph import Graph
-from aequilibrae.utils.logging_utils import debug_bridge
-
-logger = logging.getLogger(__name__)
+from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
 
 class PathResults:
@@ -16,26 +16,13 @@ class PathResults:
     .. code-block:: python
 
         >>> from aequilibrae.paths.results import PathResults
-
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()
-
-        # Mode c is car in this project
-        >>> car_graph = project.network.graphs['c']
-
-        # minimize distance
-        >>> car_graph.set_graph('distance')
-
-        # If you want to compute skims
-        # It does increase path computation time substantially
-        >>> car_graph.set_skimming(['distance', 'free_flow_time'])
-
-        >>> res = PathResults(car_graph, 1, 17)
-
-        # Update all the outputs mentioned above for destination 9. Same origin: 1
+        >>> graph = project.network.graphs['c']
+        >>> graph.set_graph('distance')
+        >>> graph.set_skimming(['distance', 'free_flow_time'])
+        >>> res = PathResults(graph, 1, 17)
         >>> res.update_trace(9)
-
-
         >>> project.close()
     """
 
@@ -49,39 +36,76 @@ class PathResults:
         heuristic: str | None = None,
         heap: str | None = None,
     ) -> None:
-        self.predecessors: np.ndarray
-        self.connectors: np.ndarray
-        self.skims: np.ndarray | None = None
-        self._skimming_array: np.ndarray
-        self.path: np.ndarray[tuple[int], np.dtype[np.int_]] | None = None
-        self.path_nodes: np.ndarray | None = None
-        self.path_link_directions: np.ndarray | None = None
-        self.milepost: np.ndarray | None = None
-        self.reached_first: np.ndarray
-        self.origin: int = origin
-        self.destination: int = destination
-        self.graph: Graph
-        self.early_exit: bool
-        self.a_star: bool
-        self.links: int
-        self.nodes: int
-        self.zones: int
-        self.num_skims: int
-        self._graph_id: str
-        self.__graph_sum: float
-        self._early_exit: bool = early_exit
-        self._a_star: bool = a_star
+        """Prepare a full-graph snapshot and compute the initial path.
 
-        self._heap: str
-        self._heuristic: str
-        self.set_heap("4ary" if heap is None else heap)
-        self.set_heuristic("equirectangular" if heuristic is None else heuristic)
+        :Arguments:
+            **graph** (:obj:`Graph`): Prepared graph with a cost field.
+            **origin** (:obj:`int`): External ID of the path origin.
+            **destination** (:obj:`int`): External ID of the initial destination.
+            **early_exit** (:obj:`bool`): Stop after finalising the destination.
+            **a_star** (:obj:`bool`): Whether to use A* for this search.
+            **heuristic** (:obj:`str` or None): Heuristic used when A* is enabled.
+            **heap** (:obj:`str` or None): Priority queue implementation to use.
 
+        :Raises:
+            **ValueError**: If an external node ID is not in the graph snapshot.
+        """
+        self._check_search_options(a_star, heuristic, heap)
         self.set_graph_data(graph)
+        self.compute_path(origin, destination, early_exit=early_exit, heap=heap)
 
-        self.compute_path(
-            origin, destination, early_exit=early_exit, a_star=a_star, heuristic=self._heuristic, heap=self._heap
+    @staticmethod
+    def _check_search_options(a_star, heuristic, heap):
+        if a_star or heuristic is not None:
+            raise NotImplementedError("PathResults does not support A* or its heuristics")
+        if heap is not None and heap != "4ary":
+            raise NotImplementedError("PathResults supports only the four-ary heap")
+
+    def set_graph_data(self, graph: Graph) -> None:
+        """Copy graph data into a new full-network routing snapshot.
+
+        :Arguments:
+            **graph** (:obj:`Graph`): Prepared graph with a cost field. Its
+                topology, costs, skim fields and external IDs are copied.
+
+        :Returns:
+            ``None``. The existing result buffers are replaced for the new
+            snapshot and cleared before the next search.
+
+        :Raises:
+            **ValueError**: If the graph does not have context-compatible IDs
+                or a required node/link mapping is invalid.
+        """
+        context = make_routing_context(graph)
+        mapping = GraphMapping(context, graph.all_nodes, graph.graph.link_id, graph.graph.direction)
+
+        fields = {}
+        for name in graph.skim_fields:
+            if name != graph.cost_field:
+                values = np.array(graph.graph[name], dtype=np.float64, order="C", copy=True)
+                values.flags.writeable = False
+                fields[name] = values
+
+        skim_context = SkimmingContext(
+            context.link_count,
+            link_fields=fields,
+            cost_name=graph.cost_field if graph.cost_field in graph.skim_fields else None,
         )
+
+        self.context = context
+        self._mapping = mapping
+        self.nodes = context.node_count
+        self.links = context.link_count
+        self.num_skims = len(skim_context.field_names)
+        self.search_results = SearchResults(self.nodes, context.state_count, self.links)
+        self._skimming = skim_context
+        self._skim_workspace = (
+            SkimmingWorkspace(context.state_count, skim_context.additive_field_count)
+            if skim_context.additive_field_count
+            else None
+        )
+        self.skims = skim_context.make_outputs(self.nodes) if self.num_skims else None
+        self.reset()
 
     def compute_path(
         self,
@@ -89,161 +113,180 @@ class PathResults:
         destination: int,
         early_exit: bool = False,
         a_star: bool = False,
-        heuristic: Union[str, None] = None,
-        heap: Union[str, None] = None,
+        heuristic: str | None = None,
+        heap: str | None = None,
     ) -> None:
-        """Computes the path between two nodes in the network.
+        """Search the snapshot and trace a path between external node IDs.
 
-        `A*` heuristics are currently only valid distance cost fields.
-
-        :Arguments:
-            **origin** (:obj:`int`): Origin for the path
-
-            **destination** (:obj:`int`): Destination for the path
-
-            **early_exit** (:obj:`bool`): Stop constructing the shortest path tree once the destination is found.
-            Doing so may cause subsequent calls to ``update_trace`` to recompute the tree. Default is ``False``.
-
-            **a_star** (:obj:`bool`): Whether or not to use A* over Dijkstra's algorithm.
-            When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
-
-            **heuristic** (:obj:`str`): Heuristic to use if ``a_star`` is enabled. Default is ``None``.
-
-            **heap** (:obj:`str`): Priority queue implementation to use, one of ``get_heaps()``.
-            Defaults to ``None``, leaving the object's current heap (see :func:`set_heap`) unchanged.
-        """
-
-        if self.graph is None:
-            raise Exception("You need to set graph skimming before you compute a path")
-
-        if a_star and self.graph.lonlat_index.empty:
-            raise Exception("You need to supply a lon/lat index to graph.prepare_graph to use A*")
-
-        self.early_exit = self._early_exit = early_exit or a_star
-        self.a_star = self._a_star = a_star
-        if heuristic is not None:
-            self.set_heuristic(heuristic)
-        if heap is not None:
-            self.set_heap(heap)
-        with debug_bridge(logger) as bridge:
-            self.path, self.path_nodes, self.path_link_directions, self.milepost = path_computation(
-                origin, destination, self, bridge=bridge
-            )
-        self.__skim_path()
-
-    def set_graph_data(self, graph: Graph) -> None:
-        """
-        Prepares the object with dimensions corresponding to the graph object
+        With ``early_exit``, stop when the destination is finalised. Other
+        missing terminals may still be reachable; ``update_trace`` searches
+        again if needed.
 
         :Arguments:
-            **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+            **origin** (:obj:`int`): External ID of the search origin.
+            **destination** (:obj:`int`): External ID of the traced destination.
+            **early_exit** (:obj:`bool`): Stop after finalising the destination.
+            **a_star** (:obj:`bool`): Whether to use A* for this search.
+            **heuristic** (:obj:`str` or None): Heuristic used when A* is enabled.
+            **heap** (:obj:`str` or None): Priority queue implementation to use.
+
+        :Returns:
+            ``None``. The search arrays, skims and traced path are updated in place.
+
+        :Raises:
+            **ValueError**: If an external node ID is not in the snapshot.
         """
+        self._check_search_options(a_star, heuristic, heap)
+        origin_index = self._mapping.node_index(origin)
+        destination_index = self._mapping.node_index(destination)
+        targets = None
 
-        if not graph.cost_field:
-            raise Exception('Cost field needs to be set for cost computation. use graph.set_graph("your_cost_field")')
+        if early_exit:
+            targets = np.zeros(self.nodes, dtype=bool)
+            targets[destination_index] = True
 
-        self.__integer_type = graph.default_types("int")
-        self.__float_type = graph.default_types("float")
-        self.nodes = graph.num_nodes + 1
-        self.zones = graph.centroids + 1
-        self.links = graph.num_links + 1
-        self.num_skims = len(graph.skim_fields)
+        query = SearchQuery(self.nodes, origin_index, targets)
+        dijkstra(self.context, query, self.search_results)
 
-        self.predecessors = np.zeros(self.nodes, dtype=self.__integer_type)
-        self.connectors = np.zeros(self.nodes, dtype=self.__integer_type)
-        self.reached_first = np.zeros(self.nodes, dtype=self.__integer_type)
-        if self.num_skims:
-            self.skims = np.empty((np.max(graph.all_nodes) + 1, self.num_skims), self.__float_type)
-            self.skims.fill(np.inf)
-            self._skimming_array = np.zeros((self.nodes, self.num_skims), self.__float_type)
-        else:
-            self._skimming_array = np.zeros((1, 2), self.__float_type)
+        self.origin = origin
+        self.destination = destination
+        self.early_exit = early_exit
+        if self.skims is not None:
+            skimming(self.search_results, self._skimming, self._skim_workspace, self.skims)
 
-        self._graph_id = graph._id
-        # We can imagine somebody creating a worst-case scenario network (imagining that turn penalties are considered)
-        # where one needs to traverse all links (or almost all) in both directions.
-        self.__graph_sum = 2 * graph.cost.sum()
-        self.graph = graph
-
-    def reset(self) -> None:
-        """
-        Resets object to prepared and pre-computation state
-        """
-        if self.predecessors is not None:
-            self.predecessors.fill(-1)
-            self.connectors.fill(-1)
-            if self.skims is not None:
-                self.skims.fill(np.inf)
-            self._skimming_array.fill(np.inf)
-            self.path = None
-            self.path_nodes = None
-            self.path_link_directions = None
-            self.milepost = None
-            self._early_exit = self.early_exit = False
-            self._a_star = self.a_star = False
-            self._heuristic = "equirectangular"
-            self._heap = "4ary"
-
-        else:
-            raise ValueError("Exception: Path results object was not yet prepared/initialized")
+        self._trace(destination_index)
 
     def update_trace(self, destination: int) -> None:
-        """
-        Updates the path's nodes, links, skims and mileposts
+        """Update the traced destination using the current search tree.
 
-        If the previously computed path had `early_exit` enabled, `update_trace` will check if the
-        `destination` has already been found, if not the shortest path tree will be recomputed with the `early_exit`
-        argument passed on.
-
-        If the previously computed path had `a_star` enabled, `update_trace` always recompute the path.
+        A partial early-exit search is rerun when it has not finalised the
+        requested destination. A full search reuses its finalised state tree.
 
         :Arguments:
-            **destination** (:obj:`int`): ID of the node we are computing the path too
+            **destination** (:obj:`int`): External ID of the new destination.
+
+        :Returns:
+            ``None``. ``path``, ``path_nodes``, ``path_link_directions`` and
+            ``milepost`` are replaced for the requested destination.
+
+        :Raises:
+            **RuntimeError**: If no search has been performed.
+            **ValueError**: If the destination is not in the snapshot.
         """
-        if not isinstance(destination, (int, np.integer)):
-            raise TypeError("destination needs to be an integer")
+        index = self._mapping.node_index(destination)
+        results = self.search_results
+        if results.origin is None:
+            raise RuntimeError("Compute a path before updating its trace")
 
-        if destination >= self.graph.nodes_to_indices.shape[0]:
-            raise ValueError("destination out of the range of node numbers in the graph")
+        if not results.reachable_to(index) and not results.exhausted:
+            self.compute_path(self.origin, destination, early_exit=self.early_exit)
+            return
 
-        update_path_trace(self, destination, self.graph)
+        self.destination = destination
+        self._trace(index)
 
-        self.__skim_path()
+    def _trace(self, destination: int) -> None:
+        results = self.search_results
+        states = results.path_states_to(destination)
+        if states.size == 0:
+            self._clear_path()
+            return
 
-    def set_heuristic(self, heuristic: str) -> None:
+        links = results.connectors[states[1:]]
+
+        self.path = self._mapping.link_ids[links]
+        self.path_link_directions = self._mapping.directions[links]
+        self.path_nodes = self._mapping.path_nodes(results.origin, links)
+        # Stored labels preserve the cost of each actual arrival, including turns.
+        self.milepost = results.distances[states]
+
+    def _clear_path(self) -> None:
+        self.path = None
+        self.path_nodes = None
+        self.path_link_directions = None
+        self.milepost = None
+
+    def reset(self) -> None:
+        """Clear search results, paths, labels and skims in place.
+
+        :Returns:
+            ``None``. Allocated result buffers and their read-only views remain
+            valid, but contain their reset sentinel or infinity values.
         """
-        Set the heuristics to be used in A*. Must be one of `get_heuristics()`.
-
-        :Arguments:
-            **heuristic** (:obj:`str`): Heuristic to use in A*.
-        """
-        if heuristic not in HEURISTIC_MAP.keys():
-            raise ValueError(f"heuristic must be one of {self.get_heuristics()}")
-
-        self._heuristic = heuristic
-
-    def get_heuristics(self) -> List[str]:
-        """Return the available heuristics."""
-        return list(HEURISTIC_MAP.keys())
+        self.search_results.reset()
+        if self.skims is not None:
+            self.skims.reset()
+        self._clear_path()
+        self.origin = None
+        self.destination = None
+        self.early_exit = False
+        self._heap = "4ary"
 
     def set_heap(self, heap: str) -> None:
-        """
-        Set the priority queue implementation used for path computation. Must be one of ``get_heaps()``.
+        """Select the priority queue implementation used for path computation.
 
         :Arguments:
-            **heap** (:obj:`str`): Heap to use.
-        """
-        if heap not in HEAP_MAP:
-            raise ValueError(f"heap must be one of {self.get_heaps()}")
+            **heap** (:obj:`str`): Name returned by :meth:`get_heaps`.
 
+        :Returns:
+            ``None``. The selected heap is used by subsequent searches.
+        """
+        if heap != "4ary":
+            raise NotImplementedError("PathResults supports only the four-ary heap")
         self._heap = heap
 
-    def get_heaps(self) -> List[str]:
-        """Return the available priority queue implementations."""
-        return list(HEAP_MAP.keys())
+    def get_heaps(self) -> list[str]:
+        """Return the available priority queue implementation names.
 
-    def __skim_path(self):
-        if self.graph.skim_fields:
-            self.skims.fill(np.inf)
-            self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
-            self.skims[self.skims > self.__graph_sum] = np.inf
+        :Returns:
+            :obj:`list[str]`: Names accepted by :meth:`set_heap`.
+        """
+        return ["4ary"]
+
+    def set_heuristic(self, heuristic: str) -> None:
+        """Select the heuristic used by A* path computation.
+
+        :Arguments:
+            **heuristic** (:obj:`str`): Name returned by :meth:`get_heuristics`.
+
+        :Returns:
+            ``None``. The selected heuristic is used by subsequent A* searches.
+        """
+        raise NotImplementedError("PathResults does not support A* or its heuristics")
+
+    def get_heuristics(self) -> list[str]:
+        """Return the available A* heuristic names.
+
+        :Returns:
+            :obj:`list[str]`: Names accepted by :meth:`set_heuristic`.
+        """
+        return []
+
+    @property
+    def node_ids(self) -> np.ndarray:
+        """External node IDs in context and skim destination order."""
+        return self._mapping.node_ids
+
+    @property
+    def predecessors(self) -> np.ndarray:
+        return self.search_results.predecessors
+
+    @property
+    def connectors(self) -> np.ndarray:
+        return self.search_results.connectors
+
+    @property
+    def settlement_order(self) -> np.ndarray:
+        return self.search_results.settlement_order
+
+    @property
+    def terminal_states(self) -> np.ndarray:
+        return self.search_results.terminal_states
+
+    @property
+    def distances(self) -> np.ndarray:
+        return self.search_results.distances
+
+    @property
+    def turn_costs(self) -> np.ndarray:
+        return self.search_results.turn_costs

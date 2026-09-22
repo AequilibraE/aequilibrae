@@ -13,6 +13,7 @@ pyfiles = [
     'optimal_strategies.py',
     'public_transport.py',
     'route_choice.py',
+    'routing_context.py',
     'sub_area.py',
     'traffic_assignment.py',
     'traffic_class.py',

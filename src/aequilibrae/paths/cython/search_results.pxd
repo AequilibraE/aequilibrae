@@ -37,6 +37,7 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::mvp" n
         double *distances
         double *turn_costs
         CppSearchMetadata *metadata
+        void reset() noexcept
         CppSearchResults read_view() noexcept
 
 

@@ -151,12 +151,15 @@ terminal can mean unreachable or simply not finalized by a partial search.
 Results expose only destination-specific path queries:
 
 - `reachable_to(destination)` reports whether a finalized path is available.
-- `path_links_to(destination)` reconstructs local directed links.
+- `path_states_to(destination)` reconstructs arrival states, including root and terminal.
+- `path_links_to(destination)` maps that state path to local directed links.
 - `path_cost_to(destination)` returns the routing objective.
 - `path_turn_cost_to(destination)` returns its turn-cost component.
 
-A missing path has an empty link array and infinite costs. An origin-to-itself
-path has no links and zero costs. There is no node-path reconstruction method;
+Returned state and link arrays are copies in path order. A missing path has
+empty arrays and infinite costs. An origin-to-itself path has only the root
+state, no links and zero costs. Index `distances` with the state path to obtain
+turn-aware mileposts. There is no node-path reconstruction method;
 callers needing physical nodes use their graph's link heads. Results do not store
 an additional node per state or retain a graph for this purpose.
 
@@ -317,18 +320,17 @@ remains ordinary reference rotation.
 
 `SkimmingContext` retains field meanings and borrowed link buffers, not a routing
 context, results, demand, scratch or output. Its constructor takes a link count
-and four separate named inputs:
+and three separate named inputs:
 
 | Argument | Meaning |
 | --- | --- |
 | `link_fields={name: buffer, ...}` | Sum the supplied link values along the path |
-| `link_fields_with_turn_costs={name: buffer, ...}` | Sum the supplied link values, then add the path's turn cost |
 | `cost_name=name` | Copy the routing objective already stored in results |
 | `turn_cost_name=name` | Copy the turn-cost component already stored in results |
 
-Each argument is optional. The output order is the two mappings in the order
-shown above, preserving insertion order within each mapping, then the two label
-fields. Names must be nonempty strings and unique across all four groups.
+Each argument is optional. Link fields keep their insertion order, followed by
+the cost and turn-cost fields. Names must be nonempty strings and unique across
+all three groups.
 `field_names` records that order; `field_count` includes every output field.
 `additive_field_count` counts only the supplied link buffers.
 
@@ -342,7 +344,9 @@ The two label fields have no input buffer.
 Meanings are explicit. Passing a routing cost buffer as a link field does not
 make it an objective projection or implicitly add penalties. Rebinding a routing
 context's costs does not rebind a skim field. Label projections use the completed
-search's labels even if routing costs have since changed.
+search's labels even if routing costs have since changed. To include turn costs
+in another field, request both that link field and a turn-cost skim, then add
+the two matrices in the calling code.
 
 ### Output storage and one-shot allocation
 
@@ -360,6 +364,9 @@ and dimensions, not an input-owner reference. All three axes may be zero.
 
 Retained views keep buffers alive after the wrapper is deleted. Later calls and
 resets overwrite those views; use `.copy()` for a snapshot.
+`SkimmingOutputs.from_matrices(matrices)` copies a nonempty dictionary of named
+OD matrices into a separate output owner. Reporting code can use this after
+combining fields without changing the raw routing outputs.
 
 `inputs.make_outputs(destination_count, origin_count=1)` is a convenient way to
 allocate matching names and order. One origin row is the default, regardless of
@@ -374,17 +381,16 @@ from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
 skim_inputs = SkimmingContext(
     context.link_count,
     link_fields={"distance": np.ones(context.link_count)},
-    link_fields_with_turn_costs={"time": np.ones(context.link_count)},
     cost_name="objective",
     turn_cost_name="turn_penalty",
 )
 skim_scratch = SkimmingWorkspace(results.state_count, skim_inputs.additive_field_count)
 skim_output = skim_inputs.make_outputs(context.node_count)  # One origin row per field.
-assert skim_output.skims.shape == (1, 4, context.node_count)
+assert skim_output.skims.shape == (1, 3, context.node_count)
 
 skimming(results, skim_inputs, skim_scratch, skim_output)
 matrices = skim_output.matrices
-assert list(matrices) == ["distance", "time", "objective", "turn_penalty"]
+assert list(matrices) == ["distance", "objective", "turn_penalty"]
 assert matrices["objective"][0, results.origin] == 0.0
 
 # Label-only skimming needs neither link buffers nor state-sum scratch.
@@ -409,26 +415,24 @@ extends or changes a search.
 The workspace stays `[states, additive fields]`: the tree pass sums every field
 at a state together. Its width must equal `additive_field_count`, not total field
 count. With additive fields, scratch is replaced on every call: the root is zero,
-finalized states hold link sums, and unfinalized states are infinity. Turn costs
-are added only when writing the output, not into state sums. Paths follow state
-predecessors so they preserve turn history. With no destinations, additive state
+finalized states hold link sums, and unfinalized states are infinity. Link sums
+never include turn costs. Paths follow state predecessors so they preserve turn
+history. With no destinations, additive state
 sums are still computed. With no additive fields, supply `None` for workspace;
 label projection reads terminal labels directly without walking the state tree.
 
 Cython calls an allocation-free C++ operation with `results.read_view()`,
 `context.view()`, a workspace view and `output.view().origin(origin_row)`. The context
-prepares group counts and positions, and both label positions at construction.
+prepares the link-field count and both label positions at construction.
 Each label has a count of zero or one. Its view borrows the link-buffer pointer
-table and exposes boolean methods such as `has_link_fields()` and
-`has_cost_field()`, derived from those counts rather than separate stored flags.
+table and exposes methods such as `needs_state_sums()` and `has_cost_field()`.
 Dispatch uses these names; there are no per-field type tags or label position
 calculations during a call.
 
-The combined operation chooses separate functions once per group: `skim_fields`,
-`skim_fields_with_turn_costs`, `skim_costs` and `skim_turn_costs`. The two additive
-functions project the sums from one shared state-tree pass. Each receives a group
-view and writes a contiguous destination row per field. Label functions receive
-only a destination count and a pointer to their single field's row.
+The operation uses `skim_fields`, `skim_costs` and `skim_turn_costs`.
+`skim_fields` copies the link sums from the state-tree pass into one destination
+row per field. The label functions receive a destination count and a pointer to
+their single field's row.
 No destination/field loop switches on a field's meaning. Selecting these views
 does not allocate, copy or transpose output.
 
@@ -786,8 +790,14 @@ Skim access uses `results.skims.matrices[name]`; selected OD access uses
 `results.select_link_od.matrices[name]`. Their layouts remain those of the new
 owners. `AequilibraeMatrix` is created only for export. Selected OD export writes
 every demand column with a name of the form `selection_trafficClass_demandColumn`.
-Congested skimming retains a separate `TrafficClass.congested_skims` owner rather
-than replacing the last AoN output.
+The requested assignment time field uses `cost_name`, so it copies the search
+distances, including fixed and turn costs. Other fields are plain link sums.
+Congested skimming reports two separate values on those same paths:
+`__assignment_cost__` copies the search distances; `__congested_time__` adds link
+travel time and the separate turn-cost skim. The addition happens in reporting,
+not in the skimming kernel. Tolls affect assignment cost, not congested time.
+`TrafficClass.congested_skims` keeps this separate report rather than replacing
+the last AoN output.
 
 ### Deferred changes
 

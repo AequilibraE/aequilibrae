@@ -11,8 +11,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from aequilibrae.paths.cython.aon_context import PreparedAoN
-from aequilibrae.paths.cython.context import NodeBasedContext, SelectLinkContext, SkimmingContext, TurnBasedContext
+from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext
+from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs, project_link_loads, sum_axis1
+from aequilibrae.paths.routing_context import make_routing_context
 
 if TYPE_CHECKING:
     from aequilibrae.matrix import AequilibraeMatrix
@@ -47,7 +49,10 @@ def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.nd
 
 
 class AssignmentMapping:
-    """Fixed link and zone metadata, independent of later Graph changes."""
+    """Map compact assignment loads to full-network reporting order.
+
+    This is separate from GraphMapping, whose IDs describe only context links.
+    """
 
     def __init__(self, graph: Graph):
         self.link_count = graph.num_links
@@ -127,32 +132,23 @@ class AssignmentInputs:
         self.costs = np.zeros(links, dtype=np.float64)
         self.full_costs = np.zeros(self.mapping.link_count, dtype=np.float64)
 
-        if not np.array_equal(graph.compact_graph.id.to_numpy(), np.arange(links)):
-            raise ValueError("Compact link IDs must match CSR link positions")
+        self.routing = make_routing_context(graph, self.costs, compact=True)
 
-        topology = (graph.compact_fs, graph.compact_graph.b_node.to_numpy(), self.costs)
-        if graph.has_turn_restrictions:
-            # FIXME: Graph's connector-to-connector bans differ from blocking
-            # travel through centroid nodes. Preserve the existing turn branch.
-            # FIXME: Assume compact turn CSR preserves full-network restrictions.
-            self.routing = TurnBasedContext(
-                *topology,
-                turn_fs=graph.compact_turn_fs,
-                turn_to_links=graph.compact_turn_to_arcs,
-                turn_penalties=graph.compact_turn_penalties,
-                allow_uturns=graph.allow_path_uturns,
-                blocked_centroid_count=0,
-            )
-        else:
-            self.routing = NodeBasedContext(
-                *topology, blocked_centroid_count=graph.num_zones if graph.block_centroid_flows else 0
-            )
+        skim_names = graph.skim_fields if skim_fields is None else skim_fields
+        separate_time = cost_name is not None and cost_name != time_field
+        if cost_name is None and time_field in skim_names:
+            cost_name = time_field
 
-        plain_fields = {}
-        turn_fields = {}
-        penalty_fields = graph.turn_skim_fields or [time_field]
+        fields = {}
+        self.time_field = time_field
         self.time_skim = None
-        for name in graph.skim_fields if skim_fields is None else skim_fields:
+        self.turn_cost_name = None
+
+        for name in skim_names:
+            if name == time_field and not separate_time:
+                # The routing distance already includes the turn costs.
+                continue
+
             values = np.zeros(links, dtype=np.float64)
             if name == time_field:
                 self.time_skim = values
@@ -160,11 +156,16 @@ class AssignmentInputs:
                 full = np.empty(self.mapping.link_count, dtype=np.float64)
                 full[self.mapping.graph_ids] = graph.graph[name].to_numpy()
                 self.mapping.aggregate_costs(full, values)
-            fields = turn_fields if graph.has_turn_restrictions and name in penalty_fields else plain_fields
+
             fields[name] = values
 
+        if self.time_skim is not None and graph.has_turn_restrictions:
+            self.turn_cost_name = "__turn_cost__"
+            while self.turn_cost_name in fields or self.turn_cost_name == cost_name:
+                self.turn_cost_name = "_" + self.turn_cost_name
+
         self.skimming = SkimmingContext(
-            links, link_fields=plain_fields, link_fields_with_turn_costs=turn_fields, cost_name=cost_name
+            links, link_fields=fields, cost_name=cost_name, turn_cost_name=self.turn_cost_name
         )
         # A selected link removed by compression can never be used by a path.
         selections = {}
@@ -182,6 +183,17 @@ class AssignmentInputs:
         self.routing.update_costs(self.costs)
         if self.time_skim is not None:
             self.mapping.aggregate_costs(congested_time, self.time_skim)
+
+    def report_skims(self, output: SkimmingOutputs) -> SkimmingOutputs:
+        """Add turn delay to a separate travel-time skim, without changing raw outputs."""
+        if self.turn_cost_name is None:
+            return output
+
+        matrices = output.matrices
+        turn_costs = matrices.pop(self.turn_cost_name)
+        matrices[self.time_field] = matrices[self.time_field] + turn_costs
+
+        return SkimmingOutputs.from_matrices(matrices)
 
     def make_state(self, cores: int, threading_threshold: int) -> AssignmentState:
         return AssignmentState(self.driver.make_outputs(), self.mapping, cores, threading_threshold)
