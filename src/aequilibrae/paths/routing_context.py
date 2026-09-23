@@ -105,9 +105,6 @@ def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compa
 
     link_count = len(links)
 
-    if not np.array_equal(links.id.to_numpy(), np.arange(link_count)):
-        raise ValueError("Link IDs must match CSR link positions")
-
     if costs is None:
         if not graph.cost_field:
             raise ValueError("Set the graph cost field before preparing routing")

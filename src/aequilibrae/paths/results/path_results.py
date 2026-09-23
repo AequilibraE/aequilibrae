@@ -36,7 +36,7 @@ class PathResults:
         heuristic: str | None = None,
         heap: str | None = None,
     ) -> None:
-        """Prepare a full-graph snapshot and compute the initial path.
+        """Prepare graph data and compute the initial path.
 
         :Arguments:
             **graph** (:obj:`Graph`): Prepared graph with a cost field.
@@ -62,7 +62,7 @@ class PathResults:
             raise NotImplementedError("PathResults supports only the four-ary heap")
 
     def set_graph_data(self, graph: Graph) -> None:
-        """Copy graph data into a new full-network routing snapshot.
+        """Prepare graph data for path and skim computation.
 
         :Arguments:
             **graph** (:obj:`Graph`): Prepared graph with a cost field. Its
@@ -116,7 +116,7 @@ class PathResults:
         heuristic: str | None = None,
         heap: str | None = None,
     ) -> None:
-        """Search the snapshot and trace a path between external node IDs.
+        """Search the prepared graph and trace a path between external IDs.
 
         With ``early_exit``, stop when the destination is finalised. Other
         missing terminals may still be reachable; ``update_trace`` searches
@@ -134,7 +134,7 @@ class PathResults:
             ``None``. The search arrays, skims and traced path are updated in place.
 
         :Raises:
-            **ValueError**: If an external node ID is not in the snapshot.
+            **ValueError**: If an external node ID is not in the prepared graph.
         """
         self._check_search_options(a_star, heuristic, heap)
         origin_index = self._mapping.node_index(origin)
@@ -171,7 +171,7 @@ class PathResults:
 
         :Raises:
             **RuntimeError**: If no search has been performed.
-            **ValueError**: If the destination is not in the snapshot.
+            **ValueError**: If the destination is not in the prepared graph.
         """
         index = self._mapping.node_index(destination)
         results = self.search_results

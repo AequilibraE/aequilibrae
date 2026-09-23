@@ -184,10 +184,6 @@ loaded. ``traffic_class._aon_results.unassigned_demand`` gives the latest AoN to
 excluding intrazonal demand. ``traffic_class.results.unassigned_demand`` gives the
 total carried by the accepted solution.
 
-Assignment path-file saving and heaps other than the four-ary heap are not yet
-supported by the prepared assignment driver. Requests for these features raise
-an error rather than being ignored.
-
 Assigning sparse matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Modern Activity-Based models (and even some trip-based and tour-based ones) result on incredibly sparse

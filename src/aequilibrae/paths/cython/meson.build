@@ -5,7 +5,6 @@ pyfiles = [
 ]
 
 exts = [
-    'AoN',
     'aon_context',
     'basic_path_finding',
     'graph_building',

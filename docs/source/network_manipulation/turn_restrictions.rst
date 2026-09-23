@@ -234,7 +234,7 @@ in seconds, turn penalties should also be in seconds.
 Limitations
 -----------
 
-- A* path finding is not supported with turn restrictions. Requesting both raises a runtime error.
+- A* path finding can be used together with turn restrictions.
 - Turn restrictions are defined by 3-node movement sequences (no lane-level control)
 - Complex turn restrictions involving multiple via-nodes are not supported
 

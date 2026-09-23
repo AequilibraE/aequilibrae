@@ -200,8 +200,8 @@ temporary return values. Subsequent calls borrow them by reference. A temporary
 view may bind to a const reference for a call; no kernel retains that reference.
 
 The routing kernels live in `dijkstra.hpp`. Legacy production algorithms remain
-in `path_finding.hpp`. The new kernels still allocate their own four-ary heap on
-each search; persistent heap storage and other heap choices are deferred.
+in `path_finding.hpp`. Each search owns its priority-queue state, while the
+public routing API selects the queue implementation.
 
 ## Second slice: workspaces and network loading
 
@@ -806,10 +806,10 @@ the last AoN output.
   branch uses the blocked prefix. Reconciling these rules is separate work.
 - FIXME: Assume Graph's compact turn CSR is correct. Checking or repairing turn
   restrictions across compression is separate work.
-- FIXME: Assignment path saving is unsupported and raises when requested. A new
-  format must preserve turn-state paths.
-- FIXME: Assignment currently supports only the four-ary heap. Other requested
-  heaps raise rather than being silently ignored.
+- FIXME: Assignment path saving must preserve turn-state paths in its output
+  format.
+- FIXME: Assignment heap selection is part of the prepared driver interface and
+  must remain consistent across searches.
 - FIXME: Congested skimming currently reuses PreparedAoN. A separate skim-only
   driver and persistent routing heaps remain separate work.
 

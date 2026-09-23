@@ -1,9 +1,9 @@
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from typing import List
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
-from aequilibrae.paths.cython.AoN import HEAP_MAP
+from aequilibrae.paths.cython.basic_path_finding import HEAP_MAP
 from aequilibrae.paths.graph import Graph
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
 class SkimResults:

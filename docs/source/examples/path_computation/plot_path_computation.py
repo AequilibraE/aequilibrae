@@ -66,13 +66,12 @@ res = graph.compute_path(32343, 22041)
 
 # %%
 # Computing paths directly from the graph is more straightforward, though we could
-# alternatively use ``PathComputation`` class to achieve the same result.
-
+# alternatively use the ``PathResults`` class to achieve the same result.
+#
 # from aequilibrae.paths import PathResults
-
-# res = PathResults()
-# res.prepare(graph)
-# res.compute_path(32343, 22041)
+# res = PathResults(graph, 32343, 22041)
+#
+# ``graph.compute_path`` has already performed this setup above.
 
 # %%
 # We can get the sequence of nodes we traverse
@@ -100,11 +99,7 @@ res = graph.compute_path(32343, 22041, early_exit=True)
 # If you prefer to find a potentially non-optimal path to the destination faster,
 # provide ``a_star=True`` to use `A*` with a heuristic. This method always recomputes the
 # path's nodes, links, skims, and mileposts with ``update_trace``.
-# A* is not compatible with active turn restrictions, so clear them and turn off
-# centroid-flow blocking for this separate demonstration. Note that a_star takes
-# precedence over early_exit.
-graph.clear_turn_restrictions()
-graph.set_blocked_centroid_flows(False)
+# Note that a_star takes precedence over early_exit.
 res = graph.compute_path(32343, 22041, a_star=True)
 
 # %%
@@ -120,10 +115,9 @@ res = graph.compute_path(32343, 22041, a_star=True, heuristic="haversine")
 # Suppose you want to adjust the path to the University of La Serena instead of Fort Lambert. 
 # It is possible to adjust the existing path computation for this alteration. The following code 
 # allows both `early_exit` and `A*` settings to persist when calling ``update_trace``. If you’d 
-# like to adjust them for subsequent path re-computations set the ``res.early_exit`` and 
-# ``res.a_star`` attributes. Notice that this procedure is much faster when you have large networks.
+# like to adjust them for subsequent path re-computations, call ``compute_path`` with the desired
+# settings. Notice that this procedure is much faster when you have large networks.
 
-res.a_star = False
 res.update_trace(73131)
 
 res.path_nodes

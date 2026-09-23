@@ -41,6 +41,11 @@ HEURISTIC_MAP = {"haversine": Heuristic.HAVERSINE, "equirectangular": Heuristic.
 cdef long long ORIGIN_ARC_SENTINEL = -2
 
 
+def available_heaps() -> list:
+    """Return the priority queue implementations"""
+    return list(HEAP_MAP.keys())
+
+
 cdef int[:] return_an_int_view(input) noexcept nogil:
     cdef int [:] critical_links_view = input
     return critical_links_view

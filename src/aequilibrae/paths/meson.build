@@ -1,7 +1,6 @@
 thisdir = 'aequilibrae/paths'
 
 pyfiles = [
-    'AoN.py',
     '__init__.py',
     'assignment_context.py',
     'assignment_paths.py',

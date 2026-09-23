@@ -124,20 +124,20 @@ def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
         graph.set_turn_restrictions(turn_restrictions)
 
 
-def test_a_star_raises_with_turn_restrictions(sioux_falls_example):
+def test_a_star_with_turn_restrictions(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     graph.prepare_graph()
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)
-
     from_node, via_node, to_node = sample_turn_from_path(graph, 1, 6)
     turn_restrictions = pd.DataFrame(
         {"from_node": [from_node], "via_node": [via_node], "to_node": [to_node], "penalty": [np.inf]}
     )
     graph.set_turn_restrictions(turn_restrictions)
 
-    with pytest.raises(RuntimeError, match="not compatible"):
-        graph.compute_path(1, 6, a_star=True)
+    result = graph.compute_path(1, 6, a_star=True, heuristic="equirectangular")
+    assert result.path_nodes[0] == 1
+    assert result.path_nodes[-1] == 6
 
 
 def test_compute_skims(sioux_falls_example):
