@@ -3,7 +3,6 @@ import logging
 import numpy as np
 from scipy import sparse
 
-from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 logger = logging.getLogger(__name__)
 

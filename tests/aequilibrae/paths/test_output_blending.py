@@ -116,12 +116,16 @@ def sources():
         # The directed cycle reaches every destination. Distinct costs, demand
         # columns and selections expose axis swaps as well as reversed weights.
         context = make_context(
-            [0, 1, 2, 3, 4], [1, 2, 3, 0], np.arange(1, 5, dtype=float) * scale,
-            turns={(0, 1): 2.0 * scale, (1, 2): 3.0 * scale}, turn=True,
+            [0, 1, 2, 3, 4],
+            [1, 2, 3, 0],
+            np.arange(1, 5, dtype=float) * scale,
+            turns={(0, 1): 2.0 * scale, (1, 2): 3.0 * scale},
+            turn=True,
         )
         demand = np.arange(1, 49, dtype=float).reshape(4, 4, 3) * scale
         prepared = PreparedAoN(
-            context, demand,
+            context,
+            demand,
             skimming=SkimmingContext(4, cost_name=SKIMS[0], turn_cost_name=SKIMS[1]),
             selected_links=SelectLinkContext(4, {SETS[0]: [0], SETS[1]: [2, 3]}),
         )
@@ -145,8 +149,7 @@ def test_blends_and_copies_preserve_storage_and_allow_any_source_as_destination(
     addresses = [value.ctypes.data for value in retained]
     weights = WEIGHTS[method]
     expected = [
-        sum(weight * saved[index][0][field] for index, weight in enumerate(weights))
-        for field in range(len(retained))
+        sum(weight * saved[index][0][field] for index, weight in enumerate(weights)) for field in range(len(retained))
     ]
 
     assert apply(output, method, inputs, cores=cores, threading_threshold=threshold) is output
@@ -334,13 +337,18 @@ def test_empty_axes_and_empty_groups(factory, method):
             apply(output, method, inputs, weight=-1.0)
 
 
-@pytest.mark.parametrize("method,weight", [
-    ("blend_cfw", 0.0), ("blend_cfw", 1.0),
-    ("blend_result", 0.0), ("blend_result", 1.0),
-    ("blend_bfw", (0.0, 0.3, 0.7)),
-    ("blend_bfw", (0.3, 0.0, 0.7)),
-    ("blend_bfw", (0.3, 0.7, 0.0)),
-])
+@pytest.mark.parametrize(
+    "method,weight",
+    [
+        ("blend_cfw", 0.0),
+        ("blend_cfw", 1.0),
+        ("blend_result", 0.0),
+        ("blend_result", 1.0),
+        ("blend_bfw", (0.0, 0.3, 0.7)),
+        ("blend_bfw", (0.3, 0.0, 0.7)),
+        ("blend_bfw", (0.3, 0.7, 0.0)),
+    ],
+)
 @pytest.mark.parametrize("grouped", (False, True))
 def test_zero_weight_skims_warn_and_keep_existing_infinity_arithmetic(caplog, method, weight, grouped):
     # Unwritten skim entries start at infinity. A zero weight is deliberately
@@ -386,8 +394,14 @@ def test_rectangular_outputs_and_retained_named_views(method, kind):
             else:
                 demand = np.arange(20, dtype=float).reshape(4, 5) * scale * (row + 1)
                 select_link_loading(
-                    results, LoadingQuery(demand), selections, SelectLinkWorkspace(context.state_count),
-                    None, None, output, origin_row=row,
+                    results,
+                    LoadingQuery(demand),
+                    selections,
+                    SelectLinkWorkspace(context.state_count),
+                    None,
+                    None,
+                    output,
+                    origin_row=row,
                 )
         inputs.append(output)
     output = inputs[-1]

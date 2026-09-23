@@ -472,9 +472,7 @@ def test_congested_time_excludes_tolls_but_keeps_turn_delay(turn):
 
 def test_congested_skim_reporting_does_not_add_turn_delay_twice():
     graph = diamond(True)
-    inputs = AssignmentInputs(
-        graph, matrix_for(graph), "time", {}, 1, cost_name="assignment_cost"
-    )
+    inputs = AssignmentInputs(graph, matrix_for(graph), "time", {}, 1, cost_name="assignment_cost")
     full = np.empty(graph.num_links)
     full[inputs.mapping.graph_ids] = graph.graph.time.to_numpy()
     inputs.update_costs(full, np.zeros_like(full))

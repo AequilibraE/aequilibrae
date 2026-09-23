@@ -87,9 +87,7 @@ def test_each_combination_of_skim_groups(plain, cost, turn_cost):
         saved_other_row = output.skims[1 - row].copy()
         search(context, origin, results=results)
         skimming(results, inputs, scratch, output, origin_row=row)
-        np.testing.assert_array_equal(
-            output.skims[row], path_walk_skims(results, inputs, 3, "cost", "turns")
-        )
+        np.testing.assert_array_equal(output.skims[row], path_walk_skims(results, inputs, 3, "cost", "turns"))
         np.testing.assert_array_equal(output.skims[1 - row], saved_other_row)
 
 
@@ -186,9 +184,7 @@ def test_borrowing_and_field_meanings_survive_objective_rebinding(turn):
     np.testing.assert_array_equal(output.skims, previous)
     search(context, 0, results=results)
     skimming(results, inputs, scratch, output)
-    np.testing.assert_array_equal(
-        output.skims[0], path_walk_skims(results, inputs, 4, "objective", "penalty")
-    )
+    np.testing.assert_array_equal(output.skims[0], path_walk_skims(results, inputs, 4, "objective", "penalty"))
     assert output.matrices["objective"][0, 1] == 2
     assert output.matrices["links"][0, 1] == 1
 
@@ -279,9 +275,7 @@ def test_zero_cost_cycle_and_nonfinite_link_fields(turn):
 
 def test_link_fields_and_turn_costs_can_be_added_by_the_caller():
     context = history_context(0.5)
-    inputs = SkimmingContext(
-        4, link_fields={"links": context.costs}, cost_name="cost", turn_cost_name="turns"
-    )
+    inputs = SkimmingContext(4, link_fields={"links": context.costs}, cost_name="cost", turn_cost_name="turns")
     output = inputs.make_outputs(4)
     results = search(context, 0)
     skimming(results, inputs, workspace_for(context, inputs), output)
