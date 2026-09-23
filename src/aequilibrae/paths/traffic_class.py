@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph
@@ -152,7 +153,8 @@ class TrafficClass(TransportClassBase):
 
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
-        if np.any(np.isnan(self.graph.graph[field_name].values)):
+        self.graph.graph[field_name] = pd.to_numeric(self.graph.graph[field_name], errors="raise").astype(np.float64)
+        if np.any(pd.isna(self.graph.graph[field_name].to_numpy())):
             logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
         if self.graph.graph[field_name].min() < 0:

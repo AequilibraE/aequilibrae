@@ -158,10 +158,16 @@ class AssignmentBase(ABC):
             if field not in c.graph.graph.columns:
                 raise ValueError(f"'{field}' not in graph for '{c._id}'")
 
-            if np.any(np.isnan(c.graph.graph[field].values)):
+            try:
+                c.graph.graph[field] = pd.to_numeric(c.graph.graph[field], errors="raise").astype(np.float64)
+                values = c.graph.graph[field].to_numpy(dtype=np.float64)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Field {field} must contain numeric values for '{c._id}'") from exc
+
+            if np.any(pd.isna(values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
+            if values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
     def set_time_field(self, time_field: str) -> None:

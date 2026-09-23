@@ -42,8 +42,8 @@ class OptimalStrategies:
 
             # The HyperpathGenerating maps taz_id, taz_id -> O, D, we then take the COO matrix and index into that
             self.__demand_cols[cls._id] = {
-                "origin_column": hypergraph._o_vert_ids[demand.row].to_numpy(dtype=np.uint32),
-                "destination_column": hypergraph._d_vert_ids[demand.col].to_numpy(dtype=np.uint32),
+                "origin_column": hypergraph._o_vert_ids[demand.row].astype(np.uint32),
+                "destination_column": hypergraph._d_vert_ids[demand.col].astype(np.uint32),
                 "demand_column": demand.data,
             }
 

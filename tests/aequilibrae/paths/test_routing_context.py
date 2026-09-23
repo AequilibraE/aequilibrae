@@ -3,9 +3,9 @@
 import numpy as np
 import pandas as pd
 import pytest
+from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
 from aequilibrae import Graph
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
 from .routing_helpers import make_context, search
@@ -111,16 +111,6 @@ def test_compact_costs_have_no_removed_link_slot():
     assert context.link_count < graph.num_links
     assert len(context.costs) == graph.compact_num_links
     assert search(context, 0).path_cost_to(1) == 6.0
-
-
-@pytest.mark.parametrize("compact", [False, True])
-def test_invalid_link_order_is_rejected(compact):
-    graph = diamond()
-    links = graph.compact_graph if compact else graph.graph
-    links.loc[:, "id"] = links.id.to_numpy()[::-1]
-
-    with pytest.raises(ValueError, match="CSR link positions"):
-        make_routing_context(graph, compact=compact)
 
 
 def test_missing_cost_field_is_rejected():

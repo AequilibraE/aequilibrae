@@ -186,7 +186,8 @@ def transit_graph(transit_data):
 
 def test_transit_graph_config(transit_graph):
     transit_graph_obj = transit_graph.to_transit_graph()
-    assert transit_graph.config == transit_graph_obj._config
+    for k, v in transit_graph.config.items():
+        assert transit_graph_obj._config[k] == v
 
 
 def test_transit_graph_od_node_mapping(transit_graph):

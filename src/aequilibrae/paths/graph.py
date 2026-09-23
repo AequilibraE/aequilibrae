@@ -528,6 +528,12 @@ class GraphBase(ABC):  # noqa: B024
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
+        try:
+            for field in skim_fields:
+                self.graph[field] = pd.to_numeric(self.graph[field], errors="raise").astype(np.float64)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Skim fields must contain numeric values: {exc}") from exc
+
         if self.centroids is not None and self.centroids.shape[0]:
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
@@ -1429,9 +1435,6 @@ class NewTransitGraph:
 
         self.od_node_mapping = od_node_mapping.copy()
         o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
-
-        self.od_node_mapping["idx"] = self.od_node_mapping.index
-        self.od_node_mapping = self.od_node_mapping.set_index("taz_id")
 
         self.all_nodes, self.nodes_to_indices, _, self.graph = _build_directed_graph(
             self.network, self.centroids, build_fs=False
