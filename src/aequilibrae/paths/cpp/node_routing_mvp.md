@@ -808,8 +808,8 @@ the last AoN output.
   restrictions across compression is separate work.
 - FIXME: Assignment path saving must preserve turn-state paths in its output
   format.
-- FIXME: Assignment heap selection is part of the prepared driver interface and
-  must remain consistent across searches.
+- Assignment heap selection is configurable through the prepared driver and is
+  kept consistent across searches.
 - FIXME: Congested skimming currently reuses PreparedAoN. A separate skim-only
   driver and persistent routing heaps remain separate work.
 

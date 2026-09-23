@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.parameters import Parameters
+from aequilibrae.paths.cython.basic_path_finding import available_heaps
 from aequilibrae.paths.graph import _get_graph_to_network_mapping
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores, resolve_elementwise_cores
 from aequilibrae.utils.core_setter import resolve_threading_threshold
@@ -107,14 +108,13 @@ class AssignmentResults(AssignmentResultsBase):
         self.state.update_totals()
 
     def set_heap(self, heap):
-        # FIXME: Add assignment heap selection to PreparedAoN.
-        if heap != "4ary":
-            raise NotImplementedError("Assignment currently supports only the 4ary heap")
+        if heap not in available_heaps():
+            raise ValueError(f"heap must be one of {available_heaps()}")
         self._heap = heap
 
     @staticmethod
     def get_heaps():
-        return ["4ary"]
+        return available_heaps()
 
     def get_graph_to_network_mapping(self):
         mapping = self.state.mapping

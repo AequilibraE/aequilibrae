@@ -124,6 +124,7 @@ class AssignmentInputs:
         *,
         skim_fields: list[str] | None = None,
         cost_name: str | None = None,
+        heap: str = "4ary",
     ):
         self.mapping = AssignmentMapping(graph)
         self.demand = assignment_demand(matrix, self.mapping.centroids)
@@ -174,7 +175,7 @@ class AssignmentInputs:
             selections[name] = indices[indices != links]
         self.selection = SelectLinkContext(links, selections)
         self.driver = PreparedAoN(
-            self.routing, self.demand, cores=cores, skimming=self.skimming, selected_links=self.selection
+            self.routing, self.demand, cores=cores, skimming=self.skimming, selected_links=self.selection, heap=heap
         )
 
     def update_costs(self, congested_time: np.ndarray, fixed_cost: np.ndarray) -> None:

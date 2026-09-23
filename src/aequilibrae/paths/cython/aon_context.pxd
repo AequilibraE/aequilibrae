@@ -1,18 +1,11 @@
 from libc.stddef cimport size_t
-from aequilibrae.paths.cython.context cimport (
-    CppNodeBasedContext, CppTurnBasedContext, CppSkimmingContext, CppSelectLinkContext,
-)
+from aequilibrae.paths.cython.context cimport CppSkimmingContext, CppSelectLinkContext
 from aequilibrae.paths.cython.queries cimport CppSearchQuery, CppLoadingQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
 from aequilibrae.paths.cython.workspaces cimport CppAoNWorkspace
 from aequilibrae.paths.cython.outputs cimport (
     CppLoadingOutputs, CppSelectLinkLoadingOutputsView,
 )
-
-
-ctypedef fused RoutingView:
-    CppNodeBasedContext
-    CppTurnBasedContext
 
 
 cdef extern from "aon.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:

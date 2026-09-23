@@ -55,19 +55,21 @@ def test_compute_paths(p_results):
             assert list(result.milepost) == [0, 4, 9]
 
 
-def test_compute_with_skimming(p_results):
+@pytest.mark.parametrize("heap", available_heaps())
+def test_compute_with_skimming(p_results, heap):
     graph = p_results["g"]
     graph.set_skimming("free_flow_time")
     for early_exit in [True, False]:
-        result = PathResults(graph, origin, dest, early_exit=early_exit)
+        result = PathResults(graph, origin, dest, early_exit=early_exit, heap=heap)
         destination = int(np.flatnonzero(result.node_ids == 13)[0])
         assert result.milepost[-1] == result.skims.matrices["free_flow_time"][0, destination]
 
 
-def test_update_trace(p_results):
+@pytest.mark.parametrize("heap", available_heaps())
+def test_update_trace(p_results, heap):
     graph = p_results["g"]
     for early_exit in [True, False]:
-        result = PathResults(graph, origin, 2, early_exit=early_exit)
+        result = PathResults(graph, origin, 2, early_exit=early_exit, heap=heap)
         result.update_trace(10)
         assert list(result.path) == [13, 25]
         assert list(result.path_link_directions) == [1, 1]

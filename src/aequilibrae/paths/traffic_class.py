@@ -237,6 +237,7 @@ class TrafficClass(TransportClassBase):
             self.results.cores,
             skim_fields=fields + ["__congested_time__"],
             cost_name="__assignment_cost__",
+            heap=self.results._heap,
         )
         inputs.update_costs(self.congested_time, self.fixed_cost)
         # FIXME: Use a separate skim-only driver when one is available.

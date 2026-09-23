@@ -3,6 +3,7 @@
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths import available_heaps
 
 
 @pytest.fixture
@@ -32,7 +33,9 @@ def test_path_file_format_is_explicitly_unsupported(assignment, format):
         assignment.set_path_file_format(format)
 
 
-@pytest.mark.parametrize("heap", ["std", "pairing"])
-def test_assignment_heap_selection_is_explicitly_unsupported(assignment, heap):
-    with pytest.raises(NotImplementedError, match="4ary"):
-        assignment.classes[0].set_heap(heap)
+@pytest.mark.parametrize("heap", available_heaps())
+def test_assignment_accepts_available_heaps(assignment, heap):
+    traffic = assignment.classes[0]
+    traffic.set_heap(heap)
+    assert traffic.results._heap == heap
+    assert traffic._aon_results._heap == heap

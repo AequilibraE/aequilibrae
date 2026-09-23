@@ -511,11 +511,14 @@ class LinearApproximation(WorkerThread):
         """Make the spare current, keeping only the history the method needs."""
         if self.algorithm == "cfw":
             self.step_direction[c_id], self.spare_direction[c_id] = (
-                self.spare_direction[c_id], self.step_direction[c_id]
+                self.spare_direction[c_id],
+                self.step_direction[c_id],
             )
         else:
             self.step_direction[c_id], self.previous_step_direction[c_id], self.spare_direction[c_id] = (
-                self.spare_direction[c_id], self.step_direction[c_id], self.previous_step_direction[c_id]
+                self.spare_direction[c_id],
+                self.step_direction[c_id],
+                self.previous_step_direction[c_id],
             )
 
     def __retry_with_fw_direction(self, msg: str):
@@ -539,13 +542,12 @@ class LinearApproximation(WorkerThread):
         self.blend_options = {"cores": self.elementwise_cores, "threading_threshold": self.threading_threshold}
 
         for c in self.traffic_classes:
-            # FIXME: Add turn-state path saving and assignment heap selection.
+            # FIXME: Add turn-state path saving.
             if c.results.save_path_file or c._aon_results.save_path_file:
                 raise NotImplementedError("Path file saving is not supported by the prepared assignment driver")
-            if c.results._heap != "4ary" or c._aon_results._heap != "4ary":
-                raise NotImplementedError("Assignment currently supports only the 4ary heap")
-
-            inputs = AssignmentInputs(c.graph, c.matrix, self.time_field, c._selected_links, self.cores)
+            inputs = AssignmentInputs(
+                c.graph, c.matrix, self.time_field, c._selected_links, self.cores, heap=c.results._heap
+            )
             self.inputs[c._id] = inputs
             for results in (c.results, c._aon_results):
                 results.bind(inputs.make_state(self.elementwise_cores, self.threading_threshold), inputs.class_names)
@@ -607,7 +609,9 @@ class LinearApproximation(WorkerThread):
                 if c._aon_results.unassigned_demand:
                     logger.warning(
                         "Class %s, iteration %s: %g demand could not be assigned",
-                        c._id, self.iter, c._aon_results.unassigned_demand,
+                        c._id,
+                        self.iter,
+                        c._aon_results.unassigned_demand,
                     )
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
@@ -793,7 +797,8 @@ class LinearApproximation(WorkerThread):
             alpha_max = min(1.0, 1.0 / max(self.iter, 1) ** 0.5) if self.algorithm == "bfw" else 1.0
             derivative_of_objective_stepsize_independent = (
                 self.__derivative_of_objective_stepsize_independent()
-                + self._direction_turn_cost() - self.fw_total_turn_cost
+                + self._direction_turn_cost()
+                - self.fw_total_turn_cost
             )
             res = minimize_scalar(
                 partial(
@@ -907,7 +912,8 @@ class LinearApproximation(WorkerThread):
                         derivative_scale += float(
                             np.sum(
                                 np.abs(
-                                    c.pce * c.fixed_cost
+                                    c.pce
+                                    * c.fixed_cost
                                     * (self.step_direction[c._id].total_link_loads - c.results.total_link_loads)
                                 )
                             )

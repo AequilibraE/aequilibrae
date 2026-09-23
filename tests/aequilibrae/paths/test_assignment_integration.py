@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from aequilibrae import Graph, TrafficAssignment, TrafficClass
+from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
@@ -72,6 +73,17 @@ def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, core
     assignment.rgap_target = 0.0
     assignment.set_algorithm(algorithm)
     return assignment, traffic
+
+
+@pytest.mark.parametrize("heap", available_heaps())
+@pytest.mark.parametrize("turn", [False, True])
+def test_assignment_uses_selected_heap(heap, turn):
+    assignment, traffic = assignment_for(diamond(turn))
+    traffic.set_heap(heap)
+    assert traffic.results.get_heaps() == available_heaps()
+    assignment.execute()
+    assert traffic.results._heap == traffic._aon_results._heap == heap
+    assert traffic.results.get_load_results().loc[71, "work_ab"] == 8.0
 
 
 @pytest.mark.parametrize("turn", [False, True])

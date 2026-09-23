@@ -1,5 +1,6 @@
 import numpy as np
 
+from aequilibrae.paths.cython.basic_path_finding import available_heaps
 from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.queries import SearchQuery
@@ -51,15 +52,18 @@ class PathResults:
             **ValueError**: If an external node ID is not in the graph snapshot.
         """
         self._check_search_options(a_star, heuristic, heap)
+        self._heap = "4ary"
         self.set_graph_data(graph)
-        self.compute_path(origin, destination, early_exit=early_exit, heap=heap)
+        if heap is not None:
+            self.set_heap(heap)
+        self.compute_path(origin, destination, early_exit=early_exit)
 
     @staticmethod
     def _check_search_options(a_star, heuristic, heap):
         if a_star or heuristic is not None:
             raise NotImplementedError("PathResults does not support A* or its heuristics")
-        if heap is not None and heap != "4ary":
-            raise NotImplementedError("PathResults supports only the four-ary heap")
+        if heap is not None and heap not in available_heaps():
+            raise ValueError(f"heap must be one of {available_heaps()}")
 
     def set_graph_data(self, graph: Graph) -> None:
         """Prepare graph data for path and skim computation.
@@ -146,7 +150,7 @@ class PathResults:
             targets[destination_index] = True
 
         query = SearchQuery(self.nodes, origin_index, targets)
-        dijkstra(self.context, query, self.search_results)
+        dijkstra(self.context, query, self.search_results, heap=self._heap if heap is None else heap)
 
         self.origin = origin
         self.destination = destination
@@ -220,7 +224,6 @@ class PathResults:
         self.origin = None
         self.destination = None
         self.early_exit = False
-        self._heap = "4ary"
 
     def set_heap(self, heap: str) -> None:
         """Select the priority queue implementation used for path computation.
@@ -231,8 +234,8 @@ class PathResults:
         :Returns:
             ``None``. The selected heap is used by subsequent searches.
         """
-        if heap != "4ary":
-            raise NotImplementedError("PathResults supports only the four-ary heap")
+        if heap not in available_heaps():
+            raise ValueError(f"heap must be one of {available_heaps()}")
         self._heap = heap
 
     def get_heaps(self) -> list[str]:
@@ -241,7 +244,7 @@ class PathResults:
         :Returns:
             :obj:`list[str]`: Names accepted by :meth:`set_heap`.
         """
-        return ["4ary"]
+        return available_heaps()
 
     def set_heuristic(self, heuristic: str) -> None:
         """Select the heuristic used by A* path computation.
