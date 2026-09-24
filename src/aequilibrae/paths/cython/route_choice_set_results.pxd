@@ -1,10 +1,11 @@
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_types cimport (
     RouteVec_t,
-    RouteSet_t,
+    RouteCandidate, RouteCandidateSet_t,
 )
 
 from libcpp.vector cimport vector
+from libcpp.utility cimport pair
 from libcpp.memory cimport shared_ptr
 from libc.stdint cimport *
 
@@ -16,7 +17,7 @@ cdef class RouteChoiceSetResults:
         bint perform_assignment
         double cutoff_prob
         double beta
-        double[:] cost_view
+        const double[:] cost_view
         const unsigned int [:] mapping_idx
         const int64_t [::] mapping_data
         const int64_t [::] link_id_direction
@@ -31,7 +32,12 @@ cdef class RouteChoiceSetResults:
         readonly object table
 
     @staticmethod
-    cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil
+    cdef void route_set_to_route_vec(
+        RouteVec_t &route_vec,
+        vector[vector[double]] &route_turns,
+        RouteCandidateSet_t &route_set,
+        bint save_turns
+    ) noexcept nogil
 
     cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil
@@ -43,6 +49,7 @@ cdef class RouteChoiceSetResults:
         RouteChoiceSetResults self,
         size_t i,
         RouteVec_t &route_set,
+        const vector[vector[double]] &route_turns,
         bint *found_zero_cost,
         size_t thread_id
     ) noexcept nogil
@@ -51,6 +58,7 @@ cdef class RouteChoiceSetResults:
         RouteChoiceSetResults self,
         vector[double] &cost_vec,
         const RouteVec_t &route_set,
+        const vector[vector[double]] &route_turns,
         const double[:] cost_view,
         bint *found_zero_cost
     ) noexcept nogil
@@ -75,6 +83,8 @@ cdef class RouteChoiceSetResults:
         const RouteVec_t &route_set,
         const vector[long long] &keys,
         const vector[long long] &counts,
+        const vector[pair[long long, long long]] &turns,
+        const vector[vector[double]] &route_turns,
         const vector[double] &total_cost,
         const vector[bint] &route_mask,
         const double[:] cost_view

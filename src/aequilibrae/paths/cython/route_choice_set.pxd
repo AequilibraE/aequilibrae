@@ -4,26 +4,23 @@ from aequilibrae.paths.cython.route_choice_link_loading_results cimport LinkLoad
 
 from libcpp.vector cimport vector
 
-from aequilibrae.paths.cython.route_choice_types cimport RouteSet_t
+from aequilibrae.paths.cython.route_choice_types cimport RouteCandidateSet_t
+from aequilibrae.paths.cython.context cimport CppNodeBasedContext, CppTurnBasedContext
+from aequilibrae.paths.cython.queries cimport CppSearchQuery
+from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
 from libc.stdint cimport *
 
 
 cdef class RouteChoiceSet:
     cdef:
-        double [::1] cost_view
-        long long [::1] graph_fs_view
-        const long long [:] b_nodes_view
+        const double [::1] cost_view
+        object routing
+        bint turn_based
+        bint has_turn_costs
         long long [::1] nodes_to_indices_view
-        double [::1] lat_view
-        double [::1] lon_view
-        const long long [::1] ids_graph_view
         const long long [::1] graph_compressed_id_view
-        long long [:] compressed_link_ids
         long long num_nodes
         long long num_links
-        long long zones
-        bint block_flows_through_centroids
-        bint a_star
 
         unsigned int [:] mapping_idx
         int64_t [::] mapping_data
@@ -34,60 +31,47 @@ cdef class RouteChoiceSet:
 
     cdef void path_find(
         RouteChoiceSet self,
-        long origin_index,
-        long dest_index,
-        double [::1] scratch_cost,
-        long long [::1] thread_predecessors,
-        long long [::1] thread_conn,
-        long long [::1] thread_b_nodes,
-        long long [::1] thread_reached_first,
-        unsigned char [::1] thread_destinations
+        CppSearchQuery &query,
+        const CppMutableSearchResults &result,
+        const CppNodeBasedContext &node_context,
+        const CppTurnBasedContext &turn_context
     ) noexcept nogil
 
     cdef void bfsle(
         RouteChoiceSet self,
-        RouteSet_t &route_set,
+        RouteCandidateSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
         double [::1] thread_cost,
-        long long [::1] thread_predecessors,
-        long long [::1] thread_conn,
-        long long [::1] thread_b_nodes,
-        long long [::1] _thread_reached_first,
-        unsigned char [::1] thread_destinations,
-        double penatly,
-        unsigned int seed
+        CppSearchQuery &query,
+        const CppMutableSearchResults &result,
+        const CppNodeBasedContext &node_context,
+        const CppTurnBasedContext &turn_context,
+        double penalty,
+        unsigned int seed,
+        bint save_turns
     ) noexcept nogil
 
     cdef void link_penalisation(
         RouteChoiceSet self,
-        RouteSet_t &route_set,
+        RouteCandidateSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
         double [::1] thread_cost,
-        long long [::1] thread_predecessors,
-        long long [::1] thread_conn,
-        long long [::1] thread_b_nodes,
-        long long [::1] _thread_reached_first,
-        unsigned char [::1] thread_destinations,
-        double penatly,
-        unsigned int seed
+        CppSearchQuery &query,
+        const CppMutableSearchResults &result,
+        const CppNodeBasedContext &node_context,
+        const CppTurnBasedContext &turn_context,
+        double penalty,
+        unsigned int seed,
+        bint save_turns
     ) noexcept nogil
-
-    # @staticmethod
-    # cdef vector[vector[double] *] *compute_path_files(
-    #     vector[pair[long long, long long]] &ods,
-    #     vector[RouteSet_t *] &results,
-    #     vector[vector[long long] *] &link_union_set,
-    #     vector[vector[double] *] &prob_set,
-    #     unsigned int cores
-    # ) noexcept nogil
 
 
 cdef class Checkpoint:

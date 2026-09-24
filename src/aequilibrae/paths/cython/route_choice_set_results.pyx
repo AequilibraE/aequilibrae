@@ -1,4 +1,5 @@
-from libcpp.algorithm cimport min_element, sort, lower_bound
+from libcpp.algorithm cimport min_element, sort, lower_bound, upper_bound
+from libcpp.utility cimport pair
 from libc.math cimport INFINITY, exp, pow, log
 from libcpp.memory cimport shared_ptr, make_shared
 
@@ -28,7 +29,7 @@ cdef class RouteChoiceSetResults:
             cutoff_prob: float,
             beta: float,
             num_links: int,
-            double[:] cost_view,
+            const double[:] cost_view,
             const unsigned int [:] mapping_idx,
             const int64_t [::] mapping_data,
             const int64_t [::] link_id_direction,
@@ -171,23 +172,38 @@ cdef class RouteChoiceSetResults:
         return df
 
     @staticmethod
-    cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil:
-        """
-        Transform a set of raw pointers to routes (vectors) into a vector of unique points to
-        routes.
-        """
-        cdef vector[long long] *route
+    cdef void route_set_to_route_vec(
+        RouteVec_t &route_vec,
+        vector[vector[double]] &route_turns,
+        RouteCandidateSet_t &route_set,
+        bint save_turns
+    ) noexcept nogil:
+        """Move links and any needed turn steps into matching output positions."""
+        cdef RouteCandidate *candidate
+        cdef vector[RouteCandidate *] candidates
 
         route_vec.reserve(route_set.size())
-        for route in route_set:
-            route_vec.emplace_back(route)
+        if save_turns:
+            route_turns.reserve(route_set.size())
 
-        # We now drop all references to those raw pointers. The unique pointers now own those vectors.
+        for candidate in route_set:
+            candidates.push_back(candidate)
+
+        # Remove candidates from the hash set before moving their link keys.
         route_set.clear()
+        for candidate in candidates:
+            route_vec.emplace_back(new vector[long long]())
+            d(route_vec.back()).swap(candidate.links)
+
+            if save_turns:
+                route_turns.emplace_back()
+                route_turns.back().swap(candidate.turn_steps)
+
+            del candidate
 
     cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil:
         """
-        Return either a new empty RouteSet_t, or the RouteSet_t (initially empty) corresponding to a OD pair index.
+        Return either a new route vector or the stored route vector for this OD pair.
 
         If `self.store_results` is False no attempt is made to store the route set. The caller is responsible for
         maintaining a reference to it.
@@ -198,7 +214,7 @@ cdef class RouteChoiceSetResults:
             # All elements of self.__route_vecs have been initialised in self.__init__.
             return self.__route_vecs[i]
         else:
-            # We make a new empty RouteSet_t here, we don't attempt to store it.
+            # Make a temporary route vector without storing it.
             return make_shared[RouteVec_t]()
 
     cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
@@ -217,6 +233,7 @@ cdef class RouteChoiceSetResults:
         RouteChoiceSetResults self,
         size_t i,
         RouteVec_t &route_set,
+        const vector[vector[double]] &route_turns,
         bint *found_zero_cost,
         size_t thread_id
     ) noexcept nogil:
@@ -233,6 +250,10 @@ cdef class RouteChoiceSetResults:
             shared_ptr[vector[double]] cost_vec
             shared_ptr[vector[bint]] route_mask
             vector[long long] keys, counts
+            vector[pair[long long, long long]] turns
+            pair[long long, long long] turn
+            size_t j
+            long long previous, link
             shared_ptr[vector[double]] path_overlap_vec
             shared_ptr[vector[double]] prob_vec
 
@@ -246,14 +267,30 @@ cdef class RouteChoiceSetResults:
         path_overlap_vec = self.__get_path_overlap_set(i)
         prob_vec = self.get_prob_vec(i)
 
-        self.compute_cost(d(cost_vec), route_set, self.cost_view, found_zero_cost)
+        self.compute_cost(d(cost_vec), route_set, route_turns, self.cost_view, found_zero_cost)
         self.compute_mask(d(route_mask), d(cost_vec))
         self.compute_frequency(keys, counts, route_set, d(route_mask))
+
+        if route_turns.size() and route_turns[0].size():
+            for j in range(route_set.size()):
+                if not d(route_mask)[j]:
+                    continue
+                previous = -1
+                for link in d(route_set[j]):
+                    if previous != -1:
+                        turn.first = previous
+                        turn.second = link
+                        turns.push_back(turn)
+                    previous = link
+            sort(turns.begin(), turns.end())
+
         self.compute_path_overlap(
             d(path_overlap_vec),
             route_set,
             keys,
             counts,
+            turns,
+            route_turns,
             d(cost_vec),
             d(route_mask),
             self.cost_view
@@ -270,24 +307,26 @@ cdef class RouteChoiceSetResults:
         RouteChoiceSetResults self,
         vector[double] &cost_vec,
         const RouteVec_t &route_set,
-        const double[:]
-        cost_view,
+        const vector[vector[double]] &route_turns,
+        const double[:] cost_view,
         bint *found_zero_cost
     ) noexcept nogil:
         """Compute the cost each route."""
         cdef:
             # Scratch objects
             double cost
-            long long link
-            size_t i
+            size_t i, j
 
+        cdef bint has_turn_steps = route_turns.size() and route_turns[0].size()
         cost_vec.resize(route_set.size())
 
         found_zero_cost[0] = False
         for i in range(route_set.size()):
             cost = 0.0
-            for link in d(route_set[i]):
-                cost = cost + cost_view[link]
+            for j in range(d(route_set[i]).size()):
+                cost = cost + cost_view[d(route_set[i])[j]]
+                if has_turn_steps:
+                    cost = cost + route_turns[i][j]
 
             cost_vec[i] = cost
             if cost == 0.0:
@@ -403,6 +442,8 @@ cdef class RouteChoiceSetResults:
         const RouteVec_t &route_set,
         const vector[long long] &keys,
         const vector[long long] &counts,
+        const vector[pair[long long, long long]] &turns,
+        const vector[vector[double]] &route_turns,
         const vector[double] &total_cost,
         const vector[bint] &route_mask,
         const double[:] cost_view
@@ -420,10 +461,13 @@ cdef class RouteChoiceSetResults:
         cdef:
             # Scratch objects
             vector[long long].const_iterator link_iter
+            vector[pair[long long, long long]].const_iterator turn_begin, turn_end
+            pair[long long, long long] turn
             double path_overlap
-            long long link
-            size_t i
+            long long link, previous
+            size_t i, j
 
+        cdef bint has_turn_steps = route_turns.size() and route_turns[0].size()
         path_overlap_vec.resize(route_set.size())
 
         for i in range(route_set.size()):
@@ -432,7 +476,9 @@ cdef class RouteChoiceSetResults:
                 continue
 
             path_overlap = 0.0
-            for link in d(route_set[i]):
+            previous = -1
+            for j in range(d(route_set[i]).size()):
+                link = d(route_set[i])[j]
                 # We know the frequency table is ordered and contains every link in the union of the routes.
                 # We want to find the index of the link, and use that to look up it's frequency
                 link_iter = lower_bound(keys.cbegin(), keys.cend(), link)
@@ -442,6 +488,15 @@ cdef class RouteChoiceSetResults:
                 if link_iter == keys.cend():
                     continue
                 path_overlap = path_overlap + cost_view[link] / counts[link_iter - keys.cbegin()]
+
+                if has_turn_steps and previous != -1:
+                    turn.first = previous
+                    turn.second = link
+                    turn_begin = lower_bound(turns.cbegin(), turns.cend(), turn)
+                    turn_end = upper_bound(turns.cbegin(), turns.cend(), turn)
+                    path_overlap = path_overlap + route_turns[i][j] / (turn_end - turn_begin)
+
+                previous = link
 
             path_overlap_vec[i] = path_overlap / total_cost[i]
 

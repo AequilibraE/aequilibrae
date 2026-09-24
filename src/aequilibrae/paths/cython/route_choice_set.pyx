@@ -1,89 +1,58 @@
 # cython: language_level=3str
-"""This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen, 'Route
-Choice Sets for Very High-Resolution Data'.  https://doi.org/10.1080/18128602.2012.671383
-
-A rough overview of the algorithm is as follows.
-    1. Prepare the initial graph, this is depth 0 with no links removed.
-    2. Find a short path, P. If P is not empty add P to the path set.
-    3. For all links p in P, remove p from E, compounding with the previously removed links.
-    4. De-duplicate the sub-graphs, we only care about unique sub-graphs.
-    5. Go to 2.
-
-Details: The general idea of the algorithm is pretty simple, as is the implementation. The caveats here is that there is
-a lot of cpp interop and memory management. A description of the purpose of variables is in order:
-
-route_set: See route_choice.pxd for full type signature. It's an unordered set (hash set) of pointers to vectors of link
-IDs. It uses a custom hashing function and comparator. The hashing function is defined in a string that in inlined
-directly into the output cpp. This is done allow declaring of the `()` operator, which is required and AFAIK not
-possible in Cython. The hash is designed to dereference then hash order dependent vectors. One isn't provided by
-stdlib. The comparator simply dereferences the pointer and uses the vector comparator. It's designed to store the
-outputted paths. Heap allocated (needs to be returned).
-
-removed_links: See route_choice.pxd for full type signature. It's an unordered set of pointers to unordered sets of link
-IDs. Similarly to `route_set` is uses a custom hash function and comparator. This hash function is designed to be order
-independent and should only use commutative operations. The comparator is the same. It's designed to store all of the
-removed link sets we've seen before. This allows us to detected duplicated graphs.
-
-rng: A custom imported version of std::linear_congruential_engine. libcpp doesn't provide one so we do. It should be
-significantly faster than the std::mersenne_twister_engine without sacrificing much. We don't need amazing RNG, just ok
-and fast. This is only used to shuffle the queue.
-
-queue, next_queue: These are vectors of pointers to sets of removed links. We never need to push to the front of these
-so a vector is best. We maintain two queues, one that we are currently iterating over, and one that we can add to,
-building up with all the newly removed link sets. These two are swapped at the end of an iteration, next_queue is then
-cleared. These store sets of removed links.
-
-banned, next_banned: `banned` is the iterator variable for `queue`. `banned` is copied into `next_banned` where another
-link can be added without mutating `banned`. If we've already seen this set of removed links `next_banned` is
-immediately deallocated. Otherwise it's placed into `next_queue`.
-
-vec: `vec` is a scratch variable to store pointers to new vectors, or rather, paths while we are building them. Each
-time a path is found a new one is allocated, built, and stored in the route_set.
-
-p, connector: Scratch variables for iteration.
-
-Optimisations: As described in the paper, both optimisations have been implemented. The path finding operates on the
-compressed graph and the queue is shuffled if its possible to fill the route set that iteration. The route set may not
-be filled due to duplicate paths but we can't know that in advance so we shuffle anyway.
-
-Any further optimisations should focus on the path finding, from benchmarks it dominates the run time (~98%). Since huge
-routes aren't required small-ish things like the memcpy and banned link set copy aren't high priority.
-
 """
+Generate route sets with BFSLE or link penalisation.
 
-import cython
-from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.cython.basic_path_finding cimport (
-    blocking_centroid_flows,
-    path_finding,
-    path_finding_a_star,
-    Heuristic,
-)
-from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
-from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG
-from aequilibrae.utils.cython.bar cimport Bar
+BFSLE follows Rieser-Schüssler, Balmer and Axhausen, "Route Choice Sets for
+Very High-Resolution Data": https://doi.org/10.1080/18128602.2012.671383
 
+BFSLE starts with the unmodified graph, finds a route, and adds a new subgraph
+for each route link by banning that link together with previously banned links.
+Duplicate banned-link sets are skipped. Link penalisation instead the costs of
+links in each found route before searching again.
+
+The route set stores pointers to RouteCandidate objects. Ordered links identify
+unique routes with optional turn-cost increments so PSL can use the costs
+later. The removed-link sets and current/next queues are also pointer-based:
+queues are swapped at each depth, and duplicate sets are discarded. The custom
+hash and equality operations that compare pointed-to values are declared in
+route_choice_types.pxd.
+
+Search results are overwritten by the next search, so turn-cost increments must
+be copied and routes must be constructed from the predecessors. The queue is
+shuffled when it may fill the route set in that depth.
+"""
 
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
 from libc.math cimport INFINITY
 from libc.string cimport memcpy
+from libcpp cimport bool
 from libcpp cimport nullptr
 from libcpp.algorithm cimport reverse, copy
+from libcpp.memory cimport shared_ptr
 from libcpp.unordered_set cimport unordered_set
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
-from libcpp cimport bool
 from openmp cimport omp_get_max_threads
 
-from libcpp.memory cimport shared_ptr
+from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.paths.assignment_context import AssignmentMapping
+from aequilibrae.paths.cython.context cimport NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra, cpp_turn_dijkstra
+from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
+from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, RouteCandidate, RouteCandidateSet_t, minstd_rand, shuffle
+from aequilibrae.paths.cython.search_results cimport SearchResults
+from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.routing_context import make_routing_context
+from aequilibrae.utils.cython.bar cimport Bar
+from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, WARNING
 
 from typing import Tuple
 import itertools
 import warnings
 
+import cython
 import numpy as np
 import pandas as pd
 
@@ -91,34 +60,37 @@ import pandas as pd
 @cython.embedsignature(True)
 cdef class RouteChoiceSet:
     """
-    Route choice implemented via breadth first search with link removal (BFS-LE) as described in Rieser-Schüssler,
-    Balmer, and Axhausen, 'Route Choice Sets for Very High-Resolution Data'
+    Route choice via BFSLE or link penalisation, using the compact routing graph.
+    See the module documentation for the algorithms and reference.
     """
 
     def __init__(self, graph: Graph):
-        """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
-        # self.heuristic = HEURISTIC_MAP[self.res._heuristic]
-        self.cost_view = graph.compact_cost
-        self.graph_fs_view = graph.compact_fs
-        self.b_nodes_view = graph.compact_graph.b_node.to_numpy(copy=False)
-        self.nodes_to_indices_view = graph.compact_nodes_to_indices
+        """Take a compact routing snapshot and keep the graph's ID mappings."""
+        self.routing = make_routing_context(graph, compact=True)
+        self.turn_based = isinstance(self.routing, TurnBasedContext)
 
-        # tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
-        # self.lat_view = tmp.lat.values
-        # self.lon_view = tmp.lon.values
-        self.a_star = False
+        # We only need to do extra work when there's penalties, not just bans
+        self.has_turn_costs = False
+        if self.turn_based:
+            penalties = self.routing.turn_penalties
+            self.has_turn_costs = np.any((penalties > 0) & np.isfinite(penalties))
 
-        self.ids_graph_view = graph.compact_graph.id.to_numpy(copy=False)
+        self.cost_view = self.routing.costs
+        # The search loop needs a dense lookup without the GIL.
+        self.nodes_to_indices_view = np.array(graph.compact_nodes_to_indices, dtype=np.int64, copy=True)
+        self.num_nodes = self.routing.node_count
+        self.num_links = self.routing.link_count
 
-        # We explicitly don't want the links that have been removed from the graph
-        self.graph_compressed_id_view = graph.graph.__compressed_id__.to_numpy(copy=False)
-        self.num_nodes = graph.compact_num_nodes
-        self.num_links = graph.compact_num_links
-        self.zones = graph.num_zones
-        self.block_flows_through_centroids = graph.block_centroid_flows
-
-        self.mapping_idx, self.mapping_data, _ = graph.create_compressed_link_network_mapping()
-        self.link_id_direction = (graph.graph.link_id * graph.graph.direction).to_numpy(copy=False)
+        # GraphMapping only describes context links. Route expansion also needs
+        # the full-network crosswalk, which AssignmentMapping copies.
+        mapping = AssignmentMapping(graph)
+        self.graph_compressed_id_view = mapping.crosswalk[mapping.graph_ids].copy()
+        idx, data, _ = graph.create_compressed_link_network_mapping()
+        self.mapping_idx = np.array(idx, dtype=np.uint32, copy=True)
+        self.mapping_data = np.array(data, dtype=np.int64, copy=True)
+        signed_ids = np.empty(mapping.link_count, dtype=np.int64)
+        signed_ids[mapping.graph_ids] = mapping.link_ids * mapping.directions
+        self.link_id_direction = signed_ids
 
         self.results = None
         self.ll_results = None
@@ -246,41 +218,49 @@ cdef class RouteChoiceSet:
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
             double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
-            # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this
-            # memory
-            double [:, ::1] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
-            long long [:, ::1] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, ::1] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, ::1] b_nodes_matrix = np.broadcast_to(
-                self.b_nodes_view,
-                (c_cores, self.b_nodes_view.shape[0])
-            ).copy()
+            double [:, ::1] cost_matrix = np.zeros((c_cores, self.num_links), dtype=np.float64)
+            bool [:, ::1] targets = np.zeros((c_cores, self.num_nodes), dtype=np.bool_)
+            vector[CppSearchQuery] query_views
+            vector[CppMutableSearchResults] search_views
+            vector[CppNodeBasedContext] node_views
+            vector[CppTurnBasedContext] turn_views
+            SearchResults search
 
-            # This matrix is never read from, it exists to allow using the Dijkstra's method without changing the
-            # interface.
-            long long [:, ::1] _reached_first_matrix
+        # Each worker keeps its own cost binding, target and result buffers.
+        workers = []
+        worker_contexts = []
+        query_views.resize(c_cores)
+        search_views.resize(c_cores)
+        node_views.resize(c_cores)
+        turn_views.resize(c_cores)
+        for j in range(c_cores):
+            worker_context = self.routing.with_costs(cost_matrix[j])
+            worker_contexts.append(worker_context)
 
-            unsigned char [:, ::1] destinations_matrix = np.zeros((c_cores, self.num_nodes), dtype="bool")
+            search = SearchResults(self.num_nodes, self.routing.state_count, self.num_links)
+            workers.append(search)
 
-            # self.a_star = a_star
+            query_views[j].node_count = self.num_nodes
+            query_views[j].target_mask = &targets[j, 0]
+            query_views[j].target_count = 1
+            search_views[j] = search.view()
 
-        if self.a_star:
-            _reached_first_matrix = np.zeros((c_cores, 1), dtype=np.int64)  # Dummy array to allow slicing
-        else:
-            _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
+            # Fused types are not nice as class attributes so we need to have
+            # both, only one will ever be used at once
+            if self.turn_based:
+                turn_views[j] = (<TurnBasedContext>worker_context).view()
+            else:
+                node_views[j] = (<NodeBasedContext>worker_context).view()
 
         cdef:
-            RouteSet_t *route_set
+            RouteCandidateSet_t *route_set
+            vector[vector[double]] *turn_vecs
             shared_ptr[vector[double]] prob_vec
             int thread_id
             bint found_zero_cost
 
         demand._initalise_col_names()
         self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
-
-        # These are accessed with the gil and used for error reporting
-        zero_cost_ods: list[tuple[int]] = []
-        unreachable_ods: list[tuple[int]] = []
 
         for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
             if bridge.should_stop():
@@ -302,9 +282,12 @@ cdef class RouteChoiceSet:
             )
 
             with nogil, parallel(num_threads=c_cores):
-                route_set = new RouteSet_t()
+                # Make the variables thread local
+                route_set = new RouteCandidateSet_t()
+                turn_vecs = new vector[vector[double]]()
                 thread_id = threadid()
-                found_zero_cost = False  # Make the variable thread local
+                found_zero_cost = False
+
                 for i in prange(<long int>demand.ods.size(), schedule="guided"):
                     if bridge.should_stop():
                         break
@@ -317,60 +300,34 @@ cdef class RouteChoiceSet:
                         bar.inc()
                         continue
 
-                    if self.block_flows_through_centroids:
-                        blocking_centroid_flows(
-                            0,  # Always blocking
-                            origin_index,
-                            self.zones,
-                            self.graph_fs_view,
-                            b_nodes_matrix[thread_id],
-                            self.b_nodes_view,
-                        )
+                    query_views[thread_id].origin = origin_index
+                    targets[thread_id, dest_index] = True
 
                     if bfsle:
                         RouteChoiceSet.bfsle(
-                            self,
-                            d(route_set),
-                            origin_index,
-                            dest_index,
-                            c_max_routes,
-                            c_max_depth,
-                            c_max_misses,
-                            cost_matrix[thread_id],
-                            predecessors_matrix[thread_id],
-                            conn_matrix[thread_id],
-                            b_nodes_matrix[thread_id],
-                            _reached_first_matrix[thread_id],
-                            destinations_matrix[thread_id],
-                            penalty,
-                            c_seed,
+                            self, d(route_set), origin_index, dest_index,
+                            c_max_routes, c_max_depth, c_max_misses, cost_matrix[thread_id],
+                            query_views[thread_id], search_views[thread_id],
+                            node_views[thread_id], turn_views[thread_id], penalty, c_seed,
+                            path_size_logit and self.has_turn_costs,
                         )
                     else:
                         RouteChoiceSet.link_penalisation(
-                            self,
-                            d(route_set),
-                            origin_index,
-                            dest_index,
-                            c_max_routes,
-                            c_max_depth,
-                            c_max_misses,
-                            cost_matrix[thread_id],
-                            predecessors_matrix[thread_id],
-                            conn_matrix[thread_id],
-                            b_nodes_matrix[thread_id],
-                            _reached_first_matrix[thread_id],
-                            destinations_matrix[thread_id],
-                            penalty,
-                            c_seed,
+                            self, d(route_set), origin_index, dest_index,
+                            c_max_routes, c_max_depth, c_max_misses, cost_matrix[thread_id],
+                            query_views[thread_id], search_views[thread_id],
+                            node_views[thread_id], turn_views[thread_id], penalty, c_seed,
+                            path_size_logit and self.has_turn_costs,
                         )
 
-                    # Here we transform the set of raw pointers to routes (vectors) into a vector of unique points to
-                    # routes. This is done to simplify memory management later on.
+                    # Move links and optional turn steps into the same route order.
                     route_vec = self.results.get_route_vec(i)
-                    RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
+                    RouteChoiceSetResults.route_set_to_route_vec(
+                        d(route_vec), d(turn_vecs), d(route_set), path_size_logit and self.has_turn_costs
+                    )
 
                     if path_size_logit:
-                        prob_vec = self.results.compute_result(i, d(route_vec), &found_zero_cost, thread_id)
+                        prob_vec = self.results.compute_result(i, d(route_vec), d(turn_vecs), &found_zero_cost, thread_id)
                         self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
                         self.ll_results.sl_link_load_single_route_set(
                             i, d(route_vec),
@@ -380,26 +337,18 @@ cdef class RouteChoiceSet:
                             thread_id
                         )
 
-                    if d(route_vec).size() == 0 or found_zero_cost:
-                        with gil:
-                            if found_zero_cost:
-                                zero_cost_ods.append(tuple(demand.ods[i]))
-                            if d(route_vec).size() == 0:
-                                unreachable_ods.append(tuple(demand.ods[i]))
+                    if found_zero_cost:
+                        log(bridge.c, WARNING, f("Found zero cost route for: ", demand.ods[i], ". The entire route set has been masked."))
 
-                    if self.block_flows_through_centroids:
-                        blocking_centroid_flows(
-                            1,  # Always unblocking
-                            origin_index,
-                            self.zones,
-                            self.graph_fs_view,
-                            b_nodes_matrix[thread_id],
-                            self.b_nodes_view,
-                        )
+                    if d(route_vec).size() == 0:
+                        log(bridge.c, WARNING, f("Found unreachable: ", demand.ods[i], ". No choice sets were generated."))
 
+                    d(turn_vecs).clear()
+                    targets[thread_id, dest_index] = False
                     bar.inc()
 
                 del route_set
+                del turn_vecs
 
             if store_results:
                 self.get_results()
@@ -414,17 +363,6 @@ cdef class RouteChoiceSet:
             self.get_link_loading(cores=c_cores)
             self.get_sl_link_loading(cores=c_cores)
             self.get_sl_od_matrices()
-
-        if zero_cost_ods:
-            warnings.warn(
-                f"found zero cost routes for OD pairs, the entire route set has been masked for: {zero_cost_ods}",
-                stacklevel=2,
-            )
-        if unreachable_ods:
-            warnings.warn(
-                f"found unreachable OD pairs, no choice sets generated for: {unreachable_ods}",
-                stacklevel=2,
-            )
 
     def assign_from_df(
         self,
@@ -488,6 +426,7 @@ cdef class RouteChoiceSet:
 
         cdef:
             vector[long long] *route
+            vector[vector[double]] no_turns
             bint found_zero_cost
 
         # We iterate over the OD pairs in the path files
@@ -518,7 +457,7 @@ cdef class RouteChoiceSet:
             # If we are recomputing the probabilities then we do so here. This also has the side effect of recompute the
             # cost, masking, and path overlap with new parameters
             if recompute_psl:
-                prob_vec = self.results.compute_result(od_idx, d(route_vec), &found_zero_cost, thread_id)
+                prob_vec = self.results.compute_result(od_idx, d(route_vec), no_turns, &found_zero_cost, thread_id)
 
             # We have now have both the route and probability vectors restored so we can do LL and SLL.
             self.ll_results.link_load_single_route_set(od_idx, d(route_vec), d(prob_vec), thread_id)
@@ -549,46 +488,16 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     cdef void path_find(
         RouteChoiceSet self,
-        long origin_index,
-        long dest_index,
-        double [::1] thread_cost,
-        long long [::1] thread_predecessors,
-        long long [::1] thread_conn,
-        long long [::1] thread_b_nodes,
-        long long [::1] _thread_reached_first,
-        unsigned char [::1] thread_destinations
+        CppSearchQuery &query,
+        const CppMutableSearchResults &result,
+        const CppNodeBasedContext &node_context,
+        const CppTurnBasedContext &turn_context
     ) noexcept nogil:
-        """Small wrapper around path finding, thread locals should be passes as arguments."""
-        if self.a_star:
-            path_finding_a_star(
-                origin_index,
-                dest_index,
-                thread_cost,
-                thread_b_nodes,
-                self.graph_fs_view,
-                self.nodes_to_indices_view,
-                self.lat_view,
-                self.lon_view,
-                thread_predecessors,
-                self.ids_graph_view,
-                thread_conn,
-                Heuristic.EQUIRECTANGULAR
-            )
+        """Search one destination with the worker's current link costs."""
+        if self.turn_based:
+            cpp_turn_dijkstra[FourAryHeap](turn_context, query, result)
         else:
-            thread_destinations[dest_index] = True
-            path_finding(
-                origin_index,
-                thread_destinations,
-                1,  # Single destination
-                thread_cost,
-                thread_b_nodes,
-                self.graph_fs_view,
-                thread_predecessors,
-                self.ids_graph_view,
-                thread_conn,
-                _thread_reached_first
-            )
-            thread_destinations[dest_index] = False
+            cpp_dijkstra[FourAryHeap](node_context, query, result)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -596,20 +505,20 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     cdef void bfsle(
         RouteChoiceSet self,
-        RouteSet_t &route_set,
+        RouteCandidateSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
         double [::1] thread_cost,
-        long long [::1] thread_predecessors,
-        long long [::1] thread_conn,
-        long long [::1] thread_b_nodes,
-        long long [::1] _thread_reached_first,
-        unsigned char [::1] thread_destinations,
+        CppSearchQuery &query,
+        const CppMutableSearchResults &result,
+        const CppNodeBasedContext &node_context,
+        const CppTurnBasedContext &turn_context,
         double penalty,
-        unsigned int seed
+        unsigned int seed,
+        bint save_turns
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
         cdef:
@@ -624,11 +533,12 @@ cdef class RouteChoiceSet:
             unordered_set[long long] *new_banned
 
             # Local variables, Cython doesn't allow conditional declarations
-            vector[long long] *vec
-            pair[RouteSet_t.iterator, bool] status
+            RouteCandidate *vec
+            pair[RouteCandidateSet_t.iterator, bool] status
             pair[LinkSet_t.iterator, bool] banned_status
             unsigned int miss_count = 0
-            long long p, connector
+            size_t p
+            long long connector
 
             # Link penalisation, only used when penalty != 1.0
             bint lp = penalty != 1.0
@@ -681,17 +591,7 @@ cdef class RouteChoiceSet:
                 for connector in d(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoiceSet.path_find(
-                    self,
-                    origin_index,
-                    dest_index,
-                    thread_cost,
-                    thread_predecessors,
-                    thread_conn,
-                    thread_b_nodes,
-                    _thread_reached_first,
-                    thread_destinations
-                )
+                RouteChoiceSet.path_find(self, query, result, node_context, turn_context)
 
                 # Mark this set of banned links as seen
                 banned_status = removed_links.insert(banned)
@@ -701,26 +601,29 @@ cdef class RouteChoiceSet:
                     banned = d(banned_status.first)
 
                 # If the destination is reachable we must build the path and re-add
-                if thread_predecessors[dest_index] >= 0:
-                    vec = new vector[long long]()
-                    # Walk the predecessors tree to find our path, we build it up in a C++ vector because we can't know
-                    # how long it'll be
-                    p = dest_index
-                    while p != origin_index:
-                        connector = thread_conn[p]
-                        p = thread_predecessors[p]
-                        vec.push_back(connector)
+                if result.terminal_states[dest_index] != <size_t>-1:
+                    vec = new RouteCandidate()
+                    # Walk the search tree from the destination and build the route backwards.
+                    p = result.terminal_states[dest_index]
+                    while p != result.metadata.root:
+                        connector = result.connectors[p]
+                        if save_turns:
+                            # Save this step before the next search replaces these labels.
+                            vec.turn_steps.push_back(result.turn_costs[p] - result.turn_costs[result.predecessors[p]])
+                        p = result.predecessors[p]
+                        vec.links.push_back(connector)
 
                     if lp:
                         # Here we penalise all seen links for the *next* depth. If we penalised on the current depth
                         # then we would introduce a bias for earlier seen paths
-                        for connector in d(vec):
+                        for connector in vec.links:
                             # *= does not work
                             d(next_penalised_cost)[connector] = penalty * d(next_penalised_cost)[connector]
 
-                    reverse(vec.begin(), vec.end())
+                    reverse(vec.links.begin(), vec.links.end())
+                    reverse(vec.turn_steps.begin(), vec.turn_steps.end())
 
-                    for connector in d(vec):
+                    for connector in vec.links:
                         # This is one area for potential improvement. Here we construct a new set from the old one,
                         # copying all the elements then add a single element. An incremental set hash function could be
                         # of use. However, the since of this set is directly dependent on the current depth and as the
@@ -780,27 +683,28 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     cdef void link_penalisation(
         RouteChoiceSet self,
-        RouteSet_t &route_set,
+        RouteCandidateSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
         unsigned int max_misses,
         double [::1] thread_cost,
-        long long [::1] thread_predecessors,
-        long long [::1] thread_conn,
-        long long [::1] thread_b_nodes,
-        long long [::1] _thread_reached_first,
-        unsigned char [::1] thread_destinations,
+        CppSearchQuery &query,
+        const CppMutableSearchResults &result,
+        const CppNodeBasedContext &node_context,
+        const CppTurnBasedContext &turn_context,
         double penalty,
-        unsigned int seed
+        unsigned int seed,
+        bint save_turns
     ) noexcept nogil:
         """Link penalisation algorithm for choice set generation."""
         cdef:
             # Scratch objects
-            vector[long long] *vec
-            long long p, connector
-            pair[RouteSet_t.iterator, bool] status
+            RouteCandidate *vec
+            size_t p
+            long long connector
+            pair[RouteCandidateSet_t.iterator, bool] status
             unsigned int miss_count = 0
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
@@ -811,32 +715,25 @@ cdef class RouteChoiceSet:
             if route_set.size() >= max_routes:
                 break
 
-            RouteChoiceSet.path_find(
-                self,
-                origin_index,
-                dest_index,
-                thread_cost,
-                thread_predecessors,
-                thread_conn,
-                thread_b_nodes,
-                _thread_reached_first,
-                thread_destinations
-            )
+            RouteChoiceSet.path_find(self, query, result, node_context, turn_context)
 
-            if thread_predecessors[dest_index] >= 0:
-                vec = new vector[long long]()
-                # Walk the predecessors tree to find our path, we build it up in a C++ vector because we can't know how
-                # long it'll be
-                p = dest_index
-                while p != origin_index:
-                    connector = thread_conn[p]
-                    p = thread_predecessors[p]
-                    vec.push_back(connector)
+            if result.terminal_states[dest_index] != <size_t>-1:
+                vec = new RouteCandidate()
+                # Walk the search tree from the destination and build the route backwards.
+                p = result.terminal_states[dest_index]
+                while p != result.metadata.root:
+                    connector = result.connectors[p]
+                    if save_turns:
+                        vec.turn_steps.push_back(result.turn_costs[p] - result.turn_costs[result.predecessors[p]])
 
-                for connector in d(vec):
+                    p = result.predecessors[p]
+                    vec.links.push_back(connector)
+
+                for connector in vec.links:
                     thread_cost[connector] = penalty * thread_cost[connector]
 
-                reverse(vec.begin(), vec.end())
+                reverse(vec.links.begin(), vec.links.end())
+                reverse(vec.turn_steps.begin(), vec.turn_steps.end())
 
                 # To prevent runaway algorithms if we find N duplicate routes we should stop
                 status = route_set.insert(vec)

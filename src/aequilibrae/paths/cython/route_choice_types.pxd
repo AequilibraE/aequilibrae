@@ -96,12 +96,36 @@ cdef extern from * nogil:
     cppclass PointerDereferenceEqualTo[T]:
         bool operator()(const T& lhs, const T& rhs) const
 
+
+cdef extern from * nogil:
+    """
+    struct RouteCandidate {
+        std::vector<long long> links;
+        std::vector<double> turn_steps;
+    };
+    struct RouteCandidateHasher {
+        size_t operator()(const RouteCandidate *route) const {
+            return OrderedVectorPointerHasher{}(&route->links);
+        }
+    };
+    struct RouteCandidateEqual {
+        bool operator()(const RouteCandidate *a, const RouteCandidate *b) const {
+            return a->links == b->links;
+        }
+    };
+    """
+    cppclass RouteCandidate:
+        RouteCandidate() noexcept
+        vector[long long] links
+        vector[double] turn_steps
+
+    cppclass RouteCandidateHasher:
+        size_t operator()(const RouteCandidate *route) const
+
+    cppclass RouteCandidateEqual:
+        bool operator()(const RouteCandidate *a, const RouteCandidate *b) const
+
 # For typing convenience, the types names are getting long
-ctypedef unordered_set[
-    vector[long long] *,
-    OrderedVectorPointerHasher,
-    PointerDereferenceEqualTo[vector[long long] *]
-] RouteSet_t
 ctypedef unordered_set[
     unordered_set[long long] *,
     UnorderedSetPointerHasher,
@@ -110,6 +134,12 @@ ctypedef unordered_set[
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
 
 ctypedef vector[unique_ptr[vector[long long]]] RouteVec_t
+ctypedef RouteCandidate * RouteCandidatePtr
+ctypedef unordered_set[
+    RouteCandidatePtr,
+    RouteCandidateHasher,
+    RouteCandidateEqual
+] RouteCandidateSet_t
 
 # A (known 2016) bug in the Cython compiler means it incorrectly parses the following type when used in a cdef
 # https://github.com/cython/cython/issues/534
