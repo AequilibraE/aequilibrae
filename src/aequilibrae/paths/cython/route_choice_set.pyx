@@ -41,7 +41,13 @@ from aequilibrae.paths.assignment_context import AssignmentMapping
 from aequilibrae.paths.cython.context cimport NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra, cpp_turn_dijkstra
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
-from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, RouteCandidate, RouteCandidateSet_t, minstd_rand, shuffle
+from aequilibrae.paths.cython.route_choice_types cimport (
+    LinkSet_t,
+    RouteCandidate,
+    RouteCandidateSet_t,
+    minstd_rand,
+    shuffle,
+)
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.routing_context import make_routing_context
@@ -50,7 +56,6 @@ from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f
 
 from typing import Tuple
 import itertools
-import warnings
 
 import cython
 import numpy as np
@@ -323,11 +328,16 @@ cdef class RouteChoiceSet:
                     # Move links and optional turn steps into the same route order.
                     route_vec = self.results.get_route_vec(i)
                     RouteChoiceSetResults.route_set_to_route_vec(
-                        d(route_vec), d(turn_vecs), d(route_set), path_size_logit and self.has_turn_costs
+                        d(route_vec),
+                        d(turn_vecs),
+                        d(route_set),
+                        path_size_logit and self.has_turn_costs,
                     )
 
                     if path_size_logit:
-                        prob_vec = self.results.compute_result(i, d(route_vec), d(turn_vecs), &found_zero_cost, thread_id)
+                        prob_vec = self.results.compute_result(
+                            i, d(route_vec), d(turn_vecs), &found_zero_cost, thread_id
+                        )
                         self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
                         self.ll_results.sl_link_load_single_route_set(
                             i, d(route_vec),
@@ -338,10 +348,30 @@ cdef class RouteChoiceSet:
                         )
 
                     if found_zero_cost:
-                        log(bridge.c, WARNING, f("Found zero cost route for: ", demand.ods[i], ". The entire route set has been masked."))
+                        log(
+                            bridge.c,
+                            WARNING,
+                            f(
+                                "Found zero cost route for: ",
+                                demand.ods[i].first,
+                                ", ",
+                                demand.ods[i].second,
+                                ". The entire route set has been masked.",
+                            ),
+                        )
 
                     if d(route_vec).size() == 0:
-                        log(bridge.c, WARNING, f("Found unreachable: ", demand.ods[i], ". No choice sets were generated."))
+                        log(
+                            bridge.c,
+                            WARNING,
+                            f(
+                                "Found unreachable: ",
+                                demand.ods[i].first,
+                                ", ",
+                                demand.ods[i].second,
+                                ". No choice sets were generated.",
+                            ),
+                        )
 
                     d(turn_vecs).clear()
                     targets[thread_id, dest_index] = False
