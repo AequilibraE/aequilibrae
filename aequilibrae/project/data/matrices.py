@@ -142,6 +142,7 @@ class Matrices:
         """Deletes a Matrix Record from the model and attempts to remove from disk"""
         mr = self.get_record(matrix_name)
         mr.delete()
+        del self.__items[matrix_name.lower()]
 
     def new_record(self, name: str, file_name: str, matrix=None) -> MatrixRecord:
         """Creates a new record for a matrix in disk, but does not save it
