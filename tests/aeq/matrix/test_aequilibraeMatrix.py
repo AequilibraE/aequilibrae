@@ -66,6 +66,19 @@ def test_load(file_paths, matrix, no_index_omx):
     new_matrix.close()
 
 
+def test_create_from_trip_list_sets_zone_index(tmp_path):
+    trip_file = tmp_path / "trips.csv"
+    pd.DataFrame({"orig": [10, 10, 20], "dest": [20, 30, 10], "trips": [5, 2, 3]}).to_csv(trip_file, index=False)
+
+    matrix = AequilibraeMatrix()
+    matrix.create_from_trip_list(str(trip_file), from_column="orig", to_column="dest", list_cores=["trips"])
+
+    loaded = AequilibraeMatrix()
+    loaded.load(tmp_path / "trips.aem")
+    np.testing.assert_array_equal(loaded.index, [10, 20, 30])
+    loaded.close()
+
+
 def test_computational_view(matrix):
     matrix.computational_view(["mat", "seed"])
     matrix.mat.fill(0)

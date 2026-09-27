@@ -433,6 +433,7 @@ class AequilibraeMatrix(object):
         new_mat.create_empty(
             file_name=path_to_file[:-4] + ".aem", zones=nb_of_zones, matrix_names=list_cores, memory_only=False
         )
+        new_mat.index[:] = zones_list
 
         for idx, core in enumerate(list_cores):
             m = (
