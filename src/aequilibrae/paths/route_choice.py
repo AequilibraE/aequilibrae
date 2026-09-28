@@ -38,6 +38,9 @@ class RouteChoice:
             "cutoff_prob": 0.0,
             "beta": 1.0,
             "store_results": True,
+            "a_star": False,
+            "heuristic": "euclidean",
+            "heuristic_scale": None,
         },
         "link-penalisation": {},
         "bfsle": {"penalty": 1.0},
@@ -45,7 +48,7 @@ class RouteChoice:
 
     demand_index_names = ["origin id", "destination id"]
 
-    def __init__(self, graph: Graph, project=None):
+    def __init__(self, graph: Graph, project=None, *, coordinates: pd.DataFrame | None = None):
         self.parameters = {}
         self.procedure_id = None
         self.procedure_date = None
@@ -54,7 +57,7 @@ class RouteChoice:
         self.project = proj
 
         self.cores: int = 0
-        self.__rc = RouteChoiceSet(graph)
+        self.__rc = RouteChoiceSet(graph, coordinates=coordinates)
         self.demand = self.__init_demand()
 
         self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
@@ -114,7 +117,16 @@ class RouteChoice:
           a depth of 0 no links are penalised nor removed. At depth 1, all links found at depth 0
           are penalised, then the links marked for removal are removed. All links in the routes
           found at depth 1 are then penalised for the next depth. The penalisation compounds.
-          Set ``penalty=1.0`` to disable.
+          Set ``penalty=1.0`` to disable. For both algorithms, ``penalty`` must be finite and at least 1.
+
+        * Set ``a_star=True`` to use A* instead of Dijkstra. ``heuristic`` accepts ``euclidean``
+          (default) or ``haversine``. Euclidean distance uses the constructor's ``coordinates``;
+          Haversine uses the graph's ``lonlat_index`` in degrees.
+
+        * A* requires an finite, nonnegative ``heuristic_scale`` to convert distance to
+          cost units. Use ``estimate_heuristic_scale`` to calculate a conservative value. A scale
+          above a consistent bound can give non-shortest paths and change the generated route sets.
+          A consistent bound remains valid as links are removed or penalised.
 
         * When performing an assignment, ``cutoff_prob`` can be provided to exclude routes from
           the path-sized logit model. The ``cutoff_prob`` is used to compute an inverse binary
@@ -156,10 +168,14 @@ class RouteChoice:
                 if key not in defaults:
                     raise ValueError(f"Invalid or non-generic parameter '{key}' provided")
 
+        parameters = defaults | kwargs
+        RouteChoiceSet._validate_search_options(
+            parameters["a_star"], parameters["heuristic"], parameters["heuristic_scale"], parameters["penalty"]
+        )
         self.algorithm = algorithm
         self._config["Algorithm"] = algorithm
 
-        self.parameters = defaults | kwargs
+        self.parameters = parameters
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used

@@ -9,6 +9,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
     RouteCandidateSet_t,
     RouteVec_t,
 )
+from aequilibrae.paths.cython.a_star cimport CppEuclideanContext, CppHaversineContext
 from aequilibrae.paths.cython.context cimport CppNodeBasedContext, CppTurnBasedContext
 from aequilibrae.paths.cython.queries cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
@@ -16,10 +17,20 @@ from libc.stdint cimport *
 from libc.stddef cimport size_t
 
 
+cdef struct RouteChoiceHeuristic:
+    bint a_star
+    bint haversine
+    CppEuclideanContext euclidean_context
+    CppHaversineContext haversine_context
+
+
 cdef class RouteChoiceSet:
     cdef:
         const double [::1] cost_view
         object routing
+        object coordinates
+        object lonlat
+        object node_ids
         bint turn_based
         bint has_turn_costs
         object graph
@@ -64,7 +75,9 @@ cdef class RouteChoiceSet:
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
         const CppNodeBasedContext &node_context,
-        const CppTurnBasedContext &turn_context
+        const CppTurnBasedContext &turn_context,
+        size_t destination,
+        const RouteChoiceHeuristic &heuristic
     ) noexcept nogil
 
     cdef void bfsle(
@@ -80,6 +93,7 @@ cdef class RouteChoiceSet:
         const CppMutableSearchResults &result,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
+        const RouteChoiceHeuristic &heuristic,
         double penalty,
         unsigned int seed,
         bint save_turns
@@ -98,6 +112,7 @@ cdef class RouteChoiceSet:
         const CppMutableSearchResults &result,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
+        const RouteChoiceHeuristic &heuristic,
         double penalty,
         unsigned int seed,
         bint save_turns

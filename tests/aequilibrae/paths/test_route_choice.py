@@ -69,6 +69,9 @@ def test_set_choice_set_generation(route_choice_setup):
         "cutoff_prob": 0.0,
         "beta": 1.0,
         "store_results": True,
+        "a_star": False,
+        "heuristic": "euclidean",
+        "heuristic_scale": None,
     }
 
     rc.set_choice_set_generation("bfsle", max_routes=20)
@@ -81,6 +84,9 @@ def test_set_choice_set_generation(route_choice_setup):
         "cutoff_prob": 0.0,
         "beta": 1.0,
         "store_results": True,
+        "a_star": False,
+        "heuristic": "euclidean",
+        "heuristic_scale": None,
     }
 
     with pytest.raises(AttributeError):

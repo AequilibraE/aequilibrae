@@ -37,6 +37,10 @@ from libcpp.vector cimport vector
 from openmp cimport omp_get_max_threads
 
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.paths.cython.a_star cimport (
+    EuclideanContext, HaversineContext, node_euclidean, node_haversine, turn_euclidean, turn_haversine,
+)
+from aequilibrae.paths.cython.a_star import validate_scale
 from aequilibrae.paths.cython.context cimport NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra, cpp_turn_dijkstra
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
@@ -50,6 +54,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.routing_context import make_routing_context
+from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.cython.route_choice_set_results cimport recompute_route_probabilities, imported_route_dataframe
 from aequilibrae.utils.cython.bar cimport Bar
 from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, WARNING
@@ -74,9 +79,12 @@ cdef class RouteChoiceSet:
     See the module documentation for the algorithms and reference.
     """
 
-    def __init__(self, graph: Graph):
+    def __init__(self, graph: Graph, *, coordinates: pd.DataFrame | None = None):
         self.graph = graph
         self.routing = make_routing_context(graph, compact=True)
+        self.coordinates = coordinates.copy() if coordinates is not None else None
+        self.lonlat = graph.lonlat_index.copy()
+        self.node_ids = graph.compact_all_nodes.copy()
         self.turn_based = isinstance(self.routing, TurnBasedContext)
         # Directed link indices use full-graph row order, before compression can hide invalid steps.
         self.full_link_ids = graph.graph.link_id.to_numpy(copy=False)
@@ -157,6 +165,17 @@ cdef class RouteChoiceSet:
             results = self.get_results()
         return [tuple(x) for x in results["route set"]]
 
+    @staticmethod
+    def _validate_search_options(a_star, heuristic, heuristic_scale, penalty):
+        if not np.isfinite(penalty) or penalty < 1.0:
+            raise ValueError("`penalty` must be finite and >= 1")
+
+        if heuristic not in HEURISTICS:
+            raise ValueError(f"heuristic must be one of {list(HEURISTICS)}")
+
+        if a_star or heuristic_scale is not None:
+            validate_scale(heuristic_scale)
+
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -172,7 +191,7 @@ cdef class RouteChoiceSet:
         max_misses: int = 100,
         seed: int = 0,
         cores: int = 0,
-        a_star: bool = True,
+        a_star: bool = False,
         bfsle: bool = True,
         penalty: float = 1.0,
         where: Optional[str] = None,
@@ -182,6 +201,8 @@ cdef class RouteChoiceSet:
         beta: float = 1.0,
         cutoff_prob: float = 0.0,
         *,
+        heuristic: str = "euclidean",
+        heuristic_scale: float | None = None,
         bridge: Bridge
     ):
         """Compute the a route set for a list of OD pairs.
@@ -204,12 +225,35 @@ cdef class RouteChoiceSet:
             **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link
                 penalisation. Default ``True``.
             **penalty** (:obj:`float`): Penalty to use for Link Penalisation and BFSLE with LP.
+            **a_star** (:obj:`bool`): Use A* instead of Dijkstra. Default ``False``.
+            **heuristic** (:obj:`str`): ``euclidean`` (default) uses the constructor's planar coordinates;
+                ``haversine`` uses the graph's longitude/latitude coordinates in degrees.
+            **heuristic_scale** (:obj:`float` or None): Explicit finite, nonnegative coefficient required for A*.
+                A scale above a consistent bound can give non-shortest paths. Use ``estimate_heuristic_scale``
+                to calculate a conservative value before searching.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
             **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
         cdef:
             long long origin, dest
             long int i
+
+        self._validate_search_options(a_star, heuristic, heuristic_scale, penalty)
+        cdef RouteChoiceHeuristic search_heuristic
+
+        search_heuristic.a_star = a_star
+        search_heuristic.haversine = heuristic == "haversine"
+        # The owner keeps coordinate buffers alive while workers share read-only views.
+        heuristic_context = None
+        if a_star:
+            heuristic_context = make_heuristic_context(
+                self.node_ids, self.coordinates, self.lonlat, heuristic, heuristic_scale
+            )
+
+            if search_heuristic.haversine:
+                search_heuristic.haversine_context = (<HaversineContext>heuristic_context).view()
+            else:
+                search_heuristic.euclidean_context = (<EuclideanContext>heuristic_context).view()
 
         if select_links is None:
             select_links = {}
@@ -335,7 +379,7 @@ cdef class RouteChoiceSet:
                             self, d(route_set), origin_index, dest_index,
                             c_max_routes, c_max_depth, c_max_misses, cost_matrix[thread_id],
                             query_views[thread_id], search_views[thread_id],
-                            node_views[thread_id], turn_views[thread_id], penalty, c_seed,
+                            node_views[thread_id], turn_views[thread_id], search_heuristic, penalty, c_seed,
                             path_size_logit and self.has_turn_costs,
                         )
                     else:
@@ -343,7 +387,7 @@ cdef class RouteChoiceSet:
                             self, d(route_set), origin_index, dest_index,
                             c_max_routes, c_max_depth, c_max_misses, cost_matrix[thread_id],
                             query_views[thread_id], search_views[thread_id],
-                            node_views[thread_id], turn_views[thread_id], penalty, c_seed,
+                            node_views[thread_id], turn_views[thread_id], search_heuristic, penalty, c_seed,
                             path_size_logit and self.has_turn_costs,
                         )
 
@@ -841,10 +885,22 @@ cdef class RouteChoiceSet:
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
         const CppNodeBasedContext &node_context,
-        const CppTurnBasedContext &turn_context
+        const CppTurnBasedContext &turn_context,
+        size_t destination,
+        const RouteChoiceHeuristic &heuristic
     ) noexcept nogil:
         """Search one destination with the worker's current link costs."""
-        if self.turn_based:
+        if heuristic.a_star:
+            if self.turn_based:
+                if heuristic.haversine:
+                    turn_haversine[FourAryHeap](turn_context, query, destination, heuristic.haversine_context, result)
+                else:
+                    turn_euclidean[FourAryHeap](turn_context, query, destination, heuristic.euclidean_context, result)
+            elif heuristic.haversine:
+                node_haversine[FourAryHeap](node_context, query, destination, heuristic.haversine_context, result)
+            else:
+                node_euclidean[FourAryHeap](node_context, query, destination, heuristic.euclidean_context, result)
+        elif self.turn_based:
             cpp_turn_dijkstra[FourAryHeap](turn_context, query, result)
         else:
             cpp_dijkstra[FourAryHeap](node_context, query, result)
@@ -866,6 +922,7 @@ cdef class RouteChoiceSet:
         const CppMutableSearchResults &result,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
+        const RouteChoiceHeuristic &heuristic,
         double penalty,
         unsigned int seed,
         bint save_turns
@@ -940,7 +997,7 @@ cdef class RouteChoiceSet:
                 for connector in d(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoiceSet.path_find(self, query, result, node_context, turn_context)
+                RouteChoiceSet.path_find(self, query, result, node_context, turn_context, dest_index, heuristic)
 
                 # Mark this set of banned links as seen
                 banned_status = removed_links.insert(banned)
@@ -1032,6 +1089,7 @@ cdef class RouteChoiceSet:
         const CppMutableSearchResults &result,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
+        const RouteChoiceHeuristic &heuristic,
         double penalty,
         unsigned int seed,
         bint save_turns
@@ -1052,7 +1110,7 @@ cdef class RouteChoiceSet:
             if route_set.size() >= max_routes:
                 break
 
-            RouteChoiceSet.path_find(self, query, result, node_context, turn_context)
+            RouteChoiceSet.path_find(self, query, result, node_context, turn_context, dest_index, heuristic)
 
             if result.terminal_states[dest_index] != <size_t>-1:
                 # Trace the settled state path, including its turn steps.

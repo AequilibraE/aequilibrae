@@ -1,4 +1,4 @@
-"""Coordinate preparation and optional scale estimation for PathResults A*."""
+"""Coordinate preparation and optional scale estimation for path and route choice A*."""
 
 import numpy as np
 import pandas as pd
