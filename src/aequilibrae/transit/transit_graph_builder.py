@@ -25,7 +25,6 @@ import shapely.ops
 from pandas.api.types import is_integer_dtype
 from pandas.core.frame import DataFrame
 from scipy.spatial import KDTree
-from scipy.spatial.distance import minkowski as minkowski_distance
 
 from aequilibrae.paths import PathResults
 from aequilibrae.paths.graph import NewTransitGraph
@@ -873,7 +872,7 @@ class TransitGraphBuilder:
             # Build up a list of dataframes to concat, each dataframe corresponds to all connectors for a given OD
             connectors = []
             for i, verts in enumerate(results):
-                distance = minkowski_distance(od_geometries[i], stop_geometries[verts])
+                distance = np.linalg.norm(od_geometries[i] - stop_geometries[verts], axis=1)
                 df = stop_vertices["node_id"].iloc[verts].to_frame()
                 df["b_node"] = od_vertices.iloc[i]["node_id"]  # OD is tail node of access connector
                 df["trav_time"] = distance / self.walking_speed
