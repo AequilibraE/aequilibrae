@@ -99,6 +99,19 @@ def test_delete(sioux_falls_example):
         matrices.get_record("demand_omx")
 
 
+def test_recreate_deleted_record(sioux_falls_example, tmp_path):
+    matrices = sioux_falls_example.matrices
+    record = matrices.get_record("demand_omx")
+    backup = tmp_path / record.file_name
+    copyfile(join(record.fldr, record.file_name), backup)
+
+    matrices.delete_record("demand_omx")
+    copyfile(backup, join(record.fldr, record.file_name))
+
+    recreated = matrices.new_record("demand_omx", record.file_name)
+    assert recreated.name == "demand_omx"
+
+
 def test_list(sioux_falls_example):
     matrices = sioux_falls_example.matrices
     df = matrices.list()
