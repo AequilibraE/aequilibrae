@@ -167,8 +167,8 @@ class VDF:
         return func
 
     def check_valid(self, num_points, link_attributes: dict[str, Any], from_voc: float = 0.0, to_voc: float = 3.0):
-        """Implements a number of checks copied from Spiess, 1989 where requirements for VDFs are described, accessed
-        from http://www.spiess.ch/emme2/conic/conic.html#SECTION0003.
+        """Implements checks for VDF requirements described by Spiess (1990) in "Technical Note—Conical
+        Volume-Delay Functions" (*Transportation Science*, 24(2): 153-158).
 
         The VDF is evaluated at num_points values of volume/capacity in the range between from_voc to to_voc. Then,
         these values are used in the following checks:
