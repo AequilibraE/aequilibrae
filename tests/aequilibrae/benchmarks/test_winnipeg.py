@@ -6,6 +6,7 @@ from .conftest import (
     METHODS,
     run_validation,
 )
+from .path_finding_benchmark import run_path_finding_search
 
 MODEL_STUB = "Winnipeg"
 
@@ -30,3 +31,8 @@ def test_winnipeg(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm,
         model_stub,
         algorithm,
     )
+
+
+@pytest.mark.parametrize("algorithm", ["dijkstra", "a_star"], ids=["dijkstra", "a_star"])
+def test_winnipeg_path_finding(benchmark, tntp_graph, model_stub, model_folder, algorithm):
+    run_path_finding_search(benchmark, tntp_graph, model_stub, model_folder, algorithm)
