@@ -1,7 +1,7 @@
 """One internal search interface for both routing modes."""
 
 from aequilibrae.paths.cython.basic_path_finding cimport (
-    FOUR_ARY_HEAP, PAIRING_HEAP, STD_PRIORITY_QUEUE, HeapType,
+    PAIRING_HEAP, STD_PRIORITY_QUEUE, HeapType,
 )
 from aequilibrae.paths.cython.basic_path_finding import HEAP_MAP, available_heaps
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, StdPriorityQueueAdapter

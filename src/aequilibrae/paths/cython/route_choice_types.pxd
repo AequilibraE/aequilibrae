@@ -8,6 +8,7 @@ from libcpp.memory cimport unique_ptr
 # std::linear_congruential_engine is not available in the Cython libcpp.random shim. We'll import it ourselves
 # from libcpp.random cimport minstd_rand
 from libc.stdint cimport *
+from libc.stddef cimport size_t
 
 cdef extern from "<random>" namespace "std" nogil:
     cdef cppclass random_device:
@@ -134,6 +135,10 @@ ctypedef unordered_set[
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
 
 ctypedef vector[unique_ptr[vector[long long]]] RouteVec_t
+# Borrowed paths let PSL use generated or imported routes without copying their links.
+ctypedef vector[const vector[long long] *] RouteView_t
+ctypedef vector[const vector[double] *] RouteTurnView_t
+
 ctypedef RouteCandidate * RouteCandidatePtr
 ctypedef unordered_set[
     RouteCandidatePtr,

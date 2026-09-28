@@ -1,6 +1,6 @@
-from libcpp.algorithm cimport min_element, sort, lower_bound, upper_bound
+from libcpp.algorithm cimport sort, lower_bound, upper_bound
 from libcpp.utility cimport pair
-from libc.math cimport INFINITY, exp, pow, log
+from libc.math cimport INFINITY, exp, pow, log, isfinite
 from libcpp.memory cimport shared_ptr, make_shared
 
 from cython.operator cimport dereference as d
@@ -35,6 +35,8 @@ cdef class RouteChoiceSetResults:
             const int64_t [::] link_id_direction,
             store_results: bool = True,
             perform_assignment: bool = True,
+            const int64_t[::1] full_link_ids = None,
+            const int8_t[::1] full_directions = None,
     ):
         """
         :Arguments:
@@ -72,6 +74,10 @@ cdef class RouteChoiceSetResults:
         self.mapping_idx = mapping_idx
         self.mapping_data = mapping_data
         self.link_id_direction = link_id_direction
+        # Imported routes keep full-link indices, including invalid sequences that cannot be expanded from compact
+        # links.
+        self.full_link_ids = full_link_ids
+        self.full_directions = full_directions
         self.table = None
 
         cdef size_t size = self.demand.ods.size()
@@ -229,6 +235,29 @@ cdef class RouteChoiceSetResults:
     cdef shared_ptr[vector[double]] get_prob_vec(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__prob_set[i] if self.store_results else make_shared[vector[double]]()
 
+    cdef void store_imported_result(
+        self,
+        size_t i,
+        RouteVec_t &routes,
+        const vector[double] &costs,
+        const vector[bint] &mask,
+        const vector[double] &overlap,
+        const vector[double] &probabilities,
+        const vector[size_t] &positions
+    ) noexcept nogil:
+        """Move imported paths into the result owner and store their matching numeric results."""
+        cdef size_t position, j
+        if not self.store_results:
+            return
+
+        for j in range(positions.size()):
+            position = positions[j]
+            d(self.__route_vecs[i]).emplace_back(routes[position].release())
+            d(self.__cost_set[i]).push_back(costs[position])
+            d(self.__mask_set[i]).push_back(mask[position])
+            d(self.__path_overlap_set[i]).push_back(overlap[position])
+            d(self.__prob_set[i]).push_back(probabilities[position])
+
     cdef shared_ptr[vector[double]] compute_result(
         RouteChoiceSetResults self,
         size_t i,
@@ -249,13 +278,11 @@ cdef class RouteChoiceSetResults:
         cdef:
             shared_ptr[vector[double]] cost_vec
             shared_ptr[vector[bint]] route_mask
-            vector[long long] keys, counts
-            vector[pair[long long, long long]] turns
-            pair[long long, long long] turn
-            size_t j
-            long long previous, link
             shared_ptr[vector[double]] path_overlap_vec
             shared_ptr[vector[double]] prob_vec
+            RouteView_t paths
+            RouteTurnView_t turns
+            size_t j
 
         if not self.perform_assignment:
             # If we're not performing an assignment then we must be storing the routes and the routes most already be
@@ -268,36 +295,76 @@ cdef class RouteChoiceSetResults:
         prob_vec = self.get_prob_vec(i)
 
         self.compute_cost(d(cost_vec), route_set, route_turns, self.cost_view, found_zero_cost)
-        self.compute_mask(d(route_mask), d(cost_vec))
-        self.compute_frequency(keys, counts, route_set, d(route_mask))
 
-        if route_turns.size() and route_turns[0].size():
+        for j in range(route_set.size()):
+            paths.push_back(&d(route_set[j]))
+
+        for j in range(route_turns.size()):
+            turns.push_back(&route_turns[j])
+
+        RouteChoiceSetResults.compute_psl(
+            paths, turns,
+            d(cost_vec),
+            d(route_mask),
+            d(path_overlap_vec),
+            d(prob_vec),
+            self.cost_view,
+            self.beta,
+            self.cutoff_prob
+        )
+
+        return prob_vec
+
+    @staticmethod
+    cdef void compute_psl(
+        const RouteView_t &route_set,
+        const RouteTurnView_t &route_turns,
+        const vector[double] &cost_vec,
+        vector[bint] &route_mask,
+        vector[double] &path_overlap_vec,
+        vector[double] &prob_vec,
+        const double[:] cost_view,
+        double beta,
+        double cutoff_prob
+    ) noexcept nogil:
+        """Compute PSL from costs and links, preserving any supplied exclusions."""
+        cdef vector[long long] keys, counts
+        cdef vector[pair[long long, long long]] turns
+        cdef pair[long long, long long] turn
+        cdef size_t j, k
+        cdef long long previous, link
+
+        RouteChoiceSetResults.compute_mask(route_mask, cost_vec, cutoff_prob)
+        RouteChoiceSetResults.compute_frequency(keys, counts, route_set, route_mask)
+
+        if route_turns.size() and d(route_turns[0]).size():
             for j in range(route_set.size()):
-                if not d(route_mask)[j]:
+                if not route_mask[j]:
                     continue
+
                 previous = -1
-                for link in d(route_set[j]):
+                for k in range(d(route_set[j]).size()):
+                    link = d(route_set[j])[k]
                     if previous != -1:
                         turn.first = previous
                         turn.second = link
                         turns.push_back(turn)
                     previous = link
+
             sort(turns.begin(), turns.end())
 
-        self.compute_path_overlap(
-            d(path_overlap_vec),
+        RouteChoiceSetResults.compute_path_overlap(
+            path_overlap_vec,
             route_set,
             keys,
             counts,
             turns,
             route_turns,
-            d(cost_vec),
-            d(route_mask),
-            self.cost_view
+            cost_vec,
+            route_mask,
+            cost_view
         )
-        self.compute_prob(d(prob_vec), d(cost_vec), d(path_overlap_vec), d(route_mask))
-
-        return prob_vec
+        RouteChoiceSetResults.compute_prob(prob_vec, cost_vec, path_overlap_vec, route_mask, beta)
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -336,10 +403,11 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
+    @staticmethod
     cdef void compute_mask(
-        RouteChoiceSetResults self,
         vector[bint] &route_mask,
-        const vector[double] &total_cost
+        const vector[double] &total_cost,
+        double cutoff_prob
     ) noexcept nogil:
         """
         Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
@@ -350,21 +418,28 @@ cdef class RouteChoiceSetResults:
             bint found_zero_cost = False
             size_t i
 
-            vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
+            size_t min_index = total_cost.size()
+            double min_cost = INFINITY
             double cutoff_cost
 
-        if min == total_cost.cend():
-            cutoff_cost = INFINITY
-        else:
-            cutoff_cost = d(min) + inverse_binary_logit(self.cutoff_prob, 0.0, 1.0)
+        route_mask.resize(total_cost.size(), True)
+        # An excluded route or infinite ban must not become the fallback minimum; also skip NaN costs.
+        for i in range(total_cost.size()):
+            if route_mask[i] and isfinite(total_cost[i]) and total_cost[i] < min_cost:
+                min_cost = total_cost[i]
+                min_index = i
 
-        route_mask.resize(total_cost.size())
+        cutoff_cost = min_cost + inverse_binary_logit(cutoff_prob, 0.0, 1.0)
 
         # The route mask should be True for the routes we wish to include.
         for i in range(total_cost.size()):
+            if not route_mask[i]:
+                continue
+            route_mask[i] = False
+            if not isfinite(total_cost[i]):
+                continue
             if total_cost[i] == 0.0:
                 found_zero_cost = True
-                break
             elif total_cost[i] <= cutoff_cost:
                 route_mask[i] = True
 
@@ -372,20 +447,20 @@ cdef class RouteChoiceSetResults:
             # If we've found a zero cost path we must abandon the whole route set.
             for i in range(total_cost.size()):
                 route_mask[i] = False
-        elif min != total_cost.cend():
+        elif min_index != total_cost.size():
             # Always include the min element. It should already be but I don't trust floating math to do this correctly.
-            # But only if there actually was a min element (i.e. empty route set)
-            route_mask[min - total_cost.cbegin()] = True
+            # But only if there actually was a finite minimum.
+            route_mask[min_index] = True
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
+    @staticmethod
     cdef void compute_frequency(
-        RouteChoiceSetResults self,
         vector[long long] &keys,
         vector[long long] &counts,
-        const RouteVec_t &route_set,
+        const RouteView_t &route_set,
         const vector[bint] &route_mask
     ) noexcept nogil:
         """
@@ -436,14 +511,14 @@ cdef class RouteChoiceSetResults:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @cython.cdivision(True)
+    @staticmethod
     cdef void compute_path_overlap(
-        RouteChoiceSetResults self,
         vector[double] &path_overlap_vec,
-        const RouteVec_t &route_set,
+        const RouteView_t &route_set,
         const vector[long long] &keys,
         const vector[long long] &counts,
         const vector[pair[long long, long long]] &turns,
-        const vector[vector[double]] &route_turns,
+        const RouteTurnView_t &route_turns,
         const vector[double] &total_cost,
         const vector[bint] &route_mask,
         const double[:] cost_view
@@ -467,12 +542,13 @@ cdef class RouteChoiceSetResults:
             long long link, previous
             size_t i, j
 
-        cdef bint has_turn_steps = route_turns.size() and route_turns[0].size()
+        cdef bint has_turn_steps = route_turns.size() and d(route_turns[0]).size()
         path_overlap_vec.resize(route_set.size())
 
         for i in range(route_set.size()):
             # Skip masked routes
             if not route_mask[i]:
+                path_overlap_vec[i] = 0.0
                 continue
 
             path_overlap = 0.0
@@ -494,7 +570,7 @@ cdef class RouteChoiceSetResults:
                     turn.second = link
                     turn_begin = lower_bound(turns.cbegin(), turns.cend(), turn)
                     turn_end = upper_bound(turns.cbegin(), turns.cend(), turn)
-                    path_overlap = path_overlap + route_turns[i][j] / (turn_end - turn_begin)
+                    path_overlap = path_overlap + d(route_turns[i])[j] / (turn_end - turn_begin)
 
                 previous = link
 
@@ -505,12 +581,13 @@ cdef class RouteChoiceSetResults:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @cython.cdivision(True)
+    @staticmethod
     cdef void compute_prob(
-        RouteChoiceSetResults self,
         vector[double] &prob_vec,
         const vector[double] &total_cost,
         const vector[double] &path_overlap_vec,
-        const vector[bint] &route_mask
+        const vector[bint] &route_mask,
+        double beta
     ) noexcept nogil:
         """Compute a probability for each route in the route set based on the path overlap."""
         cdef:
@@ -525,6 +602,7 @@ cdef class RouteChoiceSetResults:
         for i in range(total_cost.size()):
             # The probability of choosing a route that has been masked out is 0.
             if not route_mask[i]:
+                prob_vec[i] = 0.0
                 continue
 
             inv_prob = 0.0
@@ -534,7 +612,7 @@ cdef class RouteChoiceSetResults:
                 if not route_mask[j]:
                     continue
 
-                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], self.beta) \
+                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
                     * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
 
             prob_vec[i] = 1.0 / inv_prob
@@ -547,7 +625,8 @@ cdef class RouteChoiceSetResults:
         """
         Construct an pd.DataFrame from the C++ stdlib structures.
 
-        Compressed link IDs are expanded to full network link IDs.
+        Generated compact link IDs are expanded to full network link IDs.
+        Imported full-link indices are mapped directly to their original signed IDs.
         """
 
         if self.table is not None:
@@ -581,7 +660,7 @@ cdef class RouteChoiceSetResults:
                 if not d(self.__route_vecs[i]).size():  # If there's no routes to add just skip these.
                     continue
 
-                # When assigning from df, the cost, mask, and path overlap vectors may be empty
+                # Empty numeric vectors use defaults for results without these fields.
                 tmp = d(self.__cost_set[i]).size()
                 columns["cost"].append(
                     np.asarray(<double[:tmp]>d(self.__cost_set[i]).data())
@@ -591,7 +670,7 @@ cdef class RouteChoiceSetResults:
 
                 tmp = d(self.__mask_set[i]).size()
                 columns["mask"].append(
-                    np.asarray(<bint[:tmp]>d(self.__mask_set[i]).data())
+                    np.asarray(<bint[:tmp]>d(self.__mask_set[i]).data()).astype(bool)
                     if tmp
                     else np.ones(n_routes, dtype="bool")
                 )
@@ -618,6 +697,12 @@ cdef class RouteChoiceSetResults:
             # construct one big array of link IDs (with direction as sign) with a corresponding offsets array that
             # indicates where each new row (path) starts.
             for j in range(d(route_set).size()):
+                if self.full_link_ids is not None:
+                    route_set_col.append(np.array(
+                        [self.full_link_ids[link] * self.full_directions[link] for link in d(d(route_set)[j])],
+                        dtype=np.int64
+                    ))
+                    continue
 
                 links = []
                 for link in d(d(route_set)[j]):
@@ -643,6 +728,68 @@ cdef class RouteChoiceSetResults:
 
         self.table = pd.DataFrame(columns)
         return self.table
+
+
+cdef void recompute_route_probabilities(
+    object df, const RouteVec_t &routes, const vector[vector[double]] &turn_steps,
+    const vector[double] &costs, vector[bint] &route_mask, vector[double] &path_overlap,
+    vector[double] &probabilities, const double[:] link_costs, double beta, double cutoff_prob
+):
+    """Apply the shared PSL kernel to borrowed native routes and turn steps, without demand."""
+    cdef double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
+    cdef RouteView_t paths
+    cdef RouteTurnView_t turns
+    cdef vector[double] route_costs, overlap, probability
+    cdef vector[bint] mask
+    cdef vector[size_t] positions
+    cdef size_t position, j
+
+    if not isfinite(beta) or beta < 0:
+        raise ValueError("beta must be finite and non-negative")
+    if not 0 <= cutoff_prob <= 1:
+        raise ValueError("cutoff_prob must be between zero and one")
+
+    path_overlap.resize(costs.size(), 0.0)
+    probabilities.resize(costs.size(), 0.0)
+    # Group positions rather than labels: dataframe indices need not be unique.
+    for group in df.groupby(["origin id", "destination id"], sort=False).indices.values():
+        positions = group
+        paths.clear()
+        turns.clear()
+        route_costs.clear()
+        mask.clear()
+        for position in positions:
+            paths.push_back(&d(routes[position]))
+            turns.push_back(&turn_steps[position])
+            route_costs.push_back(costs[position])
+            mask.push_back(route_mask[position])
+        with nogil:
+            RouteChoiceSetResults.compute_psl(
+                paths, turns, route_costs, mask, overlap, probability, link_costs, beta, scaled_cutoff_prob
+            )
+        for j in range(positions.size()):
+            position = positions[j]
+            route_mask[position] = mask[j]
+            path_overlap[position] = overlap[j]
+            probabilities[position] = probability[j]
+
+
+cdef object imported_route_dataframe(
+    object df, const vector[double] &costs, const vector[bint] &mask,
+    const vector[double] &overlap, const vector[double] &probabilities
+):
+    """Copy numeric results to public columns without exposing temporary native storage."""
+    cdef size_t size = costs.size()
+    cdef const double *cost_data = costs.data()
+    cdef const bint *mask_data = mask.data()
+    cdef const double *overlap_data = overlap.data()
+    cdef const double *probability_data = probabilities.data()
+    columns = {}
+    columns["cost"] = np.asarray(<const double[:size]>cost_data).copy() if size else np.empty(0)
+    columns["mask"] = np.asarray(<const bint[:size]>mask_data).astype(bool) if size else np.empty(0, dtype=bool)
+    columns["path overlap"] = np.asarray(<const double[:size]>overlap_data).copy() if size else np.empty(0)
+    columns["probability"] = np.asarray(<const double[:size]>probability_data).copy() if size else np.empty(0)
+    return df.assign(**columns)
 
 
 @cython.wraparound(False)

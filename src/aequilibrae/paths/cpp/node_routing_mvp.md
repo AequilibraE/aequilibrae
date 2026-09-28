@@ -817,6 +817,37 @@ This translation boundary should be removed when Graph owns routing contexts
 directly. `SearchResults` remains independent of loading, skimming, selection,
 assignment preparation and external network mappings.
 
+## Imported route-choice PSL
+
+Generated routes retain turn steps from their state paths when PSL is requested.
+For imported routes, `RouteChoice.recompute_psl(df, log_warnings=True)` returns
+recomputed costs, a combined mask, overlap and probabilities without requiring
+demand. Imported signed links are converted to full-link vectors first. A native
+walk then checks OD endpoints, consecutive link connectivity, explicit turn bans,
+U-turn rules and centroid blocking before compression. `log_warnings=False` only
+silences warnings. Costs include finite turn penalties. Wrong endpoints,
+disconnected routes, prohibited turns, disallowed U-turns and blocked centroid
+flows have infinite cost and are masked. Missing links or directions are errors.
+Empty route rows are omitted with a warning. Other rows retain their order and
+index, and the input dataframe is not changed.
+
+PSL recomputation discards supplied costs and combines a supplied mask with the
+finite-cost and PSL cutoff masks. Excluded routes do not affect the minimum cost,
+overlap frequencies or probability normalisation. Finite turn penalties contribute
+to both route cost and overlap. Generated and imported routes share static Cython
+PSL helpers; the numerical helpers do not validate topology or require a results
+owner. The native walk borrows Graph's full topology, costs and turn CSR directly.
+Compact routing data is prepared when `RouteChoice` is created; full-graph data
+is borrowed during import. Callers must not change the graph's topology, costs,
+restrictions or mappings while the route choice object is in use.
+
+`execute_from_pandas()` and `execute_from_path_files()` validate and recost only
+when `recompute_psl=True`; then probabilities and overlap are recomputed too.
+Otherwise, supplied results are trusted, masked probabilities become zero and
+remaining probabilities are kept without renormalising. Both accept the same
+warning switch. If every route is masked or an OD has an empty route set,
+no demand is loaded for that OD.
+
 ## Validation
 
 ```sh

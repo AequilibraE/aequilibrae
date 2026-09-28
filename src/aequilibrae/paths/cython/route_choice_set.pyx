@@ -25,7 +25,7 @@ shuffled when it may fill the route set in that depth.
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
-from libc.math cimport INFINITY
+from libc.math cimport INFINITY, isfinite
 from libc.string cimport memcpy
 from libcpp cimport bool
 from libcpp cimport nullptr
@@ -37,29 +37,34 @@ from libcpp.vector cimport vector
 from openmp cimport omp_get_max_threads
 
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.paths.assignment_context import AssignmentMapping
 from aequilibrae.paths.cython.context cimport NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra, cpp_turn_dijkstra
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
 from aequilibrae.paths.cython.route_choice_types cimport (
-    LinkSet_t,
+    LinkSet_t, RouteVec_t,
     RouteCandidate,
     RouteCandidateSet_t,
     minstd_rand,
     shuffle,
 )
 from aequilibrae.paths.cython.search_results cimport SearchResults
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.routing_context import make_routing_context
+from aequilibrae.paths.cython.route_choice_set_results cimport recompute_route_probabilities, imported_route_dataframe
 from aequilibrae.utils.cython.bar cimport Bar
 from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, WARNING
 
 from typing import Tuple
-import itertools
+import builtins
+import logging
+import operator
 
 import cython
 import numpy as np
 import pandas as pd
+
+
+logger = logging.getLogger(__name__)
 
 
 @cython.embedsignature(True)
@@ -70,9 +75,23 @@ cdef class RouteChoiceSet:
     """
 
     def __init__(self, graph: Graph):
-        """Take a compact routing snapshot and keep the graph's ID mappings."""
+        self.graph = graph
         self.routing = make_routing_context(graph, compact=True)
         self.turn_based = isinstance(self.routing, TurnBasedContext)
+        # Directed link indices use full-graph row order, before compression can hide invalid steps.
+        self.full_link_ids = graph.graph.link_id.to_numpy(copy=False)
+        self.full_directions = graph.graph.direction.to_numpy(copy=False)
+        self.full_link_indices = {
+            int(link) * int(direction): i
+            for i, (link, direction) in enumerate(zip(self.full_link_ids, self.full_directions))
+        }
+        self.centroids = graph.centroids
+        self.network_link_ids = np.unique(self.full_link_ids)
+        self.network_mapping = _get_graph_to_network_mapping(
+            np.asarray(self.full_link_ids), np.asarray(self.full_directions)
+        )
+        for values in (self.network_link_ids, *vars(self.network_mapping).values()):
+            values.flags.writeable = False
 
         # We only need to do extra work when there's penalties, not just bans
         self.has_turn_costs = False
@@ -81,20 +100,23 @@ cdef class RouteChoiceSet:
             self.has_turn_costs = np.any((penalties > 0) & np.isfinite(penalties))
 
         self.cost_view = self.routing.costs
+
         # The search loop needs a dense lookup without the GIL.
-        self.nodes_to_indices_view = np.array(graph.compact_nodes_to_indices, dtype=np.int64, copy=True)
+        self.nodes_to_indices_view = graph.compact_nodes_to_indices
         self.num_nodes = self.routing.node_count
         self.num_links = self.routing.link_count
 
-        # GraphMapping only describes context links. Route expansion also needs
-        # the full-network crosswalk, which AssignmentMapping copies.
-        mapping = AssignmentMapping(graph)
-        self.graph_compressed_id_view = mapping.crosswalk[mapping.graph_ids].copy()
+        # Keep the full-to-compact link crosswalk in graph-row order for loading.
+        self.graph_compressed_id_view = graph.graph.__compressed_id__.to_numpy(copy=False)
         idx, data, _ = graph.create_compressed_link_network_mapping()
-        self.mapping_idx = np.array(idx, dtype=np.uint32, copy=True)
-        self.mapping_data = np.array(data, dtype=np.int64, copy=True)
-        signed_ids = np.empty(mapping.link_count, dtype=np.int64)
-        signed_ids[mapping.graph_ids] = mapping.link_ids * mapping.directions
+        self.mapping_idx = idx
+        self.mapping_data = data
+
+        # Compressed route expansion uses supernetwork order, unlike imported links.
+        signed_ids = np.empty(graph.num_links, dtype=np.int64)
+        signed_ids[graph.graph.__supernet_id__.to_numpy(copy=False)] = (
+            np.asarray(self.full_link_ids) * np.asarray(self.full_directions)
+        )
         self.link_id_direction = signed_ids
 
         self.results = None
@@ -394,9 +416,273 @@ cdef class RouteChoiceSet:
             self.get_sl_link_loading(cores=c_cores)
             self.get_sl_od_matrices()
 
+    def make_demand(self, origin_column, destination_column):
+        """Create demand using the borrowed node mapping and centroid count."""
+        return GeneralisedCOODemand(
+            origin_column, destination_column, self.graph.nodes_to_indices,
+            shape=(len(self.centroids), len(self.centroids))
+        )
+
+    def compact_links(self, link_id, direction):
+        """Map a selected link and direction using the graph's link mapping."""
+        directions = (-1, 1) if direction == 0 else (direction,)
+        if direction not in (-1, 0, 1):
+            raise ValueError(f"link_id or direction {(link_id, direction)} is not present within graph.")
+
+        matches = [
+            self.full_link_indices[link_id * sign]
+            for sign in directions
+            if link_id * sign in self.full_link_indices
+        ]
+
+        if not matches:
+            raise ValueError(f"link_id or direction {(link_id, direction)} is not present within graph.")
+
+        cdef size_t local
+        result = []
+        for local in matches:
+            compact = self.graph_compressed_id_view[local]
+            if not 0 <= compact < self.num_links:
+                raise ValueError(
+                    f"link ID {link_id} and direction {direction} is not present in compressed graph. "
+                    "It may have been removed during dead-end removal."
+                )
+
+            result.append(compact)
+        return result
+
+    def recompute_psl(self, df, *, beta=1.0, cutoff_prob=0.0, log_warnings=True):
+        """Validate supplied routes and recompute the PSL results."""
+        cdef RouteVec_t routes
+        cdef vector[vector[double]] turns
+        cdef vector[double] costs, overlap, probabilities
+        cdef vector[bint] mask
+
+        table = self.import_dataframe(df, log_warnings, routes, mask)
+        self.recost_routes(table, routes, turns, costs, mask, log_warnings)
+
+        recompute_route_probabilities(
+            table,
+            routes,
+            turns,
+            costs,
+            mask,
+            overlap,
+            probabilities,
+            self.graph.cost,
+            beta,
+            cutoff_prob
+        )
+        return imported_route_dataframe(table, costs, mask, overlap, probabilities)
+
+    cdef object import_dataframe(self, object df, bint log_warnings, RouteVec_t &routes, vector[bint] &mask):
+        """Convert signed IDs to full-link vectors."""
+        cdef vector[long long] route
+        cdef size_t local, i
+
+        for column in ("origin id", "destination id", "route set"):
+            if column not in df.columns:
+                raise ValueError(f"provided DataFrame is missing required column '{column}'")
+
+        keep = []
+        for position, (index, row) in enumerate(df.iterrows()):
+            route_ids = row["route set"]
+            if not isinstance(route_ids, (list, np.ndarray)):
+                raise TypeError(f"route sets must be a list or Numpy array, found {type(route_ids)}")
+
+            if len(route_ids) == 0:
+                if log_warnings:
+                    logger.warning("Ignoring empty route at row %s for OD (%s, %s)",
+                                   index, row["origin id"], row["destination id"])
+                continue
+
+            route.clear()
+            for link in route_ids:
+                if isinstance(link, (builtins.bool, np.bool_)):
+                    raise TypeError("Route link IDs must be integers, not booleans")
+
+                link = operator.index(link)
+                if link not in self.full_link_indices:
+                    raise ValueError(f"Imported route contains a link or direction absent from the graph: {link}")
+
+                local = self.full_link_indices[link]
+                if not 0 <= self.graph_compressed_id_view[local] < self.num_links:
+                    raise ValueError(f"Imported route contains a link absent from the compact graph: {link}")
+
+                route.push_back(local)
+            keep.append(position)
+            routes.emplace_back(new vector[long long]())
+            d(routes.back()).swap(route)
+
+        table = df.iloc[keep].copy()
+        if "mask" in table:
+            # Older path files stored the Cython boolean buffer as integer zeroes and ones.
+            if table["mask"].isna().any() or not table["mask"].isin([False, True]).all():
+                raise TypeError("The route mask must contain booleans without missing values")
+
+            supplied_mask = table["mask"].to_numpy(dtype=np.bool_)
+            for i in range(routes.size()):
+                mask.push_back(supplied_mask[i])
+        else:
+            mask.resize(routes.size(), True)
+
+        return table
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef void recost_routes(
+        self,
+        object table,
+        const RouteVec_t &routes,
+        vector[vector[double]] &turns,
+        vector[double] &costs,
+        vector[bint] &mask,
+        bint log_warnings
+    ):
+        """Walk full-link paths once, costing and checking each step before PSL."""
+        cdef const int64_t[::1] node_ids = self.graph.all_nodes
+        cdef const int64_t[::1] tails = self.graph.graph.a_node.to_numpy(copy=False)
+        cdef const int64_t[::1] heads = self.graph.graph.b_node.to_numpy(copy=False)
+        cdef const double[::1] link_costs = self.graph.cost[:tails.shape[0]]
+        cdef const int64_t[::1] turn_fs, turn_to_arcs
+        cdef const double[::1] turn_penalties
+        cdef const vector[long long] *route
+        cdef size_t i, j, previous, current
+        cdef int64_t origin, destination, lo, hi, mid
+        cdef int64_t blocked_centroids = (
+            self.graph.num_zones if self.graph.block_centroid_flows and not self.turn_based else 0
+        )
+        cdef bint allow_uturns = self.graph.allow_path_uturns
+        cdef bint connected, explicit_turn, valid, connectivity_ok, turns_ok, uturns_ok, centroids_ok
+        cdef double cost, penalty
+
+        if self.turn_based:
+            turn_fs = self.graph.turn_fs
+            turn_to_arcs = self.graph.turn_to_arcs
+            turn_penalties = self.graph.turn_penalties
+
+        costs.resize(routes.size(), 0.0)
+        turns.resize(routes.size())
+
+        for i, (index, row) in enumerate(table.iterrows()):
+            route = &d(routes[i])
+            origin, destination = operator.index(row["origin id"]), operator.index(row["destination id"])
+            valid = connectivity_ok = turns_ok = uturns_ok = centroids_ok = True
+            cost = 0.0
+            turns[i].assign(d(route).size(), 0.0)
+
+            if node_ids[tails[d(route)[0]]] != origin:
+                valid = False
+                if log_warnings:
+                    logger.warning(
+                        "Invalid route %s at row %s for OD (%s, %s): route starts at the wrong node",
+                        row["route set"],
+                        index,
+                        origin,
+                        destination
+                    )
+
+            if node_ids[heads[d(route).back()]] != destination:
+                valid = False
+                if log_warnings:
+                    logger.warning(
+                        "Invalid route %s at row %s for OD (%s, %s): route ends at the wrong node",
+                        row["route set"],
+                        index,
+                        origin,
+                        destination
+                    )
+
+            for j in range(d(route).size()):
+                current = d(route)[j]
+                cost += link_costs[current]
+                if j == 0:
+                    continue
+
+                previous = d(route)[j - 1]
+                connected = heads[previous] == tails[current]
+                if not connected and connectivity_ok:
+                    connectivity_ok = False
+                    if log_warnings:
+                        logger.warning(
+                            "Invalid route %s at row %s for OD (%s, %s): disconnected links",
+                            row["route set"],
+                            index,
+                            origin,
+                            destination
+                        )
+
+                penalty = 0.0
+                explicit_turn = False
+
+                if self.turn_based:
+                    lo, hi = turn_fs[previous], turn_fs[previous + 1]
+                    while lo < hi:
+                        mid = lo + (hi - lo) // 2
+                        if turn_to_arcs[mid] < <int64_t>current:
+                            lo = mid + 1
+                        else:
+                            hi = mid
+
+                    if lo < turn_fs[previous + 1] and turn_to_arcs[lo] == <int64_t>current:
+                        explicit_turn = True
+                        penalty = turn_penalties[lo]
+
+                turns[i][j] = penalty
+                cost += penalty
+
+                if not isfinite(penalty) and turns_ok:
+                    turns_ok = False
+                    if log_warnings:
+                        logger.warning(
+                            "Invalid route %s at row %s for OD (%s, %s): prohibited turn",
+                            row["route set"],
+                            index,
+                            origin,
+                            destination
+                        )
+
+                if connected and not allow_uturns and heads[current] == tails[previous]:
+                    # An explicit finite turn overrides the default U-turn ban.
+                    if (not explicit_turn or not isfinite(penalty)) and uturns_ok:
+                        uturns_ok = False
+                        if log_warnings:
+                            logger.warning(
+                                "Invalid route %s at row %s for OD (%s, %s): disallowed U-turn",
+                                row["route set"],
+                                index,
+                                origin,
+                                destination
+                            )
+
+                if connected and tails[current] < blocked_centroids:
+                    if node_ids[tails[current]] != origin and centroids_ok:
+                        centroids_ok = False
+                        if log_warnings:
+                            logger.warning(
+                                "Invalid route %s at row %s for OD (%s, %s): blocked centroid flow",
+                                row["route set"], index,
+                                origin,
+                                destination
+                            )
+
+            valid = valid and connectivity_ok and turns_ok and uturns_ok and centroids_ok
+            if not valid:
+                cost = INFINITY
+            elif not isfinite(cost) and log_warnings:
+                logger.warning(
+                    "Invalid route %s at row %s for OD (%s, %s): infinite route cost",
+                    row["route set"],
+                    index,
+                    origin,
+                    destination
+                )
+
+            costs[i] = cost
+            mask[i] = mask[i] and isfinite(cost)
+
     def assign_from_df(
         self,
-        graph: pd.DataFrame,
         df: pd.DataFrame,
         demand: GeneralisedCOODemand,
         select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
@@ -405,7 +691,45 @@ cdef class RouteChoiceSet:
         store_results: bool = True,
         beta: float = 1.0,
         cutoff_prob: float = 0.0,
+        *,
+        log_warnings: bool = True,
     ):
+        """
+        Load supplied routes and their unmasked probabilities.
+
+        PSL recomputation validates paths and replaces costs and probabilities. Otherwise, supplied results are kept and
+        masked probabilities are used.
+        """
+        cdef RouteVec_t routes
+        cdef vector[vector[double]] turns
+        cdef vector[double] costs, overlap, route_probabilities
+        cdef vector[bint] mask
+        cdef size_t position, link
+        cdef long long previous, compact
+        cdef RouteVec_t compact_routes
+        cdef vector[double] probabilities
+        cdef vector[size_t] positions
+        cdef vector[long long] *route
+
+        df = self.import_dataframe(df, log_warnings, routes, mask)
+
+        if recompute_psl:
+            self.recost_routes(df, routes, turns, costs, mask, log_warnings)
+            recompute_route_probabilities(df, routes, turns, costs, mask, overlap, route_probabilities,
+                                          self.graph.cost, beta, cutoff_prob)
+        else:
+            if "probability" not in df:
+                raise ValueError("provided DataFrame is missing required column 'probability'")
+
+            route_probabilities = df["probability"].to_numpy(dtype=np.float64)
+
+            # Without PSL recomputation, keep any supplied results. No route validation
+            costs = df["cost"].to_numpy(dtype=np.float64) if "cost" in df else np.zeros(len(df))
+            overlap = df["path overlap"].to_numpy(dtype=np.float64) if "path overlap" in df else np.zeros(len(df))
+            for position in range(mask.size()):
+                if not mask[position]:
+                    route_probabilities[position] = 0.0
+
         cdef:
             long int c_cores = 1  # Single threaded only due to high python interop, this should be fast anyway
             int thread_id = 0
@@ -413,27 +737,9 @@ cdef class RouteChoiceSet:
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
             double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
-        for _, route_list in df["route set"].items():
-            if not isinstance(route_list, (list, np.ndarray)):
-                raise TypeError(f"route sets must be a list or Numpy array, found {type(route_list)}")
-
-        # We want to enforce that if the demand matrix cell is non-cell for an OD pair, then at least one route exists
-        # to assign to it
-        demand_df = demand.df.assign(idx=np.arange(len(demand.df)))
-        demand_df = demand_df[demand_df.index.get_level_values(0) != demand_df.index.get_level_values(1)]
-
-        df = df.set_index(demand_df.index.names)
-        if not demand_df.index.drop_duplicates().isin(df.index).all():
-            raise KeyError(
-                "not all origin and destinations IDs from the demand matrix are present within the path files"
-            )
-
-        # We also store those indices along side the route sets themselves so it's easier to keep track
-        df = demand_df[["idx"]].merge(df, how="left", left_index=True, right_index=True).reset_index()
-        gb = df.groupby(by="idx")
-
-        # In order to map the network link IDs to compressed links we'll use the graph
-        graph_to_compressed = graph[["link_id", "direction"]].prod(axis=1).reset_index().set_index(0)
+        # An OD with no routes loads no demand. Import has removed empty route rows.
+        demand_indices = {od: i for i, od in enumerate(demand.df.index)}
+        groups = df.groupby(list(demand.df.index.names), sort=False).indices
 
         # Now we initialise the demand matrix and prepare to insert the route sets
         demand._initalise_col_names()
@@ -450,58 +756,48 @@ cdef class RouteChoiceSet:
             self.link_id_direction,
             store_results=store_results,
             perform_assignment=True,
+            full_link_ids=self.full_link_ids,
+            full_directions=self.full_directions,
         )
 
         self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
 
-        cdef:
-            vector[long long] *route
-            vector[vector[double]] no_turns
-            bint found_zero_cost
+        # We iterate over the OD pairs in the path files. ODs without demand are omitted.
+        for od, group in groups.items():
+            if od[0] == od[1] or od not in demand_indices:
+                continue
 
-        # We iterate over the OD pairs in the path files
-        for od_idx, df in gb:
-            # We obtain a reference to the route vector, we then need to insert the right *compressed* link IDs
-            route_vec = self.results.get_route_vec(od_idx)
-
-            # If we are reusing the probabilities then we need to a similar thing for this
-            if not recompute_psl:
-                prob_vec = self.results.get_prob_vec(od_idx)
-
-            d(route_vec).reserve(len(df))
-            for _, row in df.iterrows():
-                # We find the indices for the compressed id that corresponds to the direction link id pair (as a
-                # product)
-                compressed_link_indices = graph_to_compressed.loc[row["route set"]]["index"].to_numpy()
-
-                route = new vector[long long]()
-                # Then use itertools.groupby to de-duplicate them without modifying the order. The order is not required
-                # for assignment but it is if we wish to output this route set again.
-                for compressed_link_id, _ in itertools.groupby(graph.__compressed_id__.iloc[compressed_link_indices]):
-                    route.push_back(compressed_link_id)
-
-                d(route_vec).emplace_back(route)
-                if not recompute_psl:
-                    d(prob_vec).push_back(row["probability"])
-
-            # If we are recomputing the probabilities then we do so here. This also has the side effect of recompute the
-            # cost, masking, and path overlap with new parameters
-            if recompute_psl:
-                prob_vec = self.results.compute_result(od_idx, d(route_vec), no_turns, &found_zero_cost, thread_id)
-
-            # We have now have both the route and probability vectors restored so we can do LL and SLL.
-            self.ll_results.link_load_single_route_set(od_idx, d(route_vec), d(prob_vec), thread_id)
-
+            od_idx = demand_indices[od]
+            positions = group
             origin_index = self.nodes_to_indices_view[demand.ods[od_idx].first]
             dest_index = self.nodes_to_indices_view[demand.ods[od_idx].second]
+
+            compact_routes.clear()
+            probabilities.clear()
+            for position in positions:
+                if not mask[position]:
+                    continue
+
+                route = new vector[long long]()
+                compact_routes.emplace_back(route)
+
+                previous = -1
+                # De-duplicate adjacent compact IDs without changing their order.
+                # PSL validation checks original links before compression when requested.
+                for link in d(routes[position]):
+                    compact = self.graph_compressed_id_view[link]
+                    if compact != previous:
+                        route.push_back(compact)
+                        previous = compact
+
+                probabilities.push_back(route_probabilities[position])
+
+            # Route and probability vectors can now be used for LL and SLL.
+            self.ll_results.link_load_single_route_set(od_idx, compact_routes, probabilities, thread_id)
             self.ll_results.sl_link_load_single_route_set(
-                od_idx,
-                d(route_vec),
-                d(prob_vec),
-                origin_index,
-                dest_index,
-                thread_id
+                od_idx, compact_routes, probabilities, origin_index, dest_index, thread_id
             )
+            self.results.store_imported_result(od_idx, routes, costs, mask, overlap, route_probabilities, positions)
 
         # Clean up and reduce any results from the threaded storage
         self.ll_results.reduce_link_loading()
@@ -511,6 +807,30 @@ cdef class RouteChoiceSet:
         self.get_link_loading(cores=c_cores)
         self.get_sl_link_loading(cores=c_cores)
         self.get_sl_od_matrices()
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef RouteCandidate *trace_route(
+        RouteChoiceSet self,
+        const CppMutableSearchResults &result,
+        size_t destination,
+        bint save_turns
+    ) noexcept nogil:
+        """Copy one settled state path before the next search replaces its labels."""
+        cdef RouteCandidate *vec = new RouteCandidate()
+        cdef size_t p = result.terminal_states[destination]
+
+        # Walk the search tree from the destination and build the route backwards.
+        while p != result.metadata.root:
+            if save_turns:
+                # Save this step before the next search replaces these labels.
+                vec.turn_steps.push_back(result.turn_costs[p] - result.turn_costs[result.predecessors[p]])
+            vec.links.push_back(result.connectors[p])
+            p = result.predecessors[p]
+
+        reverse(vec.links.begin(), vec.links.end())
+        reverse(vec.turn_steps.begin(), vec.turn_steps.end())
+        return vec
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -567,7 +887,6 @@ cdef class RouteChoiceSet:
             pair[RouteCandidateSet_t.iterator, bool] status
             pair[LinkSet_t.iterator, bool] banned_status
             unsigned int miss_count = 0
-            size_t p
             long long connector
 
             # Link penalisation, only used when penalty != 1.0
@@ -632,16 +951,8 @@ cdef class RouteChoiceSet:
 
                 # If the destination is reachable we must build the path and re-add
                 if result.terminal_states[dest_index] != <size_t>-1:
-                    vec = new RouteCandidate()
-                    # Walk the search tree from the destination and build the route backwards.
-                    p = result.terminal_states[dest_index]
-                    while p != result.metadata.root:
-                        connector = result.connectors[p]
-                        if save_turns:
-                            # Save this step before the next search replaces these labels.
-                            vec.turn_steps.push_back(result.turn_costs[p] - result.turn_costs[result.predecessors[p]])
-                        p = result.predecessors[p]
-                        vec.links.push_back(connector)
+                    # Trace the settled state path, including its turn steps.
+                    vec = RouteChoiceSet.trace_route(self, result, dest_index, save_turns)
 
                     if lp:
                         # Here we penalise all seen links for the *next* depth. If we penalised on the current depth
@@ -649,9 +960,6 @@ cdef class RouteChoiceSet:
                         for connector in vec.links:
                             # *= does not work
                             d(next_penalised_cost)[connector] = penalty * d(next_penalised_cost)[connector]
-
-                    reverse(vec.links.begin(), vec.links.end())
-                    reverse(vec.turn_steps.begin(), vec.turn_steps.end())
 
                     for connector in vec.links:
                         # This is one area for potential improvement. Here we construct a new set from the old one,
@@ -732,7 +1040,6 @@ cdef class RouteChoiceSet:
         cdef:
             # Scratch objects
             RouteCandidate *vec
-            size_t p
             long long connector
             pair[RouteCandidateSet_t.iterator, bool] status
             unsigned int miss_count = 0
@@ -748,22 +1055,11 @@ cdef class RouteChoiceSet:
             RouteChoiceSet.path_find(self, query, result, node_context, turn_context)
 
             if result.terminal_states[dest_index] != <size_t>-1:
-                vec = new RouteCandidate()
-                # Walk the search tree from the destination and build the route backwards.
-                p = result.terminal_states[dest_index]
-                while p != result.metadata.root:
-                    connector = result.connectors[p]
-                    if save_turns:
-                        vec.turn_steps.push_back(result.turn_costs[p] - result.turn_costs[result.predecessors[p]])
-
-                    p = result.predecessors[p]
-                    vec.links.push_back(connector)
+                # Trace the settled state path, including its turn steps.
+                vec = RouteChoiceSet.trace_route(self, result, dest_index, save_turns)
 
                 for connector in vec.links:
                     thread_cost[connector] = penalty * thread_cost[connector]
-
-                reverse(vec.links.begin(), vec.links.end())
-                reverse(vec.turn_steps.begin(), vec.turn_steps.end())
 
                 # To prevent runaway algorithms if we find N duplicate routes we should stop
                 status = route_set.insert(vec)
