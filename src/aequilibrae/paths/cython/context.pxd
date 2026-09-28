@@ -3,8 +3,8 @@ from libcpp cimport bool as cpp_bool
 from libcpp.vector cimport vector
 
 
-cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    cdef cppclass CppNodeBasedContext "aequilibrae::paths::cpp::mvp::NodeBasedContext":
+cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    cdef cppclass CppNodeBasedContext "aequilibrae::paths::cpp::routing::NodeBasedContext":
         CppNodeBasedContext() noexcept
         size_t node_count
         size_t link_count
@@ -13,7 +13,7 @@ cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         const double *costs
         size_t blocked_centroid_count
 
-    cdef cppclass CppTurnBasedContext "aequilibrae::paths::cpp::mvp::TurnBasedContext":
+    cdef cppclass CppTurnBasedContext "aequilibrae::paths::cpp::routing::TurnBasedContext":
         CppTurnBasedContext() noexcept
         CppNodeBasedContext graph
         const size_t *tails
@@ -22,7 +22,7 @@ cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         const double *turn_penalties
         cpp_bool allow_uturns
 
-    cdef cppclass CppSkimmingContext "aequilibrae::paths::cpp::mvp::SkimmingContext"[T]:
+    cdef cppclass CppSkimmingContext "aequilibrae::paths::cpp::routing::SkimmingContext"[T]:
         CppSkimmingContext() noexcept
         size_t link_count
         size_t field_count
@@ -37,7 +37,7 @@ cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         cpp_bool has_cost_field() noexcept
         cpp_bool has_turn_cost_field() noexcept
 
-    cdef cppclass CppSelectLinkContext "aequilibrae::paths::cpp::mvp::SelectLinkContext":
+    cdef cppclass CppSelectLinkContext "aequilibrae::paths::cpp::routing::SelectLinkContext":
         CppSelectLinkContext() noexcept
         size_t link_count
         size_t set_count

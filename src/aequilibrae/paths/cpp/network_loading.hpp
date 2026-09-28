@@ -9,7 +9,7 @@
 #include "search_results.hpp"
 #include "workspaces.hpp"
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 // Both ordinary and selected loading seed demand at terminal states. Parents
 // receive demand from all their children before loading their own connector.
@@ -118,4 +118,4 @@ void reduce_loading_outputs(const LoadingOutputs<T> *workers,
   }
 }
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

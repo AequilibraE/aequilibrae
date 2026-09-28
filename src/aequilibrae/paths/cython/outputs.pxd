@@ -1,15 +1,15 @@
 from libc.stddef cimport size_t
 
 
-cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    cdef cppclass CppLoadingOutputs "aequilibrae::paths::cpp::mvp::LoadingOutputs"[T]:
+cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    cdef cppclass CppLoadingOutputs "aequilibrae::paths::cpp::routing::LoadingOutputs"[T]:
         CppLoadingOutputs() noexcept
         size_t link_count
         size_t class_count
         T *link_loads
         void reset() noexcept
 
-    cdef cppclass CppSkimmingOriginView "aequilibrae::paths::cpp::mvp::SkimmingOriginView"[T]:
+    cdef cppclass CppSkimmingOriginView "aequilibrae::paths::cpp::routing::SkimmingOriginView"[T]:
         CppSkimmingOriginView() noexcept
         size_t field_count
         size_t destination_count
@@ -17,7 +17,7 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         T *field_data(size_t index) noexcept
         CppSkimmingOriginView[T] subfields(size_t first, size_t count) noexcept
 
-    cdef cppclass CppSkimmingOutputsView "aequilibrae::paths::cpp::mvp::SkimmingOutputsView"[T]:
+    cdef cppclass CppSkimmingOutputsView "aequilibrae::paths::cpp::routing::SkimmingOutputsView"[T]:
         CppSkimmingOutputsView() noexcept
         size_t origin_count
         size_t field_count
@@ -26,7 +26,7 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         CppSkimmingOriginView[T] origin(size_t index) noexcept
         void reset() noexcept
 
-    cdef cppclass CppSelectLinkLoadingOutputsView "aequilibrae::paths::cpp::mvp::SelectLinkLoadingOutputsView"[T]:
+    cdef cppclass CppSelectLinkLoadingOutputsView "aequilibrae::paths::cpp::routing::SelectLinkLoadingOutputsView"[T]:
         CppSelectLinkLoadingOutputsView() noexcept
         size_t set_count
         size_t link_count
@@ -35,7 +35,7 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         CppLoadingOutputs[T] selection(size_t index) noexcept
         void reset() noexcept
 
-    cdef cppclass CppSelectLinkODOriginView "aequilibrae::paths::cpp::mvp::SelectLinkODOriginView"[T]:
+    cdef cppclass CppSelectLinkODOriginView "aequilibrae::paths::cpp::routing::SelectLinkODOriginView"[T]:
         CppSelectLinkODOriginView() noexcept
         size_t set_count
         size_t destination_count
@@ -43,7 +43,7 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         T *data
         T *selection_data(size_t index) noexcept
 
-    cdef cppclass CppSelectLinkODOutputsView "aequilibrae::paths::cpp::mvp::SelectLinkODOutputsView"[T]:
+    cdef cppclass CppSelectLinkODOutputsView "aequilibrae::paths::cpp::routing::SelectLinkODOutputsView"[T]:
         CppSelectLinkODOutputsView() noexcept
         size_t origin_count
         size_t set_count
@@ -53,7 +53,7 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
         CppSelectLinkODOriginView[T] origin(size_t index) noexcept
         void reset() noexcept
 
-    cdef cppclass CppAoNOutputsView "aequilibrae::paths::cpp::mvp::AoNOutputsView":
+    cdef cppclass CppAoNOutputsView "aequilibrae::paths::cpp::routing::AoNOutputsView":
         CppAoNOutputsView() noexcept
         CppLoadingOutputs[double] loading
         CppSkimmingOutputsView[double] skimming

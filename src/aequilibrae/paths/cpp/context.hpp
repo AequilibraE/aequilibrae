@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 struct NodeBasedContext {
   std::size_t node_count = 0;
@@ -58,4 +58,4 @@ struct SelectLinkContext {
   }
 };
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

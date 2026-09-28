@@ -25,14 +25,14 @@ cdef void run_dijkstra(
 ) noexcept nogil
 
 
-cdef extern from "dijkstra.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    void cpp_dijkstra "aequilibrae::paths::cpp::mvp::dijkstra"[Queue](
+cdef extern from "dijkstra.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    void cpp_dijkstra "aequilibrae::paths::cpp::routing::dijkstra"[Queue](
         const CppNodeBasedContext &context,
         const CppSearchQuery &query,
         const CppMutableSearchResults &results,
     ) noexcept
 
-    void cpp_turn_dijkstra "aequilibrae::paths::cpp::mvp::dijkstra"[Queue](
+    void cpp_turn_dijkstra "aequilibrae::paths::cpp::routing::dijkstra"[Queue](
         const CppTurnBasedContext &context,
         const CppSearchQuery &query,
         const CppMutableSearchResults &results,

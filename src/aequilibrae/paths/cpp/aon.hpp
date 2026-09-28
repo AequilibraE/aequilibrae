@@ -8,7 +8,7 @@
 #include "search_results.hpp"
 #include "workspaces.hpp"
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 // The driver prepares these queries once because demand and targets are fixed.
 struct AoNOrigin {
@@ -44,4 +44,4 @@ struct AoNWorkerView {
   }
 };
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

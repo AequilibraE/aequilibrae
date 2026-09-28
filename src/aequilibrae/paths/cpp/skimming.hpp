@@ -10,7 +10,7 @@
 #include "search_results.hpp"
 #include "workspaces.hpp"
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 // Sum all supplied link fields in one walk of the state tree.
 template <typename T>
@@ -125,4 +125,4 @@ void skimming(const SearchResults &results, const SkimmingContext<T> &context,
   }
 }
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

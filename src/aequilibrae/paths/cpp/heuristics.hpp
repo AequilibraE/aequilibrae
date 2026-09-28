@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstddef>
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 // Coordinates use local node order. Views borrow their Cython owner's arrays.
 struct EuclideanContext {
@@ -47,4 +47,4 @@ struct HaversineContext {
   }
 };
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

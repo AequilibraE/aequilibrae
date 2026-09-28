@@ -2,25 +2,25 @@ from libc.stddef cimport size_t
 from libcpp cimport bool as cpp_bool
 
 
-cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    cdef cppclass CppLoadingWorkspace "aequilibrae::paths::cpp::mvp::LoadingWorkspace"[T]:
+cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    cdef cppclass CppLoadingWorkspace "aequilibrae::paths::cpp::routing::LoadingWorkspace"[T]:
         CppLoadingWorkspace() noexcept
         size_t state_count
         size_t class_count
         T *state_loads
 
-    cdef cppclass CppSkimmingWorkspace "aequilibrae::paths::cpp::mvp::SkimmingWorkspace"[T]:
+    cdef cppclass CppSkimmingWorkspace "aequilibrae::paths::cpp::routing::SkimmingWorkspace"[T]:
         CppSkimmingWorkspace() noexcept
         size_t state_count
         size_t field_count
         T *state_skims
 
-    cdef cppclass CppSelectLinkWorkspace "aequilibrae::paths::cpp::mvp::SelectLinkWorkspace":
+    cdef cppclass CppSelectLinkWorkspace "aequilibrae::paths::cpp::routing::SelectLinkWorkspace":
         CppSelectLinkWorkspace() noexcept
         size_t state_count
         cpp_bool *selected_paths
 
-    cdef cppclass CppAoNWorkspace "aequilibrae::paths::cpp::mvp::AoNWorkspace"[T]:
+    cdef cppclass CppAoNWorkspace "aequilibrae::paths::cpp::routing::AoNWorkspace"[T]:
         CppAoNWorkspace() noexcept
         CppLoadingWorkspace[T] loading
         CppSkimmingWorkspace[T] skimming

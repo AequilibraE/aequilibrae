@@ -9,7 +9,7 @@
 #include "queries.hpp"
 #include "search_results.hpp"
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 inline bool reached_last_target(const SearchQuery &query, std::size_t node,
                                 SearchMetadata &metadata) noexcept {
@@ -173,4 +173,4 @@ void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
   }
 }
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

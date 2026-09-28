@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 // Ordinary and selected loading can reuse this cascade scratch sequentially
 // because each operation replaces every state total.
@@ -35,4 +35,4 @@ template <typename T> struct AoNWorkspace {
   SelectLinkWorkspace select_link;
 };
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

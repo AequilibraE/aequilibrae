@@ -4,8 +4,8 @@ from aequilibrae.paths.cython.queries cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
 
 
-cdef extern from "heuristics.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    cdef cppclass CppEuclideanContext "aequilibrae::paths::cpp::mvp::EuclideanContext":
+cdef extern from "heuristics.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    cdef cppclass CppEuclideanContext "aequilibrae::paths::cpp::routing::EuclideanContext":
         CppEuclideanContext() noexcept
         size_t node_count
         const double *x
@@ -13,7 +13,7 @@ cdef extern from "heuristics.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil
         double scale
         double distance(size_t, size_t) noexcept
 
-    cdef cppclass CppHaversineContext "aequilibrae::paths::cpp::mvp::HaversineContext":
+    cdef cppclass CppHaversineContext "aequilibrae::paths::cpp::routing::HaversineContext":
         CppHaversineContext() noexcept
         size_t node_count
         const double *latitudes
@@ -50,20 +50,20 @@ ctypedef fused CppHeuristicContext:
     CppHaversineContext
 
 
-cdef extern from "a_star.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    void node_euclidean "aequilibrae::paths::cpp::mvp::a_star"[Queue](
+cdef extern from "a_star.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    void node_euclidean "aequilibrae::paths::cpp::routing::a_star"[Queue](
         const CppNodeBasedContext &, const CppSearchQuery &, size_t,
         const CppEuclideanContext &, const CppMutableSearchResults &,
     ) noexcept
-    void node_haversine "aequilibrae::paths::cpp::mvp::a_star"[Queue](
+    void node_haversine "aequilibrae::paths::cpp::routing::a_star"[Queue](
         const CppNodeBasedContext &, const CppSearchQuery &, size_t,
         const CppHaversineContext &, const CppMutableSearchResults &,
     ) noexcept
-    void turn_euclidean "aequilibrae::paths::cpp::mvp::a_star"[Queue](
+    void turn_euclidean "aequilibrae::paths::cpp::routing::a_star"[Queue](
         const CppTurnBasedContext &, const CppSearchQuery &, size_t,
         const CppEuclideanContext &, const CppMutableSearchResults &,
     ) noexcept
-    void turn_haversine "aequilibrae::paths::cpp::mvp::a_star"[Queue](
+    void turn_haversine "aequilibrae::paths::cpp::routing::a_star"[Queue](
         const CppTurnBasedContext &, const CppSearchQuery &, size_t,
         const CppHaversineContext &, const CppMutableSearchResults &,
     ) noexcept

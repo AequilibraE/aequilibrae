@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <limits>
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 inline constexpr std::size_t invalid_state =
     std::numeric_limits<std::size_t>::max();
@@ -75,4 +75,4 @@ struct MutableSearchResults {
   }
 };
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

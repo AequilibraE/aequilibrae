@@ -12,7 +12,7 @@
 #include "queries.hpp"
 #include "search_results.hpp"
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 inline const NodeBasedContext &
 a_star_graph(const NodeBasedContext &context) noexcept {
@@ -148,4 +148,4 @@ void a_star(const RoutingContext &context, const SearchQuery &query,
   }
 }
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

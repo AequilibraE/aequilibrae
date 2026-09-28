@@ -8,20 +8,20 @@ from aequilibrae.paths.cython.outputs cimport (
 )
 
 
-cdef extern from "aon.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    cdef cppclass CppAoNOrigin "aequilibrae::paths::cpp::mvp::AoNOrigin":
+cdef extern from "aon.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    cdef cppclass CppAoNOrigin "aequilibrae::paths::cpp::routing::AoNOrigin":
         CppAoNOrigin() noexcept
         CppSearchQuery search
         CppLoadingQuery[double] loading
 
-    cdef cppclass CppAoNInputs "aequilibrae::paths::cpp::mvp::AoNInputs":
+    cdef cppclass CppAoNInputs "aequilibrae::paths::cpp::routing::AoNInputs":
         CppAoNInputs() noexcept
         CppSkimmingContext[double] skimming
         CppSelectLinkContext selection
         const CppAoNOrigin *origins
         size_t origin_count
 
-    cdef cppclass CppAoNWorkerView "aequilibrae::paths::cpp::mvp::AoNWorkerView":
+    cdef cppclass CppAoNWorkerView "aequilibrae::paths::cpp::routing::AoNWorkerView":
         CppAoNWorkerView() noexcept
         CppMutableSearchResults search
         CppAoNWorkspace[double] workspace
