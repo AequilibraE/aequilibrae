@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths import Graph, estimate_heuristic_scale
 from aequilibrae.paths.results import PathResults
 from aequilibrae.transit import Transit
 
@@ -135,7 +135,9 @@ def test_a_star_with_turn_restrictions(sioux_falls_example):
     )
     graph.set_turn_restrictions(turn_restrictions)
 
-    result = graph.compute_path(1, 6, a_star=True, heuristic="equirectangular")
+    scale = estimate_heuristic_scale(graph, heuristic="haversine")
+    result = graph.compute_path(1, 6, a_star=True, heuristic="haversine", heuristic_scale=scale)
+    assert result.milepost[-1] == graph.compute_path(1, 6).milepost[-1]
     assert result.path_nodes[0] == 1
     assert result.path_nodes[-1] == 6
 

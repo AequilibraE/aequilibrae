@@ -5,6 +5,7 @@ pyfiles = [
 ]
 
 exts = [
+    'a_star',
     'aon_context',
     'basic_path_finding',
     'graph_building',

@@ -15,9 +15,14 @@ In this example, we show how to perform path computation for Coquimbo, a city in
 
 # %%
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
 from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
+
+import geopandas as gpd
+import pandas as pd
+
+from aequilibrae.paths import estimate_heuristic_scale
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
 
@@ -40,7 +45,7 @@ basic_config()
 # %%
 # We build all graphs
 project.network.build_graphs()
-# We get warnings that several fields in the project are filled with ``NaN``s. 
+# We get warnings that several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
 # %%
@@ -60,7 +65,7 @@ graph.set_graph("distance")
 graph.set_skimming(["travel_time", "distance"])
 
 # %%
-# Let's create a path results object from the graph and compute a path from 
+# Let's create a path results object from the graph and compute a path from
 # node 32343 (near the airport) to 22041 (near Fort Lambert, overlooking Coquimbo Bay).
 res = graph.compute_path(32343, 22041)
 
@@ -86,37 +91,44 @@ res.path
 res.milepost
 
 # %%
-# Additionally, you can also provide ``early_exit=True`` or ``a_star=True`` to `compute_path` to 
-# adjust its path-finding behavior.
-# 
-# Providing ``early_exit=True`` allows you to quit the path-finding procedure once it discovers 
-# the destination. This setup works better for topographically close origin-destination pairs. 
-# However, exiting early may cause subsequent calls to ``update_trace`` to recompute the tree 
-# in cases where it typically wouldn't.
+# Additionally, you can also provide ``early_exit=True`` or ``a_star=True`` to `compute_path` to adjust its
+# path-finding behaviour.
+#
+# Providing ``early_exit=True`` allows you to quit the path-finding procedure once it discovers the destination. This
+# setup works better for topographically close origin-destination pairs.  However, exiting early may cause subsequent
+# calls to ``update_trace`` to recompute the tree in cases where it typically wouldn't.
 res = graph.compute_path(32343, 22041, early_exit=True)
 
 # %%
-# If you prefer to find a potentially non-optimal path to the destination faster,
-# provide ``a_star=True`` to use `A*` with a heuristic. This method always recomputes the
-# path's nodes, links, skims, and mileposts with ``update_trace``.
-# Note that a_star takes precedence over early_exit.
-res = graph.compute_path(32343, 22041, a_star=True)
+# To guide the search towards the destination, provide ``a_star=True`` to use `A*` with a heuristic. ``update_trace``
+# reuses finalised paths, or searches again if needed, retaining the algorithm, heuristic, scale and heap.  Note that
+# a_star takes precedence over early_exit. Euclidean distance needs node coordinates projected to a suitable local CRS
+# and a scale parameter to transform it into a cost value.
+lonlat = graph.lonlat_index
+points = gpd.GeoSeries(gpd.points_from_xy(lonlat.lon, lonlat.lat), index=lonlat.index, crs=4326)
+points = points.to_crs(points.estimate_utm_crs())
+coordinates = points.get_coordinates()
+
+scale = estimate_heuristic_scale(graph, coordinates)
+res = graph.compute_path(32343, 22041, a_star=True, coordinates=coordinates, heuristic_scale=scale)
 
 # %%
-# If you are using `a_star`, it is possible to use different heuristics to compute the path. 
-# By default, an equirectangular heuristic is used, and we can view the available heuristics via:
+# If you are using `a_star`, it is possible to use different heuristics to compute the path.
+# By default, a Euclidean heuristic is used, and we can view the available heuristics via:
 res.get_heuristics()
 
 # %%
-# If you prefer a more accurate but slower heuristic, you can choose "haversine", by setting:
-res = graph.compute_path(32343, 22041, a_star=True, heuristic="haversine")
+# To use geographic distance without projecting the coordinates, choose "haversine".  It uses the graph's
+# longitude/latitude data and needs its own scale.
+scale = estimate_heuristic_scale(graph, heuristic="haversine")
+res = graph.compute_path(32343, 22041, a_star=True, heuristic="haversine", heuristic_scale=scale)
 
 # %%
-# Suppose you want to adjust the path to the University of La Serena instead of Fort Lambert. 
-# It is possible to adjust the existing path computation for this alteration. The following code 
-# allows both `early_exit` and `A*` settings to persist when calling ``update_trace``. If you’d 
-# like to adjust them for subsequent path re-computations, call ``compute_path`` with the desired
-# settings. Notice that this procedure is much faster when you have large networks.
+# Suppose you want to adjust the path to the University of La Serena instead of Fort Lambert.  It is possible to adjust
+# the existing path computation for this alteration. The following code allows both `early_exit` and `A*` settings to
+# persist when calling ``update_trace``. If you’d like to adjust them for subsequent path re-computations, call
+# ``compute_path`` with the desired settings. Notice that this procedure is much faster when you have large networks and
+# the search for the previous destination happened to include the new destination.
 
 res.update_trace(73131)
 
@@ -124,13 +136,13 @@ res.path_nodes
 
 # %%
 # If you want to show the path in Python.
-# 
+#
 # We do NOT recommend this, though... It is very slow for real networks.
 links = project.network.links.data.set_index("link_id")
 links = links.loc[res.path]
 
 # %%
-links.explore(color="blue", style_kwds={'weight':5})
+links.explore(color="blue", style_kwds={"weight": 5})
 
 # %%
 project.close()

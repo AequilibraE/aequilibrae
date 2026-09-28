@@ -1,7 +1,9 @@
+import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 
-from aequilibrae.paths import PathResults, available_heaps
+from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
 from aequilibrae.paths.cython.aon_context import PreparedAoN
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.results import path_results as path_results_module
@@ -91,10 +93,19 @@ def test_path_results_remembers_selected_heap(sioux_falls_example, heap, monkeyp
         result.compute_path(1, 20, heap="unknown")
 
 
-@pytest.mark.parametrize("heuristic", ["haversine", "equirectangular"])
+@pytest.mark.parametrize("heuristic", ["haversine", "euclidean"])
 def test_path_results_support_astar(sioux_falls_example, heuristic):
     graph = build_graph(sioux_falls_example)
-    result = PathResults(graph, 1, 20, a_star=True, heuristic=heuristic)
+    lonlat = graph.lonlat_index
+    points = gpd.GeoSeries(gpd.points_from_xy(lonlat.lon, lonlat.lat), index=lonlat.index, crs=4326)
+    points = points.to_crs(points.estimate_utm_crs())
+    coordinates = pd.DataFrame({"x": points.x, "y": points.y})
+    scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
+    result = PathResults(
+        graph, 1, 20, a_star=True, heuristic=heuristic, coordinates=coordinates, heuristic_scale=scale
+    )
+    reference = PathResults(graph, 1, 20)
+    assert result.milepost[-1] == pytest.approx(reference.milepost[-1])
 
     assert heuristic in result.get_heuristics()
     assert result.path_nodes[0] == 1 and result.path_nodes[-1] == 20

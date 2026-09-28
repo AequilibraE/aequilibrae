@@ -10,6 +10,7 @@ pyfiles = [
     'linear_approximation.py',
     'network_skimming.py',
     'optimal_strategies.py',
+    'path_heuristics.py',
     'public_transport.py',
     'route_choice.py',
     'routing_context.py',

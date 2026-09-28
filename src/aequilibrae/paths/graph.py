@@ -349,6 +349,9 @@ class GraphBase(ABC):  # noqa: B024
         early_exit: bool = False,
         a_star: bool = False,
         heuristic: Union[str, None] = None,
+        *,
+        coordinates: pd.DataFrame | None = None,
+        heuristic_scale: float | None = None,
     ) -> PathResults:
         """
         Returns the results from path computation result holder.
@@ -363,9 +366,15 @@ class GraphBase(ABC):  # noqa: B024
 
             **a_star** (:obj:`bool`): whether or not to use A* over Dijkstra's algorithm.
             When ``True``, 'early_exit' is always ``True``. Default is ``False``.
-            This option is incompatible with turn restrictions.
 
-            **heuristic** (:obj:`str`): heuristic to use if ``a_star`` is enabled. Default is ``None``.
+            **heuristic** (:obj:`str`): ``euclidean`` (default) or ``haversine`` if A* is enabled.
+
+            **coordinates** (:obj:`pandas.DataFrame`, optional): Planar ``x`` and ``y`` columns indexed by
+            external node ID, required for Euclidean A*. Haversine uses the graph's longitude/latitude.
+
+            **heuristic_scale** (:obj:`float`): Finite, nonnegative coefficient required for A*.  Use
+            ``aequilibrae.paths.estimate_heuristic_scale`` for a conservative bound. A larger scale can give
+            non-shortest paths.
         """
         from aequilibrae.paths import PathResults
 
@@ -376,6 +385,8 @@ class GraphBase(ABC):  # noqa: B024
             early_exit=early_exit,
             a_star=a_star,
             heuristic=heuristic,
+            coordinates=coordinates,
+            heuristic_scale=heuristic_scale,
         )
 
         return res

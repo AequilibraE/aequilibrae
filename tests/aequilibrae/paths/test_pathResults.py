@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from aequilibrae.paths import available_heaps
+from aequilibrae.paths import available_heaps, estimate_heuristic_scale
 from aequilibrae.paths.results import PathResults
 
 origin = 5
@@ -48,7 +48,10 @@ def test_compute_paths(p_results):
 
     for early_exit in [True, False]:
         for a_star, heuristic in [(False, None), (True, "haversine")]:
-            result.compute_path(5, 2, early_exit=early_exit, a_star=a_star, heuristic=heuristic)
+            scale = estimate_heuristic_scale(graph, heuristic=heuristic) if a_star else None
+            result.compute_path(
+                5, 2, early_exit=early_exit, a_star=a_star, heuristic=heuristic, heuristic_scale=scale
+            )
             assert list(result.path) == [12, 14]
             assert list(result.path_link_directions) == [1, 1]
             assert list(result.path_nodes) == [5, 6, 2]

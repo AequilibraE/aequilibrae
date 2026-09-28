@@ -199,9 +199,34 @@ run-local routing views store these values so they do not retain references to
 temporary return values. Subsequent calls borrow them by reference. A temporary
 view may bind to a const reference for a call; no kernel retains that reference.
 
-The routing kernels live in `dijkstra.hpp`. Legacy production algorithms remain
-in `path_finding.hpp`. Each search owns its priority-queue state, while the
-public routing API selects the queue implementation.
+The routing kernels live in `dijkstra.hpp` and `a_star.hpp`. Legacy production
+algorithms remain in `path_finding.hpp`. Each search owns its priority-queue
+state, while the public routing API selects the queue implementation.
+
+### A* for PathResults
+
+A* accepts either routing context and a single-target `SearchQuery`, plus an
+explicit destination and a separate heuristic context. `EuclideanContext`
+copies planar x/y coordinates. `HaversineContext` copies longitude/latitude,
+converts degrees to radians and caches latitude cosines. Both expose borrowed
+C++ views from `heuristics.hpp` that implement the heuristic calculation.
+
+Each context needs an explicit finite, nonnegative scale. A consistent scale
+preserves shortest paths and settles each state once; larger unchecked scales
+can give approximate paths. Heap priorities include the heuristic, but result
+distances and turn costs contain only actual costs. A* clears tentative states
+and retains the parent-before-child order needed by skimming.
+
+`PathResults` accepts planar coordinates as a DataFrame with x/y columns indexed
+by external node ID. Haversine uses a copy of `graph.lonlat_index` instead.
+Euclidean is the default. The public `estimate_heuristic_scale` helper calculates
+a conservative coefficient from link costs and endpoint distances for either
+heuristic, without running a path search. Its bound works for every destination
+and nonnegative turn penalties. It is never called automatically.
+
+A* always stops at the destination. `update_trace` reuses an available terminal,
+or searches again with the previous algorithm, heuristic, scale and heap.
+Assignment and Route Choice do not use this A* implementation.
 
 ## Second slice: workspaces and network loading
 
