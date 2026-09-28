@@ -40,7 +40,7 @@ from aequilibrae.paths.cython.outputs cimport (
 )
 from aequilibrae.paths.cython.select_link_loading cimport (
     cpp_select_link_loading,
-    cpp_reduce_select_link_loading_outputs,
+    cpp_reduce_select_link_loading,
 )
 
 
@@ -419,7 +419,7 @@ cdef class PreparedAoN:
                 output.loading,
             )
             if self.load_selected_links:
-                cpp_reduce_select_link_loading_outputs[double](
+                cpp_reduce_select_link_loading[double](
                     self.selected_outputs.data(),
                     self.selected_outputs.size(),
                     output.selected_loading,

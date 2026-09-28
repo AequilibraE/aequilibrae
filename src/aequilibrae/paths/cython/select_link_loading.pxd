@@ -22,7 +22,7 @@ cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::r
         const CppSelectLinkODOriginView[T] &od,
     ) noexcept
 
-    void cpp_reduce_select_link_loading_outputs "aequilibrae::paths::cpp::routing::reduce_select_link_loading_outputs"[T](
+    void cpp_reduce_select_link_loading "aequilibrae::paths::cpp::routing::reduce_select_link_loading_outputs"[T](
         const CppSelectLinkLoadingOutputsView[T] *workers,
         size_t worker_count,
         const CppSelectLinkLoadingOutputsView[T] &output,

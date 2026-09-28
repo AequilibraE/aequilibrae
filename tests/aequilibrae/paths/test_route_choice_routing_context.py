@@ -139,9 +139,7 @@ def test_shared_turn_cost_counts_towards_overlap():
     graph.prepare_graph(np.array([10, 20, 30, 40, 50]), remove_dead_ends=False)
     graph.set_blocked_centroid_flows(False)
     graph.set_graph("time")
-    graph.set_turn_restrictions(
-        pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [30], "penalty": [3.0]})
-    )
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [30], "penalty": [3.0]}))
     choice = RouteChoice(graph)
     choice.set_choice_set_generation("bfsle", max_routes=2, max_depth=5)
     choice.execute_single(10, 50, demand=1.0)
@@ -173,9 +171,7 @@ def test_generation_without_psl_does_not_need_turn_steps(algorithm):
     assert "cost" not in choice.get_results()
 
 
-def recompute_imported_routes(
-    graph, routes, *, destination=40, log_warnings=True, return_choice=False
-):
+def recompute_imported_routes(graph, routes, *, destination=40, log_warnings=True, return_choice=False):
     choice = RouteChoice(graph)
     choice.set_choice_set_generation()
     choice.add_demand(
@@ -187,9 +183,7 @@ def recompute_imported_routes(
     supplied = pd.DataFrame(
         {"origin id": [10] * len(routes), "destination id": [destination] * len(routes), "route set": routes}
     )
-    choice.execute_from_pandas(
-        supplied, recompute_psl=True, log_warnings=log_warnings
-    )
+    choice.execute_from_pandas(supplied, recompute_psl=True, log_warnings=log_warnings)
     return choice if return_choice else choice.get_results()
 
 
@@ -259,8 +253,10 @@ def test_recomputed_psl_applies_uturn_rules(allow_explicit_uturn, caplog):
     graph.set_graph("time")
     turns = pd.DataFrame(
         {
-            "from_node": [10], "via_node": [20],
-            "to_node": [10 if allow_explicit_uturn else 40], "penalty": [0.0],
+            "from_node": [10],
+            "via_node": [20],
+            "to_node": [10 if allow_explicit_uturn else 40],
+            "penalty": [0.0],
         }
     )
     graph.set_turn_restrictions(turns)
@@ -277,9 +273,7 @@ def test_recomputed_psl_applies_uturn_rules(allow_explicit_uturn, caplog):
         assert "disallowed U-turn" in caplog.text
 
         graph.clear_turn_restrictions()
-        node_rows = recompute_imported_routes(
-            graph, [[11, 12, 13], [11, 14]]
-        )
+        node_rows = recompute_imported_routes(graph, [[11, 12, 13], [11, 14]])
         node_table = {tuple(row["route set"]): row for _, row in node_rows.iterrows()}
         assert not node_table[11, 12, 13]["mask"]
         assert node_table[11, 14]["probability"] == 1.0
@@ -311,9 +305,7 @@ def test_recomputed_psl_from_path_files_includes_turns(tmp_path):
 def test_recomputed_psl_validates_node_routes_without_turn_tables(caplog):
     graph = diamond()
     graph.clear_turn_restrictions()
-    rows = recompute_imported_routes(
-        graph, [[71, 24], [55, 24]]
-    )
+    rows = recompute_imported_routes(graph, [[71, 24], [55, 24]])
     table = {tuple(row["route set"]): row for _, row in rows.iterrows()}
     assert not table[71, 24]["mask"]
     assert table[55, 24]["probability"] == 1.0
@@ -348,23 +340,30 @@ def test_imported_link_absent_from_compact_graph_is_rejected():
         choice.assign_from_df(supplied, demand, select_links={}, recompute_psl=True)
 
 
-@pytest.mark.parametrize("origin,destination,invalid,valid,reason", [
-    (20, 40, [55, 24], [12], "starts at the wrong node"),
-    (10, 30, [71, 12], [55], "ends at the wrong node"),
-])
-def test_imported_route_validation_checks_od_endpoints(
-    origin, destination, invalid, valid, reason, caplog
-):
+@pytest.mark.parametrize(
+    "origin,destination,invalid,valid,reason",
+    [
+        (20, 40, [55, 24], [12], "starts at the wrong node"),
+        (10, 30, [71, 12], [55], "ends at the wrong node"),
+    ],
+)
+def test_imported_route_validation_checks_od_endpoints(origin, destination, invalid, valid, reason, caplog):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(pd.DataFrame(
-        {"flow": [1.0]},
-        index=pd.MultiIndex.from_tuples([(origin, destination)], names=["origin id", "destination id"]),
-    ))
-    df = pd.DataFrame({
-        "origin id": [origin, origin], "destination id": [destination, destination],
-        "route set": [invalid, valid], "probability": [0.25, 0.75],
-    })
+    choice.add_demand(
+        pd.DataFrame(
+            {"flow": [1.0]},
+            index=pd.MultiIndex.from_tuples([(origin, destination)], names=["origin id", "destination id"]),
+        )
+    )
+    df = pd.DataFrame(
+        {
+            "origin id": [origin, origin],
+            "destination id": [destination, destination],
+            "route set": [invalid, valid],
+            "probability": [0.25, 0.75],
+        }
+    )
     choice.execute_from_pandas(df, recompute_psl=True)
     table = {tuple(row["route set"]): row for _, row in choice.get_results().iterrows()}
     assert np.isinf(table[tuple(invalid)]["cost"])
@@ -377,15 +376,22 @@ def test_imported_route_validation_checks_od_endpoints(
 def test_without_psl_uses_supplied_mask_without_renormalising(caplog):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(pd.DataFrame(
-        {"flow": [1.0]},
-        index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-    ))
-    df = pd.DataFrame({
-        "origin id": [10, 10], "destination id": [40, 40],
-        "route set": [[71, 24], [55, 24]], "probability": [0.4, 0.6],
-        "mask": [False, True], "cost": [123.0, 456.0],
-    })
+    choice.add_demand(
+        pd.DataFrame(
+            {"flow": [1.0]},
+            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
+        )
+    )
+    df = pd.DataFrame(
+        {
+            "origin id": [10, 10],
+            "destination id": [40, 40],
+            "route set": [[71, 24], [55, 24]],
+            "probability": [0.4, 0.6],
+            "mask": [False, True],
+            "cost": [123.0, 456.0],
+        }
+    )
     choice.execute_from_pandas(df)
     table = {tuple(row["route set"]): row for _, row in choice.get_results().iterrows()}
     assert table[71, 24]["probability"] == 0.0
@@ -404,14 +410,20 @@ def test_without_psl_uses_supplied_mask_without_renormalising(caplog):
 def test_imported_empty_route_set_loads_no_demand(routes, recompute_psl):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(pd.DataFrame(
-        {"flow": [1.0]},
-        index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-    ))
-    df = pd.DataFrame({
-        "origin id": [10] * len(routes), "destination id": [40] * len(routes),
-        "route set": routes, "probability": [1.0] * len(routes),
-    })
+    choice.add_demand(
+        pd.DataFrame(
+            {"flow": [1.0]},
+            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
+        )
+    )
+    df = pd.DataFrame(
+        {
+            "origin id": [10] * len(routes),
+            "destination id": [40] * len(routes),
+            "route set": routes,
+            "probability": [1.0] * len(routes),
+        }
+    )
     choice.execute_from_pandas(df, recompute_psl=recompute_psl)
     assert choice.get_results().empty
     assert np.all(choice.get_load_results()["flow_tot"] == 0.0)
@@ -421,14 +433,20 @@ def test_imported_empty_route_set_loads_no_demand(routes, recompute_psl):
 def test_empty_route_row_is_omitted_from_nonempty_set(recompute_psl, expected_probability):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(pd.DataFrame(
-        {"flow": [1.0]},
-        index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-    ))
-    df = pd.DataFrame({
-        "origin id": [10, 10], "destination id": [40, 40],
-        "route set": [[], [71, 12]], "probability": [0.25, 0.75],
-    })
+    choice.add_demand(
+        pd.DataFrame(
+            {"flow": [1.0]},
+            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
+        )
+    )
+    df = pd.DataFrame(
+        {
+            "origin id": [10, 10],
+            "destination id": [40, 40],
+            "route set": [[], [71, 12]],
+            "probability": [0.25, 0.75],
+        }
+    )
     choice.execute_from_pandas(df, recompute_psl=recompute_psl)
     rows = choice.get_results()
     assert len(rows) == 1
@@ -440,16 +458,22 @@ def test_empty_route_row_is_omitted_from_nonempty_set(recompute_psl, expected_pr
 def test_path_file_without_psl_uses_supplied_mask(tmp_path, caplog):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(pd.DataFrame(
-        {"flow": [1.0]},
-        index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-    ))
+    choice.add_demand(
+        pd.DataFrame(
+            {"flow": [1.0]},
+            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
+        )
+    )
     file = tmp_path / "invalid_route.parquet"
-    pd.DataFrame({
-        "origin id": pd.Series([10], dtype="uint32"),
-        "destination id": pd.Series([40], dtype="uint32"),
-        "route set": [[71, 24]], "probability": [1.0], "mask": [False],
-    }).to_parquet(file, index=False)
+    pd.DataFrame(
+        {
+            "origin id": pd.Series([10], dtype="uint32"),
+            "destination id": pd.Series([40], dtype="uint32"),
+            "route set": [[71, 24]],
+            "probability": [1.0],
+            "mask": [False],
+        }
+    ).to_parquet(file, index=False)
     choice.execute_from_path_files(file)
     assert choice.get_results()["probability"].iloc[0] == 0.0
     assert choice.get_load_results()["flow_tot"].loc[71] == 0.0
@@ -478,11 +502,16 @@ def test_route_choice_keeps_borrowed_graph_alive():
 
 def test_validation_preserves_rows_and_logs_each_reason(caplog):
     choice = RouteChoice(diamond(np.inf))
-    supplied = pd.DataFrame({
-        "origin id": [20, 10, 10, 10], "destination id": [30, 40, 40, 40],
-        "route set": [[71, 12], [71, 24], [55, 24], []],
-        "cost": [999.0] * 4, "mask": [True, True, False, True],
-    }, index=[9, 9, 2, 1])
+    supplied = pd.DataFrame(
+        {
+            "origin id": [20, 10, 10, 10],
+            "destination id": [30, 40, 40, 40],
+            "route set": [[71, 12], [71, 24], [55, 24], []],
+            "cost": [999.0] * 4,
+            "mask": [True, True, False, True],
+        },
+        index=[9, 9, 2, 1],
+    )
     before = supplied.copy(deep=True)
     result = choice.recompute_psl(supplied)
     pd.testing.assert_frame_equal(supplied, before)
@@ -491,8 +520,13 @@ def test_validation_preserves_rows_and_logs_each_reason(caplog):
     assert not any(column.startswith("valid ") for column in result)
     assert np.isinf(result["cost"].iloc[:2]).all()
     assert result["cost"].iloc[2] == 4.0
-    for reason in ("starts at the wrong node", "ends at the wrong node", "prohibited turn",
-                   "disconnected links", "Ignoring empty route"):
+    for reason in (
+        "starts at the wrong node",
+        "ends at the wrong node",
+        "prohibited turn",
+        "disconnected links",
+        "Ignoring empty route",
+    ):
         assert reason in caplog.text
 
     caplog.clear()
@@ -503,11 +537,16 @@ def test_validation_preserves_rows_and_logs_each_reason(caplog):
 def test_public_psl_discards_costs_and_preserves_exclusions():
     choice = RouteChoice(diamond(0.0))
     choice.set_choice_set_generation(cutoff_prob=1.0)
-    supplied = pd.DataFrame({
-        "origin id": [10, 10, 10], "destination id": [40, 40, 40],
-        "route set": [[71, 12], [55, 24], [55, 24]],
-        "cost": [np.nan, -1.0, np.inf], "mask": [False, True, False],
-    }, index=[5, 5, 0])
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10, 10, 10],
+            "destination id": [40, 40, 40],
+            "route set": [[71, 12], [55, 24], [55, 24]],
+            "cost": [np.nan, -1.0, np.inf],
+            "mask": [False, True, False],
+        },
+        index=[5, 5, 0],
+    )
     before = supplied.copy(deep=True)
     result = choice.recompute_psl(supplied)
     pd.testing.assert_frame_equal(supplied, before)
@@ -524,14 +563,21 @@ def test_imported_supplied_mask_excludes_loading_and_select_links(recompute):
     choice = RouteChoice(graph)
     choice.set_choice_set_generation()
     choice.set_select_links({"banned": [[(71, 1)]], "used": [[(55, 1)]]})
-    choice.add_demand(pd.DataFrame(
-        {"flow": [10.0]},
-        index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-    ))
-    supplied = pd.DataFrame({
-        "origin id": [10, 10], "destination id": [40, 40],
-        "route set": [[71, 12], [55, 24]], "mask": [False, True], "probability": [0.9, 0.1],
-    })
+    choice.add_demand(
+        pd.DataFrame(
+            {"flow": [10.0]},
+            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
+        )
+    )
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10, 10],
+            "destination id": [40, 40],
+            "route set": [[71, 12], [55, 24]],
+            "mask": [False, True],
+            "probability": [0.9, 0.1],
+        }
+    )
     choice.execute_from_pandas(supplied, recompute_psl=recompute)
     expected = 10.0 if recompute else 1.0
     loads = choice.get_load_results()["flow_tot"]
@@ -546,9 +592,13 @@ def test_imported_routes_use_graph_prepared_before_route_choice():
     graph = diamond(5.0)
     graph.set_graph("distance")
     choice = RouteChoice(graph)
-    supplied = pd.DataFrame({
-        "origin id": [10, 10], "destination id": [40, 40], "route set": [[71, 12], [55, 24]],
-    })
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10, 10],
+            "destination id": [40, 40],
+            "route set": [[71, 12], [55, 24]],
+        }
+    )
     result = choice.recompute_psl(supplied)
     assert result["cost"].tolist() == [75.0, 110.0]
     assert result["path overlap"].tolist() == [1.0, 1.0]
@@ -557,10 +607,15 @@ def test_imported_routes_use_graph_prepared_before_route_choice():
 
 def compressed_chain():
     graph = Graph()
-    graph.network = pd.DataFrame({
-        "link_id": [11, 12, 13], "a_node": [10, 20, 30], "b_node": [20, 30, 40],
-        "direction": [1, 1, 1], "time": [1.0, 2.0, 3.0],
-    })
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [11, 12, 13],
+            "a_node": [10, 20, 30],
+            "b_node": [20, 30, 40],
+            "direction": [1, 1, 1],
+            "time": [1.0, 2.0, 3.0],
+        }
+    )
     graph.prepare_graph(np.array([10, 40]), remove_dead_ends=False)
     graph.set_blocked_centroid_flows(False)
     graph.set_graph("time")
@@ -571,10 +626,13 @@ def test_validation_checks_links_before_compression():
     graph = compressed_chain()
     assert graph.compact_num_links == 1
     choice = RouteChoice(graph)
-    supplied = pd.DataFrame({
-        "origin id": [10] * 4, "destination id": [40] * 4,
-        "route set": [[11, 12, 13], [11, 13], [12, 11, 13], [11, 12]],
-    })
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10] * 4,
+            "destination id": [40] * 4,
+            "route set": [[11, 12, 13], [11, 13], [12, 11, 13], [11, 12]],
+        }
+    )
     result = choice.recompute_psl(supplied, log_warnings=False)
     assert result["cost"].tolist() == [6.0, np.inf, np.inf, np.inf]
     assert result["mask"].tolist() == [True, False, False, False]
@@ -584,9 +642,14 @@ def test_validation_checks_links_before_compression():
 @pytest.mark.parametrize("route", [[999], [-71]])
 def test_missing_directed_links_are_errors_even_when_masked(route):
     choice = RouteChoice(diamond())
-    supplied = pd.DataFrame({
-        "origin id": [10], "destination id": [40], "route set": [route], "mask": [False],
-    })
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10],
+            "destination id": [40],
+            "route set": [route],
+            "mask": [False],
+        }
+    )
     with pytest.raises(ValueError, match="absent from the graph"):
         choice.recompute_psl(supplied, log_warnings=False)
 
@@ -606,9 +669,13 @@ def test_infinite_link_cost_is_masked_without_a_turn_ban():
     graph.graph.loc[graph.graph.link_id == 71, "time"] = np.inf
     graph.set_graph("time")
     choice = RouteChoice(graph)
-    supplied = pd.DataFrame({
-        "origin id": [10, 10], "destination id": [40, 40], "route set": [[71, 12], [55, 24]],
-    })
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10, 10],
+            "destination id": [40, 40],
+            "route set": [[71, 12], [55, 24]],
+        }
+    )
     result = choice.recompute_psl(supplied, log_warnings=False)
     assert np.isinf(result["cost"].iloc[0])
     assert result["mask"].tolist() == [False, True]
@@ -618,15 +685,21 @@ def test_infinite_link_cost_is_masked_without_a_turn_ban():
 def test_without_psl_does_not_validate_or_recost(caplog):
     choice = RouteChoice(diamond(np.inf))
     choice.set_choice_set_generation()
-    choice.add_demand(pd.DataFrame(
-        {"flow": [1.0]},
-        index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-    ))
-    supplied = pd.DataFrame({
-        "origin id": [10, 10], "destination id": [40, 40],
-        "route set": [[71, 24], [71, 12]], "cost": [123.0, 456.0],
-        "probability": [0.4, 0.6],
-    })
+    choice.add_demand(
+        pd.DataFrame(
+            {"flow": [1.0]},
+            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
+        )
+    )
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10, 10],
+            "destination id": [40, 40],
+            "route set": [[71, 24], [71, 12]],
+            "cost": [123.0, 456.0],
+            "probability": [0.4, 0.6],
+        }
+    )
     choice.execute_from_pandas(supplied)
     result = choice.get_results()
     assert result["mask"].tolist() == [True, True]
@@ -637,19 +710,27 @@ def test_without_psl_does_not_validate_or_recost(caplog):
 
 def test_recompute_psl_blocks_intermediate_centroid(caplog):
     graph = Graph()
-    graph.network = pd.DataFrame({
-        "link_id": [11, 12, 13], "a_node": [10, 20, 10], "b_node": [20, 40, 40],
-        "direction": [1, 1, 1], "time": [1.0, 1.0, 3.0],
-    })
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [11, 12, 13],
+            "a_node": [10, 20, 10],
+            "b_node": [20, 40, 40],
+            "direction": [1, 1, 1],
+            "time": [1.0, 1.0, 3.0],
+        }
+    )
     graph.prepare_graph(np.array([10, 20, 40]), remove_dead_ends=False)
     graph.set_blocked_centroid_flows(True)
     graph.set_graph("time")
     assert graph.has_turn_restrictions  # Connector bans, rather than node-prefix blocking.
     choice = RouteChoice(graph)
-    supplied = pd.DataFrame({
-        "origin id": [10, 10], "destination id": [40, 40],
-        "route set": [[11, 12], [13]],
-    })
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10, 10],
+            "destination id": [40, 40],
+            "route set": [[11, 12], [13]],
+        }
+    )
     result = choice.recompute_psl(supplied)
     assert result["cost"].tolist() == [np.inf, 3.0]
     assert result["mask"].tolist() == [False, True]

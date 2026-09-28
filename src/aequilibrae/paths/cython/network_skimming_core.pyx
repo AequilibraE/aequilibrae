@@ -104,7 +104,11 @@ def skimming_parallel(
     if indices.ndim != 2 or indices.shape[1] != 2 or indices.dtype.kind not in "iu":
         raise ValueError("origins must contain output row and local node indices")
 
-    if np.any(indices < 0) or np.any(indices[:, 0] >= output.origin_count) or np.any(indices[:, 1] >= routing.node_count):
+    if (
+            np.any(indices < 0)
+            or np.any(indices[:, 0] >= output.origin_count)
+            or np.any(indices[:, 1] >= routing.node_count)
+    ):
         raise ValueError("origin rows or nodes are out of range")
 
     if np.unique(indices[:, 0]).size != indices.shape[0]:

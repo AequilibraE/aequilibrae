@@ -6,7 +6,10 @@ import pytest
 
 from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
 from aequilibrae.paths.cython.a_star import (
-    EuclideanContext, HaversineContext, a_star, estimate_context_scale,
+    EuclideanContext,
+    HaversineContext,
+    a_star,
+    estimate_context_scale,
 )
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.results import path_results as path_results_module
@@ -119,9 +122,16 @@ def test_centroid_blocking(turn):
     assert results.path_cost_to(3) == 2
 
 
-@pytest.mark.parametrize("allow_uturns, override, reachable", [
-    (True, None, True), (False, None, False), (False, 0, True), (False, 2, True), (True, np.inf, False),
-])
+@pytest.mark.parametrize(
+    "allow_uturns, override, reachable",
+    [
+        (True, None, True),
+        (False, None, False),
+        (False, 0, True),
+        (False, 2, True),
+        (True, np.inf, False),
+    ],
+)
 @pytest.mark.parametrize("cost", [0, 1])
 def test_uturns_explicit_overrides_and_zero_cost_cycles(allow_uturns, override, reachable, cost):
     turns = {(0, 2): np.inf}
@@ -142,16 +152,20 @@ def test_uturns_explicit_overrides_and_zero_cost_cycles(allow_uturns, override, 
 def test_random_parallel_graph_matches_dijkstra(heap, turn, name):
     rng = np.random.default_rng(239)
     n = 9
-    edges = [(a, b, rng.uniform(0.1, 10)) for a in range(n) for b in range(n)
-             for _ in range(2) if rng.random() < 0.15]
+    edges = [(a, b, rng.uniform(0.1, 10)) for a in range(n) for b in range(n) for _ in range(2) if rng.random() < 0.15]
     turns = {}
     for incoming, (_, via, _) in enumerate(edges):
         for outgoing, (tail, _, _) in enumerate(edges):
             if via == tail and rng.random() < 0.4:
                 turns[incoming, outgoing] = rng.choice([0.0, 2.5, np.inf])
     fs = np.r_[0, np.cumsum(np.bincount([a for a, _, _ in edges], minlength=n))]
-    context = make_context(fs, [b for _, b, _ in edges], [c for _, _, c in edges],
-                           turns if turn else None, **({"allow_uturns": False} if turn else {}))
+    context = make_context(
+        fs,
+        [b for _, b, _ in edges],
+        [c for _, _, c in edges],
+        turns if turn else None,
+        **({"allow_uturns": False} if turn else {}),
+    )
     heuristic = heuristic_for(context, name, rng.uniform(-5, 5, n), rng.uniform(-5, 5, n))
     results = allocate_results(context)
     for origin in range(n):
@@ -167,7 +181,7 @@ def test_random_parallel_graph_matches_dijkstra(heap, turn, name):
 
 
 def coordinates_for(graph):
-    coordinates = pd.DataFrame({"x": [0., 1., 0., 2.], "y": [0., 0., 1., 0.]}, index=[10, 20, 30, 40])
+    coordinates = pd.DataFrame({"x": [0.0, 1.0, 0.0, 2.0], "y": [0.0, 0.0, 1.0, 0.0]}, index=[10, 20, 30, 40])
     graph.lonlat_index = coordinates.rename(columns={"x": "lon", "y": "lat"}) * 0.01
     return coordinates.iloc[::-1]
 
@@ -179,8 +193,9 @@ def test_path_results_snapshot_skims_and_update_trace(heap, name, turn, monkeypa
     graph = diamond(turn)
     coordinates = coordinates_for(graph)
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=name)
-    result = PathResults(graph, 10, 20, coordinates=coordinates, a_star=True,
-                         heuristic=name, heuristic_scale=scale, heap=heap)
+    result = PathResults(
+        graph, 10, 20, coordinates=coordinates, a_star=True, heuristic=name, heuristic_scale=scale, heap=heap
+    )
     assert result.a_star and result.early_exit
     assert result.get_heuristics() == ["euclidean", "haversine"]
     assert result.milepost[-1] == 1
@@ -289,6 +304,7 @@ def test_scale_helper_bounds_and_no_automatic_clamping():
 
 def test_helper_is_not_called_by_path_results(monkeypatch):
     from aequilibrae.paths import path_heuristics
+
     graph = diamond()
     coordinates = coordinates_for(graph)
 

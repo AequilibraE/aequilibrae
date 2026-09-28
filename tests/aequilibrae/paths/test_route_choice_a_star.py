@@ -45,42 +45,56 @@ def test_batched_matches_dijkstra(algorithm, penalty, heuristic, turn_penalty, c
         choice = RouteChoice(graph, coordinates=coordinates)
         choice.set_cores(cores)
         choice.set_choice_set_generation(
-            algorithm, max_routes=2, max_depth=6, penalty=penalty,
-            a_star=a_star, heuristic=heuristic, heuristic_scale=scale,
+            algorithm,
+            max_routes=2,
+            max_depth=6,
+            penalty=penalty,
+            a_star=a_star,
+            heuristic=heuristic,
+            heuristic_scale=scale,
         )
-        choice.add_demand(pd.DataFrame(
-            {"flow": [2.0, 3.0, 4.0, 5.0]},
-            index=pd.MultiIndex.from_tuples(
-                [(10, 40), (20, 40), (40, 10), (10, 10)], names=choice.demand_index_names
-            ),
-        ))
+        choice.add_demand(
+            pd.DataFrame(
+                {"flow": [2.0, 3.0, 4.0, 5.0]},
+                index=pd.MultiIndex.from_tuples(
+                    [(10, 40), (20, 40), (40, 10), (10, 10)], names=choice.demand_index_names
+                ),
+            )
+        )
         choice.set_select_links({"selected": [(14, 1)]})
         choice.execute()
         choices.append(choice)
     reference, actual = choices
     pd.testing.assert_frame_equal(sorted_results(actual), sorted_results(reference))
     pd.testing.assert_frame_equal(actual.get_load_results(), reference.get_load_results())
-    pd.testing.assert_frame_equal(
-        actual.get_select_link_loading_results(), reference.get_select_link_loading_results()
-    )
+    pd.testing.assert_frame_equal(actual.get_select_link_loading_results(), reference.get_select_link_loading_results())
 
 
 def compressed_graph(turn):
     graph = Graph()
-    graph.network = pd.DataFrame({
-        "link_id": [71, 72, 12, 55, 56, 24],
-        "a_node": [10, 20, 30, 10, 40, 50],
-        "b_node": [20, 30, 60, 40, 50, 60],
-        "direction": [1] * 6,
-        "time": [1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
-    })
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [71, 72, 12, 55, 56, 24],
+            "a_node": [10, 20, 30, 10, 40, 50],
+            "b_node": [20, 30, 60, 40, 50, 60],
+            "direction": [1] * 6,
+            "time": [1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
+        }
+    )
     graph.prepare_graph(np.array([10, 60]), remove_dead_ends=False)
     graph.set_blocked_centroid_flows(False)
     graph.set_graph("time")
     if turn:
-        graph.set_turn_restrictions(pd.DataFrame({
-            "from_node": [20], "via_node": [30], "to_node": [60], "penalty": [5.0],
-        }))
+        graph.set_turn_restrictions(
+            pd.DataFrame(
+                {
+                    "from_node": [20],
+                    "via_node": [30],
+                    "to_node": [60],
+                    "penalty": [5.0],
+                }
+            )
+        )
     assert graph.compact_num_nodes < graph.num_nodes
     return graph
 
@@ -134,9 +148,7 @@ def test_explicit_scale_controls_search(algorithm, heuristic, turn):
     assert choice.execute_single(10, 40) == [(71, 12)]
     # This deliberately unsafe scale favours the more expensive branch. It also
     # checks that A* is actually dispatched, rather than silently using Dijkstra.
-    choice.set_choice_set_generation(
-        algorithm, max_routes=1, a_star=True, heuristic=heuristic, heuristic_scale=100.0
-    )
+    choice.set_choice_set_generation(algorithm, max_routes=1, a_star=True, heuristic=heuristic, heuristic_scale=100.0)
     assert choice.execute_single(10, 40) == [(55, 24)]
 
 
@@ -151,14 +163,17 @@ def test_invalid_penalty_rejected_at_both_entry_points(a_star, penalty):
         RouteChoiceSet(graph).run(10, 40, (4, 4), bridge=bridge, **options)
 
 
-@pytest.mark.parametrize("options,match", [
-    ({"a_star": True}, "explicit heuristic_scale"),
-    ({"a_star": True, "heuristic_scale": -1.0}, "finite and nonnegative"),
-    ({"a_star": True, "heuristic_scale": np.inf}, "finite and nonnegative"),
-    ({"a_star": True, "heuristic_scale": np.nan}, "finite and nonnegative"),
-    ({"heuristic_scale": -1.0}, "finite and nonnegative"),
-    ({"heuristic": "unknown"}, "heuristic must be one of"),
-])
+@pytest.mark.parametrize(
+    "options,match",
+    [
+        ({"a_star": True}, "explicit heuristic_scale"),
+        ({"a_star": True, "heuristic_scale": -1.0}, "finite and nonnegative"),
+        ({"a_star": True, "heuristic_scale": np.inf}, "finite and nonnegative"),
+        ({"a_star": True, "heuristic_scale": np.nan}, "finite and nonnegative"),
+        ({"heuristic_scale": -1.0}, "finite and nonnegative"),
+        ({"heuristic": "unknown"}, "heuristic must be one of"),
+    ],
+)
 def test_invalid_search_options_rejected_at_both_entry_points(options, match):
     graph = diamond()
     with pytest.raises(ValueError, match=match):
@@ -167,12 +182,15 @@ def test_invalid_search_options_rejected_at_both_entry_points(options, match):
         RouteChoiceSet(graph).run(10, 40, (4, 4), max_routes=1, bridge=bridge, **options)
 
 
-@pytest.mark.parametrize("problem,match", [
-    ("missing", "requires coordinate columns"),
-    ("node", "every graph node ID"),
-    ("duplicate", "node IDs must be unique"),
-    ("nonfinite", "coordinates must be finite"),
-])
+@pytest.mark.parametrize(
+    "problem,match",
+    [
+        ("missing", "requires coordinate columns"),
+        ("node", "every graph node ID"),
+        ("duplicate", "node IDs must be unique"),
+        ("nonfinite", "coordinates must be finite"),
+    ],
+)
 def test_invalid_coordinates(problem, match):
     graph = diamond()
     coordinates = coordinates_for(graph)

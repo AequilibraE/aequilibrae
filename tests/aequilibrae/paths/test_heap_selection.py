@@ -101,9 +101,7 @@ def test_path_results_support_astar(sioux_falls_example, heuristic):
     points = points.to_crs(points.estimate_utm_crs())
     coordinates = pd.DataFrame({"x": points.x, "y": points.y})
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
-    result = PathResults(
-        graph, 1, 20, a_star=True, heuristic=heuristic, coordinates=coordinates, heuristic_scale=scale
-    )
+    result = PathResults(graph, 1, 20, a_star=True, heuristic=heuristic, coordinates=coordinates, heuristic_scale=scale)
     reference = PathResults(graph, 1, 20)
     assert result.milepost[-1] == pytest.approx(reference.milepost[-1])
 

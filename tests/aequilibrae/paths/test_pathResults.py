@@ -49,9 +49,7 @@ def test_compute_paths(p_results):
     for early_exit in [True, False]:
         for a_star, heuristic in [(False, None), (True, "haversine")]:
             scale = estimate_heuristic_scale(graph, heuristic=heuristic) if a_star else None
-            result.compute_path(
-                5, 2, early_exit=early_exit, a_star=a_star, heuristic=heuristic, heuristic_scale=scale
-            )
+            result.compute_path(5, 2, early_exit=early_exit, a_star=a_star, heuristic=heuristic, heuristic_scale=scale)
             assert list(result.path) == [12, 14]
             assert list(result.path_link_directions) == [1, 1]
             assert list(result.path_nodes) == [5, 6, 2]
