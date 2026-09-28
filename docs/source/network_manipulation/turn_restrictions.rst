@@ -3,17 +3,17 @@
 Turn Restrictions
 =================
 
-AequilibraE supports turn restrictions and turn penalties for traffic assignment
-and path computation. This feature enables modeling of prohibited turns (e.g.,
+AequilibraE supports turn restrictions and turn penalties for traffic assignment,
+path computation and route choice. This feature enables modelling of prohibited turns (e.g.,
 no left turn signs) and turn penalties (e.g., additional time for turning movements).
 
 Overview
 --------
 
 Turn restrictions in AequilibraE are stored in a dedicated database table and can
-be applied to graphs during path computation and traffic assignment. When turn
+be applied to graphs during path computation, traffic assignment and route choice. When turn
 restrictions are enabled, AequilibraE uses an arc-based Dijkstra algorithm instead
-of the standard node-based algorithm, which allows for modeling turn-to-turn
+of the standard node-based algorithm, which allows for modelling turn-to-turn
 transitions with associated costs.
 
 Database Schema
@@ -212,6 +212,19 @@ time costs during the equilibration process.
     >>> assignment.set_time_field('free_flow_time')
     >>> assignment.set_algorithm('bfw')
     >>> assignment.execute()
+
+Route Choice with Turn Restrictions
+-----------------------------------
+
+Turn restrictions and turn penalties are automatically considered during route
+choice when they are present in the graph. They are included in generated route
+costs and path-size logit calculations.
+
+For imported routes, ``RouteChoice.recompute_psl()`` validates origin and
+destination endpoints, link connectivity and turn restrictions before
+recalculating costs, overlap and probabilities. For assignment from imported
+routes, pass ``recompute_psl=True`` to ``execute_from_pandas()`` or
+``execute_from_path_files()`` to perform the same validation and recalculation.
 
 Performance Considerations
 --------------------------
