@@ -751,8 +751,13 @@ separate work; the heap currently allocates on each search.
 
 `LinearApproximation` uses `PreparedAoN` for every traffic class. The former
 `allOrNothing` and `MultiThreadedAoN` drivers and legacy assignment kernels have
-been removed. Public path queries and standalone network skimming still use
-their existing drivers.
+been removed. Public path queries use `PathResults`. Standalone network skimming
+uses its own OpenMP driver over the same routing and skimming kernels, not `PreparedAoN`.
+It searches the compact graph with worker-local results and skim scratch. The
+routing cost field copies search distances, including turn penalties; other
+fields sum compact link values. Results are copied into the public
+`AequilibraeMatrix` in the graph's skim field and centroid order. Centroids
+without outgoing links retain infinite rows and are reported as skipped.
 
 ### Entry boundary
 
@@ -835,8 +840,8 @@ the last AoN output.
   format.
 - Assignment heap selection is configurable through the prepared driver and is
   kept consistent across searches.
-- FIXME: Congested skimming currently reuses PreparedAoN. A separate skim-only
-  driver and persistent routing heaps remain separate work.
+- FIXME: Congested skimming currently reuses PreparedAoN. Persistent routing
+  heaps remain separate work.
 
 This translation boundary should be removed when Graph owns routing contexts
 directly. `SearchResults` remains independent of loading, skimming, selection,
@@ -882,6 +887,8 @@ LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
 LD_PRELOAD=$(gcc -print-file-name=libasan.so) \
 AEQ_SHOW_PROGRESS=0 \
 python -m pytest -q -s \
+    tests/aequilibrae/paths/test_network_skimming.py \
+    tests/aequilibrae/paths/test_graph.py \
     tests/aequilibrae/paths/test_node_routing_mvp.py \
     tests/aequilibrae/paths/test_turn_routing_mvp.py \
     tests/aequilibrae/paths/test_context_skimming.py \
@@ -898,7 +905,9 @@ python -m pytest -q -s \
 The new routing tests check independent NetworkX distances and expanded turn
 states, partial-search cleanup, zero-cost cycles, U-turn rules, borrowed inputs,
 context-independent reuse, metadata updates, view lifetimes and separate workers.
-Standalone loading tests check partial and empty queries, demand borrowing,
+Standalone skimming tests compare compact network skims with path distances,
+turn penalties, additive fields, skipped centroids and worker counts. Standalone
+loading tests check partial and empty queries, demand borrowing,
 fixed buffer reuse, read-only views, independent lifetimes, dimension validation,
 worker-local accumulation and reduction. Standalone skim tests cover all four
 field meanings and all group combinations, strided named matrices, rectangular

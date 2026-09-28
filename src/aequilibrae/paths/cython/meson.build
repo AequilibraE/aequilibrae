@@ -23,6 +23,7 @@ exts = [
     'workspaces',
     'outputs',
     'network_loading',
+    'network_skimming_core',
     'skimming',
     'select_link_loading',
     'dijkstra',
