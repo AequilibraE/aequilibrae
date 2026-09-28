@@ -2,8 +2,13 @@ from aequilibrae.paths.cython.context cimport (
     CppNodeBasedContext, CppTurnBasedContext, NodeBasedContext, TurnBasedContext,
 )
 from aequilibrae.paths.cython.queries cimport CppSearchQuery, SearchQuery
-from aequilibrae.paths.cython.basic_path_finding cimport HeapType
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults, SearchResults
+
+
+cdef enum HeapType:
+    FOUR_ARY_HEAP
+    PAIRING_HEAP
+    STD_PRIORITY_QUEUE
 
 
 ctypedef fused RoutingContext:

@@ -13,7 +13,9 @@ from libcpp cimport bool as cpp_bool
 from aequilibrae.utils.cython.array_allocations cimport array
 from aequilibrae.utils.cython.array_allocations import readonly_view
 from aequilibrae.paths.cython.workspaces cimport AoNWorkspace
-from aequilibrae.paths.cython.dijkstra cimport RoutingContext, routing_heap_from_name, run_dijkstra
+from aequilibrae.paths.cython.dijkstra cimport (
+    HeapType, RoutingContext, routing_heap_from_name, run_dijkstra,
+)
 from aequilibrae.paths.cython.context cimport (
     GraphContext,
     NodeBasedContext,
@@ -21,7 +23,6 @@ from aequilibrae.paths.cython.context cimport (
     SelectLinkContext,
     SkimmingContext,
 )
-from aequilibrae.paths.cython.basic_path_finding cimport HeapType
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults
 from aequilibrae.paths.cython.skimming cimport cpp_skimming
 from aequilibrae.paths.cython.network_loading cimport (

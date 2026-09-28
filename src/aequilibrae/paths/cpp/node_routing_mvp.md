@@ -199,9 +199,9 @@ run-local routing views store these values so they do not retain references to
 temporary return values. Subsequent calls borrow them by reference. A temporary
 view may bind to a const reference for a call; no kernel retains that reference.
 
-The routing kernels live in `dijkstra.hpp` and `a_star.hpp`. Legacy production
-algorithms remain in `path_finding.hpp`. Each search owns its priority-queue
-state, while the public routing API selects the queue implementation.
+The routing kernels live in `dijkstra.hpp` and `a_star.hpp`. Each search owns
+its priority-queue state, while the public routing API selects the queue
+implementation.
 
 ### A* for PathResults
 

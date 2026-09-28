@@ -4,8 +4,9 @@ import operator
 import numpy as np
 
 from libc.math cimport isfinite
-from aequilibrae.paths.cython.basic_path_finding cimport PAIRING_HEAP, STD_PRIORITY_QUEUE, HeapType
-from aequilibrae.paths.cython.dijkstra cimport RoutingContext, routing_heap_from_name
+from aequilibrae.paths.cython.dijkstra cimport (
+    PAIRING_HEAP, STD_PRIORITY_QUEUE, HeapType, RoutingContext, routing_heap_from_name,
+)
 from aequilibrae.paths.cython.queries cimport SearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, StdPriorityQueueAdapter

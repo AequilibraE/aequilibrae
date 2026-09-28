@@ -1,10 +1,14 @@
 """One internal search interface for both routing modes."""
 
-from aequilibrae.paths.cython.basic_path_finding cimport (
-    PAIRING_HEAP, STD_PRIORITY_QUEUE, HeapType,
-)
-from aequilibrae.paths.cython.basic_path_finding import HEAP_MAP, available_heaps
 from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, StdPriorityQueueAdapter
+
+
+HEAP_MAP = {"4ary": FOUR_ARY_HEAP, "pairing": PAIRING_HEAP, "std": STD_PRIORITY_QUEUE}
+
+
+def available_heaps() -> list:
+    """Return the priority queue implementations."""
+    return list(HEAP_MAP.keys())
 
 
 cdef HeapType routing_heap_from_name(object heap) except *:

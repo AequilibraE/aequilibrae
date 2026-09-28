@@ -9,11 +9,12 @@ from cython.parallel cimport prange, threadid
 from libc.stddef cimport size_t
 from libcpp.vector cimport vector
 
-from aequilibrae.paths.cython.basic_path_finding cimport HeapType
 from aequilibrae.paths.cython.context cimport (
     NodeBasedContext, TurnBasedContext, SkimmingContext, CppSkimmingContext,
 )
-from aequilibrae.paths.cython.dijkstra cimport RoutingContext, routing_heap_from_name, run_dijkstra
+from aequilibrae.paths.cython.dijkstra cimport (
+    HeapType, RoutingContext, routing_heap_from_name, run_dijkstra,
+)
 from aequilibrae.paths.cython.outputs cimport SkimmingOutputs, CppSkimmingOutputsView
 from aequilibrae.paths.cython.queries cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppMutableSearchResults

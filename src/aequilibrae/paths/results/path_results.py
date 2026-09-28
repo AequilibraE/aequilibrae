@@ -3,7 +3,7 @@ import pandas as pd
 
 from aequilibrae.paths.cython.a_star import a_star as run_a_star
 from aequilibrae.paths.cython.a_star import validate_scale
-from aequilibrae.paths.cython.basic_path_finding import available_heaps
+from aequilibrae.paths.cython.dijkstra import available_heaps
 from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.queries import SearchQuery

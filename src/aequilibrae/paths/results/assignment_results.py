@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.parameters import Parameters
-from aequilibrae.paths.cython.basic_path_finding import available_heaps
+from aequilibrae.paths.cython.dijkstra import available_heaps
 from aequilibrae.paths.graph import _get_graph_to_network_mapping
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores, resolve_elementwise_cores
 from aequilibrae.utils.core_setter import resolve_threading_threshold
