@@ -86,6 +86,35 @@ class Parameters:
         exclude_builtins: bool = False,
         function_map: dict[str, tuple[Callable, Callable]] | None = None,
     ):
+        """Gets Volume Delay Functions (VDFs) specified in the parameters "vdfs" entry, as well
+        as preset VDFs if exclude_builtins is False.
+
+        Each entry in the "vdfs" entry of the parameters must either be specifying a default vdf, or
+        either a preset function via "function" or a custom functional form "functional_form".
+        If "function" is specified, the name of a preset VDF or VDF in function_map must be specified,
+        with an optional "spec" dict overriding the preset's default parameters. If "functional_form"
+        is specified with a string representation of the VDF (to be interpreted by NumExpr), the
+        specification is required in "spec" and its derivative can be optionally included by its
+        string representation in "derivative_functional_form". If a derivative of a custom VDF is not
+        specified, it will use a finite difference scheme to calculate the derivative.
+
+        :Arguments:
+            **exclude_builtins** (:obj:`bool`, *Optional*): Setting to exclude the built in preset
+            VDFs, for example bpr. Defaults to False, so presets are included
+            **function_map** (:obj:`dict[str, tuple[Callable, Callable]]`, *Optional*): mapping of
+            user supplied function names to (function, derivative) tuples, taking precedence over
+            preset vdf definitions. Then the parameters can reference these functions
+            by their name and spec in the "function" entry.
+
+        :Returns:
+            **results** (:obj:`dict[str, VDF]`): mapping of VDF names to their constructed VDF
+            objects.
+
+        :Raises:
+            **ValueError**: if a "function" entry references a preset not found in function_map
+            or a built in preset, if a "spec" contains keys not present in the preset's default
+            spec, or if an entry defines neither "function" nor "functional_form".
+        """
         from aequilibrae.paths.vdf import builtin_vdfs, load_from_parameters
 
         vdfs = self.parameters.get("vdfs", None)
