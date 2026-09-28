@@ -447,6 +447,7 @@ class AequilibraeMatrix(object):
             new_mat.matrix[new_mat.names[idx]][:, :] = m[:, :]
 
         new_mat.save()
+        new_mat.close()
 
         print(f"AequilibraE matrix saved at {path_to_file[:-4]}.aem")
         return
