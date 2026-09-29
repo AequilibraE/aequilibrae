@@ -707,7 +707,7 @@ class GraphBase(ABC):  # noqa: B024
         b_nodes_by_id: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Generates prohibited turns between centroid connectors meeting at the same node.
+        Generates prohibited turns through centroid nodes.
         """
         if num_zones <= 0 or fs.size == 0 or a_nodes_by_id.size == 0:
             return (
@@ -728,7 +728,7 @@ class GraphBase(ABC):  # noqa: B024
         prohibited_pairs = set()
         for from_arc in connector_arcs:
             node = int(b_nodes_by_id[from_arc])
-            if node < 0 or node + 1 >= fs.shape[0]:
+            if node < 0 or node >= num_zones or node + 1 >= fs.shape[0]:
                 continue
 
             for to_arc in range(int(fs[node]), int(fs[node + 1])):
@@ -810,7 +810,11 @@ class GraphBase(ABC):  # noqa: B024
             full_penalties = np.empty(0, dtype=np.float64)
 
         # 2) Only use connector bans with explicit turns, otherwise keep node-based centroid blocking.
-        if has_explicit_turns and self._has_multi_connector_centroid():
+        # A single bidirectional connector needs a ban only if path U-turns are allowed.
+        block_centroid_turns = has_explicit_turns and self.block_centroid_flows and (
+            self._has_multi_connector_centroid() or self._allow_path_uturns
+        )
+        if block_centroid_turns:
             auto_from_arcs, auto_to_arcs, auto_penalties = self._generate_centroid_connector_turn_bans(
                 self.num_zones,
                 self.fs,
@@ -880,7 +884,7 @@ class GraphBase(ABC):  # noqa: B024
             compact_to_arcs = np.empty(0, dtype=np.int64)
             compact_penalties = np.empty(0, dtype=np.float64)
 
-        if has_explicit_turns and self._has_multi_connector_centroid():
+        if block_centroid_turns:
             auto_c_from_arcs, auto_c_to_arcs, auto_c_penalties = self._generate_centroid_connector_turn_bans(
                 self.num_zones,
                 self.compact_fs,
