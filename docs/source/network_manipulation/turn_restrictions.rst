@@ -104,8 +104,8 @@ Use ``project.transaction()`` to group writes.
 
     # Clear all restrictions
     >>> turns.clear_restrictions()
+    1
 
-    >>> project.close()
 
 Bulk Loading from DataFrame
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,8 +137,7 @@ The U-turn setting is managed through the project's ``about`` table:
 
 .. code-block:: python
 
-    >>> project.about.allow_uturns = '1'  # Allow U-turns
-    >>> project.about.write_back()
+    >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
     # Rebuild graphs to apply the change
     >>> project.network.build_graphs()
@@ -166,18 +165,13 @@ You can also manually set turn restrictions on a graph:
 .. code-block:: python
 
     >>> import pandas as pd
-    >>> from aequilibrae.paths import Graph
 
-    >>> graph = Graph()
-    >>> graph.network = network_data
-    >>> graph.prepare_graph(centroids)
-
-    # Create turn restrictions DataFrame
+    >>> links = project.network.links.data.set_index("link_id")
     >>> turn_df = pd.DataFrame({
-    ...     'from_node': [1, 2],
-    ...     'via_node': [2, 3],
-    ...     'to_node': [3, 4],
-    ...     'penalty': [None, 20.0]
+    ...     "from_node": [int(links.loc[7, "a_node"])],
+    ...     "via_node": [int(links.loc[7, "b_node"])],
+    ...     "to_node": [int(links.loc[36, "b_node"])],
+    ...     "penalty": [20.0],
     ... })
 
     # Apply turn restrictions
@@ -196,18 +190,20 @@ time costs during the equilibration process.
 .. code-block:: python
 
     >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
+    >>> from aequilibrae.paths.vdf import bpr
 
     >>> project.network.build_graphs()
     >>> graph = project.network.graphs['c']
     >>> graph.set_graph('free_flow_time')
 
     # Turn restrictions are automatically included
+    >>> demand_matrix = project.matrices.get_matrix("demand_omx")
+    >>> demand_matrix.computational_view(["matrix"])
     >>> traffic_class = TrafficClass('car', graph, demand_matrix)
 
     >>> assignment = TrafficAssignment()
     >>> assignment.set_classes([traffic_class])
-    >>> assignment.set_vdf('BPR')
-    >>> assignment.set_vdf_parameters({'alpha': 0.15, 'beta': 4.0})
+    >>> assignment.set_vdf(bpr, {'alpha': 0.15, 'beta': 4.0})
     >>> assignment.set_capacity_field('capacity')
     >>> assignment.set_time_field('free_flow_time')
     >>> assignment.set_algorithm('bfw')
