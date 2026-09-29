@@ -907,7 +907,7 @@ class TrafficAssignment(AssignmentBase):
         }
         return info
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> None:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[Any]:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         :Arguments:
@@ -921,10 +921,13 @@ class TrafficAssignment(AssignmentBase):
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
                 Defaults to the active project
+
+        :Returns:
+            **records** (:obj:`list`): Matrix records created for classes with skims to save.
         """
         if which_ones not in ("final", "blended", "all"):
             raise ValueError("which_ones must be final, blended or all")
-        record = None
+        records = []
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
@@ -1006,8 +1009,9 @@ class TrafficAssignment(AssignmentBase):
             )
 
             out_skims.close()
+            records.append(record)
 
-        return record
+        return records
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
