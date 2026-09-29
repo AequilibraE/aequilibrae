@@ -10,6 +10,7 @@ from aequilibrae.paths.cython.context import GraphContext
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
+from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
 
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.utils.list_all_turns import list_left_turns
@@ -144,6 +145,9 @@ def run_path_finding_search(benchmark, graph, model_stub, model_folder, algorith
 
     node_indices = {int(node): index for index, node in enumerate(graph.all_nodes)}
     results = SearchResults(context.node_count, context.state_count, context.link_count)
+    workspace = (SearchWorkspace if algorithm == "dijkstra" else AStarWorkspace)(
+        context.node_count, context.state_count
+    )
 
     queries = []
     for origin, destination in ods:
@@ -157,9 +161,9 @@ def run_path_finding_search(benchmark, graph, model_stub, model_folder, algorith
     def run_searches():
         for query, destination in queries:
             if algorithm == "dijkstra":
-                dijkstra(context, query, results)
+                dijkstra(context, query, results, workspace)
             else:
-                a_star(context, query, destination, heuristic, results)
+                a_star(context, query, destination, heuristic, results, workspace)
         return results
 
     benchmark(run_searches)

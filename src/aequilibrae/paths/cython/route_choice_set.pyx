@@ -37,13 +37,10 @@ from libcpp.vector cimport vector
 from openmp cimport omp_get_max_threads
 
 from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.paths.cython.a_star cimport (
-    EuclideanContext, HaversineContext, node_euclidean, node_haversine, turn_euclidean, turn_haversine,
-)
+from aequilibrae.paths.cython.a_star cimport EuclideanContext, HaversineContext, cpp_a_star
 from aequilibrae.paths.cython.a_star import validate_scale
 from aequilibrae.paths.cython.context cimport NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra, cpp_turn_dijkstra
-from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
+from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra
 from aequilibrae.paths.cython.route_choice_types cimport (
     LinkSet_t, RouteVec_t,
     RouteCandidate,
@@ -52,6 +49,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
     shuffle,
 )
 from aequilibrae.paths.cython.search_results cimport SearchResults
+from aequilibrae.paths.cython.workspaces cimport SearchWorkspace, AStarWorkspace, CppAStarWorkspace
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
@@ -293,6 +291,8 @@ cdef class RouteChoiceSet:
             bool [:, ::1] targets = np.zeros((c_cores, self.num_nodes), dtype=np.bool_)
             vector[CppSearchQuery] query_views
             vector[CppMutableSearchResults] search_views
+            vector[CppAStarWorkspace] workspace_views
+            SearchWorkspace workspace
             vector[CppNodeBasedContext] node_views
             vector[CppTurnBasedContext] turn_views
             SearchResults search
@@ -302,6 +302,7 @@ cdef class RouteChoiceSet:
         worker_contexts = []
         query_views.resize(c_cores)
         search_views.resize(c_cores)
+        workspace_views.resize(c_cores)
         node_views.resize(c_cores)
         turn_views.resize(c_cores)
         for j in range(c_cores):
@@ -309,7 +310,13 @@ cdef class RouteChoiceSet:
             worker_contexts.append(worker_context)
 
             search = SearchResults(self.num_nodes, self.routing.state_count, self.num_links)
-            workers.append(search)
+            if search_heuristic.a_star:
+                workspace = AStarWorkspace(self.num_nodes, self.routing.state_count)
+                workspace_views[j] = (<AStarWorkspace>workspace).a_star_view()
+            else:
+                workspace = SearchWorkspace(self.num_nodes, self.routing.state_count)
+                workspace_views[j].search = workspace.view()
+            workers.append((search, workspace))
 
             query_views[j].node_count = self.num_nodes
             query_views[j].target_mask = &targets[j, 0]
@@ -378,7 +385,7 @@ cdef class RouteChoiceSet:
                         RouteChoiceSet.bfsle(
                             self, d(route_set), origin_index, dest_index,
                             c_max_routes, c_max_depth, c_max_misses, cost_matrix[thread_id],
-                            query_views[thread_id], search_views[thread_id],
+                            query_views[thread_id], search_views[thread_id], workspace_views[thread_id],
                             node_views[thread_id], turn_views[thread_id], search_heuristic, penalty, c_seed,
                             path_size_logit and self.has_turn_costs,
                         )
@@ -386,7 +393,7 @@ cdef class RouteChoiceSet:
                         RouteChoiceSet.link_penalisation(
                             self, d(route_set), origin_index, dest_index,
                             c_max_routes, c_max_depth, c_max_misses, cost_matrix[thread_id],
-                            query_views[thread_id], search_views[thread_id],
+                            query_views[thread_id], search_views[thread_id], workspace_views[thread_id],
                             node_views[thread_id], turn_views[thread_id], search_heuristic, penalty, c_seed,
                             path_size_logit and self.has_turn_costs,
                         )
@@ -884,6 +891,7 @@ cdef class RouteChoiceSet:
         RouteChoiceSet self,
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
+        const CppAStarWorkspace &workspace,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
         size_t destination,
@@ -893,17 +901,25 @@ cdef class RouteChoiceSet:
         if heuristic.a_star:
             if self.turn_based:
                 if heuristic.haversine:
-                    turn_haversine[FourAryHeap](turn_context, query, destination, heuristic.haversine_context, result)
+                    cpp_a_star(
+                        turn_context, query, destination, heuristic.haversine_context, result, workspace
+                    )
                 else:
-                    turn_euclidean[FourAryHeap](turn_context, query, destination, heuristic.euclidean_context, result)
+                    cpp_a_star(
+                        turn_context, query, destination, heuristic.euclidean_context, result, workspace
+                    )
             elif heuristic.haversine:
-                node_haversine[FourAryHeap](node_context, query, destination, heuristic.haversine_context, result)
+                cpp_a_star(
+                    node_context, query, destination, heuristic.haversine_context, result, workspace
+                )
             else:
-                node_euclidean[FourAryHeap](node_context, query, destination, heuristic.euclidean_context, result)
+                cpp_a_star(
+                    node_context, query, destination, heuristic.euclidean_context, result, workspace
+                )
         elif self.turn_based:
-            cpp_turn_dijkstra[FourAryHeap](turn_context, query, result)
+            cpp_dijkstra(turn_context, query, result, workspace.search)
         else:
-            cpp_dijkstra[FourAryHeap](node_context, query, result)
+            cpp_dijkstra(node_context, query, result, workspace.search)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -920,6 +936,7 @@ cdef class RouteChoiceSet:
         double [::1] thread_cost,
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
+        const CppAStarWorkspace &workspace,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
         const RouteChoiceHeuristic &heuristic,
@@ -997,7 +1014,9 @@ cdef class RouteChoiceSet:
                 for connector in d(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoiceSet.path_find(self, query, result, node_context, turn_context, dest_index, heuristic)
+                RouteChoiceSet.path_find(
+                    self, query, result, workspace, node_context, turn_context, dest_index, heuristic
+                )
 
                 # Mark this set of banned links as seen
                 banned_status = removed_links.insert(banned)
@@ -1087,6 +1106,7 @@ cdef class RouteChoiceSet:
         double [::1] thread_cost,
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
+        const CppAStarWorkspace &workspace,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
         const RouteChoiceHeuristic &heuristic,
@@ -1110,7 +1130,7 @@ cdef class RouteChoiceSet:
             if route_set.size() >= max_routes:
                 break
 
-            RouteChoiceSet.path_find(self, query, result, node_context, turn_context, dest_index, heuristic)
+            RouteChoiceSet.path_find(self, query, result, workspace, node_context, turn_context, dest_index, heuristic)
 
             if result.terminal_states[dest_index] != <size_t>-1:
                 # Trace the settled state path, including its turn steps.

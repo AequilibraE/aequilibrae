@@ -8,6 +8,7 @@
 #include "pq_heap_base.hpp"
 #include "queries.hpp"
 #include "search_results.hpp"
+#include "workspaces.hpp"
 
 namespace aequilibrae::paths::cpp::routing {
 
@@ -23,8 +24,10 @@ inline bool reached_last_target(const SearchQuery &query, std::size_t node,
 // Contexts and queries contain only inputs. The result view writes through to
 // its Cython owner's arrays and metadata without changing the view itself.
 template <class Queue>
-void dijkstra(const NodeBasedContext &context, const SearchQuery &query,
-              const MutableSearchResults &results) noexcept {
+void dijkstra_with_queue(const NodeBasedContext &context,
+                         const SearchQuery &query,
+                         const MutableSearchResults &results,
+                         Queue &queue) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   results.reset();
   auto &metadata = *results.metadata;
@@ -33,8 +36,7 @@ void dijkstra(const NodeBasedContext &context, const SearchQuery &query,
   metadata.target_count = query.target_count;
   bool stopped_at_targets = false;
 
-  Queue queue;
-  queue.init_heap(context.node_count);
+  queue.reset_heap();
   queue.insert(query.origin, 0.0);
 
   while (!queue.is_empty()) {
@@ -88,8 +90,10 @@ void dijkstra(const NodeBasedContext &context, const SearchQuery &query,
 }
 
 template <class Queue>
-void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
-              const MutableSearchResults &results) noexcept {
+void dijkstra_with_queue(const TurnBasedContext &context,
+                         const SearchQuery &query,
+                         const MutableSearchResults &results,
+                         Queue &queue) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   const auto &graph = context.graph;
   // Link states preserve incoming-link history. One virtual root lets first
@@ -104,8 +108,7 @@ void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
   bool stopped_at_targets = false;
   results.turn_costs[root] = 0.0;
 
-  Queue queue;
-  queue.init_heap(results.state_count);
+  queue.reset_heap();
   queue.insert(root, 0.0);
 
   while (!queue.is_empty()) {
@@ -171,6 +174,15 @@ void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
       results.turn_costs[state] = std::numeric_limits<double>::infinity();
     }
   }
+}
+
+template <class Context>
+void dijkstra(const Context &context, const SearchQuery &query,
+              const MutableSearchResults &results,
+              const SearchWorkspace &workspace) noexcept {
+  workspace.heap->visit([&](auto &queue) {
+    dijkstra_with_queue(context, query, results, queue);
+  });
 }
 
 } // namespace aequilibrae::paths::cpp::routing

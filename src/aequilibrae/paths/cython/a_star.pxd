@@ -2,6 +2,7 @@ from libc.stddef cimport size_t
 from aequilibrae.paths.cython.context cimport CppNodeBasedContext, CppTurnBasedContext
 from aequilibrae.paths.cython.queries cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
+from aequilibrae.paths.cython.workspaces cimport CppAStarWorkspace
 
 
 cdef extern from "heuristics.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
@@ -51,19 +52,19 @@ ctypedef fused CppHeuristicContext:
 
 
 cdef extern from "a_star.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
-    void node_euclidean "aequilibrae::paths::cpp::routing::a_star"[Queue](
+    void cpp_a_star "aequilibrae::paths::cpp::routing::a_star"(
         const CppNodeBasedContext &, const CppSearchQuery &, size_t,
-        const CppEuclideanContext &, const CppMutableSearchResults &,
+        const CppEuclideanContext &, const CppMutableSearchResults &, const CppAStarWorkspace &,
     ) noexcept
-    void node_haversine "aequilibrae::paths::cpp::routing::a_star"[Queue](
+    void cpp_a_star "aequilibrae::paths::cpp::routing::a_star"(
         const CppNodeBasedContext &, const CppSearchQuery &, size_t,
-        const CppHaversineContext &, const CppMutableSearchResults &,
+        const CppHaversineContext &, const CppMutableSearchResults &, const CppAStarWorkspace &,
     ) noexcept
-    void turn_euclidean "aequilibrae::paths::cpp::routing::a_star"[Queue](
+    void cpp_a_star "aequilibrae::paths::cpp::routing::a_star"(
         const CppTurnBasedContext &, const CppSearchQuery &, size_t,
-        const CppEuclideanContext &, const CppMutableSearchResults &,
+        const CppEuclideanContext &, const CppMutableSearchResults &, const CppAStarWorkspace &,
     ) noexcept
-    void turn_haversine "aequilibrae::paths::cpp::routing::a_star"[Queue](
+    void cpp_a_star "aequilibrae::paths::cpp::routing::a_star"(
         const CppTurnBasedContext &, const CppSearchQuery &, size_t,
-        const CppHaversineContext &, const CppMutableSearchResults &,
+        const CppHaversineContext &, const CppMutableSearchResults &, const CppAStarWorkspace &,
     ) noexcept

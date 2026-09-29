@@ -12,6 +12,7 @@ from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
+from aequilibrae.paths.cython.workspaces import SearchWorkspace
 
 from .routing_helpers import allocate_results, assert_state_tree, history_context, make_context, search
 
@@ -58,7 +59,8 @@ def test_explicit_context_query_results(context):
     mask = np.array([False, True, True, False, False])
     query = SearchQuery(context.node_count, 0, mask)
     results = allocate_results(context)
-    assert dijkstra(context, query, results) is results
+    workspace = SearchWorkspace(context.node_count, context.state_count)
+    assert dijkstra(context, query, results, workspace) is results
     assert results.target_count == results.reached_target_count == 2
     assert results.all_targets_reached and not results.exhausted
     assert results.settled_count == 3
@@ -95,13 +97,14 @@ def test_reuse_updates_metadata_and_retained_views(context):
     views = [getattr(results, name) for name in names]
     snapshot = results.predecessors.copy()
     query = SearchQuery(context.node_count, 4)
-    dijkstra(context, query, results)
+    workspace = SearchWorkspace(context.node_count, context.state_count)
+    dijkstra(context, query, results, workspace)
     assert results.origin == results.root == 4
     assert results.settled_count == 1 and results.exhausted
     assert np.all(views[0] == results.sentinel)
     assert snapshot[3] == 2
     query.origin = 0
-    dijkstra(context, query, results)
+    dijkstra(context, query, results, workspace)
     assert results.settled_count == 4
     assert results.path_cost_to(3) == 3
     for name, view in zip(names, views, strict=True):
@@ -209,11 +212,12 @@ def test_results_reuse_depends_on_dimensions_not_context_identity(context):
 def test_dimension_checks_happen_before_writes(context):
     results = search(context, 0)
     before = results.distances.copy()
+    workspace = SearchWorkspace(context.node_count, context.state_count)
     with pytest.raises(ValueError, match="query node_count"):
-        dijkstra(context, SearchQuery(2, 0), results)
+        dijkstra(context, SearchQuery(2, 0), results, workspace)
     for sizes in [(5, 4, 5), (4, 5, 5), (5, 5, 4)]:
         with pytest.raises(ValueError, match="results dimensions"):
-            dijkstra(context, SearchQuery(5, 0), SearchResults(*sizes))
+            dijkstra(context, SearchQuery(5, 0), SearchResults(*sizes), workspace)
     np.testing.assert_array_equal(before, results.distances)
 
 
@@ -224,7 +228,8 @@ def test_results_do_not_retain_context_costs_or_query():
     context = NodeBasedContext([0, 1, 1], [1], costs)
     query = SearchQuery(2, 0, mask)
     results = allocate_results(context)
-    dijkstra(context, query, results)
+    workspace = SearchWorkspace(context.node_count, context.state_count)
+    dijkstra(context, query, results, workspace)
     del costs, mask, context, query
     gc.collect()
     assert costs_ref() is mask_ref() is None
@@ -350,9 +355,10 @@ def test_shared_context_separate_workers(turn):
 
     def run(origin):
         results = allocate_results(context)
+        workspace = SearchWorkspace(context.node_count, context.state_count)
         query = SearchQuery(n, origin)
         for _ in range(5):
-            dijkstra(context, query, results)
+            dijkstra(context, query, results, workspace)
         return results.path_links_to(n - 1)
 
     with ThreadPoolExecutor(max_workers=4) as pool:

@@ -6,18 +6,19 @@ for the earlier routing-context MVP.
 
 ## First slice: context, query, results
 
-A search has three independent owners:
+A search has four independent owners:
 
 | Object | Owns or retains | Does not hold |
 | --- | --- | --- |
 | `NodeBasedContext` / `TurnBasedContext` | Fixed topology, borrowed current costs, routing restrictions | Query, results, demand, skims or operation scratch |
 | `SearchQuery` | Origin and an optional borrowed target mask, with its count | Graph or results |
 | `SearchResults` | Fixed-size path buffers and completion metadata | Context, query, node-path mapping, loading or skimming scratch |
+| `SearchWorkspace` / `AStarWorkspace` | One selected heap and, for A*, cost and estimate scratch | Context, query or results |
 
 Each Cython object creates a C++ `view()` that borrows its storage. A view does
 not allocate or extend the owner's lifetime. Keep owners alive for the call.
-Use separate results for concurrent workers; contexts and fixed target masks can
-be shared. Inputs must be used consistently by internal callers. There are no
+Use separate results and workspaces for concurrent workers; contexts and fixed
+target masks can be shared. Inputs must be used consistently by internal callers. There are no
 locks or runtime checks for concurrent changes or buffer overlap.
 
 ### Search example
@@ -28,6 +29,7 @@ import numpy as np
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
+from aequilibrae.paths.cython.workspaces import SearchWorkspace
 from aequilibrae.paths.cython.dijkstra import dijkstra
 
 # Links: 0: 0->1, 1: 0->2, 2: 1->3, 3: 2->1.
@@ -42,8 +44,9 @@ context = TurnBasedContext(
 )
 query = SearchQuery(4, origin=0, target_mask=np.array([False, True, False, True]))
 results = SearchResults(context.node_count, context.state_count, context.link_count)
+workspace = SearchWorkspace(context.node_count, context.state_count)
 
-dijkstra(context, query, results)
+dijkstra(context, query, results, workspace)
 assert results.path_links_to(1).tolist() == [0]
 assert results.path_links_to(3).tolist() == [1, 3, 2]
 assert results.path_cost_to(3) == 3.0
@@ -52,16 +55,18 @@ assert results.all_targets_reached
 
 # Reuse the same buffers for another origin and the same target set.
 query.origin = 2
-dijkstra(context, query, results)
+dijkstra(context, query, results, workspace)
 
 # Or search the entire reachable state space. No mask is needed.
 full_query = SearchQuery(context.node_count, origin=0)
-dijkstra(context, full_query, results)
+dijkstra(context, full_query, results, workspace)
 assert results.exhausted
 ```
 
 One-shot use allocates these same objects and calls the same function. There is
-no optional result allocation inside `dijkstra`, and no context result factory.
+no optional result or workspace allocation inside `dijkstra`, and no context
+result factory. `SearchWorkspace` owns one selected heap and no A* buffers;
+`AStarWorkspace` owns its own heap and the A* cost and estimate buffers.
 
 ### Routing contexts
 
@@ -237,6 +242,8 @@ All workspace types live together in `workspaces.hpp`, `workspaces.pxd` and
 
 | Object | Allocation | Used by |
 | --- | --- | --- |
+| `SearchWorkspace(nodes, states, heap="4ary")` | One reusable routing heap | Dijkstra |
+| `AStarWorkspace(nodes, states, heap="4ary")` | One heap, state costs and node estimates | A* |
 | `LoadingWorkspace(states, classes)` | State demand totals `[states, classes]` | Ordinary and selected loading |
 | `SkimmingWorkspace(states, fields)` | Additive field sums `[states, fields]` | Field skimming |
 | `SelectLinkWorkspace(states)` | One boolean path-membership flag per state | Select-link analysis |
@@ -247,17 +254,20 @@ own scratch before using it, so callers need not clear scratch between origins.
 Read-only buffer views keep their allocations alive and reflect the last operation
 that wrote them. Zero class and field widths produce empty buffers.
 
-`AoNWorkspace` allocates an optional group of these objects:
+`AoNWorkspace` always allocates search scratch and optionally groups the
+other workspaces:
 
 ```python
 from aequilibrae.paths.cython.workspaces import AoNWorkspace
 
 workspace = AoNWorkspace(
+    context.node_count,
     context.state_count,
     class_count=2,
     field_count=3,
     select_links=True,
 )
+search_scratch = workspace.search
 loading_scratch = workspace.loading
 skim_scratch = workspace.skimming
 selection_scratch = workspace.select_link

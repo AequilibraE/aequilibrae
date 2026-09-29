@@ -12,6 +12,7 @@ from aequilibrae.paths.cython.a_star import (
     estimate_context_scale,
 )
 from aequilibrae.paths.cython.queries import SearchQuery
+from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
 from aequilibrae.paths.results import path_results as path_results_module
 
 from .routing_helpers import allocate_results, assert_state_tree, history_context, make_context, search
@@ -32,7 +33,8 @@ def run(context, origin, destination, heuristic, heap="4ary", results=None):
     mask = np.zeros(context.node_count, dtype=bool)
     mask[destination] = True
     results = allocate_results(context) if results is None else results
-    return a_star(context, SearchQuery(context.node_count, origin, mask), destination, heuristic, results, heap)
+    workspace = AStarWorkspace(context.node_count, context.state_count, heap=heap)
+    return a_star(context, SearchQuery(context.node_count, origin, mask), destination, heuristic, results, workspace)
 
 
 @pytest.mark.parametrize("heap", available_heaps())
@@ -186,6 +188,27 @@ def coordinates_for(graph):
     return coordinates.iloc[::-1]
 
 
+def test_path_results_owns_only_the_active_workspace():
+    graph = diamond(False)
+    result = PathResults(graph, 10, 20, coordinates=coordinates_for(graph), a_star=True, heuristic_scale=0)
+    assert isinstance(result._workspace, AStarWorkspace)
+    first = result._workspace
+    result.compute_path(10, 40)
+    assert isinstance(result._workspace, SearchWorkspace)
+    assert not isinstance(result._workspace, AStarWorkspace)
+    assert result._workspace is not first
+
+    current = result._workspace
+    result.set_heap("pairing")
+    assert result._workspace is current
+    result.compute_path(10, 40)
+    assert result._workspace.heap == "pairing"
+    assert result._workspace is not current
+    result.compute_path(10, 40, a_star=True, heuristic_scale=0)
+    assert isinstance(result._workspace, AStarWorkspace)
+    assert result._workspace.heap == "pairing"
+
+
 @pytest.mark.parametrize("heap", available_heaps())
 @pytest.mark.parametrize("name", ["euclidean", "haversine"])
 @pytest.mark.parametrize("turn", [False, True])
@@ -207,9 +230,9 @@ def test_path_results_snapshot_skims_and_update_trace(heap, name, turn, monkeypa
     called = []
     original = path_results_module.run_a_star
 
-    def record(context, query, destination, heuristic, results, heap):
-        called.append((heap, heuristic.scale, type(heuristic)))
-        return original(context, query, destination, heuristic, results, heap)
+    def record(context, query, destination, heuristic, results, workspace):
+        called.append((workspace.heap, heuristic.scale, type(heuristic)))
+        return original(context, query, destination, heuristic, results, workspace)
 
     monkeypatch.setattr(path_results_module, "run_a_star", record)
     result.set_heap("std" if heap != "std" else "4ary")
@@ -340,10 +363,11 @@ def test_wrapper_checks_queries_and_dimensions():
     context = history_context()
     results = allocate_results(context)
     heuristic = heuristic_for(context, "euclidean")
+    workspace = AStarWorkspace(context.node_count, context.state_count)
     with pytest.raises(ValueError, match="only target"):
-        a_star(context, SearchQuery(4, 0), 3, heuristic, results)
+        a_star(context, SearchQuery(4, 0), 3, heuristic, results, workspace)
     with pytest.raises(ValueError, match="only target"):
-        a_star(context, SearchQuery(4, 0, np.array([False, True, True, False])), 3, heuristic, results)
+        a_star(context, SearchQuery(4, 0, np.array([False, True, True, False])), 3, heuristic, results, workspace)
     with pytest.raises(ValueError, match="dimensions"):
         run(context, 0, 3, EuclideanContext([0], [0], 1))
     with pytest.raises(ValueError, match="heap must be"):

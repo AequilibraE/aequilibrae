@@ -1,8 +1,54 @@
 #pragma once
 
 #include <cstddef>
+#include <utility>
+#include <variant>
+
+#include "pq_4ary_heap.hpp"
+#include "pq_pairing_heap.hpp"
+#include "pq_std_priority_queue_adapter.hpp"
 
 namespace aequilibrae::paths::cpp::routing {
+
+enum class SearchHeap { FourAry, Pairing, Std };
+
+class SearchHeapStorage {
+public:
+  SearchHeapStorage(std::size_t state_count, SearchHeap type) {
+    switch (type) {
+    case SearchHeap::FourAry:
+      break; // The variant defaults to this alternative.
+    case SearchHeap::Pairing:
+      heap.emplace<cpp::PairingHeap>();
+      break;
+    case SearchHeap::Std:
+      heap.emplace<cpp::StdPriorityQueueAdapter>();
+      break;
+    }
+    std::visit([state_count](auto &queue) { queue.alloc_heap(state_count); },
+               heap);
+  }
+
+  template <class F> void visit(F &&fn) {
+    std::visit(std::forward<F>(fn), heap);
+  }
+
+private:
+  std::variant<cpp::FourAryHeap, cpp::PairingHeap, cpp::StdPriorityQueueAdapter>
+      heap;
+};
+
+// Scratch heap for Dijkstra.
+struct SearchWorkspace {
+  SearchHeapStorage *heap = nullptr;
+};
+
+// A* also  needs tentative costs and per-node heuristic estimates.
+struct AStarWorkspace {
+  SearchWorkspace search;
+  double *costs = nullptr;     // [states]
+  double *estimates = nullptr; // [nodes]
+};
 
 // Ordinary and selected loading can reuse this cascade scratch sequentially
 // because each operation replaces every state total.
@@ -30,6 +76,7 @@ struct SelectLinkWorkspace {
 // Group worker scratch for the assignment driver. Each kernel accepts only
 // the small workspace it needs; none depends on this aggregate.
 template <typename T> struct AoNWorkspace {
+  SearchWorkspace search;
   LoadingWorkspace<T> loading;
   SkimmingWorkspace<T> skimming;
   SelectLinkWorkspace select_link;

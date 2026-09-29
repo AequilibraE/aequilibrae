@@ -4,12 +4,10 @@ import operator
 import numpy as np
 
 from libc.math cimport isfinite
-from aequilibrae.paths.cython.dijkstra cimport (
-    PAIRING_HEAP, STD_PRIORITY_QUEUE, HeapType, RoutingContext, routing_heap_from_name,
-)
+from aequilibrae.paths.cython.dijkstra cimport RoutingContext
 from aequilibrae.paths.cython.queries cimport SearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults
-from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, PairingHeap, StdPriorityQueueAdapter
+from aequilibrae.paths.cython.workspaces cimport AStarWorkspace, CppAStarWorkspace
 from aequilibrae.utils.cython.array_allocations cimport const_array_pointer
 
 
@@ -92,49 +90,9 @@ cdef class HaversineContext:
         return context
 
 
-cdef void run_search(
-    const CppRoutingContext &context,
-    const CppHeuristicContext &heuristic,
-    const CppSearchQuery &query,
-    size_t destination,
-    const CppMutableSearchResults &results,
-    HeapType heap,
-) noexcept nogil:
-    if CppRoutingContext is CppNodeBasedContext:
-        if CppHeuristicContext is CppEuclideanContext:
-            if heap == PAIRING_HEAP:
-                node_euclidean[PairingHeap](context, query, destination, heuristic, results)
-            elif heap == STD_PRIORITY_QUEUE:
-                node_euclidean[StdPriorityQueueAdapter](context, query, destination, heuristic, results)
-            else:
-                node_euclidean[FourAryHeap](context, query, destination, heuristic, results)
-        else:
-            if heap == PAIRING_HEAP:
-                node_haversine[PairingHeap](context, query, destination, heuristic, results)
-            elif heap == STD_PRIORITY_QUEUE:
-                node_haversine[StdPriorityQueueAdapter](context, query, destination, heuristic, results)
-            else:
-                node_haversine[FourAryHeap](context, query, destination, heuristic, results)
-    else:
-        if CppHeuristicContext is CppEuclideanContext:
-            if heap == PAIRING_HEAP:
-                turn_euclidean[PairingHeap](context, query, destination, heuristic, results)
-            elif heap == STD_PRIORITY_QUEUE:
-                turn_euclidean[StdPriorityQueueAdapter](context, query, destination, heuristic, results)
-            else:
-                turn_euclidean[FourAryHeap](context, query, destination, heuristic, results)
-        else:
-            if heap == PAIRING_HEAP:
-                turn_haversine[PairingHeap](context, query, destination, heuristic, results)
-            elif heap == STD_PRIORITY_QUEUE:
-                turn_haversine[StdPriorityQueueAdapter](context, query, destination, heuristic, results)
-            else:
-                turn_haversine[FourAryHeap](context, query, destination, heuristic, results)
-
-
 def a_star(
     RoutingContext context, SearchQuery query not None, destination,
-    HeuristicContext heuristic, SearchResults results not None, heap="4ary",
+    HeuristicContext heuristic, SearchResults results not None, AStarWorkspace workspace not None,
 ):
     """
     Replace results with a single-target search; do not check scale safety.
@@ -163,13 +121,16 @@ def a_star(
             results.link_count != context.link_count):
         raise ValueError("results dimensions do not match context")
 
+    if workspace.node_count != context.node_count or workspace.state_count != context.state_count:
+        raise ValueError("workspace dimensions do not match context")
+
     cdef size_t target = destination
-    cdef HeapType heap_type = routing_heap_from_name(heap)
     cdef CppSearchQuery cpp_query = query.view()
     cdef CppMutableSearchResults cpp_results = results.view()
+    cdef CppAStarWorkspace cpp_workspace = workspace.a_star_view()
 
     with nogil:
-        run_search(context.view(), heuristic.view(), cpp_query, target, cpp_results, heap_type)
+        cpp_a_star(context.view(), cpp_query, target, heuristic.view(), cpp_results, cpp_workspace)
 
     return results
 

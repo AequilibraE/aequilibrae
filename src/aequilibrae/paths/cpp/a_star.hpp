@@ -4,13 +4,13 @@
 #include <cmath>
 #include <limits>
 #include <type_traits>
-#include <vector>
 
 #include "context.hpp"
 #include "heuristics.hpp"
 #include "pq_heap_base.hpp"
 #include "queries.hpp"
 #include "search_results.hpp"
+#include "workspaces.hpp"
 
 namespace aequilibrae::paths::cpp::routing {
 
@@ -25,9 +25,11 @@ a_star_graph(const TurnBasedContext &context) noexcept {
 }
 
 template <class Queue, class RoutingContext, class HeuristicContext>
-void a_star(const RoutingContext &context, const SearchQuery &query,
-            std::size_t destination, const HeuristicContext &heuristic,
-            const MutableSearchResults &results) noexcept {
+void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
+                       std::size_t destination,
+                       const HeuristicContext &heuristic,
+                       const MutableSearchResults &results,
+                       const AStarWorkspace &workspace, Queue &queue) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   constexpr bool turn_based = std::is_same_v<RoutingContext, TurnBasedContext>;
   const auto &graph = a_star_graph(context);
@@ -43,8 +45,10 @@ void a_star(const RoutingContext &context, const SearchQuery &query,
   results.turn_costs[root] = 0.0;
 
   // Heap keys include the heuristic, but reported distances contain only costs.
-  std::vector<double> costs(results.state_count, infinity);
-  std::vector<double> estimates(graph.node_count, -1.0);
+  auto *costs = workspace.costs;
+  auto *estimates = workspace.estimates;
+  std::fill_n(costs, results.state_count, infinity);
+  std::fill_n(estimates, graph.node_count, -1.0);
   const auto priority = [&](std::size_t node, double cost) {
     if (estimates[node] < 0.0) {
       estimates[node] = heuristic(node, destination);
@@ -54,8 +58,7 @@ void a_star(const RoutingContext &context, const SearchQuery &query,
   };
 
   costs[root] = 0.0;
-  Queue queue;
-  queue.init_heap(results.state_count);
+  queue.reset_heap();
   queue.insert(root, priority(query.origin, 0.0));
 
   while (!queue.is_empty()) {
@@ -146,6 +149,17 @@ void a_star(const RoutingContext &context, const SearchQuery &query,
       results.turn_costs[state] = infinity;
     }
   }
+}
+
+template <class RoutingContext, class HeuristicContext>
+void a_star(const RoutingContext &context, const SearchQuery &query,
+            std::size_t destination, const HeuristicContext &heuristic,
+            const MutableSearchResults &results,
+            const AStarWorkspace &workspace) noexcept {
+  workspace.search.heap->visit([&](auto &queue) {
+    a_star_with_queue(context, query, destination, heuristic, results, workspace,
+                      queue);
+  });
 }
 
 } // namespace aequilibrae::paths::cpp::routing

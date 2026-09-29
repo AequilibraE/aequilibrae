@@ -6,6 +6,7 @@ from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
+from aequilibrae.paths.cython.workspaces import SearchWorkspace
 
 
 def make_context(fs, heads, costs, turns=None, *, turn=False, **options):
@@ -30,7 +31,7 @@ def allocate_results(context):
     return SearchResults(context.node_count, context.state_count, context.link_count)
 
 
-def search(context, origin, targets=None, results=None):
+def search(context, origin, targets=None, results=None, workspace=None):
     mask = None
     if targets is not None:
         mask = np.zeros(context.node_count, dtype=np.bool_)
@@ -38,7 +39,9 @@ def search(context, origin, targets=None, results=None):
     query = SearchQuery(context.node_count, origin, mask)
     if results is None:
         results = allocate_results(context)
-    return dijkstra(context, query, results)
+    if workspace is None:
+        workspace = SearchWorkspace(context.node_count, context.state_count)
+    return dijkstra(context, query, results, workspace)
 
 
 def assert_state_tree(context, results):

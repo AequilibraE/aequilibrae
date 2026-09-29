@@ -5,10 +5,12 @@ import pytest
 
 from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
 from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.paths.cython.a_star import EuclideanContext, a_star
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.results import path_results as path_results_module
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
+from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
 
 from .routing_helpers import make_context
 
@@ -43,11 +45,40 @@ def test_new_dijkstra_heap_dispatch(heap, turn):
     context = make_context([0, 2, 3, 3], [1, 2, 2], [1, 5, 2], turn=turn)
     query = SearchQuery(context.node_count, 0, np.array([False, False, True]))
     results = SearchResults(context.node_count, context.state_count, context.link_count)
-    dijkstra(context, query, results, heap=heap)
+    workspace = SearchWorkspace(context.node_count, context.state_count, heap=heap)
+    dijkstra(context, query, results, workspace)
     np.testing.assert_array_equal(results.path_links_to(2), [0, 2])
     assert results.path_cost_to(2) == 3
     with pytest.raises(ValueError, match="heap must be one of"):
-        dijkstra(context, query, results, heap="invalid")
+        SearchWorkspace(context.node_count, context.state_count, heap="invalid")
+
+
+@pytest.mark.parametrize("heap", available_heaps())
+@pytest.mark.parametrize("turn", [False, True])
+def test_separate_workspaces_reuse_their_heaps(heap, turn):
+    context = make_context([0, 2, 3, 3], [1, 2, 2], [1, 5, 2], turn=turn)
+    results = SearchResults(context.node_count, context.state_count, context.link_count)
+    search = SearchWorkspace(context.node_count, context.state_count, heap=heap)
+    astar = AStarWorkspace(context.node_count, context.state_count, heap=heap)
+    heuristic = EuclideanContext([0, 1, 2], [0, 0, 0], 0)
+    assert search.heap == astar.heap == heap
+    assert not isinstance(search, AStarWorkspace)
+
+    for destination in (2, 1, 2):
+        mask = np.zeros(context.node_count, dtype=bool)
+        mask[destination] = True
+        query = SearchQuery(context.node_count, 0, mask)
+        assert dijkstra(context, query, results, search).path_cost_to(destination) == (3 if destination == 2 else 1)
+        assert a_star(context, query, destination, heuristic, results, astar).path_cost_to(destination) == (
+            3 if destination == 2 else 1
+        )
+
+    with pytest.raises(ValueError, match="workspace dimensions"):
+        dijkstra(context, query, results, SearchWorkspace(context.node_count, context.state_count + 1))
+    with pytest.raises(ValueError, match="workspace dimensions"):
+        a_star(
+            context, query, destination, heuristic, results, AStarWorkspace(context.node_count + 1, context.state_count)
+        )
 
 
 @pytest.mark.parametrize("heap", available_heaps())
@@ -72,9 +103,9 @@ def test_path_results_remembers_selected_heap(sioux_falls_example, heap, monkeyp
     result = PathResults(graph, 1, 20, heap=heap)
     selected = []
 
-    def recording_dijkstra(context, query, results, heap):
-        selected.append(heap)
-        return dijkstra(context, query, results, heap=heap)
+    def recording_dijkstra(context, query, results, workspace):
+        selected.append(workspace.heap)
+        return dijkstra(context, query, results, workspace)
 
     monkeypatch.setattr(path_results_module, "dijkstra", recording_dijkstra)
     assert result._heap == heap

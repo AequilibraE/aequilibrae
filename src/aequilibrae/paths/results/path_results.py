@@ -9,7 +9,7 @@ from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.skimming import skimming
-from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
+from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace, SkimmingWorkspace
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
@@ -150,6 +150,7 @@ class PathResults:
         self.links = context.link_count
         self.num_skims = len(skim_context.field_names)
         self.search_results = SearchResults(self.nodes, context.state_count, self.links)
+        self._workspace = None
         self._skimming = skim_context
         self._skim_workspace = (
             SkimmingWorkspace(context.state_count, skim_context.additive_field_count)
@@ -222,16 +223,24 @@ class PathResults:
                 )
                 self._a_star_context_key = key
 
+            if not isinstance(self._workspace, AStarWorkspace) or self._workspace.heap != selected_heap:
+                self._workspace = AStarWorkspace(self.nodes, self.context.state_count, heap=selected_heap)
             run_a_star(
                 self.context,
                 query,
                 destination_index,
                 self._a_star_context,
                 self.search_results,
-                heap=selected_heap,
+                self._workspace,
             )
         else:
-            dijkstra(self.context, query, self.search_results, heap=selected_heap)
+            if (
+                self._workspace is None
+                or isinstance(self._workspace, AStarWorkspace)
+                or self._workspace.heap != selected_heap
+            ):
+                self._workspace = SearchWorkspace(self.nodes, self.context.state_count, heap=selected_heap)
+            dijkstra(self.context, query, self.search_results, self._workspace)
 
         self.origin = origin
         self.destination = destination

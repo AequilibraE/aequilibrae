@@ -156,7 +156,7 @@ for easy identification.
 
   >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
   >>> assig.execute() # doctest: +SKIP
-  >>> assig.save_skims("one_matrix_name")
+  >>> assig.save_skims("one_matrix_name") # doctest: +SKIP
 
 
 Working with assignment outputs

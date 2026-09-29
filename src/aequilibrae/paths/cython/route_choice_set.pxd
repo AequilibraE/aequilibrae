@@ -10,6 +10,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
     RouteVec_t,
 )
 from aequilibrae.paths.cython.a_star cimport CppEuclideanContext, CppHaversineContext
+from aequilibrae.paths.cython.workspaces cimport CppAStarWorkspace
 from aequilibrae.paths.cython.context cimport CppNodeBasedContext, CppTurnBasedContext
 from aequilibrae.paths.cython.queries cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
@@ -74,6 +75,7 @@ cdef class RouteChoiceSet:
         RouteChoiceSet self,
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
+        const CppAStarWorkspace &workspace,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
         size_t destination,
@@ -91,6 +93,7 @@ cdef class RouteChoiceSet:
         double [::1] thread_cost,
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
+        const CppAStarWorkspace &workspace,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
         const RouteChoiceHeuristic &heuristic,
@@ -110,6 +113,7 @@ cdef class RouteChoiceSet:
         double [::1] thread_cost,
         CppSearchQuery &query,
         const CppMutableSearchResults &result,
+        const CppAStarWorkspace &workspace,
         const CppNodeBasedContext &node_context,
         const CppTurnBasedContext &turn_context,
         const RouteChoiceHeuristic &heuristic,
