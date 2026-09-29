@@ -722,7 +722,7 @@ def test_recompute_psl_blocks_intermediate_centroid(caplog):
     graph.prepare_graph(np.array([10, 20, 40]), remove_dead_ends=False)
     graph.set_blocked_centroid_flows(True)
     graph.set_graph("time")
-    assert graph.has_turn_restrictions  # Connector bans, rather than node-prefix blocking.
+    assert not graph.has_turn_restrictions  # Without explicit turns, block the centroid node.
     choice = RouteChoice(graph)
     supplied = pd.DataFrame(
         {

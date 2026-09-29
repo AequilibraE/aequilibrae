@@ -256,7 +256,7 @@ class GraphBase(ABC):  # noqa: B024
 
         # Rebuild turn structures whenever graph topology/indexing changes.
         # This applies both explicit user turn restrictions and the automatic
-        # centroid-connector bans used when centroid flows are blocked.
+        # centroid-connector bans used with turn restrictions when centroid flows are blocked.
         self._build_turn_csr_structures()
 
     def __build_compressed_graph(self, remove_dead_ends):
@@ -572,15 +572,12 @@ class GraphBase(ABC):  # noqa: B024
         """
         Chooses whether paths are allowed to pass through centroid connector turns.
 
-        When enabled, AequilibraE automatically creates prohibited turns between
-        centroid connectors that meet at the same node (for centroids with more than
-        one connector), which activates arc-based path finding under the hood.
+        With explicit turn restrictions, turn restrictions between centroid connectors are inserted.
 
         Default value is ``True``.
 
         :Arguments:
-            **block_centroid_flows** (:obj:`bool`): Whether to block connector-to-connector
-            flow through centroids using automatic turn prohibitions.
+            **block_centroid_flows** (:obj:`bool`): Whether to block flows through centroids.
         """
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("block_centroid_flows needs to be boolean")
@@ -759,7 +756,8 @@ class GraphBase(ABC):  # noqa: B024
         For arc-based Dijkstra, we need to map from each incoming arc to its
         possible outgoing arcs with associated turn penalties.
         """
-        if self._turn_restrictions is not None and len(self._turn_restrictions) > 0:
+        has_explicit_turns = self._turn_restrictions is not None and len(self._turn_restrictions) > 0
+        if has_explicit_turns:
             tr = self._turn_restrictions
             tr_from_node = tr["from_node"].to_numpy(np.int64, copy=False)
             tr_via_node = tr["via_node"].to_numpy(np.int64, copy=False)
@@ -811,8 +809,8 @@ class GraphBase(ABC):  # noqa: B024
             full_to_arcs = np.empty(0, dtype=np.int64)
             full_penalties = np.empty(0, dtype=np.float64)
 
-        # 2) Auto-generate bans between centroid connectors when centroid flows are blocked.
-        if self._has_multi_connector_centroid():
+        # 2) Only use connector bans with explicit turns, otherwise keep node-based centroid blocking.
+        if has_explicit_turns and self._has_multi_connector_centroid():
             auto_from_arcs, auto_to_arcs, auto_penalties = self._generate_centroid_connector_turn_bans(
                 self.num_zones,
                 self.fs,
@@ -882,7 +880,7 @@ class GraphBase(ABC):  # noqa: B024
             compact_to_arcs = np.empty(0, dtype=np.int64)
             compact_penalties = np.empty(0, dtype=np.float64)
 
-        if self._has_multi_connector_centroid():
+        if has_explicit_turns and self._has_multi_connector_centroid():
             auto_c_from_arcs, auto_c_to_arcs, auto_c_penalties = self._generate_centroid_connector_turn_bans(
                 self.num_zones,
                 self.compact_fs,
