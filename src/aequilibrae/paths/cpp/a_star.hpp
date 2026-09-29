@@ -157,8 +157,8 @@ void a_star(const RoutingContext &context, const SearchQuery &query,
             const MutableSearchResults &results,
             const AStarWorkspace &workspace) noexcept {
   workspace.search.heap->visit([&](auto &queue) {
-    a_star_with_queue(context, query, destination, heuristic, results, workspace,
-                      queue);
+    a_star_with_queue(context, query, destination, heuristic, results,
+                      workspace, queue);
   });
 }
 
