@@ -134,6 +134,9 @@ class AssignmentBase(ABC):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TransportClassBase]
+        if "Skimming Fields" in self._config:
+            for transport_class in self.classes:
+                transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def add_class(self, transport_class: TransportClassBase) -> None:
         """
@@ -148,6 +151,8 @@ class AssignmentBase(ABC):
             raise ValueError("Transport class already in the assignment")
 
         self.classes.append(transport_class)
+        if "Skimming Fields" in self._config:
+            transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws exception if field is invalid."""
@@ -1315,4 +1320,7 @@ class TransitAssignment(AssignmentBase):
             if not isinstance(skimming_fields, list):
                 raise TypeError("Skimming Fields should be defined on a list, tuple or set")
 
-        self._config["Skimming Fields"] = skimming_fields
+        fields = list(skimming_fields or [])
+        self._config["Skimming Fields"] = fields
+        for transport_class in self.classes:
+            transport_class.graph.set_skimming_fields(fields)

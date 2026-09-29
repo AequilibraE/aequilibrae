@@ -1445,6 +1445,10 @@ class NewTransitGraph:
         # FIXME: Old graphs make a distinction between free_flow_time and cost? Not sure why
 
         self.skimming_fields = skimming_fields if skimming_fields is not None else []
+        self.time_field = time_field
+        self.frequency_field = frequency_field
+        self.a_node_field = a_node_field
+        self.b_node_field = b_node_field
 
         self.od_node_mapping = od_node_mapping.copy()
         o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
@@ -1455,10 +1459,10 @@ class NewTransitGraph:
 
         self.context = HyperpathGenerating(
             self.graph,
-            head=a_node_field,
-            tail=b_node_field,
-            trav_time=time_field,
-            freq=frequency_field,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
             skim_cols=self.skimming_fields,
             o_vert_ids=self.od_node_mapping[o_key].to_numpy(),  # taz_id
             d_vert_ids=self.od_node_mapping[d_key].to_numpy(),  # node_id for destination in the above taz_id
@@ -1468,15 +1472,35 @@ class NewTransitGraph:
         self._config = {
             "time_field": time_field,
             "frequency_field": frequency_field,
-            "a_node_field": time_field,
-            "b_node_field": time_field,
+            "a_node_field": self.a_node_field,
+            "b_node_field": self.b_node_field,
             "num_links": self.num_links,
             "num_nodes": self.num_nodes,
             "num_zones": self.num_zones,
-            "skimming_fields": skimming_fields,
+            "skimming_fields": self.skimming_fields,
         }
         if config is not None:
             self._config.update(config)
+
+    def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
+        """Set the fields to skim and rebuild the hyperpath context."""
+        self.skimming_fields = list(skimming_fields or [])
+        self.context = HyperpathGenerating(
+            self.graph,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
+            skim_cols=self.skimming_fields,
+            o_vert_ids=self.od_node_mapping[
+                "node_id" if len(self.od_node_mapping.columns) == 2 else "o_node_id"
+            ].to_numpy(),
+            d_vert_ids=self.od_node_mapping[
+                "node_id" if len(self.od_node_mapping.columns) == 2 else "d_node_id"
+            ].to_numpy(),
+            nodes_to_indices=self.nodes_to_indices,
+        )
+        self._config["skimming_fields"] = self.skimming_fields
 
     @property
     def num_links(self) -> int:
