@@ -30,7 +30,7 @@ other changes to the layers or preventing the changes.
 **requires the editing to be done inside such software.**
 
 .. important::
-   AequilibraE supports turn penalties and bans for path computation, traffic
+   As of 2.0, AequilibraE supports turn penalties and bans for path computation, traffic
    assignment and route choice. See :ref:`turn_restrictions`.
 
 .. _links_nodes_consistency_triggers:

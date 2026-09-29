@@ -158,31 +158,12 @@ for easy identification.
   >>> assig.execute() # doctest: +SKIP
   >>> assig.save_skims("one_matrix_name") # doctest: +SKIP
 
+Unassigned demand
+~~~~~~~~~~~~~~~~~
 
-Working with assignment outputs
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Assignment skims are ``SkimmingOutputs`` objects, not ``AequilibraeMatrix`` objects.
-Use ``traffic_class.results.skims.matrices["distance"]`` for a named OD matrix.
-The whole ``skims`` array has axes ``[origin, field, destination]``. Views are
-read-only and reflect later changes to the same output; use ``.copy()`` for a snapshot.
-When no skim fields are requested, ``results.skims`` is ``None``.
-
-Selected OD matrices are available at
-``traffic_class.results.select_link_od.matrices[selection_name]`` with axes
-``[origin, destination, demand_column]``. Selected OD export writes every demand
-column, using names of the form ``selection_trafficClass_demandColumn``.
-
-Ordinary and selected loads remain in original demand units. PCE is used for
-optimizer calculations, not applied to the stored demand or result arrays.
-``results.link_loads`` returns a full-network reporting snapshot in supernetwork
-order; ``results.compact_link_loads`` is a view of the compact output storage.
-The assignment uses ``AequilibraeMatrix`` only when exporting matrices.
-
-Demand must be finite and nonnegative. Unreachable demand is reported but not
-loaded. ``traffic_class._aon_results.unassigned_demand`` gives the latest AoN total,
-excluding intrazonal demand. ``traffic_class.results.unassigned_demand`` gives the
-total carried by the accepted solution.
+Unassigned demand is demand that present within the demand matrix but it's destination was unreachable from the origin,
+it is not loaded on the network and ``traffic_class._aon_results.unassigned_demand`` gives the latest AoN total,
+excluding intrazonal demand. ``traffic_class.results.unassigned_demand`` gives the total of the accepted solution.
 
 Assigning sparse matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -209,15 +190,11 @@ of zones and over 100 iterations of assignment.
   >>> assig.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
   [MatrixRecord(name='another_matrix_name_car', ...), MatrixRecord(name='another_matrix_name_truck', ...)]
 
-The list of fields defined by the user for skimming is added to the congested time and the assignment
-cost from the last iteration of the assignment by default. These matrices are named *__congested_time__*
-and *__assignment_cost__* respectively. The returned values are ``SkimmingOutputs``
-objects, also stored in ``traffic_class.congested_skims``. They do not replace the
-latest AoN skims. ``save_skims`` uses them for the final matrices when present.
-Congested time includes link travel time and turn delay, but excludes fixed costs.
-Assignment cost includes those fixed costs, converted to time units. Both are
-measured on paths chosen using assignment cost. Additional skim fields sum link
-values without adding turn costs.
+The list of fields defined by the user for skimming is added to the congested time and the assignment cost from the last
+iteration of the assignment by default. These matrices are named *__congested_time__* and *__assignment_cost__*
+respectively. The returned values are ``SkimmingOutputs`` objects, also stored in ``traffic_class.congested_skims``.
+Congested time includes link travel time and turn delay, but excludes fixed costs. Assignment cost includes those fixed
+costs, converted to time units with the traffic classes value of time.
 
 See the the example :ref:`example_assign_sparse` for a more practical explanation of this feature.
 
