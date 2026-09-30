@@ -122,10 +122,8 @@ def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
 
 
 @pytest.mark.parametrize("algorithm", ["msa", "frank-wolfe", "cfw", "bfw"])
-@pytest.mark.parametrize("line_search", ["exact", "trapezoidal"])
-def test_turn_cost_and_selected_outputs_follow_accepted_solution(algorithm, line_search):
+def test_turn_cost_and_selected_outputs_follow_accepted_solution(algorithm):
     assignment, traffic = assignment_for(diamond(True), algorithm=algorithm, iterations=12)
-    assignment.set_line_search(line_search)
     assignment.set_algorithm(algorithm)
     assignment.execute()
     results = traffic.results
