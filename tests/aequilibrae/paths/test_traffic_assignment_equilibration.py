@@ -67,12 +67,10 @@ def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigc
 
     algorithm = assignment.assignment
     report = algorithm.convergence_report
-    # The gap is evaluated inside the loop, where class flows are still in PCE units. ``execute`` divides the
-    # class results by PCE on the way out, so scale them back to reconstruct the quantity that was reported.
-    # The AON results are never rescaled.
+    # Both result groups remain in demand units. The optimizer applies PCE to both.
     unit_cost = algorithm.congested_time + assigclass.fixed_cost
     expected_current_cost = np.sum(unit_cost * assigclass.results.total_link_loads * pce)
-    expected_aon_cost = np.sum(unit_cost * assigclass._aon_results.total_link_loads)
+    expected_aon_cost = np.sum(unit_cost * assigclass._aon_results.total_link_loads * pce)
     expected_rgap = abs(expected_current_cost - expected_aon_cost) / expected_current_cost
 
     assert np.isclose(algorithm.rgap, expected_rgap)

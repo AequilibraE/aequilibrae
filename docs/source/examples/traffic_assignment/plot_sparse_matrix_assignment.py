@@ -118,7 +118,7 @@ skims = assig.skim_congested(["distance"], return_matrices=True)
 
 # Skims are returned as a dictionary, with the class names as keys
 # Let's see all skims we have inside it:
-print(skims["car"].names)
+print(skims["car"].field_names)
 
 # %%
 # We can save the skims, but we need to choose to only save the final ones, as the blended were not generated

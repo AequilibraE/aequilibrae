@@ -202,7 +202,7 @@ class Network(WorkerThread):
             centroids = centroids if centroids.shape[0] else None
 
             if limit_to_area is None:
-                df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(copy=False)
+                df = pd.read_sql(sql, conn).fillna(value=np.nan)
             else:
                 sql += spatial_add
                 df = (

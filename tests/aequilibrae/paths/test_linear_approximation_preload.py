@@ -116,6 +116,7 @@ def test_relative_gap_ignores_constant_preload():
 
     cls = SimpleNamespace(
         _id="car",
+        pce=1.0,
         fixed_cost=np.array([0.5, 1.5]),
         _aon_results=SimpleNamespace(total_link_loads=np.array([10.0, 1.0])),
         results=SimpleNamespace(total_link_loads=np.array([8.0, 2.0])),
@@ -147,6 +148,7 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
 
     cls = SimpleNamespace(
         _id="car",
+        pce=1.0,
         fixed_cost=np.zeros(2),
         _aon_results=SimpleNamespace(total_link_loads=np.array([10.0, 1.0])),
         results=SimpleNamespace(total_link_loads=np.zeros(2)),
@@ -163,6 +165,7 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
 
 def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.traffic_classes = []
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 4
@@ -211,6 +214,7 @@ def test_failed_bfw_direction_retries_with_fw_in_same_iteration(monkeypatch):
 
 def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.traffic_classes = []
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 5
@@ -246,6 +250,7 @@ def test_failed_fw_direction_uses_tiny_step_instead_of_recursing(monkeypatch):
 
 def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.traffic_classes = []
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 4
@@ -292,6 +297,7 @@ def test_failed_bfw_direction_clips_retry_stepsize_to_alpha_max(monkeypatch):
 
 def test_nonfinite_fw_retry_stepsize_uses_tiny_step_instead_of_zero(monkeypatch):
     assignment = LinearApproximation.__new__(LinearApproximation)
+    assignment.traffic_classes = []
     assignment.algorithm = "bfw"
     assignment.line_search = "trapezoidal"
     assignment.iter = 4
@@ -358,13 +364,12 @@ def test_cfw_zero_denominator_falls_back_to_fw():
 
     cls = SimpleNamespace(
         _id="car",
-        results=SimpleNamespace(link_loads=np.array([[1.0], [2.0]])),
-        _aon_results=SimpleNamespace(link_loads=np.array([[2.0], [3.0]])),
+        pce=1.0,
+        results=SimpleNamespace(total_link_loads=np.array([1.0, 2.0])),
+        _aon_results=SimpleNamespace(total_link_loads=np.array([2.0, 3.0])),
     )
     assignment.traffic_classes = [cls]
-    assignment.step_direction = {
-        "car": SimpleNamespace(link_loads=np.array([[1.0], [2.0]])),
-    }
+    assignment.step_direction = {"car": SimpleNamespace(total_link_loads=np.array([1.0, 2.0]))}
 
     assignment.calculate_conjugate_stepsize()
 
@@ -397,16 +402,13 @@ def test_bfw_nonfinite_coefficient_falls_back_to_fw():
 
     cls = SimpleNamespace(
         _id="car",
-        results=SimpleNamespace(link_loads=np.array([[1.0], [2.0]])),
-        _aon_results=SimpleNamespace(link_loads=np.array([[2.0], [3.0]])),
+        pce=1.0,
+        results=SimpleNamespace(total_link_loads=np.array([1.0, 2.0])),
+        _aon_results=SimpleNamespace(total_link_loads=np.array([2.0, 3.0])),
     )
     assignment.traffic_classes = [cls]
-    assignment.step_direction = {
-        "car": SimpleNamespace(link_loads=np.array([[3.0], [5.0]])),
-    }
-    assignment.previous_step_direction = {
-        "car": SimpleNamespace(link_loads=np.array([[4.0], [7.0]])),
-    }
+    assignment.step_direction = {"car": SimpleNamespace(total_link_loads=np.array([3.0, 5.0]))}
+    assignment.previous_step_direction = {"car": SimpleNamespace(total_link_loads=np.array([4.0, 7.0]))}
 
     assignment.calculate_biconjugate_direction()
 
@@ -494,12 +496,13 @@ def _multiclass_fixture(num_links=4, num_classes=3, num_cores=2, seed=None):
         classes.append(
             SimpleNamespace(
                 _id=cid,
-                results=SimpleNamespace(link_loads=loads["results"][m]),
-                _aon_results=SimpleNamespace(link_loads=loads["aon"][m]),
+                pce=1.0,
+                results=SimpleNamespace(total_link_loads=aggregated["results"][m]),
+                _aon_results=SimpleNamespace(total_link_loads=aggregated["aon"][m]),
             )
         )
-        step_direction[cid] = SimpleNamespace(link_loads=loads["step_dir"][m])
-        previous_step_direction[cid] = SimpleNamespace(link_loads=loads["prev_step_dir"][m])
+        step_direction[cid] = SimpleNamespace(total_link_loads=aggregated["step_dir"][m])
+        previous_step_direction[cid] = SimpleNamespace(total_link_loads=aggregated["prev_step_dir"][m])
 
     assignment = LinearApproximation.__new__(LinearApproximation)
     assignment.cores = 1
@@ -714,7 +717,7 @@ def test_singular_exact_bfw_system_falls_back_to_fw():
     # stepsize == 0 makes x_ (d_{k-2}) equal psd - ll while z_ stays sd - ll; force them equal instead by
     # pointing the previous step direction at the current one.
     for cid, sdr in assignment.step_direction.items():
-        assignment.previous_step_direction[cid] = SimpleNamespace(link_loads=sdr.link_loads)
+        assignment.previous_step_direction[cid] = SimpleNamespace(total_link_loads=sdr.total_link_loads)
 
     assert not assignment.calculate_biconjugate_direction()
     assert assignment.current_direction == "fw"

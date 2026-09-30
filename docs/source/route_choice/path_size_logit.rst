@@ -33,6 +33,7 @@ but those cases are arguably not reasonable to exist in practice.
 .. important::
 
     **AequilibraE uses cost to compute path overlaps rather than distance.**
+    Finite turn penalties are included in route cost and path overlap.
 
 Binary logit filter
 -------------------

@@ -6,7 +6,7 @@
 #include "context.hpp"
 #include "network_loading.hpp"
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 // A path matches once it has used any state in this set.
 inline void mark_selected_paths(const SearchResults &results,
@@ -120,4 +120,4 @@ void reduce_select_link_loading_outputs(
   }
 }
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

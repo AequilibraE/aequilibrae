@@ -59,6 +59,16 @@ cdef class SearchResults:
         """Downstream operations may read paths, but must not change them."""
         return self.view().read_view()
 
+    def reset(self):
+        """Clear labels and search metadata in place.
+
+        :Returns:
+            ``None``. Existing array views remain valid and contain sentinel or
+            infinity values.
+        """
+        with nogil:
+            self.view().reset()
+
     @property
     def sentinel(self):
         return INVALID
@@ -136,34 +146,88 @@ cdef class SearchResults:
         return destination
 
     def reachable_to(self, destination):
-        """Whether the search finalized a path to this node."""
+        """Return whether a finalized path is available to a node.
+
+        :Arguments:
+            **destination** (:obj:`int`): Local node index.
+
+        :Returns:
+            ``bool``: Whether the node has a finalized terminal state.
+
+        :Raises:
+            **TypeError**: If ``destination`` is not an integer.
+            **ValueError**: If ``destination`` is outside the node range.
+        """
         cdef size_t node = self.validate_destination(destination)
 
         return self.terminal_states_buffer[node] != INVALID
 
     def path_cost_to(self, destination):
+        """Return the routing objective for a destination.
+
+        :Arguments:
+            **destination** (:obj:`int`): Local node index.
+
+        :Returns:
+            ``float``: Finalised routing cost, or infinity when unavailable.
+        """
         cdef size_t node = self.validate_destination(destination)
         cdef size_t terminal = self.terminal_states_buffer[node]
 
         return np.inf if terminal == INVALID else self.distances_buffer[terminal]
 
     def path_turn_cost_to(self, destination):
+        """Return the accumulated turn-cost component for a destination.
+
+        :Arguments:
+            **destination** (:obj:`int`): Local node index.
+
+        :Returns:
+            ``float``: Finalised turn cost, or infinity when unavailable.
+        """
         cdef size_t node = self.validate_destination(destination)
         cdef size_t terminal = self.terminal_states_buffer[node]
 
         return np.inf if terminal == INVALID else self.turn_costs_buffer[terminal]
 
-    def path_links_to(self, destination):
-        """Return local directed links without consulting a graph or routing mode."""
+    def path_states_to(self, destination):
+        """Return the chosen arrival-state path in path order.
+
+        The returned array includes the root and terminal state. Follow these
+        states when turn history matters; an intermediate node's cheapest
+        terminal state may belong to another arrival history.
+
+        :Arguments:
+            **destination** (:obj:`int`): Local node index.
+
+        :Returns:
+            :obj:`numpy.ndarray`: A copied ``uintp`` state path. An
+            unfinalized destination returns an empty array; an origin path
+            contains only the root.
+        """
         cdef size_t node = self.validate_destination(destination)
         cdef size_t state = self.terminal_states_buffer[node]
 
         if state == INVALID:
             return np.empty(0, dtype=np.uintp)
 
-        links = []
+        states = []
         while state != self.metadata.root:
-            links.append(self.connectors_buffer[state])
+            states.append(state)
             state = self.predecessors_buffer[state]
+        states.append(self.metadata.root)
 
-        return np.array(links[::-1], dtype=np.uintp)
+        return np.array(states[::-1], dtype=np.uintp)
+
+    def path_links_to(self, destination):
+        """Return the local directed links for a destination path.
+
+        :Arguments:
+            **destination** (:obj:`int`): Local node index.
+
+        :Returns:
+            :obj:`numpy.ndarray`: A copied ``uintp`` link path in traversal
+            order. An unavailable or intrazonal path returns an empty array.
+        """
+        states = self.path_states_to(destination)
+        return np.asarray(self.connectors_buffer)[states[1:]]

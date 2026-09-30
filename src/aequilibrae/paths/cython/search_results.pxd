@@ -2,8 +2,8 @@ from libc.stddef cimport size_t
 from libcpp cimport bool as cpp_bool
 
 
-cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    cdef cppclass CppSearchMetadata "aequilibrae::paths::cpp::mvp::SearchMetadata":
+cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    cdef cppclass CppSearchMetadata "aequilibrae::paths::cpp::routing::SearchMetadata":
         CppSearchMetadata() noexcept
         size_t origin
         size_t root
@@ -12,7 +12,7 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::mvp" n
         size_t reached_target_count
         cpp_bool exhausted
 
-    cdef cppclass CppSearchResults "aequilibrae::paths::cpp::mvp::SearchResults":
+    cdef cppclass CppSearchResults "aequilibrae::paths::cpp::routing::SearchResults":
         CppSearchResults() noexcept
         size_t node_count
         size_t state_count
@@ -25,7 +25,7 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::mvp" n
         const double *turn_costs
         const CppSearchMetadata *metadata
 
-    cdef cppclass CppMutableSearchResults "aequilibrae::paths::cpp::mvp::MutableSearchResults":
+    cdef cppclass CppMutableSearchResults "aequilibrae::paths::cpp::routing::MutableSearchResults":
         CppMutableSearchResults() noexcept
         size_t node_count
         size_t state_count
@@ -37,6 +37,7 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::mvp" n
         double *distances
         double *turn_costs
         CppSearchMetadata *metadata
+        void reset() noexcept
         CppSearchResults read_view() noexcept
 
 

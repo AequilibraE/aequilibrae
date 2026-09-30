@@ -11,7 +11,14 @@ from aequilibrae.paths.cython.aon_context import PreparedAoN
 from aequilibrae.paths.cython.queries import LoadingQuery
 from aequilibrae.paths.cython.outputs import LoadingOutputs
 from aequilibrae.paths.cython.network_loading import network_loading, reduce_loading_outputs
-from aequilibrae.paths.cython.workspaces import AoNWorkspace, LoadingWorkspace, SkimmingWorkspace, SelectLinkWorkspace
+from aequilibrae.paths.cython.workspaces import (
+    AoNWorkspace,
+    SearchWorkspace,
+    AStarWorkspace,
+    LoadingWorkspace,
+    SkimmingWorkspace,
+    SelectLinkWorkspace,
+)
 from .routing_helpers import allocate_results, history_context, make_context, path_walk_outputs, search
 
 
@@ -169,7 +176,7 @@ def test_query_borrows_demand_without_changing_writeability():
 def test_owners_have_independent_lifetimes():
     context = history_context()
     results = search(context, 0)
-    group = AoNWorkspace(context.state_count, class_count=1, field_count=2, select_links=True)
+    group = AoNWorkspace(context.node_count, context.state_count, class_count=1, field_count=2, select_links=True)
     workspace = group.loading
     output = LoadingOutputs(context.link_count, 1)
     demand = np.ones((context.node_count, 1))
@@ -197,12 +204,13 @@ def test_owners_have_independent_lifetimes():
 
 
 def test_workspace_group_allocates_only_requested_operations():
-    group = AoNWorkspace(5)
+    group = AoNWorkspace(5, 5)
     assert group.loading is group.skimming is group.select_link is None
-    group = AoNWorkspace(5, class_count=2)
+    assert group.search is not None
+    group = AoNWorkspace(5, 5, class_count=2)
     assert isinstance(group.loading, LoadingWorkspace)
     assert group.skimming is group.select_link is None
-    full = AoNWorkspace(5, class_count=2, field_count=3, select_links=True)
+    full = AoNWorkspace(5, 5, class_count=2, field_count=3, select_links=True)
     assert isinstance(full.skimming, SkimmingWorkspace)
     assert isinstance(full.select_link, SelectLinkWorkspace)
     assert full.loading.state_loads.shape == (5, 2)
@@ -228,7 +236,9 @@ def test_workspace_group_allocates_only_requested_operations():
         (LoadingWorkspace, (5, 2)),
         (SkimmingWorkspace, (5, 3)),
         (SelectLinkWorkspace, (5,)),
-        (AoNWorkspace, (5,)),
+        (AoNWorkspace, (5, 5)),
+        (SearchWorkspace, (5, 5)),
+        (AStarWorkspace, (5, 5)),
         (LoadingOutputs, (0, 0)),
         (LoadingQuery, (np.empty((0, 0)),)),
     ],
@@ -247,7 +257,9 @@ def test_fixed_layout_cannot_be_reinitialized(factory, args):
         (SkimmingWorkspace, (0, 2)),
         (SkimmingWorkspace, (5, -1)),
         (SelectLinkWorkspace, (0,)),
-        (AoNWorkspace, (0,)),
+        (AoNWorkspace, (0, 5)),
+        (SearchWorkspace, (5, 0)),
+        (AStarWorkspace, (5, 0)),
         (LoadingOutputs, (-1, 0)),
         (LoadingOutputs, (0, -1)),
     ],

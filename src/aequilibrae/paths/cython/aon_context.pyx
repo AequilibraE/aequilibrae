@@ -13,7 +13,8 @@ from libcpp cimport bool as cpp_bool
 from aequilibrae.utils.cython.array_allocations cimport array
 from aequilibrae.utils.cython.array_allocations import readonly_view
 from aequilibrae.paths.cython.workspaces cimport AoNWorkspace
-from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra, cpp_turn_dijkstra
+from aequilibrae.paths.cython.dijkstra cimport RoutingContext, cpp_dijkstra
+from aequilibrae.paths.cython.dijkstra import validate_routing_heap
 from aequilibrae.paths.cython.context cimport (
     GraphContext,
     NodeBasedContext,
@@ -21,13 +22,13 @@ from aequilibrae.paths.cython.context cimport (
     SelectLinkContext,
     SkimmingContext,
 )
-from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults
 from aequilibrae.paths.cython.skimming cimport cpp_skimming
 from aequilibrae.paths.cython.network_loading cimport (
     cpp_network_loading,
     cpp_reduce_loading_outputs,
     cpp_sum_weighted_turn_costs,
+    cpp_sum_unassigned_demand,
 )
 from aequilibrae.paths.cython.outputs cimport (
     AoNOutputs,
@@ -38,7 +39,7 @@ from aequilibrae.paths.cython.outputs cimport (
 )
 from aequilibrae.paths.cython.select_link_loading cimport (
     cpp_select_link_loading,
-    cpp_reduce_select_link_loading_outputs,
+    cpp_reduce_select_link_loading,
 )
 
 
@@ -110,6 +111,7 @@ cdef class _AoNWorker:
     def __init__(
         self,
         GraphContext context,
+        heap,
         class_count,
         skim_width,
         selection_names,
@@ -118,7 +120,9 @@ cdef class _AoNWorker:
     ):
         self.search = SearchResults(context.node_count, context.state_count, context.link_count)
         self.workspace = AoNWorkspace(
+            context.node_count,
             context.state_count,
+            heap=heap,
             class_count=class_count,
             field_count=skim_width,
             select_links=load_selected_links or write_selected_od,
@@ -165,6 +169,7 @@ cdef class PreparedAoN:
     cdef bint load_selected_links, write_selected_od
     cdef size_t zone_count, class_count
     cdef int cores
+    cdef object heap_name
 
     cdef list workers
     cdef vector[CppAoNOrigin] origin_queries
@@ -187,9 +192,12 @@ cdef class PreparedAoN:
         SelectLinkContext selected_links=None,
         select_link_loads=True,
         select_link_od=True,
+        heap="4ary",
     ):
         if self.context is not None:
             raise RuntimeError("PreparedAoN cannot be reinitialized")
+        validate_routing_heap(heap)
+        self.heap_name = heap
         if not isinstance(context, (NodeBasedContext, TurnBasedContext)):
             raise TypeError("context must be a node or turn routing context")
 
@@ -280,6 +288,7 @@ cdef class PreparedAoN:
         for _ in range(self.cores):
             worker = _AoNWorker(
                 self.context,
+                self.heap_name,
                 self.class_count,
                 skim_width,
                 selection_names,
@@ -373,19 +382,12 @@ cdef class PreparedAoN:
         """Replace this iteration's outputs, reusing all prepared worker storage."""
         cdef size_t worker
         cdef CppAoNOutputsView output
-        cdef CppNodeBasedContext nodes
-        cdef CppTurnBasedContext turns
         cdef double turn_cost_total = 0
+        cdef double unassigned_demand = 0
         cdef bint node_based = isinstance(self.context, NodeBasedContext)
 
         self.validate_outputs(out)
         output = out.view()
-
-        # Routing costs may have been rebound, we get a new view
-        if node_based:
-            nodes = (<NodeBasedContext>self.context).view()
-        else:
-            turns = (<TurnBasedContext>self.context).view()
 
         with nogil:
             for worker in range(self.worker_views.size()):
@@ -397,9 +399,21 @@ cdef class PreparedAoN:
             output.selected_od.reset()
 
             if node_based:
-                assign_origins(nodes, self.inputs, self.worker_views.data(), self.cores, output)
+                assign_origins(
+                    <NodeBasedContext>self.context,
+                    self.inputs,
+                    self.worker_views.data(),
+                    self.cores,
+                    output,
+                )
             else:
-                assign_origins(turns, self.inputs, self.worker_views.data(), self.cores, output)
+                assign_origins(
+                    <TurnBasedContext>self.context,
+                    self.inputs,
+                    self.worker_views.data(),
+                    self.cores,
+                    output,
+                )
 
             cpp_reduce_loading_outputs[double](
                 self.loading_outputs.data(),
@@ -407,7 +421,7 @@ cdef class PreparedAoN:
                 output.loading,
             )
             if self.load_selected_links:
-                cpp_reduce_select_link_loading_outputs[double](
+                cpp_reduce_select_link_loading[double](
                     self.selected_outputs.data(),
                     self.selected_outputs.size(),
                     output.selected_loading,
@@ -415,13 +429,15 @@ cdef class PreparedAoN:
 
             for worker in range(self.worker_views.size()):
                 turn_cost_total += self.worker_views[worker].turn_cost_total
+                unassigned_demand += self.worker_views[worker].unassigned_demand
 
         out.turn_cost_total = turn_cost_total
+        out.unassigned_demand = unassigned_demand
         return out
 
 
 cdef void assign_origin(
-    const RoutingView &routing,
+    RoutingContext routing,
     const CppAoNOrigin &query,
     const CppAoNInputs &inputs,
     CppAoNWorkerView &worker,
@@ -432,10 +448,7 @@ cdef void assign_origin(
     cdef CppSelectLinkODOriginView[double] selected_od
     cdef size_t origin = query.search.origin
 
-    if RoutingView is CppNodeBasedContext:
-        cpp_dijkstra[FourAryHeap](routing, query.search, worker.search)
-    else:
-        cpp_turn_dijkstra[FourAryHeap](routing, query.search, worker.search)
+    cpp_dijkstra(routing.view(), query.search, worker.search, worker.workspace.search)
 
     if inputs.skimming.field_count:
         cpp_skimming[double](
@@ -463,10 +476,11 @@ cdef void assign_origin(
     )
 
     worker.turn_cost_total += cpp_sum_weighted_turn_costs[double](search, query.loading)
+    worker.unassigned_demand += cpp_sum_unassigned_demand[double](search, query.loading)
 
 
 cdef void assign_origins(
-    const RoutingView &routing,
+    RoutingContext routing,
     const CppAoNInputs &inputs,
     CppAoNWorkerView *workers,
     int cores,

@@ -63,7 +63,7 @@ nodes = project.network.nodes
 centroid_count = nodes.data.query('is_centroid == 1').shape[0]
 
 if centroid_count == 0:
-    arbitrary_node = nodes.data["node_id"][0]
+    arbitrary_node = nodes.data.query('modes.str.contains(@mode)')["node_id"].iloc[0]
     nodes.update(arbitrary_node, is_centroid=1)
 
 network = project.network
@@ -94,8 +94,7 @@ idx_islands = 0
 while missing_nodes.shape[0] >= 2:
     print(datetime.now().strftime("%H:%M:%S"), f" - Computing island: {idx_islands}")
     res = PathResults(graph, missing_nodes[0], missing_nodes[1])
-    res.predecessors[graph.nodes_to_indices[missing_nodes[0]]] = 0
-    connected = graph.all_nodes[np.where(res.predecessors >= 0)]
+    connected = res.node_ids[res.terminal_states != res.search_results.sentinel]
     connected = np.intersect1d(missing_nodes, connected)
     missing_nodes = np.setdiff1d(missing_nodes, connected)
     print(f"    Nodes to find: {missing_nodes.shape[0]:,}")

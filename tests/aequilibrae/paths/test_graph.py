@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths import Graph, estimate_heuristic_scale
 from aequilibrae.paths.results import PathResults
 from aequilibrae.transit import Transit
 
@@ -124,20 +124,22 @@ def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
         graph.set_turn_restrictions(turn_restrictions)
 
 
-def test_a_star_raises_with_turn_restrictions(sioux_falls_example):
+def test_a_star_with_turn_restrictions(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     graph.prepare_graph()
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)
-
     from_node, via_node, to_node = sample_turn_from_path(graph, 1, 6)
     turn_restrictions = pd.DataFrame(
         {"from_node": [from_node], "via_node": [via_node], "to_node": [to_node], "penalty": [np.inf]}
     )
     graph.set_turn_restrictions(turn_restrictions)
 
-    with pytest.raises(RuntimeError, match="not compatible"):
-        graph.compute_path(1, 6, a_star=True)
+    scale = estimate_heuristic_scale(graph, heuristic="haversine")
+    result = graph.compute_path(1, 6, a_star=True, heuristic="haversine", heuristic_scale=scale)
+    assert result.milepost[-1] == graph.compute_path(1, 6).milepost[-1]
+    assert result.path_nodes[0] == 1
+    assert result.path_nodes[-1] == 6
 
 
 def test_compute_skims(sioux_falls_example):
@@ -186,7 +188,8 @@ def transit_graph(transit_data):
 
 def test_transit_graph_config(transit_graph):
     transit_graph_obj = transit_graph.to_transit_graph()
-    assert transit_graph.config == transit_graph_obj._config
+    for k, v in transit_graph.config.items():
+        assert transit_graph_obj._config[k] == v
 
 
 def test_transit_graph_od_node_mapping(transit_graph):

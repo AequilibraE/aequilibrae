@@ -6,7 +6,6 @@ import socket
 import warnings
 from collections.abc import Hashable
 from datetime import datetime
-from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 
@@ -17,10 +16,9 @@ import scipy
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
-from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
+from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.cython.bridge import Bridge
 
@@ -40,6 +38,9 @@ class RouteChoice:
             "cutoff_prob": 0.0,
             "beta": 1.0,
             "store_results": True,
+            "a_star": False,
+            "heuristic": "euclidean",
+            "heuristic_scale": None,
         },
         "link-penalisation": {},
         "bfsle": {"penalty": 1.0},
@@ -47,7 +48,7 @@ class RouteChoice:
 
     demand_index_names = ["origin id", "destination id"]
 
-    def __init__(self, graph: Graph, project=None):
+    def __init__(self, graph: Graph, project=None, *, coordinates: pd.DataFrame | None = None):
         self.parameters = {}
         self.procedure_id = None
         self.procedure_date = None
@@ -56,7 +57,7 @@ class RouteChoice:
         self.project = proj
 
         self.cores: int = 0
-        self.graph = graph
+        self.__rc = RouteChoiceSet(graph, coordinates=coordinates)
         self.demand = self.__init_demand()
 
         self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
@@ -70,15 +71,8 @@ class RouteChoice:
         self._selected_links = {}
         self.sl_link_loading = True
 
-    @cached_property
-    def __rc(self) -> RouteChoiceSet:
-        return RouteChoiceSet(self.graph)
-
     def __init_demand(self):
-        d = GeneralisedCOODemand(
-            *self.demand_index_names, self.graph.nodes_to_indices, shape=(self.graph.num_zones, self.graph.num_zones)
-        )
-        return d
+        return self.__rc.make_demand(*self.demand_index_names)
 
     def set_choice_set_generation(self, /, algorithm: str = None, **kwargs) -> None:
         """
@@ -123,7 +117,16 @@ class RouteChoice:
           a depth of 0 no links are penalised nor removed. At depth 1, all links found at depth 0
           are penalised, then the links marked for removal are removed. All links in the routes
           found at depth 1 are then penalised for the next depth. The penalisation compounds.
-          Set ``penalty=1.0`` to disable.
+          Set ``penalty=1.0`` to disable. For both algorithms, ``penalty`` must be finite and at least 1.
+
+        * Set ``a_star=True`` to use A* instead of Dijkstra. ``heuristic`` accepts ``euclidean``
+          (default) or ``haversine``. Euclidean distance uses the constructor's ``coordinates``;
+          Haversine uses the graph's ``lonlat_index`` in degrees.
+
+        * A* requires an finite, nonnegative ``heuristic_scale`` to convert distance to
+          cost units. Use ``estimate_heuristic_scale`` to calculate a conservative value. A scale
+          above a consistent bound can give non-shortest paths and change the generated route sets.
+          A consistent bound remains valid as links are removed or penalised.
 
         * When performing an assignment, ``cutoff_prob`` can be provided to exclude routes from
           the path-sized logit model. The ``cutoff_prob`` is used to compute an inverse binary
@@ -165,10 +168,14 @@ class RouteChoice:
                 if key not in defaults:
                     raise ValueError(f"Invalid or non-generic parameter '{key}' provided")
 
+        parameters = defaults | kwargs
+        RouteChoiceSet._validate_search_options(
+            parameters["a_star"], parameters["heuristic"], parameters["heuristic_scale"], parameters["penalty"]
+        )
         self.algorithm = algorithm
         self._config["Algorithm"] = algorithm
 
-        self.parameters = defaults | kwargs
+        self.parameters = parameters
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used
@@ -327,19 +334,37 @@ class RouteChoice:
                 **self.parameters,
             )
 
-    def execute_from_path_files(self, path_files: Union[pathlib.Path, str], recompute_psl: bool = False) -> None:
+    def recompute_psl(self, df: pd.DataFrame, *, log_warnings: bool = True) -> pd.DataFrame:
+        """Validate and recost routes, then return their PSL results by OD."""
+        defaults = self.default_parameters["generic"]
+        return self.__rc.recompute_psl(
+            df,
+            beta=self.parameters.get("beta", defaults["beta"]),
+            cutoff_prob=self.parameters.get("cutoff_prob", defaults["cutoff_prob"]),
+            log_warnings=log_warnings,
+        )
+
+    def execute_from_path_files(
+        self,
+        path_files: Union[pathlib.Path, str],
+        recompute_psl: bool = False,
+        *,
+        log_warnings: bool = True,
+    ) -> None:
         """
         Perform an assignment from an existing set of path-files.
 
-        This method expects the path-files to be written by the ``self.save_path_files()`` method,
-        however any parquet hive dataset with the correct structure is accepted. This allows the
-        use of AequilibraE's path-sized logit, link loading, select link analysis, and assignment
-        while using externally generated routes.
+        This method expects the path-files to be written by the ``self.save_path_files()`` method, however any parquet
+        hive dataset with the correct structure is accepted. This allows the use of AequilibraE's path-sized logit, link
+        loading, select link analysis, and assignment while using externally generated routes. With
+        ``recompute_psl=True``, routes are validated and costs (including turn penalties), probabilities and overlap are
+        recomputed. Otherwise, supplied results are used without path validation.  Set ``log_warnings=False`` to silence
+        validation warnings.
         """
 
         # Read the dataset schema and make sure it conforms to what we want
         df = RouteChoiceSetResults.read_dataset(path_files)
-        required_fields = ["origin id", "destination id", "route set"] + [] if recompute_psl else ["probability"]
+        required_fields = ["origin id", "destination id", "route set"] + ([] if recompute_psl else ["probability"])
         schema = {
             "destination id": "uint32",
             "route set": "object",
@@ -362,41 +387,52 @@ class RouteChoice:
         except KeyError as e:
             raise KeyError(f"Column '{field}' does not exist in the path-files") from e
 
-        self.execute_from_pandas(df=df, recompute_psl=recompute_psl)
+        self.execute_from_pandas(
+            df=df,
+            recompute_psl=recompute_psl,
+            log_warnings=log_warnings,
+        )
 
-    def execute_from_pandas(self, df: pd.DataFrame, recompute_psl: bool = False) -> None:
+    def execute_from_pandas(
+        self,
+        df: pd.DataFrame,
+        recompute_psl: bool = False,
+        *,
+        log_warnings: bool = True,
+    ) -> None:
         """
         Perform an assignment using route sets from a Pandas DataFrame.
 
-        Requires the DataFrame contains the ``origin id``, ``destination id`` and ``route set``
-        columns. The route sets must be a list of links IDs stored as integers with the direction
-        encoded as the sign.  Additionally, when ``recompute_psl`` is ``False``, the
-        ``probability`` column must also be present.
+        Requires the DataFrame contains the ``origin id``, ``destination id`` and ``route set`` columns. The route sets
+        must be a list of links IDs stored as integers with the direction encoded as the sign.  Additionally, when
+        ``recompute_psl`` is ``False``, the ``probability`` column must also be present.
 
-        When ``recompute_psl`` is ``True``, the path-sized logit is recomputed for each route with
-        respect to the graphs current cost field and the ``beta`` and ``cutoff_prob`` parameters.
+        When ``recompute_psl`` is ``True``, the path-sized logit is recomputed for each route with respect to the
+        graph's cost field and the ``beta`` and ``cutoff_prob`` parameters.  With PSL recomputation, the supplied mask
+        is combined with the path validation and cost mask. Otherwise, paths are not validated and any supplied costs
+        and masks are kept. Masked routes load no demand regardless of supplied probabilities. Without recomputation,
+        unmasked probabilities are unchanged. Links absent from the graph or compact graph raise an error. Set
+        ``log_warnings=False`` to silence warnings.
 
         All origin and destination IDs within the DataFrame must exist within the demand matrix.
 
-        All link IDs and directions must exist within the graph. Links must also be present within
-        the compressed graph.
+        All link IDs and directions must exist within the graph. Links must also be present within the compressed graph.
 
-        If ``recompute_psl`` is ``False`` the table returned from ``self.get_results()`` will have
-        all zeros for the cost and path overlap fields, and all True for the mask field. If
-        ``recompute_psl`` is ``True`` these fields will be recalculated as required.
+        The table returned from ``self.get_results()`` includes recalculated costs and a combined mask when PSL is
+        recomputed. Otherwise, missing costs and path overlap default to zero and masked probabilities are zero.
         """
 
-        required_columns = ["origin id", "destination id", "route set"] + [] if recompute_psl else ["probability"]
+        required_columns = ["origin id", "destination id", "route set"] + ([] if recompute_psl else ["probability"])
         for col in required_columns:
             if col not in df.columns:
                 raise ValueError(f"provided DataFrame is missing required column '{col}'")
 
         self.__rc.assign_from_df(
-            self.graph.graph,
             df,
             self.demand,
             select_links=self._selected_links,
             recompute_psl=recompute_psl,
+            log_warnings=log_warnings,
             sl_link_loading=self.sl_link_loading,
             store_results=self.parameters["store_results"],
             beta=self.parameters["beta"],
@@ -494,9 +530,7 @@ class RouteChoice:
         ll = {(k,): v for k, v in ll.items()}
 
         # Create a data store with a row for each uncompressed link
-        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
-        lids = np.unique(self.graph.graph.link_id.values)
-        df = self.__link_loads_to_df(m, lids, ll)
+        df = self.__link_loads_to_df(self.__rc.network_mapping, self.__rc.network_link_ids, ll)
 
         return df
 
@@ -526,7 +560,7 @@ class RouteChoice:
         **AND** sets of links.
 
         Dictionary values should be a list of either a single ``(link_id, direction)`` tuple or a
-        list of ``(link_id, dirirection)``.
+        list of ``(link_id, direction)``.
 
         The elements of the first list represent the **AND** sets, together they are OR'ed. If any
         of these sets is satisfied the link are loaded as appropriate.
@@ -555,8 +589,6 @@ class RouteChoice:
             del self._config["select_links"]
             return
 
-        max_id = self.graph.compact_graph.id.max() + 1
-
         for name, link_set in links.items():
             normalised_link_set = []
             for link_ids in link_set:
@@ -566,33 +598,24 @@ class RouteChoice:
                         f"unintentional. Replacing with {(link_ids[0], -1)} OR {(link_ids[0], 1)}",
                         stacklevel=2,
                     )
-                    normalised_link_set.append((link_ids[0], -1))
-                    normalised_link_set.append((link_ids[0], 1))
+                    normalised_link_set.append([(link_ids[0], -1)])
+                    normalised_link_set.append([(link_ids[0], 1)])
                 else:
-                    normalised_link_set.append(link_ids)
+                    # A tuple can be one link pair or a tuple of link pairs.
+                    single_link = (
+                        isinstance(link_ids, tuple)
+                        and len(link_ids) == 2
+                        and not isinstance(link_ids[0], (tuple, list))
+                    )
+                    normalised_link_set.append([link_ids] if single_link else link_ids)
 
             or_set = set()
             for link_ids in normalised_link_set:
                 and_set = set()
                 for link, dir in link_ids:
-                    if dir == 0:
-                        query = (self.graph.graph["link_id"] == link) & (
-                            (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
-                        )
-                    else:
-                        query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
-
-                    if not query.any():
-                        raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
-
-                    for comp_id in self.graph.graph[query]["__compressed_id__"].values:
+                    for comp_id in self.__rc.compact_links(link, dir):
                         # Check for duplicate compressed link ids in the current link set
-                        if comp_id == max_id:
-                            raise ValueError(
-                                f"link ID {link} and direction {dir} is not present in compressed graph. "
-                                "It may have been removed during dead-end removal."
-                            )
-                        elif comp_id in and_set:
+                        if comp_id in and_set:
                             warnings.warn(
                                 "Two input links map to the same compressed link in the network"
                                 f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}",
@@ -626,9 +649,7 @@ class RouteChoice:
                 sl_link_loads[demand_name, sl_name] = res
 
         # Create a data store with a row for each uncompressed link
-        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
-        lids = np.unique(self.graph.graph.link_id.values)
-        df = self.__link_loads_to_df(m, lids, sl_link_loads)
+        df = self.__link_loads_to_df(self.__rc.network_mapping, self.__rc.network_link_ids, sl_link_loads)
 
         return df
 
@@ -717,6 +738,6 @@ class RouteChoice:
 
         file = omx.open_file(path, "a")
         try:
-            file.create_mapping(self.index_name, self.graph.centroids)
+            file.create_mapping(self.index_name, self.__rc.centroids)
         finally:
             file.close()
