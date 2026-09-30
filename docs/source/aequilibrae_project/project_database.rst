@@ -30,9 +30,8 @@ other changes to the layers or preventing the changes.
 **requires the editing to be done inside such software.**
 
 .. important::
-   AequilibraE does not currently support turn penalties and/or bans. Their
-   implementation requires a complete overahaul of the path-building code, so
-   that is still a long-term goal, barred specific development efforts.
+   As of 2.0, AequilibraE supports turn penalties and bans for path computation, traffic
+   assignment and route choice. See :ref:`turn_restrictions`.
 
 .. _links_nodes_consistency_triggers:
 

@@ -17,6 +17,7 @@ import pandas as pd
 
 from aequilibrae.paths.connectivity_analysis import disconnected_analysis
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 if TYPE_CHECKING:
     from aequilibrae.paths import PathResults
@@ -255,7 +256,7 @@ class GraphBase(ABC):  # noqa: B024
 
         # Rebuild turn structures whenever graph topology/indexing changes.
         # This applies both explicit user turn restrictions and the automatic
-        # centroid-connector bans used when centroid flows are blocked.
+        # centroid-connector bans used with turn restrictions when centroid flows are blocked.
         self._build_turn_csr_structures()
 
     def __build_compressed_graph(self, remove_dead_ends):
@@ -348,6 +349,9 @@ class GraphBase(ABC):  # noqa: B024
         early_exit: bool = False,
         a_star: bool = False,
         heuristic: Union[str, None] = None,
+        *,
+        coordinates: pd.DataFrame | None = None,
+        heuristic_scale: float | None = None,
     ) -> PathResults:
         """
         Returns the results from path computation result holder.
@@ -362,13 +366,28 @@ class GraphBase(ABC):  # noqa: B024
 
             **a_star** (:obj:`bool`): whether or not to use A* over Dijkstra's algorithm.
             When ``True``, 'early_exit' is always ``True``. Default is ``False``.
-            This option is incompatible with turn restrictions.
 
-            **heuristic** (:obj:`str`): heuristic to use if ``a_star`` is enabled. Default is ``None``.
+            **heuristic** (:obj:`str`): ``euclidean`` (default) or ``haversine`` if A* is enabled.
+
+            **coordinates** (:obj:`pandas.DataFrame`, optional): Planar ``x`` and ``y`` columns indexed by
+            external node ID, required for Euclidean A*. Haversine uses the graph's longitude/latitude.
+
+            **heuristic_scale** (:obj:`float`): Finite, nonnegative coefficient required for A*.  Use
+            ``aequilibrae.paths.estimate_heuristic_scale`` for a conservative bound. A larger scale can give
+            non-shortest paths.
         """
         from aequilibrae.paths import PathResults
 
-        res = PathResults(self, origin, destination, early_exit, a_star, heuristic)
+        res = PathResults(
+            self,
+            origin,
+            destination,
+            early_exit=early_exit,
+            a_star=a_star,
+            heuristic=heuristic,
+            coordinates=coordinates,
+            heuristic_scale=heuristic_scale,
+        )
 
         return res
 
@@ -520,6 +539,12 @@ class GraphBase(ABC):  # noqa: B024
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
+        try:
+            for field in skim_fields:
+                self.graph[field] = pd.to_numeric(self.graph[field], errors="raise").astype(np.float64)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Skim fields must contain numeric values: {exc}") from exc
+
         if self.centroids is not None and self.centroids.shape[0]:
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
@@ -547,15 +572,12 @@ class GraphBase(ABC):  # noqa: B024
         """
         Chooses whether paths are allowed to pass through centroid connector turns.
 
-        When enabled, AequilibraE automatically creates prohibited turns between
-        centroid connectors that meet at the same node (for centroids with more than
-        one connector), which activates arc-based path finding under the hood.
+        With explicit turn restrictions, turn restrictions between centroid connectors are inserted.
 
         Default value is ``True``.
 
         :Arguments:
-            **block_centroid_flows** (:obj:`bool`): Whether to block connector-to-connector
-            flow through centroids using automatic turn prohibitions.
+            **block_centroid_flows** (:obj:`bool`): Whether to block flows through centroids.
         """
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("block_centroid_flows needs to be boolean")
@@ -685,7 +707,7 @@ class GraphBase(ABC):  # noqa: B024
         b_nodes_by_id: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Generates prohibited turns between centroid connectors meeting at the same node.
+        Generates prohibited turns through centroid nodes.
         """
         if num_zones <= 0 or fs.size == 0 or a_nodes_by_id.size == 0:
             return (
@@ -706,7 +728,7 @@ class GraphBase(ABC):  # noqa: B024
         prohibited_pairs = set()
         for from_arc in connector_arcs:
             node = int(b_nodes_by_id[from_arc])
-            if node < 0 or node + 1 >= fs.shape[0]:
+            if node < 0 or node >= num_zones or node + 1 >= fs.shape[0]:
                 continue
 
             for to_arc in range(int(fs[node]), int(fs[node + 1])):
@@ -734,7 +756,8 @@ class GraphBase(ABC):  # noqa: B024
         For arc-based Dijkstra, we need to map from each incoming arc to its
         possible outgoing arcs with associated turn penalties.
         """
-        if self._turn_restrictions is not None and len(self._turn_restrictions) > 0:
+        has_explicit_turns = self._turn_restrictions is not None and len(self._turn_restrictions) > 0
+        if has_explicit_turns:
             tr = self._turn_restrictions
             tr_from_node = tr["from_node"].to_numpy(np.int64, copy=False)
             tr_via_node = tr["via_node"].to_numpy(np.int64, copy=False)
@@ -786,8 +809,14 @@ class GraphBase(ABC):  # noqa: B024
             full_to_arcs = np.empty(0, dtype=np.int64)
             full_penalties = np.empty(0, dtype=np.float64)
 
-        # 2) Auto-generate bans between centroid connectors when centroid flows are blocked.
-        if self._has_multi_connector_centroid():
+        # 2) Only use connector bans with explicit turns, otherwise keep node-based centroid blocking.
+        # A single bidirectional connector needs a ban only if path U-turns are allowed.
+        block_centroid_turns = (
+            has_explicit_turns
+            and self.block_centroid_flows
+            and (self._has_multi_connector_centroid() or self._allow_path_uturns)
+        )
+        if block_centroid_turns:
             auto_from_arcs, auto_to_arcs, auto_penalties = self._generate_centroid_connector_turn_bans(
                 self.num_zones,
                 self.fs,
@@ -857,7 +886,7 @@ class GraphBase(ABC):  # noqa: B024
             compact_to_arcs = np.empty(0, dtype=np.int64)
             compact_penalties = np.empty(0, dtype=np.float64)
 
-        if self._has_multi_connector_centroid():
+        if block_centroid_turns:
             auto_c_from_arcs, auto_c_to_arcs, auto_c_penalties = self._generate_centroid_connector_turn_bans(
                 self.num_zones,
                 self.compact_fs,
@@ -1236,3 +1265,261 @@ class TransitGraph(GraphBase):
     @property
     def config(self):
         return self._config
+
+
+def sanitise_centroids(centroids: np.ndarray) -> np.ndarray:
+    if len(centroids.shape) != 1:
+        raise ValueError(f"centroids must be 1D, got: {centroids.shape}")
+    elif centroids.shape[0] == 0:
+        raise ValueError("centroids must contain at least one value")
+
+    centroids = centroids.astype("uint32", order="C", casting="same_value", subok=False)
+    centroids = np.sort(centroids)  # Makes a copy
+    if (np.diff(centroids) == 0).any():
+        raise ValueError("centroids must be unique")
+
+    return centroids  # a copy of the unique, sorted, C-contiguous, uint_32 centroids
+
+
+def sanitise_network(network: pd.DataFrame) -> pd.DataFrame:
+    required_fields = {"link_id", "a_node", "b_node", "direction"}
+    if missing_fields := required_fields - set(network.columns):
+        raise ValueError(f"network is missing the following required fields: {missing_fields}")
+
+    network = network.copy(deep=False)  # CoW copy
+
+    if not network["link_id"].is_unique:
+        raise ValueError("'link_id' field must be unique")
+
+    network["link_id"] = network["link_id"].to_numpy().astype("int64", order="C", casting="same_value")
+
+    # Direction values
+    if network["direction"].max() > 1 or network["direction"].min() < -1:
+        raise ValueError('"direction" field not limited to (-1, 0, 1) values')
+
+    network["direction"] = (
+        network["direction"].to_numpy().astype("int8", order="C", casting="same_value")
+    )  # FIXME: enforced type for direction?
+
+    network["a_node"] = network["a_node"].to_numpy().astype("uint32", order="C", casting="same_value")
+    network["b_node"] = network["b_node"].to_numpy().astype("uint32", order="C", casting="same_value")
+
+    return network
+
+
+def _make_unidirectional(network: pd.DataFrame) -> pd.DataFrame:
+    """Expand links into directed edges and collapse paired _ab/_ba columns."""
+    required = ["link_id", "a_node", "b_node", "direction"]
+    names = required.copy()
+
+    for column in network.columns:
+        # Internal edge IDs are regenerated after node mapping and sorting.
+        if column in required + ["id"] or column[:-3] in required + ["id"]:
+            continue
+
+        if column.endswith("_ab"):
+            if column[:-3] + "_ba" not in network.columns:
+                raise ValueError(f"Field {column} exists for ab direction but does not exist for ba")
+            names.append(column[:-3])
+        elif column.endswith("_ba"):
+            if column[:-3] + "_ab" not in network.columns:
+                raise ValueError(f"Field {column} exists for ba direction but does not exist for ab")
+        else:
+            names.append(column)
+
+    edges = []
+    for direction, suffix in ((1, "_ab"), (-1, "_ba")):
+        columns = [name if name in network.columns else name + suffix for name in names]
+        directed = network.loc[network["direction"] != -direction, columns].copy()
+        directed.columns = names
+        directed["direction"] = np.full(len(directed), direction, dtype=np.int8)
+
+        if direction == -1:
+            a_nodes = directed["a_node"].to_numpy(copy=True)
+            directed["a_node"] = directed["b_node"].to_numpy(copy=True)
+            directed["b_node"] = a_nodes
+
+        edges.append(directed)
+
+    return pd.concat(edges, ignore_index=True)
+
+
+def _map_centroids(
+    graph: pd.DataFrame,
+    centroids: np.ndarray,
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    """Map nodes to centroid-first indices, sort edges, and assign edge IDs."""
+    nodes = np.unique(np.concatenate((graph["a_node"].to_numpy(), graph["b_node"].to_numpy())))
+
+    present = np.isin(centroids, nodes, assume_unique=True)
+    if not present.all():
+        warnings.warn(
+            "Found centroids not present in the graph!\n" + str(centroids[~present]),
+            stacklevel=2,
+        )
+
+    non_centroids = np.setdiff1d(nodes, centroids, assume_unique=True)
+    all_nodes = np.concatenate((centroids, non_centroids)).astype(np.uint32, casting="same_value", copy=False)
+
+    # Signed indices retain the -1 sentinel for node IDs absent from the graph.
+    nodes_to_indices = np.full(int(all_nodes.max()) + 1, -1, dtype=np.int64)
+    nodes_to_indices[all_nodes] = np.arange(len(all_nodes), dtype=np.int64)
+
+    graph = graph.copy()
+    for column in ("a_node", "b_node"):
+        graph[column] = nodes_to_indices[graph[column].to_numpy()].astype(np.uint32, casting="same_value")
+
+    # We generate IDs that we KNOW will be constant across modes
+    graph = graph.sort_values(by=["link_id", "direction"])
+    graph["__supernet_id__"] = np.arange(graph.shape[0]).astype("uint32")
+
+    graph = graph.sort_values(["a_node", "b_node"]).reset_index(drop=True)
+    graph["id"] = np.arange(len(graph), dtype=np.int64)
+
+    return graph, all_nodes, nodes_to_indices
+
+
+def _build_forward_star(graph: pd.DataFrame, num_nodes: int) -> np.ndarray:
+    """Build CSR offsets for edges already sorted by mapped a_node."""
+    counts = np.bincount(graph["a_node"].to_numpy(), minlength=num_nodes)
+    fs = np.empty(num_nodes + 1, dtype=np.int64)
+    fs[0] = 0
+    np.cumsum(counts, dtype=np.int64, out=fs[1:])
+    return fs
+
+
+def _ensure_graph_dtypes(graph: pd.DataFrame) -> pd.DataFrame:
+    """Enforce required column dtypes without casting other columns."""
+    graph = graph.copy()
+    required_types = {
+        "link_id": np.int64,
+        "a_node": np.uint32,
+        "b_node": np.uint32,
+        "direction": np.int8,
+        "id": np.int64,
+    }
+
+    for column, dtype in required_types.items():
+        graph[column] = graph[column].to_numpy().astype(dtype, order="C", casting="same_value", copy=False)
+
+    nans = ", ".join(column for column in graph.columns if graph[column].isna().any())
+    if nans:
+        logger.warning(
+            "Found fields with at least one NaN value. Check your computations. Fields: %s",
+            nans,
+        )
+
+    return graph
+
+
+def _build_directed_graph(
+    network: pd.DataFrame,
+    centroids: np.ndarray,
+    *,
+    build_fs: bool = True,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, pd.DataFrame]:
+    """Build from sanitised inputs, optionally omitting CSR construction."""
+    graph = _make_unidirectional(network)
+    graph, all_nodes, nodes_to_indices = _map_centroids(graph, centroids)
+    graph = _ensure_graph_dtypes(graph)
+
+    num_nodes = len(all_nodes)
+    fs = _build_forward_star(graph, num_nodes) if build_fs else None
+
+    return all_nodes, nodes_to_indices, fs, graph
+
+
+class NewTransitGraph:
+    def __init__(
+        self,
+        network: pd.DataFrame,
+        centroids: np.ndarray,  # FIXME: Centroids used to be optional?
+        time_field: str,
+        frequency_field: str,
+        od_node_mapping: pd.DataFrame,
+        a_node_field: str = "a_node",
+        b_node_field: str = "b_node",
+        skimming_fields: list[str] | None = None,
+        config: dict | None = None,
+    ):
+        self.network = sanitise_network(network)
+        self.centroids = sanitise_centroids(centroids)
+        # FIXME: Old graphs make a distinction between free_flow_time and cost? Not sure why
+
+        self.skimming_fields = skimming_fields if skimming_fields is not None else []
+        self.time_field = time_field
+        self.frequency_field = frequency_field
+        self.a_node_field = a_node_field
+        self.b_node_field = b_node_field
+
+        self.od_node_mapping = od_node_mapping.copy()
+        o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
+
+        self.all_nodes, self.nodes_to_indices, _, self.graph = _build_directed_graph(
+            self.network, self.centroids, build_fs=False
+        )
+
+        self.context = HyperpathGenerating(
+            self.graph,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
+            skim_cols=self.skimming_fields,
+            o_vert_ids=self.od_node_mapping[o_key].to_numpy(),  # taz_id
+            d_vert_ids=self.od_node_mapping[d_key].to_numpy(),  # node_id for destination in the above taz_id
+            nodes_to_indices=self.nodes_to_indices,
+        )
+
+        self._config = {
+            "time_field": time_field,
+            "frequency_field": frequency_field,
+            "a_node_field": self.a_node_field,
+            "b_node_field": self.b_node_field,
+            "num_links": self.num_links,
+            "num_nodes": self.num_nodes,
+            "num_zones": self.num_zones,
+            "skimming_fields": self.skimming_fields,
+        }
+        if config is not None:
+            self._config.update(config)
+
+    def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
+        """Set the fields to skim and rebuild the hyperpath context."""
+        self.skimming_fields = list(skimming_fields or [])
+        self.context = HyperpathGenerating(
+            self.graph,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
+            skim_cols=self.skimming_fields,
+            o_vert_ids=self.od_node_mapping[
+                "node_id" if len(self.od_node_mapping.columns) == 2 else "o_node_id"
+            ].to_numpy(),
+            d_vert_ids=self.od_node_mapping[
+                "node_id" if len(self.od_node_mapping.columns) == 2 else "d_node_id"
+            ].to_numpy(),
+            nodes_to_indices=self.nodes_to_indices,
+        )
+        self._config["skimming_fields"] = self.skimming_fields
+
+    @property
+    def num_links(self) -> int:
+        return len(self.graph)
+
+    @property
+    def num_nodes(self) -> int:
+        return len(self.all_nodes)
+
+    @property
+    def num_zones(self) -> int:
+        return len(self.centroids)
+
+    @property
+    def mode(self) -> str:
+        return "t"
+
+    @property
+    def block_centroid_flows(self) -> bool:
+        return False

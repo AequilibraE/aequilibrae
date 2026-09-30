@@ -134,6 +134,9 @@ class AssignmentBase(ABC):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TransportClassBase]
+        if "Skimming Fields" in self._config:
+            for transport_class in self.classes:
+                transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def add_class(self, transport_class: TransportClassBase) -> None:
         """
@@ -148,6 +151,8 @@ class AssignmentBase(ABC):
             raise ValueError("Transport class already in the assignment")
 
         self.classes.append(transport_class)
+        if "Skimming Fields" in self._config:
+            transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws exception if field is invalid."""
@@ -158,16 +163,22 @@ class AssignmentBase(ABC):
             if field not in c.graph.graph.columns:
                 raise ValueError(f"'{field}' not in graph for '{c._id}'")
 
-            if np.any(np.isnan(c.graph.graph[field].values)):
+            try:
+                c.graph.graph[field] = pd.to_numeric(c.graph.graph[field], errors="raise").astype(np.float64)
+                values = c.graph.graph[field].to_numpy(dtype=np.float64)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Field {field} must contain numeric values for '{c._id}'") from exc
+
+            if np.any(pd.isna(values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
+            if values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
     def set_time_field(self, time_field: str) -> None:
         self._check_field(time_field)
         c = self.classes[0]
-        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], "float64")
         self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
@@ -548,7 +559,9 @@ class TrafficAssignment(AssignmentBase):
         if self.classes is None:
             raise RuntimeError("You need to set traffic classes before turning path saving on or off")
 
-        # self.save_path_files = save_it
+        # FIXME: Add path saving for state-based routing results.
+        if save_it:
+            raise NotImplementedError("Path file saving is not supported by the prepared assignment driver")
         for c in self.classes:
             c._aon_results.save_path_file = save_it
 
@@ -561,14 +574,8 @@ class TrafficAssignment(AssignmentBase):
         if self.classes is None:
             raise RuntimeError("You need to set traffic classes before specifying path saving options")
 
-        if file_format == "feather":
-            for c in self.classes:
-                c._aon_results.write_feather = True
-        elif file_format == "parquet":
-            for c in self.classes:
-                c._aon_results.write_feather = False
-        else:
-            raise TypeError(f"Unsupported path file format {file_format} - only feather or parquet available.")
+        # FIXME: Choose a file format that can represent turn-state paths.
+        raise NotImplementedError("Assignment path file formats are not supported yet")
 
     def set_time_field(self, time_field: str) -> None:
         """
@@ -672,9 +679,7 @@ class TrafficAssignment(AssignmentBase):
         """
         data = {}
         for assig_class in self.classes:
-            skimmer = assig_class.skim_congested(skim_fields)
-            assig_class._aon_results.skims = skimmer.results.skims
-            data[assig_class._id] = skimmer.results.skims
+            data[assig_class._id] = assig_class.skim_congested(skim_fields)
         if return_matrices:
             return data
 
@@ -878,7 +883,7 @@ class TrafficAssignment(AssignmentBase):
         }
         return info
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> None:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[Any]:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         :Arguments:
@@ -892,7 +897,13 @@ class TrafficAssignment(AssignmentBase):
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
                 Defaults to the active project
+
+        :Returns:
+            **records** (:obj:`list`): Matrix records created for classes with skims to save.
         """
+        if which_ones not in ("final", "blended", "all"):
+            raise ValueError("which_ones must be final, blended or all")
+        records = []
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
@@ -914,18 +925,17 @@ class TrafficAssignment(AssignmentBase):
             if mats.get(matrix_name, default=None) is not None:
                 raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
-            avg_skims = cls.results.skims  # type: AequilibraeMatrix
-
-            # The ones for the last iteration are here
-            last_skims = cls._aon_results.skims  # type: AequilibraeMatrix
+            avg_skims = {} if cls.results.skims is None else cls.results.skims.matrices
+            final = cls.congested_skims if cls.congested_skims is not None else cls._aon_results.skims
+            last_skims = {} if final is None else final.matrices
 
             names = []
             if which_ones in ["final", "all"]:
-                for core in last_skims.names:
+                for core in last_skims:
                     names.append(f"{core}_final")
 
             if which_ones in ["blended", "all"]:
-                for core in avg_skims.names:
+                for core in avg_skims:
                     names.append(f"{core}_blended")
 
             if not names:
@@ -949,12 +959,12 @@ class TrafficAssignment(AssignmentBase):
             out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls._id}"
 
             if which_ones in ["final", "all"]:
-                for core in last_skims.names:
-                    out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
+                for core, values in last_skims.items():
+                    out_skims.matrix[f"{core}_final"][:, :] = values
 
             if which_ones in ["blended", "all"]:
-                for core in avg_skims.names:
-                    out_skims.matrix[f"{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
+                for core, values in avg_skims.items():
+                    out_skims.matrix[f"{core}_blended"][:, :] = values
 
             out_skims.matrices.flush()  # Make sure that all data went to the disk
 
@@ -974,7 +984,10 @@ class TrafficAssignment(AssignmentBase):
                 description=out_skims.description,
             )
 
-            return record
+            out_skims.close()
+            records.append(record)
+
+        return records
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
@@ -1046,7 +1059,20 @@ class TrafficAssignment(AssignmentBase):
         if mats.get(matrix_name, default=False):
             raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
-        names = [f"{key}_{cls._id}" for cls in self.classes for key in cls._selected_links.keys()]
+        matrices = {}
+        for cls in self.classes:
+            selected = cls.results.select_link_od
+            if selected is None:
+                continue
+            for name, values in selected.matrices.items():
+                for column, class_name in enumerate(cls.results.classes["names"]):
+                    key = f"{name}_{cls._id}_{class_name}"
+                    if key in matrices:
+                        raise ValueError(f"Duplicate selected OD export name: {key}")
+                    matrices[key] = values[:, :, column]
+        if not matrices:
+            return
+        names = list(matrices)
 
         kwargs = {
             "file_name": AequilibraeMatrix().random_name(),
@@ -1061,19 +1087,14 @@ class TrafficAssignment(AssignmentBase):
 
         out_skims.index[:] = self.classes[0].graph.centroids[:]
 
-        for cls in self.classes:
-            if cls._selected_links is None:
-                continue
-
-            res = cls.results.select_link_od
-
-            for mat in res.names:
-                out_skims.matrix[f"{mat}_{cls._id}"][:, :] = res.get_matrix(mat)[:, :, 0]
+        for name, values in matrices.items():
+            out_skims.matrix[name][:, :] = values
 
         out_skims.matrices.flush()  # Make sure that all data went to the disk
         out_skims.description = f"Select link matrix from procedure ID {self.procedure_id}_sl."
 
         out_skims.export(export_name)
+        out_skims.close()
 
     def save_select_link_results(self, name: str) -> None:
         """
@@ -1270,4 +1291,7 @@ class TransitAssignment(AssignmentBase):
             if not isinstance(skimming_fields, list):
                 raise TypeError("Skimming Fields should be defined on a list, tuple or set")
 
-        self._config["Skimming Fields"] = skimming_fields
+        fields = list(skimming_fields or [])
+        self._config["Skimming Fields"] = fields
+        for transport_class in self.classes:
+            transport_class.graph.set_skimming_fields(fields)

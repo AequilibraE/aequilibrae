@@ -118,7 +118,7 @@ bpr_spec = {
     "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
     "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
 }
-vdf = VDF("bpr_tyler", bpr, bpr_spec, delta_bpr)
+vdf = VDF("bpr_example", bpr, bpr_spec, delta_bpr)
 assig.set_vdf(vdf, name_mapping={"alpha": "b", "beta": "power"})
 
 # Then we set the volume delay function and its parameters

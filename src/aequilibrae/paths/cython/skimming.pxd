@@ -4,8 +4,8 @@ from aequilibrae.paths.cython.workspaces cimport SkimmingWorkspace, CppSkimmingW
 from aequilibrae.paths.cython.outputs cimport SkimmingOutputs, CppSkimmingOriginView
 
 
-cdef extern from "skimming.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    void cpp_skimming "aequilibrae::paths::cpp::mvp::skimming"[T](
+cdef extern from "skimming.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    void cpp_skimming "aequilibrae::paths::cpp::routing::skimming"[T](
         const CppSearchResults &results,
         const CppSkimmingContext[T] &context,
         const CppSkimmingWorkspace[T] &workspace,

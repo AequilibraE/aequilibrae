@@ -3,17 +3,17 @@
 Turn Restrictions
 =================
 
-AequilibraE supports turn restrictions and turn penalties for traffic assignment
-and path computation. This feature enables modeling of prohibited turns (e.g.,
+AequilibraE supports turn restrictions and turn penalties for traffic assignment,
+path computation and route choice. This feature enables modelling of prohibited turns (e.g.,
 no left turn signs) and turn penalties (e.g., additional time for turning movements).
 
 Overview
 --------
 
 Turn restrictions in AequilibraE are stored in a dedicated database table and can
-be applied to graphs during path computation and traffic assignment. When turn
+be applied to graphs during path computation, traffic assignment and route choice. When turn
 restrictions are enabled, AequilibraE uses an arc-based Dijkstra algorithm instead
-of the standard node-based algorithm, which allows for modeling turn-to-turn
+of the standard node-based algorithm, which allows for modelling turn-to-turn
 transitions with associated costs.
 
 Database Schema
@@ -104,8 +104,8 @@ Use ``project.transaction()`` to group writes.
 
     # Clear all restrictions
     >>> turns.clear_restrictions()
+    1
 
-    >>> project.close()
 
 Bulk Loading from DataFrame
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,8 +137,7 @@ The U-turn setting is managed through the project's ``about`` table:
 
 .. code-block:: python
 
-    >>> project.about.allow_uturns = '1'  # Allow U-turns
-    >>> project.about.write_back()
+    >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
     # Rebuild graphs to apply the change
     >>> project.network.build_graphs()
@@ -166,18 +165,13 @@ You can also manually set turn restrictions on a graph:
 .. code-block:: python
 
     >>> import pandas as pd
-    >>> from aequilibrae.paths import Graph
 
-    >>> graph = Graph()
-    >>> graph.network = network_data
-    >>> graph.prepare_graph(centroids)
-
-    # Create turn restrictions DataFrame
+    >>> links = project.network.links.data.set_index("link_id")
     >>> turn_df = pd.DataFrame({
-    ...     'from_node': [1, 2],
-    ...     'via_node': [2, 3],
-    ...     'to_node': [3, 4],
-    ...     'penalty': [None, 20.0]
+    ...     "from_node": [int(links.loc[7, "a_node"])],
+    ...     "via_node": [int(links.loc[7, "b_node"])],
+    ...     "to_node": [int(links.loc[36, "b_node"])],
+    ...     "penalty": [20.0],
     ... })
 
     # Apply turn restrictions
@@ -196,22 +190,37 @@ time costs during the equilibration process.
 .. code-block:: python
 
     >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
+    >>> from aequilibrae.paths.vdf import bpr
 
     >>> project.network.build_graphs()
     >>> graph = project.network.graphs['c']
     >>> graph.set_graph('free_flow_time')
 
     # Turn restrictions are automatically included
+    >>> demand_matrix = project.matrices.get_matrix("demand_omx")
+    >>> demand_matrix.computational_view(["matrix"])
     >>> traffic_class = TrafficClass('car', graph, demand_matrix)
 
     >>> assignment = TrafficAssignment()
     >>> assignment.set_classes([traffic_class])
-    >>> assignment.set_vdf('BPR')
-    >>> assignment.set_vdf_parameters({'alpha': 0.15, 'beta': 4.0})
+    >>> assignment.set_vdf(bpr, {'alpha': 0.15, 'beta': 4.0})
     >>> assignment.set_capacity_field('capacity')
     >>> assignment.set_time_field('free_flow_time')
     >>> assignment.set_algorithm('bfw')
     >>> assignment.execute()
+
+Route Choice with Turn Restrictions
+-----------------------------------
+
+Turn restrictions and turn penalties are automatically considered during route
+choice when they are present in the graph. They are included in generated route
+costs and path-size logit calculations.
+
+For imported routes, ``RouteChoice.recompute_psl()`` validates origin and
+destination endpoints, link connectivity and turn restrictions before
+recalculating costs, overlap and probabilities. For assignment from imported
+routes, pass ``recompute_psl=True`` to ``execute_from_pandas()`` or
+``execute_from_path_files()`` to perform the same validation and recalculation.
 
 Performance Considerations
 --------------------------
@@ -234,7 +243,7 @@ in seconds, turn penalties should also be in seconds.
 Limitations
 -----------
 
-- A* path finding is not supported with turn restrictions. Requesting both raises a runtime error.
+- A* path finding can be used together with turn restrictions.
 - Turn restrictions are defined by 3-node movement sequences (no lane-level control)
 - Complex turn restrictions involving multiple via-nodes are not supported
 

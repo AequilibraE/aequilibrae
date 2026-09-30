@@ -1,19 +1,19 @@
 thisdir = 'aequilibrae/paths'
 
 pyfiles = [
-    'AoN.py',
     '__init__.py',
-    'all_or_nothing.py',
+    'assignment_context.py',
     'assignment_paths.py',
     'connectivity_analysis.py',
     'graph.py',
     'graph_building.py',
     'linear_approximation.py',
-    'multi_threaded_aon.py',
     'network_skimming.py',
     'optimal_strategies.py',
+    'path_heuristics.py',
     'public_transport.py',
     'route_choice.py',
+    'routing_context.py',
     'sub_area.py',
     'traffic_assignment.py',
     'traffic_class.py',

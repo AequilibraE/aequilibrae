@@ -96,6 +96,6 @@ def reduce_select_link_loading_outputs(workers, SelectLinkLoadingOutputs output 
         views.push_back(worker.view())
 
     with nogil:
-        cpp_reduce_select_link_loading_outputs[double](views.data(), views.size(), output.view())
+        cpp_reduce_select_link_loading[double](views.data(), views.size(), output.view())
 
     return output
