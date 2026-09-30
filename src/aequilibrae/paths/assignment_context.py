@@ -79,6 +79,17 @@ class AssignmentMapping:
     def project_loads(
         self, compact: np.ndarray, output: np.ndarray, cores: int = 1, threading_threshold: int = 10000
     ) -> None:
+        if cores < 1:
+            raise ValueError("cores must be positive")
+        if output.ndim != 2 or compact.ndim != 2:
+            raise ValueError("compact and output must be two-dimensional")
+        if output.shape[0] != self.link_count or compact.shape[0] != self.compact_link_count:
+            raise ValueError("projection link counts must match the assignment context")
+        if output.shape[1] != compact.shape[1]:
+            raise ValueError("projection class counts must match")
+        if np.any(self.crosswalk < 0) or np.any(self.crosswalk > compact.shape[0]):
+            raise ValueError("crosswalk contains an invalid compact link")
+
         project_link_loads(output, compact, self.crosswalk, cores, threading_threshold)
 
     def full_loads(self, compact: np.ndarray) -> np.ndarray:

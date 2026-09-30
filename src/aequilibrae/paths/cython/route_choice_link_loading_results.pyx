@@ -34,6 +34,7 @@ cdef class LinkLoadingResults:
         cdef:
             vector[unique_ptr[vector[double]]] *f64_demand_cols
             vector[unique_ptr[vector[float]]] *f32_demand_cols
+            Py_ssize_t _i, _j, _k, k
 
         # Link loading
         # Allocate the threaded f64 link loading.
@@ -103,7 +104,7 @@ cdef class LinkLoadingResults:
                 f64_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[double]]]]]()
                 f64_sl_select_link_sets.reserve(self.select_link_sets.size())
 
-                for _j in range(self.select_link_sets.size()):
+                for _j in range(<Py_ssize_t>self.select_link_sets.size()):
                     f64_sl_demand_cols = new vector[unique_ptr[vector[double]]]()
                     f64_sl_demand_cols.reserve(len(self.demand.f64_names))
 
@@ -120,7 +121,7 @@ cdef class LinkLoadingResults:
                 f32_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[float]]]]]()
                 f32_sl_select_link_sets.reserve(self.select_link_sets.size())
 
-                for _j in range(self.select_link_sets.size()):
+                for _j in range(<Py_ssize_t>self.select_link_sets.size()):
                     f32_sl_demand_cols = new vector[unique_ptr[vector[float]]]()
                     f32_sl_demand_cols.reserve(len(self.demand.f32_names))
 
@@ -147,7 +148,7 @@ cdef class LinkLoadingResults:
             f64_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f64_struct]]]()
             f64_sl_od_matrix_sets.reserve(self.select_link_sets.size())
 
-            for _j in range(self.select_link_sets.size()):
+            for _j in range(<Py_ssize_t>self.select_link_sets.size()):
                 f64_sl_od_matrix_demand_cols = new vector[COO_f64_struct](len(self.demand.f64_names))
 
                 for k in range(len(self.demand.f64_names)):
@@ -163,7 +164,7 @@ cdef class LinkLoadingResults:
             f32_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f32_struct]]]()
             f32_sl_od_matrix_sets.reserve(self.select_link_sets.size())
 
-            for _j in range(self.select_link_sets.size()):
+            for _j in range(<Py_ssize_t>self.select_link_sets.size()):
                 f32_sl_od_matrix_demand_cols = new vector[COO_f32_struct](len(self.demand.f32_names))
 
                 for k in range(len(self.demand.f32_names)):
