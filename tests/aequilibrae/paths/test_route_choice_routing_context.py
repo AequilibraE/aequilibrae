@@ -536,7 +536,7 @@ def test_validation_preserves_rows_and_logs_each_reason(caplog):
 
 def test_public_psl_discards_costs_and_preserves_exclusions():
     choice = RouteChoice(diamond(0.0))
-    choice.set_choice_set_generation(cutoff_prob=1.0)
+    choice.set_choice_set_generation(disutility_cutoff_constant=0, disutility_cutoff_coefficient=1)
     supplied = pd.DataFrame(
         {
             "origin id": [10, 10, 10],

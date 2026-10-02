@@ -17,7 +17,10 @@ import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
+from aequilibrae.paths.cython.route_choice_set_results import (
+    RouteChoiceSetResults,
+    check_disutility_cutoff_values,
+)
 from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.cython.bridge import Bridge
@@ -35,7 +38,8 @@ class RouteChoice:
             "max_depth": 0,
             "max_misses": 100,
             "penalty": 1.01,
-            "cutoff_prob": 0.0,
+            "disutility_cutoff_constant": float("inf"),
+            "disutility_cutoff_coefficient": float("inf"),
             "beta": 1.0,
             "store_results": True,
             "a_star": False,
@@ -128,17 +132,13 @@ class RouteChoice:
           above a consistent bound can give non-shortest paths and change the generated route sets.
           A consistent bound remains valid as links are removed or penalised.
 
-        * When performing an assignment, ``cutoff_prob`` can be provided to exclude routes from
-          the path-sized logit model. The ``cutoff_prob`` is used to compute an inverse binary
-          logit and obtain a max difference in utilities. If a paths total cost is greater than
-          the minimum cost path in the route set plus the max difference, the route is excluded
-          from the PSL calculations. The route is still returned, but with a probability of 0.0.
-
-        * The ``cutoff_prob`` should be in the range :math:`[0, 1]`. It is then rescaled
-          internally to :math:`[0.5, 1]` as probabilities below 0.5 produce negative differences
-          in utilities because the choice is between two routes only, one of which is the
-          shortest path. A higher ``cutoff_prob`` includes less routes. A value of 1.0 will only
-          include the minimum cost route. A value of 0.0 includes all routes.
+        * When performing an assignment, ``disutility_cutoff_constant`` and
+        ``disutility_cutoff_coefficient`` can be provided to exclude routes from
+          the path-sized logit model. Consider ``minimum_disutility`` being the disutility of the
+          route between the given source and destingation that has the lowest disutility. The
+          maximum allowed utility is then
+          ``disutility_cutoff_constant + minimum_disutility * disutility_cutoff_coefficient``
+          and routes with a higher disutility are still returned but are masked.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
@@ -167,6 +167,12 @@ class RouteChoice:
             for key in kwargs.keys():
                 if key not in defaults:
                     raise ValueError(f"Invalid or non-generic parameter '{key}' provided")
+
+        # this is not stored anywhere, it is here to give an early warning to the user
+        disutility_cutoff_constant = kwargs.get("disutility_cutoff_constant", float("inf"))
+        disutility_cutoff_coefficient = kwargs.get("disutility_cutoff_coefficient", float("inf"))
+
+        check_disutility_cutoff_values(disutility_cutoff_constant, disutility_cutoff_coefficient)
 
         parameters = defaults | kwargs
         RouteChoiceSet._validate_search_options(
@@ -340,7 +346,12 @@ class RouteChoice:
         return self.__rc.recompute_psl(
             df,
             beta=self.parameters.get("beta", defaults["beta"]),
-            cutoff_prob=self.parameters.get("cutoff_prob", defaults["cutoff_prob"]),
+            disutility_cutoff_constant=self.parameters.get(
+                "disutility_cutoff_constant", defaults["disutility_cutoff_constant"]
+            ),
+            disutility_cutoff_coefficient=self.parameters.get(
+                "disutility_cutoff_coefficient", defaults["disutility_cutoff_coefficient"]
+            ),
             log_warnings=log_warnings,
         )
 
@@ -408,11 +419,11 @@ class RouteChoice:
         ``recompute_psl`` is ``False``, the ``probability`` column must also be present.
 
         When ``recompute_psl`` is ``True``, the path-sized logit is recomputed for each route with respect to the
-        graph's cost field and the ``beta`` and ``cutoff_prob`` parameters.  With PSL recomputation, the supplied mask
-        is combined with the path validation and cost mask. Otherwise, paths are not validated and any supplied costs
-        and masks are kept. Masked routes load no demand regardless of supplied probabilities. Without recomputation,
-        unmasked probabilities are unchanged. Links absent from the graph or compact graph raise an error. Set
-        ``log_warnings=False`` to silence warnings.
+        graph's cost field and the ``beta``, ``disutility_cutoff_constant`` and ``disutility_cutoff_coefficient``
+        parameters.  With PSL recomputation, the supplied mask is combined with the path validation and cost mask.
+        Otherwise, paths are not validated and any supplied costs and masks are kept. Masked routes load no demand
+        regardless of supplied probabilities. Without recomputation, unmasked probabilities are unchanged. Links
+        absent from the graph or compact graph raise an error. Set ``log_warnings=False`` to silence warnings.
 
         All origin and destination IDs within the DataFrame must exist within the demand matrix.
 
@@ -436,7 +447,8 @@ class RouteChoice:
             sl_link_loading=self.sl_link_loading,
             store_results=self.parameters["store_results"],
             beta=self.parameters["beta"],
-            cutoff_prob=self.parameters["cutoff_prob"],
+            disutility_cutoff_constant=self.parameters["disutility_cutoff_constant"],
+            disutility_cutoff_coefficient=self.parameters["disutility_cutoff_coefficient"],
         )
 
     def info(self) -> dict:
