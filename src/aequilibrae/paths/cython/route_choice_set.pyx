@@ -333,11 +333,11 @@ cdef class RouteChoiceSet:
                 node_views[j] = (<NodeBasedContext>worker_context).view()
 
         cdef:
-            RouteCandidateSet_t *route_set
-            vector[vector[double]] *turn_vecs
+            RouteCandidateSet_t *route_set = NULL
+            vector[vector[double]] *turn_vecs = NULL
             shared_ptr[vector[double]] prob_vec
-            int thread_id
-            bint found_zero_cost
+            int thread_id = 0
+            bint found_zero_cost = False
 
         demand._initalise_col_names()
         self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)

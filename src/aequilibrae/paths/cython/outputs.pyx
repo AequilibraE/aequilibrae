@@ -185,7 +185,7 @@ cdef class LoadingOutputs:
         """Copy the data from source to self projected through crosswalk."""
         _validate_cores(cores)
 
-        if crosswalk.shape[0] != self.link_count:
+        if crosswalk.shape[0] != <Py_ssize_t>self.link_count:
             raise ValueError("crosswalk must have shape (link_count,)")
         elif self.class_count != source.class_count:
             raise ValueError("source and output must have the same number of classes")
@@ -393,6 +393,7 @@ cdef class SkimmingOutputs:
         with nogil:
             self.view().reset()
 
+    @cython.boundscheck(False)
     def copy_from(self, SkimmingOutputs source not None):
         """Copy skims with matching dimensions and ordered field names."""
         _validate_skimming_source(self, source)
@@ -549,6 +550,7 @@ cdef class SelectLinkLoadingOutputs:
     def link_loads(self):
         return readonly_view(self.link_loads_buffer)
 
+    @cython.boundscheck(False)
     def copy_from(self, SelectLinkLoadingOutputs source not None):
         """Copy selected loads with matching dimensions and ordered set names."""
         _validate_selected_loading_source(self, source)
@@ -678,6 +680,7 @@ cdef class SelectLinkODOutputs:
         with nogil:
             self.view().reset()
 
+    @cython.boundscheck(False)
     def copy_from(self, SelectLinkODOutputs source not None):
         """Copy selected demand with matching dimensions and ordered set names."""
         _validate_selected_od_source(self, source)
