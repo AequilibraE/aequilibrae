@@ -135,7 +135,7 @@ class RouteChoice:
           route between the given source and destingation that has the lowest disutility. The
           maximum allowed utility is then
           ``disutility_cutoff_constant + minimum_disutility * disutility_cutoff_coefficient``
-          and routes with a higher disutility are still returned but are masked. .
+          and routes with a higher disutility are still returned but are masked.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
@@ -164,6 +164,21 @@ class RouteChoice:
             for key in kwargs.keys():
                 if key not in defaults:
                     raise ValueError(f"Invalid or non-generic parameter '{key}' provided")
+
+        # this is not stored anywhere, it is here to give an early warning to the user
+        disutility_cutoff_constant = kwargs.get("disutility_cutoff_constant", float("inf"))
+        disutility_cutoff_coefficient = kwargs.get("disutility_cutoff_coefficient", float("inf"))
+
+        if disutility_cutoff_constant == float("inf") and disutility_cutoff_coefficient != float("inf"):
+            raise ValueError(
+                "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is defaulting to infinity. "
+                "Both must be set or unset"
+            )
+        elif disutility_cutoff_constant != float("inf") and disutility_cutoff_coefficient == float("inf"):
+            raise ValueError(
+                "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
+                "Both must be set or unset"
+            )
 
         parameters = defaults | kwargs
         RouteChoiceSet._validate_search_options(
