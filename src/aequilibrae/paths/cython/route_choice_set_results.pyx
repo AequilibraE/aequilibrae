@@ -48,7 +48,7 @@ cdef class RouteChoiceSetResults:
             of the disutility of the route with the minimum disutility. This is the constant term.
 
             **disutility_cutoff_coefficient** (`obj`: float): The cutoff disutility for path filter is a linear function
-            of the disutility of the route with the minimum disutility. This is the coefficient of the minimum 
+            of the disutility of the route with the minimum disutility. This is the coefficient of the minimum
             disutility.
 
             **beta** (`obj`: float): The beta parameter for the path-sized logit.
@@ -343,7 +343,8 @@ cdef class RouteChoiceSetResults:
         cdef size_t j, k
         cdef long long previous, link
 
-        RouteChoiceSetResults.compute_mask(route_mask, cost_vec, disutility_cutoff_constant, disutility_cutoff_coefficient)
+        RouteChoiceSetResults.compute_mask(
+            route_mask, cost_vec, disutility_cutoff_constant, disutility_cutoff_coefficient)
         RouteChoiceSetResults.compute_frequency(keys, counts, route_set, route_mask)
 
         if route_turns.size() and d(route_turns[0]).size():
@@ -743,7 +744,7 @@ cdef class RouteChoiceSetResults:
 cdef void recompute_route_probabilities(
     object df, const RouteVec_t &routes, const vector[vector[double]] &turn_steps,
     const vector[double] &costs, vector[bint] &route_mask, vector[double] &path_overlap,
-    vector[double] &probabilities, const double[:] link_costs, double beta, 
+    vector[double] &probabilities, const double[:] link_costs, double beta,
     double disutility_cutoff_constant, double disutility_cutoff_coefficient
 ):
     """Apply the shared PSL kernel to borrowed native routes and turn steps, without demand."""
@@ -767,7 +768,6 @@ cdef void recompute_route_probabilities(
             "Either both or neither should be specified"
         )
 
-
     path_overlap.resize(costs.size(), 0.0)
     probabilities.resize(costs.size(), 0.0)
     # Group positions rather than labels: dataframe indices need not be unique.
@@ -784,7 +784,16 @@ cdef void recompute_route_probabilities(
             mask.push_back(route_mask[position])
         with nogil:
             RouteChoiceSetResults.compute_psl(
-                paths, turns, route_costs, mask, overlap, probability, link_costs, beta, disutility_cutoff_constant, disutility_cutoff_coefficient
+                paths,
+                turns,
+                route_costs,
+                mask,
+                overlap,
+                probability,
+                link_costs,
+                beta,
+                disutility_cutoff_constant,
+                disutility_cutoff_coefficient
             )
         for j in range(positions.size()):
             position = positions[j]

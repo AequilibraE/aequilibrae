@@ -266,12 +266,20 @@ cdef class RouteChoiceSet:
         if path_size_logit and beta < 0:
             raise ValueError("`beta` must be >= 0 for path sized logit model")
 
-        if path_size_logit and disutility_cutoff_constant == float('inf') and disutility_cutoff_coefficient != float("inf"):
+        if (
+            path_size_logit
+            and disutility_cutoff_constant == float('inf')
+            and disutility_cutoff_coefficient != float("inf")
+        ):
             raise ValueError(
                 "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is defaulting to infinity. "
                 "Both must be set or unset"
             )
-        elif path_size_logit and disutility_cutoff_constant != float('inf') and disutility_cutoff_coefficient == float("inf"):
+        elif (
+            path_size_logit
+            and disutility_cutoff_constant != float('inf')
+            and disutility_cutoff_coefficient == float("inf")
+        ):
             raise ValueError(
                 "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
                 "Both must be set or unset"
@@ -509,7 +517,10 @@ cdef class RouteChoiceSet:
             result.append(compact)
         return result
 
-    def recompute_psl(self, df, *, beta=1.0, disutility_cutoff_constant, disutility_cutoff_coefficient, log_warnings=True):
+    def recompute_psl(
+        self, df, *, beta=1.0, disutility_cutoff_constant,
+        disutility_cutoff_coefficient, log_warnings=True
+    ):
         """Validate supplied routes and recompute the PSL results."""
         cdef RouteVec_t routes
         cdef vector[vector[double]] turns
@@ -775,8 +786,10 @@ cdef class RouteChoiceSet:
 
         if recompute_psl:
             self.recost_routes(df, routes, turns, costs, mask, log_warnings)
-            recompute_route_probabilities(df, routes, turns, costs, mask, overlap, route_probabilities,
-                                          self.graph.cost, beta, disutility_cutoff_constant, disutility_cutoff_coefficient)
+            recompute_route_probabilities(
+                df, routes, turns, costs, mask, overlap, route_probabilities,
+                self.graph.cost, beta, disutility_cutoff_constant, disutility_cutoff_coefficient
+            )
         else:
             if "probability" not in df:
                 raise ValueError("provided DataFrame is missing required column 'probability'")
@@ -793,7 +806,6 @@ cdef class RouteChoiceSet:
         cdef:
             long int c_cores = 1  # Single threaded only due to high python interop, this should be fast anyway
             int thread_id = 0
-
 
         # An OD with no routes loads no demand. Import has removed empty route rows.
         demand_indices = {od: i for i, od in enumerate(demand.df.index)}
