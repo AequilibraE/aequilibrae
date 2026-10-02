@@ -18,7 +18,8 @@ cdef class RouteChoiceSetResults:
         GeneralisedCOODemand demand
         bint store_results
         bint perform_assignment
-        double cutoff_prob
+        double disutility_cutoff_constant
+        double disutility_cutoff_coefficient
         double beta
         const double[:] cost_view
         const unsigned int [:] mapping_idx
@@ -80,7 +81,8 @@ cdef class RouteChoiceSetResults:
         vector[double] &prob_vec,
         const double[:] cost_view,
         double beta,
-        double cutoff_prob
+        double disutility_cutoff_constant,
+        double disutility_cutoff_coefficient,
     ) noexcept nogil
 
     cdef void compute_cost(
@@ -96,7 +98,8 @@ cdef class RouteChoiceSetResults:
     cdef void compute_mask(
         vector[bint] &route_mask,
         const vector[double] &total_cost,
-        double cutoff_prob
+        double disutility_cutoff_constant,
+        double disutility_cutoff_coefficient,
     ) noexcept nogil
 
     @staticmethod
@@ -141,7 +144,8 @@ cdef void recompute_route_probabilities(
     vector[double] &probabilities,
     const double[:] link_costs,
     double beta,
-    double cutoff_prob
+    double disutility_cutoff_constant,
+    double disutility_cutoff_coefficient,
 )
 
 cdef object imported_route_dataframe(

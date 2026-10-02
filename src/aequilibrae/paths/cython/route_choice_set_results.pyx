@@ -26,7 +26,8 @@ cdef class RouteChoiceSetResults:
     def __init__(
             self,
             demand: GeneralisedCOODemand,
-            cutoff_prob: float,
+            disutility_cutoff_constant: float,
+            disutility_cutoff_coefficient: float,
             beta: float,
             num_links: int,
             const double[:] cost_view,
@@ -43,7 +44,12 @@ cdef class RouteChoiceSetResults:
             **demand** (`obj`: GeneralisedCOODemand): A GeneralisedCOODemand object stores the ODs pairs and various
               demand values in a COO form. No verification of these is performed here.
 
-            **cutoff_prob** (`obj`: float): The cut-off probability for the inverse binary logit filter.
+            **disutility_cutoff_constant** (`obj`: float): The cutoff disutility for path filter is a linear function
+            of the disutility of the route with the minimum disutility. This is the constant term.
+
+            **disutility_cutoff_coefficient** (`obj`: float): The cutoff disutility for path filter is a linear function
+            of the disutility of the route with the minimum disutility. This is the coefficient of the minimum 
+            disutility.
 
             **beta** (`obj`: float): The beta parameter for the path-sized logit.
 
@@ -66,7 +72,8 @@ cdef class RouteChoiceSetResults:
             raise ValueError("either `store_results` or `perform_assignment` must be True")
 
         self.demand = demand
-        self.cutoff_prob = cutoff_prob
+        self.disutility_cutoff_constant = disutility_cutoff_constant
+        self.disutility_cutoff_coefficient = disutility_cutoff_coefficient
         self.beta = beta
         self.store_results = store_results
         self.perform_assignment = perform_assignment
@@ -310,7 +317,8 @@ cdef class RouteChoiceSetResults:
             d(prob_vec),
             self.cost_view,
             self.beta,
-            self.cutoff_prob
+            self.disutility_cutoff_constant,
+            self.disutility_cutoff_coefficient
         )
 
         return prob_vec
@@ -325,7 +333,8 @@ cdef class RouteChoiceSetResults:
         vector[double] &prob_vec,
         const double[:] cost_view,
         double beta,
-        double cutoff_prob
+        double disutility_cutoff_constant,
+        double disutility_cutoff_coefficient,
     ) noexcept nogil:
         """Compute PSL from costs and links, preserving any supplied exclusions."""
         cdef vector[long long] keys, counts
@@ -334,7 +343,7 @@ cdef class RouteChoiceSetResults:
         cdef size_t j, k
         cdef long long previous, link
 
-        RouteChoiceSetResults.compute_mask(route_mask, cost_vec, cutoff_prob)
+        RouteChoiceSetResults.compute_mask(route_mask, cost_vec, disutility_cutoff_constant, disutility_cutoff_coefficient)
         RouteChoiceSetResults.compute_frequency(keys, counts, route_set, route_mask)
 
         if route_turns.size() and d(route_turns[0]).size():
@@ -407,7 +416,8 @@ cdef class RouteChoiceSetResults:
     cdef void compute_mask(
         vector[bint] &route_mask,
         const vector[double] &total_cost,
-        double cutoff_prob
+        double disutility_cutoff_constant,
+        double disutility_cutoff_coefficient,
     ) noexcept nogil:
         """
         Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
@@ -429,7 +439,7 @@ cdef class RouteChoiceSetResults:
                 min_cost = total_cost[i]
                 min_index = i
 
-        cutoff_cost = min_cost + inverse_binary_logit(cutoff_prob, 0.0, 1.0)
+        cutoff_cost = disutility_cutoff_constant + disutility_cutoff_coefficient * min_cost
 
         # The route mask should be True for the routes we wish to include.
         for i in range(total_cost.size()):
@@ -733,10 +743,11 @@ cdef class RouteChoiceSetResults:
 cdef void recompute_route_probabilities(
     object df, const RouteVec_t &routes, const vector[vector[double]] &turn_steps,
     const vector[double] &costs, vector[bint] &route_mask, vector[double] &path_overlap,
-    vector[double] &probabilities, const double[:] link_costs, double beta, double cutoff_prob
+    vector[double] &probabilities, const double[:] link_costs, double beta, 
+    double disutility_cutoff_constant, double disutility_cutoff_coefficient
 ):
     """Apply the shared PSL kernel to borrowed native routes and turn steps, without demand."""
-    cdef double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
+    # // cdef double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
     cdef RouteView_t paths
     cdef RouteTurnView_t turns
     cdef vector[double] route_costs, overlap, probability
@@ -746,8 +757,20 @@ cdef void recompute_route_probabilities(
 
     if not isfinite(beta) or beta < 0:
         raise ValueError("beta must be finite and non-negative")
-    if not 0 <= cutoff_prob <= 1:
-        raise ValueError("cutoff_prob must be between zero and one")
+    #if not 0 <= cutoff_prob <= 1:
+    #    raise ValueError("cutoff_prob must be between zero and one")
+    # check disutility_cutoff_constant and disutility_cutoff_coefficient?
+    if disutility_cutoff_constant != float('inf') and disutility_cutoff_coefficient == float('inf'):
+        raise ValueError(
+            "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is unset. "
+            "Either both or neither should be specified"
+        )
+    elif disutility_cutoff_constant == float('inf') and disutility_cutoff_coefficient != float('inf'):
+        raise ValueError(
+            "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is unset. "
+            "Either both or neither should be specified"
+        )
+
 
     path_overlap.resize(costs.size(), 0.0)
     probabilities.resize(costs.size(), 0.0)
@@ -765,7 +788,7 @@ cdef void recompute_route_probabilities(
             mask.push_back(route_mask[position])
         with nogil:
             RouteChoiceSetResults.compute_psl(
-                paths, turns, route_costs, mask, overlap, probability, link_costs, beta, scaled_cutoff_prob
+                paths, turns, route_costs, mask, overlap, probability, link_costs, beta, disutility_cutoff_constant, disutility_cutoff_coefficient
             )
         for j in range(positions.size()):
             position = positions[j]

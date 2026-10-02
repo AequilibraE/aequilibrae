@@ -35,7 +35,8 @@ class RouteChoice:
             "max_depth": 0,
             "max_misses": 100,
             "penalty": 1.01,
-            "cutoff_prob": 0.0,
+            "disutility_cutoff_constant": float("inf"),
+            "disutility_cutoff_coefficient": float("inf"),
             "beta": 1.0,
             "store_results": True,
             "a_star": False,
@@ -128,8 +129,14 @@ class RouteChoice:
           above a consistent bound can give non-shortest paths and change the generated route sets.
           A consistent bound remains valid as links are removed or penalised.
 
-        * When performing an assignment, ``cutoff_prob`` can be provided to exclude routes from
-          the path-sized logit model. The ``cutoff_prob`` is used to compute an inverse binary
+        * When performing an assignment, ``disutility_cutoff_constant`` and
+        ``disutility_cutoff_coefficient`` can be provided to exclude routes from
+          the path-sized logit model. Consider ``minimum_disutility`` being the disutility of the
+          route between the given source and destingation that has the lowest disutility. The
+          maximum allowed utility is then
+          ``disutility_cutoff_constant + minimum_disutility * disutility_cutoff_coefficient``
+          and routes with a higher disutility are still returned but are masked. .
+          The ``cutoff_prob`` is used to compute an inverse binary
           logit and obtain a max difference in utilities. If a paths total cost is greater than
           the minimum cost path in the route set plus the max difference, the route is excluded
           from the PSL calculations. The route is still returned, but with a probability of 0.0.
@@ -340,7 +347,12 @@ class RouteChoice:
         return self.__rc.recompute_psl(
             df,
             beta=self.parameters.get("beta", defaults["beta"]),
-            cutoff_prob=self.parameters.get("cutoff_prob", defaults["cutoff_prob"]),
+            disutility_cutoff_constant=self.parameters.get(
+                "disutility_cutoff_constant", defaults["disutility_cutoff_constant"]
+            ),
+            disutility_cutoff_coefficient=self.parameters.get(
+                "disutility_cutoff_coefficient", defaults["disutility_cutoff_coefficient"]
+            ),
             log_warnings=log_warnings,
         )
 
@@ -436,7 +448,8 @@ class RouteChoice:
             sl_link_loading=self.sl_link_loading,
             store_results=self.parameters["store_results"],
             beta=self.parameters["beta"],
-            cutoff_prob=self.parameters["cutoff_prob"],
+            disutility_cutoff_constant=self.parameters["disutility_cutoff_constant"],
+            disutility_cutoff_coefficient=self.parameters["disutility_cutoff_coefficient"],
         )
 
     def info(self) -> dict:

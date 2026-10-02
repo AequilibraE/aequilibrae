@@ -197,7 +197,8 @@ cdef class RouteChoiceSet:
         store_results: bool = True,
         path_size_logit: bool = False,
         beta: float = 1.0,
-        cutoff_prob: float = 0.0,
+        disutility_cutoff_constant: float = float('inf'),
+        disutility_cutoff_coefficient: float = float('inf'),
         *,
         heuristic: str = "euclidean",
         heuristic_scale: float | None = None,
@@ -265,8 +266,16 @@ cdef class RouteChoiceSet:
         if path_size_logit and beta < 0:
             raise ValueError("`beta` must be >= 0 for path sized logit model")
 
-        if path_size_logit and not 0.0 <= cutoff_prob <= 1.0:
-            raise ValueError("`cutoff_prob` must be 0 <= `cutoff_prob` <= 1 for path sized logit model")
+        if path_size_logit and disutility_cutoff_constant == float('inf') and disutility_cutoff_coefficient != float("inf"):
+            raise ValueError(
+                "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is defaulting to infinity. "
+                "Both must be set or unset"
+            )
+        elif path_size_logit and disutility_cutoff_constant != float('inf') and disutility_cutoff_coefficient == float("inf"):
+            raise ValueError(
+                "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
+                "Both must be set or unset"
+            )
 
         for origin, dest in demand.df.index:
             if self.nodes_to_indices_view[origin] == -1:
@@ -285,7 +294,7 @@ cdef class RouteChoiceSet:
             long int c_cores = cores if cores > 0 else omp_get_max_threads()
 
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
-            double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
+            # // double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
             double [:, ::1] cost_matrix = np.zeros((c_cores, self.num_links), dtype=np.float64)
             bool [:, ::1] targets = np.zeros((c_cores, self.num_nodes), dtype=np.bool_)
@@ -348,7 +357,8 @@ cdef class RouteChoiceSet:
 
             self.results = RouteChoiceSetResults(
                 demand,
-                scaled_cutoff_prob,
+                disutility_cutoff_constant,
+                disutility_cutoff_coefficient,
                 beta,
                 self.num_links,
                 self.cost_view,
@@ -502,7 +512,7 @@ cdef class RouteChoiceSet:
             result.append(compact)
         return result
 
-    def recompute_psl(self, df, *, beta=1.0, cutoff_prob=0.0, log_warnings=True):
+    def recompute_psl(self, df, *, beta=1.0, disutility_cutoff_constant, disutility_cutoff_coefficient, log_warnings=True):
         """Validate supplied routes and recompute the PSL results."""
         cdef RouteVec_t routes
         cdef vector[vector[double]] turns
@@ -522,7 +532,8 @@ cdef class RouteChoiceSet:
             probabilities,
             self.graph.cost,
             beta,
-            cutoff_prob
+            disutility_cutoff_constant,
+            disutility_cutoff_coefficient
         )
         return imported_route_dataframe(table, costs, mask, overlap, probabilities)
 
@@ -741,7 +752,8 @@ cdef class RouteChoiceSet:
         sl_link_loading: bool = True,
         store_results: bool = True,
         beta: float = 1.0,
-        cutoff_prob: float = 0.0,
+        disutility_cutoff_constant: float = float('inf'),
+        disutility_cutoff_coefficient: float = float('inf'),
         *,
         log_warnings: bool = True,
     ):
@@ -767,7 +779,7 @@ cdef class RouteChoiceSet:
         if recompute_psl:
             self.recost_routes(df, routes, turns, costs, mask, log_warnings)
             recompute_route_probabilities(df, routes, turns, costs, mask, overlap, route_probabilities,
-                                          self.graph.cost, beta, cutoff_prob)
+                                          self.graph.cost, beta, disutility_cutoff_constant, disutility_cutoff_coefficient)
         else:
             if "probability" not in df:
                 raise ValueError("provided DataFrame is missing required column 'probability'")
@@ -786,7 +798,7 @@ cdef class RouteChoiceSet:
             int thread_id = 0
 
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
-            double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
+            # // double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
         # An OD with no routes loads no demand. Import has removed empty route rows.
         demand_indices = {od: i for i, od in enumerate(demand.df.index)}
@@ -798,7 +810,8 @@ cdef class RouteChoiceSet:
 
         self.results = RouteChoiceSetResults(
             demand,
-            scaled_cutoff_prob,
+            disutility_cutoff_constant,
+            disutility_cutoff_coefficient,
             beta,
             self.num_links,
             self.cost_view,
