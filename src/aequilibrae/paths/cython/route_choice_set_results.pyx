@@ -16,6 +16,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def check_disutility_cutoff_values(disutility_cutoff_constant: float, disutility_cutoff_coefficient: float):
+    if disutility_cutoff_constant == float("inf") and disutility_cutoff_coefficient != float("inf"):
+        raise ValueError(
+            "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is defaulting to infinity. "
+            "Both must be set or unset"
+        )
+    elif disutility_cutoff_constant != float("inf") and disutility_cutoff_coefficient == float("inf"):
+        raise ValueError(
+            "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
+            "Both must be set or unset"
+        )
+
+
 @cython.embedsignature(True)
 cdef class RouteChoiceSetResults:
     """
@@ -757,16 +770,8 @@ cdef void recompute_route_probabilities(
 
     if not isfinite(beta) or beta < 0:
         raise ValueError("beta must be finite and non-negative")
-    if disutility_cutoff_constant != float('inf') and disutility_cutoff_coefficient == float('inf'):
-        raise ValueError(
-            "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is unset. "
-            "Either both or neither should be specified"
-        )
-    elif disutility_cutoff_constant == float('inf') and disutility_cutoff_coefficient != float('inf'):
-        raise ValueError(
-            "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is unset. "
-            "Either both or neither should be specified"
-        )
+
+    check_disutility_cutoff_values(disutility_cutoff_constant, disutility_cutoff_coefficient)
 
     path_overlap.resize(costs.size(), 0.0)
     probabilities.resize(costs.size(), 0.0)

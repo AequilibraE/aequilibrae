@@ -17,7 +17,10 @@ import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
+from aequilibrae.paths.cython.route_choice_set_results import (
+    RouteChoiceSetResults,
+    check_disutility_cutoff_values,
+)
 from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.cython.bridge import Bridge
@@ -169,16 +172,7 @@ class RouteChoice:
         disutility_cutoff_constant = kwargs.get("disutility_cutoff_constant", float("inf"))
         disutility_cutoff_coefficient = kwargs.get("disutility_cutoff_coefficient", float("inf"))
 
-        if disutility_cutoff_constant == float("inf") and disutility_cutoff_coefficient != float("inf"):
-            raise ValueError(
-                "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is defaulting to infinity. "
-                "Both must be set or unset"
-            )
-        elif disutility_cutoff_constant != float("inf") and disutility_cutoff_coefficient == float("inf"):
-            raise ValueError(
-                "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
-                "Both must be set or unset"
-            )
+        check_disutility_cutoff_values(disutility_cutoff_constant, disutility_cutoff_coefficient)
 
         parameters = defaults | kwargs
         RouteChoiceSet._validate_search_options(

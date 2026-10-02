@@ -53,7 +53,11 @@ from aequilibrae.paths.cython.workspaces cimport SearchWorkspace, AStarWorkspace
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
-from aequilibrae.paths.cython.route_choice_set_results cimport recompute_route_probabilities, imported_route_dataframe
+from aequilibrae.paths.cython.route_choice_set_results cimport (
+    recompute_route_probabilities,
+    imported_route_dataframe,
+)
+from aequilibrae.paths.cython.route_choice_set_results import check_disutility_cutoff_values
 from aequilibrae.utils.cython.bar cimport Bar
 from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, WARNING
 
@@ -266,24 +270,8 @@ cdef class RouteChoiceSet:
         if path_size_logit and beta < 0:
             raise ValueError("`beta` must be >= 0 for path sized logit model")
 
-        if (
-            path_size_logit
-            and disutility_cutoff_constant == float('inf')
-            and disutility_cutoff_coefficient != float("inf")
-        ):
-            raise ValueError(
-                "`disutility_cutoff_coefficient` is set while `disutility_cutoff_constant` is defaulting to infinity. "
-                "Both must be set or unset"
-            )
-        elif (
-            path_size_logit
-            and disutility_cutoff_constant != float('inf')
-            and disutility_cutoff_coefficient == float("inf")
-        ):
-            raise ValueError(
-                "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
-                "Both must be set or unset"
-            )
+        if path_size_logit:
+            check_disutility_cutoff_values(disutility_cutoff_constant, disutility_cutoff_coefficient)
 
         for origin, dest in demand.df.index:
             if self.nodes_to_indices_view[origin] == -1:
