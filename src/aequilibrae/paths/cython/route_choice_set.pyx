@@ -293,9 +293,6 @@ cdef class RouteChoiceSet:
             unsigned int c_seed = seed
             long int c_cores = cores if cores > 0 else omp_get_max_threads()
 
-            # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
-            # // double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
-
             double [:, ::1] cost_matrix = np.zeros((c_cores, self.num_links), dtype=np.float64)
             bool [:, ::1] targets = np.zeros((c_cores, self.num_nodes), dtype=np.bool_)
             vector[CppSearchQuery] query_views
@@ -797,8 +794,6 @@ cdef class RouteChoiceSet:
             long int c_cores = 1  # Single threaded only due to high python interop, this should be fast anyway
             int thread_id = 0
 
-            # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
-            # // double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
         # An OD with no routes loads no demand. Import has removed empty route rows.
         demand_indices = {od: i for i, od in enumerate(demand.df.index)}

@@ -136,16 +136,6 @@ class RouteChoice:
           maximum allowed utility is then
           ``disutility_cutoff_constant + minimum_disutility * disutility_cutoff_coefficient``
           and routes with a higher disutility are still returned but are masked. .
-          The ``cutoff_prob`` is used to compute an inverse binary
-          logit and obtain a max difference in utilities. If a paths total cost is greater than
-          the minimum cost path in the route set plus the max difference, the route is excluded
-          from the PSL calculations. The route is still returned, but with a probability of 0.0.
-
-        * The ``cutoff_prob`` should be in the range :math:`[0, 1]`. It is then rescaled
-          internally to :math:`[0.5, 1]` as probabilities below 0.5 produce negative differences
-          in utilities because the choice is between two routes only, one of which is the
-          shortest path. A higher ``cutoff_prob`` includes less routes. A value of 1.0 will only
-          include the minimum cost route. A value of 0.0 includes all routes.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
@@ -420,11 +410,11 @@ class RouteChoice:
         ``recompute_psl`` is ``False``, the ``probability`` column must also be present.
 
         When ``recompute_psl`` is ``True``, the path-sized logit is recomputed for each route with respect to the
-        graph's cost field and the ``beta`` and ``cutoff_prob`` parameters.  With PSL recomputation, the supplied mask
-        is combined with the path validation and cost mask. Otherwise, paths are not validated and any supplied costs
-        and masks are kept. Masked routes load no demand regardless of supplied probabilities. Without recomputation,
-        unmasked probabilities are unchanged. Links absent from the graph or compact graph raise an error. Set
-        ``log_warnings=False`` to silence warnings.
+        graph's cost field and the ``beta``, ``disutility_cutoff_constant`` and ``disutility_cutoff_coefficient``
+        parameters.  With PSL recomputation, the supplied mask is combined with the path validation and cost mask.
+        Otherwise, paths are not validated and any supplied costs and masks are kept. Masked routes load no demand
+        regardless of supplied probabilities. Without recomputation, unmasked probabilities are unchanged. Links
+        absent from the graph or compact graph raise an error. Set ``log_warnings=False`` to silence warnings.
 
         All origin and destination IDs within the DataFrame must exist within the demand matrix.
 

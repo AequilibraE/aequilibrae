@@ -747,7 +747,6 @@ cdef void recompute_route_probabilities(
     double disutility_cutoff_constant, double disutility_cutoff_coefficient
 ):
     """Apply the shared PSL kernel to borrowed native routes and turn steps, without demand."""
-    # // cdef double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
     cdef RouteView_t paths
     cdef RouteTurnView_t turns
     cdef vector[double] route_costs, overlap, probability
@@ -757,9 +756,6 @@ cdef void recompute_route_probabilities(
 
     if not isfinite(beta) or beta < 0:
         raise ValueError("beta must be finite and non-negative")
-    #if not 0 <= cutoff_prob <= 1:
-    #    raise ValueError("cutoff_prob must be between zero and one")
-    # check disutility_cutoff_constant and disutility_cutoff_coefficient?
     if disutility_cutoff_constant != float('inf') and disutility_cutoff_coefficient == float('inf'):
         raise ValueError(
             "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is unset. "
