@@ -21,6 +21,11 @@ struct TurnBasedContext {
   const std::size_t *turn_fs = nullptr;
   const std::size_t *turn_to_links = nullptr;
   const double *turn_penalties = nullptr;
+  // Plain nodes share one incoming-link label; controlled nodes keep each one.
+  const std::size_t *state_labels = nullptr;
+  // Physical neighbours at each end of a link, including compressed chains.
+  const std::size_t *first_nodes = nullptr;
+  const std::size_t *last_nodes = nullptr;
   bool allow_uturns = true;
 };
 

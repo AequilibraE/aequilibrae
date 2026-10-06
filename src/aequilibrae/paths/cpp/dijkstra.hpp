@@ -129,10 +129,12 @@ void dijkstra_with_queue(const TurnBasedContext &context,
       continue;
     }
 
-    auto turn = state == root ? 0 : context.turn_fs[state];
-    const auto turn_end = state == root ? 0 : context.turn_fs[state + 1];
+    const auto incoming = state == root ? root : results.connectors[state];
+    auto turn = state == root ? 0 : context.turn_fs[incoming];
+    const auto turn_end = state == root ? 0 : context.turn_fs[incoming + 1];
     for (auto next = graph.fs[node]; next < graph.fs[node + 1]; ++next) {
-      if (queue.effective_state(next) == SCANNED) {
+      const auto next_label = context.state_labels[next];
+      if (queue.effective_state(next_label) == SCANNED) {
         continue;
       }
       // Sorted turn rows can be merged with outgoing links without
@@ -145,23 +147,23 @@ void dijkstra_with_queue(const TurnBasedContext &context,
           turn < turn_end && context.turn_to_links[turn] == next;
       const double penalty = explicit_turn ? context.turn_penalties[turn] : 0.0;
       if (state != root && !explicit_turn && !context.allow_uturns &&
-          graph.heads[next] == context.tails[state]) {
+          context.first_nodes[next] == context.last_nodes[incoming]) {
         continue;
       }
       const double next_cost = cost + graph.costs[next] + penalty;
       if (!std::isfinite(next_cost)) {
         continue;
       }
-      if (queue.effective_state(next) == NOT_IN_HEAP) {
-        queue.insert(next, next_cost);
-      } else if (next_cost < queue.element_key(next)) {
-        queue.decrease_key(next, next_cost);
+      if (queue.effective_state(next_label) == NOT_IN_HEAP) {
+        queue.insert(next_label, next_cost);
+      } else if (next_cost < queue.element_key(next_label)) {
+        queue.decrease_key(next_label, next_cost);
       } else {
         continue;
       }
-      results.predecessors[next] = state;
-      results.connectors[next] = next;
-      results.turn_costs[next] = results.turn_costs[state] + penalty;
+      results.predecessors[next_label] = state;
+      results.connectors[next_label] = next;
+      results.turn_costs[next_label] = results.turn_costs[state] + penalty;
     }
   }
 

@@ -545,11 +545,14 @@ def test_uturn_policy_and_zero_cost_cycles(cost, allow_uturns, override, reachab
     assert_state_tree(context, results)
 
 
-def test_turn_topology_copied_then_shared_by_independent_objectives():
+@pytest.mark.parametrize("use_hybrid", [False, True])
+def test_turn_topology_copied_then_shared_by_independent_objectives(use_hybrid):
     offsets = np.array([0, 99, 1, 99, 1])[::2]
     links = np.array([1, 99])[::2]
     penalties = np.array([2.5, 99])[::2]
-    context = TurnBasedContext([0, 1, 2, 2], [1, 2], np.array([1.0, 2.0]), offsets, links, penalties)
+    context = TurnBasedContext(
+        [0, 1, 2, 2], [1, 2], np.array([1.0, 2.0]), offsets, links, penalties, use_hybrid=use_hybrid
+    )
     for source, output in (
         (offsets, context.turn_fs),
         (links, context.turn_to_links),
@@ -558,8 +561,12 @@ def test_turn_topology_copied_then_shared_by_independent_objectives():
         assert not np.shares_memory(source, output)
         source[:] = 99
     other = context.with_costs(np.array([2.0, 3.0]))
-    for name in ("fs", "heads", "tails", "turn_fs", "turn_to_links", "turn_penalties"):
+    for name in (
+        "fs", "heads", "tails", "turn_fs", "turn_to_links", "turn_penalties",
+        "state_labels", "first_nodes", "last_nodes",
+    ):
         assert np.shares_memory(getattr(context, name), getattr(other, name))
+    assert other.use_hybrid == use_hybrid
     assert search(context, 0).path_cost_to(2) == 5.5
     del context
     assert search(other, 0).path_cost_to(2) == 7.5
@@ -613,7 +620,9 @@ def expanded_oracle(context, turns, origin):
 
 @pytest.mark.parametrize("seed", [17, 29, 42])
 @pytest.mark.parametrize("allow_uturns", [False, True])
-def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
+@pytest.mark.parametrize("use_hybrid", [False, True])
+@pytest.mark.parametrize("turn_probability", [0.02, 0.35])
+def test_random_multigraph_against_expanded_networkx(seed, allow_uturns, use_hybrid, turn_probability):
     rng = np.random.default_rng(seed)
     n = 8
     edges = [
@@ -622,10 +631,13 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
     turns = {}
     for incoming, (_, via, _) in enumerate(edges):
         for outgoing, (tail, _, _) in enumerate(edges):
-            if via == tail and rng.random() < 0.35:
+            if via == tail and rng.random() < turn_probability:
                 turns[incoming, outgoing] = np.inf if rng.random() < 0.3 else float(rng.integers(0, 10))
     fs = np.r_[0, np.cumsum(np.bincount([a for a, _, _ in edges], minlength=n))]
-    context = make_context(fs, [b for _, b, _ in edges], [c for _, _, c in edges], turns, allow_uturns=allow_uturns)
+    context = make_context(
+        fs, [b for _, b, _ in edges], [c for _, _, c in edges], turns,
+        allow_uturns=allow_uturns, use_hybrid=use_hybrid,
+    )
     results = allocate_results(context)
     for origin in range(n):
         oracle = expanded_oracle(context, turns, origin)
@@ -646,7 +658,8 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
             assert results.path_cost_to(destination) == expected
             assert_state_tree(context, results)
             for state in results.settlement_order[: results.settled_count]:
-                assert results.distances[state] == oracle[state]
+                incoming = results.root if state == results.root else results.connectors[state]
+                assert results.distances[state] == oracle[incoming]
             if not results.reachable_to(destination):
                 continue
             links = results.path_links_to(destination)
@@ -658,3 +671,42 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
                 penalty += turns.get((incoming, outgoing), 0)
             assert context.costs[links].sum() + penalty == expected
             assert results.path_turn_cost_to(destination) == penalty
+
+
+def test_hybrid_reduces_states_away_from_turn_controls():
+    width = 8
+    nodes = width * width
+    edges = sorted(
+        (a, b)
+        for a in range(nodes)
+        for b in range(nodes)
+        if abs(a // width - b // width) + abs(a % width - b % width) == 1
+    )
+    fs = np.r_[0, np.cumsum(np.bincount([a for a, _ in edges], minlength=nodes))]
+    heads = [b for _, b in edges]
+    costs = np.ones(len(edges))
+    turns = {(0, int(fs[heads[0]])): 2.0}
+    full = make_context(fs, heads, costs, turns, allow_uturns=False)
+    hybrid = make_context(fs, heads, costs, turns, allow_uturns=False, use_hybrid=True)
+    reference, result = search(full, 0), search(hybrid, 0)
+
+    assert result.settled_count < reference.settled_count / 2
+    assert_state_tree(hybrid, result)
+    for destination in range(nodes):
+        assert result.path_cost_to(destination) == reference.path_cost_to(destination)
+
+
+def test_hybrid_retains_winning_link_and_reuses_labels_with_new_costs():
+    context = make_context([0, 2, 3, 4, 4], [1, 2, 3, 3], [10, 1, 1, 1], turn=True, use_hybrid=True)
+    results = search(context, 0, 3)
+    assert results.terminal_states[3] == 2
+    assert results.connectors[2] == 3
+    np.testing.assert_array_equal(results.path_links_to(3), [1, 3])
+    assert results.path_cost_to(3) == 2
+    assert_state_tree(context, results)
+
+    rebound = context.with_costs(np.array([1.0, 10.0, 1.0, 1.0]))
+    search(rebound, 0, 3, results)
+    np.testing.assert_array_equal(results.path_links_to(3), [0, 2])
+    assert results.path_cost_to(3) == 2
+    assert_state_tree(rebound, results)

@@ -38,6 +38,8 @@ def test_routing_context_copies_graph_inputs(turn, compact):
     expected = search(context, 0).path_cost_to(3)
 
     assert isinstance(context, TurnBasedContext if turn else NodeBasedContext)
+    if turn:
+        assert context.use_hybrid
     assert expected == (2.5 if turn else 2.0)
 
     offsets = graph.compact_fs if compact else graph.fs

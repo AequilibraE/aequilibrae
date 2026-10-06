@@ -116,6 +116,10 @@ cdef class GraphContext:
             other_turns.turn_links = source_turns.turn_links
             other_turns.turn_penalties_buffer = source_turns.turn_penalties_buffer
             other_turns.uturns_allowed = source_turns.uturns_allowed
+            other_turns.state_labels_buffer = source_turns.state_labels_buffer
+            other_turns.first_nodes_buffer = source_turns.first_nodes_buffer
+            other_turns.last_nodes_buffer = source_turns.last_nodes_buffer
+            other_turns.use_hybrid = source_turns.use_hybrid
         return other
 
     cdef CppNodeBasedContext graph_view(self) noexcept nogil:
@@ -173,7 +177,9 @@ cdef class TurnBasedContext(GraphContext):
 
     ``turn_fs`` has ``link_count + 1`` entries. Explicit turns are grouped by
     their incoming link; missing turns cost zero. Search states are incoming
-    links plus a virtual root.
+    links plus a virtual root. Hybrid Dijkstra shares labels at nodes outside
+    turn-controlled nodes and their neighbours, retaining the winning link
+    in the result's connector. A* continues to use separate link states.
     """
 
     def __init__(
@@ -186,7 +192,10 @@ cdef class TurnBasedContext(GraphContext):
             turn_penalties=None,
             *,
             allow_uturns=True,
-            blocked_centroid_count=0
+            blocked_centroid_count=0,
+            use_hybrid=False,
+            first_nodes=None,
+            last_nodes=None,
     ):
         super().__init__(fs, heads, costs, blocked_centroid_count=blocked_centroid_count)
 
@@ -228,6 +237,35 @@ cdef class TurnBasedContext(GraphContext):
         np.copyto(np.asarray(self.turn_penalties_buffer), turn_penalties)
         self.uturns_allowed = bool(allow_uturns)
 
+        labels = np.arange(m, dtype=np.uintp)
+        if use_hybrid:
+            heads_array = np.asarray(self.heads_buffer)
+            stateful = np.zeros(n, dtype=bool)
+            stateful[heads_array[np.flatnonzero(np.diff(turn_fs_array))]] = True
+            # A turn control can force a reversal at either neighbour too.
+            adjacent = stateful[tails_array] | stateful[heads_array]
+            stateful[tails_array[adjacent]] = True
+            stateful[heads_array[adjacent]] = True
+            representative = np.full(n, m, dtype=np.uintp)
+            np.minimum.at(representative, heads_array, labels)
+            plain = ~stateful[heads_array]
+            labels[plain] = representative[heads_array[plain]]
+        self.state_labels_buffer = labels
+        self.use_hybrid = bool(use_hybrid)
+
+        if first_nodes is None and last_nodes is None:
+            self.first_nodes_buffer = self.heads_buffer
+            self.last_nodes_buffer = self.tails_buffer
+        elif first_nodes is None or last_nodes is None:
+            raise ValueError("first_nodes and last_nodes must be supplied together")
+        else:
+            first_array = validate_index_array(first_nodes, "first_nodes")
+            last_array = validate_index_array(last_nodes, "last_nodes")
+            if first_array.size != m or last_array.size != m:
+                raise ValueError("boundary nodes must have one value per link")
+            self.first_nodes_buffer = first_array
+            self.last_nodes_buffer = last_array
+
     cdef CppTurnBasedContext view(self) noexcept nogil:
         """Borrow the graph and turn buffers for a turn-based search."""
         cdef CppTurnBasedContext turns
@@ -236,6 +274,9 @@ cdef class TurnBasedContext(GraphContext):
         turns.turn_fs = const_array_pointer(self.turn_offsets)
         turns.turn_to_links = const_array_pointer(self.turn_links)
         turns.turn_penalties = const_array_pointer[double](self.turn_penalties_buffer)
+        turns.state_labels = const_array_pointer(self.state_labels_buffer)
+        turns.first_nodes = const_array_pointer(self.first_nodes_buffer)
+        turns.last_nodes = const_array_pointer(self.last_nodes_buffer)
         turns.allow_uturns = self.uturns_allowed
         return turns
 
@@ -248,6 +289,21 @@ cdef class TurnBasedContext(GraphContext):
     def tails(self):
         """Read-only starting node for each directed link."""
         return readonly_view(self.tails_buffer)
+
+    @property
+    def state_labels(self):
+        """Dijkstra label for each incoming link; connectors retain the actual link."""
+        return readonly_view(self.state_labels_buffer)
+
+    @property
+    def first_nodes(self):
+        """First physical neighbour reached along each link."""
+        return readonly_view(self.first_nodes_buffer)
+
+    @property
+    def last_nodes(self):
+        """Last physical neighbour left before reaching each link's head."""
+        return readonly_view(self.last_nodes_buffer)
 
     @property
     def turn_fs(self):
