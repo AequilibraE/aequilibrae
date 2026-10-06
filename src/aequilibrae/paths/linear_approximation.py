@@ -604,7 +604,7 @@ class LinearApproximation(WorkerThread):
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
-            # Accumulate AoN turn penalty costs from all traffic classes (PCE-weighted to match link flows).
+            # Accumulate AoN turn penalty costs from all traffic classes.
             self.aon_total_turn_cost = sum(c.pce * c._aon_results.total_turn_penalty for c in self.traffic_classes)
 
             converged = self.check_convergence() if self.iter > 1 else False

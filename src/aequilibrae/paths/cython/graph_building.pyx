@@ -155,16 +155,11 @@ cdef long long _build_compressed_graph(
     long long[:] all_links,
     long long[:] compressed_dir,
     long long[:] compressed_a_node,
-    long long[:] compressed_b_node,
-    long long[:] first_node_ab,
-    long long[:] last_node_ab,
-    long long[:] first_node_ba,
-    long long[:] last_node_ba,
+    long long[:] compressed_b_node
 ) noexcept nogil:
     cdef:
         long long slink = 0
         long long pre_link, n, first_node, lidx, a_node, b_node
-        long long first_neighbour, penultimate_node, prev_n
         bint ab_dir, ba_dir
         long drc
         Py_ssize_t k
@@ -182,8 +177,6 @@ cdef long long _build_compressed_graph(
 
         n = a_node if counts[a_node] == 2 else b_node
         first_node = b_node if counts[a_node] == 2 else a_node
-        first_neighbour = n
-        prev_n = first_node
 
         # True if there exists a link in the direction ab (or ba), could be two links, or a single bidirectional link
         ab_dir = False if (first_node == a_node and drc < 0) or (first_node == b_node and drc > 0) else True
@@ -191,7 +184,6 @@ cdef long long _build_compressed_graph(
 
         # While the node we are looking at, n, has degree two, we can continue to compress
         while counts[n] == 2:
-            prev_n = n
             simplified_links[pre_link] = slink  # Mark link for removal
             simplified_directions[pre_link] = -1 if a_node == n else 1
 
@@ -216,15 +208,11 @@ cdef long long _build_compressed_graph(
         simplified_links[pre_link] = slink
         simplified_directions[pre_link] = -1 if a_node == n else 1
         last_node = b_node if counts[a_node] == 2 else a_node
-        penultimate_node = prev_n
+        # major_nodes[slink] = [first_node, last_node]
 
         # Available directions are NOT indexed like the other arrays
         compressed_a_node[slink] = first_node
         compressed_b_node[slink] = last_node
-        first_node_ab[slink] = first_neighbour
-        last_node_ab[slink] = penultimate_node
-        first_node_ba[slink] = penultimate_node
-        last_node_ba[slink] = first_neighbour
         if ab_dir:
             if ba_dir:
                 compressed_dir[slink] = 0
@@ -260,68 +248,21 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     graph_directions = graph.graph.direction.to_numpy(copy=False)
     graph_link_ids = graph.graph.link_id.to_numpy(copy=False)
 
-    if len(graph_a_nodes) == 0:
-        graph.dead_end_links = np.array([], dtype=np.int64)
-        graph.compact_all_nodes = (
-            np.array(graph.centroids, copy=True).astype(graph.default_types("int"))
-            if graph.centroids is not None
-            else np.empty(0, dtype=graph.default_types("int"))
-        )
-        graph.compact_num_nodes = len(graph.compact_all_nodes)
-        graph.compact_nodes_to_indices = (
-            np.full(int(graph.compact_all_nodes.max()) + 1, -1, dtype=np.int64)
-            if len(graph.compact_all_nodes) > 0
-            else np.empty(0, dtype=np.int64)
-        )
-        if len(graph.compact_all_nodes) > 0:
-            graph.compact_nodes_to_indices[graph.compact_all_nodes] = np.arange(graph.compact_num_nodes)
-        graph.compact_graph = pd.DataFrame(
-            {
-                "id": np.empty(0, dtype=np.int64),
-                "link_id": np.empty(0, dtype=np.int64),
-                "a_node": np.empty(0, dtype=np.int64),
-                "b_node": np.empty(0, dtype=np.int64),
-                "direction": np.empty(0, dtype=np.int8),
-            }
-        )
-        graph.compact_num_links = 0
-        graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
-        graph.graph["__compressed_id__"] = np.full(len(graph.graph), graph.compact_num_links, dtype=np.int64)
-        graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
-        graph._compact_first_node = np.empty(0, dtype=np.int64)
-        graph._compact_last_node = np.empty(0, dtype=np.int64)
-        graph._compact_source = np.empty(0, dtype=np.int64)
-        return
-
-    num_directed_nodes = max(graph.num_nodes, int(graph_a_nodes.max()) + 1, int(graph_b_nodes.max()) + 1)
+    num_directed_nodes = graph.num_nodes
     in_degree = np.bincount(graph_b_nodes, minlength=num_directed_nodes)
     out_degree = np.bincount(graph_a_nodes, minlength=num_directed_nodes)
 
-    centroid_idx = graph.nodes_to_indices[graph.centroids]
-    valid_c = (centroid_idx >= 0) & (centroid_idx < num_directed_nodes)
-    if np.any(valid_c):
-        in_degree[centroid_idx[valid_c]] = -1
-        out_degree[centroid_idx[valid_c]] = -1
-    del centroid_idx
-
     effective_vias = graph._compute_effective_turn_vias()
-    for via in effective_vias:
-        via = int(via)
-        if 0 <= via < len(graph.nodes_to_indices):
-            v_idx = graph.nodes_to_indices[via]
-            if 0 <= v_idx < num_directed_nodes:
-                in_degree[v_idx] = -1
-                out_degree[v_idx] = -1
+    protected = np.array(list(effective_vias) + list(graph.centroids), dtype=np.int64)
+    protected_indices = graph.nodes_to_indices[protected]
+    in_degree[protected_indices] = -1
+    out_degree[protected_indices] = -1
 
     allow_uturns = bool(graph._allow_uturns_everywhere or graph._allow_path_uturns)
 
     df = pd.DataFrame(graph.network, copy=True)
 
-    # Genuine self-loops in the source network are legitimate geometry and are kept. Mode
-    # exclusion, however, *manufactures* self-loops: Network.build_graphs sets b_node = a_node
-    # on every link that does not serve this graph's mode, precisely so they drop out here.
-    # Those carry no geometry and must not reach the compact graph. The `modes` column still
-    # tells the two apart, so use it rather than deleting every self-loop indiscriminately.
+    # Mode filtering represents excluded links as self-loops; keep only loops serving this mode.
     if graph.mode and "modes" in df.columns:
         self_loops = df.a_node.to_numpy(copy=False) == df.b_node.to_numpy(copy=False)
         if self_loops.any():
@@ -329,16 +270,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
             df = df[~(self_loops & ~serves_mode)]
 
     if remove_dead_ends:
-        num_directed_arcs = len(graph_b_nodes)
-        r_counts = np.bincount(graph_b_nodes, minlength=num_directed_nodes)
-        r_fs = np.zeros(num_directed_nodes + 1, dtype=np.int64)
-        np.cumsum(r_counts, out=r_fs[1:])
-        curr = r_fs[:-1].copy()
-        r_arcs = np.empty(num_directed_arcs, dtype=np.int64)
-        for i in range(num_directed_arcs):
-            head = graph_b_nodes[i]
-            r_arcs[curr[head]] = i
-            curr[head] += 1
+        r_fs = np.r_[0, np.cumsum(np.bincount(graph_b_nodes, minlength=num_directed_nodes))]
+        r_arcs = np.argsort(graph_b_nodes, kind="stable").astype(np.int64)
 
         burnt_links = np.full(len(graph.graph), False, dtype=bool)
         _remove_dead_ends(
@@ -364,36 +297,17 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.dead_end_links = np.array([], dtype=np.int64)
 
     if df.empty:
-        graph.compact_all_nodes = (
-            np.array(graph.centroids, copy=True).astype(graph.default_types("int"))
-            if graph.centroids is not None
-            else np.empty(0, dtype=graph.default_types("int"))
-        )
-        graph.compact_num_nodes = len(graph.compact_all_nodes)
-        graph.compact_nodes_to_indices = (
-            np.full(int(graph.compact_all_nodes.max()) + 1, -1, dtype=np.int64)
-            if len(graph.compact_all_nodes) > 0
-            else np.empty(0, dtype=np.int64)
-        )
-        if len(graph.compact_all_nodes) > 0:
-            graph.compact_nodes_to_indices[graph.compact_all_nodes] = np.arange(graph.compact_num_nodes)
-        graph.compact_graph = pd.DataFrame(
-            {
-                "id": np.empty(0, dtype=np.int64),
-                "link_id": np.empty(0, dtype=np.int64),
-                "a_node": np.empty(0, dtype=np.int64),
-                "b_node": np.empty(0, dtype=np.int64),
-                "direction": np.empty(0, dtype=np.int8),
-            }
-        )
+        graph.compact_all_nodes = graph.centroids.astype(graph.default_types("int"))
+        graph.compact_num_nodes = len(graph.centroids)
+        graph.compact_nodes_to_indices = np.full(graph.centroids.max() + 1, -1, dtype=np.int64)
+        graph.compact_nodes_to_indices[graph.centroids] = np.arange(graph.compact_num_nodes)
+        graph.compact_fs = np.zeros(graph.compact_num_nodes + 1, dtype=np.int64)
+        graph.compact_graph = graph.graph.iloc[:0].copy()
         graph.compact_num_links = 0
         graph.compact_cost = np.zeros(1, dtype=graph.default_types("float"))
-        graph.graph["__compressed_id__"] = np.full(len(graph.graph), graph.compact_num_links, dtype=np.int64)
-        graph._crosswalk = np.zeros(len(graph.graph), dtype=np.int64)
-        graph._compact_first_node = np.empty(0, dtype=np.int64)
-        graph._compact_last_node = np.empty(0, dtype=np.int64)
-        graph._compact_source = np.empty(0, dtype=np.int64)
+        graph.graph["__compressed_id__"] = np.zeros(len(graph.graph), dtype=np.int64)
         return
+
     # Build link index
     link_id_max = df.link_id.max()
     link_ids = df.link_id.to_numpy(copy=False)
@@ -412,14 +326,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     all_links = links[idx]
     all_nodes_max = all_nodes.max()
 
-    max_node_id = all_nodes_max
-    if graph.centroids is not None and len(graph.centroids) > 0:
-        c_max = int(np.max(graph.centroids))
-        if c_max > max_node_id:
-            max_node_id = c_max
-
-    # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
-    counts = np.bincount(nodes, minlength=max_node_id + 1).astype(np.int64)
+    counts = np.bincount(nodes, minlength=max(all_nodes_max, graph.centroids.max(initial=0)) + 1)
 
     links_index = np.full(all_nodes_max + 2, -1, dtype=np.int64)
     nlist = np.arange(all_nodes_max + 2)
@@ -431,8 +338,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     _back_fill(links_index[:], all_nodes_max)
 
     # We keep all centroids for sure
-    if graph.centroids is not None and len(graph.centroids) > 0:
-        counts[graph.centroids] = 999
+    counts[graph.centroids] = 999
 
     # If U-turns are allowed, we need to preserve nodes with bidirectional links
     # because U-turns can occur at these nodes
@@ -497,10 +403,6 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     compressed_dir = np.zeros(link_id_max + 1, dtype=np.int64)
     compressed_a_node = np.zeros(link_id_max + 1, dtype=np.int64)
     compressed_b_node = np.zeros(link_id_max + 1, dtype=np.int64)
-    compressed_first_node_ab = np.zeros(link_id_max + 1, dtype=np.int64)
-    compressed_last_node_ab = np.zeros(link_id_max + 1, dtype=np.int64)
-    compressed_first_node_ba = np.zeros(link_id_max + 1, dtype=np.int64)
-    compressed_last_node_ba = np.zeros(link_id_max + 1, dtype=np.int64)
 
     slink = _build_compressed_graph(
         link_idx[:],
@@ -517,19 +419,12 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         compressed_dir[:],
         compressed_a_node[:],
         compressed_b_node[:],
-        compressed_first_node_ab[:],
-        compressed_last_node_ab[:],
-        compressed_first_node_ba[:],
-        compressed_last_node_ba[:],
     )
 
-    invalid_chains = set(
-        np.flatnonzero((compressed_a_node[:slink] == compressed_b_node[:slink]) | (compressed_dir[:slink] == -999))
+    invalid_chains = np.flatnonzero(
+        (compressed_a_node[:slink] == compressed_b_node[:slink]) | (compressed_dir[:slink] == -999)
     )
-    if invalid_chains:
-        for idx in range(len(simplified_links)):
-            if simplified_links[idx] in invalid_chains:
-                simplified_links[idx] = -1
+    simplified_links[np.isin(simplified_links, invalid_chains)] = -1
 
     links_to_remove = (simplified_links >= 0).nonzero()[0]
     if links_to_remove.shape[0]:
@@ -560,33 +455,6 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     graph.compact_fs = properties[3]
     graph.compact_graph = properties[4]
     graph.compact_num_links = graph.compact_graph.shape[0]
-
-    # Build compact boundary context arrays (_compact_first_node, _compact_last_node)
-    if graph.compact_num_links > 0:
-        comp_ab = pd.DataFrame({
-            "link_id": np.arange(slink) + max_link_id,
-            "direction": 1,
-            "first_node": graph.nodes_to_indices[compressed_first_node_ab[:slink]],
-            "last_node": graph.nodes_to_indices[compressed_last_node_ab[:slink]],
-        })
-        comp_ba = pd.DataFrame({
-            "link_id": np.arange(slink) + max_link_id,
-            "direction": -1,
-            "first_node": graph.nodes_to_indices[compressed_first_node_ba[:slink]],
-            "last_node": graph.nodes_to_indices[compressed_last_node_ba[:slink]],
-        })
-        uncomp = graph.graph[["link_id", "direction", "b_node", "a_node"]].rename(
-            columns={"b_node": "first_node", "a_node": "last_node"}
-        )
-        contexts = pd.concat([uncomp, comp_ab, comp_ba], ignore_index=True)
-        merged_contexts = graph.compact_graph[["id", "link_id", "direction"]].merge(
-            contexts, on=["link_id", "direction"], how="left"
-        ).sort_values("id")
-        graph._compact_first_node = merged_contexts["first_node"].to_numpy(np.int64)
-        graph._compact_last_node = merged_contexts["last_node"].to_numpy(np.int64)
-    else:
-        graph._compact_first_node = np.empty(0, dtype=np.int64)
-        graph._compact_last_node = np.empty(0, dtype=np.int64)
 
     crosswalk = pd.DataFrame(
         {
@@ -637,17 +505,6 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 @cython.boundscheck(False)
 @cython.initializedcheck(False)
 def create_compressed_link_network_mapping(graph):
-    cdef:
-        long long i, j, a_node, x, b_node, tmp, compressed_id, removed_id, non_duplicated_idx, supernet_id
-        const long long[:] b
-        const long long[:] supernet_ids
-        uint32_t[:] idx
-        int64_t[::] data
-        int32_t[:] node_mapping
-        const int64_t[:, :] non_duplicated
-        const long long[:] compact_a_nodes
-        const long long[:] compact_b_nodes
-
     # Cache the result, this isn't a huge computation but isn't worth doing twice
     if (
         graph.compressed_link_network_mapping_idx is not None
@@ -660,7 +517,18 @@ def create_compressed_link_network_mapping(graph):
             graph.network_compressed_node_mapping,
         )
 
-    if graph.compact_num_links <= 0 or graph.compact_graph.empty:
+    cdef:
+        long long i, j, a_node, x, b_node, tmp, compressed_id, removed_id, non_duplicated_idx, supernet_id
+        const long long[:] b
+        const long long[:] supernet_ids
+        uint32_t[:] idx
+        int64_t[::] data
+        int32_t[:] node_mapping
+        const int64_t[:, :] non_duplicated
+        const long long[:] compact_a_nodes
+        const long long[:] compact_b_nodes
+
+    if graph.compact_graph.empty:
         idx_arr = np.zeros(1, dtype=np.uint32)
         data_arr = np.empty(0, dtype=np.int64)
         node_map_arr = np.full(graph.num_nodes, -1, dtype=np.int32)

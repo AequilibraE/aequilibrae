@@ -182,10 +182,6 @@ centroid-flow blocking.**
     * :func:`aequilibrae.paths.graph.TransitGraph`
         Class documentation
 
-Turn restrictions interact with graph compression: a via node cannot be contracted away, and
-U-turn detection has to be expressed against physical nodes rather than the endpoints of a
-shortcut. :ref:`turn_aware_path_computation` covers the algorithm that handles this.
-
 Blocking centroid flows
 -----------------------
 

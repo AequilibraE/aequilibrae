@@ -230,11 +230,7 @@ class Network(WorkerThread):
             if allow_uturns_r:
                 allow_uturns = allow_uturns_r[0] == "1"
 
-        if turn_restrictions_df is not None and "modes" not in turn_restrictions_df.columns:
-            raise ValueError(
-                "Turn restrictions table is missing required 'modes' column. "
-                "Run project.upgrade() to update the schema."
-            )
+        assert turn_restrictions_df is None or "modes" in turn_restrictions_df.columns
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[all_fields]
@@ -254,9 +250,7 @@ class Network(WorkerThread):
                     turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
                 ].copy()
 
-            # Turn restrictions affect which nodes may be compressed, and the U-turn
-            # setting is part of that topology policy. Install both before preparing
-            # the graph so the topology is built once with the final policy.
+            # Install the turn policy before compression.
             g.set_turn_restrictions(mode_turns, allow_path_uturns=allow_uturns)
 
             g.prepare_graph(centroids)
