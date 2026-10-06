@@ -1,9 +1,9 @@
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from typing import List
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
-from aequilibrae.paths.cython.AoN import HEAP_MAP
+from aequilibrae.paths.cython.dijkstra import HEAP_MAP
 from aequilibrae.paths.graph import Graph
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
 class SkimResults:
@@ -38,12 +38,6 @@ class SkimResults:
         self.skims = AequilibraeMatrix()
         self.cores = omp_get_max_threads()
 
-        self.links = -1
-        self.nodes = -1
-        self.zones = -1
-        self.num_skims = -1
-        self._graph_id = None
-        self.graph = Graph()
         self._heap = "4ary"
 
     def prepare(self, graph: Graph):
@@ -57,20 +51,16 @@ class SkimResults:
         if not graph.cost_field:
             raise Exception('Cost field needs to be set for computation. use graph.set_graph("your_cost_field")')
 
-        self.nodes = graph.compact_num_nodes + 1
-        self.zones = graph.num_zones
-        self.links = graph.compact_num_links + 1
-        self.num_skims = len(graph.skim_fields)
+        zones = graph.num_zones
+        num_skims = len(graph.skim_fields)
 
         self.skims = AequilibraeMatrix()
         self.skims.create_empty(
-            file_name=AequilibraeMatrix().random_name(), zones=self.zones, matrix_names=graph.skim_fields
+            file_name=AequilibraeMatrix().random_name(), zones=zones, matrix_names=graph.skim_fields
         )
         self.skims.index[:] = graph.centroids[:]
         self.skims.computational_view(core_list=self.skims.names)
-        self.skims.matrix_view = self.skims.matrix_view.reshape(self.zones, self.zones, self.num_skims)
-        self._graph_id = graph._id
-        self.graph = graph
+        self.skims.matrix_view = self.skims.matrix_view.reshape(zones, zones, num_skims)
 
     def set_heap(self, heap: str) -> None:
         """

@@ -11,8 +11,8 @@ from aequilibrae.paths.cython.workspaces cimport (
 )
 
 
-cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::mvp" nogil:
-    void cpp_select_link_loading "aequilibrae::paths::cpp::mvp::select_link_loading"[T](
+cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    void cpp_select_link_loading "aequilibrae::paths::cpp::routing::select_link_loading"[T](
         const CppSearchResults &results,
         const CppLoadingQuery[T] &query,
         const CppSelectLinkContext &context,
@@ -22,7 +22,7 @@ cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::m
         const CppSelectLinkODOriginView[T] &od,
     ) noexcept
 
-    void cpp_reduce_select_link_loading_outputs "aequilibrae::paths::cpp::mvp::reduce_select_link_loading_outputs"[T](
+    void cpp_reduce_select_link_loading "aequilibrae::paths::cpp::routing::reduce_select_link_loading_outputs"[T](
         const CppSelectLinkLoadingOutputsView[T] *workers,
         size_t worker_count,
         const CppSelectLinkLoadingOutputsView[T] &output,

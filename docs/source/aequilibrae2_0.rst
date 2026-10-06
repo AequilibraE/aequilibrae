@@ -77,3 +77,4 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
     # We get the graphs for cars and trucks
     >>> graph = project.network.graphs['c']
     >>> graph.disconnected_nodes()
+    array([], dtype=int64)

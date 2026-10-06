@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <limits>
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 template <typename T> struct LoadingOutputs {
   std::size_t link_count = 0;
@@ -137,4 +137,4 @@ struct AoNOutputsView {
   }
 };
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

@@ -66,9 +66,13 @@ def test_set_choice_set_generation(route_choice_setup):
         "max_depth": 0,
         "max_misses": 100,
         "penalty": 1.1,
-        "cutoff_prob": 0.0,
+        "disutility_cutoff_constant": float("inf"),
+        "disutility_cutoff_coefficient": float("inf"),
         "beta": 1.0,
         "store_results": True,
+        "a_star": False,
+        "heuristic": "euclidean",
+        "heuristic_scale": None,
     }
 
     rc.set_choice_set_generation("bfsle", max_routes=20)
@@ -78,13 +82,24 @@ def test_set_choice_set_generation(route_choice_setup):
         "max_depth": 0,
         "max_misses": 100,
         "penalty": 1.0,
-        "cutoff_prob": 0.0,
+        "disutility_cutoff_constant": float("inf"),
+        "disutility_cutoff_coefficient": float("inf"),
         "beta": 1.0,
         "store_results": True,
+        "a_star": False,
+        "heuristic": "euclidean",
+        "heuristic_scale": None,
     }
 
     with pytest.raises(AttributeError):
         rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
+
+    with pytest.raises(
+        ValueError,
+        match="`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
+        "Both must be set or unset",
+    ):
+        rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1, disutility_cutoff_constant=0)
 
 
 def test_link_results(route_choice_setup):
@@ -145,17 +160,14 @@ def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost)
             results_new[["origin id", "destination id", "route set"]],
         )
     elif recompute_psl and not change_cost:
-        # Everything must match here
-        pd.testing.assert_frame_equal(results, results_new)
+        # All generated fields must match after PSL recomputation.
+        pd.testing.assert_frame_equal(results, results_new[results.columns])
         pd.testing.assert_frame_equal(ll_res, ll_res_new)
     elif not recompute_psl and change_cost:
         raise RuntimeError("branch should be unreachable, cannot change cost field without recomputing PSL")
     elif not recompute_psl and not change_cost:
-        # Cost, mask, and path overlap are not compared because the they are note used when assigning from DF
-        pd.testing.assert_frame_equal(
-            results[["origin id", "destination id", "route set", "probability"]],
-            results_new[["origin id", "destination id", "route set", "probability"]],
-        )
+        # Without recomputation, supplied costs, masks and probabilities are kept.
+        pd.testing.assert_frame_equal(results, results_new[results.columns])
         # Not recomputing PSL means the assignment results are the same
         pd.testing.assert_frame_equal(ll_res, ll_res_new)
     else:
@@ -298,7 +310,6 @@ def test_assign_from_df(route_choice_setup):
     demand.add_matrix(mat2)
 
     args = {
-        "graph": graph.graph,
         "demand": demand,
         "select_links": {},
         "recompute_psl": False,
@@ -306,8 +317,8 @@ def test_assign_from_df(route_choice_setup):
         "store_results": True,
     }
 
-    # Test missing OD pairs
-    with pytest.raises(KeyError):
+    # Test missing route column
+    with pytest.raises(ValueError, match="missing required column 'route set'"):
         df = pd.DataFrame(
             {
                 "origin id": [graph.centroids[0]],
@@ -317,8 +328,8 @@ def test_assign_from_df(route_choice_setup):
         )
         rc.assign_from_df(df=df, **args)
 
-    # Test link missing from compressed graph
-    with pytest.raises(KeyError):
+    # Test link missing from graph
+    with pytest.raises(ValueError, match="absent from the graph"):
         df = pd.DataFrame(
             {
                 "origin id": [graph.centroids[0]],
@@ -330,7 +341,7 @@ def test_assign_from_df(route_choice_setup):
         rc.assign_from_df(df=df, **args)
 
     # Test wrong direction
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError, match="absent from the graph"):
         df = pd.DataFrame(
             {
                 "origin id": [graph.centroids[0]],

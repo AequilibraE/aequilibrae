@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace aequilibrae::paths::cpp::mvp {
+namespace aequilibrae::paths::cpp::routing {
 
 // Borrowed search inputs. A null mask requests a full search. Otherwise the
 // caller supplies one flag per physical node and its nonzero count, prepared
@@ -22,4 +22,4 @@ template <typename T> struct LoadingQuery {
   const T *demand = nullptr; // [destinations, classes]
 };
 
-} // namespace aequilibrae::paths::cpp::mvp
+} // namespace aequilibrae::paths::cpp::routing

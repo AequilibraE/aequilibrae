@@ -141,8 +141,8 @@ procedure.
 Skimming while assigning
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-AequilibraE allows for skimming to be performed during assignnment, and maintains both the skimming
-of the final iteration, as well as the blended skim for all iterations.
+AequilibraE can skim during assignment and keeps both the latest all-or-nothing
+skims and the blended skims for the accepted solution.
 
 This is the case because, strictly speaking, the equilibrium travel time is the one resulting
 at the end of the last assignment iteration, while the most correct distance and toll skims, for example,
@@ -156,8 +156,14 @@ for easy identification.
 
   >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
   >>> assig.execute() # doctest: +SKIP
-  >>> assig.save_skims("one_matrix_name")
+  >>> assig.save_skims("one_matrix_name") # doctest: +SKIP
 
+Unassigned demand
+~~~~~~~~~~~~~~~~~
+
+Unassigned demand is demand that present within the demand matrix but it's destination was unreachable from the origin,
+it is not loaded on the network and ``traffic_class._aon_results.unassigned_demand`` gives the latest AoN total,
+excluding intrazonal demand. ``traffic_class.results.unassigned_demand`` gives the total of the accepted solution.
 
 Assigning sparse matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -182,11 +188,13 @@ of zones and over 100 iterations of assignment.
   >>> assig.execute()
   >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
   >>> assig.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
-  MatrixRecord(name='another_matrix_name_car', file_name='another_matrix_name_car.omx', ...)
+  [MatrixRecord(name='another_matrix_name_car', ...), MatrixRecord(name='another_matrix_name_truck', ...)]
 
-The list of fields defined by the user for skimming is added to the congested time and the assignment
-cost from the last iteration of the assignment by default. These matrices are named *__congested_time__*
-and *__assignment_cost__* respectively.
+The list of fields defined by the user for skimming is added to the congested time and the assignment cost from the last
+iteration of the assignment by default. These matrices are named *__congested_time__* and *__assignment_cost__*
+respectively. The returned values are ``SkimmingOutputs`` objects, also stored in ``traffic_class.congested_skims``.
+Congested time includes link travel time and turn delay, but excludes fixed costs. Assignment cost includes those fixed
+costs, converted to time units with the traffic classes value of time.
 
 See the the example :ref:`example_assign_sparse` for a more practical explanation of this feature.
 

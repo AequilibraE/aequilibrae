@@ -8,16 +8,67 @@ from aequilibrae.utils.cython.array_allocations cimport array, array_pointer
 from aequilibrae.utils.cython.array_allocations import readonly_view
 
 
-cdef class LoadingWorkspace:
-    """Demand cascade scratch for one worker.
+cdef class SearchWorkspace:
+    """Heap for Dijkstra."""
 
-    Loading replaces this scratch on every call. It does not hold link output,
-    demand or a search reference. Retained views show the last cascade.
-    """
+    def __cinit__(self):
+        self.heap_storage = NULL
+
+    def __init__(self, node_count, state_count, heap="4ary"):
+        cdef CppSearchHeap heap_type
+        if self.heap_storage != NULL:
+            raise RuntimeError("SearchWorkspace cannot be reinitialised")
+
+        node_count, state_count = map(operator.index, (node_count, state_count))
+        if node_count < 1 or state_count < 1:
+            raise ValueError("node_count and state_count must be positive")
+
+        if heap == "4ary":
+            heap_type = CPP_FOUR_ARY
+        elif heap == "pairing":
+            heap_type = CPP_PAIRING
+        elif heap == "std":
+            heap_type = CPP_STD
+        else:
+            raise ValueError("heap must be one of ['4ary', 'pairing', 'std']")
+
+        self.heap_storage = new CppSearchHeapStorage(state_count, heap_type)
+        self.node_count = node_count
+        self.state_count = state_count
+        self.heap = heap
+
+    def __dealloc__(self):
+        if self.heap_storage != NULL:
+            del self.heap_storage
+
+    cdef CppSearchWorkspace view(self) noexcept nogil:
+        cdef CppSearchWorkspace workspace
+        workspace.heap = self.heap_storage
+        return workspace
+
+
+cdef class AStarWorkspace(SearchWorkspace):
+    """Heap and cost and estimate scratch buffers for A*."""
+
+    def __init__(self, node_count, state_count, heap="4ary"):
+        super().__init__(node_count, state_count, heap)
+        self.costs_buffer = array[double](self.state_count, True, np.inf)
+        self.estimates_buffer = array[double](self.node_count, True, -1.0)
+
+    cdef CppAStarWorkspace a_star_view(self) noexcept nogil:
+        cdef CppAStarWorkspace workspace
+        workspace.search = self.view()
+        workspace.costs = array_pointer(self.costs_buffer)
+        workspace.estimates = array_pointer(self.estimates_buffer)
+        return workspace
+
+
+cdef class LoadingWorkspace:
+    """Link loading scratch buffers."""
 
     def __init__(self, state_count, class_count):
         if self.state_count:
-            raise RuntimeError("LoadingWorkspace cannot be reinitialized")
+            raise RuntimeError("LoadingWorkspace cannot be reinitialised")
 
         state_count, class_count = map(operator.index, (state_count, class_count))
         if state_count < 1 or class_count < 0:
@@ -43,11 +94,11 @@ cdef class LoadingWorkspace:
 
 
 cdef class SkimmingWorkspace:
-    """State sums for additive fields, independent of inputs and output."""
+    """Skimming scratch buffers."""
 
     def __init__(self, state_count, field_count):
         if self.state_count:
-            raise RuntimeError("SkimmingWorkspace cannot be reinitialized")
+            raise RuntimeError("SkimmingWorkspace cannot be reinitialised")
 
         state_count, field_count = map(operator.index, (state_count, field_count))
         if state_count < 1 or field_count < 0:
@@ -74,15 +125,11 @@ cdef class SkimmingWorkspace:
 
 
 cdef class SelectLinkWorkspace:
-    """One path-membership flag per state, reused across selected sets.
-
-    Loading scratch is supplied separately so regular and selected loading
-    can share a cascade allocation without sharing unrelated skim scratch.
-    """
+    """Select link scratch buffers."""
 
     def __init__(self, state_count):
         if self.state_count:
-            raise RuntimeError("SelectLinkWorkspace cannot be reinitialized")
+            raise RuntimeError("SelectLinkWorkspace cannot be reinitialised")
 
         state_count = operator.index(state_count)
         if state_count < 1:
@@ -104,21 +151,18 @@ cdef class SelectLinkWorkspace:
 
 
 cdef class AoNWorkspace:
-    """Allocate the small workspaces needed by one assignment worker.
+    """All scratch buffers required by an assignment worker."""
 
-    Omit a width to leave that operation unallocated. Components are usable
-    independently and keep their own storage alive if the group is deleted.
-    Dimensions are fixed; kernels never prepare or resize these buffers.
-    """
-
-    def __init__(self, state_count, *, class_count=None, field_count=None, select_links=False):
+    def __init__(self, node_count, state_count, *, heap="4ary", class_count=None, field_count=None, select_links=False):
         if self.state_count:
-            raise RuntimeError("AoNWorkspace cannot be reinitialized")
+            raise RuntimeError("AoNWorkspace cannot be reinitialised")
 
-        state_count = operator.index(state_count)
-        if state_count < 1:
-            raise ValueError("state_count must be positive")
+        node_count, state_count = map(operator.index, (node_count, state_count))
+        if node_count < 1 or state_count < 1:
+            raise ValueError("node_count and state_count must be positive")
+        self.node_count = node_count
         self.state_count = state_count
+        self.search = SearchWorkspace(node_count, state_count, heap=heap)
 
         if class_count is not None:
             self.loading = LoadingWorkspace(state_count, class_count)
@@ -130,6 +174,7 @@ cdef class AoNWorkspace:
     cdef CppAoNWorkspace[double] view(self) noexcept nogil:
         cdef CppAoNWorkspace[double] workspace
 
+        workspace.search = self.search.view()
         if self.loading is not None:
             workspace.loading = self.loading.view()
         if self.skimming is not None:

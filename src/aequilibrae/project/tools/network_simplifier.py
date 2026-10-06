@@ -1,5 +1,4 @@
 import logging
-import warnings
 from copy import deepcopy
 from math import ceil
 from typing import TYPE_CHECKING, List, Literal, Optional
@@ -32,7 +31,7 @@ class NetworkSimplifier(WorkerThread):
         self.network = self.project.network
         self.link_layer = self.network.links.data
 
-        warnings.warn("This will alter your database in place. Make sure you have a backup.", stacklevel=2)
+        logger.warning("This will alter your database in place. Make sure you have a backup.")
 
     def simplify(self, graph: Graph, max_speed_ratio: float = 1.1):
         """
@@ -103,7 +102,7 @@ class NetworkSimplifier(WorkerThread):
 
             new_geo = linemerge(geos)
             if not isinstance(new_geo, LineString):
-                warnings.warn(f"Failed to merge geometry for superlink around link {rec.link_id}", stacklevel=2)
+                logger.warning("Failed to merge geometry for superlink around link %s", rec.link_id)
                 continue
 
             break_into = ceil(new_geo.length)
@@ -204,11 +203,12 @@ class NetworkSimplifier(WorkerThread):
             conn.commit()
 
         # Validate that we kept distances the same
-        old_dist = self.link_layer.geometry.length.sum()
+        distance_crs = self.link_layer.estimate_utm_crs()
+        old_dist = self.link_layer.geometry.to_crs(distance_crs).length.sum()
         self.link_layer = self.network.links.data
-        new_dist = self.link_layer.geometry.length.sum()
+        new_dist = self.link_layer.geometry.to_crs(distance_crs).length.sum()
 
-        logger.warning(f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}")
+        logger.warning("Old distance: %s, new distance: %s. Difference: %s", old_dist, new_dist, old_dist - new_dist)
 
     def collapse_links_into_nodes(self, links: List[int]):
         """

@@ -8,7 +8,7 @@ travel time and traffic volume. They are essential components of traffic assignm
 how congestion affects travel times as more vehicles use a link.
 
 AequilibraE implements five different VDF formulations, each with distinct characteristics that make
-them suitable for different modeling traditions.
+them suitable for different modelling traditions.
 
 Available VDF Functions
 -----------------------
@@ -24,7 +24,7 @@ AequilibraE currently supports the following VDF functions:
 VDF Comparison
 --------------
 
-The following chart compares the behavior of all available VDF functions with their example values:
+The following chart compares the behaviour of all available VDF functions with their example values:
 
 .. image:: ../_images/vdf_comparison.png
    :align: center
@@ -33,19 +33,19 @@ The following chart compares the behavior of all available VDF functions with th
 **Key observations:**
 
 * All functions show increasing travel times as the Volume/Capacity (V/C) ratio increases
-* Functions differ significantly in their behavior near and above capacity (V/C = 1)
+* Functions differ significantly in their behaviour near and above capacity (V/C = 1)
 * BPR and Conical are smooth throughout the range
-* BPR2 and INRETS have distinct behavioral changes at capacity
+* BPR2 and INRETS have distinct behavioural changes at capacity
 * Akcelik shows moderate growth rates suitable for signalized intersections
 
 Near-Capacity Behavior
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The behavior of VDFs near capacity is particularly important for congested urban networks:
+The behaviour of VDFs near capacity is particularly important for congested urban networks:
 
 .. image:: ../_images/vdf_near_capacity.png
    :align: center
-   :alt: VDF behavior near capacity
+   :alt: VDF behaviour near capacity
 
 This zoomed view (V/C from 0.5 to 1.5) highlights the differences in how each function transitions
 from free-flow to congested conditions.
@@ -93,7 +93,7 @@ standard choice for highway assignment models worldwide.
 **When to Use:**
 
 * Highway and freeway networks
-* Long-distance travel modeling
+* Long-distance travel modelling
 * When computational stability is critical
 * As a baseline for comparison with other functions
 * When empirical data supports the standard parameters
@@ -134,7 +134,7 @@ after capacity creates a steeper penalty for over-capacity conditions.
 
 * Piecewise function with a transition at V/C = 1
 * Much steeper increase in travel time after capacity is exceeded
-* Maintains BPR behavior below capacity
+* Maintains BPR behaviour below capacity
 * Non-differentiable at V/C = 1 (but continuous)
 * More aggressive congestion penalty than standard BPR
 
@@ -149,7 +149,7 @@ after capacity creates a steeper penalty for over-capacity conditions.
 
 * Non-differentiable point at capacity may cause convergence issues in some algorithms
 * The sharp transition may not reflect real-world gradual congestion buildup
-* Requires careful calibration of the transition behavior
+* Requires careful calibration of the transition behaviour
 
 Conical (Spiess)
 ~~~~~~~~~~~~~~~~
@@ -176,7 +176,7 @@ derivatives everywhere and has desirable mathematical properties for convergence
 **Characteristics:**
 
 * Infinitely differentiable (smooth everywhere)
-* Asymptotic behavior as V/C approaches infinity
+* Asymptotic behaviour as V/C approaches infinity
 * Guaranteed positive marginal costs
 * Strong theoretical foundation
 * Good convergence properties in equilibrium algorithms
@@ -214,7 +214,7 @@ After capacity (:math:`v > c`):
 .. math:: t = t_0 \frac{1.1 - \alpha}{0.1} \left(\frac{v}{c}\right)^2
 
 **Standard Parameters:**
-  * :math:`\alpha = 1.0` (must be :math:`<= 1.0`)
+  * :math:`\alpha = 1.0` (must be :math:`\leq 1.0`)
 
 **Origin and Background:**
 
@@ -224,10 +224,10 @@ for French urban networks and reflects European traffic flow characteristics.
 
 **Characteristics:**
 
-* Piecewise function with distinct before/after capacity behavior
+* Piecewise function with distinct before/after capacity behaviour
 * The :math:`\alpha` parameter must be less than or equal to 1.0
-* Hyperbolic behavior before capacity
-* Quadratic behavior after capacity
+* Hyperbolic behaviour before capacity
+* Quadratic behaviour after capacity
 * Designed for urban arterial roads
 * Reflects observed traffic patterns in French cities
 
@@ -235,17 +235,17 @@ for French urban networks and reflects European traffic flow characteristics.
 
 * Urban arterial networks
 * European-style road networks
-* When modeling contexts similar to French urban environments
+* When modelling contexts similar to French urban environments
 * Networks with well-defined capacity constraints
 * Calibrated models for specific urban areas
 
 **Limitations:**
 
-* Restricted parameter range (:math:`\alpha <= 1.0`)
+* Restricted parameter range (:math:`\alpha \leq 1.0`)
 * Non-differentiable at V/C = 1
 * Less widely used outside of Europe
 * May require local calibration
-* Dramatic change in behavior at capacity may not suit all networks
+* Dramatic change in behaviour at capacity may not suit all networks
 
 Akcelik
 ~~~~~~~
@@ -310,11 +310,11 @@ in AequilibraE's implementation, this factor of 8 has been absorbed into the :ma
 
 * Urban networks with signalized intersections
 * Arterial roads with frequent signals
-* Australian and some Asian modeling contexts (where it's more common)
+* Australian and some Asian modelling contexts (where it's more common)
 
 **Limitations:**
 
-* Less intuitive than BPR for general highway modeling
+* Less intuitive than BPR for general highway modelling
 * Parameter interpretation requires understanding of signal timing
 * May underestimate delay on uninterrupted flow facilities
 * Less validated for freeway applications
@@ -334,14 +334,13 @@ General Recommendations
 
 **For Conical:**
 
-* Can use similar values to BPR as starting points
-* :math:`\alpha = 0.15` and :math:`\beta = 4.0` provide comparable behavior to BPR
+* Values satisfying :math:`2.0 \leq \alpha \leq 9.0` have been recommended by the Hampton Roads Transportation Planning Organization (2020), depending on the types of roads being modelled.
 * Fine-tuning may require understanding of the specific mathematical properties
 
 **For INRETS:**
 
 * :math:`\alpha = 1.0` is standard
-* Must satisfy :math:`\alpha <= 1.0`
+* Must satisfy :math:`\alpha \leq 1.0`
 * Higher values create steeper curves before capacity
 
 **For Akcelik:**
@@ -413,7 +412,7 @@ Use this decision tree to help select an appropriate VDF:
 
 **For Mixed Networks:**
   * **BPR** or **BPR2** provide good general performance
-  * Consider using link-specific parameters to vary behavior by facility type
+  * Consider using link-specific parameters to vary behaviour by facility type
 
 **For Transit Assignment:**
   * **Conical** was originally designed for transit applications
@@ -433,7 +432,7 @@ While individual network characteristics vary, general patterns include:
 
 * **BPR**: Most widely validated, good general performance
 * **BPR2**: Better for preventing unrealistic over-capacity assignment
-* **Conical**: Excellent convergence behavior, less intuitive calibration
+* **Conical**: Excellent convergence behaviour, less intuitive calibration
 * **INRETS**: Good for specific urban contexts, may need local calibration
 * **Akcelik**: Best for signalized urban networks
 
@@ -480,6 +479,218 @@ Link-Specific Parameters
     # with values calibrated for each link
     assig.set_vdf(bpr, {"alpha": "alpha_field", "beta": "beta_field"})
 
+Creating Custom VDFs
+--------------------
+
+Custom VDFs can be created in three different ways. When using the python constructor of the VDF object, the VDF function and its derivative can be input as either a ``Callable``, or as a string to be interpreted by NumExpr. Alternatively, the string representation and other data can be placed in a project's yaml file. In all cases, if the derivative is not supplied, then it will be computed numerically using the central difference scheme. 
+
+The VDF callable (``func``) and its derivative (``d_func``) write their results to their first argument, which is an output array. The VDF receives that array as ``congested_time``, and the derivative receives it as ``delta``. The exact calls are shown by these methods in the ``VDF`` class:
+
+.. code-block:: python
+
+    def apply_vdf(self, *, congested_time, link_flows, fftime, capacity, cores: int, **link_attributes):
+        self.func(congested_time, link_flows, fftime, capacity, cores, **link_attributes)
+
+    def apply_derivative(self, *, delta, link_flows, fftime, capacity, cores: int, **link_attributes):
+        self.d_func(delta, link_flows, fftime, capacity, cores, **link_attributes)
+
+A Python VDF callable must accept ``congested_time, link_flows, fftime, capacity, cores``, followed by any custom link attributes. Its derivative must accept ``delta, link_flows, fftime, capacity, cores``, followed by the same custom link attributes.
+
+
+The following example defines the SANDAG modified two-part additive formulation [#sandag-report]_ as a Python VDF.
+
+.. code-block:: python
+
+    # define custom vdf function
+    def SANDAG_modified_two_part_additive(
+        congested_time,
+        link_flows,
+        fftime,
+        capacity,
+        cores,
+        alpha_1,
+        beta_1,
+        alpha_2,
+        beta_2,
+        green_to_cycle_ratio,
+        cycle_time,
+        intersection_capacity,
+    ):
+        voc = link_flows / capacity
+        voc_intersection = link_flows / intersection_capacity
+        term_1 = fftime * (
+            1.0 + alpha_1 * voc**beta_1
+        )
+        term_2 = (
+            0.5
+            * cycle_time
+            * (1 - green_to_cycle_ratio) ** 2
+            * (1.0 + alpha_2 * voc_intersection**beta_2)
+        )
+        congested_time[:] = term_1 + term_2
+
+    # define custom vdf derivative
+    def derivative_SANDAG_modified_two_part_additive(
+        delta,
+        link_flows,
+        fftime,
+        capacity,
+        cores,
+        alpha_1,
+        beta_1,
+        alpha_2,
+        beta_2,
+        green_to_cycle_ratio,
+        cycle_time,
+        intersection_capacity,
+    ):
+        voc = link_flows / capacity
+        voc_intersection = link_flows / intersection_capacity
+        term_1 = (
+            fftime
+            * alpha_1
+            * beta_1
+            * voc ** (beta_1 - 1)
+            / capacity
+        )
+        term_2 = (
+            0.5
+            * cycle_time
+            * (1 - green_to_cycle_ratio) ** 2
+            * alpha_2
+            * beta_2
+            * voc_intersection ** (beta_2 - 1)
+            / intersection_capacity
+        )
+        delta[:] = term_1 + term_2
+        
+    # define the specification
+    SANDAG_spec = {
+        "alpha_1": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
+        "beta_1": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+        "alpha_2": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
+        "beta_2": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
+        "green_to_cycle_ratio": {"bounds": (0.0, 1.0)},
+        "cycle_time": {"bounds": (0.0, float("inf"))},
+        "intersection_capacity": {"bounds": (0.0, float("inf"))}
+    }
+    
+    # uses both the defined function and derivative
+    sandag_vdf = VDF(
+        "SANDAG", 
+        SANDAG_modified_two_part_additive, 
+        SANDAG_spec, 
+        derivative_SANDAG_modified_two_part_additive,
+    )
+
+    # only uses the definition of the vdf function
+    # derivative is calculated numerically using finite difference 
+    sandag_finite_difference_derivative_vdf = VDF(
+        "SANDAG", 
+        SANDAG_modified_two_part_additive, 
+        SANDAG_spec,
+    )
+
+The following shows the SANDAG modified two-part additive formulation being created using a string representation to be evaluated by NumExpr.
+
+.. code-block:: python
+
+    SANDAG_string_representation = (
+        "fftime * (1.0 + alpha_1 * (link_flows / capacity)**beta_1) + "
+        "0.5 * cycle_time * (1 - green_to_cycle_ratio)**2 * "
+        "(1.0 + alpha_2 * (link_flows / intersection_capacity)**beta_2)"
+    )
+
+    derivative_SANDAG_string_representation = (
+        "fftime * alpha_1 * beta_1 * (link_flows / capacity) ** (beta_1 - 1) / capacity + "
+        "0.5 * cycle_time * (1 - green_to_cycle_ratio) ** 2 * "
+        "alpha_2 * beta_2 * (link_flows / intersection_capacity) ** "
+        "(beta_2 - 1) / intersection_capacity"
+    )
+
+    # string representations of the function and its derivative will be interpreted by NumExpr
+    sandag_string_vdf = VDF(
+      "SANDAG", 
+      SANDAG_string_representation, 
+      SANDAG_spec, 
+      derivative_SANDAG_string_representation
+    )
+
+This VDF could also be read in from a project's yaml file. The "vdfs" entry of the parameters file
+would contain:
+
+.. code-block:: yaml
+
+    vdfs:
+      SANDAG:
+        functional_form: >
+          fftime * (1.0 + alpha_1 * (link_flows/capacity)**beta_1) +
+          0.5 * cycle_time * (1 - green_to_cycle_ratio)**2 * (1.0 + alpha_2 * (link_flows/intersection_capacity)**beta_2)
+        derivative_functional_form: >
+          (fftime * alpha_1 * beta_1 * (link_flows / capacity) ** (beta_1 - 1) / capacity
+          + 0.5 * cycle_time * (1 - green_to_cycle_ratio) ** 2
+          * alpha_2 * beta_2 * (link_flows / intersection_capacity) ** (beta_2 - 1) / intersection_capacity)
+        spec:
+          alpha_1:
+            fill_NA: 0.15
+            bounds: [0.0, .inf]
+          beta_1:
+            fill_NA: 4.0
+            bounds: [1.0, .inf]
+          alpha_2:
+            fill_NA: 0.15
+            bounds: [0.0, .inf]
+          beta_2:
+            fill_NA: 4.0
+            bounds: [1.0, .inf]
+          green_to_cycle_ratio:
+            bounds: [0.0, 1.0]
+          cycle_time:
+            bounds: [0.0, .inf]
+          intersection_capacity:
+            bounds: [0.0, .inf]
+
+This can then be loaded with:
+
+.. code-block:: python
+
+    # includes all built-in preset VDFs and any VDFs defined in the project's parameters
+    all_vdfs = project.project_parameters.get_vdfs()
+
+    # only the VDFs explicitly defined in the parameters file
+    custom_vdfs = project.project_parameters.get_vdfs(exclude_builtins=True)
+    sandag_yaml_vdf = custom_vdfs["SANDAG"]
+
+If a name in the "vdfs" entry collides with one of the built in presets (for example "bpr"),
+``get_vdfs`` raises a ``ValueError``.
+
+Checking Custom VDFs
+~~~~~~~~~~~~~~~~~~~~
+
+The ``check_valid`` function on a ``VDF`` object checks whether the VDF satisfies the following criteria for a well-behaved congestion function described by Spiess (1990):
+
+ 1. The VDF is strictly increasing - when there is more traffic, the delay increases
+ 2. (part of) For no volume on the link, the congested time is the free flow travel time
+ 3. The VDF's derivative exists and is strictly increasing, to ensure that it is convex
+
+It achieves this by evaluating the VDF and its derivative at a specified number of values of volume between 0 and 3, with a capacity assumed to be 1. It then finds the values of volume / capacity where these conditions were violated, and prints out the result.
+
+For example, the built-in INRETS VDF is non-convex:
+
+.. code-block:: python
+
+    from aequilibrae.paths.vdf import inrets
+
+    num_points = 300
+    link_attributes = {"alpha": np.full(num_points, 0.9, dtype=np.float64)}
+
+    # true,        true,              true,                   false
+    valid_0_value, increasing_f_vals, nonnegative_derivative, convex = inrets.check_valid(num_points, link_attributes)
+
+    # Prints out:
+    # The VDF is non-convex due to its derivative decreasing at these values of volume/capacity: [np.float64(1.0033444816053512)]
+
+
 References and Further Reading
 -------------------------------
 
@@ -499,6 +710,11 @@ References and Further Reading
 
 * Akcelik, R. (1991). "Travel Time Functions for Transport Planning Purposes: Davidson's Function, Its Time Dependent Form and an Alternative Travel Time Function."
   *Australian Road Research*, 21(3): 49-59.
+
+**Custom VDF example:**
+
+.. [#sandag-report] SANDAG (2011). *Activity-Based Model Development and Calibration: C04 Model Development*.
+   Available: https://tfresource.org/topics/SANDAG_C04Report.pdf
 
 **General Traffic Assignment:**
 

@@ -94,6 +94,9 @@ result in simplification beyond pure topological simplification.
 
 .. code-block:: python
 
+    >>> project = create_example(project_path, "coquimbo")
+    >>> project.network.build_graphs()
+    >>> graph = project.network.graphs['c']
     >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32), remove_dead_ends=False)
 
 
@@ -104,8 +107,6 @@ Building graphs directly from an AequilibraE model is the easiest option for beg
 or when using AequilibraE in anger, as much of the setup is done by default.
 
 .. code-block:: python
-
-    >>> project = create_coquimbo_example
 
     >>> project.network.build_graphs() # We build the graph for all modes
     >>> graph = project.network.graphs['c'] # we grab the graph for cars

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <type_traits>
@@ -9,25 +8,9 @@
 #include "pq_heap_base.hpp"
 #include "queries.hpp"
 #include "search_results.hpp"
+#include "workspaces.hpp"
 
-namespace aequilibrae::paths::cpp::mvp {
-
-inline void reset_search(const SearchQuery &query, std::size_t root,
-                         const MutableSearchResults &results) noexcept {
-  auto &metadata = *results.metadata;
-  metadata = SearchMetadata{};
-  metadata.origin = query.origin;
-  metadata.root = root;
-  metadata.target_count = query.target_count;
-
-  const auto infinity = std::numeric_limits<double>::infinity();
-  std::fill_n(results.predecessors, results.state_count, invalid_state);
-  std::fill_n(results.connectors, results.state_count, invalid_state);
-  std::fill_n(results.settlement_order, results.state_count, invalid_state);
-  std::fill_n(results.terminal_states, results.node_count, invalid_state);
-  std::fill_n(results.distances, results.state_count, infinity);
-  std::fill_n(results.turn_costs, results.state_count, infinity);
-}
+namespace aequilibrae::paths::cpp::routing {
 
 inline bool reached_last_target(const SearchQuery &query, std::size_t node,
                                 SearchMetadata &metadata) noexcept {
@@ -41,15 +24,19 @@ inline bool reached_last_target(const SearchQuery &query, std::size_t node,
 // Contexts and queries contain only inputs. The result view writes through to
 // its Cython owner's arrays and metadata without changing the view itself.
 template <class Queue>
-void dijkstra(const NodeBasedContext &context, const SearchQuery &query,
-              const MutableSearchResults &results) noexcept {
+void dijkstra_with_queue(const NodeBasedContext &context,
+                         const SearchQuery &query,
+                         const MutableSearchResults &results,
+                         Queue &queue) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
-  reset_search(query, query.origin, results);
+  results.reset();
   auto &metadata = *results.metadata;
+  metadata.origin = query.origin;
+  metadata.root = query.origin;
+  metadata.target_count = query.target_count;
   bool stopped_at_targets = false;
 
-  Queue queue;
-  queue.init_heap(context.node_count);
+  queue.reset_heap();
   queue.insert(query.origin, 0.0);
 
   while (!queue.is_empty()) {
@@ -103,21 +90,25 @@ void dijkstra(const NodeBasedContext &context, const SearchQuery &query,
 }
 
 template <class Queue>
-void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
-              const MutableSearchResults &results) noexcept {
+void dijkstra_with_queue(const TurnBasedContext &context,
+                         const SearchQuery &query,
+                         const MutableSearchResults &results,
+                         Queue &queue) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   const auto &graph = context.graph;
   // Link states preserve incoming-link history. One virtual root lets first
   // links leave the origin without paying a turn cost, including edgeless
   // graphs.
   const auto root = graph.link_count;
-  reset_search(query, root, results);
+  results.reset();
   auto &metadata = *results.metadata;
+  metadata.origin = query.origin;
+  metadata.root = root;
+  metadata.target_count = query.target_count;
   bool stopped_at_targets = false;
   results.turn_costs[root] = 0.0;
 
-  Queue queue;
-  queue.init_heap(results.state_count);
+  queue.reset_heap();
   queue.insert(root, 0.0);
 
   while (!queue.is_empty()) {
@@ -185,4 +176,13 @@ void dijkstra(const TurnBasedContext &context, const SearchQuery &query,
   }
 }
 
-} // namespace aequilibrae::paths::cpp::mvp
+template <class Context>
+void dijkstra(const Context &context, const SearchQuery &query,
+              const MutableSearchResults &results,
+              const SearchWorkspace &workspace) noexcept {
+  workspace.heap->visit([&](auto &queue) {
+    dijkstra_with_queue(context, query, results, queue);
+  });
+}
+
+} // namespace aequilibrae::paths::cpp::routing

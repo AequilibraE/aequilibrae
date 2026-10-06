@@ -56,11 +56,11 @@ def test_skim_after(project, assigclass):
 
     b = assig.skim_congested(["distance"], return_matrices=True)
 
-    assert b["car"].names == ["distance", "__assignment_cost__", "__congested_time__"]
+    assert b["car"].field_names == ("distance", "__congested_time__", "__assignment_cost__")
 
     b = assig.skim_congested(return_matrices=True)
 
-    assert b["car"].names == ["__assignment_cost__", "__congested_time__"]
+    assert b["car"].field_names == ("__congested_time__", "__assignment_cost__")
 
 
 # tests/aequilibrae/paths/test_traffic_assignment.py

@@ -1,13 +1,14 @@
-import warnings
 import logging
-from copy import deepcopy
-from typing import Union, List, Tuple, Dict
+import warnings
 from abc import ABC
+from copy import deepcopy
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
+from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class TransportClassBase(ABC):  # noqa: B024
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
-        if matrix.matrix_view.dtype != graph.default_types("float"):
+        if matrix.matrix_view.dtype != "float64":
             raise TypeError("Matrix's computational view need to be of type np.float64")
         self._config = {}
         self.graph = graph
@@ -113,6 +114,7 @@ class TrafficClass(TransportClassBase):
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
         self.congested_time = np.array([])
+        self.congested_skims = None
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -151,7 +153,8 @@ class TrafficClass(TransportClassBase):
 
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
-        if np.any(np.isnan(self.graph.graph[field_name].values)):
+        self.graph.graph[field_name] = pd.to_numeric(self.graph.graph[field_name], errors="raise").astype(np.float64)
+        if np.any(pd.isna(self.graph.graph[field_name].to_numpy())):
             logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
         if self.graph.graph[field_name].min() < 0:
@@ -185,7 +188,7 @@ class TrafficClass(TransportClassBase):
             **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
             Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
-        for name, link_set in links.items():
+        for name, link_set in (links or {}).items():
             if len(name.split(" ")) != 1:
                 warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
                 name = str.join("_", name.split(" "))
@@ -215,48 +218,34 @@ class TrafficClass(TransportClassBase):
 
     def skim_congested(self, skim_fields=None):
         """
-        Skims the congested network. The user can add a list of skims to be computed, which
-        will be added to the congested time and the assignment cost from the last iteration of
-        the assignment.
+        Skims the congested network using the final assignment costs.
+
+        Congested time includes link travel time and turn delay. Assignment cost
+        also includes fixed costs, such as tolls converted to time units.
 
         :Arguments:
             **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
         """
-        pre_compact_cost = np.array(self.graph.compact_cost, copy=True)
-        try:
-            if self.graph.compact_num_links > 0:
-                self.graph.compact_costs_from_link_costs(self.fixed_cost + self.congested_time)
+        from aequilibrae.paths.assignment_context import AssignmentInputs
 
-            # Reorder supernet-indexed costs to match graph row order (a_node, b_node)
-            supernet_ids = self.graph.graph.__supernet_id__.to_numpy(copy=False)
-            cost = (self.fixed_cost + self.congested_time)[supernet_ids]
-            congested_time = np.asarray(self.congested_time)[supernet_ids]
-            self.graph.graph = self.graph.graph.assign(__assignment_cost__=cost, __congested_time__=congested_time)
-            if skim_fields is None:
-                requested_skims = []
-            elif isinstance(skim_fields, str):
-                requested_skims = [skim_fields]
-            else:
-                requested_skims = list(skim_fields)
-            skims = requested_skims + ["__assignment_cost__", "__congested_time__"]
-            pre_fields = self.graph.skim_fields
-            pre_turn_fields = list(self.graph.turn_skim_fields) if self.graph.turn_skim_fields else []
-            try:
-                self.graph.set_skimming(skims)
-                # Turn penalties are part of the cost the assignment minimised, so the
-                # generalised cost skim has to carry them as well as the link costs.
-                if pre_turn_fields:
-                    if "__assignment_cost__" not in self.graph.turn_skim_fields:
-                        self.graph.turn_skim_fields.append("__assignment_cost__")
-                else:
-                    self.graph.turn_skim_fields = ["__assignment_cost__"]
-                skimmer = self.graph.compute_skims()
-            finally:
-                self.graph.set_skimming(pre_fields)
-                self.graph.turn_skim_fields = pre_turn_fields
-            return skimmer
-        finally:
-            self.graph.compact_cost[:] = pre_compact_cost[:]
+        if self.congested_time.size == 0:
+            raise RuntimeError("Run the assignment before skimming congested costs")
+        fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
+        inputs = AssignmentInputs(
+            self.graph,
+            self.matrix,
+            "__congested_time__",
+            {},
+            self.results.cores,
+            skim_fields=fields + ["__congested_time__"],
+            cost_name="__assignment_cost__",
+            heap=self.results._heap,
+        )
+        inputs.update_costs(self.congested_time, self.fixed_cost)
+        # FIXME: Use a separate skim-only driver when one is available.
+        output = inputs.driver.run(inputs.driver.make_outputs()).skimming
+        self.congested_skims = inputs.report_skims(output)
+        return self.congested_skims
 
     def __setattr__(self, key, value):
         if key not in [
@@ -276,6 +265,7 @@ class TrafficClass(TransportClassBase):
             "_selected_links",
             "_config",
             "congested_time",
+            "congested_skims",
         ]:
             raise KeyError(f"Traffic Class does not have '{key}'")
         self.__dict__[key] = value

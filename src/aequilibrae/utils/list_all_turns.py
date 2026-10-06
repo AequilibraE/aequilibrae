@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from aequilibrae.project.project import Project
-
 
 def _build_directed_edges(links, nodes, mode: str):
     links = links.loc[
@@ -93,11 +91,17 @@ def _classify_turns(turn_angle: np.ndarray) -> np.ndarray:
 
 
 def list_left_turns(
-    project: Project,
+    links: pd.DataFrame,
+    nodes: pd.DataFrame,
     mode: str = "c",
 ):
-    links = project.network.links.data[["link_id", "a_node", "b_node", "direction", "modes"]].copy()
-    nodes = project.network.nodes.data[["node_id", "longitude", "latitude"]].copy()
+    """List left turns from link and node tables.
+
+    Links must contain ``link_id``, ``a_node``, ``b_node``, ``direction`` and
+    ``modes``. Nodes must contain ``node_id``, ``longitude`` and ``latitude``.
+    """
+    links = links[["link_id", "a_node", "b_node", "direction", "modes"]].copy()
+    nodes = nodes[["node_id", "longitude", "latitude"]].copy()
 
     edges = _build_directed_edges(links, nodes, mode)
 

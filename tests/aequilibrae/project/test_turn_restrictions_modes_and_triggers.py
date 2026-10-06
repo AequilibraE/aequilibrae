@@ -30,7 +30,7 @@ def _sample_disconnected_pair(conn):
 
 
 def test_turn_restrictions_has_modes_column(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         cols = [row[1] for row in conn.execute("PRAGMA table_info(turn_restrictions)").fetchall()]
         assert "modes" in cols
         assert "from_node" in cols
@@ -57,7 +57,7 @@ def test_turn_restriction_geometry_is_populated(sioux_falls_example):
 
 
 def test_turn_restriction_no_duplicate_mode_overlap(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -81,7 +81,7 @@ def test_turn_restriction_no_duplicate_mode_overlap(sioux_falls_example):
 
 
 def test_turn_restriction_no_duplicate_mode_overlap_different_mode_config(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -116,7 +116,7 @@ def test_turn_restriction_no_duplicate_mode_overlap_different_mode_config(sioux_
 
 
 def test_turn_restrictions_node_delete_blocked_with_links(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -133,7 +133,7 @@ def test_turn_restrictions_node_delete_blocked_with_links(sioux_falls_example):
 
 
 def test_mode_update_blocked_when_used_in_turn_restrictions(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -151,7 +151,7 @@ def test_mode_update_blocked_when_used_in_turn_restrictions(sioux_falls_example)
 
 
 def test_mode_delete_blocked_when_used_in_turn_restrictions(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -169,7 +169,7 @@ def test_mode_delete_blocked_when_used_in_turn_restrictions(sioux_falls_example)
 
 
 def test_turn_restriction_via_node_is_stored(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -195,7 +195,7 @@ def test_turn_restriction_via_node_is_stored(sioux_falls_example):
 
 
 def test_turn_restriction_api_stores_infinite_penalty_as_prohibition(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -204,7 +204,7 @@ def test_turn_restriction_api_stores_infinite_penalty_as_prohibition(sioux_falls
         from_node=from_node, via_node=via_node, to_node=to_node, penalty=float("inf"), modes="c"
     )
 
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         stored_penalty = conn.execute(
             "SELECT penalty FROM turn_restrictions WHERE restriction_id = ?",
             (restriction_id,),
@@ -214,7 +214,7 @@ def test_turn_restriction_api_stores_infinite_penalty_as_prohibition(sioux_falls
 
 
 def test_turn_restriction_api_rejects_negative_penalty(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -226,7 +226,7 @@ def test_turn_restriction_api_rejects_negative_penalty(sioux_falls_example):
 
 
 def test_turn_restriction_api_update_can_set_prohibition(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
@@ -236,7 +236,7 @@ def test_turn_restriction_api_update_can_set_prohibition(sioux_falls_example):
 
     turns.update(restriction_id, penalty=None)
 
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         stored_penalty = conn.execute(
             "SELECT penalty FROM turn_restrictions WHERE restriction_id = ?",
             (restriction_id,),
@@ -246,7 +246,7 @@ def test_turn_restriction_api_update_can_set_prohibition(sioux_falls_example):
 
 
 def test_turn_restriction_requires_node_consistency(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_disconnected_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair
