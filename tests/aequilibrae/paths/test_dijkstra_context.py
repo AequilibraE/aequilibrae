@@ -545,14 +545,11 @@ def test_uturn_policy_and_zero_cost_cycles(cost, allow_uturns, override, reachab
     assert_state_tree(context, results)
 
 
-@pytest.mark.parametrize("use_hybrid", [False, True])
-def test_turn_topology_copied_then_shared_by_independent_objectives(use_hybrid):
+def test_turn_topology_copied_then_shared_by_independent_objectives():
     offsets = np.array([0, 99, 1, 99, 1])[::2]
     links = np.array([1, 99])[::2]
     penalties = np.array([2.5, 99])[::2]
-    context = TurnBasedContext(
-        [0, 1, 2, 2], [1, 2], np.array([1.0, 2.0]), offsets, links, penalties, use_hybrid=use_hybrid
-    )
+    context = TurnBasedContext([0, 1, 2, 2], [1, 2], np.array([1.0, 2.0]), offsets, links, penalties)
     for source, output in (
         (offsets, context.turn_fs),
         (links, context.turn_to_links),
@@ -561,12 +558,8 @@ def test_turn_topology_copied_then_shared_by_independent_objectives(use_hybrid):
         assert not np.shares_memory(source, output)
         source[:] = 99
     other = context.with_costs(np.array([2.0, 3.0]))
-    for name in (
-        "fs", "heads", "tails", "turn_fs", "turn_to_links", "turn_penalties",
-        "state_labels", "first_nodes", "last_nodes",
-    ):
+    for name in ("fs", "heads", "tails", "turn_fs", "turn_to_links", "turn_penalties"):
         assert np.shares_memory(getattr(context, name), getattr(other, name))
-    assert other.use_hybrid == use_hybrid
     assert search(context, 0).path_cost_to(2) == 5.5
     del context
     assert search(other, 0).path_cost_to(2) == 7.5
@@ -674,14 +667,9 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns, use_hyb
 
 
 def test_hybrid_reduces_states_away_from_turn_controls():
-    width = 8
-    nodes = width * width
-    edges = sorted(
-        (a, b)
-        for a in range(nodes)
-        for b in range(nodes)
-        if abs(a // width - b // width) + abs(a % width - b % width) == 1
-    )
+    graph = nx.convert_node_labels_to_integers(nx.grid_2d_graph(8, 8)).to_directed()
+    nodes = len(graph)
+    edges = sorted(graph.edges)
     fs = np.r_[0, np.cumsum(np.bincount([a for a, _ in edges], minlength=nodes))]
     heads = [b for _, b in edges]
     costs = np.ones(len(edges))

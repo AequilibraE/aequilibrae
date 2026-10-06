@@ -116,7 +116,7 @@ def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compa
     topology = (offsets, links.b_node.to_numpy(), costs)
 
     if graph.has_turn_restrictions:
-        boundaries = {}
+        first = last = None
         if compact:
             compressed = graph.graph["__compressed_id__"].to_numpy()
             retained = compressed < link_count
@@ -130,7 +130,6 @@ def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compa
             last = np.empty(link_count, dtype=np.uintp)
             first[compressed[starts]] = heads[starts]
             last[compressed[ends]] = tails[ends]
-            boundaries = {"first_nodes": first, "last_nodes": last}
         # Keep Graph's connector bans rather than also blocking centroid nodes.
         # Compact routing uses Graph's turn tables without rebuilding them.
         return TurnBasedContext(
@@ -141,7 +140,8 @@ def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compa
             allow_uturns=graph.allow_path_uturns,
             blocked_centroid_count=0,
             use_hybrid=True,
-            **boundaries,
+            first_nodes=first,
+            last_nodes=last,
         )
 
     return NodeBasedContext(

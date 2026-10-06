@@ -231,11 +231,12 @@ def test_compressed_graph(compressed_graph):
 
 
 def test_dead_end_removal(compressed_graph):
-    # Dead end removal reaches links [30, 38, 40]. Link 40 is a single-direction link with no outgoing
-    # edges, which the reverse forward star built for turn-aware compression now finds too.
+    # The dead end remove should be able to remove links [30, 38]. In it's current state it is not able to remove
+    # link 40 as it's a single direction link with no outgoing edges so its not possible to find the incoming edges
+    # (in general) without a transposed graph representation.
     assert set(compressed_graph.dead_end_links) == set(
         compressed_graph.graph[compressed_graph.graph.dead_end == 1].link_id
-    ), "Dead end removal removed incorrect links"
+    ) - {40}, "Dead end removal removed incorrect links"
 
 
 def test_turn_restrictions_match_networkx(coquimbo_example):
@@ -361,54 +362,91 @@ def test_turn_restrictions_match_networkx(coquimbo_example):
     assert restricted_cost_aeq == pytest.approx(restricted_cost_nx)
 
 
-def _spur_graph_for_uturn():
-    """Builds 1(c)-3-2(c) with a spur 3-4, so reaching 2 from 1 needs either the direct move or a U-turn at 4."""
-    network = pd.DataFrame(
-        {
-            "link_id": [1, 2, 3],
-            "a_node": [1, 3, 3],
-            "b_node": [3, 2, 4],
-            "direction": [0, 0, 0],
-            "distance": [1.0, 1.0, 1.0],
-        }
-    )
+@pytest.mark.parametrize("uturn_penalty, allow_path_uturns", [(0.5, False), (np.inf, True)])
+def test_explicit_uturn_penalty_overrides_default_policy(uturn_penalty, allow_path_uturns):
     graph = Graph()
-    graph.network = network
+    graph.network = pd.DataFrame(
+        [(1, 1, 3, 0, 1.0), (2, 3, 2, 0, 1.0), (3, 3, 4, 0, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "distance"],
+    )
     graph.prepare_graph(np.array([1, 2], dtype=np.int64))
     graph.set_graph("distance")
-    return graph
-
-
-def _uturn_restrictions(uturn_penalty):
-    """Builds a turn table prohibiting the through movement 1-3-2 and setting the U-turn 3-4-3 to a given penalty."""
-    return pd.DataFrame(
-        {
+    graph.set_turn_restrictions(
+        pd.DataFrame({
             "from_node": [1, 3],
             "via_node": [3, 4],
             "to_node": [2, 3],
             "penalty": [np.inf, uturn_penalty],
-        }
+        }),
+        allow_path_uturns=allow_path_uturns,
     )
-
-
-def test_explicit_finite_uturn_overrides_default_ban():
-    """Test that an explicit finite penalty permits a U-turn even when allow_path_uturns is False."""
-    graph = _spur_graph_for_uturn()
-    graph.set_turn_restrictions(_uturn_restrictions(0.5), allow_path_uturns=False)
-
     res = graph.compute_path(1, 2)
+    if np.isfinite(uturn_penalty):
+        np.testing.assert_array_equal(res.path_nodes, [1, 3, 4, 3, 2])
+        assert res.milepost[-1] == 4.5
+    else:
+        assert res.path is None
 
-    assert res.path is not None, "Explicit finite U-turn penalty was overridden by the default U-turn ban"
-    assert list(res.path_nodes) == [1, 3, 4, 3, 2]
-    assert res.milepost[-1] == pytest.approx(4.5)
+
+def test_effective_via_node_protected_from_chain_compression():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 1, 2, 1, 1.0), (2, 2, 3, 1, 1.0), (3, 3, 4, 1, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+    )
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [3], "penalty": [5.0]}))
+    graph.prepare_graph(np.array([1, 4]), remove_dead_ends=False)
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+
+    assert 2 in graph.compact_all_nodes
+    assert graph.compact_num_links < graph.num_links
+    assert graph.compute_path(1, 4).milepost[-1] == 8.0
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 8.0
 
 
-def test_explicit_prohibited_uturn_is_not_overridden():
-    """Test that an explicit infinite penalty keeps a U-turn prohibited even when path U-turns are allowed."""
-    graph = _spur_graph_for_uturn()
-    graph.set_turn_restrictions(_uturn_restrictions(np.inf), allow_path_uturns=True)
+def test_cycle_preservation_under_chain_compression():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 1, 2, 1, 1.0), (2, 2, 3, 1, 1.0), (3, 3, 5, 1, 1.0),
+         (4, 5, 2, 1, 1.0), (5, 2, 4, 1, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+    )
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [4], "penalty": [np.inf]}))
+    graph.prepare_graph(np.array([1, 4]), remove_dead_ends=False)
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
 
-    assert graph.compute_path(1, 2).path is None
+    result = graph.compute_path(1, 4)
+    np.testing.assert_array_equal(result.path_nodes, [1, 2, 3, 5, 2, 4])
+    assert result.milepost[-1] == 5.0
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 5.0
+
+
+def test_distinct_compressed_chains_are_not_physical_uturns():
+    from aequilibrae.paths.routing_context import make_routing_context
+    from .test_a_star_context import heuristic_for, run as a_star_search
+
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 10, 20, 1, 1.0), (2, 20, 30, 1, 1.0), (3, 30, 50, 1, 1.0),
+         (4, 50, 60, 1, 1.0), (5, 60, 20, 1, 1.0), (6, 20, 40, 1, 1.0), (7, 50, 70, 1, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+    )
+    graph.set_turn_restrictions(
+        pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [np.inf]})
+    )
+    graph.prepare_graph(np.array([10, 40, 70]), remove_dead_ends=False)
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+
+    assert graph.compact_num_links < graph.num_links
+    result = graph.compute_path(10, 40)
+    np.testing.assert_array_equal(result.path_nodes, [10, 20, 30, 50, 60, 20, 40])
+    assert result.milepost[-1] == 6.0
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 6.0
+    context = make_routing_context(graph, compact=True)
+    assert a_star_search(context, 0, 1, heuristic_for(context, "euclidean", scale=0)).path_cost_to(1) == 6.0
 
 
 def test_degree_two_sink_is_not_compressed():

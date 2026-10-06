@@ -65,7 +65,6 @@ cdef class TurnBasedContext(GraphContext):
     cdef const size_t[::1] state_labels_buffer, first_nodes_buffer, last_nodes_buffer
     cdef double[::1] turn_penalties_buffer
     cdef cpp_bool uturns_allowed
-    cdef readonly cpp_bool use_hybrid
     cdef CppTurnBasedContext view(self) noexcept nogil
 
 

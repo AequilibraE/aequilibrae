@@ -119,7 +119,6 @@ cdef class GraphContext:
             other_turns.state_labels_buffer = source_turns.state_labels_buffer
             other_turns.first_nodes_buffer = source_turns.first_nodes_buffer
             other_turns.last_nodes_buffer = source_turns.last_nodes_buffer
-            other_turns.use_hybrid = source_turns.use_hybrid
         return other
 
     cdef CppNodeBasedContext graph_view(self) noexcept nogil:
@@ -241,7 +240,7 @@ cdef class TurnBasedContext(GraphContext):
         if use_hybrid:
             heads_array = np.asarray(self.heads_buffer)
             stateful = np.zeros(n, dtype=bool)
-            stateful[heads_array[np.flatnonzero(np.diff(turn_fs_array))]] = True
+            stateful[heads_array[from_links]] = True
             # A turn control can force a reversal at either neighbour too.
             adjacent = stateful[tails_array] | stateful[heads_array]
             stateful[tails_array[adjacent]] = True
@@ -251,20 +250,15 @@ cdef class TurnBasedContext(GraphContext):
             plain = ~stateful[heads_array]
             labels[plain] = representative[heads_array[plain]]
         self.state_labels_buffer = labels
-        self.use_hybrid = bool(use_hybrid)
 
-        if first_nodes is None and last_nodes is None:
-            self.first_nodes_buffer = self.heads_buffer
-            self.last_nodes_buffer = self.tails_buffer
-        elif first_nodes is None or last_nodes is None:
-            raise ValueError("first_nodes and last_nodes must be supplied together")
-        else:
-            first_array = validate_index_array(first_nodes, "first_nodes")
-            last_array = validate_index_array(last_nodes, "last_nodes")
-            if first_array.size != m or last_array.size != m:
-                raise ValueError("boundary nodes must have one value per link")
-            self.first_nodes_buffer = first_array
-            self.last_nodes_buffer = last_array
+        self.first_nodes_buffer = (
+            self.heads_buffer if first_nodes is None else validate_index_array(first_nodes, "first_nodes")
+        )
+        self.last_nodes_buffer = (
+            self.tails_buffer if last_nodes is None else validate_index_array(last_nodes, "last_nodes")
+        )
+        if self.first_nodes_buffer.shape[0] != m or self.last_nodes_buffer.shape[0] != m:
+            raise ValueError("boundary nodes must have one value per link")
 
     cdef CppTurnBasedContext view(self) noexcept nogil:
         """Borrow the graph and turn buffers for a turn-based search."""
@@ -289,21 +283,6 @@ cdef class TurnBasedContext(GraphContext):
     def tails(self):
         """Read-only starting node for each directed link."""
         return readonly_view(self.tails_buffer)
-
-    @property
-    def state_labels(self):
-        """Dijkstra label for each incoming link; connectors retain the actual link."""
-        return readonly_view(self.state_labels_buffer)
-
-    @property
-    def first_nodes(self):
-        """First physical neighbour reached along each link."""
-        return readonly_view(self.first_nodes_buffer)
-
-    @property
-    def last_nodes(self):
-        """Last physical neighbour left before reaching each link's head."""
-        return readonly_view(self.last_nodes_buffer)
 
     @property
     def turn_fs(self):

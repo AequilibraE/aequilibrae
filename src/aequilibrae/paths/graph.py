@@ -171,11 +171,11 @@ class GraphBase(ABC):  # noqa: B024
     def reverse(self):
         g = deepcopy(self)
         g.network = g.network.rename(columns={"a_node": "b_node", "b_node": "a_node"})
-        if self._turn_restrictions is not None:
-            g._turn_restrictions = self._turn_restrictions.rename(
-                columns={"from_node": "to_node", "to_node": "from_node"}
-            )
-        g._reprepare()
+        g.prepare_graph(self.centroids)
+        if self.cost_field:
+            g.set_graph(self.cost_field)
+        if self.skim_fields:
+            g.set_skimming(self.skim_fields)
         return g
 
     def prepare_graph(
@@ -250,11 +250,6 @@ class GraphBase(ABC):  # noqa: B024
         if self.centroids.shape[0]:
             self.__build_compressed_graph(remove_dead_ends)
             self.compact_num_links = self.compact_graph.shape[0]
-        else:
-            properties = self._build_directed_graph(self.network.iloc[:0], self.centroids)
-            (self.compact_all_nodes, self.compact_num_nodes, self.compact_nodes_to_indices,
-             self.compact_fs, self.compact_graph) = properties
-            self.compact_num_links = 0
 
         # The cache property should be recalculated when the graph has been re-prepared
         self.compressed_link_network_mapping_idx = None
@@ -320,7 +315,7 @@ class GraphBase(ABC):  # noqa: B024
 
         num_nodes = all_nodes.shape[0]
 
-        nodes_to_indices = np.full(int(all_nodes.max(initial=0)) + 1, -1, dtype=np.int64)
+        nodes_to_indices = np.full(int(all_nodes.max()) + 1, -1, dtype=np.int64)
         nlist = np.arange(num_nodes)
         nodes_to_indices[all_nodes] = nlist
 
@@ -430,7 +425,8 @@ class GraphBase(ABC):  # noqa: B024
         self.network.loc[filter, "b_node"] = self.network.loc[filter, "a_node"]
 
         if self.centroids is not None:
-            self._reprepare()
+            self.prepare_graph(self.centroids)
+            self.set_blocked_centroid_flows(self.block_centroid_flows)
         self._id = uuid.uuid4().hex
 
     def disconnected_nodes(self) -> np.ndarray:
@@ -497,9 +493,6 @@ class GraphBase(ABC):  # noqa: B024
                 f"Field '{cost_field}' not found in graph columns. Available fields: {list(self.graph.columns)}"
             )
 
-        self.graph[cost_field] = pd.to_numeric(self.graph[cost_field], errors="raise").astype(np.float64).fillna(np.inf)
-        if (self.graph[cost_field] < 0).any():
-            raise ValueError("Graph costs must be non-negative")
         self.cost_field = cost_field
 
         # Restore turn penalties from master copies (they are preserved across cost field changes).
@@ -557,7 +550,11 @@ class GraphBase(ABC):  # noqa: B024
         if self.centroids is not None and self.centroids.shape[0]:
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
-            df = self.graph.groupby("__compressed_id__")[skim_fields].sum().reset_index()
+            gpb = self.__graph_groupby
+            if any(x not in self.__graph_groupby for x in skim_fields):
+                gpb = self.graph.groupby(["__compressed_id__"])
+
+            df = gpb.sum(numeric_only=True)[skim_fields].reset_index()
 
             for i, skm in enumerate(skim_fields):
                 self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
@@ -625,16 +622,8 @@ class GraphBase(ABC):  # noqa: B024
             return float("inf")
         return value
 
-    def _reprepare(self) -> None:
-        centroids = self.centroids if self.num_zones else None
-        self.prepare_graph(centroids, self._remove_dead_ends, self._allow_uturns_everywhere)
-        if self.cost_field:
-            self.set_graph(self.cost_field)
-        if self.skim_fields:
-            self.set_skimming(self.skim_fields)
-
     def _compute_effective_turn_vias(self) -> set[int]:
-        if self._turn_restrictions is None or self._turn_restrictions.empty:
+        if self._turn_restrictions is None:
             return set()
         turns = self._turn_restrictions
         edges = pd.MultiIndex.from_arrays([
@@ -680,7 +669,12 @@ class GraphBase(ABC):  # noqa: B024
         self._turn_restrictions = turn_restrictions
         self._allow_path_uturns = allow_path_uturns
         if self.num_nodes >= 0:
-            self._reprepare()
+            self.prepare_graph(self.centroids if self.num_zones else None, self._remove_dead_ends,
+                               self._allow_uturns_everywhere)
+            if self.cost_field:
+                self.set_graph(self.cost_field)
+            if self.skim_fields:
+                self.set_skimming(self.skim_fields)
 
     def clear_turn_restrictions(self) -> None:
         """Clears all turn restrictions from the graph."""
@@ -838,7 +832,7 @@ class GraphBase(ABC):  # noqa: B024
         self.turn_to_arcs = np.asarray(turn_to_arcs, dtype=self.default_types("int"))
         self.turn_penalties = np.asarray(turn_penalties, dtype=self.default_types("float"))
         self._turn_penalties_master = np.array(self.turn_penalties, copy=True)
-        if self.compact_graph.empty:
+        if self.compact_graph.empty or not self.num_zones:
             self.compact_turn_fs = np.zeros(1, dtype=self.default_types("int"))
             self.compact_turn_to_arcs = np.empty(0, dtype=self.default_types("int"))
             self.compact_turn_penalties = np.empty(0, dtype=self.default_types("float"))

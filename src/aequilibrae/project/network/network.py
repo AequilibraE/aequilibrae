@@ -244,14 +244,12 @@ class Network(WorkerThread):
             g.mode = m
             g.network = net
 
-            mode_turns = None
             if turn_restrictions_df is not None:
-                mode_turns = turn_restrictions_df[
+                g._turn_restrictions = turn_restrictions_df[
                     turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
                 ].copy()
 
-            # Install the turn policy before compression.
-            g.set_turn_restrictions(mode_turns, allow_path_uturns=allow_uturns)
+            g.set_turn_restrictions(g._turn_restrictions, allow_path_uturns=allow_uturns)
 
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)
