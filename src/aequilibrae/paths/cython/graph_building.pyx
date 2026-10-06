@@ -281,8 +281,12 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         graph.dead_end_links = np.array([], dtype=np.int64)
 
     if df.empty:
-        (graph.compact_all_nodes, graph.compact_num_nodes, graph.compact_nodes_to_indices,
-         graph.compact_fs, graph.compact_graph) = graph._build_directed_graph(df, graph.centroids)
+        graph.compact_all_nodes = graph.centroids.astype(graph.default_types("int"))
+        graph.compact_num_nodes = len(graph.centroids)
+        graph.compact_nodes_to_indices = np.full(graph.centroids.max() + 1, -1, dtype=np.int64)
+        graph.compact_nodes_to_indices[graph.centroids] = np.arange(graph.compact_num_nodes)
+        graph.compact_fs = np.zeros(graph.compact_num_nodes + 1, dtype=np.int64)
+        graph.compact_graph = graph.graph.iloc[:0].copy()
         graph.graph["__compressed_id__"] = 0
         return
 
