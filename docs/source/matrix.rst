@@ -96,9 +96,10 @@ Alternatively, start with no named matrices and add them using ``AequilibraEMatr
     empty["car"] = np.zeros(empty.shape)
     empty.update({"bus": bus})
 
-Matrix assignment requires a NumPy array with the object's square shape.
-``AequilibraEMatrix`` copies supplied arrays and stores their values as
-``float64``. Changing an array supplied earlier does not change the matrix.
+Matrix assignment accepts array-like values with the object's square shape.
+Both objects store assigned matrices as ``float64``. ``AequilibraEMatrix``
+copies supplied arrays. Changing an array supplied earlier does not change
+the matrix. Replacing a matrix in a ``MatrixStore`` preserves its attributes.
 
 Inspect and manage named matrices
 ---------------------------------
@@ -251,6 +252,8 @@ names and mappings are not replaced unless ``overwrite=True`` is supplied:
 
 Prefer a new output file when the original must be preserved. Saving selected
 matrices to an existing file does not remove other matrices from the file.
+Overwriting a matrix preserves its existing attributes, values supplied in
+``matrix_metadata`` will replace matching attributes.
 
 You can supply per-matrix attributes separately when saving:
 
@@ -261,9 +264,11 @@ You can supply per-matrix attributes separately when saving:
         matrix_metadata={"car": {"mode": "car"}, "bus": {"mode": "bus"}},
     )
 
-The ``matrix_metadata`` is translated directly to OMX (and thus HDF5)
-attributes for the matrix groups. See the `h5py attributes documentation
-<https://docs.h5py.org/en/stable/high/attr.html>` for more information.
+The ``matrix_metadata`` must only name matrices being saved. Names outside
+``subset`` are rejected. The ``matrix_metadata`` is translated directly to OMX
+(and thus HDF5) attributes for the matrix groups. See the `h5py attributes
+documentation <https://docs.h5py.org/en/stable/high/attr.html>` for more
+information.
     
 A store can use these attributes to select an in-memory working set using OMX
 attribute queries:

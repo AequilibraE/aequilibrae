@@ -93,35 +93,42 @@ class _Matrix(MutableMapping[str, Any]):
 
         keys = set(self) if subset is None else set(subset)
         if missing_keys := keys - self.keys():
-            raise ValueError(f"found not existent keys in subset: {missing_keys}")
+            raise ValueError(f"found non-existent keys in subset: {missing_keys}")
+        if matrix_metadata is not None and (missing_keys := matrix_metadata.keys() - keys):
+            raise ValueError(f"matrix_metadata contains names outside the save subset: {missing_keys}")
 
-        with omx.open_file(path, mode="a", **kwargs) as file:
-            if not overwrite:
-                if self.index_name in file.list_mappings():
-                    raise ValueError(f"index '{self.index_name}' already exists in file: {path}")
+        if (shape := kwargs.get("shape")) is not None and tuple(shape) != self.shape:
+            raise ValueError(f"destination matrix shape does not match, expected {self.shape}, got {shape}")
 
-                if existing_keys := keys & set(file.list_matrices()):
-                    raise ValueError(f"matrices {existing_keys} already exist in file: {path}")
+        # OMX will try to save the OMX_SPECIAL_ATTRS when opened with write permissions, so we first open with read only
+        # to validate the file, then re-open with write permissions only once we know it's ok to save.
+        if os.path.exists(path):
+            with omx.open_file(path, mode="r") as file:
+                if (shape := file.shape()) is not None and shape != self.shape:
+                    raise ValueError(f"destination matrix shape does not match, expected {self.shape}, got {shape}")
 
-                if matrix_metadata is not None:
-                    for name, attributes in matrix_metadata.items():
-                        if (group := file.get(name)) is None:
-                            continue
+                if not overwrite:
+                    if self.index_name in file.list_mappings():
+                        raise ValueError(f"index '{self.index_name}' already exists in file: {path}")
 
-                        if existing_keys := group.attrs.keys() & attributes.keys():
-                            raise ValueError(
-                                f"attributes {existing_keys} already exist in file: {path} for matrix: {name}"
-                            )
+                    if existing_keys := keys & set(file.list_matrices()):
+                        raise ValueError(f"matrices {existing_keys} already exist in file: {path}")
 
-                    # Ignoring OMX special attribute, we don't write them anyway
+                    # Ignoring OMX special attributes, we don't write them anyway
                     if existing_keys := file.attrs.keys() & (self.metadata.keys() - OMX_SPECIAL_ATTRS):
                         raise ValueError(f"attributes {existing_keys} already exist in file: {path}")
 
+        with omx.open_file(path, mode="a", **kwargs) as file:
             # Save index, overwrite=True because we've already checked
             file.create_mapping(title=self.index_name, entries=self.index, overwrite=True)
 
             for name in keys:
+                # OMX replaces the dataset, so keep its existing attributes.
+                dataset = file.data.get(name)
+                attributes = dict(dataset.attrs) if dataset is not None else {}
+
                 file[name] = self[name]
+                file[name].attrs.update(attributes)
 
             if matrix_metadata is not None:
                 for name, attributes in matrix_metadata.items():
@@ -155,7 +162,7 @@ class _Matrix(MutableMapping[str, Any]):
         if len(np.unique(value)) != len(value):
             raise ValueError("found duplicate values in the index, the index must be unique")
 
-        if not np.can_cast(value.dtype, np.uintp, casting="safe"):
+        if value.size and not np.can_cast(value.dtype, np.uintp, casting="safe"):
             if np.isdtype(value.dtype, "signed integer"):
                 if value.min() < 0:
                     raise TypeError(f"cannot cast {value.dtype} to {np.uintp} safely (found negative values)")
@@ -212,7 +219,7 @@ class AequilibraEMatrix(_Matrix):
 
     # Normal write
     @overload
-    def __setitem__(self, key: str | tuple[str], value: np.ndarray) -> None: ...
+    def __setitem__(self, key: str | tuple[str], value: ArrayLike) -> None: ...
 
     # Allows in-place modification without writing the whole matrix
     @overload
@@ -222,7 +229,7 @@ class AequilibraEMatrix(_Matrix):
         key, rest = _key_to_key_and_rest(key)
 
         if not rest:
-            assert isinstance(value, np.ndarray)
+            value = np.asarray(value, dtype="float64", order="C")
             shape = self.shape
 
             if value.shape != shape:
@@ -302,18 +309,22 @@ class MatrixStore(_Matrix):
         self.close()
 
     def close(self) -> None:
-        self.omx.close()
+        if hasattr(self, "_backend"):
+            self.omx.close()
 
     def __del__(self) -> None:
         self.close()
 
     def _set_index(self, value: ArrayLike) -> None:
+        if self._backend.mode == "r" and hasattr(self, "_index"):
+            raise PermissionError("cannot change the index of a read-only matrix store")
+
         super()._set_index(value)
         if self._backend.mode != "r":
             self._backend.create_mapping(self.index_name, self.index, overwrite=True)
 
     @overload
-    def __setitem__(self, key: str | tuple[str], value: np.ndarray) -> None: ...
+    def __setitem__(self, key: str | tuple[str], value: ArrayLike) -> None: ...
 
     # dataset slice (partial write), allows in-place modification without writing the whole matrix
     @overload
@@ -323,13 +334,16 @@ class MatrixStore(_Matrix):
         key, rest = _key_to_key_and_rest(key)
 
         if not rest:
-            assert isinstance(value, np.ndarray)
+            value = np.asarray(value, dtype="float64", order="C")
 
             shape = self.shape
             if value.shape != shape:
                 raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
 
+            # OMX replaces the dataset, so keep its existing attributes.
+            attributes = dict(self._backend[key].attrs) if key in self else {}
             self._backend[key] = value
+            self._backend[key].attrs.update(attributes)
         else:
             self._backend[key][rest] = value
 
@@ -425,7 +439,7 @@ def from_file(
 
 @overload
 def from_dict(
-    data: Mapping[str, np.ndarray],
+    data: Mapping[str, ArrayLike],
     index: ArrayLike,
     *,
     path: None = None,
@@ -438,7 +452,7 @@ def from_dict(
 
 @overload
 def from_dict(
-    data: Mapping[str, np.ndarray],
+    data: Mapping[str, ArrayLike],
     index: ArrayLike,
     *,
     path: str | os.PathLike,
@@ -451,7 +465,7 @@ def from_dict(
 
 @overload
 def from_dict(
-    data: Mapping[str, np.ndarray],
+    data: Mapping[str, ArrayLike],
     index: ArrayLike,
     *,
     path: str | os.PathLike | None = None,
@@ -463,7 +477,7 @@ def from_dict(
 
 
 def from_dict(
-    data: Mapping[str, np.ndarray],
+    data: Mapping[str, ArrayLike],
     index: ArrayLike,
     *,
     path: str | os.PathLike | None = None,

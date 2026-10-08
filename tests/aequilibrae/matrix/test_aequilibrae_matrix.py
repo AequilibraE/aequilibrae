@@ -104,8 +104,7 @@ def test_construction_copies_index(matrix_factory, index, index_type):
         matrix.index[0] = 999
 
 
-def test_memory_assignment_copies_and_converts_values(index):
-    matrix = AequilibraEMatrix(index)
+def test_assignment_copies_and_converts_values(matrix):
     values = np.arange(9, dtype=np.int32).reshape(3, 3)
     expected = values.copy()
 
@@ -114,6 +113,32 @@ def test_memory_assignment_copies_and_converts_values(index):
 
     assert matrix["car"].dtype == np.dtype("float64")
     np.testing.assert_array_equal(matrix["car"], expected)
+
+
+@pytest.mark.parametrize("array_type", [np.asarray, list, tuple], ids=["array", "list", "tuple"])
+def test_assignment_accepts_array_like(matrix, data, array_type):
+    matrix["car"] = array_type(data["car"].tolist())
+    np.testing.assert_array_equal(matrix["car"], data["car"])
+    assert matrix["car"].dtype == np.dtype("float64")
+
+    matrix["car", 0, 1] = 2.5
+    assert matrix["car", 0, 1] == 2.5
+    matrix["car"] *= 1.1
+    assert matrix["car", 0, 1] == pytest.approx(2.75)
+
+
+@pytest.mark.parametrize("invalid_values", [1, [[1, 2], [3]], [["bad"] * 3] * 3])
+def test_invalid_assignment_preserves_values(matrix, index, data, metadata, invalid_values):
+    with pytest.raises((TypeError, ValueError)):
+        matrix["car"] = invalid_values
+    assert_matrix(matrix, index, data, metadata=metadata)
+
+
+@pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
+def test_from_dict_accepts_array_like(tmp_path, manage, index, data, store):
+    kwargs = {"path": tmp_path / "lists.omx"} if store else {}
+    matrix = manage(from_dict({name: values.tolist() for name, values in data.items()}, index, store=store, **kwargs))
+    assert_matrix(matrix, index, data, index_name="main_index")
 
 
 @pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
@@ -192,6 +217,89 @@ def test_save_requires_explicit_overwrite(matrix, tmp_path, index, data, metadat
         {**data, "car": replacement},
         metadata={**metadata, "description": "Updated demand"},
     )
+
+
+@pytest.mark.parametrize("matrix_metadata", [None, {"car": {"mode": "updated", "year": 2026}}])
+def test_save_overwrite_preserves_matrix_attributes(matrix, tmp_path, index, data, metadata, matrix_metadata):
+    path = tmp_path / "attributes.omx"
+    matrix.save_as_omx(path, matrix_metadata={"car": {"mode": "car", "units": "trips"}, "bus": {"mode": "bus"}})
+    with omx.open_file(path, "a") as file:
+        file["car"].attrs["periods"] = [1, 2, 3]
+
+    replacement = np.full(matrix.shape, 7.0)
+    matrix["car"] = replacement
+    matrix.save_as_omx(path, subset=["car"], matrix_metadata=matrix_metadata, overwrite=True)
+
+    assert_matrix(from_file(path, index_name="zones"), index, {**data, "car": replacement}, metadata=metadata)
+    with omx.open_file(path, "r") as file:
+        attrs = file["car"].attrs
+        assert attrs["mode"] == ("car" if matrix_metadata is None else "updated")
+        assert attrs["units"] == "trips"
+        np.testing.assert_array_equal(attrs["periods"], [1, 2, 3])
+        if matrix_metadata is not None:
+            assert attrs["year"] == 2026
+        assert file["bus"].attrs["mode"] == "bus"
+
+
+@pytest.mark.parametrize("overwrite", [False, True])
+@pytest.mark.parametrize("subset", [None, ["car"], []], ids=["all", "one", "empty"])
+def test_save_rejects_metadata_outside_subset(matrix, tmp_path, subset, overwrite):
+    path = tmp_path / "invalid.omx"
+    name = "missing" if subset is None else "bus"
+    with pytest.raises(ValueError, match="outside the save subset"):
+        matrix.save_as_omx(path, subset=subset, matrix_metadata={name: {"mode": name}}, overwrite=overwrite)
+    assert not path.exists()
+
+
+def test_save_rejects_metadata_for_existing_matrix_outside_subset(matrix, tmp_path, index, data, metadata):
+    path = tmp_path / "export.omx"
+    matrix.save_as_omx(path)
+
+    with pytest.raises(ValueError, match="outside the save subset"):
+        matrix.save_as_omx(path, subset=["car"], matrix_metadata={"bus": {"mode": "bus"}}, overwrite=True)
+    assert_matrix(from_file(path, index_name="zones"), index, data, metadata=metadata)
+    with omx.open_file(path, "r") as file:
+        assert "mode" not in file["bus"].attrs
+
+
+@pytest.mark.parametrize("matrix_metadata", [None, {"total": {"mode": "all"}}], ids=["no-attributes", "attributes"])
+def test_save_file_metadata_requires_overwrite(matrix, tmp_path, index, data, metadata, matrix_metadata):
+    path = tmp_path / "export.omx"
+    matrix.save_as_omx(path)
+    addition = from_dict(
+        {"total": np.zeros(matrix.shape)}, index, index_name="other", metadata={"description": "Changed demand"}
+    )
+
+    with pytest.raises(ValueError, match="attributes .* already exist"):
+        addition.save_as_omx(path, matrix_metadata=matrix_metadata, title="Changed title")
+    assert_matrix(from_file(path, index_name="zones"), index, data, metadata=metadata)
+    with omx.open_file(path, "r") as file:
+        assert "other" not in file.list_mappings()
+        assert "total" not in file.list_matrices()
+        assert file.attrs.get("TITLE", "") != "Changed title"
+
+    addition.save_as_omx(path, matrix_metadata=matrix_metadata, overwrite=True)
+    assert from_file(path, index_name="other").metadata["description"] == "Changed demand"
+
+
+@pytest.mark.parametrize("overwrite", [False, True])
+def test_save_rejects_destination_shape_before_writing(matrix, tmp_path, overwrite):
+    path = tmp_path / "different_shape.omx"
+    original = from_dict({"other": np.ones((2, 2))}, [10, 20], index_name="other")
+    original.save_as_omx(path)
+
+    with pytest.raises(ValueError, match="destination matrix shape"):
+        matrix.save_as_omx(path, overwrite=overwrite)
+    assert_matrix(from_file(path, index_name="other"), [10, 20], {"other": np.ones((2, 2))}, index_name="other")
+    with omx.open_file(path, "r") as file:
+        assert "zones" not in file.list_mappings()
+
+
+def test_save_rejects_shape_option_before_creating_file(matrix, tmp_path):
+    path = tmp_path / "invalid.omx"
+    with pytest.raises(ValueError, match="destination matrix shape"):
+        matrix.save_as_omx(path, shape=(2, 2))
+    assert not path.exists()
 
 
 @pytest.mark.parametrize("subset", [["car"], [], ["bus", "car"]], ids=["one", "empty", "all"])
@@ -319,6 +427,41 @@ def test_store_omx_access(omx_path, data):
         assert isinstance(store.omx, omx.File)
         assert set(store.omx.list_matrices()) == set(data)
         np.testing.assert_array_equal(np.asarray(store.omx["car"]), data["car"])
+
+
+@pytest.mark.parametrize("operation", ["replace", "scale", "slice"])
+def test_store_updates_preserve_matrix_attributes(omx_path, data, operation):
+    expected = data["car"].copy()
+    with from_file(omx_path, index_name="zones", mode="r+", store=True) as store:
+        if operation == "replace":
+            expected[:] = 7
+            store["car"] = expected
+        elif operation == "scale":
+            expected *= 2
+            store["car"] *= 2
+        else:
+            expected[:, 1] = 7
+            store["car", :, 1] = 7
+        assert store.omx["car"].attrs["mode"] == "car"
+        np.testing.assert_array_equal(store[{"mode": "car"}][0], expected)
+
+    with from_file(omx_path, index_name="zones", store=True) as store:
+        assert store.omx["car"].attrs["mode"] == "car"
+        np.testing.assert_array_equal(store["car"], expected)
+
+
+def test_read_only_store_rejects_index_replacement(omx_path, index):
+    with from_file(omx_path, index_name="zones", store=True) as store:
+        with pytest.raises(PermissionError, match="read-only"):
+            store.index = [809, 0, 801]
+        np.testing.assert_array_equal(store.index, index)
+        np.testing.assert_array_equal(store.omx.lookup["zones"][:], index)
+
+
+def test_failed_store_construction_has_no_cleanup_error(tmp_path, recwarn):
+    with pytest.raises(FileNotFoundError):
+        MatrixStore(tmp_path / "missing.omx")
+    assert not recwarn
 
 
 def test_store_edits_survive_reopening(omx_path, data, metadata):
