@@ -53,7 +53,7 @@ API Changes
    :maxdepth: 1
 
    table_api_migration
-
+   matrix_api_migration
 
 Changes in Behaviour
 --------------------
