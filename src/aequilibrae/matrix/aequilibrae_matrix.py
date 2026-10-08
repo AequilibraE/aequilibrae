@@ -1,6 +1,6 @@
 import os
 from abc import abstractmethod
-from collections.abc import MutableMapping
+from collections.abc import Iterator, MutableMapping
 from typing import Any, Literal, Mapping, Self, Sequence, overload
 
 import h5py
@@ -8,6 +8,9 @@ import numpy as np
 import openmatrix as omx
 import pandas as pd
 import scipy.sparse
+from numpy.typing import ArrayLike
+
+OMX_SPECIAL_ATTRS = {"OMX_VERSION", "OMX_CREATED_WITH", "SHAPE", "TITLE"}
 
 
 def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[tuple[str, h5py.Dataset]]:
@@ -23,10 +26,30 @@ def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[t
     return mats
 
 
-class Matrix(MutableMapping):
-    def __init__(self, index: np.ndarray, index_name: str):
-        self._backend: MutableMapping[str, np.ndarray]
+@overload
+def _key_to_key_and_rest(key: str | tuple[str, *tuple[Any, ...]]) -> tuple[str, tuple[Any, ...]]: ...
+
+
+@overload
+def _key_to_key_and_rest(
+    key: dict[str, Any] | tuple[dict[str, Any], *tuple[Any, ...]],
+) -> tuple[dict[str, Any], tuple[Any, ...]]: ...
+
+
+def _key_to_key_and_rest(
+    key: str | dict[str, Any] | tuple[str | dict[str, Any], *tuple[Any, ...]],
+) -> tuple[str | dict[str, Any], tuple[Any, ...]]:
+    if isinstance(key, tuple):
+        return key[0], key[1:]
+    else:
+        return key, ()
+
+
+class _Matrix(MutableMapping[str, Any]):
+    def __init__(self, index: ArrayLike, index_name: str) -> None:
+        self._backend: MutableMapping[str, Any]
         self._metadata: MutableMapping[str, Any]
+        self._index: np.ndarray
         assert hasattr(self, "_backend") and hasattr(self, "_metadata")
 
         self.__index_name = index_name
@@ -52,8 +75,11 @@ class Matrix(MutableMapping):
 
             self = cls(index=index, index_name=index_name, **kwargs)
 
+            # We should ignore the OMX special attributes
+            attrs = {key: value for key, value in file.attrs.items() if key not in OMX_SPECIAL_ATTRS}
+
             self.update(mats)
-            self.metadata.update(dict(file.attrs))
+            self.metadata.update(attrs)
             return self
 
     def save_as_omx(
@@ -61,10 +87,40 @@ class Matrix(MutableMapping):
         path: str | os.PathLike,
         subset: list[str] | None = None,
         matrix_metadata: Mapping[str, Mapping[str, Any]] | None = None,
+        overwrite: bool = False,
         **kwargs,
     ) -> None:
+
+        keys = set(self) if subset is None else set(subset)
+        if missing_keys := keys - self.keys():
+            raise ValueError(f"found not existent keys in subset: {missing_keys}")
+
         with omx.open_file(path, mode="a", **kwargs) as file:
-            for name in self.keys() if subset is None else subset:
+            if not overwrite:
+                if self.index_name in file.list_mappings():
+                    raise ValueError(f"index '{self.index_name}' already exists in file: {path}")
+
+                if existing_keys := keys & set(file.list_matrices()):
+                    raise ValueError(f"matrices {existing_keys} already exist in file: {path}")
+
+                if matrix_metadata is not None:
+                    for name, attributes in matrix_metadata.items():
+                        if (group := file.get(name)) is None:
+                            continue
+
+                        if existing_keys := group.attrs.keys() & attributes.keys():
+                            raise ValueError(
+                                f"attributes {existing_keys} already exist in file: {path} for matrix: {name}"
+                            )
+
+                    # Ignoring OMX special attribute, we don't write them anyway
+                    if existing_keys := file.attrs.keys() & (self.metadata.keys() - OMX_SPECIAL_ATTRS):
+                        raise ValueError(f"attributes {existing_keys} already exist in file: {path}")
+
+            # Save index, overwrite=True because we've already checked
+            file.create_mapping(title=self.index_name, entries=self.index, overwrite=True)
+
+            for name in keys:
                 file[name] = self[name]
 
             if matrix_metadata is not None:
@@ -74,30 +130,49 @@ class Matrix(MutableMapping):
                         attrs[key] = value
 
             for key, value in self.metadata.items():
+                # These attributes are managed by OMX so we shouldn't try to write them
+                if key in OMX_SPECIAL_ATTRS:
+                    continue
+
                 file.attrs[key] = value
 
     @abstractmethod
     def subset(
         self,
         subset: Sequence[str],
-    ) -> Self:
+    ) -> "_Matrix":
         pass
 
-    def _get_index(self) -> np.ndarray:
-        view = self.__index.view()
-        view.setflags(write=False)
-        return view
-
-    def _set_index(self, value: np.ndarray) -> None:
+    def _set_index(self, value: ArrayLike) -> None:
+        value = np.asarray(value)
         if value.ndim != 1:
             raise ValueError(f"got too many dimensions for the index, expected 1, got {value.ndim}")
+
+        # hasattr because we might not have set it yet as this is used in the __init__ function
+        if hasattr(self, "_index") and len(self._index) != len(value):
+            raise ValueError(f"matrix and index shape may not change, expected {len(self._index)}, got {len(value)}")
 
         if len(np.unique(value)) != len(value):
             raise ValueError("found duplicate values in the index, the index must be unique")
 
-        self.__index = np.asarray(value, copy=True, dtype=np.uintp, order="C")
+        if not np.can_cast(value.dtype, np.uintp, casting="safe"):
+            if np.isdtype(value.dtype, "signed integer"):
+                if value.min() < 0:
+                    raise TypeError(f"cannot cast {value.dtype} to {np.uintp} safely (found negative values)")
+            else:
+                raise TypeError(f"cannot cast {value.dtype} to {np.uintp} safely")
 
-    index = property(_get_index, _set_index)
+        self._index = np.asarray(value, copy=True, dtype=np.uintp, order="C")
+
+    @property
+    def index(self) -> np.ndarray:
+        view = self._index.view()
+        view.setflags(write=False)
+        return view
+
+    @index.setter
+    def index(self, value: ArrayLike) -> None:
+        self._set_index(value)
 
     @property
     def index_name(self) -> str:
@@ -109,39 +184,69 @@ class Matrix(MutableMapping):
 
     @property
     def shape(self) -> tuple[int, int]:
-        length = len(self.__index)
+        length = len(self._index)
         return (length, length)
 
     def __delitem__(self, key: str) -> None:
         del self._backend[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._backend.keys())
 
     def __len__(self) -> int:
         return len(self._backend)
 
+    def __contains__(self, key: object) -> bool:
+        return key in self._backend.keys()
 
-class AequilibraEMatrix(Matrix):
+
+class AequilibraEMatrix(_Matrix):
     def __init__(
         self,
-        index: np.ndarray,
+        index: ArrayLike,
         index_name: str = "main_index",
-    ):
+    ) -> None:
         self._backend: dict[str, np.ndarray] = {}
         self._metadata: dict[str, Any] = {}
         super().__init__(index=index, index_name=index_name)
 
-    def __setitem__(self, key: str, value: np.ndarray) -> None:
-        shape = self.shape
+    # Normal write
+    @overload
+    def __setitem__(self, key: str | tuple[str], value: np.ndarray) -> None: ...
 
-        if value.shape != shape:
-            raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
+    # Allows in-place modification without writing the whole matrix
+    @overload
+    def __setitem__(self, key: tuple[str, Any, *tuple[Any, ...]], value: ArrayLike) -> None: ...
 
-        self._backend[key] = np.asarray(value, copy=True, dtype="float64", order="C")
+    def __setitem__(self, key: str | tuple[str, *tuple[Any, ...]], value: ArrayLike) -> None:
+        key, rest = _key_to_key_and_rest(key)
 
-    def __getitem__(self, key: str) -> np.ndarray:
-        return self._backend[key].view()
+        if not rest:
+            assert isinstance(value, np.ndarray)
+            shape = self.shape
+
+            if value.shape != shape:
+                raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
+
+            self._backend[key] = np.asarray(value, copy=True, dtype="float64", order="C")
+        else:
+            self._backend[key][rest] = value
+
+    # Normal lookup
+    @overload
+    def __getitem__(self, key: str | tuple[str]) -> np.ndarray: ...
+
+    # dataset slice (partial read)
+    @overload
+    def __getitem__(self, key: tuple[str, Any, *tuple[Any, ...]]) -> np.ndarray | np.generic: ...
+
+    def __getitem__(self, key: str | tuple[str, *tuple[Any, ...]]) -> np.ndarray | np.generic:
+        key, rest = _key_to_key_and_rest(key)
+
+        if rest:
+            return self._backend[key][rest]
+        else:
+            return self._backend[key].view()
 
     def subset(
         self,
@@ -156,15 +261,15 @@ class AequilibraEMatrix(Matrix):
         return other
 
 
-class MatrixStore(Matrix):
+class MatrixStore(_Matrix):
     def __init__(
         self,
         path: str | os.PathLike,
-        index: np.ndarray | None = None,
+        index: ArrayLike | None = None,
         index_name: str = "main_index",
         mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
         **kwargs,
-    ):
+    ) -> None:
         file = omx.open_file(
             path,
             mode=mode,
@@ -181,7 +286,7 @@ class MatrixStore(Matrix):
 
             self._backend: omx.File = file
             self._metadata: h5py.AttributeManager = file.attrs
-            super().__init__(index=np.asarray(index), index_name=index_name)
+            super().__init__(index=index, index_name=index_name)
         except:
             file.close()
             raise
@@ -190,49 +295,71 @@ class MatrixStore(Matrix):
     def omx(self) -> omx.File:
         return self._backend
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *_args, **_kwargs):
+    def __exit__(self, *_args: Any, **_kwargs: Any) -> None:
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         self.omx.close()
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.close()
 
-    def _set_index(self, value: np.ndarray) -> None:
+    def _set_index(self, value: ArrayLike) -> None:
         super()._set_index(value)
         if self._backend.mode != "r":
             self._backend.create_mapping(self.index_name, self.index, overwrite=True)
 
-    index = property(Matrix._get_index, _set_index)
-
-    def __setitem__(self, key: str, value: np.ndarray) -> None:
-        shape = self.shape
-
-        if value.shape != shape:
-            raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
-
-        self._backend[key] = value
-
     @overload
-    def __getitem__(self, key: str) -> np.ndarray: ...
+    def __setitem__(self, key: str | tuple[str], value: np.ndarray) -> None: ...
 
+    # dataset slice (partial write), allows in-place modification without writing the whole matrix
     @overload
-    def __getitem__(self, key: dict[str, Any]) -> list[np.ndarray]: ...
+    def __setitem__(self, key: tuple[str, Any, *tuple[Any, ...]], value: ArrayLike) -> None: ...
 
-    def __getitem__(self, key: str | dict) -> np.ndarray | list[np.ndarray]:
-        value = self._backend[key]
+    def __setitem__(self, key: str | tuple[str, *tuple[Any, ...]], value: ArrayLike) -> None:
+        key, rest = _key_to_key_and_rest(key)
+
+        if not rest:
+            assert isinstance(value, np.ndarray)
+
+            shape = self.shape
+            if value.shape != shape:
+                raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
+
+            self._backend[key] = value
+        else:
+            self._backend[key][rest] = value
+
+    # Normal lookup
+    @overload
+    def __getitem__(self, key: str | tuple[str]) -> np.ndarray: ...
+
+    # OMX attribute query, optionally with a dataset slice (partial read)
+    @overload
+    def __getitem__(self, key: dict[str, Any] | tuple[dict[str, Any], *tuple[Any, ...]]) -> list[np.ndarray]: ...
+
+    # Named dataset slice (partial read)
+    @overload
+    def __getitem__(self, key: tuple[str, Any, *tuple[Any, ...]]) -> np.ndarray | np.generic: ...
+
+    def __getitem__(
+        self,
+        key: str | dict[str, Any] | tuple[str, *tuple[Any, ...]] | tuple[dict[str, Any], *tuple[Any, ...]],
+    ) -> np.ndarray | np.generic | list[np.ndarray]:
+        key, rest = _key_to_key_and_rest(key)
+
+        try:
+            value = self._backend[key]
+        except LookupError as e:
+            raise KeyError(key) from e
 
         if isinstance(key, str):
-            # OMX escape hatch to access HDF5 objects
-            if key.startswith("/"):
-                return value
-            return np.asarray(value)
+            return value[rest] if rest else np.asarray(value)
         else:
-            return [np.asarray(x) for x in value]
+            return [np.asarray(x[rest] if rest else x) for x in value]
 
     def subset(
         self,
@@ -254,7 +381,7 @@ def from_file(
     *,
     index_name: str = "main_index",
     subset: Sequence[str | dict[str, Any]] | None = None,
-    lazy: Literal[False] = False,
+    store: Literal[False] = False,
 ) -> AequilibraEMatrix: ...
 
 
@@ -265,8 +392,19 @@ def from_file(
     *,
     index_name: str = "main_index",
     subset: None = None,
-    lazy: Literal[True] = True,
+    store: Literal[True],
 ) -> MatrixStore: ...
+
+
+@overload
+def from_file(
+    path: str | os.PathLike,
+    mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
+    *,
+    index_name: str = "main_index",
+    subset: Sequence[str | dict[str, Any]] | None = None,
+    store: bool,
+) -> AequilibraEMatrix | MatrixStore: ...
 
 
 def from_file(
@@ -275,11 +413,11 @@ def from_file(
     *,
     index_name: str = "main_index",
     subset: Sequence[str | dict[str, Any]] | None = None,
-    lazy: bool = False,
+    store: bool = False,
 ) -> AequilibraEMatrix | MatrixStore:
-    if lazy:
+    if store:
         if subset is not None:
-            raise ValueError("both lazy and subset may not provided at once")
+            raise ValueError("store=True and subset may not be provided at once")
         return MatrixStore(path=path, index_name=index_name, mode=mode)
     else:
         return AequilibraEMatrix.from_omx(path=path, index_name=index_name, subset=subset)
@@ -288,42 +426,56 @@ def from_file(
 @overload
 def from_dict(
     data: Mapping[str, np.ndarray],
-    index: np.ndarray,
+    index: ArrayLike,
     *,
     path: None = None,
     mode: None = None,
     index_name: str = "main_index",
     metadata: Mapping[str, Any] | None = None,
-    lazy: Literal[False] = False,
+    store: Literal[False] = False,
 ) -> AequilibraEMatrix: ...
 
 
 @overload
 def from_dict(
     data: Mapping[str, np.ndarray],
-    index: np.ndarray,
+    index: ArrayLike,
     *,
     path: str | os.PathLike,
-    mode: Literal["w", "a", "r+", "w-", "x"] = "a",
+    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
     index_name: str = "main_index",
     metadata: Mapping[str, Any] | None = None,
-    lazy: Literal[True] = True,
+    store: Literal[True],
 ) -> MatrixStore: ...
 
 
+@overload
 def from_dict(
     data: Mapping[str, np.ndarray],
-    index: np.ndarray,
+    index: ArrayLike,
     *,
     path: str | os.PathLike | None = None,
     mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
     index_name: str = "main_index",
     metadata: Mapping[str, Any] | None = None,
-    lazy: bool = False,
+    store: bool,
+) -> AequilibraEMatrix | MatrixStore: ...
+
+
+def from_dict(
+    data: Mapping[str, np.ndarray],
+    index: ArrayLike,
+    *,
+    path: str | os.PathLike | None = None,
+    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
+    index_name: str = "main_index",
+    metadata: Mapping[str, Any] | None = None,
+    store: bool = False,
 ) -> AequilibraEMatrix | MatrixStore:
-    if lazy:
+    mat: AequilibraEMatrix | MatrixStore
+    if store:
         if path is None:
-            raise ValueError("a lazy matrix must have a path and a mode")
+            raise ValueError("a matrix store must have a path")
         mat = MatrixStore(
             path=path,
             index=index,
@@ -332,7 +484,7 @@ def from_dict(
         )
     else:
         if path is not None:
-            raise ValueError("a non-lazy matrix cannot have a path")
+            raise ValueError("an in-memory matrix cannot have a path")
         mat = AequilibraEMatrix(index=index, index_name=index_name)
 
     mat.update(data)
@@ -348,7 +500,7 @@ def from_df(
     col: str,
     subset: Sequence[str] | None = None,
     *,
-    index: np.ndarray | None = None,
+    index: ArrayLike | None = None,
     index_name: str = "main_index",
     fill_value: float = 0,
 ) -> AequilibraEMatrix:
@@ -367,7 +519,7 @@ def from_df(
 
     for name in subset:
         values = df[name].to_numpy(dtype="float64", copy=False)
-        values_matrix = np.full(mat.shape, fill_value, dtype="float64")
+        values_matrix: np.ndarray = np.full(mat.shape, fill_value, dtype="float64")
         values_matrix[rows, cols] = 0
         np.add.at(values_matrix, (rows, cols), values)
         mat[name] = values_matrix
@@ -377,7 +529,7 @@ def from_df(
 
 def from_scipy(
     data: Mapping[str, scipy.sparse.sparray],
-    index: np.ndarray,
+    index: ArrayLike,
     *,
     index_name: str = "main_index",
 ) -> AequilibraEMatrix:
