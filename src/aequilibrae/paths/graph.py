@@ -865,8 +865,8 @@ class GraphBase(ABC):  # noqa: B024
         self.turn_penalties = np.asarray(turn_penalties, dtype=self.default_types("float"))
         self._turn_penalties_master = np.array(self.turn_penalties, copy=True)
 
-        if self.compact_graph.empty:
-            self.compact_turn_fs = np.array([], dtype=self.default_types("int"))
+        if self.compact_graph.empty or not self.num_zones:
+            self.compact_turn_fs = np.zeros(1, dtype=self.default_types("int"))
             self.compact_turn_to_arcs = np.array([], dtype=self.default_types("int"))
             self.compact_turn_penalties = np.array([], dtype=self.default_types("float"))
             self._compact_turn_penalties_master = np.array(self.compact_turn_penalties, copy=True)

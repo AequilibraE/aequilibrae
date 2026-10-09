@@ -83,6 +83,54 @@ def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
     np.testing.assert_array_equal(np.diff(fs), np.bincount(links.a_node, minlength=num_nodes))
 
 
+@pytest.mark.parametrize("centroids", [[99, 1, 3], [1, 2, 3, 99]])
+def test_compression_preserves_isolated_centroids(centroids):
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 1, 2, 1, 1.0), (2, 2, 3, 1, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+    )
+    with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
+        graph.prepare_graph(np.array(centroids))
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+    graph.set_blocked_centroid_flows(False)
+
+    np.testing.assert_array_equal(graph.compact_all_nodes[:len(centroids)], centroids)
+    np.testing.assert_array_equal(graph.compact_nodes_to_indices[centroids], np.arange(len(centroids)))
+    isolated = graph.compact_nodes_to_indices[99]
+    assert graph.compact_fs[isolated] == graph.compact_fs[isolated + 1]
+    skims = graph.compute_skims().results.skims.matrix["cost"]
+    assert skims[centroids.index(1), centroids.index(3)] == 2.0
+    assert np.isinf(skims[centroids.index(1), centroids.index(99)])
+
+
+@pytest.mark.parametrize("links, centroids", [
+    ([(1, 10, 20, 1, 1.0)], [99, 100]),
+    ([(1, 10, 20, 1, 1.0), (2, 20, 30, 1, 1.0)], [99, 100]),
+    ([(1, 1, 3, 1, 1.0), (2, 2, 3, 1, 1.0)], [1, 2]),
+])
+def test_empty_compact_graph(links, centroids):
+    graph = Graph()
+    graph.network = pd.DataFrame(links, columns=["link_id", "a_node", "b_node", "direction", "cost"])
+    with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
+        graph.prepare_graph(np.array(centroids))
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+
+    assert graph.compact_num_links == 0
+    assert graph.compact_graph.empty
+    np.testing.assert_array_equal(graph.compact_all_nodes, centroids)
+    np.testing.assert_array_equal(graph.compact_nodes_to_indices[centroids], [0, 1])
+    np.testing.assert_array_equal(graph.compact_fs, [0, 0, 0])
+    np.testing.assert_array_equal(graph.compact_turn_fs, [0])
+    np.testing.assert_array_equal(graph.graph["__compressed_id__"], 0)
+    idx, data, _ = graph.create_compressed_link_network_mapping()
+    np.testing.assert_array_equal(idx, [0, len(links)])
+    np.testing.assert_array_equal(data, graph.graph["__supernet_id__"])
+    assert np.isinf(graph.compute_skims().results.skims.matrix["cost"][0, 1])
+
+
 def test_set_graph(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     graph.set_graph(cost_field="distance")
