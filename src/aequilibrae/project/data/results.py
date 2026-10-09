@@ -180,7 +180,7 @@ class Results(NonSpatialProjectTable):
 
     def clear_database(self) -> None:
         """Remove metadata for absent tables."""
-        with self._connection.transaction() as conn:
+        with self._results_connection.transaction() as conn:
             names = [row[0] for row in conn.execute("SELECT table_name FROM results").fetchall()]
             missing = [(name,) for name in names if not self.table_exists(name)]
 
@@ -197,7 +197,9 @@ class Results(NonSpatialProjectTable):
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
-        records = {row[0] for row in self._connection._connection.execute("SELECT table_name FROM results").fetchall()}
+        records = {
+            row[0] for row in self._results_connection._connection.execute("SELECT table_name FROM results").fetchall()
+        }
         for table_name in sorted(result_tables - records):
             self.insert(table_name=table_name)
 
@@ -207,7 +209,7 @@ class Results(NonSpatialProjectTable):
         self.update_database()
 
     def list(self) -> pd.DataFrame:
-        return pd.read_sql_query("SELECT * FROM results", self._connection._connection)
+        return pd.read_sql_query("SELECT * FROM results", self._results_connection._connection)
 
     def table_exists(self, table_name: str) -> bool:
         return (

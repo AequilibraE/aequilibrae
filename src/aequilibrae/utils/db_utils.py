@@ -15,6 +15,21 @@ from pandas.api import types as pd_types
 
 logger = logging.getLogger(__name__)
 
+DST_TABLE = "results"
+
+
+def add_blank_results_table(results_conn: Connection):
+    results_conn.execute(f"""
+                        CREATE TABLE {DST_TABLE} (
+                            table_name       TEXT     NOT NULL PRIMARY KEY,
+                            procedure        TEXT     NOT NULL,
+                            procedure_id     TEXT     NOT NULL UNIQUE,
+                            procedure_report TEXT     NOT NULL,
+                            timestamp        DATETIME DEFAULT current_timestamp,
+                            description      TEXT, year TEXT, scenario TEXT, reference_table TEXT
+                        )
+                    """)
+
 
 class _AequilibraEConnection(Connection):
     """SQLite connection type used by AequilibraEs NestedTransactionManager."""
@@ -336,6 +351,7 @@ class ConnectionClosure:
         except BaseException:
             path.unlink(missing_ok=True)
             raise
+        add_blank_results_table(self.__results_connection._connection)
         return self.__results_connection
 
     def create_transit_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:
