@@ -124,6 +124,23 @@ def test_set_algorithm(assignment, assigclass):
         assignment.set_algorithm("not a valid algorithm")
 
 
+def test_steps_below_needed_to_terminate_reaches_algorithm(assignment, assigclass):
+    """Test that steps_below_needed_to_terminate set after set_algorithm reaches the algorithm."""
+    assignment.add_class(assigclass)
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
+    assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
+    assignment.set_algorithm("bfw")
+
+    assignment.steps_below_needed_to_terminate = 3
+    assert assignment.assignment.steps_below_needed_to_terminate == 3
+
+    for invalid in (0, 2.0):
+        with pytest.raises(ValueError):
+            assignment.steps_below_needed_to_terminate = invalid
+    assert assignment.assignment.steps_below_needed_to_terminate == 3
+
+
 def test_set_time_field(assignment, assigclass):
     with pytest.raises(ValueError):
         assignment.set_time_field("capacity")

@@ -268,6 +268,17 @@ class TrafficAssignment(AssignmentBase):
         "bfw_conjugacy": (all_bfw_conjugacies, "BFW conjugacy"),
     }
 
+    # Attributes the algorithm copies when it is created, so later changes are forwarded to it, as
+    # {name: (validity check, error message)}.
+    __forwarded_attributes = {
+        "rgap_target": (lambda value: isinstance(value, float), "Relative gap needs to be a float"),
+        "max_iter": (lambda value: isinstance(value, int), "Number of iterations needs to be an integer"),
+        "steps_below_needed_to_terminate": (
+            lambda value: isinstance(value, int) and value >= 1,
+            "Steps below the target needed to terminate must be a positive integer",
+        ),
+    }
+
     # Attributes that only need a type check, as {name: (expected type, description used in the error)}.
     __plain_type_attributes = {
         "time_field": (str, "string"),
@@ -316,16 +327,12 @@ class TrafficAssignment(AssignmentBase):
         super().__setattr__(name, value)
 
     def __check_attributes(self, instance, value):
-        if instance == "rgap_target":
-            if not isinstance(value, float):
-                return False, value, "Relative gap needs to be a float"
+        if instance in self.__forwarded_attributes:
+            is_valid, message = self.__forwarded_attributes[instance]
+            if not is_valid(value):
+                return False, value, message
             if isinstance(self.assignment, LinearApproximation):
-                self.assignment.rgap_target = value
-        elif instance == "max_iter":
-            if not isinstance(value, int):
-                return False, value, "Number of iterations needs to be an integer"
-            if isinstance(self.assignment, LinearApproximation):
-                self.assignment.max_iter = value
+                setattr(self.assignment, instance, value)
         elif instance == "vdf":
             if not isinstance(value, VDF):
                 raise ValueError
