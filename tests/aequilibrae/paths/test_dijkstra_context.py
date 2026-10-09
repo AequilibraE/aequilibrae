@@ -613,7 +613,9 @@ def expanded_oracle(context, turns, origin):
 
 @pytest.mark.parametrize("seed", [17, 29, 42])
 @pytest.mark.parametrize("allow_uturns", [False, True])
-def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
+@pytest.mark.parametrize("use_hybrid", [False, True])
+@pytest.mark.parametrize("turn_probability", [0.02, 0.35])
+def test_random_multigraph_against_expanded_networkx(seed, allow_uturns, use_hybrid, turn_probability):
     rng = np.random.default_rng(seed)
     n = 8
     edges = [
@@ -622,10 +624,13 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
     turns = {}
     for incoming, (_, via, _) in enumerate(edges):
         for outgoing, (tail, _, _) in enumerate(edges):
-            if via == tail and rng.random() < 0.35:
+            if via == tail and rng.random() < turn_probability:
                 turns[incoming, outgoing] = np.inf if rng.random() < 0.3 else float(rng.integers(0, 10))
     fs = np.r_[0, np.cumsum(np.bincount([a for a, _, _ in edges], minlength=n))]
-    context = make_context(fs, [b for _, b, _ in edges], [c for _, _, c in edges], turns, allow_uturns=allow_uturns)
+    context = make_context(
+        fs, [b for _, b, _ in edges], [c for _, _, c in edges], turns,
+        allow_uturns=allow_uturns, use_hybrid=use_hybrid,
+    )
     results = allocate_results(context)
     for origin in range(n):
         oracle = expanded_oracle(context, turns, origin)
@@ -646,7 +651,8 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
             assert results.path_cost_to(destination) == expected
             assert_state_tree(context, results)
             for state in results.settlement_order[: results.settled_count]:
-                assert results.distances[state] == oracle[state]
+                incoming = results.root if state == results.root else results.connectors[state]
+                assert results.distances[state] == oracle[incoming]
             if not results.reachable_to(destination):
                 continue
             links = results.path_links_to(destination)
@@ -658,3 +664,62 @@ def test_random_multigraph_against_expanded_networkx(seed, allow_uturns):
                 penalty += turns.get((incoming, outgoing), 0)
             assert context.costs[links].sum() + penalty == expected
             assert results.path_turn_cost_to(destination) == penalty
+
+
+@pytest.mark.parametrize("allow_uturns, labels_per_node", [(True, 1), (False, 2)])
+def test_hybrid_reduces_states_away_from_turn_controls(allow_uturns, labels_per_node):
+    graph = nx.convert_node_labels_to_integers(nx.grid_2d_graph(8, 8)).to_directed()
+    nodes = len(graph)
+    edges = sorted(graph.edges)
+    fs = np.r_[0, np.cumsum(np.bincount([a for a, _ in edges], minlength=nodes))]
+    heads = [b for _, b in edges]
+    costs = np.ones(len(edges))
+    turns = {(0, int(fs[heads[0]])): 2.0}
+    full = make_context(fs, heads, costs, turns, allow_uturns=allow_uturns)
+    hybrid = make_context(fs, heads, costs, turns, allow_uturns=allow_uturns, use_hybrid=True)
+    reference, result = search(full, 0), search(hybrid, 0)
+
+    # Only the turn's node keeps a label per incoming link; the root is the extra state.
+    bound = 1 + heads.count(heads[0]) + labels_per_node * (nodes - 1)
+    assert result.settled_count <= bound < reference.settled_count
+    assert_state_tree(hybrid, result)
+    for destination in range(nodes):
+        assert result.path_cost_to(destination) == reference.path_cost_to(destination)
+
+
+def test_hybrid_retains_winning_link_and_reuses_labels_with_new_costs():
+    context = make_context([0, 2, 3, 4, 4], [1, 2, 3, 3], [10, 1, 1, 1], turn=True, use_hybrid=True)
+    results = search(context, 0, 3)
+    assert results.terminal_states[3] == 2
+    assert results.connectors[2] == 3
+    np.testing.assert_array_equal(results.path_links_to(3), [1, 3])
+    assert results.path_cost_to(3) == 2
+    assert_state_tree(context, results)
+
+    rebound = context.with_costs(np.array([1.0, 10.0, 1.0, 1.0]))
+    search(rebound, 0, 3, results)
+    np.testing.assert_array_equal(results.path_links_to(3), [0, 2])
+    assert results.path_cost_to(3) == 2
+    assert_state_tree(rebound, results)
+
+
+@pytest.mark.parametrize("use_hybrid", [False, True])
+@pytest.mark.parametrize(
+    "allow_uturns, expected",
+    [(False, [0, 1, 3, 5, 7, 8, 9, 6, 4, 2]), (True, [0, 1, 3, 4, 2])],
+)
+def test_turnaround_beyond_neighbours_of_turn_control(use_hybrid, allow_uturns, expected):
+    """Test that a banned turn is recovered through a turnaround beyond the neighbours of its node."""
+    # O=0, A=1, J=2, X=3, K=4, L=5, M=6, N=7. Turning A->J->X is banned, and without U-turns the only way back
+    # into J from K is the one-way loop L->M->N->L. The cheapest arrival at L comes from K, so it cannot turn back.
+    links = [(0, 1), (1, 2), (2, 3), (2, 4), (4, 2), (4, 5), (5, 4), (5, 6), (6, 7), (7, 5)]
+    fs = np.r_[0, np.cumsum(np.bincount([a for a, _ in links], minlength=8))]
+    context = make_context(
+        fs, [b for _, b in links], np.ones(len(links)), {(1, 2): np.inf},
+        allow_uturns=allow_uturns, use_hybrid=use_hybrid,
+    )
+    results = search(context, 0)
+
+    np.testing.assert_array_equal(results.path_links_to(3), expected)
+    assert results.path_cost_to(3) == len(expected)
+    assert_state_tree(context, results)

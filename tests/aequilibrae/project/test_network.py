@@ -66,3 +66,12 @@ def test_build_graphs_without_polygons(sioux_falls_test):
     assert g.num_nodes == 24
     assert g.num_links == 76
     assert list(g.centroids) == list(range(1, 25))
+
+
+def test_build_graphs_applies_uturn_policy(sioux_falls_test):
+    with sioux_falls_test.db_connection as conn:
+        conn.execute("UPDATE about SET infovalue='1' WHERE infoname='allow_uturns'")
+
+    sioux_falls_test.network.build_graphs(modes=["c"])
+
+    assert sioux_falls_test.network.graphs["c"].allow_path_uturns

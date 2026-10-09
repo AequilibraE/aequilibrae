@@ -16,11 +16,18 @@ struct NodeBasedContext {
 
 struct TurnBasedContext {
   NodeBasedContext graph;
-  const std::size_t *tails = nullptr;
   // Sparse turns grouped by incoming link, sorted by outgoing link.
   const std::size_t *turn_fs = nullptr;
   const std::size_t *turn_to_links = nullptr;
   const double *turn_penalties = nullptr;
+  // Controlled nodes keep one label per incoming link; elsewhere arrivals
+  // share a label. With U-turns banned, a second label keeps the best arrival
+  // from a different previous node (invalid_state where none is needed).
+  const std::size_t *state_labels = nullptr;
+  const std::size_t *second_labels = nullptr;
+  // Physical neighbours at each end of a link, including compressed chains.
+  const std::size_t *first_nodes = nullptr;
+  const std::size_t *last_nodes = nullptr;
   bool allow_uturns = true;
 };
 

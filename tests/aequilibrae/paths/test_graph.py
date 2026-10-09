@@ -7,7 +7,10 @@ import pytest
 
 from aequilibrae.paths import Graph, estimate_heuristic_scale
 from aequilibrae.paths.results import PathResults
+from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.transit import Transit
+
+from .test_a_star_context import heuristic_for, run as a_star_search
 
 
 @pytest.fixture(scope="function")
@@ -360,6 +363,73 @@ def test_turn_restrictions_match_networkx(coquimbo_example):
                 raise AssertionError("AequilibraE path contains a prohibited turn")
 
     assert restricted_cost_aeq == pytest.approx(restricted_cost_nx)
+
+
+@pytest.mark.parametrize("uturn_penalty, allow_path_uturns", [(0.5, False), (np.inf, True)])
+def test_explicit_uturn_penalty_overrides_default_policy(uturn_penalty, allow_path_uturns):
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 1, 3, 0, 1.0), (2, 3, 2, 0, 1.0), (3, 3, 4, 0, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "distance"],
+    )
+    graph.prepare_graph(np.array([1, 2], dtype=np.int64))
+    graph.set_graph("distance")
+    graph.set_turn_restrictions(
+        pd.DataFrame({
+            "from_node": [1, 3],
+            "via_node": [3, 4],
+            "to_node": [2, 3],
+            "penalty": [np.inf, uturn_penalty],
+        }),
+        allow_path_uturns=allow_path_uturns,
+    )
+    res = graph.compute_path(1, 2)
+    if np.isfinite(uturn_penalty):
+        np.testing.assert_array_equal(res.path_nodes, [1, 3, 4, 3, 2])
+        assert res.milepost[-1] == 4.5
+    else:
+        assert res.path is None
+
+
+def turn_chain_graph(links, turn, centroids):
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(i, a, b, 1, 1.0) for i, (a, b) in enumerate(links, 1)],
+        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+    )
+    graph.set_turn_restrictions(pd.DataFrame([turn], columns=["from_node", "via_node", "to_node", "penalty"]))
+    graph.prepare_graph(np.array(centroids), remove_dead_ends=False)
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+    return graph
+
+
+def assert_route(graph, nodes, cost):
+    result = graph.compute_path(nodes[0], nodes[-1])
+    np.testing.assert_array_equal(result.path_nodes, nodes)
+    assert result.milepost[-1] == cost
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == cost
+
+
+def test_effective_via_node_protected_from_chain_compression():
+    graph = turn_chain_graph([(1, 2), (2, 3), (3, 4)], (1, 2, 3, 5.0), [1, 4])
+    assert 2 in graph.compact_all_nodes
+    assert graph.compact_num_links < graph.num_links
+    assert_route(graph, [1, 2, 3, 4], 8.0)
+
+
+def test_cycle_preservation_under_chain_compression():
+    graph = turn_chain_graph([(1, 2), (2, 3), (3, 5), (5, 2), (2, 4)], (1, 2, 4, np.inf), [1, 4])
+    assert_route(graph, [1, 2, 3, 5, 2, 4], 5.0)
+
+
+def test_distinct_compressed_chains_are_not_physical_uturns():
+    links = [(10, 20), (20, 30), (30, 50), (50, 60), (60, 20), (20, 40), (50, 70)]
+    graph = turn_chain_graph(links, (10, 20, 40, np.inf), [10, 40, 70])
+    assert graph.compact_num_links < graph.num_links
+    assert_route(graph, [10, 20, 30, 50, 60, 20, 40], 6.0)
+    context = make_routing_context(graph, compact=True)
+    assert a_star_search(context, 0, 1, heuristic_for(context, "euclidean", scale=0)).path_cost_to(1) == 6.0
 
 
 def test_degree_two_sink_is_not_compressed():

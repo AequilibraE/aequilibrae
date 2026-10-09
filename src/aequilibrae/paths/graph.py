@@ -133,6 +133,7 @@ class GraphBase(ABC):  # noqa: B024
         # Turn restrictions data structures
         self._turn_restrictions = None  # DataFrame of turn restrictions
         self._allow_uturns_everywhere = False  # Preserve U-turn nodes during graph compression
+        self._remove_dead_ends = True
         self._allow_path_uturns = False  # Allow U-turns during arc-based pathfinding
         self._has_turn_restrictions = False  # Flag to indicate if turn restrictions are active
 
@@ -209,6 +210,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         self.__network_error_checking__()
 
+        self._remove_dead_ends = remove_dead_ends
         self._allow_uturns_everywhere = allow_uturns_everywhere
 
         # Creates the centroids
@@ -322,14 +324,7 @@ class GraphBase(ABC):  # noqa: B024
         df = df.sort_values(by=["a_node", "b_node"])
         df.index = np.arange(df.shape[0])
         df["id"] = np.arange(df.shape[0])
-        fs = np.empty(num_nodes + 1, dtype=self.__int_type)
-        fs.fill(-1)
-        y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
-        fs[y] = x[:]
-        fs[-1] = df.shape[0]
-        for i in range(num_nodes, 1, -1):
-            if fs[i - 1] == -1:
-                fs[i - 1] = fs[i]
+        fs = np.searchsorted(df.a_node.values, np.arange(num_nodes + 1)).astype(self.__int_type)
 
         nans = ", ".join([i for i in df.columns if df[i].isnull().any().any()])
         if nans:
@@ -620,6 +615,18 @@ class GraphBase(ABC):  # noqa: B024
             return float("inf")
         return value
 
+    def _compute_effective_turn_vias(self) -> np.ndarray:
+        if self._turn_restrictions is None:
+            return np.empty(0, dtype=np.int64)
+        turns = self._turn_restrictions
+        edges = pd.MultiIndex.from_arrays([
+            self.all_nodes[self.graph.a_node.to_numpy()],
+            self.all_nodes[self.graph.b_node.to_numpy()],
+        ])
+        incoming = pd.MultiIndex.from_frame(turns[["from_node", "via_node"]])
+        outgoing = pd.MultiIndex.from_frame(turns[["via_node", "to_node"]])
+        return np.unique(turns.loc[incoming.isin(edges) & outgoing.isin(edges), "via_node"].to_numpy(np.int64))
+
     def set_turn_restrictions(self, turn_restrictions: pd.DataFrame, allow_path_uturns: bool = False) -> None:
         """
         Sets turn restrictions for the graph. When turn restrictions are set,
@@ -644,31 +651,27 @@ class GraphBase(ABC):  # noqa: B024
                 U-turns are node-based transitions that return to the tail node of the
                 current directed arc. Default is ``False``.
         """
-        required_cols = {"from_node", "via_node", "to_node", "penalty"}
-        if not required_cols.issubset(turn_restrictions.columns):
-            missing = required_cols - set(turn_restrictions.columns)
-            raise ValueError(f"Turn restrictions DataFrame missing required columns: {missing}")
+        if turn_restrictions is not None:
+            required_cols = {"from_node", "via_node", "to_node", "penalty"}
+            if not required_cols.issubset(turn_restrictions.columns):
+                missing = required_cols - set(turn_restrictions.columns)
+                raise ValueError(f"Turn restrictions DataFrame missing required columns: {missing}")
+            turn_restrictions = turn_restrictions.copy()
+            turn_restrictions["penalty"] = turn_restrictions["penalty"].apply(self._normalise_turn_penalty)
 
-        normalised = turn_restrictions.copy()
-        normalised["penalty"] = normalised["penalty"].apply(self._normalise_turn_penalty)
-
-        # Keep a canonical copy of the user-provided turn table.
-        # The table is later mapped to arc IDs for both full and compact graphs.
-        self._turn_restrictions = normalised
+        self._turn_restrictions = turn_restrictions
         self._allow_path_uturns = allow_path_uturns
-        # Rebuild turn CSR structures for the full graph (and compact graph if present)
-        self._build_turn_csr_structures()
-
-        self._id = uuid.uuid4().hex  # Reset graph ID since structure changed
-        logger.info(f"Set {len(turn_restrictions)} turn restrictions, {allow_path_uturns=}")
+        if self.num_nodes >= 0:
+            self.prepare_graph(self.centroids if self.num_zones else None, self._remove_dead_ends,
+                               self._allow_uturns_everywhere)
+            if self.cost_field:
+                self.set_graph(self.cost_field)
+            if self.skim_fields:
+                self.set_skimming(self.skim_fields)
 
     def clear_turn_restrictions(self) -> None:
         """Clears all turn restrictions from the graph."""
-        self._turn_restrictions = None
-        self._allow_path_uturns = False
-        self._build_turn_csr_structures()
-        self._id = uuid.uuid4().hex
-        logger.info("Cleared turn restrictions")
+        self.set_turn_restrictions(None)
 
     def _has_multi_connector_centroid(self) -> bool:
         """
@@ -750,42 +753,7 @@ class GraphBase(ABC):  # noqa: B024
         return from_arcs, to_arcs, penalties
 
     def _build_turn_csr_structures(self) -> None:
-        """
-        Builds CSR structures for turn transitions in the compact graph.
-
-        For arc-based Dijkstra, we need to map from each incoming arc to its
-        possible outgoing arcs with associated turn penalties.
-        """
-        has_explicit_turns = self._turn_restrictions is not None and len(self._turn_restrictions) > 0
-        if has_explicit_turns:
-            tr = self._turn_restrictions
-            tr_from_node = tr["from_node"].to_numpy(np.int64, copy=False)
-            tr_via_node = tr["via_node"].to_numpy(np.int64, copy=False)
-            tr_to_node = tr["to_node"].to_numpy(np.int64, copy=False)
-            tr_penalty = pd.to_numeric(tr["penalty"], errors="coerce").to_numpy(np.float64, copy=False)
-
-            max_idx = self.nodes_to_indices.shape[0] - 1
-            valid_nodes = (
-                (tr_from_node >= 0)
-                & (tr_via_node >= 0)
-                & (tr_to_node >= 0)
-                & (tr_from_node <= max_idx)
-                & (tr_via_node <= max_idx)
-                & (tr_to_node <= max_idx)
-            )
-
-            tr_from_node_full = np.where(valid_nodes, self.nodes_to_indices[tr_from_node], -1)
-            tr_via_node_full = np.where(valid_nodes, self.nodes_to_indices[tr_via_node], -1)
-            tr_to_node_full = np.where(valid_nodes, self.nodes_to_indices[tr_to_node], -1)
-        else:
-            tr_from_node = np.empty(0, dtype=np.int64)
-            tr_via_node = np.empty(0, dtype=np.int64)
-            tr_to_node = np.empty(0, dtype=np.int64)
-            tr_penalty = np.empty(0, dtype=np.float64)
-            tr_from_node_full = np.empty(0, dtype=np.int64)
-            tr_via_node_full = np.empty(0, dtype=np.int64)
-            tr_to_node_full = np.empty(0, dtype=np.int64)
-
+        """Builds CSR structures for turn transitions in the full and compact graphs."""
         num_links = self.num_links
         graph_ids = self.graph["id"].to_numpy(np.int64, copy=False)
         graph_a_by_id = np.empty(num_links, dtype=np.int64)
@@ -794,20 +762,17 @@ class GraphBase(ABC):  # noqa: B024
         graph_b_by_id[graph_ids] = self.graph["b_node"].to_numpy(np.int64, copy=False)
 
         # 1) Map explicit user restrictions to directed full-graph arc IDs.
-        if tr_from_node_full.size > 0:
+        full_from_arcs = full_to_arcs = np.empty(0, dtype=np.int64)
+        full_penalties = np.empty(0, dtype=np.float64)
+        has_explicit_turns = self._turn_restrictions is not None and len(self._turn_restrictions) > 0
+        if has_explicit_turns:
+            tr = self._turn_restrictions
+            # Nodes missing from this graph index as -1, which matches no arc.
+            nodes = tr[["from_node", "via_node", "to_node"]].to_numpy(np.int64)
+            indices = pd.Index(self.all_nodes).get_indexer(nodes.ravel()).reshape(-1, 3).T
             full_from_arcs, full_to_arcs, full_penalties = self._map_node_turn_restrictions_to_arcs(
-                self.fs,
-                graph_a_by_id,
-                graph_b_by_id,
-                tr_from_node_full,
-                tr_via_node_full,
-                tr_to_node_full,
-                tr_penalty,
+                self.fs, graph_a_by_id, graph_b_by_id, *indices, tr["penalty"].to_numpy(np.float64)
             )
-        else:
-            full_from_arcs = np.empty(0, dtype=np.int64)
-            full_to_arcs = np.empty(0, dtype=np.int64)
-            full_penalties = np.empty(0, dtype=np.float64)
 
         # 2) Only use connector bans with explicit turns, otherwise keep node-based centroid blocking.
         # A single bidirectional connector needs a ban only if path U-turns are allowed.
@@ -841,76 +806,25 @@ class GraphBase(ABC):  # noqa: B024
         self.turn_to_arcs = np.asarray(turn_to_arcs, dtype=self.default_types("int"))
         self.turn_penalties = np.asarray(turn_penalties, dtype=self.default_types("float"))
         self._turn_penalties_master = np.array(self.turn_penalties, copy=True)
-
-        if self.compact_graph.empty:
-            self.compact_turn_fs = np.array([], dtype=self.default_types("int"))
-            self.compact_turn_to_arcs = np.array([], dtype=self.default_types("int"))
-            self.compact_turn_penalties = np.array([], dtype=self.default_types("float"))
+        self._has_turn_restrictions = self.turn_penalties.size > 0
+        if not self.num_zones:
+            self.compact_turn_fs = np.zeros(1, dtype=self.default_types("int"))
+            self.compact_turn_to_arcs = np.empty(0, dtype=self.default_types("int"))
+            self.compact_turn_penalties = np.empty(0, dtype=self.default_types("float"))
             self._compact_turn_penalties_master = np.array(self.compact_turn_penalties, copy=True)
-            self._has_turn_restrictions = self.turn_penalties.size > 0
             return
 
-        num_compact_links = self.compact_num_links
-        compact_ids = self.compact_graph["id"].to_numpy(np.int64, copy=False)
-        compact_a_by_id = np.empty(num_compact_links, dtype=np.int64)
-        compact_b_by_id = np.empty(num_compact_links, dtype=np.int64)
-        compact_a_by_id[compact_ids] = self.compact_graph["a_node"].to_numpy(np.int64, copy=False)
-        compact_b_by_id[compact_ids] = self.compact_graph["b_node"].to_numpy(np.int64, copy=False)
-
-        # 4) Repeat mapping for compact graph IDs used by assignment/skimming.
-        if tr_from_node.size > 0 and self.compact_nodes_to_indices.shape[0] > 0:
-            max_compact_idx = self.compact_nodes_to_indices.shape[0] - 1
-            valid_compact_nodes = (
-                (tr_from_node >= 0)
-                & (tr_via_node >= 0)
-                & (tr_to_node >= 0)
-                & (tr_from_node <= max_compact_idx)
-                & (tr_via_node <= max_compact_idx)
-                & (tr_to_node <= max_compact_idx)
-            )
-            tr_from_node_compact = np.where(valid_compact_nodes, self.compact_nodes_to_indices[tr_from_node], -1)
-            tr_via_node_compact = np.where(valid_compact_nodes, self.compact_nodes_to_indices[tr_via_node], -1)
-            tr_to_node_compact = np.where(valid_compact_nodes, self.compact_nodes_to_indices[tr_to_node], -1)
-
-            compact_from_arcs, compact_to_arcs, compact_penalties = self._map_node_turn_restrictions_to_arcs(
-                self.compact_fs,
-                compact_a_by_id,
-                compact_b_by_id,
-                tr_from_node_compact,
-                tr_via_node_compact,
-                tr_to_node_compact,
-                tr_penalty,
-            )
-        else:
-            compact_from_arcs = np.empty(0, dtype=np.int64)
-            compact_to_arcs = np.empty(0, dtype=np.int64)
-            compact_penalties = np.empty(0, dtype=np.float64)
-
-        if block_centroid_turns:
-            auto_c_from_arcs, auto_c_to_arcs, auto_c_penalties = self._generate_centroid_connector_turn_bans(
-                self.num_zones,
-                self.compact_fs,
-                compact_a_by_id,
-                compact_b_by_id,
-            )
-            if auto_c_from_arcs.size > 0:
-                compact_from_arcs = np.concatenate([compact_from_arcs, auto_c_from_arcs])
-                compact_to_arcs = np.concatenate([compact_to_arcs, auto_c_to_arcs])
-                compact_penalties = np.concatenate([compact_penalties, auto_c_penalties])
-
+        # Via nodes are preserved, so full arc pairs map directly onto compact links; the CSR drops removed links.
+        compressed_ids = np.empty(num_links, dtype=np.int64)
+        compressed_ids[graph_ids] = self.graph["__compressed_id__"].to_numpy(np.int64)
         compact_turn_fs, compact_turn_to_arcs, compact_turn_penalties = self._build_sparse_turn_restriction_csr(
-            self.compact_num_links,
-            compact_from_arcs,
-            compact_to_arcs,
-            compact_penalties,
+            self.compact_num_links, compressed_ids[full_from_arcs], compressed_ids[full_to_arcs], full_penalties
         )
 
         self.compact_turn_fs = np.asarray(compact_turn_fs, dtype=self.default_types("int"))
         self.compact_turn_to_arcs = np.asarray(compact_turn_to_arcs, dtype=self.default_types("int"))
         self.compact_turn_penalties = np.asarray(compact_turn_penalties, dtype=self.default_types("float"))
         self._compact_turn_penalties_master = np.array(self.compact_turn_penalties, copy=True)
-
-        self._has_turn_restrictions = self.turn_penalties.size > 0 or self.compact_turn_penalties.size > 0
 
     @staticmethod
     def _map_node_turn_restrictions_to_arcs(
@@ -1091,6 +1005,8 @@ class GraphBase(ABC):  # noqa: B024
             else self.compact_turn_penalties
         )
 
+        mygraph["remove_dead_ends"] = self._remove_dead_ends
+
         with open(filename, "wb") as f:
             pickle.dump(mygraph, f)
 
@@ -1106,7 +1022,8 @@ class GraphBase(ABC):  # noqa: B024
             self.description = mygraph["description"]
             self.num_links = mygraph["num_links"]
             self.num_nodes = mygraph["num_nodes"]
-            self.network = mygraph["network"]
+            self.network = pd.DataFrame(mygraph["network"])
+            self._remove_dead_ends = mygraph.get("remove_dead_ends", True)
             self.graph = mygraph["graph"]
             self.turn_penalty_dimension = mygraph.get("turn_penalty_dimension", "time")
             self.turn_skim_fields = mygraph.get("turn_skim_fields", [])

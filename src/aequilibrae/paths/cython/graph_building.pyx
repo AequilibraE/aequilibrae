@@ -20,6 +20,7 @@ cdef void _remove_dead_ends(
     long long [:] in_degree,
     long long [:] out_degree,
     uint8_t [:] burnt_links,
+    bint allow_uturns,
 ) noexcept nogil:
     cdef:
         long long b_node
@@ -67,6 +68,8 @@ cdef void _remove_dead_ends(
                 continue
 
             # ### Propagation
+            if allow_uturns:
+                continue
             # We now know that the node we are looking at has a mix of incoming and outgoing edges, i.e. in_degree[node]
             # > 0 and out_degree[node] > 0 That implies that this node is reachable from some other node. We now need to
             # assess if this node would ever be considered in pathfinding.  To be considered, there needs to be some
@@ -237,16 +240,22 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     graph_directions = graph.graph.direction.to_numpy(copy=False)
     graph_link_ids = graph.graph.link_id.to_numpy(copy=False)
 
-    directed_node_max = max(graph_a_nodes.max(), graph_b_nodes.max())
-    in_degree = np.bincount(graph_b_nodes, minlength=directed_node_max + 1)
-    out_degree = np.bincount(graph_a_nodes, minlength=directed_node_max + 1)
+    in_degree = np.bincount(graph_b_nodes, minlength=graph.num_nodes)
+    out_degree = np.bincount(graph_a_nodes, minlength=graph.num_nodes)
 
-    centroid_idx = graph.nodes_to_indices[graph.centroids]
-    in_degree[centroid_idx] = -1
-    out_degree[centroid_idx] = -1
-    del centroid_idx
+    effective_vias = graph._compute_effective_turn_vias()
+    protected_indices = graph.nodes_to_indices[np.r_[effective_vias, graph.centroids]]
+    in_degree[protected_indices] = -1
+    out_degree[protected_indices] = -1
+
+    allow_uturns = graph._allow_uturns_everywhere or graph._allow_path_uturns
 
     df = pd.DataFrame(graph.network, copy=True)
+
+    # Mode filtering represents excluded links as self-loops; keep only loops serving this mode.
+    if graph.mode and "modes" in df.columns:
+        df = df[(df.a_node != df.b_node) | df.modes.fillna("").astype(str).str.contains(graph.mode, regex=False)]
+
     if remove_dead_ends:
         burnt_links = np.full(len(graph.graph), False, dtype=bool)
         _remove_dead_ends(
@@ -259,6 +268,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
             in_degree,
             out_degree,
             burnt_links,
+            allow_uturns,
         )
         # Perhaps filter to unique link_ids? There'll be duplicates in here
         graph.dead_end_links = graph_link_ids[burnt_links]
@@ -267,6 +277,17 @@ def build_compressed_graph(graph, remove_dead_ends=True):
             df = df[~df.link_id.isin(graph.dead_end_links)]
     else:
         graph.dead_end_links = np.array([], dtype=np.int64)
+
+    if df.empty:
+        graph.compact_all_nodes = graph.centroids.astype(graph.default_types("int"))
+        graph.compact_num_nodes = len(graph.centroids)
+        graph.compact_nodes_to_indices = np.full(graph.centroids.max() + 1, -1, dtype=np.int64)
+        graph.compact_nodes_to_indices[graph.centroids] = np.arange(graph.compact_num_nodes)
+        graph.compact_fs = np.zeros(graph.compact_num_nodes + 1, dtype=np.int64)
+        graph.compact_graph = graph.graph.iloc[:0].copy()
+        graph.graph["__compressed_id__"] = 0
+        return
+
     # Build link index
     link_id_max = df.link_id.max()
     link_ids = df.link_id.to_numpy(copy=False)
@@ -280,7 +301,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     nodes = np.hstack([a_nodes, b_nodes])
     links = np.hstack([link_ids, link_ids])
     # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
-    counts = np.bincount(nodes)
+    counts = np.bincount(nodes, minlength=graph.centroids.max() + 1)
 
     idx = np.argsort(nodes)
     all_nodes = nodes[idx]
@@ -299,53 +320,18 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     # We keep all centroids for sure
     counts[graph.centroids] = 999
 
-    # If U-turns are allowed, we need to preserve nodes with bidirectional links
-    # because U-turns can occur at these nodes
-    if graph._allow_uturns_everywhere:
-        # Build lookups from link_id to direction/a_node/b_node for efficient access
-        _link_dir_lookup = dict(zip(df.link_id.values, df.direction.values))
-        _link_a_lookup = dict(zip(df.link_id.values, df.a_node.values))
-        _link_b_lookup = dict(zip(df.link_id.values, df.b_node.values))
-        for node in range(all_nodes_max + 1):
-            if counts[node] == 2:
-                has_incoming = False
-                has_outgoing = False
-                end_idx = links_index[node + 1] if node < all_nodes_max else len(all_links)
-                for i in range(links_index[node], end_idx):
-                    if i >= len(all_links):
-                        continue
-                    link_id = all_links[i]
-                    link_dir = _link_dir_lookup.get(link_id, None)
-                    if link_dir is None:
-                        continue
-                    a = _link_a_lookup.get(link_id)
-                    b = _link_b_lookup.get(link_id)
-                    if a is None or b is None:
-                        continue
-                    if link_dir == 0:  # Bidirectional: both incoming and outgoing
-                        has_incoming = True
-                        has_outgoing = True
-                    elif link_dir == 1:  # AB direction only
-                        if a == node:
-                            has_outgoing = True
-                        if b == node:
-                            has_incoming = True
-                    elif link_dir == -1:  # BA direction only
-                        if b == node:
-                            has_outgoing = True
-                        if a == node:
-                            has_incoming = True
-                    if has_incoming and has_outgoing:
-                        counts[node] = 998
-                        break
+    # If U-turns are allowed, preserve degree-two nodes that can be both entered and left: a U-turn can happen there
+    if allow_uturns:
+        forward, backward = directions >= 0, directions <= 0
+        enters = np.zeros(counts.shape[0], dtype=bool)
+        leaves = np.zeros(counts.shape[0], dtype=bool)
+        enters[b_nodes[forward]] = enters[a_nodes[backward]] = True
+        leaves[a_nodes[forward]] = leaves[b_nodes[backward]] = True
+        counts[(counts == 2) & enters & leaves] = 998
 
     # Preserve nodes that are via-nodes for turn restrictions
     # These nodes must not be compressed away or the restrictions become unmappable
-    if graph._turn_restrictions is not None and len(graph._turn_restrictions) > 0:
-        for via_node in graph._turn_restrictions["via_node"].to_numpy():
-            via_node = int(via_node)
-            if 0 <= via_node <= all_nodes_max and counts[via_node] == 2:
-                counts[via_node] = 998
+    counts[effective_vias] = 998
 
     degree_two = (counts == 2).astype(np.uint8)
     # Reorder and sum the degree two nodes by how they appear in the network, finds how a particular node is connected,
@@ -377,13 +363,15 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         all_links[:],
         compressed_dir[:],
         compressed_a_node[:],
-        compressed_b_node[:]
+        compressed_b_node[:],
     )
+
+    cycles = np.flatnonzero(compressed_a_node[:slink] == compressed_b_node[:slink])
+    simplified_links[np.isin(simplified_links, cycles)] = -1
 
     links_to_remove = (simplified_links >= 0).nonzero()[0]
     if links_to_remove.shape[0]:
         df = df[~df.link_id.isin(links_to_remove)]
-        df = df[df.a_node != df.b_node]
 
     comp_lnk = pd.DataFrame(
         {
@@ -486,9 +474,9 @@ def create_compressed_link_network_mapping(graph):
     # redoing sorting it. It produces an array (mapping_data) that indexes into the ordered graph, allowing any
     # attribute to be recovered in order.
 
-    # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`.
+    # Some links are completely removed from the network, they are assigned ID `graph.compact_num_links`.
     # They're included in the output but are un-ordered.
-    removed_id = graph.compact_graph.id.max() + 1
+    removed_id = graph.compact_num_links
     filtered = graph.graph[["__compressed_id__", "a_node", "b_node", "__supernet_id__"]]
     duplicated = filtered.__compressed_id__.duplicated(keep=False)
     gb = filtered[duplicated].groupby(by="__compressed_id__", sort=True)
