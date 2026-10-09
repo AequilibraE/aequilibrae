@@ -55,6 +55,34 @@ def test_prepare_graph_no_centroids(sioux_falls_example):
     graph.set_skimming("distance")
 
 
+def test_prepare_graph_first_node_has_no_outgoing_links():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 2, 1, 1), (2, 2, 3, 1)],
+        columns=["link_id", "a_node", "b_node", "direction"],
+    )
+    graph.prepare_graph()
+
+    np.testing.assert_array_equal(graph.all_nodes, [1, 2, 3])
+    np.testing.assert_array_equal(graph.fs, [0, 0, 2, 2])
+
+
+@pytest.mark.parametrize("centroids", [[99, 1, 3], [99, 98, 1, 3]])
+def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
+    graph = Graph()
+    network = pd.DataFrame(
+        [(1, 1, 2, 1, 0), (2, 2, 3, 1, 1)],
+        columns=["link_id", "a_node", "b_node", "direction", "id"],
+    )
+    # Test adjacency construction without invoking dead-end removal or compression.
+    with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
+        _, num_nodes, _, fs, links = graph._build_directed_graph(network, np.array(centroids, dtype=np.int64))
+
+    assert fs[0] == 0
+    assert fs[-1] == len(links)
+    np.testing.assert_array_equal(np.diff(fs), np.bincount(links.a_node, minlength=num_nodes))
+
+
 def test_set_graph(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     graph.set_graph(cost_field="distance")

@@ -327,7 +327,7 @@ class GraphBase(ABC):  # noqa: B024
         y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
         fs[y] = x[:]
         fs[-1] = df.shape[0]
-        for i in range(num_nodes, 1, -1):
+        for i in range(num_nodes, 0, -1):
             if fs[i - 1] == -1:
                 fs[i - 1] = fs[i]
 
