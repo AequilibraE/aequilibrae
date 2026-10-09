@@ -5,6 +5,15 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+SRC_TABLE = "results"  # name in project_database.sqlite
+DST_TABLE = "summary"  # name in results_database.sqlite
+
+
+def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    """Returns if 'conn' has a table named 'name'"""
+    row = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
+    return row is not None
+
 
 def migrate(
     *,
@@ -13,56 +22,88 @@ def migrate(
     results_conn: Optional[sqlite3.Connection] = None,
 ):
     if results_conn is None:
-        raise (ValueError("connect to results table is not given"))
+        raise (ValueError("result_conn is required, but is not given"))
     logger.info("Beginning migration to move the results table in project_database.sqlite to results_database.sqlite")
 
-    # check/ reserve "summary"
-    # name = "summary"
-    # try:
-    #     with sqlite3.connect("app.db") as conn:
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "INSERT INTO names_registry (name) VALUES (?)", (name,)
-    #         )
-    #         conn.commit()
-    #         print(f"Name '{name}' successfully reserved!")
-    # except sqlite3.IntegrityError:
-    #     print(f"Name '{name}' is already taken.")
-    results_path = results_conn.execute("PRAGMA database_list").fetchone()[2]
-    project_conn.execute("ATTACH DATABASE ? AS results_db", (results_path,))
+    src_exists = _table_exists(project_conn, SRC_TABLE)
+    dst_exists = _table_exists(results_conn, DST_TABLE)
 
-    SRC_TABLE = "results"  # name in project_database.sqlite
-    DST_TABLE = "summary"  # name in results_database.sqlite
-
-    results_conn.execute(f"""
-        CREATE TABLE {DST_TABLE} (
-            table_name       TEXT     NOT NULL PRIMARY KEY,
-            procedure        TEXT     NOT NULL,
-            procedure_id     TEXT     NOT NULL UNIQUE,
-            procedure_report TEXT     NOT NULL,
-            timestamp        DATETIME DEFAULT current_timestamp,
-            description      TEXT, year TEXT, scenario TEXT, reference_table TEXT
+    # check if it already exists
+    if not src_exists and dst_exists:
+        logger.info("Results summary table is already in the results database, and not in the project database.")
+        return
+    if not src_exists and not dst_exists:
+        raise RuntimeError(
+            f"'{SRC_TABLE}' is not in the project database, and {DST_TABLE} is not found in the results database. "
+            "Nothing to migrate."
         )
-    """)
-    results_conn.commit()
+    if src_exists and dst_exists:
+        # Possibly a previous run crashed after copying but before dropping.
+        raise RuntimeError(
+            f"'{DST_TABLE}' already exists in the results database, but {SRC_TABLE} still exists in the project "
+            "database."
+        )
+
+    results_path = results_conn.execute("PRAGMA database_list").fetchone()[2]
+    if results_path == "":
+        # results file
+        raise ValueError("Cannot find filepath of results database")
 
     cols = (
         "table_name, procedure, procedure_id, procedure_report, timestamp, description, year, scenario, reference_table"
     )
-    project_conn.execute(f'INSERT INTO results_db."{DST_TABLE}" ({cols}) SELECT {cols} FROM main."{SRC_TABLE}"')
+    existing_columns = [row[1] for row in project_conn.execute('PRAGMA table_info("results")')]
 
-    project_conn.execute(f"DROP TABLE {SRC_TABLE};")
-    # have copied - do some check
+    assert set(cols.split(", ")) == set(existing_columns), ValueError(
+        f"project database has different columns. Expected: {set(cols.split(', '))}, got {set(existing_columns)}"
+    )
 
-    # check it doesn't already exist
+    project_conn.execute("ATTACH DATABASE ? AS results_db", (results_path,))
+    attached = {name: path for _seq, name, path in project_conn.execute("PRAGMA database_list")}
+    if attached.get("results_db") != results_path:
+        raise RuntimeError("results_db is not attached to the expected file")
 
-    # make a new summary
+    results_conn.execute(f"""
+            CREATE TABLE {DST_TABLE} (
+                table_name       TEXT     NOT NULL PRIMARY KEY,
+                procedure        TEXT     NOT NULL,
+                procedure_id     TEXT     NOT NULL UNIQUE,
+                procedure_report TEXT     NOT NULL,
+                timestamp        DATETIME DEFAULT current_timestamp,
+                description      TEXT, year TEXT, scenario TEXT, reference_table TEXT
+            )
+        """)
 
-    # read in data
+    try:
+        project_conn.execute("BEGIN")
 
-    # if works, close
+        src_count = project_conn.execute(f'SELECT COUNT(*) FROM main."{SRC_TABLE}"').fetchone()[0]
 
-    # be very careful
+        # copy the table
+        project_conn.execute(f'INSERT INTO results_db."{DST_TABLE}" ({cols}) SELECT {cols} FROM main."{SRC_TABLE}"')
+
+        dst_count = project_conn.execute(f'SELECT COUNT(*) FROM results_db."{DST_TABLE}"').fetchone()[0]
+        if src_count != dst_count:
+            raise RuntimeError(f"Row count mismatch: source={src_count}, destination={dst_count}")
+
+        project_conn.commit()
+
+    except Exception:
+        project_conn.rollback()
+        logger.exception("Copy failed. Rollback project ")
+        raise
+    finally:
+        # detach
+        project_conn.execute("DETACH DATABASE results_db")
+
+    # carefully drop
+    try:
+        project_conn.execute("BEGIN")
+        project_conn.execute(f'DROP TABLE "{SRC_TABLE}"')
+        project_conn.commit()
+    except Exception:
+        project_conn.rollback()
+        raise
 
 
 def main():
