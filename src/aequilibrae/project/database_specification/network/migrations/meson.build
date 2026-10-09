@@ -11,6 +11,7 @@ pyfiles = [
     '007_add_zones_table.py',
     '008_add_other_attributes.py',
     '009_add_turn_restrictions.py',
+    '010_move_results_table_to_results_database.py',
     'migrations.py',
 ]
 
