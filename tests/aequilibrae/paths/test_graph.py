@@ -152,6 +152,83 @@ def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
         graph.set_turn_restrictions(turn_restrictions)
 
 
+@pytest.fixture
+def turn_graph():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 10, 20, 1, 1.0), (2, 20, 30, 1, 1.0), (3, 30, 40, 1, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+    )
+    graph.prepare_graph()
+    graph.set_graph("cost")
+    return graph
+
+
+@pytest.mark.parametrize(
+    "turn, column",
+    [
+        ([-999, 20, 30], "from_node"),
+        ([10, 15, 30], "via_node"),
+        ([10, 20, 999], "to_node"),
+    ],
+)
+def test_turn_restrictions_reject_missing_nodes(turn_graph, turn, column):
+    turns = pd.DataFrame([turn + [5.0]], columns=["from_node", "via_node", "to_node", "penalty"], index=[7])
+    with pytest.raises(ValueError, match=rf"{column} IDs not in the graph at rows \[7\]") as error:
+        turn_graph.set_turn_restrictions(turns)
+    assert str(turns.loc[7, column]) in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "turn, leg",
+    [
+        ([20, 10, 20], "from_node -> via_node"),
+        ([10, 20, 10], "via_node -> to_node"),
+        ([10, 30, 40], "from_node -> via_node"),
+        ([10, 20, 40], "via_node -> to_node"),
+    ],
+)
+def test_turn_restrictions_reject_missing_directed_legs(turn_graph, turn, leg):
+    turns = pd.DataFrame([turn + [5.0]], columns=["from_node", "via_node", "to_node", "penalty"], index=[7])
+    with pytest.raises(ValueError, match=rf"missing directed legs {leg} at rows \[7\]"):
+        turn_graph.set_turn_restrictions(turns)
+
+
+def test_turn_restrictions_allow_compressed_neighbour_nodes():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        [(1, 1, 2, 1, 1.0), (2, 2, 3, 1, 1.0), (3, 3, 4, 1, 1.0), (4, 4, 5, 1, 1.0)],
+        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+    )
+    turns = pd.DataFrame([[2, 3, 4, 5.0]], columns=["from_node", "via_node", "to_node", "penalty"])
+    # Project graph construction supplies turns before preparing the graph.
+    graph._turn_restrictions = turns.copy()
+    graph.prepare_graph(np.array([1, 5]), remove_dead_ends=False)
+    graph.set_graph("cost")
+    graph.set_turn_restrictions(turns)
+
+    assert 3 in graph.compact_all_nodes
+    assert 2 not in graph.compact_all_nodes
+    assert 4 not in graph.compact_all_nodes
+    assert graph.compute_path(1, 5).milepost[-1] == 9.0
+
+
+@pytest.mark.parametrize(
+    "turn, message",
+    [
+        ([999, 20, 30], "from_node IDs not in the graph at rows"),
+        ([30, 20, 30], "missing directed legs from_node -> via_node at rows"),
+    ],
+)
+def test_prepare_graph_rejects_invalid_existing_turns(turn_graph, turn, message):
+    turn_graph._turn_restrictions = pd.DataFrame(
+        [turn + [5.0]],
+        columns=["from_node", "via_node", "to_node", "penalty"],
+    )
+    with pytest.raises(ValueError, match=f"Turn restrictions have {message}"):
+        turn_graph.prepare_graph()
+
+
 def test_a_star_with_turn_restrictions(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     graph.prepare_graph()
