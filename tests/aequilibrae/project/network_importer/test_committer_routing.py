@@ -123,3 +123,17 @@ def test_existing_other_attributes_is_merged_not_overwritten(empty_project):
         first = json.loads(rows[0][1])
         assert first["pre_existing"] == "yes"
         assert first["surface"] == "asphalt"
+
+
+def test_existing_attribute_dict_preserves_nulls_and_is_not_mutated(empty_project):
+    nodes, links = _basic_inputs()
+    existing = {"nested": {"items": [1, None]}, "bridge": "old", "surface": "old"}
+    links["other_attributes"] = [None, existing, None]
+    _write(empty_project, nodes, links)
+
+    with empty_project.db_connection as conn:
+        payload = json.loads(conn.execute("SELECT other_attributes FROM links WHERE link_id = 2").fetchone()[0])
+    assert payload["nested"] == {"items": [1, None]}
+    assert payload["bridge"] == "old"
+    assert payload["surface"] == "gravel"
+    assert existing == {"nested": {"items": [1, None]}, "bridge": "old", "surface": "old"}
