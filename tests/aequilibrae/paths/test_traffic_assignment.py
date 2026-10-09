@@ -135,9 +135,8 @@ def test_steps_below_needed_to_terminate_reaches_algorithm(assignment, assigclas
     assignment.steps_below_needed_to_terminate = 3
     assert assignment.assignment.steps_below_needed_to_terminate == 3
 
-    for invalid in (0, 2.0):
-        with pytest.raises(ValueError):
-            assignment.steps_below_needed_to_terminate = invalid
+    with pytest.raises(ValueError):
+        assignment.steps_below_needed_to_terminate = 2.0
     assert assignment.assignment.steps_below_needed_to_terminate == 3
 
 

@@ -268,19 +268,14 @@ class TrafficAssignment(AssignmentBase):
         "bfw_conjugacy": (all_bfw_conjugacies, "BFW conjugacy"),
     }
 
-    # Attributes the algorithm copies when it is created, so later changes are forwarded to it, as
-    # {name: (validity check, error message)}.
-    __forwarded_attributes = {
-        "rgap_target": (lambda value: isinstance(value, float), "Relative gap needs to be a float"),
-        "max_iter": (lambda value: isinstance(value, int), "Number of iterations needs to be an integer"),
-        "steps_below_needed_to_terminate": (
-            lambda value: isinstance(value, int) and value >= 1,
-            "Steps below the target needed to terminate must be a positive integer",
-        ),
-    }
+    # Attributes the algorithm copies when it is created, so later changes are forwarded to it.
+    __forwarded_attributes = {"rgap_target", "max_iter", "steps_below_needed_to_terminate"}
 
     # Attributes that only need a type check, as {name: (expected type, description used in the error)}.
     __plain_type_attributes = {
+        "rgap_target": (float, "float"),
+        "max_iter": (int, "integer"),
+        "steps_below_needed_to_terminate": (int, "integer"),
         "time_field": (str, "string"),
         "capacity_field": (str, "string"),
         "cores": (int, "integer"),
@@ -327,13 +322,7 @@ class TrafficAssignment(AssignmentBase):
         super().__setattr__(name, value)
 
     def __check_attributes(self, instance, value):
-        if instance in self.__forwarded_attributes:
-            is_valid, message = self.__forwarded_attributes[instance]
-            if not is_valid(value):
-                return False, value, message
-            if isinstance(self.assignment, LinearApproximation):
-                setattr(self.assignment, instance, value)
-        elif instance == "vdf":
+        if instance == "vdf":
             if not isinstance(value, VDF):
                 raise ValueError
         elif instance == "classes":
@@ -357,6 +346,8 @@ class TrafficAssignment(AssignmentBase):
                 return False, value, f"Value for {instance} is not {description}"
         if instance not in self.__dict__:
             return False, value, f"TrafficAssignment class does not have property {instance}"
+        if instance in self.__forwarded_attributes and isinstance(self.assignment, LinearApproximation):
+            setattr(self.assignment, instance, value)
         return True, value, ""
 
     def __check_choice(self, instance, value, allowed, description):

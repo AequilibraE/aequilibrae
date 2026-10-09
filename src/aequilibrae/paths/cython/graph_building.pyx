@@ -240,17 +240,15 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     graph_directions = graph.graph.direction.to_numpy(copy=False)
     graph_link_ids = graph.graph.link_id.to_numpy(copy=False)
 
-    num_directed_nodes = graph.num_nodes
-    in_degree = np.bincount(graph_b_nodes, minlength=num_directed_nodes)
-    out_degree = np.bincount(graph_a_nodes, minlength=num_directed_nodes)
+    in_degree = np.bincount(graph_b_nodes, minlength=graph.num_nodes)
+    out_degree = np.bincount(graph_a_nodes, minlength=graph.num_nodes)
 
     effective_vias = graph._compute_effective_turn_vias()
-    protected = np.array(list(effective_vias) + list(graph.centroids), dtype=np.int64)
-    protected_indices = graph.nodes_to_indices[protected]
+    protected_indices = graph.nodes_to_indices[np.r_[effective_vias, graph.centroids]]
     in_degree[protected_indices] = -1
     out_degree[protected_indices] = -1
 
-    allow_uturns = bool(graph._allow_uturns_everywhere or graph._allow_path_uturns)
+    allow_uturns = graph._allow_uturns_everywhere or graph._allow_path_uturns
 
     df = pd.DataFrame(graph.network, copy=True)
 
@@ -302,13 +300,13 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     nodes = np.hstack([a_nodes, b_nodes])
     links = np.hstack([link_ids, link_ids])
+    # index (node) i has frequency counts[i]. This is just the number of edges that connect to a given node
+    counts = np.bincount(nodes, minlength=graph.centroids.max() + 1)
 
     idx = np.argsort(nodes)
     all_nodes = nodes[idx]
     all_links = links[idx]
     all_nodes_max = all_nodes.max()
-
-    counts = np.bincount(nodes, minlength=max(all_nodes_max, graph.centroids.max(initial=0)) + 1)
 
     links_index = np.full(all_nodes_max + 2, -1, dtype=np.int64)
     nlist = np.arange(all_nodes_max + 2)
@@ -322,49 +320,18 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     # We keep all centroids for sure
     counts[graph.centroids] = 999
 
-    # If U-turns are allowed, we need to preserve nodes with bidirectional links
-    # because U-turns can occur at these nodes
-    if graph._allow_uturns_everywhere or graph._allow_path_uturns:
-        # Build lookups from link_id to direction/a_node/b_node for efficient access
-        _link_dir_lookup = dict(zip(df.link_id.values, df.direction.values))
-        _link_a_lookup = dict(zip(df.link_id.values, df.a_node.values))
-        _link_b_lookup = dict(zip(df.link_id.values, df.b_node.values))
-        for node in range(all_nodes_max + 1):
-            if counts[node] == 2:
-                has_incoming = False
-                has_outgoing = False
-                end_idx = links_index[node + 1] if node < all_nodes_max else len(all_links)
-                for i in range(links_index[node], end_idx):
-                    if i >= len(all_links):
-                        continue
-                    link_id = all_links[i]
-                    link_dir = _link_dir_lookup.get(link_id, None)
-                    if link_dir is None:
-                        continue
-                    a = _link_a_lookup.get(link_id)
-                    b = _link_b_lookup.get(link_id)
-                    if a is None or b is None:
-                        continue
-                    if link_dir == 0:  # Bidirectional: both incoming and outgoing
-                        has_incoming = True
-                        has_outgoing = True
-                    elif link_dir == 1:  # AB direction only
-                        if a == node:
-                            has_outgoing = True
-                        if b == node:
-                            has_incoming = True
-                    elif link_dir == -1:  # BA direction only
-                        if b == node:
-                            has_outgoing = True
-                        if a == node:
-                            has_incoming = True
-                    if has_incoming and has_outgoing:
-                        counts[node] = 998
-                        break
+    # If U-turns are allowed, preserve degree-two nodes that can be both entered and left: a U-turn can happen there
+    if allow_uturns:
+        forward, backward = directions >= 0, directions <= 0
+        enters = np.zeros(counts.shape[0], dtype=bool)
+        leaves = np.zeros(counts.shape[0], dtype=bool)
+        enters[b_nodes[forward]] = enters[a_nodes[backward]] = True
+        leaves[a_nodes[forward]] = leaves[b_nodes[backward]] = True
+        counts[(counts == 2) & enters & leaves] = 998
 
     # Preserve nodes that are via-nodes for turn restrictions
     # These nodes must not be compressed away or the restrictions become unmappable
-    counts[list(effective_vias)] = 998
+    counts[effective_vias] = 998
 
     degree_two = (counts == 2).astype(np.uint8)
     # Reorder and sum the degree two nodes by how they appear in the network, finds how a particular node is connected,
@@ -507,7 +474,7 @@ def create_compressed_link_network_mapping(graph):
     # redoing sorting it. It produces an array (mapping_data) that indexes into the ordered graph, allowing any
     # attribute to be recovered in order.
 
-    # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`.
+    # Some links are completely removed from the network, they are assigned ID `graph.compact_num_links`.
     # They're included in the output but are un-ordered.
     removed_id = graph.compact_num_links
     filtered = graph.graph[["__compressed_id__", "a_node", "b_node", "__supernet_id__"]]

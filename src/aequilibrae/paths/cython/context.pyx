@@ -177,12 +177,8 @@ cdef class TurnBasedContext(GraphContext):
 
     ``turn_fs`` has ``link_count + 1`` entries. Explicit turns are grouped by
     their incoming link; missing turns cost zero. Search states are incoming
-    links plus a virtual root. Hybrid Dijkstra keeps one label per incoming
-    link only where those links have explicit turns. Elsewhere arrivals share
-    a label, retaining the winning link in the result's connector. With
-    U-turns banned, the winner cannot turn back to its previous node, so a
-    second label keeps the best arrival from a different previous node. A*
-    continues to use separate link states.
+    links plus a virtual root. With ``use_hybrid``, Dijkstra shares labels at
+    nodes without explicit turns; A* keeps separate link states.
     """
 
     def __init__(
@@ -223,13 +219,14 @@ cdef class TurnBasedContext(GraphContext):
         if np.any(np.isnan(turn_penalties)) or np.any(turn_penalties < 0):
             raise ValueError("turn_penalties must be nonnegative and must not contain NaN")
 
+        heads_array = np.asarray(self.heads_buffer)
         tails_array = np.repeat(np.arange(n, dtype=np.uintp), np.diff(self.node_offsets).astype(np.intp))
         from_links = np.repeat(np.arange(m, dtype=np.uintp), np.diff(turn_fs_array).astype(np.intp))
         same_row = from_links[1:] == from_links[:-1]
 
         if np.any(same_row & (to_array[1:] <= to_array[:-1])):
             raise ValueError("turn_to_links must be strictly increasing within each row")
-        if np.any(np.asarray(self.heads_buffer)[from_links] != tails_array[to_array]):
+        if np.any(heads_array[from_links] != tails_array[to_array]):
             raise ValueError("explicit turns must connect consecutive links")
 
         self.tails_buffer = tails_array
@@ -251,35 +248,25 @@ cdef class TurnBasedContext(GraphContext):
 
         labels = np.arange(m, dtype=np.uintp)
         second = np.full(m, np.iinfo(np.uintp).max, dtype=np.uintp)
-        if use_hybrid and m:
-            heads_array = np.asarray(self.heads_buffer)
-            # Arrivals are interchangeable unless an incoming link has turns of its own.
-            plain = np.ones(n, dtype=bool)
-            plain[heads_array[from_links]] = False
-            shared = plain[heads_array]
-
-            # Group links by head in link order; the first two into a node name its labels.
+        if use_hybrid:
+            # Arrivals are interchangeable unless an incoming link has turns of its own. The first two links into a
+            # node, in link order, name its labels.
+            shared = ~np.isin(heads_array, heads_array[from_links])
             order = np.argsort(heads_array, kind="stable")
-            grouped = heads_array[order]
-            starts = np.flatnonzero(np.r_[True, grouped[1:] != grouped[:-1]])
-            first_label = np.empty(n, dtype=np.uintp)
-            first_label[grouped[starts]] = order[starts]
-            labels[shared] = first_label[heads_array[shared]]
+            first = np.searchsorted(heads_array[order], heads_array)
+            labels[shared] = order[first[shared]]
 
             if not self.uturns_allowed:
-                # The best arrival only loses the move back to its previous node, which the best arrival from any
-                # other previous node can take. A second label is needed wherever a move leads back.
-                starts = starts[starts + 1 < m]
-                starts = starts[grouped[starts + 1] == grouped[starts]]
-                second_label = np.full(n, np.iinfo(np.uintp).max, dtype=np.uintp)
-                second_label[grouped[starts]] = order[starts + 1]
-
+                # The best arrival cannot turn back to its previous node, but the best one from another node can.
+                # A second label is only needed where some move leads back.
+                departures = np.sort(tails_array.astype(np.uint64) * n + np.asarray(self.first_nodes_buffer))
                 arrivals = heads_array.astype(np.uint64) * n + np.asarray(self.last_nodes_buffer)
-                departures = tails_array.astype(np.uint64) * n + np.asarray(self.first_nodes_buffer)
+                leads_back = departures[np.minimum(np.searchsorted(departures, arrivals), m - 1)] == arrivals
                 reversible = np.zeros(n, dtype=bool)
-                reversible[heads_array[np.isin(arrivals, departures)]] = True
-                paired = shared & reversible[heads_array]
-                second[paired] = second_label[heads_array[paired]]
+                reversible[heads_array[leads_back]] = True
+                in_degree = np.bincount(heads_array.astype(np.intp), minlength=n)
+                paired = shared & reversible[heads_array] & (in_degree[heads_array] > 1)
+                second[paired] = order[first[paired] + 1]
         self.state_labels_buffer = labels
         self.second_labels_buffer = second
 
@@ -287,7 +274,6 @@ cdef class TurnBasedContext(GraphContext):
         """Borrow the graph and turn buffers for a turn-based search."""
         cdef CppTurnBasedContext turns
         turns.graph = self.graph_view()
-        turns.tails = const_array_pointer(self.tails_buffer)
         turns.turn_fs = const_array_pointer(self.turn_offsets)
         turns.turn_to_links = const_array_pointer(self.turn_links)
         turns.turn_penalties = const_array_pointer[double](self.turn_penalties_buffer)

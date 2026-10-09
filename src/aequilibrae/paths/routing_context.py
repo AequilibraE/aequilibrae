@@ -138,7 +138,6 @@ def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compa
             turn_to_links=turn_links,
             turn_penalties=turn_penalties,
             allow_uturns=graph.allow_path_uturns,
-            blocked_centroid_count=0,
             use_hybrid=True,
             first_nodes=first,
             last_nodes=last,

@@ -244,12 +244,10 @@ class Network(WorkerThread):
             g.mode = m
             g.network = net
 
-            if turn_restrictions_df is not None:
-                g._turn_restrictions = turn_restrictions_df[
-                    turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
-                ].copy()
-
-            g.set_turn_restrictions(g._turn_restrictions, allow_path_uturns=allow_uturns)
+            turns = turn_restrictions_df
+            if turns is not None:
+                turns = turns[turns["modes"].fillna("").astype(str).str.contains(m, regex=False)]
+            g.set_turn_restrictions(turns, allow_path_uturns=allow_uturns)
 
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)

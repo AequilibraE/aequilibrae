@@ -16,7 +16,6 @@ struct NodeBasedContext {
 
 struct TurnBasedContext {
   NodeBasedContext graph;
-  const std::size_t *tails = nullptr;
   // Sparse turns grouped by incoming link, sorted by outgoing link.
   const std::size_t *turn_fs = nullptr;
   const std::size_t *turn_to_links = nullptr;

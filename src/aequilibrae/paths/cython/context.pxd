@@ -16,7 +16,6 @@ cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::routing" nogi
     cdef cppclass CppTurnBasedContext "aequilibrae::paths::cpp::routing::TurnBasedContext":
         CppTurnBasedContext() noexcept
         CppNodeBasedContext graph
-        const size_t *tails
         const size_t *turn_fs
         const size_t *turn_to_links
         const double *turn_penalties

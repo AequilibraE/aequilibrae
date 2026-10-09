@@ -89,8 +89,14 @@ void dijkstra_with_queue(const NodeBasedContext &context,
   }
 }
 
-// Record an arrival in a label if it is new or cheaper. Settled labels are
-// final, so they never change.
+inline void record_arrival(const MutableSearchResults &results,
+                           std::size_t label, std::size_t predecessor,
+                           std::size_t link, double turn_cost) noexcept {
+  results.predecessors[label] = predecessor;
+  results.connectors[label] = link;
+  results.turn_costs[label] = turn_cost;
+}
+
 template <class Queue>
 void offer_arrival(const MutableSearchResults &results, Queue &queue,
                    std::size_t label, double cost, std::size_t predecessor,
@@ -103,14 +109,11 @@ void offer_arrival(const MutableSearchResults &results, Queue &queue,
   } else {
     return;
   }
-  results.predecessors[label] = predecessor;
-  results.connectors[label] = link;
-  results.turn_costs[label] = turn_cost;
+  record_arrival(results, label, predecessor, link, turn_cost);
 }
 
-// A node with two labels keeps its best arrival and its best arrival from any
-// other previous node. The first serves every move except the one back to its
-// own previous node, which the second can always take.
+// The first label keeps a node's best arrival; the second keeps the best one
+// from any other previous node, for the move back the first cannot take.
 template <class Queue>
 void offer_paired_arrival(const TurnBasedContext &context,
                           const MutableSearchResults &results, Queue &queue,
@@ -119,30 +122,27 @@ void offer_paired_arrival(const TurnBasedContext &context,
                           double turn_cost) noexcept {
   const auto first_state = queue.effective_state(first);
   if (first_state == NOT_IN_HEAP) {
-    offer_arrival(results, queue, first, cost, predecessor, link, turn_cost);
+    queue.insert(first, cost);
+    record_arrival(results, first, predecessor, link, turn_cost);
     return;
   }
   const bool new_previous = context.last_nodes[link] !=
                             context.last_nodes[results.connectors[first]];
   if (first_state == IN_HEAP && cost < queue.element_key(first)) {
     if (new_previous) {
-      // The displaced arrival is now the best from another previous node. It
-      // costs no more than the current second label, which may even share
-      // the new previous node, so it always replaces it. The second label
-      // cannot be settled yet: settled labels cost no more than this arrival,
-      // which is below the displaced one, and a second label never costs less
-      // than its first.
+      // The displaced arrival is the best from another previous node, so it
+      // replaces the second label, which cannot be settled yet.
       const double displaced = queue.element_key(first);
       if (queue.effective_state(second) == NOT_IN_HEAP) {
         queue.insert(second, displaced);
       } else if (displaced < queue.element_key(second)) {
         queue.decrease_key(second, displaced);
       }
-      results.predecessors[second] = results.predecessors[first];
-      results.connectors[second] = results.connectors[first];
-      results.turn_costs[second] = results.turn_costs[first];
+      record_arrival(results, second, results.predecessors[first],
+                     results.connectors[first], results.turn_costs[first]);
     }
-    offer_arrival(results, queue, first, cost, predecessor, link, turn_cost);
+    queue.decrease_key(first, cost);
+    record_arrival(results, first, predecessor, link, turn_cost);
   } else if (new_previous) {
     offer_arrival(results, queue, second, cost, predecessor, link, turn_cost);
   }
@@ -155,9 +155,8 @@ void dijkstra_with_queue(const TurnBasedContext &context,
                          Queue &queue) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
   const auto &graph = context.graph;
-  // Link states preserve incoming-link history. One virtual root lets first
-  // links leave the origin without paying a turn cost, including edgeless
-  // graphs.
+  // One virtual root lets first links leave the origin without paying a turn
+  // cost, including edgeless graphs.
   const auto root = graph.link_count;
   results.reset();
   auto &metadata = *results.metadata;
@@ -188,27 +187,30 @@ void dijkstra_with_queue(const TurnBasedContext &context,
       continue;
     }
 
-    const auto incoming = state == root ? root : results.connectors[state];
-    // The first label has already offered every move at no greater cost,
-    // except the one back to its own previous node. That move is all a second
-    // label adds.
+    // A label shares its turn rows and label slots with every link it stands
+    // for, so it indexes them directly. A second label only adds the move
+    // back to its first label's previous node.
     const bool second_label =
-        state != root && context.second_labels[incoming] == state;
+        state != root && context.second_labels[state] == state;
     const auto reversal =
-        second_label ? context.last_nodes[results.connectors
-                                              [context.state_labels[incoming]]]
-                     : invalid_state;
-    auto turn = state == root ? 0 : context.turn_fs[incoming];
-    const auto turn_end = state == root ? 0 : context.turn_fs[incoming + 1];
+        second_label
+            ? context.last_nodes[results.connectors[context.state_labels[state]]]
+            : invalid_state;
+    const auto previous = state == root || context.allow_uturns
+                              ? invalid_state
+                              : context.last_nodes[results.connectors[state]];
+    const double turn_cost = results.turn_costs[state];
+    auto turn = state == root ? 0 : context.turn_fs[state];
+    const auto turn_end = state == root ? 0 : context.turn_fs[state + 1];
     for (auto next = graph.fs[node]; next < graph.fs[node + 1]; ++next) {
+      if (second_label && context.first_nodes[next] != reversal) {
+        continue;
+      }
       const auto next_label = context.state_labels[next];
       const auto next_second = context.second_labels[next];
       if (queue.effective_state(next_label) == SCANNED &&
           (next_second == invalid_state ||
            queue.effective_state(next_second) == SCANNED)) {
-        continue;
-      }
-      if (second_label && context.first_nodes[next] != reversal) {
         continue;
       }
       // Sorted turn rows can be merged with outgoing links without
@@ -220,21 +222,19 @@ void dijkstra_with_queue(const TurnBasedContext &context,
       const bool explicit_turn =
           turn < turn_end && context.turn_to_links[turn] == next;
       const double penalty = explicit_turn ? context.turn_penalties[turn] : 0.0;
-      if (state != root && !explicit_turn && !context.allow_uturns &&
-          context.first_nodes[next] == context.last_nodes[incoming]) {
+      if (!explicit_turn && context.first_nodes[next] == previous) {
         continue;
       }
       const double next_cost = cost + graph.costs[next] + penalty;
       if (!std::isfinite(next_cost)) {
         continue;
       }
-      const double turn_cost = results.turn_costs[state] + penalty;
       if (next_second == invalid_state) {
         offer_arrival(results, queue, next_label, next_cost, state, next,
-                      turn_cost);
+                      turn_cost + penalty);
       } else {
         offer_paired_arrival(context, results, queue, next_label, next_second,
-                             next_cost, state, next, turn_cost);
+                             next_cost, state, next, turn_cost + penalty);
       }
     }
   }
