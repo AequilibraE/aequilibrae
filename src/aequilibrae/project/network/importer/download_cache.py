@@ -21,25 +21,13 @@ def _slugify(text: str) -> str:
     return text or "untagged"
 
 
-def _utc_timestamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-
-
-def _sha256_of_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 class DownloadCache:
     """Write one import's raw payload under ``<project>/downloaded data/``."""
 
     def __init__(self, project_base_path, source_name: str, tag: str):
         self._project_base_path = Path(project_base_path)
         self._source_name = _slugify(source_name)
-        self._timestamp = _utc_timestamp()
+        self._timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
         self._tag = _slugify(tag)
         self._folder = (
             self._project_base_path / _BASE_FOLDER_NAME / self._source_name / f"{self._timestamp}__{self._tag}"
@@ -56,40 +44,32 @@ class DownloadCache:
         """The path relative to the project base, or ``None`` if nothing written."""
         if not self._created:
             return None
-        rel = self._folder.relative_to(self._project_base_path)
-        return str(rel).replace("\\", "/")
+        return self._folder.relative_to(self._project_base_path).as_posix()
 
-    def _ensure_folder(self) -> None:
+    def _write(self, name: str, suffix: str, write) -> Path:
         if not self._created:
             self._folder.mkdir(parents=True, exist_ok=True)
             self._created = True
             logger.info(f"Download cache folder: {self._folder}")
+        if not name.endswith(suffix):
+            name += suffix
+        target = self._folder / name
+        write(target)
+        with target.open("rb") as fh:
+            self._sha256s[name] = hashlib.file_digest(fh, "sha256").hexdigest()
+        return target
 
     def write_geoparquet(self, name: str, gdf) -> Path:
         """Write a GeoDataFrame, adding the ``.parquet`` suffix if needed."""
-        self._ensure_folder()
-        if not name.endswith(".parquet"):
-            name = name + ".parquet"
-        target = self._folder / name
-        gdf.to_parquet(target)
-        self._sha256s[name] = _sha256_of_file(target)
-        return target
+        return self._write(name, ".parquet", gdf.to_parquet)
 
     def write_json(self, name: str, payload) -> Path:
         """Write JSON, adding the ``.json`` suffix if needed."""
-        self._ensure_folder()
-        if not name.endswith(".json"):
-            name = name + ".json"
-        target = self._folder / name
-        target.write_text(
-            json.dumps(payload, indent=2, default=str),
-            encoding="utf-8",
-        )
-        self._sha256s[name] = _sha256_of_file(target)
-        return target
+        text = json.dumps(payload, indent=2, default=str)
+        return self._write(name, ".json", lambda target: target.write_text(text, encoding="utf-8"))
 
     def write_manifest(self, manifest: dict) -> Path:
-        """Convenience wrapper that writes ``manifest.json`` with provenance defaults."""
+        """Write provenance and payload checksums to ``manifest.json``."""
         payload = dict(manifest)
         payload.setdefault("source", self._source_name)
         payload.setdefault("tag", self._tag)

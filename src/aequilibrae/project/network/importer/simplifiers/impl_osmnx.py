@@ -54,11 +54,6 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
     src_attrs = build_source_attr_map(net.links)
     oriented_src_attrs = build_oriented_source_attr_map(net.links)
     osm_to_new = {nid: NODE_ID_START + i for i, nid in enumerate(graph.nodes)}
-    node_rows = []
-    for nid, data in graph.nodes(data=True):
-        geom = data.get("geometry") or Point(data["x"], data["y"])
-        node_rows.append({"node_id": osm_to_new[nid], "geometry": geom})
-
     node_xy = {nid: (d["x"], d["y"]) for nid, d in graph.nodes(data=True)}
     df = pd.DataFrame(list(graph.edges(data=True)), columns=["_u", "_v", "_data"])
     if len(df) == 0:
@@ -78,25 +73,24 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
 
     df["geometry"] = df.apply(_resolve_geom, axis=1)
 
-    df["_source_refs"] = _normalize_source_refs(df)
+    df["_source_refs"] = df[_SOURCE_REF_COL].apply(_as_str_list)
     df = _merge_reciprocal_edges(df).reset_index(drop=True)
 
     df["link_id"] = np.arange(1, len(df) + 1, dtype=np.int64)
     df["_source_ids"] = df["_source_refs"].apply(lambda refs: _base_source_ids(refs, oriented_src_attrs))
     df[SOURCE_ID_COL] = [ids[0] if ids else str(lid) for ids, lid in zip(df["_source_ids"], df["link_id"], strict=True)]
 
-    edge_modes = df["modes"].apply(_coerce_modes) if "modes" in df.columns else pd.Series("c", index=df.index)
-    df["modes"] = [_aggregate_modes(sids, src_attrs, m) for sids, m in zip(df["_source_ids"], edge_modes, strict=True)]
-
-    edge_lt = df["link_type"] if "link_type" in df.columns else pd.Series(dtype=object, index=df.index)
-    df["link_type"] = [
-        _first_non_missing(
-            (src_attrs.get(sid, {}).get("link_type") for sid in sids),
-            fallback=edge_val,
-            default="unknown",
-        )
-        for sids, edge_val in zip(df["_source_ids"], edge_lt, strict=True)
+    df["modes"] = [
+        _aggregate_modes(sids, src_attrs, _coerce_modes(m))
+        for sids, m in zip(df["_source_ids"], df["modes"], strict=True)
     ]
+    for column, default in (("link_type", "unknown"), ("name", None)):
+        df[column] = [
+            _first_non_missing(
+                (src_attrs.get(sid, {}).get(column) for sid in sids), fallback=edge_val, default=default
+            )
+            for sids, edge_val in zip(df["_source_ids"], df[column], strict=True)
+        ]
 
     if "length" in df.columns:
         df["distance"] = df["length"].apply(
@@ -109,21 +103,12 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
         gs = gpd.GeoSeries(df.loc[need_dist, "geometry"].values, crs="EPSG:4326")
         df.loc[need_dist, "distance"] = compute_lengths(gs).to_numpy()
 
-    edge_name = df["name"] if "name" in df.columns else pd.Series(dtype=object, index=df.index)
-    df["name"] = [
-        _first_non_missing((src_attrs.get(sid, {}).get("name") for sid in sids), fallback=edge_val)
-        for sids, edge_val in zip(df["_source_ids"], edge_name, strict=True)
-    ]
-
     directional_attrs = [
         _aggregate_directional_attrs(geom, refs, oriented_src_attrs)
         for geom, refs in zip(df["geometry"], df["_source_refs"], strict=True)
     ]
-    df["direction"] = [attrs["direction"] for attrs in directional_attrs]
-    df["speed_ab"] = [attrs["speed_ab"] for attrs in directional_attrs]
-    df["speed_ba"] = [attrs["speed_ba"] for attrs in directional_attrs]
-    df["lanes_ab"] = [attrs["lanes_ab"] for attrs in directional_attrs]
-    df["lanes_ba"] = [attrs["lanes_ba"] for attrs in directional_attrs]
+    for column in ("direction", "speed_ab", "speed_ba", "lanes_ab", "lanes_ba"):
+        df[column] = [attrs[column] for attrs in directional_attrs]
 
     df[PROVENANCE_OUT_COL] = df["_source_ids"].apply(lambda ids: build_provenance(ids, src_attrs))
 
@@ -144,16 +129,18 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
         SOURCE_ID_COL,
         PROVENANCE_OUT_COL,
     ]
-    links_out = gpd.GeoDataFrame(df[[c for c in out_cols if c in df.columns]], geometry="geometry", crs="EPSG:4326")
+    links_out = gpd.GeoDataFrame(df[out_cols], geometry="geometry", crs="EPSG:4326")
 
-    nodes_out = gpd.GeoDataFrame(node_rows, geometry="geometry", crs="EPSG:4326")
+    nodes_out = gpd.GeoDataFrame(
+        {"node_id": list(osm_to_new.values()), "geometry": [Point(xy) for xy in node_xy.values()]},
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
     used = set(links_out["a_node"]) | set(links_out["b_node"])
     nodes_out = nodes_out[nodes_out["node_id"].isin(used)].reset_index(drop=True)
-    nodes_out["modes"] = compute_node_modes(nodes_out["node_id"].to_numpy(), links_out, fallback="c")
+    nodes_out["modes"] = compute_node_modes(nodes_out["node_id"].to_numpy(), links_out)
 
-    out = StagedNetwork(nodes=nodes_out, links=links_out, source_meta=dict(net.source_meta))
-    out.validate()
-    return out
+    return StagedNetwork(nodes=nodes_out, links=links_out, source_meta=dict(net.source_meta))
 
 
 def _coerce_modes(value) -> str:
@@ -169,12 +156,7 @@ def _coerce_modes(value) -> str:
 
 
 def _merge_reciprocal_edges(df: pd.DataFrame) -> pd.DataFrame:
-    """Recombine ``::ab`` / ``::ba`` halves of a bidirectional link after osmnx simplification.
-
-    Without this, every two-way street comes back as two one-way links, doubling
-    count and length. Edges are merged only when they share a base source id, so
-    genuinely distinct parallel carriageways are never collapsed.
-    """
+    """Recombine reciprocal edges sharing a source ID after simplification."""
     a_nodes = df["a_node"].tolist()
     b_nodes = df["b_node"].tolist()
     refs_col = [list(refs) for refs in df["_source_refs"]]
@@ -206,16 +188,8 @@ def _merge_reciprocal_edges(df: pd.DataFrame) -> pd.DataFrame:
     return out.iloc[[pos for pos in range(len(df)) if pos not in dropped]]
 
 
-def _normalize_source_refs(df: pd.DataFrame) -> pd.Series:
-    if _SOURCE_REF_COL in df.columns:
-        return df[_SOURCE_REF_COL].apply(_as_str_list)
-    if SOURCE_ID_COL in df.columns:
-        return df[SOURCE_ID_COL].apply(lambda values: [f"{value}::ab" for value in _as_str_list(values)])
-    return pd.Series([[] for _ in range(len(df))], index=df.index)
-
-
 def _as_str_list(value) -> list[str]:
-    if value is None or (isinstance(value, float) and np.isnan(value)):
+    if is_missing(value):
         return []
     if isinstance(value, (list, tuple, set)):
         return [str(v) for v in value]
@@ -237,9 +211,7 @@ def _aggregate_modes(source_ids: list, src_attrs: dict, fallback) -> str:
         modes = src_attrs.get(sid, {}).get("modes")
         if isinstance(modes, str):
             chars.update(modes)
-    if not chars and isinstance(fallback, str):
-        chars.update(fallback)
-    return "".join(sorted(chars)) or "c"
+    return "".join(sorted(chars or set(fallback)))
 
 
 def _aggregate_directional_attrs(geom, source_refs: list[str], oriented_src_attrs: dict) -> dict:
@@ -252,17 +224,8 @@ def _aggregate_directional_attrs(geom, source_refs: list[str], oriented_src_attr
         candidate = forward if aligned_along_geometry(geom, attrs["geometry"]) else backward
         candidate.append((geom.distance(attrs["geometry"]), attrs))
 
-    if forward and backward:
-        direction = 0
-    elif forward:
-        direction = 1
-    elif backward:
-        direction = -1
-    else:
-        direction = 0
-
     return {
-        "direction": direction,
+        "direction": int(bool(forward)) - int(bool(backward)),
         "speed_ab": _nearest_value(forward, "speed"),
         "speed_ba": _nearest_value(backward, "speed"),
         "lanes_ab": _nearest_value(forward, "lanes"),

@@ -16,20 +16,15 @@ class LinkTypeAllocator:
     @staticmethod
     def count_free_slots(existing: dict) -> int:
         """How many new single-character ids are still available given ``existing``."""
-        used = set(existing.values())
-        return sum(1 for c in _FALLBACK_ALPHABET if c not in used)
+        return len(set(_FALLBACK_ALPHABET) - set(existing.values()))
 
     def allocate(self, link_type: str) -> str:
         if link_type in self.existing:
             return self.existing[link_type]
         if not link_type:
             link_type = "empty"
-        normalised = link_type.strip().lower()
-
-        candidates: list = [normalised[0], normalised[0].upper()]
-        candidates.extend(_FALLBACK_ALPHABET)
-
-        for candidate in candidates:
+        first = link_type.strip().lower()[0]
+        for candidate in (first, first.upper(), *_FALLBACK_ALPHABET):
             if candidate not in self._used_ids:
                 self._used_ids.add(candidate)
                 self.existing[link_type] = candidate
