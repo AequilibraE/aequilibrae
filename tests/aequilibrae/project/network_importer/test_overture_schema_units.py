@@ -58,6 +58,27 @@ def test_missing_connector_is_synthesized_from_segment_geometry():
     assert (round(synth.x, 6), round(synth.y, 6)) == (0.0, 0.001)
 
 
+def test_segments_reuse_synthetic_connectors_without_optional_fields():
+    connectors = _connectors([("c0", Point(0, 0))])
+    segments = _segments(
+        [
+            {
+                "id": f"seg-{i}",
+                "geometry": LineString([(0, i * 0.001), (0, (i + 1) * 0.001)]),
+                "connectors": [{"connector_id": f"c{i}", "at": 0}, {"connector_id": f"c{i + 1}", "at": 1}],
+            }
+            for i in range(2)
+        ]
+    )
+    net = build_staged_from_overture(connectors=connectors, segments=segments, modes=("car",), source_meta=_META)
+    net.validate()
+    assert net.nodes["node_id"].tolist() == [100000, 100001, 100002]
+    assert net.nodes["source_id"].tolist() == ["c0", "c1", "c2"]
+    assert net.links["a_node"].tolist() == [100000, 100001]
+    assert net.links["b_node"].tolist() == [100001, 100002]
+    assert net.links[["name", "speed_ab", "speed_ba", "lanes_ab", "lanes_ba"]].isna().all().all()
+
+
 @pytest.mark.parametrize(
     "subtype, cls, expected",
     [

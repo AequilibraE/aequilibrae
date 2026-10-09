@@ -13,21 +13,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_LINK_DEFAULTS = {
-    "name": None,
-    "speed_ab": None,
-    "speed_ba": None,
-    "lanes_ab": None,
-    "lanes_ba": None,
-    "source_id": None,
-}
-_NODE_DEFAULTS = {"source_id": None}
-
-# Provenance keys persisted for every import. ``release`` is optional because
-# not every source is versioned (e.g. a raw OSM PBF has no release tag).
 REQUIRED_SOURCE_META_KEYS = ("source", "backend", "source_url", "fetched_at")
-OPTIONAL_SOURCE_META_KEYS = ("release",)
-_SOURCE_META_KEYS = REQUIRED_SOURCE_META_KEYS + OPTIONAL_SOURCE_META_KEYS
 
 
 class NetworkImporter:
@@ -64,7 +50,9 @@ class NetworkImporter:
         net.validate()
         logger.info(f"Acquired {len(net.nodes)} nodes and {len(net.links)} links")
 
-        if simplify_fn is not None:
+        if simplify_fn is None:
+            simplifier_name, consolidate_tolerance = "false", None
+        else:
             logger.info(f"Simplifying with '{simplifier_name}'")
             net = simplify_fn(net, consolidate_tolerance=consolidate_tolerance)
             net.validate()
@@ -76,28 +64,26 @@ class NetworkImporter:
         AboutWriter(self.project).write(
             source_meta=net.source_meta,
             modes=modes_tuple,
-            simplify=simplifier_name if simplify_fn is not None else "false",
-            consolidate_tolerance=consolidate_tolerance if simplify_fn is not None else None,
+            simplify=simplifier_name,
+            consolidate_tolerance=consolidate_tolerance,
             download_cache_relpath=download_cache.relative_path,
         )
         logger.info("Network build complete")
 
 
 def _normalize_importer_columns(net: StagedNetwork) -> None:
-    for column, default in _NODE_DEFAULTS.items():
-        if column not in net.nodes.columns:
-            net.nodes[column] = default
-    for column, default in _LINK_DEFAULTS.items():
-        if column not in net.links.columns:
-            net.links[column] = default
+    for frame, columns in (
+        (net.nodes, ("source_id",)),
+        (net.links, ("name", "speed_ab", "speed_ba", "lanes_ab", "lanes_ba", "source_id")),
+    ):
+        for column in columns:
+            if column not in frame.columns:
+                frame[column] = None
 
 
 def _normalize_source_meta(net: StagedNetwork) -> None:
-    if not isinstance(net.source_meta, dict):
-        raise ImporterError("StagedNetwork.source_meta must be a dict")
-
     missing = [key for key in REQUIRED_SOURCE_META_KEYS if key not in net.source_meta]
     if missing:
         raise ImporterError(f"StagedNetwork.source_meta missing required keys: {missing}")
 
-    net.source_meta = {key: net.source_meta.get(key, "") for key in _SOURCE_META_KEYS}
+    net.source_meta = {key: net.source_meta.get(key, "") for key in (*REQUIRED_SOURCE_META_KEYS, "release")}

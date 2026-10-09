@@ -59,30 +59,26 @@ class Importer:
         a local ``pbf_path``. ``simplify`` accepts ``False``, ``"osmnx"``,
         ``"neatnet"``, or ``True`` as shorthand for ``"osmnx"``.
         """
-        provided = sum(x is not None for x in (model_area, place_name, pbf_path))
-        if provided != 1:
+        if sum(x is not None for x in (model_area, place_name, pbf_path)) != 1:
             raise ValueError("network.importer.osm requires exactly one of: model_area, place_name, pbf_path")
 
         if pbf_path is not None:
-            self.source(
-                "osm-pbf",
-                modes=modes,
-                simplify=simplify,
-                consolidate_tolerance=consolidate_tolerance,
-                cache_tag=str(pbf_path),
-                pbf_path=pbf_path,
-            )
+            source = "osm-pbf"
+            source_kwargs = {"pbf_path": pbf_path}
+            cache_tag = str(pbf_path)
         else:
-            self.source(
-                "osm-overpass",
-                modes=modes,
-                simplify=simplify,
-                consolidate_tolerance=consolidate_tolerance,
-                cache_tag=place_name or "bbox",
-                model_area=model_area,
-                place_name=place_name,
-                custom_filter=custom_filter,
-            )
+            source = "osm-overpass"
+            source_kwargs = {"model_area": model_area, "place_name": place_name, "custom_filter": custom_filter}
+            cache_tag = place_name or "bbox"
+
+        self.source(
+            source,
+            modes=modes,
+            simplify=simplify,
+            consolidate_tolerance=consolidate_tolerance,
+            cache_tag=cache_tag,
+            **source_kwargs,
+        )
 
     def overture(
         self,
@@ -95,13 +91,12 @@ class Importer:
         """Import the latest Overture Maps network for an EPSG:4326 polygon."""
         if model_area is None:
             raise ValueError("network.importer.overture requires a `model_area` Polygon")
-        bounds = model_area.bounds
         self.source(
             "overture-cloud",
             modes=modes,
             simplify=simplify,
             consolidate_tolerance=consolidate_tolerance,
-            cache_tag=f"bbox_{bounds[0]:.4f}_{bounds[1]:.4f}_{bounds[2]:.4f}_{bounds[3]:.4f}",
+            cache_tag="bbox_" + "_".join(f"{b:.4f}" for b in model_area.bounds),
             model_area=model_area,
         )
 
