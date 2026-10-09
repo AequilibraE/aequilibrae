@@ -232,6 +232,15 @@ class Network(WorkerThread):
 
         assert turn_restrictions_df is None or "modes" in turn_restrictions_df.columns
 
+        if limit_to_area is not None and turn_restrictions_df is not None:
+            # Only retain turns whose two directed legs are included in the area.
+            forward = df.loc[df.direction >= 0, ["a_node", "b_node"]]
+            backward = df.loc[df.direction <= 0, ["b_node", "a_node"]].set_axis(["a_node", "b_node"], axis=1)
+            edges = pd.MultiIndex.from_frame(pd.concat([forward, backward]))
+            incoming = pd.MultiIndex.from_frame(turn_restrictions_df[["from_node", "via_node"]])
+            outgoing = pd.MultiIndex.from_frame(turn_restrictions_df[["via_node", "to_node"]])
+            turn_restrictions_df = turn_restrictions_df.loc[incoming.isin(edges) & outgoing.isin(edges)].copy()
+
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[all_fields]
         for m in modes:

@@ -245,6 +245,9 @@ class GraphBase(ABC):  # noqa: B024
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
 
+        if self._turn_restrictions is not None:
+            self._validate_turn_restrictions(self._turn_restrictions)
+
         if self.centroids.shape[0]:
             self.__build_compressed_graph(remove_dead_ends)
             self.compact_num_links = self.compact_graph.shape[0]
@@ -327,7 +330,7 @@ class GraphBase(ABC):  # noqa: B024
         y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
         fs[y] = x[:]
         fs[-1] = df.shape[0]
-        for i in range(num_nodes, 1, -1):
+        for i in range(num_nodes, 0, -1):
             if fs[i - 1] == -1:
                 fs[i - 1] = fs[i]
 
@@ -620,6 +623,32 @@ class GraphBase(ABC):  # noqa: B024
             return float("inf")
         return value
 
+    def _validate_turn_restrictions(self, turns: pd.DataFrame) -> None:
+        """Reject turns with missing nodes or directed legs in the full graph."""
+        if turns.empty:
+            return
+
+        for column in ["from_node", "via_node", "to_node"]:
+            missing = ~turns[column].isin(self.all_nodes)
+            if missing.any():
+                raise ValueError(
+                    f"Turn restrictions have {column} IDs not in the graph at rows "
+                    f"{turns.index[missing].tolist()}: {turns.loc[missing, column].tolist()}"
+                )
+
+        edges = pd.MultiIndex.from_arrays([
+            self.all_nodes[self.graph.a_node.to_numpy()],
+            self.all_nodes[self.graph.b_node.to_numpy()],
+        ])
+        for first, second in [("from_node", "via_node"), ("via_node", "to_node")]:
+            legs = pd.MultiIndex.from_frame(turns[[first, second]])
+            missing = ~legs.isin(edges)
+            if missing.any():
+                raise ValueError(
+                    f"Turn restrictions have missing directed legs {first} -> {second} at rows "
+                    f"{turns.index[missing].tolist()}: {legs[missing].tolist()}"
+                )
+
     def set_turn_restrictions(self, turn_restrictions: pd.DataFrame, allow_path_uturns: bool = False) -> None:
         """
         Sets turn restrictions for the graph. When turn restrictions are set,
@@ -638,7 +667,8 @@ class GraphBase(ABC):  # noqa: B024
                 Negative values are not allowed.
 
                 Restrictions are interpreted as directed movement sequences
-                ``from_node -> via_node -> to_node``.
+                ``from_node -> via_node -> to_node``. All three nodes and both
+                directed legs must exist in the full graph.
 
             **allow_path_uturns** (:obj:`bool`): Whether U-turns are allowed within paths.
                 U-turns are node-based transitions that return to the tail node of the
@@ -651,6 +681,7 @@ class GraphBase(ABC):  # noqa: B024
 
         normalised = turn_restrictions.copy()
         normalised["penalty"] = normalised["penalty"].apply(self._normalise_turn_penalty)
+        self._validate_turn_restrictions(normalised)
 
         # Keep a canonical copy of the user-provided turn table.
         # The table is later mapped to arc IDs for both full and compact graphs.
@@ -764,19 +795,11 @@ class GraphBase(ABC):  # noqa: B024
             tr_to_node = tr["to_node"].to_numpy(np.int64, copy=False)
             tr_penalty = pd.to_numeric(tr["penalty"], errors="coerce").to_numpy(np.float64, copy=False)
 
-            max_idx = self.nodes_to_indices.shape[0] - 1
-            valid_nodes = (
-                (tr_from_node >= 0)
-                & (tr_via_node >= 0)
-                & (tr_to_node >= 0)
-                & (tr_from_node <= max_idx)
-                & (tr_via_node <= max_idx)
-                & (tr_to_node <= max_idx)
-            )
-
-            tr_from_node_full = np.where(valid_nodes, self.nodes_to_indices[tr_from_node], -1)
-            tr_via_node_full = np.where(valid_nodes, self.nodes_to_indices[tr_via_node], -1)
-            tr_to_node_full = np.where(valid_nodes, self.nodes_to_indices[tr_to_node], -1)
+            # Look up node IDs rather than using them as array indices.
+            full_nodes = pd.Index(self.all_nodes)
+            tr_from_node_full = full_nodes.get_indexer(tr_from_node)
+            tr_via_node_full = full_nodes.get_indexer(tr_via_node)
+            tr_to_node_full = full_nodes.get_indexer(tr_to_node)
         else:
             tr_from_node = np.empty(0, dtype=np.int64)
             tr_via_node = np.empty(0, dtype=np.int64)
@@ -842,8 +865,8 @@ class GraphBase(ABC):  # noqa: B024
         self.turn_penalties = np.asarray(turn_penalties, dtype=self.default_types("float"))
         self._turn_penalties_master = np.array(self.turn_penalties, copy=True)
 
-        if self.compact_graph.empty:
-            self.compact_turn_fs = np.array([], dtype=self.default_types("int"))
+        if self.compact_graph.empty or not self.num_zones:
+            self.compact_turn_fs = np.zeros(1, dtype=self.default_types("int"))
             self.compact_turn_to_arcs = np.array([], dtype=self.default_types("int"))
             self.compact_turn_penalties = np.array([], dtype=self.default_types("float"))
             self._compact_turn_penalties_master = np.array(self.compact_turn_penalties, copy=True)
@@ -859,18 +882,10 @@ class GraphBase(ABC):  # noqa: B024
 
         # 4) Repeat mapping for compact graph IDs used by assignment/skimming.
         if tr_from_node.size > 0 and self.compact_nodes_to_indices.shape[0] > 0:
-            max_compact_idx = self.compact_nodes_to_indices.shape[0] - 1
-            valid_compact_nodes = (
-                (tr_from_node >= 0)
-                & (tr_via_node >= 0)
-                & (tr_to_node >= 0)
-                & (tr_from_node <= max_compact_idx)
-                & (tr_via_node <= max_compact_idx)
-                & (tr_to_node <= max_compact_idx)
-            )
-            tr_from_node_compact = np.where(valid_compact_nodes, self.compact_nodes_to_indices[tr_from_node], -1)
-            tr_via_node_compact = np.where(valid_compact_nodes, self.compact_nodes_to_indices[tr_via_node], -1)
-            tr_to_node_compact = np.where(valid_compact_nodes, self.compact_nodes_to_indices[tr_to_node], -1)
+            compact_nodes = pd.Index(self.compact_all_nodes)
+            tr_from_node_compact = compact_nodes.get_indexer(tr_from_node)
+            tr_via_node_compact = compact_nodes.get_indexer(tr_via_node)
+            tr_to_node_compact = compact_nodes.get_indexer(tr_to_node)
 
             compact_from_arcs, compact_to_arcs, compact_penalties = self._map_node_turn_restrictions_to_arcs(
                 self.compact_fs,
