@@ -2,11 +2,12 @@ import logging
 import sqlite3
 from typing import Optional
 
+from aequilibrae.utils.db_utils import DST_TABLE, add_blank_results_table
+
 
 logger = logging.getLogger(__name__)
 
 SRC_TABLE = "results"  # name in project_database.sqlite
-DST_TABLE = "summary"  # name in results_database.sqlite
 
 
 def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -21,11 +22,24 @@ def migrate(
     transit_conn: Optional[sqlite3.Connection] = None,
     results_conn: Optional[sqlite3.Connection] = None,
 ):
+    src_exists = _table_exists(project_conn, SRC_TABLE)
+
+    if src_exists and project_conn.execute(f'SELECT COUNT(*) FROM main."{SRC_TABLE}"').fetchone()[0] == 0:
+        # it has a table, but no results yet. We just drop the empty table from the project database
+        # carefully drop
+        try:
+            # project_conn.execute("BEGIN")
+            project_conn.execute(f'DROP TABLE "{SRC_TABLE}"')
+            # project_conn.commit()
+        except Exception:
+            project_conn.rollback()
+            raise
+        return
+
     if results_conn is None:
         raise (ValueError("result_conn is required, but is not given"))
     logger.info("Beginning migration to move the results table in project_database.sqlite to results_database.sqlite")
 
-    src_exists = _table_exists(project_conn, SRC_TABLE)
     dst_exists = _table_exists(results_conn, DST_TABLE)
 
     # check if it already exists
@@ -63,19 +77,10 @@ def migrate(
     if attached.get("results_db") != results_path:
         raise RuntimeError("results_db is not attached to the expected file")
 
-    results_conn.execute(f"""
-            CREATE TABLE {DST_TABLE} (
-                table_name       TEXT     NOT NULL PRIMARY KEY,
-                procedure        TEXT     NOT NULL,
-                procedure_id     TEXT     NOT NULL UNIQUE,
-                procedure_report TEXT     NOT NULL,
-                timestamp        DATETIME DEFAULT current_timestamp,
-                description      TEXT, year TEXT, scenario TEXT, reference_table TEXT
-            )
-        """)
+    add_blank_results_table(results_conn)
 
     try:
-        project_conn.execute("BEGIN")
+        # project_conn.execute("BEGIN")
 
         src_count = project_conn.execute(f'SELECT COUNT(*) FROM main."{SRC_TABLE}"').fetchone()[0]
 
@@ -86,7 +91,7 @@ def migrate(
         if src_count != dst_count:
             raise RuntimeError(f"Row count mismatch: source={src_count}, destination={dst_count}")
 
-        project_conn.commit()
+        # project_conn.commit()
 
     except Exception:
         project_conn.rollback()
