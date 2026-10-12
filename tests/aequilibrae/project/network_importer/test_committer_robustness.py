@@ -1,11 +1,13 @@
 """Robustness tests for the Spatialite writer: trigger restoration and link-type folding."""
 
 import sqlite3
+import string
 
 import geopandas as gpd
 from shapely.geometry import LineString, Point
 
 from aequilibrae.project.network.importer.db_writer import SpatialiteWriter
+from aequilibrae.project.network.importer.schema.link_types import LinkTypeAllocator
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
@@ -61,3 +63,26 @@ def test_excess_link_types_fold_into_other_link_types(empty_project):
         assert all(len(code) == 1 for code in link_type_ids)
         used = {r[0] for r in conn.execute("SELECT DISTINCT link_type FROM links")}
         assert "other_link_types" in used
+
+
+def test_existing_catch_all_does_not_consume_another_link_type_slot(empty_project):
+    with empty_project.db_connection as conn:
+        existing = dict(conn.execute("SELECT link_type, link_type_id FROM link_types"))
+        code = LinkTypeAllocator(existing).allocate("other_link_types")
+        conn.execute("INSERT INTO link_types (link_type_id, link_type) VALUES (?, ?)", (code, "other_link_types"))
+        free_codes = sorted(set(string.ascii_letters) - set(existing.values()))
+        conn.executemany(
+            "INSERT INTO link_types (link_type_id, link_type) VALUES (?, ?)",
+            [(code, f"reserved_{code}") for code in free_codes[1:]],
+        )
+
+    net = _staged(3)
+    net.links["link_type"] = ["common", "common", "rare"]
+    SpatialiteWriter(empty_project).write(net)
+
+    with empty_project.db_connection as conn:
+        assert [row[0] for row in conn.execute("SELECT link_type FROM links ORDER BY link_id")] == [
+            "common",
+            "common",
+            "other_link_types",
+        ]

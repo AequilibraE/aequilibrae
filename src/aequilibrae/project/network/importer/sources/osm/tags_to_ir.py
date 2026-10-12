@@ -14,7 +14,6 @@ def _has(tags: Mapping, key: str, *values: str) -> bool:
 
 
 def _denied(tags: Mapping, key: str) -> bool:
-    """A key is 'denied' if its value is in the deny-list."""
     return _has(tags, key, "no", "private", "destination", "customers", "forestry", "agricultural", "delivery")
 
 
@@ -129,24 +128,15 @@ def modes_for_tags(tags: Mapping) -> str:
     return "".join(sorted(code for code, predicate in MODE_RULES.items() if predicate(tags)))
 
 
-# --- Tag normalisation ---
-
 _SQL_KEY_RE = re.compile(r"[^a-zA-Z0-9_]+")
 
 
 def normalise_tag_key(key: str) -> str:
-    """Make an OSM tag key safe to use as a SQL column name.
-
-    Replaces ``:`` and any other non-alphanumeric character with ``_``.
-    """
+    """Replace punctuation with underscores in OSM attribute names."""
     if not key:
         return ""
     cleaned = _SQL_KEY_RE.sub("_", str(key))
-    # Strip leading underscores (so user-facing tags don't look like IR scratch)
     return cleaned.lstrip("_") or "_unnamed"
-
-
-# --- Direction / lanes / speed parsers ---
 
 
 def parse_direction(tags: Mapping) -> int:
@@ -164,34 +154,20 @@ def parse_direction(tags: Mapping) -> int:
     return 0
 
 
-# Anchored full-string match: a single numeric magnitude with an optional unit.
 _SPEED_RE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(km/h|kmh|kph|mph|knots)?\s*", re.IGNORECASE)
 
 
 def parse_speed(value) -> float | None:
-    """Parse an OSM maxspeed tag (e.g. ``"50"``, ``"30 mph"``) into km/h.
-
-    Returns ``None`` for values that are not a single clean magnitude with an
-    optional recognised unit, e.g. ``"50; 40"``, ``"50 (variable)"``, ``"walk"``.
-    """
-    if value is None:
-        return None
-    s = str(value).strip()
-    if not s:
-        return None
-    m = _SPEED_RE.fullmatch(s)
+    """Parse a single speed and optional unit into km/h; otherwise return None."""
+    m = _SPEED_RE.fullmatch(str(value))
     if not m:
         return None
-    try:
-        magnitude = float(m.group(1))
-    except (TypeError, ValueError):
-        return None
-    unit = (m.group(2) or "").lower().replace(" ", "")
+    magnitude = float(m.group(1))
+    unit = (m.group(2) or "").lower()
     if unit == "mph":
         return magnitude * 1.609344
     if unit == "knots":
         return magnitude * 1.852
-    # km/h, kmh, kph, or unitless → assume km/h
     return magnitude
 
 
@@ -216,11 +192,9 @@ def directional_lanes(tags: Mapping) -> tuple[int | None, int | None]:
     """Return ``(lanes_ab, lanes_ba)`` from OSM tags."""
 
     def _as_int(value):
-        if value is None:
-            return None
         try:
             return int(float(str(value).split(";")[0]))
-        except (TypeError, ValueError):
+        except ValueError:
             return None
 
     total = _as_int(tags.get("lanes"))
@@ -232,15 +206,12 @@ def directional_lanes(tags: Mapping) -> tuple[int | None, int | None]:
     if direction == -1:
         return None, (bwd if bwd is not None else total)
 
-    # Bidirectional. ``lanes`` in OSM is the total for both directions combined,
-    # so a two-way link must split it; using the total on both sides would
-    # double the modelled capacity.
-    if fwd is not None or bwd is not None:
-        if fwd is not None and bwd is not None:
-            return fwd, bwd
-        if fwd is not None:
-            other = (total - fwd) if (total is not None and total - fwd >= 1) else fwd
-            return fwd, other
+    if fwd is not None and bwd is not None:
+        return fwd, bwd
+    if fwd is not None:
+        other = (total - fwd) if (total is not None and total - fwd >= 1) else fwd
+        return fwd, other
+    if bwd is not None:
         other = (total - bwd) if (total is not None and total - bwd >= 1) else bwd
         return other, bwd
 
@@ -248,16 +219,7 @@ def directional_lanes(tags: Mapping) -> tuple[int | None, int | None]:
 
 
 def _split_total_lanes(total: int | None) -> tuple[int | None, int | None]:
-    """Split a carriageway lane total across the two directions.
-
-    The remainder of an odd total is assigned to the AB direction. A total of
-    ``1`` (single shared lane) is reported as one lane in each direction rather
-    than zero, since a zero-lane direction would be treated as impassable.
-    """
-    if total is None:
-        return None, None
-    if total <= 1:
+    """Split total lanes, assigning odd remainders to AB and sharing a single lane."""
+    if total is None or total <= 1:
         return total, total
-    ab = total // 2 + total % 2
-    ba = total // 2
-    return ab, ba
+    return (total + 1) // 2, total // 2
