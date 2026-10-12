@@ -168,9 +168,7 @@ def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
     # Links 1 and 2 form the route 1 -> 2 -> 6. Links 3, 4 and 5 form
     # the only detour: 2 -> 4 -> 5 -> 2. The turn restriction bans link 2.
     graph.prepare_graph(np.array([1, 6]))
-    graph.set_turn_restrictions(
-        pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [6], "penalty": [np.inf]})
-    )
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [6], "penalty": [np.inf]}))
     graph.set_graph("cost")
     graph.set_skimming(["cost"])
 

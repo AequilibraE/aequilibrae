@@ -1,4 +1,3 @@
-import pandas as pd
 import pytest
 from shapely.geometry import Polygon
 
