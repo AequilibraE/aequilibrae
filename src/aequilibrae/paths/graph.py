@@ -554,10 +554,10 @@ class GraphBase(ABC):  # noqa: B024
             self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
 
             gpb = self.__graph_groupby
-            if any(x not in self.__graph_groupby for x in skim_fields):
+            if any(x not in gpb.obj.columns for x in skim_fields):
                 gpb = self.graph.groupby(["__compressed_id__"])
 
-            df = gpb.sum(numeric_only=True)[skim_fields].reset_index()
+            df = gpb[skim_fields].sum().reset_index()
 
             for i, skm in enumerate(skim_fields):
                 self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
