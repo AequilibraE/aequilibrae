@@ -638,10 +638,12 @@ class GraphBase(ABC):  # noqa: B024
                     f"{turns.index[missing].tolist()}: {turns.loc[missing, column].tolist()}"
                 )
 
-        edges = pd.MultiIndex.from_arrays([
-            self.all_nodes[self.graph.a_node.to_numpy()],
-            self.all_nodes[self.graph.b_node.to_numpy()],
-        ])
+        edges = pd.MultiIndex.from_arrays(
+            [
+                self.all_nodes[self.graph.a_node.to_numpy()],
+                self.all_nodes[self.graph.b_node.to_numpy()],
+            ]
+        )
         for first, second in [("from_node", "via_node"), ("via_node", "to_node")]:
             legs = pd.MultiIndex.from_frame(turns[[first, second]])
             missing = ~legs.isin(edges)
@@ -675,8 +677,8 @@ class GraphBase(ABC):  # noqa: B024
                 directed legs must exist in the full graph.
 
             **allow_path_uturns** (:obj:`bool`): Whether U-turns are allowed within paths.
-                U-turns are node-based transitions that return to the tail node of the
-                current directed arc. Default is ``False``.
+                U-turns are transitions that return to the same node immediately
+                before the turn. Default is ``False``.
         """
         required_cols = {"from_node", "via_node", "to_node", "penalty"}
         if not required_cols.issubset(turn_restrictions.columns):
