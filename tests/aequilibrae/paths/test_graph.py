@@ -286,6 +286,69 @@ def test_turn_restrictions_reject_missing_directed_legs(turn_graph, turn, leg):
         turn_graph.set_turn_restrictions(turns)
 
 
+def test_dead_end_removal_preserves_turn_via_node():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3],
+            "a_node": [1, 2, 2],
+            "b_node": [2, 3, 4],
+            "direction": [1, 0, 1],
+            "cost": [1.0, 1.0, 1.0],
+        }
+    )
+    graph.prepare_graph()
+    graph.set_turn_restrictions(
+        pd.DataFrame(
+            {
+                "from_node": [1, 2],
+                "via_node": [2, 3],
+                "to_node": [4, 2],
+                "penalty": [np.inf, 5.0],
+            }
+        ),
+        allow_path_uturns=True,
+    )
+    graph.prepare_graph(np.array([1, 4]))
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+
+    assert 3 in graph.compact_all_nodes
+    assert graph.dead_end_links.size == 0
+
+    path = graph.compute_path(1, 4)
+    np.testing.assert_array_equal(path.path_nodes, [1, 2, 3, 2, 4])
+    assert path.milepost[-1] == 9.0
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 9.0
+
+
+def test_dead_end_removal_stops_at_turn_via_node():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3],
+            "a_node": [1, 30, 40],
+            "b_node": [2, 40, 2],
+            "direction": [1, 1, 1],
+        }
+    )
+    graph.prepare_graph()
+    graph.set_turn_restrictions(
+        pd.DataFrame(
+            {
+                "from_node": [30],
+                "via_node": [40],
+                "to_node": [2],
+                "penalty": [5.0],
+            }
+        )
+    )
+    graph.prepare_graph(np.array([1, 2]))
+
+    assert 40 in graph.compact_all_nodes
+    np.testing.assert_array_equal(graph.dead_end_links, [2])
+
+
 def test_turn_restrictions_allow_compressed_neighbour_nodes():
     graph = Graph()
     graph.network = pd.DataFrame(

@@ -44,7 +44,7 @@ cdef void _remove_dead_ends(
             node_idx = Q.front()
             Q.pop()
 
-            # Centroids are marked with negative degrees, the actual degree does not matter
+            # Centroids and turn-control nodes are marked with negative degrees, the actual degree does not matter
             if in_degree[node_idx] < 0 or out_degree[node_idx] < 0:
                 continue
             elif in_degree[node_idx] == 0 and out_degree[node_idx] == 0:
@@ -240,10 +240,16 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     in_degree = np.bincount(graph_b_nodes, minlength=graph.num_nodes)
     out_degree = np.bincount(graph_a_nodes, minlength=graph.num_nodes)
 
-    centroid_idx = graph.nodes_to_indices[graph.centroids]
-    in_degree[centroid_idx] = -1
-    out_degree[centroid_idx] = -1
-    del centroid_idx
+    # Turn restrictions have already been validated against the full graph.
+    if graph._turn_restrictions is not None and not graph._turn_restrictions.empty:
+        turn_vias = graph._turn_restrictions["via_node"].to_numpy(dtype=np.int64)
+    else:
+        turn_vias = np.empty(0, dtype=np.int64)
+
+    protected_indices = graph.nodes_to_indices[np.concatenate([graph.centroids, turn_vias])]
+    in_degree[protected_indices] = -1
+    out_degree[protected_indices] = -1
+    del protected_indices
 
     df = pd.DataFrame(graph.network, copy=True)
     if remove_dead_ends:
@@ -351,11 +357,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     # Preserve nodes that are via-nodes for turn restrictions
     # These nodes must not be compressed away or the restrictions become unmappable
-    if graph._turn_restrictions is not None and len(graph._turn_restrictions) > 0:
-        for via_node in graph._turn_restrictions["via_node"].to_numpy():
-            via_node = int(via_node)
-            if 0 <= via_node <= all_nodes_max and counts[via_node] == 2:
-                counts[via_node] = 998
+    counts[turn_vias[turn_vias <= all_nodes_max]] = 998
 
     degree_two = (counts == 2).astype(np.uint8)
     # Reorder and sum the degree two nodes by how they appear in the network, finds how a particular node is connected,
