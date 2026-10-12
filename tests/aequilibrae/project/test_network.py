@@ -1,5 +1,5 @@
+import pandas as pd
 import pytest
-
 from shapely.geometry import Polygon
 
 
@@ -66,6 +66,18 @@ def test_build_graphs_without_polygons(sioux_falls_test):
     assert g.num_nodes == 24
     assert g.num_links == 76
     assert list(g.centroids) == list(range(1, 25))
+
+
+def test_build_graphs_applies_project_uturn_setting_without_turns(sioux_falls_example):
+    assert len(sioux_falls_example.network.turn_restrictions) == 0
+    sioux_falls_example.about.update(infoname="allow_uturns", infovalue=1)
+
+    sioux_falls_example.network.build_graphs(modes=["c"])
+
+    graph = sioux_falls_example.network.graphs["c"]
+    assert graph.allow_uturns_everywhere
+    assert graph.allow_path_uturns
+    assert not graph.has_turn_restrictions
 
 
 def test_build_graphs_filters_turns_by_mode(sioux_falls_example):

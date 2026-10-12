@@ -258,7 +258,7 @@ class Network(WorkerThread):
                     turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
                 ].copy()
 
-            g.prepare_graph(centroids)
+            g.prepare_graph(centroids, allow_uturns_everywhere=allow_uturns)
             g.set_blocked_centroid_flows(True)
             if centroids is None:
                 logger.warning("Your graph has no centroids")

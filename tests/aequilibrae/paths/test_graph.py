@@ -412,6 +412,58 @@ def test_dead_end_removal_preserves_turn_via_node():
     assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 9.0
 
 
+def test_compaction_preserves_bidir_nodes_when_path_uturns_are_allowed():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3],
+            "a_node": [10, 20, 30],
+            "b_node": [20, 30, 40],
+            "direction": [0, 0, 0],
+            "cost": [1.0, 1.0, 1.0],
+        }
+    )
+    graph.prepare_graph(np.array([10, 40]), remove_dead_ends=False)
+    graph.set_turn_restrictions(
+        pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [30], "penalty": [np.inf]}),
+        allow_path_uturns=True,
+    )
+
+    # Node 20 is the restricted turn. Node 30 has no restriction but still
+    # needs to remain explicit because U-turns are allowed there too.
+    assert 20 in graph.compact_all_nodes
+    assert 30 in graph.compact_all_nodes
+
+
+def test_dead_end_removal_preserves_branch_needed_for_allowed_uturn():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3],
+            "a_node": [4, 1, 1],
+            "b_node": [1, 3, 2],
+            "direction": [1, 1, 0],
+            "cost": [1.0, 1.0, 1.0],
+        }
+    )
+    graph.prepare_graph(np.array([4, 3]), remove_dead_ends=True)
+    graph.set_turn_restrictions(
+        pd.DataFrame({"from_node": [4], "via_node": [1], "to_node": [3], "penalty": [np.inf]}),
+        allow_path_uturns=True,
+    )
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+
+    # The direct movement is banned. Reaching 3 requires entering the spur,
+    # reversing at node 2, then taking the now-allowed movement at node 1.
+    path = graph.compute_path(4, 3)
+    np.testing.assert_array_equal(path.path_nodes, [4, 1, 2, 1, 3])
+    np.testing.assert_array_equal(path.path, [1, 3, 3, 2])
+    assert path.milepost[-1] == 4.0
+    assert graph.dead_end_links.size == 0
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 4.0
+
+
 def test_dead_end_removal_stops_at_turn_via_node():
     graph = Graph()
     graph.network = pd.DataFrame(

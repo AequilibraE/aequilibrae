@@ -20,6 +20,7 @@ cdef void _remove_dead_ends(
     long long [:] in_degree,
     long long [:] out_degree,
     uint8_t [:] burnt_links,
+    bint allow_uturns,
 ) noexcept nogil:
     cdef:
         long long b_node
@@ -67,6 +68,9 @@ cdef void _remove_dead_ends(
                 continue
 
             # ### Propagation
+            if allow_uturns:
+                continue
+
             # We now know that the node we are looking at has a mix of incoming and outgoing edges, i.e. in_degree[node]
             # > 0 and out_degree[node] > 0 That implies that this node is reachable from some other node. We now need to
             # assess if this node would ever be considered in pathfinding.  To be considered, there needs to be some
@@ -251,6 +255,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
     out_degree[protected_indices] = -1
     del protected_indices
 
+    allow_uturns = bool(graph._allow_uturns_everywhere or graph._allow_path_uturns)
     df = pd.DataFrame(graph.network, copy=True)
     if remove_dead_ends:
         burnt_links = np.full(len(graph.graph), False, dtype=bool)
@@ -264,6 +269,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
             in_degree,
             out_degree,
             burnt_links,
+            allow_uturns,
         )
         # Perhaps filter to unique link_ids? There'll be duplicates in here
         graph.dead_end_links = graph_link_ids[burnt_links]
@@ -317,7 +323,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     # If U-turns are allowed, we need to preserve nodes with bidirectional links
     # because U-turns can occur at these nodes
-    if graph._allow_uturns_everywhere:
+    if graph._allow_uturns_everywhere or graph._allow_path_uturns:
         # Build lookups from link_id to direction/a_node/b_node for efficient access
         _link_dir_lookup = dict(zip(df.link_id.values, df.direction.values))
         _link_a_lookup = dict(zip(df.link_id.values, df.a_node.values))
