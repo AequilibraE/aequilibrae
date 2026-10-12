@@ -154,6 +154,96 @@ def test_empty_compact_graph(links, centroids):
     assert np.isinf(graph.compute_skims().results.skims.matrix["cost"][0, 1])
 
 
+def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3, 4, 5],
+            "a_node": [1, 2, 2, 4, 5],
+            "b_node": [2, 6, 4, 5, 2],
+            "direction": [1] * 5,
+            "cost": [1.0] * 5,
+        }
+    )
+    # Links 1 and 2 form the route 1 -> 2 -> 6. Links 3, 4 and 5 form
+    # the only detour: 2 -> 4 -> 5 -> 2. The turn restriction bans link 2.
+    graph.prepare_graph(np.array([1, 6]))
+    graph.set_turn_restrictions(
+        pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [6], "penalty": [np.inf]})
+    )
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+
+    path = graph.compute_path(1, 6)
+    np.testing.assert_array_equal(path.path, [1, 3, 4, 5, 2])
+    np.testing.assert_array_equal(path.path_nodes, [1, 2, 4, 5, 2, 6])
+    assert path.milepost[-1] == 5.0
+    # The cycle's links stay separate; contracting it would create a 2 -> 2 loop.
+    assert {4, 5}.issubset(graph.compact_all_nodes)
+    assert not (graph.compact_graph.a_node == graph.compact_graph.b_node).any()
+    assert (graph.graph["__compressed_id__"] < graph.compact_num_links).all()
+    graph.create_compressed_link_network_mapping()
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 5.0
+
+
+def test_parallel_link_round_trip_is_not_a_turn_restriction_detour():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3, 4],
+            "a_node": [1, 2, 2, 2],
+            "b_node": [2, 6, 4, 4],
+            "direction": [1, 1, 0, 0],
+            "cost": [1.0] * 4,
+        }
+    )
+    graph.prepare_graph(np.array([1, 6]), remove_dead_ends=False)
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [6], "penalty": [np.inf]}))
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+
+    # The two parallel bidirectional links form 2 -> 4 -> 2. This returns to
+    # the same previous node, so it is a U-turn, not a way around the ban.
+    path = graph.compute_path(1, 6)
+    assert path.path is None
+    assert 4 in graph.compact_all_nodes
+    assert {3, 4}.issubset(graph.compact_graph.link_id)
+    assert not (graph.compact_graph.a_node == graph.compact_graph.b_node).any()
+    assert np.isinf(graph.compute_skims().results.skims.matrix["cost"][0, 1])
+
+
+def graph_with_required_self_loop():
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3, 4],
+            "a_node": [1, 2, 3, 3],
+            "b_node": [2, 3, 4, 3],
+            "direction": [1] * 4,
+            "cost": [1.0, 1.0, 1.0, 2.0],
+        }
+    )
+    graph.prepare_graph(np.array([1, 4]))
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [2], "via_node": [3], "to_node": [4], "penalty": [np.inf]}))
+    graph.set_graph("cost")
+    graph.set_skimming(["cost"])
+    return graph
+
+
+def test_compaction_keeps_real_self_loop_needed_to_avoid_turn_ban():
+    graph = graph_with_required_self_loop()
+    # Links 1 -> 2 -> 3 approach the turn. Link 3 exits to 4, but the
+    # restriction bans 2 -> 3 -> 4. Link 4 is a genuine loop at node 3.
+    path = graph.compute_path(1, 4)
+    np.testing.assert_array_equal(path.path, [1, 2, 4, 3])
+    np.testing.assert_array_equal(path.path_nodes, [1, 2, 3, 3, 4])
+    assert path.milepost[-1] == 5.0
+    assert 2 not in graph.compact_all_nodes  # The separate chain 1 -> 2 -> 3 is compressed.
+    loops = graph.compact_graph.loc[graph.compact_graph.a_node == graph.compact_graph.b_node]
+    np.testing.assert_array_equal(loops.link_id, [4])
+    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 5.0
+
+
 def test_set_graph(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     graph.set_graph(cost_field="distance")

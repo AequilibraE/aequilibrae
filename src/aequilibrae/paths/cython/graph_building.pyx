@@ -392,10 +392,13 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         compressed_b_node[:]
     )
 
+    # Keep cycles uncompressed to preserve their internal turns and path expansion.
+    cycles = np.flatnonzero(compressed_a_node[:slink] == compressed_b_node[:slink])
+    simplified_links[np.isin(simplified_links, cycles)] = -1
+
     links_to_remove = (simplified_links >= 0).nonzero()[0]
     if links_to_remove.shape[0]:
         df = df[~df.link_id.isin(links_to_remove)]
-        df = df[df.a_node != df.b_node]
 
     comp_lnk = pd.DataFrame(
         {
@@ -406,7 +409,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         }
     )
 
-    # Link compression can introduce new simple cycles into the graph. Chains that cannot be traversed in either
+    # Cycles are kept uncompressed. Chains that cannot be traversed in either
     # direction (e.g. one ending on a degree-two sink) are marked with direction -999
     comp_lnk = comp_lnk[(comp_lnk.a_node != comp_lnk.b_node) & (comp_lnk.direction != -999)]
 
