@@ -347,30 +347,41 @@ def test_dead_end_removal_stops_at_turn_via_node():
 
     assert 40 in graph.compact_all_nodes
     np.testing.assert_array_equal(graph.dead_end_links, [2])
+    assert graph.compact_turn_penalties.size == 0
 
 
-def test_turn_restrictions_allow_compressed_neighbour_nodes():
+@pytest.mark.parametrize("penalty", [5.0, np.inf])
+def test_turn_restrictions_allow_compressed_neighbour_nodes(penalty):
     graph = Graph()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4],
             "a_node": [1, 2, 3, 4],
             "b_node": [2, 3, 4, 5],
-            "direction": [1, 1, 1, 1],
+            "direction": [0, 0, 0, 0],
             "cost": [1.0, 1.0, 1.0, 1.0],
         }
     )
-    turns = pd.DataFrame({"from_node": [2], "via_node": [3], "to_node": [4], "penalty": [5.0]})
+    turns = pd.DataFrame({"from_node": [2], "via_node": [3], "to_node": [4], "penalty": [penalty]})
     # Project graph construction supplies turns before preparing the graph.
     graph._turn_restrictions = turns.copy()
     graph.prepare_graph(np.array([1, 5]), remove_dead_ends=False)
     graph.set_graph("cost")
+    graph.set_skimming(["cost"])
     graph.set_turn_restrictions(turns)
 
     assert 3 in graph.compact_all_nodes
     assert 2 not in graph.compact_all_nodes
     assert 4 not in graph.compact_all_nodes
-    assert graph.compute_path(1, 5).milepost[-1] == 9.0
+    np.testing.assert_array_equal(graph.compact_turn_penalties, [penalty])
+    path = graph.compute_path(1, 5)
+    if np.isfinite(penalty):
+        assert path.milepost[-1] == 4.0 + penalty
+    else:
+        assert path.path is None
+    skims = graph.compute_skims().results.skims.matrix["cost"]
+    assert skims[0, 1] == 4.0 + penalty
+    assert skims[1, 0] == 4.0
 
 
 @pytest.mark.parametrize(

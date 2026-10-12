@@ -133,6 +133,7 @@ class GraphBase(ABC):  # noqa: B024
         # Turn restrictions data structures
         self._turn_restrictions = None  # DataFrame of turn restrictions
         self._allow_uturns_everywhere = False  # Preserve U-turn nodes during graph compression
+        self._remove_dead_ends = True
         self._allow_path_uturns = False  # Allow U-turns during arc-based pathfinding
         self._has_turn_restrictions = False  # Flag to indicate if turn restrictions are active
 
@@ -209,6 +210,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         self.__network_error_checking__()
 
+        self._remove_dead_ends = remove_dead_ends
         self._allow_uturns_everywhere = allow_uturns_everywhere
 
         # Creates the centroids
@@ -655,6 +657,8 @@ class GraphBase(ABC):  # noqa: B024
         the graph will use arc-based Dijkstra for path computation.
 
         Turn penalties are in the same time unit as the graph's cost field.
+        Prepared graphs are rebuilt using their existing preparation settings,
+        and their cost and skim fields are restored.
 
         :Arguments:
             **turn_restrictions** (:obj:`pd.DataFrame`): DataFrame with columns:
@@ -687,19 +691,33 @@ class GraphBase(ABC):  # noqa: B024
         # The table is later mapped to arc IDs for both full and compact graphs.
         self._turn_restrictions = normalised
         self._allow_path_uturns = allow_path_uturns
-        # Rebuild turn CSR structures for the full graph (and compact graph if present)
-        self._build_turn_csr_structures()
+        # Rebuild topology and turn CSR structures for the full and compact graphs.
+        self._rebuild_after_turn_change()
 
         self._id = uuid.uuid4().hex  # Reset graph ID since structure changed
         logger.info(f"Set {len(turn_restrictions)} turn restrictions, {allow_path_uturns=}")
 
     def clear_turn_restrictions(self) -> None:
-        """Clears all turn restrictions from the graph."""
+        """Clears all turn restrictions and rebuilds the prepared graph."""
         self._turn_restrictions = None
         self._allow_path_uturns = False
-        self._build_turn_csr_structures()
+        self._rebuild_after_turn_change()
         self._id = uuid.uuid4().hex
         logger.info("Cleared turn restrictions")
+
+    def _rebuild_after_turn_change(self) -> None:
+        """Rebuild prepared topology and restore routing fields after a turn change."""
+        if self.num_nodes < 0:
+            return
+        self.prepare_graph(
+            self.centroids if self.num_zones else None,
+            remove_dead_ends=self._remove_dead_ends,
+            allow_uturns_everywhere=self._allow_uturns_everywhere,
+        )
+        if self.cost_field:
+            self.set_graph(self.cost_field)
+        if self.skim_fields:
+            self.set_skimming(self.skim_fields)
 
     def _has_multi_connector_centroid(self) -> bool:
         """
@@ -782,7 +800,7 @@ class GraphBase(ABC):  # noqa: B024
 
     def _build_turn_csr_structures(self) -> None:
         """
-        Builds CSR structures for turn transitions in the compact graph.
+        Builds CSR structures for turn transitions in the full and compact graphs.
 
         For arc-based Dijkstra, we need to map from each incoming arc to its
         possible outgoing arcs with associated turn penalties.
@@ -801,10 +819,6 @@ class GraphBase(ABC):  # noqa: B024
             tr_via_node_full = full_nodes.get_indexer(tr_via_node)
             tr_to_node_full = full_nodes.get_indexer(tr_to_node)
         else:
-            tr_from_node = np.empty(0, dtype=np.int64)
-            tr_via_node = np.empty(0, dtype=np.int64)
-            tr_to_node = np.empty(0, dtype=np.int64)
-            tr_penalty = np.empty(0, dtype=np.float64)
             tr_from_node_full = np.empty(0, dtype=np.int64)
             tr_via_node_full = np.empty(0, dtype=np.int64)
             tr_to_node_full = np.empty(0, dtype=np.int64)
@@ -873,51 +887,19 @@ class GraphBase(ABC):  # noqa: B024
             self._has_turn_restrictions = self.turn_penalties.size > 0
             return
 
-        num_compact_links = self.compact_num_links
-        compact_ids = self.compact_graph["id"].to_numpy(np.int64, copy=False)
-        compact_a_by_id = np.empty(num_compact_links, dtype=np.int64)
-        compact_b_by_id = np.empty(num_compact_links, dtype=np.int64)
-        compact_a_by_id[compact_ids] = self.compact_graph["a_node"].to_numpy(np.int64, copy=False)
-        compact_b_by_id[compact_ids] = self.compact_graph["b_node"].to_numpy(np.int64, copy=False)
-
-        # 4) Repeat mapping for compact graph IDs used by assignment/skimming.
-        if tr_from_node.size > 0 and self.compact_nodes_to_indices.shape[0] > 0:
-            compact_nodes = pd.Index(self.compact_all_nodes)
-            tr_from_node_compact = compact_nodes.get_indexer(tr_from_node)
-            tr_via_node_compact = compact_nodes.get_indexer(tr_via_node)
-            tr_to_node_compact = compact_nodes.get_indexer(tr_to_node)
-
-            compact_from_arcs, compact_to_arcs, compact_penalties = self._map_node_turn_restrictions_to_arcs(
-                self.compact_fs,
-                compact_a_by_id,
-                compact_b_by_id,
-                tr_from_node_compact,
-                tr_via_node_compact,
-                tr_to_node_compact,
-                tr_penalty,
-            )
-        else:
-            compact_from_arcs = np.empty(0, dtype=np.int64)
-            compact_to_arcs = np.empty(0, dtype=np.int64)
-            compact_penalties = np.empty(0, dtype=np.float64)
-
-        if block_centroid_turns:
-            auto_c_from_arcs, auto_c_to_arcs, auto_c_penalties = self._generate_centroid_connector_turn_bans(
-                self.num_zones,
-                self.compact_fs,
-                compact_a_by_id,
-                compact_b_by_id,
-            )
-            if auto_c_from_arcs.size > 0:
-                compact_from_arcs = np.concatenate([compact_from_arcs, auto_c_from_arcs])
-                compact_to_arcs = np.concatenate([compact_to_arcs, auto_c_to_arcs])
-                compact_penalties = np.concatenate([compact_penalties, auto_c_penalties])
+        # 4) Map full-graph turns onto compact links used by assignment/skimming.
+        # Via nodes are preserved, but their neighbours may be compressed away.
+        compressed_ids = np.empty(self.num_links, dtype=np.int64)
+        compressed_ids[graph_ids] = self.graph["__compressed_id__"].to_numpy(np.int64, copy=False)
+        compact_from_arcs = compressed_ids[full_from_arcs]
+        compact_to_arcs = compressed_ids[full_to_arcs]
+        retained = (compact_from_arcs < self.compact_num_links) & (compact_to_arcs < self.compact_num_links)
 
         compact_turn_fs, compact_turn_to_arcs, compact_turn_penalties = self._build_sparse_turn_restriction_csr(
             self.compact_num_links,
-            compact_from_arcs,
-            compact_to_arcs,
-            compact_penalties,
+            compact_from_arcs[retained],
+            compact_to_arcs[retained],
+            full_penalties[retained],
         )
 
         self.compact_turn_fs = np.asarray(compact_turn_fs, dtype=self.default_types("int"))
