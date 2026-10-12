@@ -57,10 +57,7 @@ def test_prepare_graph_no_centroids(sioux_falls_example):
 
 def test_prepare_graph_first_node_has_no_outgoing_links():
     graph = Graph()
-    graph.network = pd.DataFrame(
-        [(1, 2, 1, 1), (2, 2, 3, 1)],
-        columns=["link_id", "a_node", "b_node", "direction"],
-    )
+    graph.network = pd.DataFrame({"link_id": [1, 2], "a_node": [2, 2], "b_node": [1, 3], "direction": [1, 1]})
     graph.prepare_graph()
 
     np.testing.assert_array_equal(graph.all_nodes, [1, 2, 3])
@@ -70,10 +67,7 @@ def test_prepare_graph_first_node_has_no_outgoing_links():
 @pytest.mark.parametrize("centroids", [[99, 1, 3], [99, 98, 1, 3]])
 def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
     graph = Graph()
-    network = pd.DataFrame(
-        [(1, 1, 2, 1, 0), (2, 2, 3, 1, 1)],
-        columns=["link_id", "a_node", "b_node", "direction", "id"],
-    )
+    network = pd.DataFrame({"link_id": [1, 2], "a_node": [1, 2], "b_node": [2, 3], "direction": [1, 1], "id": [0, 1]})
     # Test adjacency construction without invoking dead-end removal or compression.
     with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
         _, num_nodes, _, fs, links = graph._build_directed_graph(network, np.array(centroids, dtype=np.int64))
@@ -87,8 +81,7 @@ def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
 def test_compression_preserves_isolated_centroids(centroids):
     graph = Graph()
     graph.network = pd.DataFrame(
-        [(1, 1, 2, 1, 1.0), (2, 2, 3, 1, 1.0)],
-        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+        {"link_id": [1, 2], "a_node": [1, 2], "b_node": [2, 3], "direction": [1, 1], "cost": [1.0, 1.0]}
     )
     with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
         graph.prepare_graph(np.array(centroids))
@@ -96,7 +89,7 @@ def test_compression_preserves_isolated_centroids(centroids):
     graph.set_skimming(["cost"])
     graph.set_blocked_centroid_flows(False)
 
-    np.testing.assert_array_equal(graph.compact_all_nodes[:len(centroids)], centroids)
+    np.testing.assert_array_equal(graph.compact_all_nodes[: len(centroids)], centroids)
     np.testing.assert_array_equal(graph.compact_nodes_to_indices[centroids], np.arange(len(centroids)))
     isolated = graph.compact_nodes_to_indices[99]
     assert graph.compact_fs[isolated] == graph.compact_fs[isolated + 1]
@@ -105,14 +98,44 @@ def test_compression_preserves_isolated_centroids(centroids):
     assert np.isinf(skims[centroids.index(1), centroids.index(99)])
 
 
-@pytest.mark.parametrize("links, centroids", [
-    ([(1, 10, 20, 1, 1.0)], [99, 100]),
-    ([(1, 10, 20, 1, 1.0), (2, 20, 30, 1, 1.0)], [99, 100]),
-    ([(1, 1, 3, 1, 1.0), (2, 2, 3, 1, 1.0)], [1, 2]),
-])
+@pytest.mark.parametrize(
+    "links, centroids",
+    [
+        (
+            {
+                "link_id": [1],
+                "a_node": [10],
+                "b_node": [20],
+                "direction": [1],
+                "cost": [1.0],
+            },
+            [99, 100],
+        ),
+        (
+            {
+                "link_id": [1, 2],
+                "a_node": [10, 20],
+                "b_node": [20, 30],
+                "direction": [1, 1],
+                "cost": [1.0, 1.0],
+            },
+            [99, 100],
+        ),
+        (
+            {
+                "link_id": [1, 2],
+                "a_node": [1, 2],
+                "b_node": [3, 3],
+                "direction": [1, 1],
+                "cost": [1.0, 1.0],
+            },
+            [1, 2],
+        ),
+    ],
+)
 def test_empty_compact_graph(links, centroids):
     graph = Graph()
-    graph.network = pd.DataFrame(links, columns=["link_id", "a_node", "b_node", "direction", "cost"])
+    graph.network = pd.DataFrame(links)
     with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
         graph.prepare_graph(np.array(centroids))
     graph.set_graph("cost")
@@ -126,7 +149,7 @@ def test_empty_compact_graph(links, centroids):
     np.testing.assert_array_equal(graph.compact_turn_fs, [0])
     np.testing.assert_array_equal(graph.graph["__compressed_id__"], 0)
     idx, data, _ = graph.create_compressed_link_network_mapping()
-    np.testing.assert_array_equal(idx, [0, len(links)])
+    np.testing.assert_array_equal(idx, [0, len(links["link_id"])])
     np.testing.assert_array_equal(data, graph.graph["__supernet_id__"])
     assert np.isinf(graph.compute_skims().results.skims.matrix["cost"][0, 1])
 
@@ -204,8 +227,13 @@ def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
 def turn_graph():
     graph = Graph()
     graph.network = pd.DataFrame(
-        [(1, 10, 20, 1, 1.0), (2, 20, 30, 1, 1.0), (3, 30, 40, 1, 1.0)],
-        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+        {
+            "link_id": [1, 2, 3],
+            "a_node": [10, 20, 30],
+            "b_node": [20, 30, 40],
+            "direction": [1, 1, 1],
+            "cost": [1.0, 1.0, 1.0],
+        }
     )
     graph.prepare_graph()
     graph.set_graph("cost")
@@ -221,7 +249,15 @@ def turn_graph():
     ],
 )
 def test_turn_restrictions_reject_missing_nodes(turn_graph, turn, column):
-    turns = pd.DataFrame([turn + [5.0]], columns=["from_node", "via_node", "to_node", "penalty"], index=[7])
+    turns = pd.DataFrame(
+        {
+            "from_node": [turn[0]],
+            "via_node": [turn[1]],
+            "to_node": [turn[2]],
+            "penalty": [5.0],
+        },
+        index=[7],
+    )
     with pytest.raises(ValueError, match=rf"{column} IDs not in the graph at rows \[7\]") as error:
         turn_graph.set_turn_restrictions(turns)
     assert str(turns.loc[7, column]) in str(error.value)
@@ -237,7 +273,15 @@ def test_turn_restrictions_reject_missing_nodes(turn_graph, turn, column):
     ],
 )
 def test_turn_restrictions_reject_missing_directed_legs(turn_graph, turn, leg):
-    turns = pd.DataFrame([turn + [5.0]], columns=["from_node", "via_node", "to_node", "penalty"], index=[7])
+    turns = pd.DataFrame(
+        {
+            "from_node": [turn[0]],
+            "via_node": [turn[1]],
+            "to_node": [turn[2]],
+            "penalty": [5.0],
+        },
+        index=[7],
+    )
     with pytest.raises(ValueError, match=rf"missing directed legs {leg} at rows \[7\]"):
         turn_graph.set_turn_restrictions(turns)
 
@@ -245,10 +289,15 @@ def test_turn_restrictions_reject_missing_directed_legs(turn_graph, turn, leg):
 def test_turn_restrictions_allow_compressed_neighbour_nodes():
     graph = Graph()
     graph.network = pd.DataFrame(
-        [(1, 1, 2, 1, 1.0), (2, 2, 3, 1, 1.0), (3, 3, 4, 1, 1.0), (4, 4, 5, 1, 1.0)],
-        columns=["link_id", "a_node", "b_node", "direction", "cost"],
+        {
+            "link_id": [1, 2, 3, 4],
+            "a_node": [1, 2, 3, 4],
+            "b_node": [2, 3, 4, 5],
+            "direction": [1, 1, 1, 1],
+            "cost": [1.0, 1.0, 1.0, 1.0],
+        }
     )
-    turns = pd.DataFrame([[2, 3, 4, 5.0]], columns=["from_node", "via_node", "to_node", "penalty"])
+    turns = pd.DataFrame({"from_node": [2], "via_node": [3], "to_node": [4], "penalty": [5.0]})
     # Project graph construction supplies turns before preparing the graph.
     graph._turn_restrictions = turns.copy()
     graph.prepare_graph(np.array([1, 5]), remove_dead_ends=False)
@@ -270,8 +319,12 @@ def test_turn_restrictions_allow_compressed_neighbour_nodes():
 )
 def test_prepare_graph_rejects_invalid_existing_turns(turn_graph, turn, message):
     turn_graph._turn_restrictions = pd.DataFrame(
-        [turn + [5.0]],
-        columns=["from_node", "via_node", "to_node", "penalty"],
+        {
+            "from_node": [turn[0]],
+            "via_node": [turn[1]],
+            "to_node": [turn[2]],
+            "penalty": [5.0],
+        }
     )
     with pytest.raises(ValueError, match=f"Turn restrictions have {message}"):
         turn_graph.prepare_graph()
