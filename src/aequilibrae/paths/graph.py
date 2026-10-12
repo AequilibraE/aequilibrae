@@ -205,8 +205,8 @@ class GraphBase(ABC):  # noqa: B024
                 graph. This will allow U-turns anywhere that has both an incoming and outgoing link, severely hindering
                 the effectiveness of graph compression. This is option should rarely be used. **The U-turns allowed by
                 this option will never be taken unless turn penalties are set**. Refer to
-                ``graph.set_turn_restrictions`` to allow U-turns at intersections. This options takes effect after dead
-                end link removal.
+                ``graph.set_turn_restrictions`` to allow U-turns at intersections. This option will reduce the
+                effectiveness of dead-end link removal and graph compression.
         """
         self.__network_error_checking__()
 
