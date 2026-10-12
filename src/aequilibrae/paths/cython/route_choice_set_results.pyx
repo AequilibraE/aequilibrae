@@ -57,12 +57,13 @@ cdef class RouteChoiceSetResults:
             **demand** (`obj`: GeneralisedCOODemand): A GeneralisedCOODemand object stores the ODs pairs and various
               demand values in a COO form. No verification of these is performed here.
 
-            **disutility_cutoff_constant** (`obj`: float): The cutoff disutility for path filter is a linear function
-            of the disutility of the route with the minimum disutility. This is the constant term.
+            **disutility_cutoff_constant** (`obj`: float): The constant term of the linear (cuttoff = m * x + c)
+              disutility cutoff function. Any route with a cost higher than this function when applied to the minimum
+              disutility within the route set is masked out.
 
-            **disutility_cutoff_coefficient** (`obj`: float): The cutoff disutility for path filter is a linear function
-            of the disutility of the route with the minimum disutility. This is the coefficient of the minimum
-            disutility.
+            **disutility_cutoff_coefficient** (`obj`: float): The coefficient term of the linear (cuttoff = m * x + c)
+              disutility cutoff function. Any route with a cost higher than this function when applied to the minimum
+              disutility within the route set is masked out.
 
             **beta** (`obj`: float): The beta parameter for the path-sized logit.
 

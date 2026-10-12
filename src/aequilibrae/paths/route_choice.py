@@ -133,12 +133,10 @@ class RouteChoice:
           A consistent bound remains valid as links are removed or penalised.
 
         * When performing an assignment, ``disutility_cutoff_constant`` and
-        ``disutility_cutoff_coefficient`` can be provided to exclude routes from
-          the path-sized logit model. Consider ``minimum_disutility`` being the disutility of the
-          route between the given source and destingation that has the lowest disutility. The
-          maximum allowed utility is then
-          ``disutility_cutoff_constant + minimum_disutility * disutility_cutoff_coefficient``
-          and routes with a higher disutility are still returned but are masked.
+          ``disutility_cutoff_coefficient`` can be provided to exclude routes from the path-sized
+          logit model. Any route with a cost higher when applied to this function
+          ``disutility_cutoff_coefficient * cost + disutility_cutoff_constant`` within the route set
+          is masked out.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
@@ -421,8 +419,8 @@ class RouteChoice:
         When ``recompute_psl`` is ``True``, the path-sized logit is recomputed for each route with respect to the
         graph's cost field and the ``beta``, ``disutility_cutoff_constant`` and ``disutility_cutoff_coefficient``
         parameters.  With PSL recomputation, the supplied mask is combined with the path validation and cost mask.
-        Otherwise, paths are not validated and any supplied costs and masks are kept. Masked routes load no demand
-        regardless of supplied probabilities. Without recomputation, unmasked probabilities are unchanged. Links
+        Otherwise, paths are not validated and any supplied costs and masks are kept. Masked routes are not loaded
+        regardless of supplied probabilities. Without recomputation, unmasked probabilities are not changed. Links
         absent from the graph or compact graph raise an error. Set ``log_warnings=False`` to silence warnings.
 
         All origin and destination IDs within the DataFrame must exist within the demand matrix.
