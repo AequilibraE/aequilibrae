@@ -310,6 +310,11 @@ class TrafficAssignment(AssignmentBase):
         # Special methods (__method__) cannot be override at runtime, instead we'll
         # just set a variable to indicate if the checking of attributes should be performed
         if self.__initalised:
+            if name == "steps_below_needed_to_terminate":
+                if not value >= 1:
+                    raise ValueError("Steps below the target needed to terminate must be a positive integer")
+                if isinstance(self.assignment, LinearApproximation):
+                    self.assignment.steps_below_needed_to_terminate = value
             check, value, message = self.__check_attributes(name, value)
             if not check:
                 raise ValueError(message)
