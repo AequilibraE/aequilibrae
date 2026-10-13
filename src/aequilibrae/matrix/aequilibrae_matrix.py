@@ -412,7 +412,7 @@ class MatrixStore(_Matrix):
 @overload
 def from_file(
     path: str | os.PathLike,
-    mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
+    mode: None = None,
     *,
     index_name: str = "main_index",
     subset: Sequence[str | dict[str, Any]] | None = None,
@@ -423,7 +423,7 @@ def from_file(
 @overload
 def from_file(
     path: str | os.PathLike,
-    mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
+    mode: Literal["r", "r+"] | None = None,
     *,
     index_name: str = "main_index",
     subset: None = None,
@@ -431,20 +431,9 @@ def from_file(
 ) -> MatrixStore: ...
 
 
-@overload
 def from_file(
     path: str | os.PathLike,
-    mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
-    *,
-    index_name: str = "main_index",
-    subset: Sequence[str | dict[str, Any]] | None = None,
-    store: bool,
-) -> AequilibraEMatrix | MatrixStore: ...
-
-
-def from_file(
-    path: str | os.PathLike,
-    mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
+    mode: Literal["r", "r+"] | None = None,
     *,
     index_name: str = "main_index",
     subset: Sequence[str | dict[str, Any]] | None = None,
@@ -453,8 +442,14 @@ def from_file(
     if store:
         if subset is not None:
             raise ValueError("store=True and subset may not be provided at once")
-        return MatrixStore(path=path, index_name=index_name, mode=mode)
+
+        if mode is not None and mode not in ("r", "r+"):
+            raise ValueError("from_file stores only support modes 'r' and 'r+' (file must exist)")
+
+        return MatrixStore(path=path, index_name=index_name, mode=mode if mode is not None else "r")
     else:
+        if mode is not None:
+            raise ValueError("an in-memory matrix cannot have a mode")
         return AequilibraEMatrix.from_omx(path=path, index_name=index_name, subset=subset)
 
 
@@ -484,19 +479,6 @@ def from_dict(
 ) -> MatrixStore: ...
 
 
-@overload
-def from_dict(
-    data: Mapping[str, ArrayLike],
-    index: ArrayLike,
-    *,
-    path: str | os.PathLike | None = None,
-    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
-    index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: bool,
-) -> AequilibraEMatrix | MatrixStore: ...
-
-
 def from_dict(
     data: Mapping[str, ArrayLike],
     index: ArrayLike,
@@ -511,15 +493,22 @@ def from_dict(
     if store:
         if path is None:
             raise ValueError("a matrix store must have a path")
+
+        if mode is not None and mode not in ("w", "a", "r+", "w-", "x"):
+            raise ValueError("from_dict stores only support modes 'w', 'a', 'r+', 'w-' and 'x'")
+
         mat = MatrixStore(
             path=path,
             index=index,
             index_name=index_name,
-            mode=mode if mode is not None else "a",
+            mode=mode if mode is not None else "x",
         )
     else:
         if path is not None:
             raise ValueError("an in-memory matrix cannot have a path")
+
+        if mode is not None:
+            raise ValueError("an in-memory matrix cannot have a mode")
         mat = AequilibraEMatrix(index=index, index_name=index_name)
 
     mat.update(data)

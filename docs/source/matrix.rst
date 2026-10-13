@@ -186,8 +186,10 @@ keeps the mapping's dtype and attributes.
 Read and update files
 ---------------------
 
-A store opens an existing file read-only by default. Use ``mode="r+"`` to
-update an existing file, and a ``with`` block to close it when finished:
+``from_file(..., store=True)`` opens an existing file as read-only by default.
+Only ``mode="r"`` and ``mode="r+"`` are allowed as the file must already
+exist. Use ``mode="r+"`` to update an existing file, and a ``with`` block to
+close it when finished:
 
 .. code-block:: python
 
@@ -205,7 +207,7 @@ only change the returned array, not the file.  Use ``store["car", :, 2] = ...``
 instead.
 
 Use ``from_dict(..., store=True)`` with a path and index to create a store from
-arrays. ``mode="x"`` prevents replacement of an existing file:
+arrays. The default ``mode="x"`` prevents replacement of an existing file:
 
 .. code-block:: python
 

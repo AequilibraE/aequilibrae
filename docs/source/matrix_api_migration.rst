@@ -197,7 +197,9 @@ matrices and index mappings will raise an exception unless ``overwrite`` is
         "adjusted_demand.omx", subset=["car", "bus"], overwrite=True
     )
 
-For direct file edits, use ``from_file()`` to open a writable store:
+For direct file edits, use ``from_file()`` to open a writable store. Stores are
+opened as read-only by default, use ``mode="r+"`` to make it writable. The
+``mode`` argument is only accepted with ``store=True``:
 
 .. code-block:: python
 

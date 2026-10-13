@@ -171,6 +171,36 @@ def test_from_file(omx_path, manage, index, data, metadata, store):
     assert_matrix(matrix, index, data, metadata=metadata)
 
 
+@pytest.mark.parametrize("mode", [None, "r", "r+"])
+def test_from_file_store_modes(omx_path, mode):
+    with from_file(omx_path, index_name="zones", mode=mode, store=True) as store:
+        assert store.omx.mode == ("r" if mode is None else mode)
+
+
+@pytest.mark.parametrize("mode", ["w", "a", "w-", "x", "invalid"])
+def test_from_file_store_rejects_invalid_modes(omx_path, index, data, metadata, mode):
+    with pytest.raises(ValueError, match="only support modes 'r' and 'r\\+'"):
+        from_file(omx_path, index_name="zones", mode=mode, store=True)
+
+    assert_matrix(from_file(omx_path, index_name="zones"), index, data, metadata=metadata)
+
+
+@pytest.mark.parametrize("mode", ["r", "r+"])
+def test_from_file_store_requires_existing_file(tmp_path, mode):
+    path = tmp_path / "missing.omx"
+    with pytest.raises(FileNotFoundError):
+        from_file(path, mode=mode, store=True)
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("mode", ["r", "r+", "w"])
+def test_from_file_memory_rejects_mode(tmp_path, mode):
+    path = tmp_path / "missing.omx"
+    with pytest.raises(ValueError, match="in-memory matrix cannot have a mode"):
+        from_file(path, mode=mode)
+    assert not path.exists()
+
+
 def test_from_omx(omx_path, index, data, metadata):
     matrix = AequilibraEMatrix.from_omx(omx_path, index_name="zones")
     assert_matrix(matrix, index, data, metadata=metadata)
@@ -195,6 +225,33 @@ def test_from_dict_store_requires_path(index, data):
 def test_from_dict_memory_rejects_path(tmp_path, index, data):
     with pytest.raises(ValueError):
         from_dict(data, index, path=tmp_path / "demand.omx")
+
+
+@pytest.mark.parametrize("mode", ["r+", "x"])
+def test_from_dict_memory_rejects_mode(index, data, mode):
+    with pytest.raises(ValueError, match="in-memory matrix cannot have a mode"):
+        from_dict(data, index, mode=mode)
+
+
+@pytest.mark.parametrize("mode", ["r", "invalid"])
+def test_from_dict_store_rejects_invalid_modes(tmp_path, index, data, mode):
+    path = tmp_path / "invalid.omx"
+    with pytest.raises(ValueError, match="from_dict stores only support modes"):
+        from_dict(data, index, path=path, mode=mode, store=True)
+    assert not path.exists()
+
+
+def test_from_dict_store_does_not_overwrite_by_default(omx_path, index, data, metadata):
+    with pytest.raises(FileExistsError):
+        from_dict(data, [809, 0, 801], path=omx_path, index_name="zones", store=True)
+
+    assert_matrix(from_file(omx_path, index_name="zones"), index, data, metadata=metadata)
+
+
+def test_from_dict_store_allows_explicit_update(omx_path, index):
+    values = np.ones((3, 3))
+    with from_dict({"car": values}, index, path=omx_path, index_name="zones", mode="r+", store=True) as store:
+        np.testing.assert_array_equal(store["car"], values)
 
 
 @pytest.mark.parametrize("subset", [None, ["car"], []], ids=["all", "one", "empty"])
