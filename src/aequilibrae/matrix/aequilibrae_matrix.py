@@ -18,6 +18,23 @@ def _copy_file_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
     return deepcopy({key: value for key, value in metadata.items() if key not in OMX_SPECIAL_ATTRS})
 
 
+def _cast_index(value: np.ndarray, dataset: h5py.Dataset) -> np.ndarray:
+    if dataset.shape != value.shape:
+        raise ValueError(f"index shape may not change, expected {dataset.shape}, got {value.shape}")
+    return value.astype(dataset.dtype, casting="same_value")
+
+
+def _write_index(file: omx.File, name: str, value: np.ndarray) -> None:
+    dataset = file.lookup.get(name)
+    if dataset is None:
+        file.lookup.create_dataset(name, data=value)
+    else:
+        # Keep the existing dataset and reject casts that would change zone IDs.
+        value = _cast_index(value, dataset)
+        if not np.array_equal(dataset[:], value):
+            dataset[...] = value
+
+
 def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[tuple[str, h5py.Dataset]]:
     mats = []
     for key in subset:
@@ -111,10 +128,15 @@ class _Matrix(MutableMapping[str, Any]):
                 if (shape := file.shape()) is not None and shape != self.shape:
                     raise ValueError(f"destination matrix shape does not match, expected {self.shape}, got {shape}")
 
-                if not overwrite:
-                    if self.index_name in file.list_mappings():
-                        raise ValueError(f"index '{self.index_name}' already exists in file: {path}")
+                dataset = file.lookup.get(self.index_name)
+                if dataset is not None:
+                    index = _cast_index(self.index, dataset)
+                    if not overwrite and not np.array_equal(dataset[:], index):
+                        raise ValueError(
+                            f"index '{self.index_name}' already exists with different values in file: {path}"
+                        )
 
+                if not overwrite:
                     if existing_keys := keys & set(file.list_matrices()):
                         raise ValueError(f"matrices {existing_keys} already exist in file: {path}")
 
@@ -123,8 +145,8 @@ class _Matrix(MutableMapping[str, Any]):
                         raise ValueError(f"attributes {existing_keys} already exist in file: {path}")
 
         with omx.open_file(path, mode="a", **kwargs) as file:
-            # Save index, overwrite=True because we've already checked
-            file.create_mapping(title=self.index_name, entries=self.index, overwrite=True)
+            # Save the index without replacing its existing dtype or attributes.
+            _write_index(file, self.index_name, self.index)
 
             for name in keys:
                 # OMX replaces the dataset, so keep destination attributes and apply source attributes.
@@ -351,15 +373,7 @@ class MatrixStore(_Matrix):
             raise PermissionError("cannot change the index of a read-only matrix store")
 
         value = self._validate_index(value)
-        dataset = self._backend.lookup.get(self.index_name)
-        if dataset is None:
-            self._backend.lookup.create_dataset(self.index_name, data=value)
-        else:
-            if dataset.shape != value.shape:
-                raise ValueError(f"index shape may not change, expected {dataset.shape}, got {value.shape}")
-            # Keep the existing dataset and reject casts that would change zone IDs.
-            dataset[...] = value.astype(dataset.dtype, casting="same_value")
-
+        _write_index(self._backend, self.index_name, value)
         self._index = value
 
     @overload

@@ -254,21 +254,30 @@ which ones to write using the ``subset`` argument:
 
 OMX manages the file attributes ``OMX_VERSION``, ``OMX_CREATED_WITH``,
 ``SHAPE`` and ``TITLE``. They are ignored when loading, copying or saving file
-metadata.  Because the store's ``metadata`` using the dataset attribute set, it
-still exposes them. Do not change them directly.
+metadata. A store still exposes them through ``metadata``, which is backed by
+h5py. Do not change them directly.
 
-The file includes the zone mapping, file-level metadata and per-matrix
-attributes. Existing matrix names and mappings are not replaced unless
-``overwrite=True`` is supplied:
+The file includes the zone mapping, file metadata and matrix attributes.  An
+existing mapping is left unchanged if its zone IDs and order match the object's
+index.
+
+Use ``overwrite=True`` to:
+
+* Replace matrices that already exist.
+* Change an existing index mapping.
+* Write file metadata keys that already exist.
 
 .. code-block:: python
 
     demand.save_as_omx("updated_demand.omx", overwrite=True)
 
+Updating a mapping keeps its dtype, attributes and length. The new IDs must fit
+its dtype, even when ``overwrite=True``.
+
 Prefer a new output file when the original must be preserved. Saving selected
 matrices to an existing file does not remove other matrices from the file.
-Overwriting a matrix keeps destination attributes, then applies source
-attributes. Source attributes replace matching destination attributes.
+When overwriting a matrix, source attributes replace matching attributes in the
+file. Other attributes on that matrix are kept.
 
 Use ``matrix_metadata(name)`` to read or change attributes for an existing matrix:
 
@@ -277,7 +286,7 @@ Use ``matrix_metadata(name)`` to read or change attributes for an existing matri
     demand.matrix_metadata("car")["mode"] = "car"
     demand.matrix_metadata("bus")["mode"] = "bus"
 
-This returns a dictionary in memory and a h5py attributes set for a store.
+This returns a dictionary in memory and the h5py attributes for a store.
 Read-only stores cannot change attributes. For a store, call the method again
 after replacing a matrix to get the new dataset's attributes.
 

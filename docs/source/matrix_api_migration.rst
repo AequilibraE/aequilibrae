@@ -188,9 +188,10 @@ with ``save_as_omx()``:
     demand.save_as_omx("adjusted_demand.omx", subset=["car", "bus"])
 
 The zone index and file-level metadata are saved with the selected matrices.
-Use a new output file to preserve the source. Attempting to save over existing
-matrices and index mappings will raise an exception unless ``overwrite`` is
-``True``:
+Use a new output file to preserve the source. An existing mapping is left
+unchanged if its zone IDs and order match the object's index. Use
+``overwrite=True`` to replace existing matrices, change an existing mapping or
+write file metadata keys that already exist:
 
 .. code-block:: python
 
@@ -198,9 +199,12 @@ matrices and index mappings will raise an exception unless ``overwrite`` is
         "adjusted_demand.omx", subset=["car", "bus"], overwrite=True
     )
 
-For direct file edits, use ``from_file()`` to open a writable store. Stores are
-opened as read-only by default, use ``mode="r+"`` to make it writable. The
-``mode`` argument is only accepted with ``store=True``:
+Updating a mapping keeps its dtype, attributes and length. The new IDs must fit
+its dtype, even when ``overwrite=True``.
+
+For direct file edits, use ``from_file()`` to open a writable store. Stores
+open read-only by default. Use ``mode="r+"`` for updates. The ``mode`` argument
+is only accepted with ``store=True``:
 
 .. code-block:: python
 

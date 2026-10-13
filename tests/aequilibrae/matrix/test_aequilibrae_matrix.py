@@ -316,6 +316,52 @@ def test_save_requires_explicit_overwrite(matrix, tmp_path, index, data, metadat
     )
 
 
+@pytest.mark.parametrize("overwrite", [False, True])
+def test_save_reuses_matching_index(uint8_index_omx_path, overwrite):
+    values = np.ones((2, 2))
+    matrix = from_dict({"car": values}, [10, 20], index_name="zones")
+    matrix.save_as_omx(uint8_index_omx_path, overwrite=overwrite)
+
+    with omx.open_file(uint8_index_omx_path, "r") as file:
+        dataset = file.lookup["zones"]
+        assert dataset.dtype == np.dtype("uint8")
+        assert dataset.attrs["description"] == "Zone IDs"
+        np.testing.assert_array_equal(dataset[:], [10, 20])
+        np.testing.assert_array_equal(file["car"][:], values)
+
+
+def test_save_conflicting_index_requires_overwrite(uint8_index_omx_path):
+    matrix = from_dict({"car": np.ones((2, 2))}, [30, 40], index_name="zones")
+    with pytest.raises(ValueError, match="index 'zones' already exists with different values"):
+        matrix.save_as_omx(uint8_index_omx_path)
+
+    with omx.open_file(uint8_index_omx_path, "r") as file:
+        np.testing.assert_array_equal(file.lookup["zones"][:], [10, 20])
+        assert file.list_matrices() == []
+
+    matrix.save_as_omx(uint8_index_omx_path, overwrite=True)
+    with omx.open_file(uint8_index_omx_path, "r") as file:
+        dataset = file.lookup["zones"]
+        assert dataset.dtype == np.dtype("uint8")
+        assert dataset.attrs["description"] == "Zone IDs"
+        np.testing.assert_array_equal(dataset[:], [30, 40])
+        np.testing.assert_array_equal(file["car"][:], matrix["car"])
+
+
+def test_save_rejects_lossy_index_cast_before_writing(uint8_index_omx_path):
+    matrix = from_dict({"car": np.ones((2, 2))}, [100, 300], index_name="zones")
+    with pytest.raises(ValueError, match="same_value"):
+        matrix.save_as_omx(uint8_index_omx_path, overwrite=True, title="Changed title")
+
+    with omx.open_file(uint8_index_omx_path, "r") as file:
+        dataset = file.lookup["zones"]
+        assert dataset.dtype == np.dtype("uint8")
+        assert dataset.attrs["description"] == "Zone IDs"
+        np.testing.assert_array_equal(dataset[:], [10, 20])
+        assert file.list_matrices() == []
+        assert "TITLE" not in file.attrs
+
+
 def test_save_overwrite_preserves_matrix_attributes(matrix, tmp_path, index, data, metadata):
     path = tmp_path / "attributes.omx"
     matrix.matrix_metadata("car").update({"mode": "car", "units": "trips"})
