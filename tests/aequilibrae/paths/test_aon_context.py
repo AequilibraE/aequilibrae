@@ -38,6 +38,22 @@ def assert_walk_outputs(output, expected):
     np.testing.assert_allclose(output.select_link.od.demand, expected[4])
 
 
+def test_hybrid_outputs_use_actual_links_in_shared_labels():
+    context = make_context([0, 2, 3, 4, 4], [1, 2, 3, 3], [10, 1, 1, 1], turn=True, use_hybrid=True)
+    demand = np.zeros((4, 4, 1))
+    demand[0, 3, 0] = 5
+    skims = SkimmingContext(4, link_fields={"distance": np.array([10.0, 20.0, 30.0, 40.0])}, cost_name="cost")
+    prepared = PreparedAoN(context, demand, skimming=skims, selected_links=SelectLinkContext(4, {"last": [3]}))
+    output = prepared.run(prepared.make_outputs())
+
+    np.testing.assert_array_equal(output.loading.link_loads[:, 0], [0, 5, 0, 5])
+    np.testing.assert_array_equal(output.select_link.loading.link_loads[0], output.loading.link_loads)
+    np.testing.assert_array_equal(output.select_link.od.demand[0, 0, 3], [5])
+    assert output.skimming.matrices["distance"][0, 3] == 60
+    assert output.skimming.matrices["cost"][0, 3] == 2
+    assert output.turn_cost_total == 0
+
+
 @pytest.mark.parametrize("turn", [False, True])
 @pytest.mark.parametrize("cores", [1, 3])
 def test_selected_full_paths_and_output_rotation(turn, cores):
