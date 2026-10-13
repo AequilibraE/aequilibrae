@@ -58,8 +58,8 @@ The following example assumes that ``demand.omx`` contains matrices named
     working.save_as_omx("working_demand.omx")
 
 The working set remains available after the store closes. Changes to it do not
-change the source file. ``subset()`` copies the zone index and file-level
-metadata as well as the specified matrices.
+change the source file. ``subset()`` copies the zone index, file-level metadata
+and per-matrix attributes as well as the specified matrices.
 
 Use ``MatrixStore`` for manipulating files rather than working with it as if it
 was in-memory. It reads the matrix from disk each time it is accessed. For this
@@ -249,8 +249,9 @@ which ones to write using the ``subset`` argument:
     demand.save_as_omx("updated_demand.omx")  # All matrices
     demand.save_as_omx("car_demand.omx", subset=["car"])
 
-The file includes the zone mapping and file-level metadata. Existing matrix
-names and mappings are not replaced unless ``overwrite=True`` is supplied:
+The file includes the zone mapping, file-level metadata and per-matrix
+attributes. Existing matrix names and mappings are not replaced unless
+``overwrite=True`` is supplied:
 
 .. code-block:: python
 
@@ -258,21 +259,28 @@ names and mappings are not replaced unless ``overwrite=True`` is supplied:
 
 Prefer a new output file when the original must be preserved. Saving selected
 matrices to an existing file does not remove other matrices from the file.
-Overwriting a matrix preserves its existing attributes, values supplied in
-``matrix_metadata`` will replace matching attributes.
+Overwriting a matrix keeps destination attributes, then applies source
+attributes. Source attributes replace matching destination attributes.
 
-You can supply per-matrix attributes separately when saving:
+Use ``matrix_metadata(name)`` to read or change attributes for an existing matrix:
 
 .. code-block:: python
 
-    demand.save_as_omx(
-        "tagged_demand.omx",
-        matrix_metadata={"car": {"mode": "car"}, "bus": {"mode": "bus"}},
-    )
+    demand.matrix_metadata("car")["mode"] = "car"
+    demand.matrix_metadata("bus")["mode"] = "bus"
 
-The ``matrix_metadata`` must only name matrices being saved. Names outside
-``subset`` are rejected. The ``matrix_metadata`` is translated directly to OMX
-(and thus HDF5) attributes for the matrix groups. See the `h5py attributes
+This returns a dictionary in memory and a h5py attributes set for a store.
+Read-only stores cannot change attributes. For a store, call the method again
+after replacing a matrix to get the new dataset's attributes.
+
+Attributes are saved with their matrices:
+
+.. code-block:: python
+
+    demand.save_as_omx("tagged_demand.omx")
+
+Matrix attributes are translated directly to OMX (and thus HDF5) attributes
+for the matrix datasets. See the `h5py attributes
 documentation <https://docs.h5py.org/en/stable/high/attr.html>` for more
 information.
     
@@ -284,7 +292,7 @@ attribute queries:
     with from_file("tagged_demand.omx", index_name="zones", store=True) as store:
         car_demand = store.subset([{"mode": "car"}])
         columns = store[{"mode": "car"}, :, 1]
-        print(store.omx["car"].attrs["mode"])
+        print(store.matrix_metadata("car")["mode"])
 
 Attribute queries through ``store[...]`` return a list of arrays. ``subset()``
 creates a new in-memory ``AequilibraEMatrix`` will all matrices that matched

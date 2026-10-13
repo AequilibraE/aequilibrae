@@ -301,66 +301,44 @@ def test_save_requires_explicit_overwrite(matrix, tmp_path, index, data, metadat
     )
 
 
-@pytest.mark.parametrize("matrix_metadata", [None, {"car": {"mode": "updated", "year": 2026}}])
-def test_save_overwrite_preserves_matrix_attributes(matrix, tmp_path, index, data, metadata, matrix_metadata):
+def test_save_overwrite_preserves_matrix_attributes(matrix, tmp_path, index, data, metadata):
     path = tmp_path / "attributes.omx"
-    matrix.save_as_omx(path, matrix_metadata={"car": {"mode": "car", "units": "trips"}, "bus": {"mode": "bus"}})
+    matrix.matrix_metadata("car").update({"mode": "car", "units": "trips"})
+    matrix.matrix_metadata("bus")["mode"] = "bus"
+    matrix.save_as_omx(path)
     with omx.open_file(path, "a") as file:
         file["car"].attrs["periods"] = [1, 2, 3]
 
     replacement = np.full(matrix.shape, 7.0)
     matrix["car"] = replacement
-    matrix.save_as_omx(path, subset=["car"], matrix_metadata=matrix_metadata, overwrite=True)
+    matrix.save_as_omx(path, subset=["car"], overwrite=True)
 
     assert_matrix(from_file(path, index_name="zones"), index, {**data, "car": replacement}, metadata=metadata)
     with omx.open_file(path, "r") as file:
         attrs = file["car"].attrs
-        assert attrs["mode"] == ("car" if matrix_metadata is None else "updated")
+        assert attrs["mode"] == "car"
         assert attrs["units"] == "trips"
         np.testing.assert_array_equal(attrs["periods"], [1, 2, 3])
-        if matrix_metadata is not None:
-            assert attrs["year"] == 2026
         assert file["bus"].attrs["mode"] == "bus"
 
 
-@pytest.mark.parametrize("overwrite", [False, True])
-@pytest.mark.parametrize("subset", [None, ["car"], []], ids=["all", "one", "empty"])
-def test_save_rejects_metadata_outside_subset(matrix, tmp_path, subset, overwrite):
-    path = tmp_path / "invalid.omx"
-    name = "missing" if subset is None else "bus"
-    with pytest.raises(ValueError, match="outside the save subset"):
-        matrix.save_as_omx(path, subset=subset, matrix_metadata={name: {"mode": name}}, overwrite=overwrite)
-    assert not path.exists()
-
-
-def test_save_rejects_metadata_for_existing_matrix_outside_subset(matrix, tmp_path, index, data, metadata):
-    path = tmp_path / "export.omx"
-    matrix.save_as_omx(path)
-
-    with pytest.raises(ValueError, match="outside the save subset"):
-        matrix.save_as_omx(path, subset=["car"], matrix_metadata={"bus": {"mode": "bus"}}, overwrite=True)
-    assert_matrix(from_file(path, index_name="zones"), index, data, metadata=metadata)
-    with omx.open_file(path, "r") as file:
-        assert "mode" not in file["bus"].attrs
-
-
-@pytest.mark.parametrize("matrix_metadata", [None, {"total": {"mode": "all"}}], ids=["no-attributes", "attributes"])
-def test_save_file_metadata_requires_overwrite(matrix, tmp_path, index, data, metadata, matrix_metadata):
+def test_save_file_metadata_requires_overwrite(matrix, tmp_path, index, data, metadata):
     path = tmp_path / "export.omx"
     matrix.save_as_omx(path)
     addition = from_dict(
         {"total": np.zeros(matrix.shape)}, index, index_name="other", metadata={"description": "Changed demand"}
     )
 
+    addition.matrix_metadata("total")["mode"] = "all"
     with pytest.raises(ValueError, match="attributes .* already exist"):
-        addition.save_as_omx(path, matrix_metadata=matrix_metadata, title="Changed title")
+        addition.save_as_omx(path, title="Changed title")
     assert_matrix(from_file(path, index_name="zones"), index, data, metadata=metadata)
     with omx.open_file(path, "r") as file:
         assert "other" not in file.list_mappings()
         assert "total" not in file.list_matrices()
         assert file.attrs.get("TITLE", "") != "Changed title"
 
-    addition.save_as_omx(path, matrix_metadata=matrix_metadata, overwrite=True)
+    addition.save_as_omx(path, overwrite=True)
     assert from_file(path, index_name="other").metadata["description"] == "Changed demand"
 
 
@@ -401,6 +379,7 @@ def test_attribute_selection_and_store_subset_survives_close(omx_path, index, da
     query = {"mode": "car"}
     loaded = from_file(omx_path, index_name="zones", subset=[query])
     assert_matrix(loaded, index, {"car": data["car"]}, metadata=metadata)
+    assert loaded.matrix_metadata("car")["mode"] == "car"
 
     with from_file(omx_path, index_name="zones", store=True) as store:
         selected = store.subset([query])
@@ -413,13 +392,78 @@ def test_attribute_selection_and_store_subset_survives_close(omx_path, index, da
 
     assert isinstance(selected, AequilibraEMatrix)
     assert_matrix(selected, index, {"car": data["car"]}, metadata=metadata)
+    assert selected.matrix_metadata("car")["mode"] == "car"
 
 
 def test_export_matrix_attributes(matrix, tmp_path, index, data):
     path = tmp_path / "attributes.omx"
-    matrix.save_as_omx(path, matrix_metadata={"car": {"mode": "car"}, "bus": {"mode": "bus"}})
+    matrix.matrix_metadata("car")["mode"] = "car"
+    matrix.matrix_metadata("bus")["mode"] = "bus"
+    matrix.save_as_omx(path)
     selected = from_file(path, index_name="zones", subset=[{"mode": "car"}])
     assert_matrix(selected, index, {"car": data["car"]})
+    assert selected.matrix_metadata("car")["mode"] == "car"
+
+    selected.matrix_metadata("car")["units"] = "trips"
+    output = tmp_path / "selected.omx"
+    selected.save_as_omx(output)
+    with omx.open_file(output, "r") as file:
+        assert file.list_matrices() == ["car"]
+        assert dict(file["car"].attrs) == {"mode": "car", "units": "trips"}
+
+
+def test_matrix_metadata_follows_matrix_lifetime(matrix):
+    attributes = matrix.matrix_metadata("car")
+    attributes.update({"mode": "car", "units": "trips"})
+    assert dict(matrix.matrix_metadata("car")) == {"mode": "car", "units": "trips"}
+    del attributes["units"]
+    matrix["car"] = np.ones(matrix.shape)
+    assert dict(matrix.matrix_metadata("car")) == {"mode": "car"}
+
+    del matrix["car"]
+    with pytest.raises(KeyError):
+        matrix.matrix_metadata("car")
+
+    matrix["car"] = np.zeros(matrix.shape)
+    assert dict(matrix.matrix_metadata("car")) == {}
+
+
+def test_subset_copies_matrix_metadata(matrix):
+    matrix.matrix_metadata("car").update({"mode": "car", "periods": np.array([1, 2, 3])})
+    selected = matrix.subset(["car"])
+    assert selected.matrix_metadata("car")["mode"] == "car"
+    np.testing.assert_array_equal(selected.matrix_metadata("car")["periods"], [1, 2, 3])
+
+    selected.matrix_metadata("car")["mode"] = "updated"
+    selected.matrix_metadata("car")["periods"][0] = 9
+    assert matrix.matrix_metadata("car")["mode"] == "car"
+    np.testing.assert_array_equal(matrix.matrix_metadata("car")["periods"], [1, 2, 3])
+
+
+def test_read_only_store_rejects_matrix_metadata_edits(omx_path):
+    with from_file(omx_path, index_name="zones", store=True) as store:
+        with pytest.raises(OSError):
+            store.matrix_metadata("car")["description"] = "Updated demand"
+        assert "description" not in store.matrix_metadata("car")
+
+
+def test_save_matrix_metadata_precedence(matrix, tmp_path, index):
+    path = tmp_path / "precedence.omx"
+    destination = from_dict({"car": np.zeros(matrix.shape)}, index, index_name="zones")
+    destination.matrix_metadata("car").update({"mode": "destination", "year": 2029, "units": "trips"})
+    destination.save_as_omx(path)
+
+    matrix.matrix_metadata("car").update({"mode": "source", "year": 2030, "description": "Source demand"})
+    matrix.save_as_omx(path, subset=["car"], overwrite=True)
+
+    with omx.open_file(path, "r") as file:
+        assert dict(file["car"].attrs) == {
+            "mode": "source",
+            "year": 2030,
+            "units": "trips",
+            "description": "Source demand",
+        }
+    assert matrix.matrix_metadata("car")["mode"] == "source"
 
 
 def test_mapping_operations(matrix, data):
@@ -450,6 +494,8 @@ def test_missing_matrix(matrix):
         matrix["missing", 0, 1]
     with pytest.raises(KeyError):
         del matrix["missing"]
+    with pytest.raises(KeyError):
+        matrix.matrix_metadata("missing")
 
 
 @pytest.mark.parametrize(
@@ -515,6 +561,7 @@ def test_store_omx_access(omx_path, data):
 def test_store_updates_preserve_matrix_attributes(omx_path, data, operation):
     expected = data["car"].copy()
     with from_file(omx_path, index_name="zones", mode="r+", store=True) as store:
+        store.matrix_metadata("car")["units"] = "trips"
         if operation == "replace":
             expected[:] = 7
             store["car"] = expected
@@ -524,11 +571,11 @@ def test_store_updates_preserve_matrix_attributes(omx_path, data, operation):
         else:
             expected[:, 1] = 7
             store["car", :, 1] = 7
-        assert store.omx["car"].attrs["mode"] == "car"
+        assert dict(store.matrix_metadata("car")) == {"mode": "car", "units": "trips"}
         np.testing.assert_array_equal(store[{"mode": "car"}][0], expected)
 
     with from_file(omx_path, index_name="zones", store=True) as store:
-        assert store.omx["car"].attrs["mode"] == "car"
+        assert dict(store.matrix_metadata("car")) == {"mode": "car", "units": "trips"}
         np.testing.assert_array_equal(store["car"], expected)
 
 

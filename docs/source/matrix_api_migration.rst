@@ -45,8 +45,9 @@ with ``subset()`` instead:
     demand["total"] = demand["car"] + demand["bus"]
 
 ``subset()`` returns an ``AequilibraEMatrix`` containing the selected named
-matrices, their zone index and file-level metadata. It remains usable after the
-store closes, and changes to it do not change the source file.
+matrices, their zone index, file-level metadata and per-matrix attributes. It
+remains usable after the store closes, and changes to it do not change the
+source file.
 
 There is no ``computational_view()`` or ``matrix_view`` step. Work with each
 named matrix directly. Select only the matrices needed for the calculation
@@ -231,9 +232,9 @@ Use ``metadata`` for file-level information instead of the old ``name`` and
         {"name": "morning_demand", "description": "Adjusted morning demand"}
     )
 
-Per-matrix attributes can be supplied through ``matrix_metadata`` when saving.
-These attributes can then be used with ``store.subset([{"mode": "car"}])`` to
-select an in-memory working set.
+Use ``matrix_metadata(name)`` to read or change per-matrix attributes. These
+attributes can then be used with ``store.subset([{"mode": "car"}])`` to select
+an in-memory working set.
 
 Replace trip-list loading
 -------------------------

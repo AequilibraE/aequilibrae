@@ -1,6 +1,7 @@
 import os
 from abc import abstractmethod
 from collections.abc import Iterator, MutableMapping
+from copy import deepcopy
 from typing import Any, Literal, Mapping, Self, Sequence, overload
 
 import h5py
@@ -71,14 +72,16 @@ class _Matrix(MutableMapping[str, Any]):
             if subset is None:
                 subset = file.list_matrices()
 
-            mats = {key: np.asarray(dataset) for key, dataset in _query_omx(file, subset)}
+            datasets = dict(_query_omx(file, subset))
 
             self = cls(index=index, index_name=index_name, **kwargs)
 
             # We should ignore the OMX special attributes
             attrs = {key: value for key, value in file.attrs.items() if key not in OMX_SPECIAL_ATTRS}
 
-            self.update(mats)
+            self.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
+            for key, dataset in datasets.items():
+                self.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
             self.metadata.update(attrs)
             return self
 
@@ -86,7 +89,6 @@ class _Matrix(MutableMapping[str, Any]):
         self,
         path: str | os.PathLike,
         subset: list[str] | None = None,
-        matrix_metadata: Mapping[str, Mapping[str, Any]] | None = None,
         overwrite: bool = False,
         **kwargs,
     ) -> None:
@@ -94,8 +96,6 @@ class _Matrix(MutableMapping[str, Any]):
         keys = set(self) if subset is None else set(subset)
         if missing_keys := keys - self.keys():
             raise ValueError(f"found non-existent keys in subset: {missing_keys}")
-        if matrix_metadata is not None and (missing_keys := matrix_metadata.keys() - keys):
-            raise ValueError(f"matrix_metadata contains names outside the save subset: {missing_keys}")
 
         if (shape := kwargs.get("shape")) is not None and tuple(shape) != self.shape:
             raise ValueError(f"destination matrix shape does not match, expected {self.shape}, got {shape}")
@@ -123,18 +123,13 @@ class _Matrix(MutableMapping[str, Any]):
             file.create_mapping(title=self.index_name, entries=self.index, overwrite=True)
 
             for name in keys:
-                # OMX replaces the dataset, so keep its existing attributes.
+                # OMX replaces the dataset, so keep destination attributes and apply source attributes.
                 dataset = file.data.get(name)
                 attributes = dict(dataset.attrs) if dataset is not None else {}
+                attributes.update(self.matrix_metadata(name))
 
                 file[name] = self[name]
                 file[name].attrs.update(attributes)
-
-            if matrix_metadata is not None:
-                for name, attributes in matrix_metadata.items():
-                    attrs = file[name].attrs
-                    for key, value in attributes.items():
-                        attrs[key] = value
 
             for key, value in self.metadata.items():
                 # These attributes are managed by OMX so we shouldn't try to write them
@@ -192,6 +187,11 @@ class _Matrix(MutableMapping[str, Any]):
     def metadata(self) -> MutableMapping[str, Any]:
         return self._metadata
 
+    @abstractmethod
+    def matrix_metadata(self, name: str) -> MutableMapping[str, Any]:
+        """Return mutable attributes for an existing named matrix."""
+        pass
+
     @property
     def shape(self) -> tuple[int, int]:
         length = len(self._index)
@@ -218,7 +218,15 @@ class AequilibraEMatrix(_Matrix):
     ) -> None:
         self._backend: dict[str, np.ndarray] = {}
         self._metadata: dict[str, Any] = {}
+        self._matrix_metadata: dict[str, dict[str, Any]] = {}
         super().__init__(index=index, index_name=index_name)
+
+    def matrix_metadata(self, name: str) -> MutableMapping[str, Any]:
+        return self._matrix_metadata[name]
+
+    def __delitem__(self, key: str) -> None:
+        super().__delitem__(key)
+        del self._matrix_metadata[key]
 
     # Normal write
     @overload
@@ -239,6 +247,7 @@ class AequilibraEMatrix(_Matrix):
                 raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
 
             self._backend[key] = np.asarray(value, copy=True, order="C")
+            self._matrix_metadata.setdefault(key, {})
         else:
             self._backend[key][rest] = value
 
@@ -266,6 +275,8 @@ class AequilibraEMatrix(_Matrix):
 
         other = self.__class__(index=self.index, index_name=self.index_name)
         other.update(mats)
+        for key in mats:
+            other.matrix_metadata(key).update(deepcopy(dict(self.matrix_metadata(key))))
         other.metadata.update(self.metadata)
 
         return other
@@ -310,6 +321,9 @@ class MatrixStore(_Matrix):
         except:
             file.close()
             raise
+
+    def matrix_metadata(self, name: str) -> h5py.AttributeManager:
+        return self._backend.data[name].attrs
 
     @property
     def omx(self) -> omx.File:
@@ -400,10 +414,12 @@ class MatrixStore(_Matrix):
         self,
         subset: Sequence[str | dict[str, Any]],
     ) -> AequilibraEMatrix:
-        mats = {key: np.asarray(dataset) for key, dataset in _query_omx(self._backend, subset)}
+        datasets = dict(_query_omx(self._backend, subset))
 
         other = AequilibraEMatrix(index=self.index, index_name=self.index_name)
-        other.update(mats)
+        other.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
+        for key, dataset in datasets.items():
+            other.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
         other.metadata.update(self.metadata)
 
         return other
