@@ -132,37 +132,61 @@ values.
 Read and change values
 ----------------------
 
-Put the matrix name first, followed by row and column selections:
+Use a single string name to read or replace a whole matrix. For selections, use
+``.iloc`` with zero-based positions or ``.loc`` with zone IDs. Put the matrix
+name last. Both indexers accept a name, a row and name, or a row, column and
+name:
 
 .. code-block:: python
 
     values = demand["car"]
-    cell = demand["car", 0, 1]
-    column = demand["car", :, 1]
-    selected_rows = demand["car", [0, 2], :]
+    values = demand.loc["car"]
+    values = demand.iloc["car"]
+    cell = demand.iloc[0, 1, "car"]
+    column = demand.iloc[:, 1, "car"]
+    selected_rows = demand.iloc[[0, 2], "car"]
 
-    demand["car", 0, 1] = 42
-    demand["car", :, 2] = [1, 2, 3]
-    demand["car", :2, :2] = [[0, 5], [6, 0]]
-    demand["bus", :, :] *= 1.05
+    demand.iloc[0, 1, "car"] = 42
+    demand.iloc[:, 2, "car"] = [1, 2, 3]
+    demand.iloc[:2, :2, "car"] = [[0, 5], [6, 0]]
+    demand.iloc[:, :, "bus"] *= 1.05
 
-Selections use zero-based positions, not zone IDs. In this example, position
-``0`` represents zone ``101``.
+In this example, position ``0`` represents zone ``101``. Zone selections use
+these IDs instead of positions:
+
+.. code-block:: python
+
+    cell = demand.loc[101, 205, "car"]
+    selected_rows = demand.loc[101:205, "car"]
+    pairs = demand.loc[[101, 205], [205, 309], "car"]
+    demand.loc[[101, 205], [205, 309], "car"] = [10, 20]
+
+Unlike pandas, two lists select matching pairs in NumPy, not all row-column
+combinations. Label slices follow the stored zone order and include the stop
+label. Steps apply to positions after translating the endpoints. Unknown zone
+IDs, including slice endpoints, raise ``KeyError``. Boolean masks, ``...`` and
+``None`` pass through unchanged.
+
+Key-only assignments such as ``demand.loc["car"] = values`` replace or create a
+whole matrix and require its full shape. Assignments to selections such as
+``demand.loc[:, :, "car"] = 0`` use the backend's broadcasting rules.
 
 When working with an ``AequilibraEMatrix``, selections follow NumPy
 indexing. When working with a ``MatrixStore``, selections follow the indexing
 supported by the OMX (and h5py) library, which may have different restrictions
-on fancy selections. This allows for partial reads and writes to and from
-matrices both in memory and on disk. Assignments to a selection keep the matrix's
-dtype and use NumPy or h5py conversion rules.
+on fancy selections. In particular, h5py rejects two index lists, unsorted or
+repeated positions, and negative slice steps. These limits also apply after
+translating zone IDs. This allows for partial reads and writes to and from
+matrices both in memory and on disk. Assignments to a selection keep the
+matrix's dtype and use NumPy or h5py conversion rules.
 
 Whole-matrix reads and basic slices of an ``AequilibraEMatrix`` may share its
 memory, fancy NumPy selections may return copies. If an independent array is
 needed, use ``demand["car"].copy()``.
 
 Reads from a ``MatrixStore`` always returns a copy. To write changes back,
-assign them through the store fancy indexing rather than modifying an array
-returned by a read.
+assign them through ``store.loc`` or ``store.iloc`` rather than modifying an
+array returned by a read.
 
 Work with the zone index
 ------------------------
@@ -199,14 +223,14 @@ close it when finished:
     with from_file(
         "demand.omx", index_name="zones", mode="r+", store=True
     ) as store:
-        first_row = store["car", 0, :]
-        store["car", 0, 1] = 42
-        store["bus", :, 2] = [1, 2, 3]
+        first_row = store.iloc[0, "car"]
+        store.iloc[0, 1, "car"] = 42
+        store.iloc[:, 2, "bus"] = [1, 2, 3]
         store.metadata["description"] = "Updated morning demand"
 
-These assignments update the file directly because they use fancy index. No
+These assignments update the file directly because they use ``.iloc``. No
 separate ``save_as_omx()`` call is needed.  ``store["car"][:, 2] = ...`` would
-only change the returned array, not the file.  Use ``store["car", :, 2] = ...``
+only change the returned array, not the file.  Use ``store.iloc[:, 2, "car"] = ...``
 instead.
 
 Use ``from_dict(..., store=True)`` with a path and index to create a store from
@@ -308,13 +332,15 @@ attribute queries:
 
     with from_file("tagged_demand.omx", index_name="zones", store=True) as store:
         car_demand = store.subset([{"mode": "car"}])
-        columns = store[{"mode": "car"}, :, 1]
+        column = car_demand.iloc[:, 1, "car"]
         print(store.matrix_metadata("car")["mode"])
 
-Attribute queries through ``store[...]`` return a list of arrays. ``subset()``
-creates a new in-memory ``AequilibraEMatrix`` will all matrices that matched
-the query. Use ``store.omx`` for advanced OMX-specific operations, or
-``store.omx["/"]`` to access the underlying h5py root dataset.
+Attribute queries are only supported by ``subset()`` and the ``subset``
+arguments when loading matrices. They are not supported by ``store[...]``,
+``.loc`` or ``.iloc``. ``subset()`` creates a new in-memory
+``AequilibraEMatrix`` with all matrices that matched the query. Use
+``store.omx`` for advanced OMX-specific operations, or ``store.omx["/"]`` to
+access the underlying h5py root dataset.
 
 Create matrices from tabular or sparse data
 -------------------------------------------

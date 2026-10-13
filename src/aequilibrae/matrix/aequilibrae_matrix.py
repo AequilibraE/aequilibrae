@@ -2,7 +2,7 @@ import os
 from abc import abstractmethod
 from collections.abc import Iterator, MutableMapping
 from copy import deepcopy
-from typing import Any, Literal, Mapping, Self, Sequence, overload
+from typing import Any, Literal, Mapping, Self, Sequence, TypeAlias, overload
 
 import h5py
 import numpy as np
@@ -48,23 +48,97 @@ def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[t
     return mats
 
 
-@overload
-def _key_to_key_and_rest(key: str | tuple[str, *tuple[Any, ...]]) -> tuple[str, tuple[Any, ...]]: ...
+_IndexKey: TypeAlias = str | tuple[str] | tuple[Any, str] | tuple[Any, Any, str]
 
 
-@overload
-def _key_to_key_and_rest(
-    key: dict[str, Any] | tuple[dict[str, Any], *tuple[Any, ...]],
-) -> tuple[dict[str, Any], tuple[Any, ...]]: ...
+def _validate_matrix_key(key: str) -> None:
+    if not isinstance(key, str):
+        raise TypeError("matrix name must be a string")
 
 
-def _key_to_key_and_rest(
-    key: str | dict[str, Any] | tuple[str | dict[str, Any], *tuple[Any, ...]],
-) -> tuple[str | dict[str, Any], tuple[Any, ...]]:
-    if isinstance(key, tuple):
-        return key[0], key[1:]
-    else:
-        return key, ()
+class _MatrixIndexer:
+    def __init__(self, matrix: "_Matrix", *, zones: bool) -> None:
+        self._matrix = matrix
+        self._zones = zones
+
+    def _translate_zones(self, selection: Any) -> Any:
+        if selection is None or selection is Ellipsis:
+            return selection
+
+        positions = self._matrix._zone_positions
+        if isinstance(selection, slice):
+            start = None if selection.start is None else positions[selection.start]
+            stop = None if selection.stop is None else positions[selection.stop]
+
+            if stop is not None:
+                if selection.step is not None and selection.step < 0:
+                    # A negative stop would count from the end, not include the first zone.
+                    stop = stop - 1 if stop else None
+                else:
+                    stop += 1
+            return slice(start, stop, selection.step)
+
+        labels = np.asarray(selection)
+        if labels.dtype.kind == "b":  # boolean selection
+            return selection
+
+        if isinstance(selection, (list, tuple)):
+            # Keep integer labels exact when a list mixes small and large zone IDs.
+            labels = np.asarray(selection, dtype=object)
+
+        if labels.ndim == 0:
+            return positions[labels.item()]
+
+        return np.fromiter((positions[zone] for zone in labels.flat), dtype=np.intp, count=labels.size).reshape(
+            labels.shape
+        )
+
+    def _parse_key(self, key: _IndexKey) -> tuple[str, tuple[Any, ...]]:
+        args = key if isinstance(key, tuple) else (key,)
+        if not 1 <= len(args) <= 3:
+            raise TypeError("expected a matrix name, a row and name, or a row, column and name")
+
+        name = args[-1]
+        _validate_matrix_key(name)
+
+        selection = args[:-1]
+        if self._zones:
+            selection = tuple(self._translate_zones(value) for value in selection)
+
+        return name, selection
+
+    # Normal lookup
+    @overload
+    def __getitem__(self, key: str | tuple[str]) -> np.ndarray: ...
+
+    # Dataset slice (partial read)
+    @overload
+    def __getitem__(self, key: tuple[Any, str] | tuple[Any, Any, str]) -> np.ndarray | np.generic: ...
+
+    def __getitem__(self, key: _IndexKey) -> np.ndarray | np.generic:
+        name, selection = self._parse_key(key)
+        if not selection:
+            return self._matrix[name]
+
+        try:
+            dataset = self._matrix._backend[name]
+        except LookupError as exc:
+            raise KeyError(name) from exc
+
+        return dataset[selection]
+
+    # Dataset slice (partial write), allows in-place modification without writing the whole matrix
+    def __setitem__(self, key: _IndexKey, value: ArrayLike) -> None:
+        name, selection = self._parse_key(key)
+        if not selection:
+            self._matrix[name] = value
+        else:
+            try:
+                dataset = self._matrix._backend[name]
+            except LookupError as exc:
+                raise KeyError(name) from exc
+
+            dataset[selection] = value
 
 
 class _Matrix(MutableMapping[str, Any]):
@@ -76,6 +150,7 @@ class _Matrix(MutableMapping[str, Any]):
 
         self.__index_name = index_name
         self._index = self._validate_index(index)  # Validate without writing a store's index
+        self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
 
     @classmethod
     def from_omx(
@@ -204,6 +279,17 @@ class _Matrix(MutableMapping[str, Any]):
     @index.setter
     def index(self, value: ArrayLike) -> None:
         self._set_index(value)
+        self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
+
+    @property
+    def loc(self) -> _MatrixIndexer:
+        """Select by zone ID, with the matrix name last. Label slices include the stop."""
+        return _MatrixIndexer(self, zones=True)
+
+    @property
+    def iloc(self) -> _MatrixIndexer:
+        """Select by zero-based position, with the matrix name last."""
+        return _MatrixIndexer(self, zones=False)
 
     @property
     def index_name(self) -> str:
@@ -255,43 +341,21 @@ class AequilibraEMatrix(_Matrix):
         del self._matrix_metadata[key]
 
     # Normal write
-    @overload
-    def __setitem__(self, key: str | tuple[str], value: ArrayLike) -> None: ...
+    def __setitem__(self, key: str, value: ArrayLike) -> None:
+        _validate_matrix_key(key)
+        value = np.asarray(value, order="C")
+        shape = self.shape
 
-    # Allows in-place modification without writing the whole matrix
-    @overload
-    def __setitem__(self, key: tuple[str, Any, *tuple[Any, ...]], value: ArrayLike) -> None: ...
+        if value.shape != shape:
+            raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
 
-    def __setitem__(self, key: str | tuple[str, *tuple[Any, ...]], value: ArrayLike) -> None:
-        key, rest = _key_to_key_and_rest(key)
-
-        if not rest:
-            value = np.asarray(value, order="C")
-            shape = self.shape
-
-            if value.shape != shape:
-                raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
-
-            self._backend[key] = np.asarray(value, copy=True, order="C")
-            self._matrix_metadata.setdefault(key, {})
-        else:
-            self._backend[key][rest] = value
+        self._backend[key] = np.asarray(value, copy=True, order="C")
+        self._matrix_metadata.setdefault(key, {})
 
     # Normal lookup
-    @overload
-    def __getitem__(self, key: str | tuple[str]) -> np.ndarray: ...
-
-    # dataset slice (partial read)
-    @overload
-    def __getitem__(self, key: tuple[str, Any, *tuple[Any, ...]]) -> np.ndarray | np.generic: ...
-
-    def __getitem__(self, key: str | tuple[str, *tuple[Any, ...]]) -> np.ndarray | np.generic:
-        key, rest = _key_to_key_and_rest(key)
-
-        if rest:
-            return self._backend[key][rest]
-        else:
-            return self._backend[key].view()
+    def __getitem__(self, key: str) -> np.ndarray:
+        _validate_matrix_key(key)
+        return self._backend[key].view()
 
     def subset(
         self,
@@ -376,57 +440,28 @@ class MatrixStore(_Matrix):
         _write_index(self._backend, self.index_name, value)
         self._index = value
 
-    @overload
-    def __setitem__(self, key: str | tuple[str], value: ArrayLike) -> None: ...
+    def __setitem__(self, key: str, value: ArrayLike) -> None:
+        _validate_matrix_key(key)
+        value = np.asarray(value, order="C")
 
-    # dataset slice (partial write), allows in-place modification without writing the whole matrix
-    @overload
-    def __setitem__(self, key: tuple[str, Any, *tuple[Any, ...]], value: ArrayLike) -> None: ...
+        shape = self.shape
+        if value.shape != shape:
+            raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
 
-    def __setitem__(self, key: str | tuple[str, *tuple[Any, ...]], value: ArrayLike) -> None:
-        key, rest = _key_to_key_and_rest(key)
-
-        if not rest:
-            value = np.asarray(value, order="C")
-
-            shape = self.shape
-            if value.shape != shape:
-                raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
-
-            # OMX replaces the dataset, so keep its existing attributes.
-            attributes = dict(self._backend[key].attrs) if key in self else {}
-            self._backend[key] = value
-            self._backend[key].attrs.update(attributes)
-        else:
-            self._backend[key][rest] = value
+        # OMX replaces the dataset, so keep its existing attributes.
+        attributes = dict(self._backend[key].attrs) if key in self else {}
+        self._backend[key] = value
+        self._backend[key].attrs.update(attributes)
 
     # Normal lookup
-    @overload
-    def __getitem__(self, key: str | tuple[str]) -> np.ndarray: ...
-
-    # OMX attribute query, optionally with a dataset slice (partial read)
-    @overload
-    def __getitem__(self, key: dict[str, Any] | tuple[dict[str, Any], *tuple[Any, ...]]) -> list[np.ndarray]: ...
-
-    # Named dataset slice (partial read)
-    @overload
-    def __getitem__(self, key: tuple[str, Any, *tuple[Any, ...]]) -> np.ndarray | np.generic: ...
-
-    def __getitem__(
-        self,
-        key: str | dict[str, Any] | tuple[str, *tuple[Any, ...]] | tuple[dict[str, Any], *tuple[Any, ...]],
-    ) -> np.ndarray | np.generic | list[np.ndarray]:
-        key, rest = _key_to_key_and_rest(key)
-
+    def __getitem__(self, key: str) -> np.ndarray:
+        _validate_matrix_key(key)
         try:
             value = self._backend[key]
         except LookupError as e:
             raise KeyError(key) from e
 
-        if isinstance(key, str):
-            return value[rest] if rest else np.asarray(value)
-        else:
-            return [np.asarray(x[rest] if rest else x) for x in value]
+        return np.asarray(value)
 
     def subset(
         self,

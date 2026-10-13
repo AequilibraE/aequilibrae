@@ -112,9 +112,9 @@ Replace matrix access and inspection
 ------------------------------------
 
 Access matrices by name rather than through ``matrix``, ``get_matrix()`` or
-dynamically named attributes. Put indexes in the same brackets as the matrix
-name when changing values to ensure the underly data is mutated, rather than a
-copy:
+dynamically named attributes. Use ``.iloc`` for zero-based positions or
+``.loc`` for zone IDs, with the matrix name last, when changing values to
+ensure the underlying data is changed, rather than a copy:
 
 .. list-table::
    :header-rows: 1
@@ -126,9 +126,9 @@ copy:
    * - ``matrix.get_matrix("car", copy=True)``
      - ``matrix["car"].copy()``
    * - ``matrix.matrix["car"][0, 1]``
-     - ``matrix["car", 0, 1]``
+     - ``matrix.iloc[0, 1, "car"]``
    * - ``matrix.matrix["car"][:, 1] = values``
-     - ``matrix["car", :, 1] = values``
+     - ``matrix.iloc[:, 1, "car"] = values``
    * - ``matrix.names``
      - ``list(matrix)``
    * - ``matrix.cores``
@@ -142,8 +142,8 @@ For example:
 
 .. code-block:: python
 
-    matrix["car", 0, 1] = 42
-    matrix["car", :, 2] = [1, 2, 3]
+    matrix.iloc[0, 1, "car"] = 42
+    matrix.iloc[:, 2, "car"] = [1, 2, 3]
     selected = matrix.subset(["car"])
     print(list(selected), selected.shape)
 
@@ -211,12 +211,12 @@ is only accepted with ``store=True``:
     with from_file(
         "demand.omx", index_name="zones", mode="r+", store=True
     ) as store:
-        store["car", 0, 1] = 42
-        store["bus", :, 2] = [1, 2, 3]
+        store.iloc[0, 1, "car"] = 42
+        store.iloc[:, 2, "bus"] = [1, 2, 3]
 
 These assignments update the file without a separate save call.
 ``store["car"][:, 2] = ...`` only changes the returned array, so replace it
-with ``store["car", :, 2] = ...``. The store provides file access through a
+with ``store.iloc[:, 2, "car"] = ...``. The store provides file access through a
 similar interface to the in-memory object, but prefer ``subset()`` and an
 ``AequilibraEMatrix`` for calculations.
 

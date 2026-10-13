@@ -61,6 +61,11 @@ def matrix(matrix_factory, index, data, metadata):
 
 
 @pytest.fixture
+def memory_matrix(index, data):
+    return from_dict(data, index)
+
+
+@pytest.fixture
 def omx_path(tmp_path, index, data, metadata):
     # Create input independently of save_as_omx so loading is tested separately.
     path = tmp_path / "input.omx"
@@ -132,10 +137,10 @@ def test_assignment_accepts_array_like(matrix, data, array_type):
     np.testing.assert_array_equal(matrix["car"], data["car"])
     assert matrix["car"].dtype == data["car"].dtype
 
-    matrix["car", 0, 1] = 2.5
-    assert matrix["car", 0, 1] == 2.5
+    matrix.iloc[0, 1, "car"] = 2.5
+    assert matrix.iloc[0, 1, "car"] == 2.5
     matrix["car"] *= 1.1
-    assert matrix["car", 0, 1] == pytest.approx(2.75)
+    assert matrix.iloc[0, 1, "car"] == pytest.approx(2.75)
 
 
 @pytest.mark.parametrize("invalid_values", [1, [[1, 2], [3]]])
@@ -436,7 +441,7 @@ def test_subset_is_independent(matrix, index, data, metadata, subset):
     selected.metadata["periods"][0] = 9
     selected.index = [809, 0, 801]
     if subset:
-        selected[subset[0], 0, 1] = 42
+        selected.iloc[0, 1, subset[0]] = 42
     assert_matrix(matrix, index, data, metadata=metadata)
     np.testing.assert_array_equal(matrix.metadata["periods"], [1, 2, 3])
 
@@ -449,12 +454,8 @@ def test_attribute_selection_and_store_subset_survives_close(omx_path, index, da
 
     with from_file(omx_path, index_name="zones", store=True) as store:
         selected = store.subset([query])
-        columns = store[query, :, 1]
-
-        assert isinstance(columns, list)
-        assert len(columns) == 1
-        np.testing.assert_array_equal(columns[0], data["car"][:, 1])
-        assert store[{"mode": "missing"}] == []
+        np.testing.assert_array_equal(selected.iloc[:, 1, "car"], data["car"][:, 1])
+        assert len(store.subset([{"mode": "missing"}])) == 0
 
     assert isinstance(selected, AequilibraEMatrix)
     assert_matrix(selected, index, {"car": data["car"]}, metadata=metadata)
@@ -557,8 +558,11 @@ def test_mapping_operations(matrix, data):
 def test_missing_matrix(matrix):
     with pytest.raises(KeyError):
         matrix["missing"]
-    with pytest.raises(KeyError):
-        matrix["missing", 0, 1]
+    for indexer in (matrix.loc, matrix.iloc):
+        with pytest.raises(KeyError):
+            indexer[0, 0, "missing"]
+        with pytest.raises(KeyError):
+            indexer[0, 0, "missing"] = 42
     with pytest.raises(KeyError):
         del matrix["missing"]
     with pytest.raises(KeyError):
@@ -576,10 +580,10 @@ def test_missing_matrix(matrix):
     ],
 )
 def test_indexed_reads_and_writes(matrix, index, data, metadata, selection, values):
-    np.testing.assert_array_equal(matrix["car", *selection], data["car"][selection])
+    np.testing.assert_array_equal(matrix.iloc[*selection, "car"], data["car"][selection])
     expected = data["car"].copy()
     expected[selection] = values
-    matrix["car", *selection] = values
+    matrix.iloc[*selection, "car"] = values
     assert_matrix(matrix, index, {**data, "car": expected}, metadata=metadata)
 
 
@@ -591,8 +595,8 @@ def test_augmented_assignment(matrix, data):
     expected[[0, 2], :] += 4
 
     matrix["car"] *= 2
-    matrix["car", :, 2] *= 3
-    matrix["car", [0, 2], :] += 4
+    matrix.iloc[:, 2, "car"] *= 3
+    matrix.iloc[[0, 2], :, "car"] += 4
 
     np.testing.assert_array_equal(matrix["car"], expected)
     np.testing.assert_array_equal(matrix["bus"], data["bus"])
@@ -607,7 +611,7 @@ def test_augmented_assignment(matrix, data):
     ],
 )
 def test_mutating_read_results(matrix, data, selection, shares_memory):
-    result = matrix["car", *selection]
+    result = matrix.iloc[*selection, "car"]
     result[:] = 42
     expected = data["car"].copy()
 
@@ -615,6 +619,145 @@ def test_mutating_read_results(matrix, data, selection, shares_memory):
         expected[selection] = 42
 
     np.testing.assert_array_equal(matrix["car"], expected)
+
+
+@pytest.mark.parametrize("accessor", ["loc", "iloc"])
+def test_indexer_whole_matrix(matrix, data, accessor):
+    indexer = getattr(matrix, accessor)
+    np.testing.assert_array_equal(indexer["car"], matrix["car"])
+    np.testing.assert_array_equal(indexer["car",], matrix["car"])
+    indexer["car",] = data["car"] * 2
+    np.testing.assert_array_equal(matrix["car"], data["car"] * 2)
+    indexer["new"] = data["bus"]
+    np.testing.assert_array_equal(matrix["new"], data["bus"])
+
+
+@pytest.mark.parametrize("key", [0, ["car"], {"mode": "car"}, ("car",), ("car", 0, 1)])
+def test_plain_indexing_requires_string(matrix, data, key):
+    with pytest.raises(TypeError, match="string"):
+        matrix[key]
+    with pytest.raises(TypeError, match="string"):
+        matrix[key] = data["car"]
+    np.testing.assert_array_equal(matrix["car"], data["car"])
+
+
+@pytest.mark.parametrize(
+    "key",
+    [(), (0, 1, 2, "car"), 0, ["car"], {"mode": "car"}, (0, ["car"]), (0, 1, {"mode": "car"})],
+)
+def test_indexer_rejects_bad_arguments(memory_matrix, key):
+    # Both indexers use the same argument handling.
+    with pytest.raises(TypeError):
+        memory_matrix.iloc[key]
+    with pytest.raises(TypeError):
+        memory_matrix.iloc[key] = 42
+
+
+@pytest.mark.parametrize(
+    "labels, positions",
+    [
+        pytest.param((309,), (0,), id="row"),
+        pytest.param((309, 0), (0, 1), id="cell"),
+        pytest.param((slice(None), 101), (slice(None), 2), id="column"),
+        pytest.param((np.array([309, 101]),), ([0, 2],), id="array"),
+        pytest.param(([],), ([],), id="empty"),
+    ],
+)
+def test_loc_translates_zones(memory_matrix, data, labels, positions):
+    np.testing.assert_array_equal(memory_matrix.loc[*labels, "car"], data["car"][positions])
+    expected = data["car"].copy()
+    expected[positions] = 42
+    memory_matrix.loc[*labels, "car"] = 42
+    np.testing.assert_array_equal(memory_matrix["car"], expected)
+
+
+@pytest.mark.parametrize(
+    "labels, positions",
+    [
+        pytest.param(slice(309, 0), slice(0, 2), id="inclusive-stop"),
+        pytest.param(slice(309, 101, 2), slice(0, 3, 2), id="step"),
+        pytest.param(slice(None, 0), slice(None, 2), id="open-start"),
+        pytest.param(slice(0, None), slice(1, None), id="open-stop"),
+        pytest.param(slice(101, 309, -1), slice(2, None, -1), id="reverse-to-first"),
+        pytest.param(slice(101, 0, -1), slice(2, 0, -1), id="reverse-stop"),
+    ],
+)
+def test_loc_inclusive_slices(memory_matrix, data, labels, positions):
+    np.testing.assert_array_equal(memory_matrix.loc[labels, "car"], data["car"][positions])
+    expected = data["car"].copy()
+    expected[positions] = 42
+    memory_matrix.loc[labels, "car"] = 42
+    np.testing.assert_array_equal(memory_matrix["car"], expected)
+
+
+@pytest.mark.parametrize(
+    "key",
+    [(999, "car"), (slice(None), [309, 999], "car"), (slice(999, 101), "car"), (slice(309, 999), "car")],
+)
+def test_loc_unknown_zone(memory_matrix, data, key):
+    with pytest.raises(KeyError):
+        memory_matrix.loc[key]
+    with pytest.raises(KeyError):
+        memory_matrix.loc[key] = 42
+    np.testing.assert_array_equal(memory_matrix["car"], data["car"])
+
+
+@pytest.mark.parametrize("selection", [Ellipsis, None, [True, False, True], np.eye(3, dtype=bool)])
+def test_loc_passes_special_selections_unchanged(memory_matrix, data, selection):
+    np.testing.assert_array_equal(memory_matrix.loc[selection, "car"], data["car"][selection])
+    expected = data["car"].copy()
+    expected[selection] = 42
+    memory_matrix.loc[selection, "car"] = 42
+    np.testing.assert_array_equal(memory_matrix["car"], expected)
+
+
+@pytest.mark.parametrize("accessor", ["loc", "iloc"])
+def test_indexer_paired_selections(matrix, data, accessor):
+    indexer = getattr(matrix, accessor)
+    rows, cols = ([309, 0, 101], [0, 101, 309]) if accessor == "loc" else ([0, 1, 2], [1, 2, 0])
+    if isinstance(matrix, MatrixStore):
+        # h5py does not support two index arrays. Do not work around that limit.
+        with pytest.raises(TypeError):
+            indexer[rows, cols, "car"]
+        with pytest.raises(TypeError):
+            indexer[rows, cols, "car"] = [11, 12, 13]
+        np.testing.assert_array_equal(matrix["car"], data["car"])
+    else:
+        np.testing.assert_array_equal(indexer[rows, cols, "car"], data["car"][[0, 1, 2], [1, 2, 0]])
+        indexer[rows, cols, "car"] = [11, 12, 13]
+        expected = data["car"].copy()
+        expected[[0, 1, 2], [1, 2, 0]] = [11, 12, 13]
+        np.testing.assert_array_equal(matrix["car"], expected)
+
+
+@pytest.mark.parametrize("labels", [slice(101, 309, -1), [101, 309], [309, 309]])
+def test_loc_keeps_store_limits(omx_path, labels):
+    # h5py rejects reverse slices, unsorted positions and repeated positions.
+    with from_file(omx_path, index_name="zones", mode="r+", store=True) as store:
+        with pytest.raises((TypeError, ValueError)):
+            store.loc[labels, "car"]
+        with pytest.raises((TypeError, ValueError)):
+            store.loc[labels, "car"] = 42
+
+
+def test_loc_uses_relabelled_index(matrix, data):
+    loc = matrix.loc
+    matrix.index = [1001, 1002, 1003]
+    assert loc[1001, 1002, "car"] == data["car"][0, 1]
+    with pytest.raises(KeyError):
+        loc[309, "car"]
+    with pytest.raises(ValueError):
+        matrix.index = [1, 1, 1]
+    loc[1001, 1002, "car"] += 5
+    assert matrix.iloc[0, 1, "car"] == data["car"][0, 1] + 5
+
+
+def test_loc_large_zone_ids():
+    zones = [0, 2**64 - 1]
+    matrix = from_dict({"car": [[1, 2], [3, 4]]}, index=np.array(zones, dtype=np.uint64))
+    assert matrix.loc[zones[0], zones[1], "car"] == 2
+    np.testing.assert_array_equal(matrix.loc[zones, "car"], matrix["car"])
+    np.testing.assert_array_equal(matrix.loc[np.array(zones, dtype=np.uint64), "car"], matrix["car"])
 
 
 def test_store_omx_access(omx_path, data):
@@ -637,9 +780,9 @@ def test_store_updates_preserve_matrix_attributes(omx_path, data, operation):
             store["car"] *= 2
         else:
             expected[:, 1] = 7
-            store["car", :, 1] = 7
+            store.iloc[:, 1, "car"] = 7
         assert dict(store.matrix_metadata("car")) == {"mode": "car", "units": "trips"}
-        np.testing.assert_array_equal(store[{"mode": "car"}][0], expected)
+        np.testing.assert_array_equal(store.subset([{"mode": "car"}])["car"], expected)
 
     with from_file(omx_path, index_name="zones", store=True) as store:
         assert dict(store.matrix_metadata("car")) == {"mode": "car", "units": "trips"}
@@ -714,8 +857,8 @@ def test_store_edits_survive_reopening(omx_path, data, metadata):
     expected_metadata = {**metadata, "description": "Updated demand"}
 
     with from_file(omx_path, index_name="zones", mode="r+", store=True) as store:
-        store["car", 0, 1] = 42
-        store["car", :, 2] = [1, 2, 3]
+        store.iloc[0, 1, "car"] = 42
+        store.iloc[:, 2, "car"] = [1, 2, 3]
         store["car"] *= 2
         store["total"] = store["car"] + store["bus"]
         del store["bus"]
