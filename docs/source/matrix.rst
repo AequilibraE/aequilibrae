@@ -252,6 +252,11 @@ which ones to write using the ``subset`` argument:
     demand.save_as_omx("updated_demand.omx")  # All matrices
     demand.save_as_omx("car_demand.omx", subset=["car"])
 
+OMX manages the file attributes ``OMX_VERSION``, ``OMX_CREATED_WITH``,
+``SHAPE`` and ``TITLE``. They are ignored when loading, copying or saving file
+metadata.  Because the store's ``metadata`` using the dataset attribute set, it
+still exposes them. Do not change them directly.
+
 The file includes the zone mapping, file-level metadata and per-matrix
 attributes. Existing matrix names and mappings are not replaced unless
 ``overwrite=True`` is supplied:

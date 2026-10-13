@@ -232,6 +232,9 @@ Use ``metadata`` for file-level information instead of the old ``name`` and
         {"name": "morning_demand", "description": "Adjusted morning demand"}
     )
 
+OMX-managed file attributes are ignored when loading, copying and saving
+metadata.
+
 Use ``matrix_metadata(name)`` to read or change per-matrix attributes. These
 attributes can then be used with ``store.subset([{"mode": "car"}])`` to select
 an in-memory working set.

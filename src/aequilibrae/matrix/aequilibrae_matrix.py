@@ -14,6 +14,10 @@ from numpy.typing import ArrayLike, DTypeLike
 OMX_SPECIAL_ATTRS = {"OMX_VERSION", "OMX_CREATED_WITH", "SHAPE", "TITLE"}
 
 
+def _copy_file_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    return deepcopy({key: value for key, value in metadata.items() if key not in OMX_SPECIAL_ATTRS})
+
+
 def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[tuple[str, h5py.Dataset]]:
     mats = []
     for key in subset:
@@ -77,12 +81,12 @@ class _Matrix(MutableMapping[str, Any]):
             self = cls(index=index, index_name=index_name, **kwargs)
 
             # We should ignore the OMX special attributes
-            attrs = {key: value for key, value in file.attrs.items() if key not in OMX_SPECIAL_ATTRS}
+            attrs = _copy_file_metadata(file.attrs)
 
             self.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
             for key, dataset in datasets.items():
                 self.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
-            self.metadata.update(deepcopy(attrs))
+            self.metadata.update(attrs)
             return self
 
     def save_as_omx(
@@ -277,7 +281,7 @@ class AequilibraEMatrix(_Matrix):
         other.update(mats)
         for key in mats:
             other.matrix_metadata(key).update(deepcopy(dict(self.matrix_metadata(key))))
-        other.metadata.update(deepcopy(dict(self.metadata)))
+        other.metadata.update(_copy_file_metadata(self.metadata))
 
         return other
 
@@ -420,7 +424,7 @@ class MatrixStore(_Matrix):
         other.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
         for key, dataset in datasets.items():
             other.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
-        other.metadata.update(deepcopy(dict(self.metadata)))
+        other.metadata.update(_copy_file_metadata(self.metadata))
 
         return other
 
@@ -529,7 +533,7 @@ def from_dict(
 
     mat.update(data)
     if metadata is not None:
-        mat.metadata.update(deepcopy(dict(metadata)))
+        mat.metadata.update(_copy_file_metadata(metadata))
 
     return mat
 

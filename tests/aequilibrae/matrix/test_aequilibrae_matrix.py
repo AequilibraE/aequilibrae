@@ -156,7 +156,14 @@ def test_from_dict_accepts_array_like(tmp_path, manage, index, data, store):
 def test_from_dict(tmp_path, manage, index, data, metadata, store):
     kwargs = {"path": tmp_path / "demand.omx"} if store else {}
     periods = np.array([1, 2, 3])
-    supplied_metadata = {**metadata, "periods": periods}
+    supplied_metadata = {
+        **metadata,
+        "periods": periods,
+        "OMX_VERSION": "ignored",
+        "OMX_CREATED_WITH": "ignored",
+        "SHAPE": [99, 99],
+        "TITLE": "ignored",
+    }
     matrix = manage(from_dict(data, index, index_name="zones", metadata=supplied_metadata, store=store, **kwargs))
     assert isinstance(matrix, MatrixStore if store else AequilibraEMatrix)
     periods[0] = 9
@@ -167,6 +174,10 @@ def test_from_dict(tmp_path, manage, index, data, metadata, store):
 
     assert_matrix(matrix, index, data, metadata=metadata)
     np.testing.assert_array_equal(matrix.metadata["periods"], [1, 2, 3])
+    np.testing.assert_array_equal(matrix.metadata.get("SHAPE", matrix.shape), matrix.shape)
+    assert matrix.metadata.get("OMX_VERSION") != "ignored"
+    assert matrix.metadata.get("OMX_CREATED_WITH") != "ignored"
+    assert "TITLE" not in matrix.metadata
 
 
 @pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
@@ -369,8 +380,10 @@ def test_save_rejects_shape_option_before_creating_file(matrix, tmp_path):
 @pytest.mark.parametrize("subset", [["car"], [], ["bus", "car"]], ids=["one", "empty", "all"])
 def test_subset_is_independent(matrix, index, data, metadata, subset):
     matrix.metadata["periods"] = np.array([1, 2, 3])
+    matrix.metadata["TITLE"] = "Source title"
     selected = matrix.subset(subset)
     assert isinstance(selected, AequilibraEMatrix)
+    assert not {"OMX_VERSION", "OMX_CREATED_WITH", "SHAPE", "TITLE"} & selected.metadata.keys()
     assert_matrix(selected, index, {name: data[name] for name in subset}, metadata=metadata)
 
     selected.metadata["description"] = "Selected demand"
@@ -436,9 +449,10 @@ def test_matrix_metadata_follows_matrix_lifetime(matrix):
 
 
 def test_subset_copies_matrix_metadata(matrix):
-    matrix.matrix_metadata("car").update({"mode": "car", "periods": np.array([1, 2, 3])})
+    matrix.matrix_metadata("car").update({"mode": "car", "periods": np.array([1, 2, 3]), "TITLE": "Car demand"})
     selected = matrix.subset(["car"])
     assert selected.matrix_metadata("car")["mode"] == "car"
+    assert selected.matrix_metadata("car")["TITLE"] == "Car demand"
     np.testing.assert_array_equal(selected.matrix_metadata("car")["periods"], [1, 2, 3])
 
     selected.matrix_metadata("car")["mode"] = "updated"
