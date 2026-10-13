@@ -180,7 +180,8 @@ values. To change the number of zones, create a new object with the required
 index and matrices.
 
 Opening a store with an existing mapping does not rewrite it unless an index
-is supplied. Replacing its index keeps the mapping's dtype and attributes.
+is supplied. Supplying an index requires a writable store. Replacing its index
+keeps the mapping's dtype and attributes.
 
 Read and update files
 ---------------------

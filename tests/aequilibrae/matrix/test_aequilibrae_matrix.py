@@ -540,6 +540,47 @@ def test_store_edits_survive_reopening(omx_path, data, metadata):
         assert_matrix(reopened, new_index, {"car": car, "total": total}, metadata=expected_metadata)
 
 
+@pytest.mark.parametrize("mode", ["r", "r+"])
+def test_store_rejects_rectangular_file(tmp_path, mode):
+    path = tmp_path / "rectangular.omx"
+    with omx.open_file(path, "w") as file:
+        file["car"] = np.zeros((2, 3))
+        file.create_mapping("zones", [10, 20])
+
+    with pytest.raises(ValueError, match="matrix shape does not match index"):
+        MatrixStore(path, index_name="zones", mode=mode)
+
+    with omx.open_file(path, "r") as file:
+        assert file["car"].shape == (2, 3)
+        np.testing.assert_array_equal(file.lookup["zones"][:], [10, 20])
+
+
+def test_read_only_store_rejects_supplied_index(omx_path, index):
+    with pytest.raises(ValueError, match="cannot supply an index.*read-only"):
+        MatrixStore(omx_path, index=index, index_name="zones", mode="r")
+
+    with omx.open_file(omx_path, "r") as file:
+        np.testing.assert_array_equal(file.lookup["zones"][:], index)
+
+
+@pytest.mark.parametrize("new_index", [[10, 20], [10, 20, 30, 40]], ids=["shorter", "longer"])
+def test_store_rejects_supplied_index_length(omx_path, index, new_index):
+    with pytest.raises(ValueError, match="matrix shape does not match index"):
+        MatrixStore(omx_path, index=new_index, index_name="zones", mode="r+")
+
+    with omx.open_file(omx_path, "r") as file:
+        np.testing.assert_array_equal(file.lookup["zones"][:], index)
+
+
+def test_store_rejects_stored_index_length(omx_path):
+    with omx.open_file(omx_path, "a") as file:
+        # Use h5py directly because OMX rejects mappings with the wrong length.
+        file.lookup.create_dataset("wrong_length", data=[10, 20])
+
+    with pytest.raises(ValueError, match="matrix shape does not match index"):
+        MatrixStore(omx_path, index_name="wrong_length")
+
+
 @pytest.mark.parametrize("shape", [(2, 2), (3, 2), (3, 3, 1)])
 def test_matrix_shape_validation(matrix, index, data, metadata, shape):
     with pytest.raises(ValueError):

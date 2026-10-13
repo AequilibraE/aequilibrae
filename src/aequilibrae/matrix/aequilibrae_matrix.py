@@ -280,6 +280,9 @@ class MatrixStore(_Matrix):
         mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
         **kwargs,
     ) -> None:
+        if mode == "r" and index is not None:
+            raise ValueError("cannot supply an index when opening a read-only matrix store")
+
         file = omx.open_file(
             path,
             mode=mode,
@@ -292,13 +295,17 @@ class MatrixStore(_Matrix):
                 if index is None:
                     raise ValueError(
                         f"index not found, expected group at '/lookup/{index_name}'. "
-                        "Either provide an index directly, or an index name of one that exists with the OMX file"
+                        "Either provide an index directly when opening a writable store, "
+                        "or an index name of one that exists in the OMX file"
                     )
 
             self._backend: omx.File = file
             self._metadata: h5py.AttributeManager = file.attrs
             super().__init__(index=index, index_name=index_name)
-            if supplied_index and file.mode != "r":
+            if (shape := file.shape()) is not None and shape != self.shape:
+                raise ValueError(f"matrix shape does not match index, expected {self.shape}, got {shape}")
+
+            if supplied_index:
                 self.index = index
         except:
             file.close()
@@ -326,9 +333,6 @@ class MatrixStore(_Matrix):
             raise PermissionError("cannot change the index of a read-only matrix store")
 
         value = self._validate_index(value)
-        if (shape := self._backend.shape()) is not None and len(value) not in shape:
-            raise ValueError("index length must match one data dimension")
-
         dataset = self._backend.lookup.get(self.index_name)
         if dataset is None:
             self._backend.lookup.create_dataset(self.index_name, data=value)
