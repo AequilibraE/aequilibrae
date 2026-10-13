@@ -82,7 +82,7 @@ class _Matrix(MutableMapping[str, Any]):
             self.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
             for key, dataset in datasets.items():
                 self.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
-            self.metadata.update(attrs)
+            self.metadata.update(deepcopy(attrs))
             return self
 
     def save_as_omx(
@@ -277,7 +277,7 @@ class AequilibraEMatrix(_Matrix):
         other.update(mats)
         for key in mats:
             other.matrix_metadata(key).update(deepcopy(dict(self.matrix_metadata(key))))
-        other.metadata.update(self.metadata)
+        other.metadata.update(deepcopy(dict(self.metadata)))
 
         return other
 
@@ -420,7 +420,7 @@ class MatrixStore(_Matrix):
         other.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
         for key, dataset in datasets.items():
             other.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
-        other.metadata.update(self.metadata)
+        other.metadata.update(deepcopy(dict(self.metadata)))
 
         return other
 
@@ -529,7 +529,7 @@ def from_dict(
 
     mat.update(data)
     if metadata is not None:
-        mat.metadata.update(metadata)
+        mat.metadata.update(deepcopy(dict(metadata)))
 
     return mat
 

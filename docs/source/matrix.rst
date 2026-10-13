@@ -59,7 +59,8 @@ The following example assumes that ``demand.omx`` contains matrices named
 
 The working set remains available after the store closes. Changes to it do not
 change the source file. ``subset()`` copies the zone index, file-level metadata
-and per-matrix attributes as well as the specified matrices.
+and per-matrix attributes as well as the specified matrices. Metadata values
+are copied as well.
 
 Use ``MatrixStore`` for manipulating files rather than working with it as if it
 was in-memory. It reads the matrix from disk each time it is accessed. For this
@@ -87,6 +88,8 @@ Use ``from_dict()`` when arrays are already available:
         index_name="zones",
         metadata={"description": "Morning demand", "year": 2030},
     )
+
+Metadata supplied to ``from_dict()`` is also copied.
 
 Alternatively, start with no named matrices and add them using ``AequilibraEMatrix`` directly:
 

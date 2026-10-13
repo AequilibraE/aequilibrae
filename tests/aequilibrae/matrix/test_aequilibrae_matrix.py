@@ -155,14 +155,18 @@ def test_from_dict_accepts_array_like(tmp_path, manage, index, data, store):
 @pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
 def test_from_dict(tmp_path, manage, index, data, metadata, store):
     kwargs = {"path": tmp_path / "demand.omx"} if store else {}
-    matrix = manage(from_dict(data, index, index_name="zones", metadata=metadata, store=store, **kwargs))
+    periods = np.array([1, 2, 3])
+    supplied_metadata = {**metadata, "periods": periods}
+    matrix = manage(from_dict(data, index, index_name="zones", metadata=supplied_metadata, store=store, **kwargs))
     assert isinstance(matrix, MatrixStore if store else AequilibraEMatrix)
+    periods[0] = 9
 
     if store:
         matrix.close()
         matrix = manage(from_file(kwargs["path"], index_name="zones", store=True))
 
     assert_matrix(matrix, index, data, metadata=metadata)
+    np.testing.assert_array_equal(matrix.metadata["periods"], [1, 2, 3])
 
 
 @pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
@@ -364,15 +368,18 @@ def test_save_rejects_shape_option_before_creating_file(matrix, tmp_path):
 
 @pytest.mark.parametrize("subset", [["car"], [], ["bus", "car"]], ids=["one", "empty", "all"])
 def test_subset_is_independent(matrix, index, data, metadata, subset):
+    matrix.metadata["periods"] = np.array([1, 2, 3])
     selected = matrix.subset(subset)
     assert isinstance(selected, AequilibraEMatrix)
     assert_matrix(selected, index, {name: data[name] for name in subset}, metadata=metadata)
 
     selected.metadata["description"] = "Selected demand"
+    selected.metadata["periods"][0] = 9
     selected.index = [809, 0, 801]
     if subset:
         selected[subset[0], 0, 1] = 42
     assert_matrix(matrix, index, data, metadata=metadata)
+    np.testing.assert_array_equal(matrix.metadata["periods"], [1, 2, 3])
 
 
 def test_attribute_selection_and_store_subset_survives_close(omx_path, index, data, metadata):
