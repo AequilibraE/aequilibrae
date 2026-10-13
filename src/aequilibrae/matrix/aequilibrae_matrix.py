@@ -48,7 +48,7 @@ def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[t
     return mats
 
 
-_IndexKey: TypeAlias = str | tuple[str] | tuple[Any, str] | tuple[Any, Any, str]
+_IndexKey: TypeAlias = str | tuple[str] | tuple[str, Any] | tuple[str, Any, Any]
 
 
 def _validate_matrix_key(key: str) -> None:
@@ -96,12 +96,12 @@ class _MatrixIndexer:
     def _parse_key(self, key: _IndexKey) -> tuple[str, tuple[Any, ...]]:
         args = key if isinstance(key, tuple) else (key,)
         if not 1 <= len(args) <= 3:
-            raise TypeError("expected a matrix name, a row and name, or a row, column and name")
+            raise TypeError("expected a matrix name, a name and row, or a name, row and column")
 
-        name = args[-1]
+        name = args[0]
         _validate_matrix_key(name)
 
-        selection = args[:-1]
+        selection = args[1:]
         if self._zones:
             selection = tuple(self._translate_zones(value) for value in selection)
 
@@ -113,7 +113,7 @@ class _MatrixIndexer:
 
     # Dataset slice (partial read)
     @overload
-    def __getitem__(self, key: tuple[Any, str] | tuple[Any, Any, str]) -> np.ndarray | np.generic: ...
+    def __getitem__(self, key: tuple[str, Any] | tuple[str, Any, Any]) -> np.ndarray | np.generic: ...
 
     def __getitem__(self, key: _IndexKey) -> np.ndarray | np.generic:
         name, selection = self._parse_key(key)
@@ -282,13 +282,13 @@ class _Matrix(MutableMapping[str, Any]):
         self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
 
     @property
-    def loc(self) -> _MatrixIndexer:
-        """Select by zone ID, with the matrix name last. Label slices include the stop."""
+    def mat(self) -> _MatrixIndexer:
+        """Select by zone ID, with the matrix name first. Label slices include the stop."""
         return _MatrixIndexer(self, zones=True)
 
     @property
-    def iloc(self) -> _MatrixIndexer:
-        """Select by zero-based position, with the matrix name last."""
+    def imat(self) -> _MatrixIndexer:
+        """Select by zero-based position, with the matrix name first."""
         return _MatrixIndexer(self, zones=False)
 
     @property
