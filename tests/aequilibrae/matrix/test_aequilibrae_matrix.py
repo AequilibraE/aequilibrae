@@ -75,6 +75,16 @@ def omx_path(tmp_path, index, data, metadata):
     return path
 
 
+@pytest.fixture
+def uint8_index_omx_path(tmp_path):
+    path = tmp_path / "uint8_index.omx"
+    with omx.open_file(path, "w") as file:
+        # Use a small dtype to test casts that may change zone IDs.
+        dataset = file.create_mapping("zones", np.array([10, 20], dtype=np.uint8))
+        dataset.attrs["description"] = "Zone IDs"
+    return path
+
+
 def assert_matrix(matrix, index, data, index_name="zones", metadata=None):
     assert matrix.index_name == index_name
     assert matrix.shape == (len(index), len(index))
@@ -456,6 +466,50 @@ def test_read_only_store_rejects_index_replacement(omx_path, index):
             store.index = [809, 0, 801]
         np.testing.assert_array_equal(store.index, index)
         np.testing.assert_array_equal(store.omx.lookup["zones"][:], index)
+
+
+def test_open_writable_store_preserves_index(uint8_index_omx_path):
+    with MatrixStore(uint8_index_omx_path, index_name="zones", mode="r+") as store:
+        dataset = store.omx.lookup["zones"]
+        assert dataset.dtype == np.dtype("uint8")
+        assert dataset.attrs["description"] == "Zone IDs"
+        np.testing.assert_array_equal(dataset[:], [10, 20])
+        np.testing.assert_array_equal(store.index, [10, 20])
+
+
+def test_store_index_replacement_preserves_dtype_and_attributes(uint8_index_omx_path):
+    with MatrixStore(uint8_index_omx_path, index_name="zones", mode="r+") as store:
+        store.index = [100, 200]
+        dataset = store.omx.lookup["zones"]
+        assert dataset.dtype == np.dtype("uint8")
+        assert dataset.attrs["description"] == "Zone IDs"
+        np.testing.assert_array_equal(dataset[:], [100, 200])
+        np.testing.assert_array_equal(store.index, [100, 200])
+
+
+def test_failed_store_index_cast_leaves_index_unchanged(uint8_index_omx_path):
+    with MatrixStore(uint8_index_omx_path, index_name="zones", mode="r+") as store:
+        with pytest.raises(ValueError, match="same_value"):
+            store.index = [100, 300]
+        np.testing.assert_array_equal(store.index, [10, 20])
+        np.testing.assert_array_equal(store.omx.lookup["zones"][:], [10, 20])
+
+
+def test_store_constructor_writes_supplied_index(uint8_index_omx_path):
+    with MatrixStore(uint8_index_omx_path, index=[100, 200], index_name="zones", mode="r+") as store:
+        dataset = store.omx.lookup["zones"]
+        assert dataset.dtype == np.dtype("uint8")
+        assert dataset.attrs["description"] == "Zone IDs"
+        np.testing.assert_array_equal(dataset[:], [100, 200])
+        np.testing.assert_array_equal(store.index, [100, 200])
+
+
+def test_failed_store_constructor_index_cast_leaves_file_unchanged(uint8_index_omx_path):
+    with pytest.raises(ValueError, match="same_value"):
+        MatrixStore(uint8_index_omx_path, index=[100, 300], index_name="zones", mode="r+")
+
+    with omx.open_file(uint8_index_omx_path, "r") as file:
+        np.testing.assert_array_equal(file.lookup["zones"][:], [10, 20])
 
 
 def test_failed_store_construction_has_no_cleanup_error(tmp_path, recwarn):

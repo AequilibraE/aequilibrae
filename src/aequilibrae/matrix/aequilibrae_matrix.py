@@ -53,7 +53,7 @@ class _Matrix(MutableMapping[str, Any]):
         assert hasattr(self, "_backend") and hasattr(self, "_metadata")
 
         self.__index_name = index_name
-        self.index = index  # Assign using property setter for validation
+        self._index = self._validate_index(index)  # Validate without writing a store's index
 
     @classmethod
     def from_omx(
@@ -151,6 +151,9 @@ class _Matrix(MutableMapping[str, Any]):
         pass
 
     def _set_index(self, value: ArrayLike) -> None:
+        self._index = self._validate_index(value)
+
+    def _validate_index(self, value: ArrayLike) -> np.ndarray:
         value = np.asarray(value)
         if value.ndim != 1:
             raise ValueError(f"got too many dimensions for the index, expected 1, got {value.ndim}")
@@ -169,7 +172,7 @@ class _Matrix(MutableMapping[str, Any]):
             else:
                 raise TypeError(f"cannot cast {value.dtype} to {np.uintp} safely")
 
-        self._index = np.asarray(value, copy=True, dtype=np.uintp, order="C")
+        return np.asarray(value, copy=True, dtype=np.uintp, order="C")
 
     @property
     def index(self) -> np.ndarray:
@@ -283,7 +286,8 @@ class MatrixStore(_Matrix):
             **kwargs,
         )
         try:
-            if index is None:
+            supplied_index = index is not None
+            if not supplied_index:
                 index = file.lookup.get(index_name)
                 if index is None:
                     raise ValueError(
@@ -294,6 +298,8 @@ class MatrixStore(_Matrix):
             self._backend: omx.File = file
             self._metadata: h5py.AttributeManager = file.attrs
             super().__init__(index=index, index_name=index_name)
+            if supplied_index and file.mode != "r":
+                self.index = index
         except:
             file.close()
             raise
@@ -316,12 +322,23 @@ class MatrixStore(_Matrix):
         self.close()
 
     def _set_index(self, value: ArrayLike) -> None:
-        if self._backend.mode == "r" and hasattr(self, "_index"):
+        if self._backend.mode == "r":
             raise PermissionError("cannot change the index of a read-only matrix store")
 
-        super()._set_index(value)
-        if self._backend.mode != "r":
-            self._backend.create_mapping(self.index_name, self.index, overwrite=True)
+        value = self._validate_index(value)
+        if (shape := self._backend.shape()) is not None and len(value) not in shape:
+            raise ValueError("index length must match one data dimension")
+
+        dataset = self._backend.lookup.get(self.index_name)
+        if dataset is None:
+            self._backend.lookup.create_dataset(self.index_name, data=value)
+        else:
+            if dataset.shape != value.shape:
+                raise ValueError(f"index shape may not change, expected {dataset.shape}, got {value.shape}")
+            # Keep the existing dataset and reject casts that would change zone IDs.
+            dataset[...] = value.astype(dataset.dtype, casting="same_value")
+
+        self._index = value
 
     @overload
     def __setitem__(self, key: str | tuple[str], value: ArrayLike) -> None: ...
