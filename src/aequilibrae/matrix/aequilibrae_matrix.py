@@ -8,7 +8,7 @@ import numpy as np
 import openmatrix as omx
 import pandas as pd
 import scipy.sparse
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, DTypeLike
 
 OMX_SPECIAL_ATTRS = {"OMX_VERSION", "OMX_CREATED_WITH", "SHAPE", "TITLE"}
 
@@ -232,13 +232,13 @@ class AequilibraEMatrix(_Matrix):
         key, rest = _key_to_key_and_rest(key)
 
         if not rest:
-            value = np.asarray(value, dtype="float64", order="C")
+            value = np.asarray(value, order="C")
             shape = self.shape
 
             if value.shape != shape:
                 raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
 
-            self._backend[key] = np.asarray(value, copy=True, dtype="float64", order="C")
+            self._backend[key] = np.asarray(value, copy=True, order="C")
         else:
             self._backend[key][rest] = value
 
@@ -355,7 +355,7 @@ class MatrixStore(_Matrix):
         key, rest = _key_to_key_and_rest(key)
 
         if not rest:
-            value = np.asarray(value, dtype="float64", order="C")
+            value = np.asarray(value, order="C")
 
             shape = self.shape
             if value.shape != shape:
@@ -527,7 +527,9 @@ def from_df(
     index: ArrayLike | None = None,
     index_name: str = "main_index",
     fill_value: float = 0,
+    dtype: DTypeLike = float,
 ) -> AequilibraEMatrix:
+    dtype = np.dtype(dtype)
     if subset is None:
         subset = [name for name in df.columns if name not in (row, col)]
 
@@ -542,8 +544,8 @@ def from_df(
         raise ValueError("found row or column values that are not in the index")
 
     for name in subset:
-        values = df[name].to_numpy(dtype="float64", copy=False)
-        values_matrix: np.ndarray = np.full(mat.shape, fill_value, dtype="float64")
+        values = df[name].to_numpy(dtype=dtype, copy=False)
+        values_matrix: np.ndarray = np.full(mat.shape, fill_value, dtype=dtype)
         values_matrix[rows, cols] = 0
         np.add.at(values_matrix, (rows, cols), values)
         mat[name] = values_matrix

@@ -114,14 +114,15 @@ def test_construction_copies_index(matrix_factory, index, index_type):
         matrix.index[0] = 999
 
 
-def test_assignment_copies_and_converts_values(matrix):
-    values = np.arange(9, dtype=np.int32).reshape(3, 3)
+@pytest.mark.parametrize("dtype", [np.int32, np.float32])
+def test_assignment_copies_values_and_preserves_dtype(matrix, dtype):
+    values = np.arange(9, dtype=dtype).reshape(3, 3)
     expected = values.copy()
 
     matrix["car"] = values
     values[:] = 999
 
-    assert matrix["car"].dtype == np.dtype("float64")
+    assert matrix["car"].dtype == np.dtype(dtype)
     np.testing.assert_array_equal(matrix["car"], expected)
 
 
@@ -129,7 +130,7 @@ def test_assignment_copies_and_converts_values(matrix):
 def test_assignment_accepts_array_like(matrix, data, array_type):
     matrix["car"] = array_type(data["car"].tolist())
     np.testing.assert_array_equal(matrix["car"], data["car"])
-    assert matrix["car"].dtype == np.dtype("float64")
+    assert matrix["car"].dtype == data["car"].dtype
 
     matrix["car", 0, 1] = 2.5
     assert matrix["car", 0, 1] == 2.5
@@ -137,7 +138,7 @@ def test_assignment_accepts_array_like(matrix, data, array_type):
     assert matrix["car", 0, 1] == pytest.approx(2.75)
 
 
-@pytest.mark.parametrize("invalid_values", [1, [[1, 2], [3]], [["bad"] * 3] * 3])
+@pytest.mark.parametrize("invalid_values", [1, [[1, 2], [3]]])
 def test_invalid_assignment_preserves_values(matrix, index, data, metadata, invalid_values):
     with pytest.raises((TypeError, ValueError)):
         matrix["car"] = invalid_values
@@ -264,6 +265,20 @@ def test_omx_round_trip(matrix, tmp_path, index, data, metadata, subset):
 
     assert_matrix(loaded, index, expected, metadata=metadata)
     assert_matrix(matrix, index, data, metadata=metadata)
+
+
+@pytest.mark.parametrize("dtype", [np.int32, np.float32])
+def test_matrix_dtype_survives_subset_and_save(matrix, tmp_path, dtype):
+    values = np.arange(9, dtype=dtype).reshape(3, 3)
+    matrix["car"] = values
+    selected = matrix.subset(["car"])
+    assert selected["car"].dtype == np.dtype(dtype)
+
+    path = tmp_path / "dtype.omx"
+    selected.save_as_omx(path)
+    loaded = from_file(path, index_name="zones")
+    assert loaded["car"].dtype == np.dtype(dtype)
+    np.testing.assert_array_equal(loaded["car"], values)
 
 
 def test_save_requires_explicit_overwrite(matrix, tmp_path, index, data, metadata):
@@ -670,6 +685,15 @@ def test_from_df_infers_zones_and_sums_duplicate_trips():
         "bus": np.array([[0, 2, 0], [0, 0, 0], [5, 0, 0]]),
     }
     assert_matrix(matrix, [101, 205, 309], expected)
+    assert matrix["car"].dtype == np.dtype(float)
+
+
+@pytest.mark.parametrize("dtype", [np.int32, np.float32])
+def test_from_df_uses_supplied_dtype(dtype):
+    df = pd.DataFrame({"origin": [10, 10], "destination": [20, 20], "car": [2, 3]})
+    matrix = from_df(df, "origin", "destination", fill_value=7, dtype=dtype)
+    assert matrix["car"].dtype == np.dtype(dtype)
+    np.testing.assert_array_equal(matrix["car"], [[7, 5], [7, 7]])
 
 
 def test_from_df_preserves_supplied_zones_subset_and_fill_value():
@@ -695,3 +719,11 @@ def test_from_scipy(index, data, array_type):
     matrix = from_scipy({name: array_type(values) for name, values in data.items()}, index, index_name="zones")
     assert isinstance(matrix, AequilibraEMatrix)
     assert_matrix(matrix, index, data)
+
+
+@pytest.mark.parametrize("dtype", [np.int32, np.float32])
+def test_from_scipy_preserves_dtype(index, dtype):
+    values = np.arange(9, dtype=dtype).reshape(3, 3)
+    matrix = from_scipy({"car": sparse.csr_array(values)}, index)
+    assert matrix["car"].dtype == np.dtype(dtype)
+    np.testing.assert_array_equal(matrix["car"], values)

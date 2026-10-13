@@ -97,9 +97,8 @@ Alternatively, start with no named matrices and add them using ``AequilibraEMatr
     empty.update({"bus": bus})
 
 Matrix assignment accepts array-like values with the object's square shape.
-Both objects store assigned matrices as ``float64``. ``AequilibraEMatrix``
-copies supplied arrays. Changing an array supplied earlier does not change
-the matrix. Replacing a matrix in a ``MatrixStore`` preserves its attributes.
+``AequilibraEMatrix`` copies supplied arrays so changing an array supplied
+earlier does not change the matrix.
 
 Inspect and manage named matrices
 ---------------------------------
@@ -151,7 +150,8 @@ When working with an ``AequilibraEMatrix``, selections follow NumPy
 indexing. When working with a ``MatrixStore``, selections follow the indexing
 supported by the OMX (and h5py) library, which may have different restrictions
 on fancy selections. This allows for partial reads and writes to and from
-matrices both in memory and on disk.
+matrices both in memory and on disk. Assignments to a selection keep the matrix's
+dtype and use NumPy or h5py conversion rules.
 
 Whole-matrix reads and basic slices of an ``AequilibraEMatrix`` may share its
 memory, fancy NumPy selections may return copies. If an independent array is
