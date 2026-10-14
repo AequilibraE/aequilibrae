@@ -49,24 +49,16 @@ def matrix_summary():
     return res
 
 
-def graph_summary():
-    """
-    Compute summary statistics about the graphs built within the active project.
-
-    If no graphs have been built an empty dictionary will be returned.
-    """
-    project = get_active_project()
-    graphs = project.network.graphs
-
+def graph_summary(graph):
+    """Return summary statistics for an explicitly prepared graph."""
     return {
-        k: {
-            "num_links": v.num_links,
-            "num_nodes": v.num_nodes,
-            "num_zones": v.num_zones,
-            "compact_num_links": v.compact_num_links,
-            "compact_num_nodes": v.compact_num_nodes,
+        graph.mode: {
+            "num_links": graph.num_links,
+            "num_nodes": graph.num_nodes,
+            "num_zones": graph.num_zones,
+            "compact_num_links": graph.compact_num_links,
+            "compact_num_nodes": graph.compact_num_nodes,
         }
-        for k, v in graphs.items()
     }
 
 

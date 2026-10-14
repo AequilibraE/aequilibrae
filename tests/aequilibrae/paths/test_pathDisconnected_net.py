@@ -9,8 +9,7 @@ def test_path_disconnected_delete_link(sioux_falls_example):
     with sioux_falls_example.db_connection as conn:
         conn.executemany("delete from Links where link_id=?", [[2], [4], [5], [14]])
 
-    sioux_falls_example.network.build_graphs()
-    graph = sioux_falls_example.network.graphs["c"]
+    graph = sioux_falls_example.network.build().build_graph(mode="c", cost="distance")
     graph.set_graph("free_flow_time")
     graph.set_blocked_centroid_flows(False)
 
@@ -38,8 +37,7 @@ def test_path_disconnected_delete_link(sioux_falls_example):
 def test_path_disconnected_penalize_link_in_memory(sioux_falls_example):
     links = [2, 4, 5, 14]
 
-    sioux_falls_example.network.build_graphs()
-    graph = sioux_falls_example.network.graphs["c"]
+    graph = sioux_falls_example.network.build().build_graph(mode="c", cost="distance")
     graph.exclude_links(links)
     graph.set_graph("free_flow_time")
     graph.set_blocked_centroid_flows(False)

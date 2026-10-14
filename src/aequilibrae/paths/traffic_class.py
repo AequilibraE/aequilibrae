@@ -1,17 +1,16 @@
-import logging
-import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import Dict, List, Tuple, Union
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Mapping
 
 import numpy as np
-import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph
-from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
-
-logger = logging.getLogger(__name__)
+from aequilibrae.paths.assignment_context import validate_assignment_demand
+from aequilibrae.paths.cython.dijkstra import available_heaps
+from aequilibrae.paths.graph import GraphBase, TransitGraph
+from aequilibrae.paths.results import TransitAssignmentResults
 
 
 class TransportClassBase(ABC):  # noqa: B024
@@ -22,28 +21,30 @@ class TransportClassBase(ABC):  # noqa: B024
         :Arguments:
             **name** (:obj:`str`): UNIQUE class name.
 
-            **graph** (:obj:`Graph`): Class/mode-specific graph
+            **graph** (:obj:`GraphBase`): Class-specific graph
 
             **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
         """
+
+        if matrix.matrix_view is None:
+            raise ValueError("Set the matrix computational view before constructing a traffic class")
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
-
         if matrix.matrix_view.dtype != "float64":
             raise TypeError("Matrix's computational view need to be of type np.float64")
         self._config = {}
         self.graph = graph
+        self._config["Graph"] = str(
+            {
+                "Mode": graph.mode,
+                "Block through centroids": graph.block_centroid_flows,
+                "Number of centroids": graph.num_zones,
+                "Links": graph.num_links,
+                "Nodes": graph.num_nodes,
+            }
+        )
         self.matrix = matrix
         self._id = name
-
-        graph_config = {
-            "Mode": graph.mode,
-            "Block through centroids": graph.block_centroid_flows,
-            "Number of centroids": graph.num_zones,
-            "Links": graph.num_links,
-            "Nodes": graph.num_nodes,
-        }
-        self._config["Graph"] = str(graph_config)
 
         mat_config = {
             "Source": matrix.file_path or "",
@@ -64,211 +65,102 @@ class TransportClassBase(ABC):  # noqa: B024
         return {self._id: config}
 
 
-class TrafficClass(TransportClassBase):
-    """Traffic class for equilibrium traffic assignment
+@dataclass(frozen=True, kw_only=True)
+class TrafficClass:
+    """Define a traffic class independently of a network or prepared graph.
 
-    .. code-block:: python
+    ``cost`` is the free-flow generalized cost in time units. Congestion adds
+    the change in travel time. Fixed costs are multiplied by
+    ``fixed_cost_multiplier`` and divided by ``vot``.
 
-        >>> from aequilibrae.paths import TrafficClass
-
-        >>> project = create_example(project_path)
-        >>> project.network.build_graphs()
-
-        >>> graph = project.network.graphs['c'] # we grab the graph for cars
-        >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
-        >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
-        >>> # Set to True to apply automatic centroid-connector turn bans where needed
-        >>> graph.set_blocked_centroid_flows(False)
-
-        >>> proj_matrices = project.matrices
-
-        >>> demand = proj_matrices.get_matrix("demand_omx")
-        >>> demand.computational_view()
-
-        >>> tc = TrafficClass("car", graph, demand)
-        >>> tc.set_pce(1.3)
-
-        >>> project.close()
+    Demand must have a float64 computational view. ``name`` defaults to the
+    mode. Classes with the same mode need distinct names.
     """
 
-    def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:
-        """
-        Instantiates the class
+    mode: str
+    cost: str
+    demand: AequilibraeMatrix
+    name: str | None = None
+    pce: float = 1.0
+    vot: float = 1.0
+    skimming: tuple[str, ...] = ()
+    fixed_cost_field: str | None = None
+    fixed_cost_multiplier: float = 1.0
+    select_link_sets: Mapping[str, tuple] = field(default_factory=dict)
+    select_link_od: bool = True
+    block_centroid_flows: bool = True
+    heap: str = "4ary"
 
-        :Arguments:
-            **name** (:obj:`str`): UNIQUE class name.
+    def __post_init__(self):
+        for label, value in (
+            ("mode", self.mode),
+            ("cost", self.cost),
+            ("name", self.mode if self.name is None else self.name),
+        ):
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"{label} must be a nonempty string")
+        object.__setattr__(self, "name", self.mode if self.name is None else self.name)
+        for label, value in (("PCE", self.pce), ("Value of time", self.vot)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not np.isfinite(value) or value <= 0:
+                raise ValueError(f"{label} must be a positive finite number")
+        if (
+            isinstance(self.fixed_cost_multiplier, bool)
+            or not isinstance(self.fixed_cost_multiplier, (int, float))
+            or not np.isfinite(self.fixed_cost_multiplier)
+            or self.fixed_cost_multiplier < 0
+        ):
+            raise ValueError("Fixed cost multiplier must be nonnegative and finite")
+        if self.fixed_cost_field is not None and (
+            not isinstance(self.fixed_cost_field, str) or not self.fixed_cost_field
+        ):
+            raise ValueError("fixed_cost_field must be a nonempty string")
+        if self.heap not in available_heaps():
+            raise ValueError(f"heap must be one of {available_heaps()}")
+        if isinstance(self.skimming, str):
+            raise ValueError("skimming must contain field names")
+        object.__setattr__(self, "skimming", tuple(self.skimming))
+        if any(not isinstance(name, str) or not name for name in self.skimming):
+            raise ValueError("skimming must contain field names")
+        if not isinstance(self.select_link_od, bool) or not isinstance(self.block_centroid_flows, bool):
+            raise TypeError("select_link_od and block_centroid_flows must be booleans")
+        selections = {}
+        for name, members in self.select_link_sets.items():
+            if not isinstance(name, str) or not name:
+                raise ValueError("Select-link set names must be nonempty strings")
+            links = []
+            for member in members:
+                link, direction = (member, 0) if isinstance(member, (int, np.integer)) else member
+                if (
+                    isinstance(link, (bool, np.bool_))
+                    or not isinstance(link, (int, np.integer))
+                    or isinstance(direction, (bool, np.bool_))
+                    or not isinstance(direction, (int, np.integer))
+                    or direction not in (-1, 0, 1)
+                ):
+                    raise ValueError("Selected links require an integer link ID and a direction of -1, 0 or 1")
+                links.append((int(link), direction))
+            selections[name] = tuple(links)
+        object.__setattr__(self, "select_link_sets", MappingProxyType(selections))
+        if self.demand.matrix_view is None or self.demand.matrix_view.dtype != np.float64:
+            raise TypeError("Demand requires a float64 computational view")
+        validate_assignment_demand(self.demand, self.demand.index)
 
-            **graph** (:obj:`Graph`): Class/mode-specific graph
-
-            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
-        """
-        super().__init__(name, graph, matrix)
-        self.pce = 1.0
-        self.vot = 1.0
-        self.mode = graph.mode
-        self.class_flow: np.array  # FIXME: Is this ever access?
-        self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
-        self.fixed_cost_field = ""
-        self.fc_multiplier = 1.0
-        self.results = AssignmentResults()
-        self._aon_results = AssignmentResults()
-        self._selected_links = {}  # maps human name to link_set
-        self.congested_time = np.array([])
-        self.congested_skims = None
-
-    def set_pce(self, pce: Union[float, int]) -> None:
-        """Sets Passenger Car equivalent
-
-        :Arguments:
-            **pce** (:obj:`Union[float, int]`): PCE. Defaults to 1 if not set
-        """
-        if isinstance(pce, bool) or not isinstance(pce, (float, int)):
-            raise ValueError("PCE must be a positive finite number")
-        value = float(pce)
-        if not np.isfinite(value) or value <= 0.0:
-            raise ValueError("PCE must be a positive finite number")
-        self.pce = value
-
-    def set_heap(self, heap: str) -> None:
-        """Sets the priority queue implementation used for path finding when assigning this class.
-
-        Must be one of ``AssignmentResults.get_heaps()``. Defaults to the 4-ary heap if not set.
-
-        :Arguments:
-            **heap** (:obj:`str`): Heap to use.
-        """
-        self.results.set_heap(heap)
-        self._aon_results.set_heap(heap)
-
-    def set_fixed_cost(self, field_name: str, multiplier=1):
-        """Sets value of time
-
-        :Arguments:
-             **field_name** (:obj:`str`): Name of the graph field with fixed costs for this class
-
-             **multiplier** (:obj:`Union[float, int]`): Multiplier for the fixed cost. Defaults to 1 if not set
-        """
-        if field_name not in self.graph.graph.columns:
-            raise ValueError("Field does not exist in the graph")
-
-        self.fc_multiplier = float(multiplier)
-        self.fixed_cost_field = field_name
-        self.graph.graph[field_name] = pd.to_numeric(self.graph.graph[field_name], errors="raise").astype(np.float64)
-        if np.any(pd.isna(self.graph.graph[field_name].to_numpy())):
-            logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
-
-        if self.graph.graph[field_name].min() < 0:
-            msg = f"Cost field {field_name} has negative values. That is not allowed"
-            logger.error(msg)
-            raise ValueError(msg)
-
-    def set_vot(self, value_of_time: float) -> None:
-        """Sets value of time
-
-        :Arguments:
-            **value_of_time** (:obj:`Union[float, int]`): Value of time. Defaults to 1 if not set
-        """
-
-        if isinstance(value_of_time, bool):
-            raise ValueError("Value of time must be a positive finite number")
-        try:
-            value = float(value_of_time)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("Value of time must be a positive finite number") from exc
-        if not np.isfinite(value) or value <= 0.0:
-            raise ValueError("Value of time must be a positive finite number")
-        self.vot = value
-
-    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
-        """Set the selected links. Checks if the links and directions are valid. Translates link_id and
-        direction into unique link id used in compact graph.
-        Supply links=None to disable select link analysis.
-
-        :Arguments:
-            **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
-            Link IDs and directions to be used in select link analysis"""
-        self._selected_links = {}
-        for name, link_set in (links or {}).items():
-            if len(name.split(" ")) != 1:
-                warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
-                name = str.join("_", name.split(" "))
-
-            link_ids = []
-            for link, dir in link_set:
-                if dir == 0:
-                    query = (self.graph.graph["link_id"] == link) & (
-                        (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
-                    )
-                else:
-                    query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
-                if not query.any():
-                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
-                    # Check for duplicate compressed link ids in the current link set
-                for comp_id in self.graph.graph[query]["__compressed_id__"].values:
-                    if comp_id in link_ids:
-                        warnings.warn(
-                            "Two input links map to the same compressed link in the network"
-                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}",
-                            stacklevel=2,
-                        )
-                    else:
-                        link_ids.append(comp_id)
-            self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
-        self._config["select_links"] = str(links)
-
-    def skim_congested(self, skim_fields=None):
-        """
-        Skims the congested network using the final assignment costs.
-
-        Congested time includes link travel time and turn delay. Assignment cost
-        also includes fixed costs, such as tolls converted to time units.
-
-        :Arguments:
-            **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
-        """
-        from aequilibrae.paths.assignment_context import AssignmentInputs
-
-        if self.congested_time.size == 0:
-            raise RuntimeError("Run the assignment before skimming congested costs")
-        fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
-        inputs = AssignmentInputs(
-            self.graph,
-            self.matrix,
-            "__congested_time__",
-            {},
-            self.results.cores,
-            skim_fields=fields + ["__congested_time__"],
-            cost_name="__assignment_cost__",
-            heap=self.results._heap,
-        )
-        inputs.update_costs(self.congested_time, self.fixed_cost)
-        # FIXME: Use a separate skim-only driver when one is available.
-        output = inputs.driver.run(inputs.driver.make_outputs()).skimming
-        self.congested_skims = inputs.report_skims(output)
-        return self.congested_skims
-
-    def __setattr__(self, key, value):
-        if key not in [
-            "graph",
-            "logger",
-            "matrix",
-            "pce",
-            "mode",
-            "class_flow",
-            "results",
-            "_aon_results",
-            "_id",
-            "vot",
-            "fixed_cost",
-            "fc_multiplier",
-            "fixed_cost_field",
-            "_selected_links",
-            "_config",
-            "congested_time",
-            "congested_skims",
-        ]:
-            raise KeyError(f"Traffic Class does not have '{key}'")
-        self.__dict__[key] = value
+    @property
+    def info(self):
+        return {
+            "network mode": self.mode,
+            "cost": self.cost,
+            "PCE": self.pce,
+            "Value-of-time": self.vot,
+            "Fixed cost field": self.fixed_cost_field,
+            "Fixed cost multiplier": self.fixed_cost_multiplier,
+            "matrix_totals": {
+                name: float(self.demand.matrix_view.sum())
+                if self.demand.matrix_view.ndim == 2
+                else float(self.demand.matrix_view[:, :, i].sum())
+                for i, name in enumerate(self.demand.view_names)
+            },
+        }
 
 
 class TransitClass(TransportClassBase):

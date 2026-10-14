@@ -74,7 +74,7 @@ periods.data
 # %%
 # Connector project matching
 # --------------------------
-project.network.build_graphs()
+network = project.network.build()
 
 # %%
 # Now we'll create the line strings for the access connectors, this step is optional but provides more accurate distance 

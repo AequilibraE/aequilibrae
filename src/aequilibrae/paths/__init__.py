@@ -2,6 +2,7 @@ from aequilibrae.paths.assignment_paths import AssignmentPaths
 from aequilibrae.paths.cython.dijkstra import available_heaps
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 from aequilibrae.paths.graph import Graph, TransitGraph
+from aequilibrae.paths.network_data import NetworkData
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.path_heuristics import estimate_heuristic_scale
@@ -22,6 +23,7 @@ __all__ = [
     "Graph",
     "TransitGraph",
     "NetworkSkimming",
+    "NetworkData",
     "OptimalStrategies",
     "AssignmentResults",
     "TransitAssignmentResults",

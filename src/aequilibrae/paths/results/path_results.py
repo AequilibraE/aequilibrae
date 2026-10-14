@@ -22,8 +22,8 @@ class PathResults:
 
         >>> from aequilibrae.paths.results import PathResults
         >>> project = create_example(project_path)
-        >>> project.network.build_graphs()
-        >>> graph = project.network.graphs['c']
+        >>> network = project.network.build()
+        >>> graph = network.build_graph(mode='c', cost="distance")
         >>> graph.set_graph('distance')
         >>> graph.set_skimming(['distance', 'free_flow_time'])
         >>> res = PathResults(graph, 1, 17)

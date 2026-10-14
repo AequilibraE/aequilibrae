@@ -40,17 +40,16 @@ def test_count_nodes(sioux_falls_test):
     assert items == 24, "Wrong number of nodes found"
 
 
-def test_build_graphs_with_polygons(sioux_falls_test):
+def test_build_with_polygons(sioux_falls_test):
     coords = ((-96.75, 43.50), (-96.75, 43.55), (-96.70, 43.55), (-96.70, 43.50), (-96.75, 43.50))
     polygon = Polygon(coords)
 
     fields = ["distance"]
     modes = ["c"]
 
-    sioux_falls_test.network.build_graphs(fields, modes, polygon)
-    assert len(sioux_falls_test.network.graphs) == 1
+    assert len(sioux_falls_test.network.build(fields, modes, polygon).modes) == 1
 
-    g = sioux_falls_test.network.graphs["c"]
+    g = sioux_falls_test.network.build(fields, modes, polygon).build_graph(mode="c", cost="distance")
     assert g.num_nodes == 19
     assert g.num_links == 52
 
@@ -58,11 +57,10 @@ def test_build_graphs_with_polygons(sioux_falls_test):
     assert list(g.centroids) == existing_nodes
 
 
-def test_build_graphs_without_polygons(sioux_falls_test):
-    sioux_falls_test.network.build_graphs()
-    assert len(sioux_falls_test.network.graphs) == 3
+def test_build_without_polygons(sioux_falls_test):
+    assert len(sioux_falls_test.network.build().modes) == 3
 
-    g = sioux_falls_test.network.graphs["c"]
+    g = sioux_falls_test.network.build().build_graph(mode="c", cost="distance")
     assert g.num_nodes == 24
     assert g.num_links == 76
     assert list(g.centroids) == list(range(1, 25))

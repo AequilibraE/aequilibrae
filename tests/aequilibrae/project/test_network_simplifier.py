@@ -21,8 +21,7 @@ def project_with_graph(nauru_example):
     mode = "c"
 
     network = nauru_example.network
-    network.build_graphs(modes=[mode])
-    graph = network.graphs[mode]
+    graph = network.build(modes=[mode]).build_graph(mode=mode, cost="distance")
     graph.set_graph("distance")
     graph.set_skimming("distance")
     graph.set_blocked_centroid_flows(False)
