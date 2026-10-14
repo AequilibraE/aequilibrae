@@ -114,7 +114,9 @@ Replace matrix access and inspection
 Access matrices by name rather than through ``matrix``, ``get_matrix()`` or
 dynamically named attributes. Use ``.imat`` for zero-based positions or
 ``.mat`` for zone IDs, with the matrix name first, when changing values to
-ensure the underlying data is changed, rather than a copy:
+ensure the underlying data is changed, rather than a copy. Matrix names must be
+non-empty strings, not paths. Slashes, backslashes, null characters, ``.`` and
+``..`` are not allowed as matrix names.
 
 .. list-table::
    :header-rows: 1
@@ -153,6 +155,8 @@ Replace index changes
 Choose an OMX mapping with ``index_name`` when opening the file rather than
 calling ``set_index()`` after loading. Each object has one selected zone index.
 To use another mapping, open the file again with that mapping's name.
+Index names follow the same rules as matrix names: they must be non-empty
+strings, and HDF5 paths are not accepted.
 
 The retrieved index is read-only. Replace slice assignment with assignment of
 the complete index:
@@ -167,9 +171,11 @@ the complete index:
     # Matrix API
     matrix.index = [1001, 1002, 1003]
 
-Index values must be unique, non-negative integers. The index length cannot
-change after construction. Relabelling the index does not reorder the matrix
-values. Create a new object when the number of zones changes.
+Index values must be unique, non-negative integers from ``0`` to ``2**64 - 1``.
+They are stored in memory as ``uint64``. Booleans and floating-point values are
+not accepted, even floats such as ``1.0``. The index length cannot change after
+construction. Relabelling the index does not reorder the matrix values.  Create
+a new object when the number of zones changes.
 
 Replace saves and file edits
 ----------------------------
@@ -188,23 +194,25 @@ with ``save_as_omx()``:
     demand.save_as_omx("adjusted_demand.omx", subset=["car", "bus"])
 
 The zone index and file-level metadata are saved with the selected matrices.
-Use a new output file to preserve the source. An existing mapping is left
-unchanged if its zone IDs and order match the object's index. Use
-``overwrite=True`` to replace existing matrices, change an existing mapping or
-write file metadata keys that already exist:
+The default ``mode="x"`` creates a new output file and raises
+``FileExistsError`` if it already exists. Use ``mode="r+"`` to update an
+existing file, or ``mode="a"`` to update or create one. Selected matrices, the
+zone mapping and supplied metadata are always written:
 
 .. code-block:: python
 
     demand.save_as_omx(
-        "adjusted_demand.omx", subset=["car", "bus"], overwrite=True
+        "adjusted_demand.omx", mode="r+", subset=["car", "bus"]
     )
 
-Updating a mapping keeps its dtype, attributes and length. The new IDs must fit
-its dtype, even when ``overwrite=True``.
+
+Updating an existing files does not remove matrices or metadata that is not on
+the object.  Use ``mode="w"`` to replace the whole file, removing all previous
+contents.
 
 For direct file edits, use ``from_file()`` to open a writable store. Stores
-open read-only by default. Use ``mode="r+"`` for updates. The ``mode`` argument
-is only accepted with ``store=True``:
+open read-only by default. In ``from_file()``, the ``mode`` argument is only
+accepted with ``store=True``:
 
 .. code-block:: python
 
@@ -236,12 +244,16 @@ Use ``metadata`` for file-level information instead of the old ``name`` and
         {"name": "morning_demand", "description": "Adjusted morning demand"}
     )
 
-OMX-managed file attributes are ignored when loading, copying and saving
-metadata.
+OMX-managed file attributes are ignored when loading, copying, saving and
+comparing metadata.
 
 Use ``matrix_metadata(name)`` to read or change per-matrix attributes. These
-attributes can then be used with ``store.subset([{"mode": "car"}])`` to select
-an in-memory working set.
+attributes can then be used with ``matrix.subset([{"mode": "car"}])`` to select
+an in-memory working set. Attribute queries work on both objects.
+
+Replace each metadata value as a whole, for example
+``demand.metadata["periods"] = [1, 2, 3]``. Nested edits to a value are not
+supported. This also applies to values returned by ``matrix_metadata(name)``.
 
 Replace trip-list loading
 -------------------------
@@ -263,8 +275,9 @@ Replace ``create_from_trip_list()`` with a pandas read followed by
 
 Repeated origin-destination pairs are summed, and missing pairs default to
 zero. The index is inferred from the sorted unique origin and destination
-IDs. Pass ``index`` explicitly when a particular zone order or extra zones
-are required.
+IDs. Pass ``index`` explicitly when a particular zone order or extra zones are
+required. Origin and destination IDs must follow the same integer rules as the
+zone index, whether the index is supplied or inferred.
 
 Move existing files to OMX
 --------------------------

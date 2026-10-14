@@ -18,9 +18,8 @@ These objects replace the previous ``AequilibraEMatrix`` which mixed both
 roles. For a migration guide, see :doc:`matrix_api_migration`.
 
 ``AequilibraEMatrix`` and ``MatrixStore`` both implement the ``MutableMapping``
-protocol and behave very similarly to a dictionary. You make use all mapping
-operations including ``.keys()``, ``.values()``, ``.items()``, ``.update()``
-and others.
+protocol and behave very similarly to a dictionary. You can use mapping
+operations including ``.keys()``, ``.values()``, ``.items()`` and ``.update()``.
 
 Create an in-memory working set
 -------------------------------
@@ -64,9 +63,9 @@ are copied as well.
 
 Use ``MatrixStore`` for manipulating files rather than working with it as if it
 was in-memory. It reads the matrix from disk each time it is accessed. For this
-reason, arrays obtained from it are copies, mutating them without using fancy
-indexing (see ``Read and change values`` below) will mutate the copy rather
-than the file itself.
+reason, arrays obtained from it are copies. Mutating them changes the copy
+rather than the file itself. Assign through ``.mat`` or ``.imat`` to change
+the file (see ``Read and change values`` below).
 
 Create matrices in memory
 -------------------------
@@ -100,11 +99,17 @@ Alternatively, start with no named matrices and add them using ``AequilibraEMatr
     empty.update({"bus": bus})
 
 Matrix assignment accepts array-like values with the object's square shape.
-``AequilibraEMatrix`` copies supplied arrays so changing an array supplied
-earlier does not change the matrix.
+Matrix values must use integer, floating-point, boolean or complex dtypes.
+This limit does not apply to metadata.  Whole-matrix assignment uses the
+supplied dtype, even when replacing an existing matrix. ``AequilibraEMatrix``
+copies supplied arrays so changing an array supplied earlier does not change
+the matrix.
 
 Inspect and manage named matrices
 ---------------------------------
+
+Matrix names must be non-empty strings, not paths. Names cannot contain a slash,
+backslash or null character, and cannot be ``.`` or ``..``.
 
 Use normal dictionary operations to inspect names, add matrices or remove them:
 
@@ -128,6 +133,19 @@ Use normal dictionary operations to inspect names, add matrices or remove them:
 of each matrix. On a store, reading values through ``items()`` or ``values()``
 loads each matrix as it is read. Iterating over names does not load their
 values.
+
+``clear()`` removes all named matrices and their attributes without reading
+matrix values. It keeps the zone index and file-level metadata.
+
+``setdefault(name, values)`` adds the supplied matrix only if the name is
+missing, then returns the matrix that would be read for that key. Unlike
+``dict.setdefault``, the default of ``values=None`` is not a valid value.
+
+Equality (``==``) compares matrix names and values, zone IDs, the index name,
+file-level metadata and per-matrix attributes. NaNs are considered
+equal. Matrix insertion order and numeric dtypes do not affect equality. The
+OMX-managed file attributes listed below are ignored. For a ``MatrixStore``,
+the values must be read from disk.
 
 Read and change values
 ----------------------
@@ -174,11 +192,11 @@ whole matrix and require its full shape. Assignments to selections such as
 When working with an ``AequilibraEMatrix``, selections follow NumPy
 indexing. When working with a ``MatrixStore``, selections follow the indexing
 supported by the OMX (and h5py) library, which may have different restrictions
-on fancy selections. In particular, h5py rejects two index lists, unsorted or
-repeated positions, and negative slice steps. These limits also apply after
-translating zone IDs. This allows for partial reads and writes to and from
-matrices both in memory and on disk. Assignments to a selection keep the
-matrix's dtype and use NumPy or h5py conversion rules.
+on fancy selections. Selections are passed to the underlying object after
+translating zone IDs, so support for a selection depends on that object.  This
+allows for partial reads and writes to and from matrices both in memory and on
+disk. Assignments to a selection keep the matrix's dtype and use NumPy or h5py
+conversion rules.
 
 Whole-matrix reads and basic slices of an ``AequilibraEMatrix`` may share its
 memory, fancy NumPy selections may return copies. If an independent array is
@@ -192,9 +210,12 @@ Work with the zone index
 ------------------------
 
 The index must be a one-dimensional sequence of unique, non-negative integer
-zone IDs. The same index applies to origins and destinations. The default
-index name is ``main_index``. Pass ``index_name`` when a file uses another
-mapping name to read it instead.
+zone IDs from ``0`` to ``2**64 - 1``. IDs are stored in memory as ``uint64``.
+Booleans and floating-point values are not accepted, even floats such as
+``1.0``. The same index applies to origins and destinations. The default index
+name is ``main_index``. Pass ``index_name`` when a file uses another mapping
+name to read it instead. Index names follow the same rules as matrix names:
+they must be non-empty strings, not paths.
 
 ``index`` is read-only when retrieved. Replace it as a whole to relabel zones:
 
@@ -267,8 +288,9 @@ using ``store=True``, use ``.subset()`` to load select matrices into a new
 Save matrices and metadata
 --------------------------
 
-Use ``save_as_omx()`` to save a matrix. Save all named matrices, or select
-which ones to write using the ``subset`` argument:
+Use ``save_as_omx()`` to save a matrix. The default ``mode="x"`` creates a new
+file and raises ``FileExistsError`` if the file already exists. Save all named
+matrices, or select which ones to write using the ``subset`` argument:
 
 .. code-block:: python
 
@@ -277,31 +299,28 @@ which ones to write using the ``subset`` argument:
     demand.save_as_omx("car_demand.omx", subset=["car"])
 
 OMX manages the file attributes ``OMX_VERSION``, ``OMX_CREATED_WITH``,
-``SHAPE`` and ``TITLE``. They are ignored when loading, copying or saving file
-metadata. A store still exposes them through ``metadata``, which is backed by
-h5py. Do not change them directly.
+``SHAPE`` and ``TITLE``. They are ignored when loading, copying, saving or
+comparing file metadata. A store still exposes them through ``metadata``, which
+is backed by h5py. Do not change them directly.
 
-The file includes the zone mapping, file metadata and matrix attributes.  An
-existing mapping is left unchanged if its zone IDs and order match the object's
-index.
+The file includes the zone mapping, file metadata and matrix attributes.  Use
+``mode`` to choose how to write the file:
 
-Use ``overwrite=True`` to:
-
-* Replace matrices that already exist.
-* Change an existing index mapping.
-* Write file metadata keys that already exist.
+* ``"x"`` or ``"w-"``: create a new file, failing if it already exists.
+* ``"r+"``: update an existing file, failing if it does not exist.
+* ``"a"``: update an existing file, or create it if it does not exist.
+* ``"w"``: replace the whole file, or create it if it does not exist.
 
 .. code-block:: python
 
-    demand.save_as_omx("updated_demand.omx", overwrite=True)
+    demand.save_as_omx("updated_demand.omx", mode="r+")
 
-Updating a mapping keeps its dtype, attributes and length. The new IDs must fit
-its dtype, even when ``overwrite=True``.
-
-Prefer a new output file when the original must be preserved. Saving selected
-matrices to an existing file does not remove other matrices from the file.
-When overwriting a matrix, source attributes replace matching attributes in the
-file. Other attributes on that matrix are kept.
+The zone mapping and supplied metadata are always written, be careful when
+updating existing files. Saving selected matrices with ``mode="r+"`` or
+``mode="a"`` does not remove other matrices from the file. In contrast,
+``mode="w"`` removes all previous contents, even when saving a subset. When
+overwriting a matrix, new attributes will replace matching attributes in the
+file. Other attributes on that matrix are not modified.
 
 Use ``matrix_metadata(name)`` to read or change attributes for an existing matrix:
 
@@ -312,7 +331,16 @@ Use ``matrix_metadata(name)`` to read or change attributes for an existing matri
 
 This returns a dictionary in memory and the h5py attributes for a store.
 Read-only stores cannot change attributes. For a store, call the method again
-after replacing a matrix to get the new dataset's attributes.
+after changing a matrix's dtype to get the new dataset's attributes.
+
+For both ``metadata`` and ``matrix_metadata(name)``, replace each attribute
+value as a whole. Nested edits, such as ``demand.metadata["periods"][0] = 9``,
+are not supported.
+
+.. code-block:: python
+
+    demand.metadata["periods"] = [1, 2, 3]
+    demand.matrix_metadata("car")["periods"] = [1, 2]
 
 Attributes are saved with their matrices:
 
@@ -325,7 +353,7 @@ for the matrix datasets. See the `h5py attributes
 documentation <https://docs.h5py.org/en/stable/high/attr.html>` for more
 information.
     
-A store can use these attributes to select an in-memory working set using OMX
+Both objects can use these attributes to select an in-memory working set using
 attribute queries:
 
 .. code-block:: python
@@ -334,6 +362,11 @@ attribute queries:
         car_demand = store.subset([{"mode": "car"}])
         column = car_demand.imat["car", :, 1]
         print(store.matrix_metadata("car")["mode"])
+
+    car_demand = demand.subset([{"mode": "car"}])
+
+All attributes within a query must match, and multiple queries select the
+combined matches, with each matrix included once.
 
 Attribute queries are only supported by ``subset()`` and the ``subset``
 arguments when loading matrices. They are not supported by ``store[...]``,
@@ -364,7 +397,8 @@ Repeated origin-destination pairs are summed. Missing pairs default to zero.
 Use ``fill_value`` to specify another value. If no index is supplied, it is
 inferred from the sorted unique origin and destination IDs. It's highly
 recommend to provide an explicit index in-order to include zones with no
-trips. All origin and destination IDs must be present in that index.
+trips. All origin and destination IDs must be present in that index. These IDs
+must follow the zone-ID rules above, whether the index is supplied or inferred.
 
 Use ``from_scipy()`` when the input is a collection of SciPy sparse arrays:
 

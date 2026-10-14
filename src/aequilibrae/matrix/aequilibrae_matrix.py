@@ -2,7 +2,8 @@ import os
 from abc import abstractmethod
 from collections.abc import Iterator, MutableMapping
 from copy import deepcopy
-from typing import Any, Literal, Mapping, Self, Sequence, TypeAlias, overload
+from typing import Any, Callable, Literal, Mapping, Self, Sequence, TypeAlias, overload
+from uuid import uuid4
 
 import h5py
 import numpy as np
@@ -31,19 +32,43 @@ def _write_index(file: omx.File, name: str, value: np.ndarray) -> None:
     else:
         # Keep the existing dataset and reject casts that would change zone IDs.
         value = _cast_index(value, dataset)
-        if not np.array_equal(dataset[:], value):
-            dataset[...] = value
+        dataset[...] = value
 
 
-def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[tuple[str, h5py.Dataset]]:
-    mats = []
+def _metadata_equal(left: Any, right: Any) -> bool:
+    if isinstance(left, Mapping) or isinstance(right, Mapping):
+        return (
+            isinstance(left, Mapping)
+            and isinstance(right, Mapping)
+            and left.keys() == right.keys()
+            and all(_metadata_equal(left[key], right[key]) for key in left)
+        )
+
+    left, right = np.asarray(left), np.asarray(right)
+    equal_nan = left.dtype.kind in "fc" and right.dtype.kind in "fc"
+    return np.array_equal(left, right, equal_nan=equal_nan)
+
+
+def _query_matrices(
+    matrices: Mapping[str, Any],
+    subset: Sequence[str | dict[str, Any]],
+    matrix_metadata: Callable[[str], Mapping[str, Any]],
+) -> dict[str, Any]:
+    mats = {}
     for key in subset:
         if isinstance(key, str):
-            mats.append((key, file[key]))
+            _validate_matrix_key(key)
+            mats[key] = matrices[key]
+
+        elif isinstance(key, dict):
+            for name in matrices.keys():
+                attrs = matrix_metadata(name)
+
+                if all(attr in attrs and _metadata_equal(attrs[attr], value) for attr, value in key.items()):
+                    _validate_matrix_key(name)
+                    mats[name] = matrices[name]
         else:
-            for dataset in file[key]:
-                name = dataset.name.rsplit("/", 1)[-1]
-                mats.append((name, dataset))
+            raise TypeError("subset entries must be matrix names or attribute queries")
 
     return mats
 
@@ -51,9 +76,72 @@ def _query_omx(file: omx.File, subset: Sequence[str | dict[str, Any]]) -> list[t
 _IndexKey: TypeAlias = str | tuple[str] | tuple[str, Any] | tuple[str, Any, Any]
 
 
-def _validate_matrix_key(key: str) -> None:
-    if not isinstance(key, str):
-        raise TypeError("matrix name must be a string")
+def _validate_name(name: object, kind: str) -> None:
+    if not isinstance(name, str):
+        raise TypeError(f"{kind} name must be a string")
+    if not name or name in (".", "..") or any(char in name for char in ("/", "\\", "\0")):
+        raise ValueError(f"{kind} name must be a non-empty name, not a path")
+
+
+def _validate_matrix_key(key: object) -> None:
+    _validate_name(key, "matrix")
+
+
+def _zone_ids(value: ArrayLike) -> np.ndarray:
+    # Keep integer IDs exact and booleans visible when reading Python sequences.
+    value = np.asarray(value, dtype=object if isinstance(value, (list, tuple)) else None)
+    if value.ndim != 1:
+        raise ValueError(f"zone IDs must have one dimension, got {value.ndim}")
+
+    if value.size:
+        if value.dtype.kind == "O":
+            if any(isinstance(zone, (bool, np.bool_)) or not isinstance(zone, (int, np.integer)) for zone in value):
+                raise TypeError("zone IDs must be integers, not booleans")
+        elif value.dtype.kind not in "iu":
+            raise TypeError("zone IDs must be integers, not booleans")
+
+        if int(value.min()) < 0 or int(value.max()) > np.iinfo(np.uint64).max:
+            raise ValueError("zone IDs must be between 0 and 2**64 - 1")
+
+    return np.array(value, dtype=np.uint64, copy=True, order="C")
+
+
+def _validate_matrix_dtype(dtype: np.dtype) -> None:
+    if dtype.kind not in "biufc":
+        raise TypeError(f"matrix values must have an integer, float, bool or complex dtype, got {dtype}")
+
+
+def _matrix_values(value: ArrayLike, shape: tuple[int, int]) -> np.ndarray:
+    value = np.asarray(value, order="C")
+    _validate_matrix_dtype(value.dtype)
+
+    if value.shape != shape:
+        raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
+    return value
+
+
+def _write_matrix(file: omx.File, name: str, value: np.ndarray, attributes: Mapping[str, Any]) -> None:
+    dataset = file.data.get(name)
+    if dataset is not None and dataset.dtype == value.dtype:
+        # Keep the dataset, including its dtype and compression, when replacing values.
+        dataset.attrs.update(attributes)
+        dataset[...] = value
+        return
+
+    # Keep destination attributes and apply source attributes before replacing the dataset.
+    attrs = dict(dataset.attrs) if dataset is not None else {}
+    attrs.update(attributes)
+    temporary_name = f"__aequilibrae_{uuid4().hex}"
+
+    try:
+        file.create_matrix(temporary_name, obj=value, attrs=attrs)
+        if dataset is not None:
+            del file.data[name]
+
+        file.data.move(temporary_name, name)
+    finally:
+        if temporary_name in file.data:
+            del file.data[temporary_name]
 
 
 class _MatrixIndexer:
@@ -148,48 +236,26 @@ class _Matrix(MutableMapping[str, Any]):
         self._index: np.ndarray
         assert hasattr(self, "_backend") and hasattr(self, "_metadata")
 
+        _validate_name(index_name, "index")
         self.__index_name = index_name
         self._index = self._validate_index(index)  # Validate without writing a store's index
         self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
 
-    @classmethod
-    def from_omx(
-        cls,
-        path: str | os.PathLike,
-        index_name: str = "main_index",
-        subset: Sequence[str | dict[str, Any]] | None = None,
-        **kwargs,
-    ) -> Self:
-        with omx.open_file(path, mode="r") as file:
-            index = file.lookup.get(index_name)
-            if index is None:
-                raise ValueError(f"index not found, expected group at '/lookup/{index_name}'")
-
-            if subset is None:
-                subset = file.list_matrices()
-
-            datasets = dict(_query_omx(file, subset))
-
-            self = cls(index=index, index_name=index_name, **kwargs)
-
-            # We should ignore the OMX special attributes
-            attrs = _copy_file_metadata(file.attrs)
-
-            self.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
-            for key, dataset in datasets.items():
-                self.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
-            self.metadata.update(attrs)
-            return self
-
     def save_as_omx(
         self,
         path: str | os.PathLike,
-        subset: list[str] | None = None,
-        overwrite: bool = False,
+        mode: Literal["w", "a", "r+", "w-", "x"] = "x",
+        *,
+        subset: Sequence[str] | None = None,
         **kwargs,
     ) -> None:
+        if mode not in ("w", "a", "r+", "w-", "x"):
+            raise ValueError("save_as_omx only supports modes 'w', 'a', 'r+', 'w-' and 'x'")
 
         keys = set(self) if subset is None else set(subset)
+        for key in keys:
+            _validate_matrix_key(key)
+
         if missing_keys := keys - self.keys():
             raise ValueError(f"found non-existent keys in subset: {missing_keys}")
 
@@ -197,40 +263,23 @@ class _Matrix(MutableMapping[str, Any]):
             raise ValueError(f"destination matrix shape does not match, expected {self.shape}, got {shape}")
 
         # OMX will try to save the OMX_SPECIAL_ATTRS when opened with write permissions, so we first open with read only
-        # to validate the file, then re-open with write permissions only once we know it's ok to save.
-        if os.path.exists(path):
+        # to validate an existing file before updating it with 'a' or 'r+'.
+        if mode in ("a", "r+") and os.path.exists(path):
             with omx.open_file(path, mode="r") as file:
                 if (shape := file.shape()) is not None and shape != self.shape:
                     raise ValueError(f"destination matrix shape does not match, expected {self.shape}, got {shape}")
 
                 dataset = file.lookup.get(self.index_name)
                 if dataset is not None:
-                    index = _cast_index(self.index, dataset)
-                    if not overwrite and not np.array_equal(dataset[:], index):
-                        raise ValueError(
-                            f"index '{self.index_name}' already exists with different values in file: {path}"
-                        )
+                    _cast_index(self.index, dataset)
 
-                if not overwrite:
-                    if existing_keys := keys & set(file.list_matrices()):
-                        raise ValueError(f"matrices {existing_keys} already exist in file: {path}")
-
-                    # Ignoring OMX special attributes, we don't write them anyway
-                    if existing_keys := file.attrs.keys() & (self.metadata.keys() - OMX_SPECIAL_ATTRS):
-                        raise ValueError(f"attributes {existing_keys} already exist in file: {path}")
-
-        with omx.open_file(path, mode="a", **kwargs) as file:
+        with omx.open_file(path, mode=mode, **kwargs) as file:
             # Save the index without replacing its existing dtype or attributes.
             _write_index(file, self.index_name, self.index)
 
             for name in keys:
-                # OMX replaces the dataset, so keep destination attributes and apply source attributes.
-                dataset = file.data.get(name)
-                attributes = dict(dataset.attrs) if dataset is not None else {}
-                attributes.update(self.matrix_metadata(name))
-
-                file[name] = self[name]
-                file[name].attrs.update(attributes)
+                # Keep destination attributes and apply source attributes when writing the matrix.
+                _write_matrix(file, name, self[name], self.matrix_metadata(name))
 
             for key, value in self.metadata.items():
                 # These attributes are managed by OMX so we shouldn't try to write them
@@ -242,7 +291,7 @@ class _Matrix(MutableMapping[str, Any]):
     @abstractmethod
     def subset(
         self,
-        subset: Sequence[str],
+        subset: Sequence[str | dict[str, Any]],
     ) -> "_Matrix":
         pass
 
@@ -250,9 +299,7 @@ class _Matrix(MutableMapping[str, Any]):
         self._index = self._validate_index(value)
 
     def _validate_index(self, value: ArrayLike) -> np.ndarray:
-        value = np.asarray(value)
-        if value.ndim != 1:
-            raise ValueError(f"got too many dimensions for the index, expected 1, got {value.ndim}")
+        value = _zone_ids(value)
 
         # hasattr because we might not have set it yet as this is used in the __init__ function
         if hasattr(self, "_index") and len(self._index) != len(value):
@@ -261,14 +308,7 @@ class _Matrix(MutableMapping[str, Any]):
         if len(np.unique(value)) != len(value):
             raise ValueError("found duplicate values in the index, the index must be unique")
 
-        if value.size and not np.can_cast(value.dtype, np.uintp, casting="safe"):
-            if np.isdtype(value.dtype, "signed integer"):
-                if value.min() < 0:
-                    raise TypeError(f"cannot cast {value.dtype} to {np.uintp} safely (found negative values)")
-            else:
-                raise TypeError(f"cannot cast {value.dtype} to {np.uintp} safely")
-
-        return np.asarray(value, copy=True, dtype=np.uintp, order="C")
+        return value
 
     @property
     def index(self) -> np.ndarray:
@@ -310,6 +350,7 @@ class _Matrix(MutableMapping[str, Any]):
         return (length, length)
 
     def __delitem__(self, key: str) -> None:
+        _validate_matrix_key(key)
         del self._backend[key]
 
     def __iter__(self) -> Iterator[str]:
@@ -319,7 +360,44 @@ class _Matrix(MutableMapping[str, Any]):
         return len(self._backend)
 
     def __contains__(self, key: object) -> bool:
+        _validate_matrix_key(key)
         return key in self._backend.keys()
+
+    def __eq__(self, other: object) -> bool:
+        """Compare matrices, their ordered zone index and metadata. Matching NaNs are equal."""
+        if not isinstance(other, _Matrix):
+            return NotImplemented
+        if self is other:
+            return True
+        if (
+            self.index_name != other.index_name
+            or not np.array_equal(self.index, other.index)
+            or self.keys() != other.keys()
+        ):
+            return False
+
+        # Ignore file attributes managed by OMX, as loading and copying do.
+        left_metadata = {key: value for key, value in self.metadata.items() if key not in OMX_SPECIAL_ATTRS}
+        right_metadata = {key: value for key, value in other.metadata.items() if key not in OMX_SPECIAL_ATTRS}
+        if not _metadata_equal(left_metadata, right_metadata):
+            return False
+
+        return all(
+            _metadata_equal(self.matrix_metadata(name), other.matrix_metadata(name))
+            and np.array_equal(self[name], other[name], equal_nan=True)
+            for name in self
+        )
+
+    def clear(self) -> None:
+        """Remove all named matrices without reading their values."""
+        for key in list(self):
+            del self[key]
+
+    def setdefault(self, key: str, default: ArrayLike | None = None) -> np.ndarray:
+        """Insert a missing matrix, then return it using the usual read rules."""
+        if key not in self:
+            self[key] = default
+        return self[key]
 
 
 class AequilibraEMatrix(_Matrix):
@@ -333,7 +411,38 @@ class AequilibraEMatrix(_Matrix):
         self._matrix_metadata: dict[str, dict[str, Any]] = {}
         super().__init__(index=index, index_name=index_name)
 
+    @classmethod
+    def from_omx(
+        cls,
+        path: str | os.PathLike,
+        index_name: str = "main_index",
+        subset: Sequence[str | dict[str, Any]] | None = None,
+        **kwargs,
+    ) -> Self:
+        _validate_name(index_name, "index")
+        with omx.open_file(path, mode="r") as file:
+            index = file.lookup.get(index_name)
+            if index is None:
+                raise ValueError(f"index not found, expected group at '/lookup/{index_name}'")
+
+            if subset is None:
+                subset = file.list_matrices()
+
+            datasets = _query_matrices(file.data, subset, lambda name: file.data[name].attrs)
+
+            self = cls(index=index, index_name=index_name, **kwargs)
+
+            # We should ignore the OMX special attributes
+            attrs = _copy_file_metadata(file.attrs)
+
+            self.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
+            for key, dataset in datasets.items():
+                self.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
+            self.metadata.update(attrs)
+            return self
+
     def matrix_metadata(self, name: str) -> MutableMapping[str, Any]:
+        _validate_matrix_key(name)
         return self._matrix_metadata[name]
 
     def __delitem__(self, key: str) -> None:
@@ -343,12 +452,7 @@ class AequilibraEMatrix(_Matrix):
     # Normal write
     def __setitem__(self, key: str, value: ArrayLike) -> None:
         _validate_matrix_key(key)
-        value = np.asarray(value, order="C")
-        shape = self.shape
-
-        if value.shape != shape:
-            raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
-
+        value = _matrix_values(value, self.shape)
         self._backend[key] = np.asarray(value, copy=True, order="C")
         self._matrix_metadata.setdefault(key, {})
 
@@ -359,9 +463,9 @@ class AequilibraEMatrix(_Matrix):
 
     def subset(
         self,
-        subset: Sequence[str],
+        subset: Sequence[str | dict[str, Any]],
     ) -> Self:
-        mats = {key: self[key] for key in subset}
+        mats = _query_matrices(self, subset, self.matrix_metadata)
 
         other = self.__class__(index=self.index, index_name=self.index_name)
         other.update(mats)
@@ -381,6 +485,7 @@ class MatrixStore(_Matrix):
         mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
         **kwargs,
     ) -> None:
+        _validate_name(index_name, "index")
         if mode == "r" and index is not None:
             raise ValueError("cannot supply an index when opening a read-only matrix store")
 
@@ -406,6 +511,9 @@ class MatrixStore(_Matrix):
             if (shape := file.shape()) is not None and shape != self.shape:
                 raise ValueError(f"matrix shape does not match index, expected {self.shape}, got {shape}")
 
+            for dataset in file.data.values():
+                _validate_matrix_dtype(dataset.dtype)
+
             if supplied_index:
                 self.index = index
         except:
@@ -413,6 +521,7 @@ class MatrixStore(_Matrix):
             raise
 
     def matrix_metadata(self, name: str) -> h5py.AttributeManager:
+        _validate_matrix_key(name)
         return self._backend.data[name].attrs
 
     @property
@@ -442,16 +551,10 @@ class MatrixStore(_Matrix):
 
     def __setitem__(self, key: str, value: ArrayLike) -> None:
         _validate_matrix_key(key)
-        value = np.asarray(value, order="C")
+        value = _matrix_values(value, self.shape)
 
-        shape = self.shape
-        if value.shape != shape:
-            raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
-
-        # OMX replaces the dataset, so keep its existing attributes.
-        attributes = dict(self._backend[key].attrs) if key in self else {}
-        self._backend[key] = value
-        self._backend[key].attrs.update(attributes)
+        # Keep the dataset's existing attributes, even when its dtype changes.
+        _write_matrix(self._backend, key, value, {})
 
     # Normal lookup
     def __getitem__(self, key: str) -> np.ndarray:
@@ -467,10 +570,11 @@ class MatrixStore(_Matrix):
         self,
         subset: Sequence[str | dict[str, Any]],
     ) -> AequilibraEMatrix:
-        datasets = dict(_query_omx(self._backend, subset))
+        datasets = _query_matrices(self._backend.data, subset, self.matrix_metadata)
 
         other = AequilibraEMatrix(index=self.index, index_name=self.index_name)
         other.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
+
         for key, dataset in datasets.items():
             other.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
         other.metadata.update(_copy_file_metadata(self.metadata))
@@ -566,9 +670,18 @@ def from_dict(
         if mode is not None and mode not in ("w", "a", "r+", "w-", "x"):
             raise ValueError("from_dict stores only support modes 'w', 'a', 'r+', 'w-' and 'x'")
 
+        # Check names, shapes and dtypes before opening a file or changing its index.
+        validated_index = AequilibraEMatrix(index=index, index_name=index_name).index
+        prepared = {}
+        for name, value in data.items():
+            _validate_matrix_key(name)
+            prepared[name] = _matrix_values(value, (len(validated_index), len(validated_index)))
+
+        data = prepared
+
         mat = MatrixStore(
             path=path,
-            index=index,
+            index=validated_index,
             index_name=index_name,
             mode=mode if mode is not None else "x",
         )
@@ -580,9 +693,15 @@ def from_dict(
             raise ValueError("an in-memory matrix cannot have a mode")
         mat = AequilibraEMatrix(index=index, index_name=index_name)
 
-    mat.update(data)
-    if metadata is not None:
-        mat.metadata.update(_copy_file_metadata(metadata))
+    try:
+        mat.update(data)
+        if metadata is not None:
+            mat.metadata.update(_copy_file_metadata(metadata))
+
+    except Exception:
+        if isinstance(mat, MatrixStore):
+            mat.close()
+        raise
 
     return mat
 
@@ -602,13 +721,15 @@ def from_df(
     if subset is None:
         subset = [name for name in df.columns if name not in (row, col)]
 
+    row_ids = _zone_ids(df[row].to_numpy())
+    col_ids = _zone_ids(df[col].to_numpy())
     if index is None:
-        index = np.union1d(df[row].to_numpy(), df[col].to_numpy())
+        index = np.union1d(row_ids, col_ids)
 
     mat = AequilibraEMatrix(index=index, index_name=index_name)
     matrix_index = pd.Index(mat.index)
-    rows = matrix_index.get_indexer(df[row])
-    cols = matrix_index.get_indexer(df[col])
+    rows = matrix_index.get_indexer(row_ids)
+    cols = matrix_index.get_indexer(col_ids)
     if np.any(rows == -1) or np.any(cols == -1):
         raise ValueError("found row or column values that are not in the index")
 
