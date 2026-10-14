@@ -89,8 +89,7 @@ def test_relative_gap_ignores_constant_preload():
     assignment.fw_total_turn_cost = 0.0
 
     cls = SimpleNamespace(
-        _id="car",
-        pce=1.0,
+        configuration=SimpleNamespace(name="car", pce=1.0),
         fixed_cost=np.array([0.5, 1.5]),
         _aon_results=SimpleNamespace(total_link_loads=np.array([10.0, 1.0])),
         results=SimpleNamespace(total_link_loads=np.array([8.0, 2.0])),
@@ -121,8 +120,7 @@ def test_relative_gap_is_not_converged_for_zero_current_cost_and_nonzero_aon_cos
     assignment.fw_total_turn_cost = 0.0
 
     cls = SimpleNamespace(
-        _id="car",
-        pce=1.0,
+        configuration=SimpleNamespace(name="car", pce=1.0),
         fixed_cost=np.zeros(2),
         _aon_results=SimpleNamespace(total_link_loads=np.array([10.0, 1.0])),
         results=SimpleNamespace(total_link_loads=np.zeros(2)),
@@ -343,8 +341,7 @@ def test_cfw_zero_denominator_falls_back_to_fw():
     assignment.logger = SimpleNamespace(debug=lambda *_args, **_kwargs: None)
 
     cls = SimpleNamespace(
-        _id="car",
-        pce=1.0,
+        configuration=SimpleNamespace(name="car", pce=1.0),
         results=SimpleNamespace(total_link_loads=np.array([1.0, 2.0])),
         _aon_results=SimpleNamespace(total_link_loads=np.array([2.0, 3.0])),
     )
@@ -381,8 +378,7 @@ def test_bfw_nonfinite_coefficient_falls_back_to_fw():
     assignment.logger = SimpleNamespace(debug=lambda *_args, **_kwargs: None)
 
     cls = SimpleNamespace(
-        _id="car",
-        pce=1.0,
+        configuration=SimpleNamespace(name="car", pce=1.0),
         results=SimpleNamespace(total_link_loads=np.array([1.0, 2.0])),
         _aon_results=SimpleNamespace(total_link_loads=np.array([2.0, 3.0])),
     )
@@ -475,8 +471,7 @@ def _multiclass_fixture(num_links=4, num_classes=3, num_cores=2, seed=None):
         cid = f"class_{m}"
         classes.append(
             SimpleNamespace(
-                _id=cid,
-                pce=1.0,
+                configuration=SimpleNamespace(name=cid, pce=1.0),
                 results=SimpleNamespace(total_link_loads=aggregated["results"][m]),
                 _aon_results=SimpleNamespace(total_link_loads=aggregated["aon"][m]),
             )

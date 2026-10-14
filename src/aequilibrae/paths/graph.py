@@ -1225,9 +1225,9 @@ class GraphBase(ABC):  # noqa: B024
 
             >>> project = create_example(project_path)
 
-            >>> project.network.build_graphs()
+            >>> network = project.network.build()
 
-            >>> graph = project.network.graphs['c']
+            >>> graph = network.build_graph(mode='c', cost="distance")
             >>> graph.prepare_graph(np.arange(1,25))
 
             >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()

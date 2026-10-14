@@ -5,6 +5,7 @@ import timeit
 import warnings
 from argparse import ArgumentParser
 from copy import deepcopy
+from dataclasses import replace
 from os.path import join
 from pathlib import Path
 
@@ -20,84 +21,76 @@ def aequilibrae_init(proj_path: str, cost: str):
     """
     Prepare the graph for skimming the network for `cost`
     """
-    proj = Project()
-    proj.open(proj_path)
-    proj.network.build_graphs([cost, "capacity_ab", "capacity_ba"], ["c"])
-    graph = proj.network.graphs["c"]
+    proj = Project.from_path(proj_path)
+    network = proj.network.build(fields=[cost, "capacity"], modes=["c"])
     matrix = proj.matrices.get_matrix("demand_omx")
     matrix.computational_view()
-    assignment = TrafficAssignment()
-    car = TrafficClass("car", graph, matrix)
-    assignment.set_classes([car])
-    assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
-    assignment.set_time_field("distance")
-    assignment.set_capacity_field("capacity")
-    assignment.max_iter = 1
-    assignment.set_algorithm("msa")
-    # Keep centroid connector turns allowed for Sioux Falls, since all nodes are centroids
-    # BE CAREFUL WITH THIS SETTING
-    graph.set_blocked_centroid_flows(False)
-    return graph, matrix, assignment, car
+    car = TrafficClass(name="car", mode="c", cost=cost, demand=matrix, block_centroid_flows=False)
+    configuration = {
+        "network": network,
+        "vdf": bpr,
+        "time_field": cost,
+        "capacity_field": "capacity",
+        "name_mapping": {"alpha": 0.15, "beta": 4.0},
+        "algorithm": "msa",
+        "project": proj,
+    }
+    return configuration, car
 
 
 def arkansas(path: str):
     import logging
 
     from aequilibrae import Project
-    from aequilibrae.paths import TrafficAssignment, TrafficClass
+    from aequilibrae.paths import TrafficClass
 
     logger = logging.getLogger("aequilibrae")
 
-    proj = Project()
-    proj.open(path)
+    proj = Project.from_path(path)
     net = proj.network
-    nodes = net.nodes  # These centroids are not in the matrices, so we turn them off
-    for n in [4701, 4702, 4703]:
-        nd = nodes.get(n)
-        nd.is_centroid = 0
-        nd.save()
-    net.build_graphs(modes=["c"])
-    car_graph = net.graphs["c"]
+    nodes = net.nodes
+    for node in [4701, 4702, 4703]:
+        nodes.update(node, is_centroid=0)
+    network = net.build(modes=["c"])
+    for node in [4701, 4702, 4703]:
+        nodes.update(node, is_centroid=1)
     with proj.db_connection as conn:
-        sql = "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
-        exclude_from_passenger = [x[0] for x in conn.execute(sql).fetchall()]
-    graph = car_graph
-    set1 = graph.network[(graph.network.builtyear > 2010) | (graph.network.removedyear < 2010)].link_id.to_list()
-    set2 = graph.network[(graph.network.mode_code < 10) | (graph.network.mode_code > 11)].link_id.to_list()
-    exclude_from_passenger.extend(set1 + set2)
-    car_graph.exclude_links(exclude_from_passenger)
-    # And turn them back into centroids to not alter the model
-    for n in [4701, 4702, 4703]:
-        nd = nodes.get(n)
-        nd.is_centroid = 1
-        nd.save()
-    car_graph.graph.alpha.fillna(0.15, inplace=True)
-    car_graph.graph.beta.fillna(4.0, inplace=True)
-    car_graph.graph.hov1tollcost.fillna(0, inplace=True)
-    car_graph.graph.mttollcost.fillna(0, inplace=True)
-    car_graph.graph.httollcost.fillna(0, inplace=True)
-    car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, "am_assncap_10"] = 1.0
-    car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, "tt_am_10"] = 0.001  # Assigns all periods
-    period = "am"
-    logger.info(f"\n\n Assigning {period.upper()}")
-    proj_matrices = proj.matrices
-    car_demand = proj_matrices.get_matrix(f"{period.upper()}_omx")
-    car_demand.computational_view()  # 'AUTO')
-    assig = TrafficAssignment()
-    assig.procedure_id = f"{period}_baseline"
-    car_class = TrafficClass("car", car_graph, car_demand)
-    car_class.set_pce(1)
-    car_class.set_vot(0.2)
-    car_class.set_fixed_cost("hov1tollcost")
-    assig.set_classes([car_class])
-    assig.set_vdf(bpr, {"alpha": "alpha", "beta": "beta"})
-    assig.set_time_field(f"tt_{period}_10")
-    assig.set_capacity_field(f"{period}_assncap_10")
-
-    assig.max_iter = 1
-    assig.set_algorithm("msa")
-    assig.rgap_target = 0.00001
-    return assig, car_class
+        excluded = {
+            row[0]
+            for row in conn.execute(
+                "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
+            ).fetchall()
+        }
+    links = network.links
+    unavailable = (links.builtyear > 2010) | (links.removedyear < 2010) | ~links.mode_code.between(10, 11)
+    links.loc[unavailable | links.link_id.isin(excluded), "modes"] = ""
+    defaults = {
+        "alpha": 0.15,
+        "beta": 4.0,
+        "hov1tollcost": 0.0,
+        "mttollcost": 0.0,
+        "httollcost": 0.0,
+        "am_assncap_10": 1.0,
+        "tt_am_10": 0.001,
+    }
+    for field, default in defaults.items():
+        for column in (field, field + "_ab", field + "_ba"):
+            if column in links:
+                links[column] = links[column].fillna(default)
+    logger.info("Assigning AM")
+    demand = proj.matrices.get_matrix("AM_omx")
+    demand.computational_view()
+    car = TrafficClass(name="car", mode="c", cost="tt_am_10", demand=demand, vot=0.2, fixed_cost_field="hov1tollcost")
+    configuration = {
+        "network": network,
+        "vdf": bpr,
+        "time_field": "tt_am_10",
+        "capacity_field": "am_assncap_10",
+        "name_mapping": {"alpha": "alpha", "beta": "beta"},
+        "algorithm": "msa",
+        "project": proj,
+    }
+    return configuration, car
 
 
 def main():
@@ -148,7 +141,7 @@ def main():
         conn = sqlite3.connect(join(args["path"], "r.sqlite"))
         for project_name in args["projects"]:
             if project_name in ["chicago_sketch"]:
-                graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}", args["cost"])
+                configuration, car = aequilibrae_init(f"{args['path']}/{project_name}", args["cost"])
                 dt = {}
                 data = []
                 select_links = [None]
@@ -158,18 +151,17 @@ def main():
                     select_links.append(deepcopy(dt))
 
             elif project_name in "Arkansas":
-                assignment, car = arkansas(f"{args['path']}/{project_name}")
+                configuration, car = arkansas(f"{args['path']}/{project_name}")
                 select_links = [None, {"test": [(24, 1), (79146, 1)], "test 2": [(61, 1), (68, 1)]}]
             else:
                 raise Exception("Model Doesn't Exist Fool")
-            assignment.set_cores(args["cores"][0])
             for link in select_links:
-                if link is not None:
-                    car.set_select_links(link)
+                traffic = replace(car, select_link_sets=link or {})
+                assignment = TrafficAssignment(**configuration, classes=[traffic])
                 print("BENCHING links: ", link.keys() if link else link)
                 qries = [] if link is None else list(link.values())
 
-                t = timeit.Timer(lambda: assignment.execute())  # noqa: B023
+                t = timeit.Timer(lambda: assignment.execute(max_iterations=1, rgap=1e-5, cores=args["cores"][0]))  # noqa: B023
                 times = t.repeat(repeat=3, number=args["iters"])
                 df = pd.DataFrame(
                     {

@@ -1,15 +1,14 @@
-from os.path import join
 import os
-
-from aequilibrae.transit import Transit
-from aequilibrae.project.project import Project
+import time
+from os.path import join
 
 import numpy as np
 import pandas as pd
+
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
-
-import time
+from aequilibrae.project.project import Project
+from aequilibrae.transit import Transit
 
 
 def run_example(from_model, zones):
@@ -36,8 +35,6 @@ def run_example(from_model, zones):
             blocking_centroid_flows=False,
             connector_method="overlapping_regions",
         )
-
-        project.network.build_graphs()
 
         # c for All motorized vehicles
         graph.create_line_geometry(method="direct", graph="c")

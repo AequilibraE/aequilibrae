@@ -306,7 +306,7 @@ understand, and then we'll perform the assignment.
     from quetzal.model import stepmodel
 
     from aequilibrae.matrix import AequilibraeMatrix
-    from aequilibrae.paths import Graph, TrafficAssignment
+    from aequilibrae.paths import Graph, NetworkData, TrafficAssignment
     from aequilibrae.paths.traffic_class import TrafficClass
     from aequilibrae.paths.vdf import bpr
 
@@ -631,21 +631,17 @@ understand, and then we'll perform the assignment.
 
 
     def assign_aeq(g: Graph, mat: AequilibraeMatrix, method: str) -> TrafficAssignment:
-        assig_class = TrafficClass("car", g, mat)
-        if "toll" in g.network.columns:
-            assig_class.set_fixed_cost("toll")
-            assig_class.set_vot(1.0)
-
-        assig = TrafficAssignment()
-        assig.set_classes([assigclass])
-        assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-        assig.set_capacity_field("capacity")
-        assig.set_time_field("free_flow_time")
-        assig.max_iter = MAX_ITER
-        assig.rgap_target = RGAP_TARGET
-        assig.set_algorithm(method)
-        assig.set_cores(NUM_CORES)
-        assig.execute()
+        network = NetworkData(g.network.assign(modes="c"), centroids=g.centroids)
+        traffic = TrafficClass(
+            name="car", mode="c", cost="free_flow_time", demand=mat,
+            fixed_cost_field="toll" if "toll" in g.network else None,
+            block_centroid_flows=False,
+        )
+        assig = TrafficAssignment(
+            network=network, classes=[traffic], time_field="free_flow_time", capacity_field="capacity",
+            vdf=bpr, name_mapping={"alpha": "b", "beta": "power"}, algorithm=method,
+        )
+        assig.execute(max_iterations=MAX_ITER, rgap=RGAP_TARGET, cores=NUM_CORES)
         return assig
 
 

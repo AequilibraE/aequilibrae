@@ -32,13 +32,8 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-# We build our graphs
-project.network.build_graphs()
+network = project.network.build()
 
-graph = project.network.graphs["c"]
-graph.set_graph("free_flow_time")
-graph.set_skimming(["free_flow_time", "distance"])
-graph.set_blocked_centroid_flows(False)
 
 # %%
 # We get our demand matrix from the project and create a computational view
@@ -48,20 +43,27 @@ demand.computational_view(["matrix"])
 
 # %%
 # Now let's perform our traffic assignment
-assig = TrafficAssignment()
 
-assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
+assigclass = TrafficClass(
+    name="car",
+    mode="c",
+    cost="free_flow_time",
+    demand=demand,
+    skimming=["free_flow_time", "distance"],
+    block_centroid_flows=False,
+)
 
-assig.add_class(assigclass)
-assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
-assig.set_time_field("free_flow_time")
-assig.set_capacity_field("capacity")
 
-assig.set_algorithm("bfw")
-assig.max_iter = 50
-assig.rgap_target = 0.001
-
-assig.execute()
+assig = TrafficAssignment(
+    network=network,
+    classes=[assigclass],
+    vdf=bpr,
+    name_mapping={"alpha": 0.15, "beta": 4.0},
+    time_field="free_flow_time",
+    capacity_field="capacity",
+    algorithm="bfw",
+)
+assig.execute(max_iterations=50, rgap=0.001)
 
 # %%
 #
@@ -70,38 +72,9 @@ with open(join(fldr, "aequilibrae.log")) as file:
         print(idx + 1, "-", line)
 
 # %%
-# In lines 1-7, we receive some warnings that our fields name and lane have ``NaN`` values.
-# As they are not relevant to our example, we can move on.
-#
-# In lines 8-9 we get the Traffic Class specifications.
-# We can see that there is only one traffic class (car). Its **graph** key presents information
-# on whether blocked centroid flows are enabled, plus the number of centroids, links, and nodes.
-# In the **matrix** key, we find information on where in the disk the matrix file is located.
-# We also have information on the number of centroids and nodes, as well as on the matrix/matrices
-# used for computation. In our example, we only have one matrix named matrix, and the total
-# sum of this matrix element is equal to 360,600. If you have more than one matrix its data
-# will be also displayed in the *matrix_cores* and *matrix_totals* keys.
-#
-# In lines 10-11 the log shows the Traffic Assignment specifications.
-# We can see that the VDF parameters, VDF function, capacity and time fields, algorithm,
-# maximum number of iterations, and target gap are just like the ones we set previously.
-# The only information that might be new to you is the number of cores used for computation.
-# If you haven't set any, AequilibraE is going to use the largest number of CPU threads
-# available.
-#
-# Line 12 displays us a warning to indicate that AequilibraE is converting the data type
-# of the cost field.
-#
-# Lines 13-61 indicate that we'll receive the outputs of a *bfw* algorithm.
-# In the log there are also the number of the iteration, its relative gap, and the stepsize.
-# The outputs in lines 15-60 are exactly the same as the ones provided by the function
-# ``assig.report()``. Finally, the last line shows us that the *bfw* assignment has finished
-# after 46 iterations because its gap is smaller than the threshold we configured (0.001).
-#
-# In case you execute a new traffic assignment using different classes or changing the
-# parameters values, these new specification values would be stored in the log file as well
-# so you can always keep a record of what you have been doing. One last reminder is that
-# if we had created our project from OSM, the lines on top of the log would have been
-# different to display information on the queries done to the server to obtain the data.
-#
-# Log image by `OSRS Wiki <https://oldschool.runescape.wiki/index.php?curid=66905#>`_
+# The log records each traffic class configuration and its demand totals.
+# It then records the assignment configuration, including the VDF, algorithm,
+# iteration limit, relative gap target, and thread count.
+# Each iteration records its relative gap and step size. ``assig.report()``
+# returns the same convergence data as a DataFrame.
+# A new run records its configuration before the iteration messages.

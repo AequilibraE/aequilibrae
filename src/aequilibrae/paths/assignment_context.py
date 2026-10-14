@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from aequilibrae.paths.graph import Graph
 
 
-def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
-    """Copy a computational view into fixed, packed assignment demand."""
+def validate_assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
+    """Validate demand without allocating an assignment copy."""
     if matrix.view_names is None or matrix.matrix_view is None:
         raise ValueError("Set the matrix computational view before assigning demand")
     if not np.array_equal(matrix.index, centroids):
@@ -41,7 +41,12 @@ def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.nd
     if not np.all(np.isfinite(demand)) or np.any(demand < 0):
         raise ValueError("Demand must be finite and nonnegative")
 
-    demand = np.array(demand, dtype=np.float64, order="C", copy=True)
+    return demand
+
+
+def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
+    """Copy validated demand into packed, read-only assignment storage."""
+    demand = np.array(validate_assignment_demand(matrix, centroids), dtype=np.float64, order="C", copy=True)
     if not np.all(np.isfinite(demand)):
         raise ValueError("Demand must be finite when stored as float64")
     demand.flags.writeable = False
@@ -136,6 +141,7 @@ class AssignmentInputs:
         skim_fields: list[str] | None = None,
         cost_name: str | None = None,
         heap: str = "4ary",
+        select_link_od: bool = True,
     ):
         self.mapping = AssignmentMapping(graph)
         self.demand = assignment_demand(matrix, self.mapping.centroids)
@@ -157,6 +163,8 @@ class AssignmentInputs:
         self.turn_cost_name = None
 
         for name in skim_names:
+            if name == cost_name:
+                continue
             if name == time_field and not separate_time:
                 # The routing distance already includes the turn costs.
                 continue
@@ -186,7 +194,13 @@ class AssignmentInputs:
             selections[name] = indices[indices != links]
         self.selection = SelectLinkContext(links, selections)
         self.driver = PreparedAoN(
-            self.routing, self.demand, cores=cores, skimming=self.skimming, selected_links=self.selection, heap=heap
+            self.routing,
+            self.demand,
+            cores=cores,
+            skimming=self.skimming,
+            selected_links=self.selection,
+            heap=heap,
+            select_link_od=select_link_od,
         )
 
     def update_costs(self, congested_time: np.ndarray, fixed_cost: np.ndarray) -> None:
@@ -209,3 +223,49 @@ class AssignmentInputs:
 
     def make_state(self, cores: int, threading_threshold: int) -> AssignmentState:
         return AssignmentState(self.driver.make_outputs(), self.mapping, cores, threading_threshold)
+
+
+class PreparedTrafficClass:
+    """Assignment-owned graph and results for one traffic class."""
+
+    def __init__(self, configuration, graph):
+        from aequilibrae.paths.results import AssignmentResults
+
+        self.configuration = configuration
+        self.graph = graph
+        self.results = AssignmentResults()
+        self._aon_results = AssignmentResults()
+        self.results.set_heap(configuration.heap)
+        self._aon_results.set_heap(configuration.heap)
+        self.fixed_cost = np.zeros(graph.num_links, dtype=np.float64)
+        self.congested_time = np.array([])
+        self.congested_skims = None
+        self._selected_links = {}
+        for name, members in configuration.select_link_sets.items():
+            selected = set()
+            for link, direction in members:
+                mask = graph.graph.link_id == link
+                if direction:
+                    mask &= graph.graph.direction == direction
+                selected.update(graph.graph.loc[mask, "__compressed_id__"])
+            self._selected_links[name] = np.array(sorted(selected), dtype=np.int64)
+
+    def skim_congested(self, skim_fields=None):
+        """Compute skims with the accepted final costs."""
+        if self.congested_time.size == 0:
+            raise RuntimeError("Run the assignment before skimming congested costs")
+        fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
+        inputs = AssignmentInputs(
+            self.graph,
+            self.configuration.demand,
+            "__congested_time__",
+            {},
+            self.results.cores,
+            skim_fields=fields + ["__congested_time__"],
+            cost_name="__assignment_cost__",
+            heap=self.configuration.heap,
+        )
+        inputs.update_costs(self.congested_time, self.fixed_cost)
+        output = inputs.driver.run(inputs.driver.make_outputs()).skimming
+        self.congested_skims = inputs.report_skims(output)
+        return self.congested_skims
