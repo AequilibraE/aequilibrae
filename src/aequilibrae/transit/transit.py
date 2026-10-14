@@ -165,7 +165,7 @@ class Transit(WorkerThread):
 
             >>> project = create_example(project_path, "coquimbo")
 
-            >>> project.network.build_graphs()
+            >>> network = project.network.build()
 
             >>> start = int(6.5 * 60 * 60) # 6:30 am
             >>> end = int(8.5 * 60 * 60)   # 8:30 am

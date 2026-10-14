@@ -7,7 +7,7 @@ import pandas as pd
 from scipy.spatial import Delaunay
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Graph, TrafficAssignment, TrafficClass
+from aequilibrae.paths import NetworkData, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 DELAUNAY_TABLE = "delaunay_network"
@@ -96,19 +96,13 @@ class DelaunayAnalysis:
             df = pd.read_sql(sql, conn)
         centroids = np.array(np.unique(np.hstack((df.a_node.values, df.b_node.values))), int)
 
-        g = Graph()
-        g.mode = "delaunay"
-        g.network = df
-        g.prepare_graph(centroids)
-        g.set_blocked_centroid_flows(True)
-
-        tc = TrafficClass("delaunay", g, matrix)
-        ta = TrafficAssignment(self.project)
-        ta.set_classes([tc])
-        ta.set_time_field("distance")
-        ta.set_capacity_field("capacity")
-        ta.set_vdf(bpr, {"alpha": 0, "beta": 1.0})
-        ta.set_algorithm("all-or-nothing")
+        df["modes"] = "d"
+        network = NetworkData(df, centroids=centroids)
+        traffic = TrafficClass(name="delaunay", mode="d", cost="distance", demand=matrix)
+        ta = TrafficAssignment(
+            network=network, classes=[traffic], time_field="distance", capacity_field="capacity",
+            vdf=bpr, name_mapping={"alpha": 0.0, "beta": 1.0}, algorithm="all-or-nothing", project=self.project,
+        )
         ta.execute()
 
         cols = []

@@ -37,7 +37,7 @@ defined based on the auto-generated link types. These include:
     ...     blocking_centroid_flows=False,
     ...     connector_method="overlapping_regions",
     ... )
-    >>> project.network.build_graphs()
+    >>> network = project.network.build()
 
     >>> graph.create_line_geometry(method="direct", graph="c")
 
@@ -87,7 +87,7 @@ One example is skimming travel time in rail only.
     ...     blocking_centroid_flows=False,
     ...     connector_method="overlapping_regions",
     ... )
-    >>> project.network.build_graphs()
+    >>> network = project.network.build()
 
     >>> graph.create_line_geometry(method="direct", graph="c")
 

@@ -12,8 +12,7 @@ from aequilibrae.paths.results import PathResults, SkimResults
 
 def test_network_skimming(sioux_falls_example):
     network = sioux_falls_example.network
-    network.build_graphs()
-    graph = network.graphs["c"]
+    graph = network.build().build_graph(mode="c", cost="distance")
     graph.set_graph(cost_field="distance")
     graph.set_skimming("distance")
     graph.set_blocked_centroid_flows(False)
@@ -113,8 +112,7 @@ def test_network_skimming_uses_routing_cost_and_turn_paths(cores, turn_penalty, 
 def test_network_skimming_no_project(sioux_falls_example):
     network = sioux_falls_example.network
 
-    network.build_graphs()
-    graph = network.graphs["c"]
+    graph = network.build().build_graph(mode="c", cost="distance")
     graph.set_graph(cost_field="distance")
     graph.set_skimming("distance")
     graph.set_blocked_centroid_flows(False)

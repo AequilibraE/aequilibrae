@@ -24,9 +24,9 @@ class NetworkSkimming(WorkerThread):
         >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
         >>> project = create_example(project_path)
-        >>> project.network.build_graphs(modes=["c"])
+        >>> network = project.network.build(modes=["c"])
 
-        >>> graph = project.network.graphs['c']
+        >>> graph = network.build_graph(mode='c', cost="distance")
         >>> graph.set_graph("distance")
         >>> graph.set_skimming("distance")
 

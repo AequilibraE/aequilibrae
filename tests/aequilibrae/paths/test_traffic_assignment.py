@@ -1,167 +1,83 @@
-import random
-import string
-from random import choice
-
-import numpy as np
 import pytest
 
-from aequilibrae import Graph, TrafficAssignment, TrafficClass
+from aequilibrae import TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 
-@pytest.fixture(scope="function")
-def project(sioux_falls_example):
-    sioux_falls_example.network.build_graphs()
-    return sioux_falls_example
+@pytest.fixture
+def configuration(sioux_falls_example):
+    project = sioux_falls_example
+    demand = project.matrices.get_matrix("demand_omx")
+    return {
+        "network": project.network.build(modes=["c"]),
+        "classes": [
+            TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand, block_centroid_flows=False)
+        ],
+        "time_field": "free_flow_time",
+        "capacity_field": "capacity",
+        "vdf": bpr,
+        "name_mapping": {"alpha": "b", "beta": "power"},
+        "algorithm": "msa",
+        "project": project,
+    }
 
 
-@pytest.fixture(scope="function")
-def car_graph(project):
-    graph: Graph = project.network.graphs["c"]
-    graph.set_graph("free_flow_time")
-    graph.set_blocked_centroid_flows(False)
-    return graph
+@pytest.mark.parametrize(
+    "change, error",
+    [
+        ({"vdf": object()}, TypeError),
+        ({"classes": []}, TypeError),
+        ({"classes": [1, 2]}, TypeError),
+        ({"algorithm": "invalid"}, ValueError),
+        ({"time_field": "missing"}, ValueError),
+        ({"capacity_field": "missing"}, ValueError),
+        ({"name_mapping": {"b": "alpha"}}, ValueError),
+    ],
+)
+def test_constructor_validates_configuration(configuration, change, error):
+    with pytest.raises(error):
+        TrafficAssignment(**(configuration | change))
 
 
-@pytest.fixture(scope="function")
-def matrix(project):
-    mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
-    return mat
+def test_duplicate_class_names(configuration):
+    configuration["classes"] *= 2
+    with pytest.raises(ValueError, match="unique"):
+        TrafficAssignment(**configuration)
 
 
-@pytest.fixture(scope="function")
-def assigclass(car_graph, matrix):
-    return TrafficClass("car", car_graph, matrix)
-
-
-@pytest.fixture(scope="function")
-def assignment(project):
-    return TrafficAssignment(project)
-
-
-def test_skim_after(project, assigclass):
-    assig = TrafficAssignment(project)
-
-    assig.add_class(assigclass)
-
-    assig.set_vdf(bpr, name_mapping={"alpha": "b", "beta": "power"})
-
-    assig.set_time_field("free_flow_time")
-    assig.set_capacity_field("capacity")
-
-    assig.max_iter = 10
-    assig.set_algorithm("msa")
-    assig.execute()
-
-    b = assig.skim_congested(["distance"], return_matrices=True)
-
-    assert b["car"].field_names == ("distance", "__congested_time__", "__assignment_cost__")
-
-    b = assig.skim_congested(return_matrices=True)
-
-    assert b["car"].field_names == ("__congested_time__", "__assignment_cost__")
-
-
-# tests/aequilibrae/paths/test_traffic_assignment.py
-
-ALGORITHMS = ["msa", "cfw", "bfw", "frank-wolfe"]
-
-
-def test_matrix_with_wrong_type(matrix, car_graph):
-    core = next(iter(matrix))
-    matrix[core] = np.array(matrix[core], np.int32)
+def test_old_assignment_interface_is_removed(configuration):
     with pytest.raises(TypeError):
-        TrafficClass("car", car_graph, matrix)
+        TrafficAssignment()
+    assignment = TrafficAssignment(**configuration)
+    for method in (
+        "set_classes",
+        "add_class",
+        "set_vdf",
+        "set_algorithm",
+        "set_time_field",
+        "set_capacity_field",
+        "set_cores",
+        "add_preload",
+        "set_bfw_conjugacy",
+    ):
+        assert not hasattr(assignment, method)
+    assert assignment.classes == tuple(configuration["classes"])
 
 
-def test_set_vdf(assignment, assigclass):
-    with pytest.raises(ValueError):
-        assignment.set_vdf(object())
-    assignment.add_class(assigclass)
-    assignment.set_vdf(bpr, {})
+def test_skim_after(configuration):
+    assig = TrafficAssignment(**configuration)
+    assig.execute(max_iterations=10, cores=1)
+    skims = assig.skim_congested(["distance"], return_matrices=True)
+    assert skims["car"].field_names == ("distance", "__congested_time__", "__assignment_cost__")
+    skims = assig.skim_congested(return_matrices=True)
+    assert skims["car"].field_names == ("__congested_time__", "__assignment_cost__")
 
 
-def test_set_classes(assignment, assigclass):
-    with pytest.raises(AttributeError):
-        assignment.set_classes([1, 2])
-    with pytest.raises(TypeError):
-        assignment.set_classes(assigclass)
-    assignment.set_classes([assigclass])
-
-
-def test_algorithms_available(assignment):
-    algs = assignment.algorithms_available()
-    real = ["all-or-nothing", "msa", "frank-wolfe", "bfw", "cfw", "fw"]
-    diff = [x for x in real if x not in algs]
-    diff2 = [x for x in algs if x not in real]
-    assert len(diff) + len(diff2) <= 0, "list of algorithms raised is wrong"
-
-
-def test_set_cores(assignment, assigclass):
-    with pytest.raises(Exception):
-        assignment.set_cores(3)
-    assignment.add_class(assigclass)
-    with pytest.raises(ValueError):
-        assignment.set_cores("q")
-    assignment.set_cores(3)
-
-
-def test_set_algorithm(assignment, assigclass):
-    with pytest.raises(AttributeError):
-        assignment.set_algorithm("not an algo")
-    assignment.add_class(assigclass)
-    with pytest.raises(Exception):
-        assignment.set_algorithm("msa")
-
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_time_field("free_flow_time")
-    assignment.set_capacity_field("capacity")
-    assignment.max_iter = 10
-    for _algo in ALGORITHMS:
-        for _ in range(10):
-            pass  # Placeholder for any repeated logic if needed
-    with pytest.raises(AttributeError):
-        assignment.set_algorithm("not a valid algorithm")
-
-
-def test_steps_below_needed_to_terminate_reaches_algorithm(assignment, assigclass):
-    assignment.add_class(assigclass)
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_time_field("free_flow_time")
-    assignment.set_capacity_field("capacity")
-    assignment.set_algorithm("bfw")
-
-    assignment.steps_below_needed_to_terminate = 3
-    assert assignment.assignment.steps_below_needed_to_terminate == 3
-
-
-def test_set_time_field(assignment, assigclass):
-    with pytest.raises(ValueError):
-        assignment.set_time_field("capacity")
-    assignment.add_class(assigclass)
-    N = random.randint(1, 50)
-    val = "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
-    with pytest.raises(ValueError):
-        assignment.set_time_field(val)
-    assignment.set_time_field("free_flow_time")
-    assert assignment.time_field == "free_flow_time"
-
-
-def test_info(assignment, assigclass):
-    iterations = random.randint(1, 10000)
-    rgap = random.random() / 10000
-    algo = choice(ALGORITHMS)
-    assignment.add_class(assigclass)
-    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-    assignment.set_time_field("free_flow_time")
-    assignment.set_capacity_field("capacity")
-    assignment.max_iter = iterations
-    assignment.rgap_target = rgap
-    assignment.set_algorithm(algo)
-    for _ in range(10):
-        algo = "".join([x.upper() if random.random() < 0.5 else x.lower() for x in algo])
-    dct = assignment.info()
-    if algo.lower() == "fw":
-        algo = "frank-wolfe"
-    assert dct["Algorithm"] == algo.lower(), "Algorithm not correct in info method"
-    assert dct["Maximum iterations"] == iterations, "maximum iterations not correct in info method"
+def test_info_and_execution_options(configuration):
+    assignment = TrafficAssignment(**configuration)
+    assert assignment.info()["Classes"]["car"]["network mode"] == "c"
+    assignment.execute(max_iterations=3, rgap=1e-3, cores=1)
+    assert assignment.info()["Maximum iterations"] == 3
+    assert assignment.info()["Target RGap"] == 1e-3
+    assert assignment.cores == 1
+    assert set(assignment.algorithms_available()) == {"all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"}

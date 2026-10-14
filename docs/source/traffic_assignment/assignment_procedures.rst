@@ -1,27 +1,15 @@
 Traffic Assignment Procedure
 ============================
 
-Along with a network data model, traffic assignment is the most technically challenging portion to 
-develop in a modeling platform, especially if you want it to be *fast*. In AequilibraE, we aim to 
-make it as fast as possible, without making it overly complex to use, develop and maintain, although
-we know that *complex* is subjective.
+Traffic assignment starts with a network snapshot and a set of traffic class configurations.
+The constructor validates the configuration. Execution prepares the graphs and runs the assignment.
 
-Running traffic assignment in AequilibraE consists in creating the traffic classes that are going
-to be assigned, add them to a traffic assignment object, set the traffic assignment parameters, and
-run the assignment.
+Network data
+------------
 
-``TrafficClass``
-----------------
-
-The ``TrafficClass`` object holds all the information pertaining to a specific traffic class to be 
-assigned. There are three pieces of information that are required in the instantiation of this class:
-
-* **name**: name of the class. It has to be unique among all classes used in a multi-class traffic assignment
-
-* **graph**: it is the ``Graph`` object corresponding to that particular traffic class/mode
-
-* **matrix**: it is the AequilibraE matrix with the demand for that traffic class, which can have
-  an arbitrary number of user-classes setup as different layers (cores) of the matrix object.
+``project.network`` manages the network database. Its ``build()`` method returns a
+``NetworkData`` snapshot with link fields, available modes, centroids, and turn restrictions.
+``NetworkData`` also accepts a DataFrame for workflows without a project.
 
 .. testsetup::
 
@@ -33,244 +21,119 @@ assigned. There are three pieces of information that are required in the instant
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TrafficClass
     >>> from aequilibrae.utils.create_example import create_example
-
-    >>> project = create_example(project_path)
-    >>> project.network.build_graphs()
-
-    # We get the graphs for cars and trucks
-    >>> graph_car = project.network.graphs['c']
-    >>> graph_truck = project.network.graphs['T']
-
-    # And also get the matrices for cars and trucks
-    >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
-
-    >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
-
-    # We create the Traffic Classes
-    >>> tc_car = TrafficClass("car", graph_car, matrix_car)
-    >>> tc_truck = TrafficClass("truck", graph_truck, matrix_truck)
-
-It is also possible to modify the default values for the following parameters of a traffic class by using a
-method call:
-
-* **Passenger-car equivalent** (PCE) is the standard way of modeling multi-class traffic assignment 
-  equilibrium in a consistent manner (see [3]_ for the technical detail), and its value is set to 1.0 
-  by default.
-
-.. doctest::
-
-    >>> tc_truck.set_pce(2.5)
-
-* **Fixed costs**: in case there are fixed costs associated with the traversal of links in the network, the user 
-  can provide the name of the field in the graph that contains that network.
-
-.. doctest::
-
-    >>> tc_truck.set_fixed_cost("distance")
-
-* **Value-of-Time** (VoT) is the mechanism to bring time and monetary costs into a consistent basis 
-  within a generalized cost function. In the event that fixed cost is measured in the same unit as free-flow travel
-  time, then *vot* must be set to 1.0.
-
-.. doctest::
-
-    >>> tc_truck.set_vot(0.35)
-
-``TrafficAssignment``
----------------------
-
-.. doctest::
-
-    >>> from aequilibrae.paths import TrafficAssignment
+    >>> from aequilibrae.paths import TrafficClass, TrafficAssignment, NetworkData
     >>> from aequilibrae.paths.vdf import bpr
+    >>> project = create_example(project_path)
+    >>> network = project.network.build(modes=["c", "T"])
 
-    >>> assig = TrafficAssignment()
+The ``fields`` argument limits the loaded fields. A directional field such as
+``capacity`` loads both ``capacity_ab`` and ``capacity_ba``.
+For standalone paths, ``network.build_graph(mode="c", cost="free_flow_time")``
+returns a graph for that mode and cost field.
 
-AequilibraE's traffic assignment is organized within an object with the same name which contains a series of
-member variables that should be populated by the user, providing thus a complete specification of the assignment
-procedure.
+Traffic classes
+---------------
 
-* **classes**: list of completely specified traffic classes
-
-.. doctest::
-
-    # You can add one or more traffic classes to the assignment instance
-    >>> assig.add_class(tc_truck) # doctest: +SKIP
-
-    >>> assig.set_classes([tc_car, tc_truck])
-
-* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``, ``INRETS``, or ``AKCELIK``
+``TrafficClass`` requires a mode, a cost field, and a demand matrix.
+The demand matrices must contain float64 values.
+The name defaults to the mode. Each class in an assignment must have a unique name.
 
 .. doctest::
 
+    >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
+    >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
+    >>> tc_car = TrafficClass(
+    ...     name="car", mode="c", cost="free_flow_time", demand=matrix_car,
+    ...     skimming=["free_flow_time", "distance"], block_centroid_flows=False,
+    ... )
+    >>> tc_truck = TrafficClass(
+    ...     name="truck", mode="T", cost="free_flow_time", demand=matrix_truck, pce=2.5,
+    ...     skimming=["free_flow_time", "distance"], block_centroid_flows=False,
+    ... )
 
+Traffic classes contain configuration only. They do not hold graphs or results.
+The configuration is immutable. ``dataclasses.replace()`` creates a configuration with changed values.
 
-* **name_mapping**: the parameters to be used in the volume-delay function, other than volume, and 
-  free-flow time. VDF parameters must be consistent across all graphs.
+The ``cost`` field defines the free-flow generalized cost in time units.
+The assignment adds congestion delay to this cost.
+The assignment converts fixed monetary costs to time units through the value of time.
+The cost formula is:
 
-  Because AequilibraE supports different parameters for each link, its implementation is the most general possible 
-  while still preserving the desired properties for multi-class assignment, but the user needs to provide individual
-  values for each link *OR* a single value for the entire network.
+.. code-block:: text
 
-.. doctest::
+    class cost + congestion delay + fixed cost * fixed_cost_multiplier / vot
 
-    # The VDF parameters can be either an existing field in the graph, passed as a parameter:
-    >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"}) # doctest: +SKIP
+``fixed_cost_field`` identifies the monetary cost field.
+``pce`` and ``vot`` default to 1.0 and must be positive and finite.
+``select_link_sets`` maps names to link IDs or ``(link_id, direction)`` pairs.
+A link ID without a direction selects both directions.
+``select_link_od=False`` retains selected link loads without allocating selected OD matrices.
 
-    # Or as a global value:
-    >>> assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
+Assignment configuration
+------------------------
 
-* **time_field**: the field of the graph that corresponds to free-flow travel time. The procedure will 
-  collect this information from the graph associated with the first traffic class provided, but will check 
-  if all graphs have the same information on free-flow travel time
-  
-.. doctest::
+``TrafficAssignment`` requires the network, classes, time field, capacity field, VDF, and algorithm.
+All classes use the same network fields for travel time, capacity, and VDF parameters.
 
-    >>> assig.set_time_field("free_flow_time")
-
-* **capacity_field**: the field of the graph that corresponds to capacity of links. The procedure will 
-  collect this information from the graph associated with the first traffic class provided, but will check 
-  if all graphs have the same information on capacity
-
-.. doctest::
-
-    >>> assig.set_capacity_field("capacity")
-
-* **algorithm**: the assignment algorithm to be used, being one of ``all-or-nothing``, ``bfw``, ``cfw``, ``fw``,  
-  ``franke-wolfe``, or ``msa``.
-
-.. doctest::
-
-    >>> assig.set_algorithm("bfw")
-
-Skimming while assigning
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-AequilibraE can skim during assignment and keeps both the latest all-or-nothing
-skims and the blended skims for the accepted solution.
-
-This is the case because, strictly speaking, the equilibrium travel time is the one resulting
-at the end of the last assignment iteration, while the most correct distance and toll skims, for example,
-are those resulting from the blended skim of all iterations.
-
-The user can select the fields they want to skim, as well save the skims to disk (and the project)
-at the end of the assignment procedure, where skims are tagged with suffixes *"_final"* and *"_blended"*
-for easy identification.
-
-::
-
-  >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
-  >>> assig.execute() # doctest: +SKIP
-  >>> assig.save_skims("one_matrix_name") # doctest: +SKIP
-
-Unassigned demand
-~~~~~~~~~~~~~~~~~
-
-Unassigned demand is demand that present within the demand matrix but it's destination was unreachable from the origin,
-it is not loaded on the network and ``traffic_class._aon_results.unassigned_demand`` gives the latest AoN total,
-excluding intrazonal demand. ``traffic_class.results.unassigned_demand`` gives the total of the accepted solution.
-
-Assigning sparse matrices
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Modern Activity-Based models (and even some trip-based and tour-based ones) result on incredibly sparse
-demand matrices, which opens up a significant opportunity to save time during assignment by using early-exiting
-during the path-computation phase of assignment.
-
-AequilibraE is capable of leveraging this opportunity, and it does so automatically whenever the user
-**does NOT set skimming for the assignment or any individual traffic class graphs**.
-
-In this case, AequilibraE has a convenient method to skim the final iteration of the assignment
-as it had been computed during the assignment itself. This method call requires a new iteration
-of path computation to be made, but assignments with highly sparse matrices and more than 10 iterations
-would still experience a significant speedup, which comes at the cost of not having blended skims
-as a sub-product of the assignment.
-
-Time savings of up to 40% should be achievable in cases of micro-simulated ABMs with a large number
-of zones and over 100 iterations of assignment.
-
-::
-
-  >>> assig.execute()
-  >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
-  >>> assig.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
-  [MatrixRecord(name='another_matrix_name_car', ...), MatrixRecord(name='another_matrix_name_truck', ...)]
-
-The list of fields defined by the user for skimming is added to the congested time and the assignment cost from the last
-iteration of the assignment by default. These matrices are named *__congested_time__* and *__assignment_cost__*
-respectively. The returned values are ``SkimmingOutputs`` objects, also stored in ``traffic_class.congested_skims``.
-Congested time includes link travel time and turn delay, but excludes fixed costs. Assignment cost includes those fixed
-costs, converted to time units with the traffic classes value of time.
-
-See the the example :ref:`example_assign_sparse` for a more practical explanation of this feature.
-
-Volume-delay function
-~~~~~~~~~~~~~~~~~~~~~
-
-AequilibraE supports five Volume Delay Functions (VDFs): BPR, BPR2, Conical, INRETS, and Akcelik.
-Each VDF has distinct characteristics that make it suitable for different modeling scenarios.
-
-For detailed information on VDF formulations, parameter guidance, and usage recommendations, 
-see the dedicated :ref:`volume_delay_functions` page, which includes:
-
-* Mathematical formulas and technical descriptions
-* Default parameter values and calibration guidance
-* Behavioral charts showing V/C ratios from 0 to 3
-* Origin and background for each function
-* Recommendations for choosing the right VDF
-
-**Quick reference:**
-
-* **BPR**: Standard highway assignment (α=0.15, β=4.0)
-* **BPR2**: Enhanced over-capacity penalty (α=0.15, β=4.0)
-* **Conical**: Smooth theoretical function (α=0.15, β=4.0)
-* **INRETS**: Urban arterials (α=1.0)
-* **Akcelik**: Signalized intersections (α=0.25, τ=0.8)
-
-Setting Preloads
-----------------
-
-We can also optionally include a preload vector for constant flows which are not being otherwise modelled. 
-For example, this can be used to account for scheduled  public transport vehicles, adding an equivalent 
-load to each link along the route accordingly. AequilibraE supports various conditions for which PT trips 
-to include in the preload, and allows the user to specify the PCE for each type of vehicle in the public transport 
-network.
-
-To create a preload for public transport vehicles operating between 8 AM to 10 AM, do the following:
+``name_mapping`` maps VDF parameter names to network field names or constant values.
+Without an explicit mapping, matching field names supply the values.
+Otherwise, the VDF defaults supply the values.
 
 .. doctest::
 
-    >>> from aequilibrae.transit import Transit
+    >>> assig = TrafficAssignment(
+    ...     network=network, classes=[tc_car, tc_truck], time_field="free_flow_time",
+    ...     capacity_field="capacity", vdf=bpr,
+    ...     name_mapping={"alpha": "b", "beta": "power"}, algorithm="bfw",
+    ... )
+    >>> results = assig.execute(max_iterations=20, rgap=1e-4, cores=1)
 
-    # Times are specified in seconds from midnight
-    >>> transit = project.scenario.create_transit_database()
-    >>> preload = transit.build_pt_preload(start=8*3600, end=10*3600)
+Algorithms are ``all-or-nothing``, ``msa``, ``frank-wolfe``, ``cfw``, and ``bfw``.
+The ``max_iterations``, ``rgap``, and ``cores`` arguments apply to each execution.
+Zero cores uses all available cores. A negative value leaves that many cores unused.
+``bfw_conjugacy="exact"`` selects the exact BFW conjugacy calculation.
 
-    # Add the preload to the assignment
-    >>> assig.add_preload(preload, 'PT_vehicles') # doctest: +SKIP
+Each execution creates fresh graphs and result buffers.
+The returned DataFrame contains link results.
+``assig.report()`` returns the convergence report.
+``assig.info()`` returns configuration information before or after execution.
 
+Preloads
+--------
 
-Executing an Assignment
------------------------
+The constructor accepts a ``preload`` array or a DataFrame.
+The array uses directed links in ascending link-ID and direction order.
+The DataFrame requires ``link_id``, ``direction``, and ``preload`` columns.
+Preload values must be nonnegative and finite.
+Preloads represent constant background traffic, such as public transport vehicles.
 
-Finally, run traffic assignment!
+Results and skimming
+--------------------
+
+``assig.class_results[name]`` returns the accepted result for each traffic class.
+Results remain in demand units. The optimizer applies PCE when it combines class flows.
+``unassigned_demand`` reports demand with an unreachable destination and excludes intrazonal demand.
 
 .. doctest::
 
-  >>> assig.execute()
+    >>> car_results = assig.class_results["car"]
+    >>> skims = car_results.skims
+    >>> saved = assig.save_results("assignment_results")
+    >>> saved_skims = assig.save_skims("assignment_skims", which_ones="all")
 
-  >>> project.close()
+Fields in ``TrafficClass.skimming`` produce skims during assignment.
+Without skimming fields, the path search can exit early for sparse demand.
+``skim_congested()`` computes additional skims from the accepted final costs.
 
-References
-----------
+.. doctest::
 
-.. [1] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). 
-       Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
+    >>> final_skims = assig.skim_congested(["distance"], return_matrices=True)
+    >>> project.close()
 
-.. [2] Spiess, H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158.
-       Available in: https://doi.org/10.1287/trsc.24.2.153
+Congested skims contain ``__congested_time__`` and ``__assignment_cost__``.
+Congested time includes travel time and turn delay.
+Assignment cost also includes fixed costs and the class cost adjustment.
 
-.. [3] Zill, J., Camargo, P., Veitch, T., Daisy, N. (2019) "Toll Choice and Stochastic User Equilibrium: 
-       Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. 
-       Available in: https://doi.org/10.1177%2F0361198119837496
+For VDF formulas and custom functions, see :ref:`volume_delay_functions`.
+For a sparse demand example, see :ref:`example_assign_sparse`.

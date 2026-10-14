@@ -54,21 +54,17 @@ mode = "c"
 
 # %%
 network = project.network
-network.build_graphs(modes=[mode])
-graph = network.graphs[mode]
-graph.set_graph("distance")
-graph.set_skimming("distance")
-graph.set_blocked_centroid_flows(False)
+network = network.build(modes=[mode])
+graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%
 # With the method ``graph_summary()``, we can check the total number of links, nodes, and zones,
-# as well as the compact number of links and nodes used for computation. If we had more than
-# one graph, its information would be displayed within the nested dictionary.
+# as well as the compact number of links and nodes used for computation.
 
-project.run["graph_summary"]()
+project.run["graph_summary"](graph)
 
 # %%
-# If no graphs have been built, an empty dictionary will be returned.
+# The graph is an explicit argument to the summary function.
 
 # %%
 # Let's add a ``create_delaunay`` function to our ``run/__init__.py`` file.

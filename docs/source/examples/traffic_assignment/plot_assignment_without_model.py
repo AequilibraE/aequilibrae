@@ -33,7 +33,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Graph
+from aequilibrae.paths import NetworkData
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.traffic_class import TrafficClass
 # sphinx_gallery_thumbnail_path = '../source/_images/assignment_plot.png'
@@ -95,23 +95,10 @@ geom["node_id"] = geom.index + 1
 geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set_index("node_id")
 
 # %%
-# Let's build our Graph! In case you're in doubt about AequilibraE Graph, 
-# :ref:`click here <aequilibrae-graphs>` to read more about it.
+# Create the network snapshot from the link table.
 
 # %%
-g = Graph()
-g.cost = network['free_flow_time'].values
-g.capacity = network['capacity'].values
-g.free_flow_time = network['free_flow_time'].values
-
-g.network = network
-g.prepare_graph(index)
-g.set_graph("free_flow_time")
-g.cost = np.array(g.cost, copy=True)
-g.set_skimming(["free_flow_time"])
-g.set_blocked_centroid_flows(False)
-g.network["id"] = g.network.link_id
-g.lonlat_index = geom.loc[g.all_nodes]
+network_data = NetworkData(network.assign(modes="c"), centroids=index, lonlat=geom)
 
 # %%
 # The named matrix is ready to use in the assignment.
@@ -119,19 +106,22 @@ g.lonlat_index = geom.loc[g.all_nodes]
 # %%
 # Let's perform our assignment. Feel free to try different algorithms,
 # as well as change the maximum number of iterations and the gap
-assigclass = TrafficClass("car", g, aem)
+assigclass = TrafficClass(
+    name="car", mode="c", cost="free_flow_time", demand=aem, skimming=["free_flow_time"], block_centroid_flows=False
+)
 
-assig = TrafficAssignment()
 
-assig.set_classes([assigclass])
-assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-assig.set_time_field("free_flow_time")
-assig.set_capacity_field("capacity")
 
-assig.set_algorithm("fw")
-assig.max_iter = 100
-assig.rgap_target = 1e-6
-assig.execute()
+assig = TrafficAssignment(
+    network=network_data,
+    classes=[assigclass],
+    vdf=bpr,
+    name_mapping={"alpha": "b", "beta": "power"},
+    time_field="free_flow_time",
+    capacity_field="capacity",
+    algorithm="frank-wolfe",
+)
+assig.execute(max_iterations=100, rgap=1e-06)
 # %%
 # Now let's take a look at the Assignment results
 assig.results()

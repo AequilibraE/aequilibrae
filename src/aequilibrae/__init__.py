@@ -8,6 +8,7 @@ from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.assignment_paths import AssignmentPaths
 from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.network_data import NetworkData
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import AssignmentResults, PathResults, SkimResults
 from aequilibrae.paths.traffic_assignment import TrafficAssignment
@@ -32,6 +33,7 @@ __all__ = [
     "MatrixStore",
     "distribution",
     "NetworkSkimming",
+    "NetworkData",
     "TrafficClass",
     "VDF",
     "TrafficAssignment",

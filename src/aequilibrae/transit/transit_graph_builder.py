@@ -1268,13 +1268,13 @@ class TransitGraphBuilder:
         between the shortest path between the project nodes closest to either end of the access
         and egress connectors.
 
-        Project graphs must be built for the "connector project match" method.
+        The "connector project match" method prepares its graph from the project network.
 
         :Arguments:
            **method** (:obj:`str`): Must be either `direct` or `connector project match`.
            If method is `direct`, `graph` argument is ignored.
 
-           **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
+           **graph** (:obj:`str`): Network mode for the path computation.
         """
         if method not in ["direct", "connector project match"]:
             raise ValueError("method must be either 'direct' or 'connector project match'")
@@ -1330,7 +1330,7 @@ class TransitGraphBuilder:
 
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
         """Create line string geometry for `connector_rows` that matches the line strings in
-        ``project.network.graphs[graph_key]``.
+        the graph for ``graph_key``.
 
         :Arguments:
            **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges``
@@ -1345,7 +1345,7 @@ class TransitGraphBuilder:
            **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links.
            Must have columns `geometry`, and an index of `link_id`\'s.
 
-           **graph_key** (:obj:`str`): The key of the ``project.network.graphs`` graph to use
+           **graph_key** (:obj:`str`): The network mode to use
            for path finding.
         """
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
@@ -1359,8 +1359,7 @@ class TransitGraphBuilder:
         kdtree = KDTree(nodes_geometries)
 
         # Prepare shortest path computation
-        graph = project.network.graphs[graph_key]
-        graph.set_graph("distance")
+        graph = project.network.build(modes=[graph_key]).build_graph(mode=graph_key, cost="distance")
 
         # Loop over connect edges, query for the closest nodes in the project and create the relevant line string
         lines = []

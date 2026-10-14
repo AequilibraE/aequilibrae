@@ -68,17 +68,17 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Let's build all graphs
-project.network.build_graphs()
+network = project.network.build()
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
 # We also see what graphs are available
-project.network.graphs.keys()
+network.modes
 
 # %%
 # We grab the graph for cars
-graph = project.network.graphs["c"]
+graph = network.build_graph(mode="c", cost="distance")
 
 # Let's say that utility is just a function of distance, so we build our 'utility' field as distance * theta
 graph.network = graph.network.assign(utility=graph.network.distance * theta)

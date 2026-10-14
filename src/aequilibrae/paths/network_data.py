@@ -1,0 +1,97 @@
+"""In-memory network data shared by routing and assignment configurations."""
+
+import numpy as np
+import pandas as pd
+
+from aequilibrae.paths.graph import Graph
+
+
+class NetworkData:
+    """Own link data and turn restrictions without preparing routing graphs.
+
+    ``links`` uses the project schema, including paired ``field_ab`` and
+    ``field_ba`` columns for directional attributes. Graphs built from this
+    snapshot own their data and can be configured independently.
+    """
+
+    def __init__(self, links, modes=None, centroids=None, turn_restrictions=None, allow_uturns=False, lonlat=None):
+        required = {"link_id", "a_node", "b_node", "direction", "modes"}
+        missing = required - set(links.columns)
+        if missing:
+            raise ValueError(f"Network is missing required fields: {sorted(missing)}")
+        self.links = links.copy(deep=True)
+        if self.links.empty or self.links.link_id.duplicated().any():
+            raise ValueError("Network must contain links with unique IDs")
+        if not self.links.direction.isin([-1, 0, 1]).all():
+            raise ValueError("Link directions must be -1, 0 or 1")
+        available = set("".join(self.links.modes.fillna("").astype(str)))
+        self.modes = tuple(sorted(available) if modes is None else ([modes] if isinstance(modes, str) else modes))
+        self.centroids = None if centroids is None else np.array(centroids, copy=True)
+        self.turn_restrictions = None if turn_restrictions is None else turn_restrictions.copy(deep=True)
+        self.allow_uturns = allow_uturns
+        self.lonlat = None if lonlat is None else lonlat.copy(deep=True)
+
+    @property
+    def fields(self):
+        columns = set(self.links.columns)
+        return sorted(
+            {c for c in columns if not c.endswith(("_ab", "_ba"))}
+            | {c[:-3] for c in columns if c.endswith("_ab") and c[:-3] + "_ba" in columns}
+        )
+
+    def field_values(self, field):
+        """Return numeric directed values, without constructing a graph."""
+        if field not in self.fields:
+            raise ValueError(f"'{field}' not in network")
+        values = []
+        for direction, suffix in ((1, "_ab"), (-1, "_ba")):
+            column = field + suffix if field + suffix in self.links else field
+            data = self.links.loc[self.links.direction != -direction, column]
+            try:
+                values.append(pd.to_numeric(data, errors="raise").to_numpy(dtype=np.float64))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Field {field} must contain numeric values") from exc
+        return np.concatenate(values)
+
+    def validate_mode(self, mode):
+        if mode not in self.modes:
+            raise ValueError(f"Mode '{mode}' is not available in this network")
+
+    def validate_centroids(self, centroids):
+        values = np.asarray(centroids)
+        nodes = np.union1d(self.links.a_node, self.links.b_node)
+        if values.ndim != 1 or not np.issubdtype(values.dtype, np.integer):
+            raise ValueError("Centroids must be a one-dimensional array of integers")
+        if not len(values) or np.any(values <= 0) or len(np.unique(values)) != len(values):
+            raise ValueError("Centroids must be nonempty, unique and positive")
+        if not np.isin(values, nodes).all():
+            raise ValueError("Demand centroids are not present in the network")
+
+    def build_graph(self, mode, cost, *, centroids=None, skimming=None, block_centroid_flows=True):
+        """Prepare an independent graph for a mode, cost and centroid order."""
+        self.validate_mode(mode)
+        for field in [cost, *(skimming or [])]:
+            self.field_values(field)
+        centroids = self.centroids if centroids is None else centroids
+        if centroids is not None:
+            self.validate_centroids(centroids)
+        graph = Graph()
+        graph.mode = mode
+        graph.network = self.links.copy(deep=True)
+        forbidden = ~graph.network.modes.fillna("").astype(str).str.contains(mode, regex=False)
+        graph.network.loc[forbidden, "b_node"] = graph.network.loc[forbidden, "a_node"]
+        restrictions = self.turn_restrictions
+        if restrictions is not None:
+            if "modes" in restrictions:
+                mask = restrictions.modes.fillna("").astype(str).str.contains(mode, regex=False)
+                restrictions = restrictions[mask].copy()
+            graph._turn_restrictions = restrictions
+        graph.prepare_graph(centroids)
+        graph.set_blocked_centroid_flows(block_centroid_flows)
+        if self.lonlat is not None:
+            graph.lonlat_index = self.lonlat.loc[graph.all_nodes]
+        if restrictions is not None:
+            graph.set_turn_restrictions(restrictions, allow_path_uturns=self.allow_uturns)
+        graph.set_graph(cost)
+        graph.set_skimming(list(skimming or []))
+        return graph

@@ -14,8 +14,9 @@ from aequilibrae.paths.route_choice import RouteChoice
 
 @pytest.fixture(scope="function")
 def route_choice_setup(sioux_falls_single_class):
-    sioux_falls_single_class.network.build_graphs(fields=["distance", "free_flow_time"], modes=["c"])
-    graph = sioux_falls_single_class.network.graphs["c"]
+    graph = sioux_falls_single_class.network.build(fields=["distance", "free_flow_time"], modes=["c"]).build_graph(
+        mode="c", cost="distance"
+    )
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)
 

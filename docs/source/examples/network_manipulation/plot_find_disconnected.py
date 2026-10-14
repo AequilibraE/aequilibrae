@@ -67,8 +67,8 @@ if centroid_count == 0:
     nodes.update(arbitrary_node, is_centroid=1)
 
 network = project.network
-network.build_graphs(modes=[mode])
-graph = network.graphs[mode]
+network = network.build(modes=[mode])
+graph = network.build_graph(mode=mode, cost="distance")
 graph.set_blocked_centroid_flows(False)
 
 if centroid_count == 0:

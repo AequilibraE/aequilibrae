@@ -35,8 +35,8 @@ project = create_example(fldr, "coquimbo")
 
 # %%
 # We build all graphs and get the car graph.
-project.network.build_graphs()
-graph = project.network.graphs["c"]
+network = project.network.build()
+graph = network.build_graph(mode="c", cost="distance")
 
 # %%
 # We set the cost field and disable centroid-flow blocking for this demonstration.

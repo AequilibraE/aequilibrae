@@ -15,10 +15,10 @@ class SkimResults:
           >>> from aequilibrae.paths.results import SkimResults
 
           >>> project = create_example(project_path)
-          >>> project.network.build_graphs()
+          >>> network = project.network.build()
 
           # Mode c is car in this project
-          >>> car_graph = project.network.graphs['c']
+          >>> car_graph = network.build_graph(mode='c', cost="distance")
 
           # minimize travel time
           >>> car_graph.set_graph('free_flow_time')
