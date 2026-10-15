@@ -102,16 +102,23 @@ skm = graph.compute_skims()
 # The result is an AequilibraeMatrix object
 skims = skm.results.skims
 
-# Which we can manipulate directly from its temp file, if we wish
-skims.matrices[:3, :3, :]
+# Which we can manipulate directly in memory, if we wish
+skims.imat["distance", :3, :3]
 
 # %%
 # Or access each matrix, lets just look at the first 3x3
-skims.distance[:3, :3]
+skims["distance"][:3, :3]
 
 # %%
 # We can save it to the project if we want
-skm.save_to_project("base_skims")
+project.matrices.create(
+    "base_skims",
+    "base_skims.omx",
+    skims,
+    procedure="Network skimming",
+    procedure_id=skm.procedure_id,
+    timestamp=skm.procedure_date,
+)
 
 # %%
 # We can also retrieve this skim record to write something to its description

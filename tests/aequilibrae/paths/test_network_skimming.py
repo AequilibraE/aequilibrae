@@ -28,8 +28,19 @@ def test_network_skimming(sioux_falls_example):
     assert tot <= np.sum(graph.cost), "Skimming was not successful. At least one np.inf returned."
     assert not skm.report, f"Skimming returned an error: {skm.report}"
 
-    with pytest.raises(NotImplementedError):
-        skm.save_to_project("test_Skimming", format="omx")
+    matrices = sioux_falls_example.matrices
+    record = matrices.create(
+        "test_Skimming",
+        "test_Skimming.omx",
+        skm.results.skims,
+        procedure="Network skimming",
+        procedure_id=skm.procedure_id,
+        timestamp=skm.procedure_date,
+    )
+    assert record.cores == 1
+    assert record.procedure_id == skm.procedure_id
+    loaded = matrices.get_matrix(record.name)
+    np.testing.assert_array_equal(loaded["distance"], skm.results.skims["distance"])
 
 
 def test_prepare_shares_existing_output():

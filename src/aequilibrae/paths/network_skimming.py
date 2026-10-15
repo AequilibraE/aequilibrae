@@ -144,17 +144,3 @@ class NetworkSkimming(WorkerThread):
             **cores** (:obj:`int`): Number of cores to be used in computation
         """
         self.cores = clamp_cores(cores)
-
-    def save_to_project(self, name: str, format="omx", project=None) -> None:
-        """Project saving is not available while it uses the old matrix API.
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
-
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
-        """
-
-        raise NotImplementedError("Project matrix saving has not been updated for the new matrix API")
