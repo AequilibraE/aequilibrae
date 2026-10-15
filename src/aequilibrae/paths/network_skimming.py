@@ -120,7 +120,7 @@ class NetworkSkimming(WorkerThread):
             self.results._heap,
         )
         # Keep the public AequilibraeMatrix layout and centroid index. The
-        # internal output is origin-major with fields before destinations.
+        # internal output is origin-major with fields after destinations.
         matrices = output.matrices
         for name in graph.skim_fields:
             self.results.skims.matrix[name][:] = matrices[name]

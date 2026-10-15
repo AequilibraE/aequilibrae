@@ -23,7 +23,7 @@ def workspace_for(context, inputs):
 
 def path_walk_skims(results, inputs, destination_count, cost_name=None, turn_cost_name=None):
     """Walk each destination separately rather than using the state cascade."""
-    expected = np.full((inputs.field_count, destination_count), np.inf)
+    expected = np.full((destination_count, inputs.field_count), np.inf)
     fields = inputs.fields
     for node in range(destination_count):
         if not results.reachable_to(node):
@@ -31,11 +31,11 @@ def path_walk_skims(results, inputs, destination_count, cost_name=None, turn_cos
         links = results.path_links_to(node)
         for field, name in enumerate(inputs.field_names):
             if name == cost_name:
-                expected[field, node] = results.path_cost_to(node)
+                expected[node, field] = results.path_cost_to(node)
             elif name == turn_cost_name:
-                expected[field, node] = results.path_turn_cost_to(node)
+                expected[node, field] = results.path_turn_cost_to(node)
             else:
-                expected[field, node] = fields[name][links].sum()
+                expected[node, field] = fields[name][links].sum()
     return expected
 
 
@@ -64,7 +64,7 @@ def test_skim_state_tree_against_path_sums_and_assignment(turn, penalty, width):
         np.testing.assert_allclose(output.skims[origin], expected)
     np.testing.assert_allclose(output.skims, assigned.skimming.skims)
     expected_fields = path_walk_outputs(context, demand, fields)[1]
-    np.testing.assert_allclose(output.skims[:, :width], expected_fields)
+    np.testing.assert_allclose(output.skims[:, :, :width], expected_fields)
 
 
 @pytest.mark.parametrize("plain", [False, True])
@@ -113,13 +113,13 @@ def test_names_order_and_one_shot_allocation():
     for field, name in enumerate(inputs.field_names):
         assert matrices[name].shape == (1, 4)
         assert np.shares_memory(matrices[name], output.skims)
-        np.testing.assert_array_equal(matrices[name], output.skims[:, field, :])
-        assert matrices[name].flags.c_contiguous
+        np.testing.assert_array_equal(matrices[name], output.skims[:, :, field])
+        assert not matrices[name].flags.c_contiguous
         assert not matrices[name].flags.writeable
         with pytest.raises(ValueError):
             matrices[name].flags.writeable = True
-    assert np.all(output.skims[0, :, 2] == 0)
-    assert np.all(np.isinf(output.skims[0, :, 0]))
+    assert np.all(output.skims[0, 2, :] == 0)
+    assert np.all(np.isinf(output.skims[0, 0, :]))
 
 
 def test_origin_major_layout_with_rectangular_od_matrices():
@@ -132,9 +132,9 @@ def test_origin_major_layout_with_rectangular_od_matrices():
     )
     output = inputs.make_outputs(2, origin_count=3)
     scratch = workspace_for(context, inputs)
-    assert output.skims.shape == (3, 4, 2)
+    assert output.skims.shape == (3, 2, 4)
     assert output.skims.flags.c_contiguous
-    assert output.skims.strides == (4 * 2 * 8, 2 * 8, 8)
+    assert output.skims.strides == (2 * 4 * 8, 4 * 8, 8)
     for row in range(output.origin_count):
         origin_view = output.skims[row]
         assert origin_view.flags.c_contiguous
@@ -143,20 +143,20 @@ def test_origin_major_layout_with_rectangular_od_matrices():
     matrices = output.matrices
     for field, matrix in enumerate(matrices.values()):
         assert matrix.shape == (3, 2)
-        assert matrix.strides == (4 * 2 * 8, 8)
+        assert matrix.strides == (2 * 4 * 8, 4 * 8)
         assert not matrix.flags.c_contiguous
         assert not matrix.flags.writeable
         with pytest.raises(ValueError):
             matrix.flags.writeable = True
         assert np.shares_memory(matrix, output.skims)
-        assert matrix.ctypes.data == output.skims.ctypes.data + field * 2 * 8
+        assert matrix.ctypes.data == output.skims.ctypes.data + field * 8
     for row, origin in ((2, 0), (0, 2), (1, 3)):
         results = search(context, origin)
         skimming(results, inputs, scratch, output, origin_row=row)
         expected = path_walk_skims(results, inputs, 2, "objective", "penalty")
         np.testing.assert_array_equal(output.skims[row], expected)
         for field, matrix in enumerate(matrices.values()):
-            np.testing.assert_array_equal(matrix[row], expected[field])
+            np.testing.assert_array_equal(matrix[row], expected[:, field])
     # Retained strided matrices reflect resets without a second allocation.
     output.reset()
     assert all(np.all(np.isinf(matrix)) for matrix in matrices.values())
@@ -205,7 +205,7 @@ def test_input_updates_do_not_change_writeability_or_allocate_output():
     for value in (1.0, 2.0, -3.0):
         field[:] = value
         skimming(results, inputs, scratch, output)
-        assert retained_output[0, 0, 3] == 3 * value
+        assert retained_output[0, 3, 0] == 3 * value
         assert output.skims.ctypes.data == output_pointer
         assert scratch.state_skims.ctypes.data == scratch_pointer
         np.testing.assert_array_equal(results.predecessors, tree)
@@ -230,10 +230,10 @@ def test_partial_and_presearch_replace_only_the_requested_row():
     search(context, 0, targets=[1], results=results)
     skimming(results, inputs, scratch, output, origin_row=1)
     np.testing.assert_array_equal(output.skims[0], saved)
-    assert np.all(np.isinf(output.skims[1, :, 3]))
-    unfinalized = np.ones(context.state_count, dtype=bool)
-    unfinalized[results.settlement_order[: results.settled_count]] = False
-    assert np.all(np.isinf(scratch.state_skims[unfinalized]))
+    assert np.all(np.isinf(output.skims[1, 3, :]))
+    unfinalised = np.ones(context.state_count, dtype=bool)
+    unfinalised[results.settlement_order[: results.settled_count]] = False
+    assert np.all(np.isinf(scratch.state_skims[unfinalised]))
     skimming(allocate_results(context), inputs, scratch, output, origin_row=1)
     assert np.all(np.isinf(output.skims[1]))
     assert np.all(np.isinf(scratch.state_skims))
@@ -270,7 +270,7 @@ def test_zero_cost_cycle_and_nonfinite_link_fields(turn):
     np.testing.assert_allclose(
         output.skims[0], path_walk_skims(results, inputs, 4, cost_name="objective", turn_cost_name="penalty")
     )
-    assert np.all(output.skims[0, :, 0] == 0)
+    assert np.all(output.skims[0, 0, :] == 0)
 
 
 def test_link_fields_and_turn_costs_can_be_added_by_the_caller():
@@ -306,16 +306,16 @@ def test_zero_links_and_empty_dimensions(turn):
     scratch = workspace_for(context, inputs)
     output = inputs.make_outputs(2)
     skimming(results, inputs, scratch, output)
-    assert np.all(output.skims[0, :, 1] == 0)
-    assert np.all(np.isinf(output.skims[0, :, 0]))
+    assert np.all(output.skims[0, 1, :] == 0)
+    assert np.all(np.isinf(output.skims[0, 0, :]))
     empty_destinations = inputs.make_outputs(0)
     skimming(results, inputs, scratch, empty_destinations)
-    assert empty_destinations.skims.shape == (1, 2, 0)
+    assert empty_destinations.skims.shape == (1, 0, 2)
     assert np.all(scratch.state_skims[results.root] == 0)
     no_fields = SkimmingContext(0)
     empty_fields = no_fields.make_outputs(2)
     skimming(results, no_fields, None, empty_fields)
-    assert empty_fields.skims.shape == (1, 0, 2)
+    assert empty_fields.skims.shape == (1, 2, 0)
     assert empty_fields.matrices == {}
     no_rows = inputs.make_outputs(2, origin_count=0)
     assert no_rows.skims.shape == (0, 2, 2)
@@ -344,7 +344,7 @@ def test_skim_snapshot_copies_named_matrices():
     output = SkimmingOutputs.from_matrices(fields)
 
     assert output.field_names == ("time", "distance")
-    assert output.skims.shape == (3, 2, 4)
+    assert output.skims.shape == (3, 4, 2)
     for name, source in fields.items():
         np.testing.assert_array_equal(output.matrices[name], source)
         assert not np.shares_memory(output.matrices[name], source)
@@ -397,7 +397,7 @@ def test_invalid_output_names(names):
         SkimmingOutputs(1, 4, names)
 
 
-def test_fixed_dimensions_and_reinitialization():
+def test_fixed_dimensions_and_reinitialisation():
     inputs = SkimmingContext(4, cost_name="objective")
     output = inputs.make_outputs(4)
     with pytest.raises(RuntimeError, match="reinitialized"):
@@ -409,7 +409,7 @@ def test_fixed_dimensions_and_reinitialization():
     with pytest.raises(AttributeError):
         output.origin_count = 2
     assert inputs.field_names == output.field_names == ("objective",)
-    assert output.skims.shape == (1, 1, 4)
+    assert output.skims.shape == (1, 4, 1)
     with pytest.raises(ValueError, match="link_count"):
         SkimmingContext(-1)
     for origins, destinations in ((-1, 4), (1, -1)):
@@ -467,7 +467,7 @@ def test_output_and_retained_views_do_not_retain_inputs():
     del output
     gc.collect()
     assert not matrices["distance"].flags.c_contiguous
-    np.testing.assert_array_equal(matrices["distance"], saved[:, 0, :])
+    np.testing.assert_array_equal(matrices["distance"], saved[:, :, 0])
     assert np.isfinite(state_sums).any()
 
 
@@ -508,12 +508,12 @@ def test_label_only_assignment_searches_zero_demand_and_resets_skipped_rows(turn
     np.testing.assert_array_equal(prepared.destination_counts, [4])
     output = prepared.run(prepared.make_outputs())
     retained = output.skimming.skims
-    assert np.all(np.diag(retained[:, 0, :]) == 0)
-    assert np.isfinite(retained[0, 0, 3])
+    assert np.all(np.diag(retained[:, :, 0]) == 0)
+    assert np.isfinite(retained[0, 3, 0])
     subset = PreparedAoN(context, demand, skimming=inputs, origins=[2])
     subset.run(output)
     assert np.all(np.isinf(retained[[0, 1, 3]]))
-    assert retained[2, 0, 2] == 0
+    assert retained[2, 2, 0] == 0
     component = output.skimming
     assert isinstance(component, SkimmingOutputs)
     assert np.shares_memory(retained, component.skims)

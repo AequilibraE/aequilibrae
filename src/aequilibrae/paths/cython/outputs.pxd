@@ -14,8 +14,7 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::routing" nogi
         size_t field_count
         size_t destination_count
         T *data
-        T *field_data(size_t index) noexcept
-        CppSkimmingOriginView[T] subfields(size_t first, size_t count) noexcept
+        T *destination_data(size_t index) noexcept
 
     cdef cppclass CppSkimmingOutputsView "aequilibrae::paths::cpp::routing::SkimmingOutputsView"[T]:
         CppSkimmingOutputsView() noexcept

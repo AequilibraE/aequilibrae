@@ -319,7 +319,7 @@ def _validate_skim_names(field_names):
 cdef class SkimmingOutputs:
     """Holds the skim values calculated between origins and destinations.
 
-    The values are arranged by origin, skim field, and destination, with one
+    The values are arranged by origin, destination, and skim field, with one
     named matrix for each requested field. Routing fills the values for each
     origin, and resetting the output marks every entry as infinity until it is
     calculated again. The ``skims`` and ``matrices`` properties provide
@@ -341,7 +341,7 @@ cdef class SkimmingOutputs:
         self.field_count = len(names)
 
         self.skims_buffer = array[double](
-            (origin_count, self.field_count, destination_count), True, np.inf
+            (origin_count, destination_count, self.field_count), True, np.inf
         )
         self.field_names = names
 
@@ -370,7 +370,7 @@ cdef class SkimmingOutputs:
         values = np.asarray(output.skims_buffer)
 
         for field, matrix in enumerate(arrays):
-            np.copyto(values[:, field, :], matrix)
+            np.copyto(values[:, :, field], matrix)
 
         return output
 
@@ -478,7 +478,7 @@ cdef class SkimmingOutputs:
 
     @property
     def skims(self):
-        """Read-only, contiguous [origin rows, fields, destinations] array."""
+        """Read-only, contiguous [origin rows, destinations, fields] array."""
         return readonly_view(self.skims_buffer)
 
     @property
@@ -487,7 +487,7 @@ cdef class SkimmingOutputs:
         skims = self.skims
 
         # These slices preserve the array's read-only storage for each matrix.
-        return {name: skims[:, field, :] for field, name in enumerate(self.field_names)}
+        return {name: skims[:, :, field] for field, name in enumerate(self.field_names)}
 
 
 def _validate_selection_names(set_names):
