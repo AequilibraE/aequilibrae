@@ -412,6 +412,30 @@ class AequilibraeMatrix(_Matrix):
         super().__init__(index=index, index_name=index_name)
 
     @classmethod
+    def _from_shared_arrays(
+        cls,
+        data: Mapping[str, np.ndarray],
+        index: ArrayLike,
+        index_name: str = "main_index",
+    ) -> Self:
+        """Keep supplied arrays without copying, including strided views.
+
+        This private path lets DenseMatrix hand off its buffer. Normal matrix
+        assignment still copies values. Each array keeps its own buffer alive.
+        """
+        self = cls(index=index, index_name=index_name)
+        for name, values in data.items():
+            _validate_matrix_key(name)
+            if not isinstance(values, np.ndarray):
+                raise TypeError("shared matrix values must be NumPy arrays")
+            _validate_matrix_dtype(values.dtype)
+            if values.shape != self.shape:
+                raise ValueError(f"got bad shape, expected {self.shape}, got {values.shape}")
+            self._backend[name] = values
+            self._matrix_metadata[name] = {}
+        return self
+
+    @classmethod
     def from_omx(
         cls,
         path: str | os.PathLike,
