@@ -3,7 +3,7 @@ Working with matrices
 
 AequilibraE provides two objects for working with named matrices:
 
-* ``AequilibraEMatrix`` holds matrices in memory and is backed by a dictionary.
+* ``AequilibraeMatrix`` holds matrices in memory and is backed by a dictionary.
   Prefer this object for calculations and other in-memory work.
 * ``MatrixStore`` is backed by an OMX file. Use it to read and update matrices
   on disk through a similar interface to the in-memory object.
@@ -12,12 +12,12 @@ Both objects associate names with square matrices. All matrices in an object
 share the same zone index, which gives the zone IDs in row and column order.
 Use the ``from_file()``, ``from_dict()``, ``from_df()`` and ``from_scipy()``
 functions to create the appropriate object from your source data, or the
-``AequilibraEMatrix`` constructor directly.
+``AequilibraeMatrix`` constructor directly.
 
-These objects replace the previous ``AequilibraEMatrix`` which mixed both
+These objects replace the previous ``AequilibraeMatrix`` which mixed both
 roles. For a migration guide, see :doc:`matrix_api_migration`.
 
-``AequilibraEMatrix`` and ``MatrixStore`` both implement the ``MutableMapping``
+``AequilibraeMatrix`` and ``MatrixStore`` both implement the ``MutableMapping``
 protocol and behave very similarly to a dictionary. You can use mapping
 operations including ``.keys()``, ``.values()``, ``.items()`` and ``.update()``.
 
@@ -25,11 +25,11 @@ Create an in-memory working set
 -------------------------------
 
 The recommended workflow is to open an OMX file with ``from_file(...,
-subset=[...])``, which returns an ``AequilibraEMatrix``. If you don't know
+subset=[...])``, which returns an ``AequilibraeMatrix``. If you don't know
 which matrices you need ahead of time, provide ``store=True`` to ``from_file``
 instead of ``subset`` to obtain a ``MatrixStore``. Inspect the file, then use
 its ``subset()`` method to select the matrices needed for a calculation. It
-returns an new, independent ``AequilibraEMatrix``. Work on that object in memory,
+returns a new, independent ``AequilibraeMatrix``. Work on that object in memory,
 then save the result when needed.
 
 The following example assumes that ``demand.omx`` contains matrices named
@@ -75,7 +75,7 @@ Use ``from_dict()`` when arrays are already available:
 .. code-block:: python
 
     import numpy as np
-    from aequilibrae.matrix import AequilibraEMatrix, from_dict
+    from aequilibrae.matrix import AequilibraeMatrix, from_dict
 
     index = [101, 205, 309]
     car = np.array([[0, 12, 8], [10, 0, 6], [7, 9, 0]], dtype=float)
@@ -90,18 +90,18 @@ Use ``from_dict()`` when arrays are already available:
 
 Metadata supplied to ``from_dict()`` is also copied.
 
-Alternatively, start with no named matrices and add them using ``AequilibraEMatrix`` directly:
+Alternatively, start with no named matrices and add them using ``AequilibraeMatrix`` directly:
 
 .. code-block:: python
 
-    empty = AequilibraEMatrix(index=index, index_name="zones")
+    empty = AequilibraeMatrix(index=index, index_name="zones")
     empty["car"] = np.zeros(empty.shape)
     empty.update({"bus": bus})
 
 Matrix assignment accepts array-like values with the object's square shape.
 Matrix values must use integer, floating-point, boolean or complex dtypes.
 This limit does not apply to metadata.  Whole-matrix assignment uses the
-supplied dtype, even when replacing an existing matrix. ``AequilibraEMatrix``
+supplied dtype, even when replacing an existing matrix. ``AequilibraeMatrix``
 copies supplied arrays so changing an array supplied earlier does not change
 the matrix.
 
@@ -189,7 +189,7 @@ Key-only assignments such as ``demand.mat["car"] = values`` replace or create a
 whole matrix and require its full shape. Assignments to selections such as
 ``demand.mat["car", :, :] = 0`` use the backend's broadcasting rules.
 
-When working with an ``AequilibraEMatrix``, selections follow NumPy
+When working with an ``AequilibraeMatrix``, selections follow NumPy
 indexing. When working with a ``MatrixStore``, selections follow the indexing
 supported by the OMX (and h5py) library, which may have different restrictions
 on fancy selections. Selections are passed to the underlying object after
@@ -198,7 +198,7 @@ allows for partial reads and writes to and from matrices both in memory and on
 disk. Assignments to a selection keep the matrix's dtype and use NumPy or h5py
 conversion rules.
 
-Whole-matrix reads and basic slices of an ``AequilibraEMatrix`` may share its
+Whole-matrix reads and basic slices of an ``AequilibraeMatrix`` may share its
 memory, fancy NumPy selections may return copies. If an independent array is
 needed, use ``demand["car"].copy()``.
 
@@ -266,11 +266,11 @@ arrays. The default ``mode="x"`` prevents replacement of an existing file:
         print(list(store))
 
 A store must stay open while it is being used. If a ``with`` block is not
-suitable, close it explicitly with ``store.close()``. An ``AequilibraEMatrix``
+suitable, close it explicitly with ``store.close()``. An ``AequilibraeMatrix``
 does not need to be closed.
 
 To load a whole OMX file into memory, omit ``store=True`` and
-``subset=[...]``. ``from_file()`` returns an ``AequilibraEMatrix`` by default:
+``subset=[...]``. ``from_file()`` returns an ``AequilibraeMatrix`` by default:
 
 .. code-block:: python
 
@@ -283,7 +283,7 @@ To load a whole OMX file into memory, omit ``store=True`` and
 
 Providing ``subset`` and ``store=True`` at the same time is not supported. If
 using ``store=True``, use ``.subset()`` to load select matrices into a new
-``AequilibraEMatrix`` object.
+``AequilibraeMatrix`` object.
 
 Save matrices and metadata
 --------------------------
@@ -371,7 +371,7 @@ combined matches, with each matrix included once.
 Attribute queries are only supported by ``subset()`` and the ``subset``
 arguments when loading matrices. They are not supported by ``store[...]``,
 ``.mat`` or ``.imat``. ``subset()`` creates a new in-memory
-``AequilibraEMatrix`` with all matrices that matched the query. Use
+``AequilibraeMatrix`` with all matrices that matched the query. Use
 ``store.omx`` for advanced OMX-specific operations, or ``store.omx["/"]`` to
 access the underlying h5py root dataset.
 
@@ -411,5 +411,5 @@ Use ``from_scipy()`` when the input is a collection of SciPy sparse arrays:
         {"car": csr_array(car)}, index=index, index_name="zones"
     )
 
-Both helpers return an ``AequilibraEMatrix``. ``from_scipy()`` produces dense
+Both helpers return an ``AequilibraeMatrix``. ``from_scipy()`` produces dense
 matrices, so allow enough memory for their full square shape.

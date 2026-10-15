@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import scipy.sparse as sparse
 
-from aequilibrae.matrix import AequilibraEMatrix, MatrixStore, from_df, from_dict, from_file, from_scipy
+from aequilibrae.matrix import AequilibraeMatrix, MatrixStore, from_df, from_dict, from_file, from_scipy
 
 
 @pytest.fixture
@@ -40,13 +40,13 @@ def manage():
         yield register
 
 
-@pytest.fixture(params=[AequilibraEMatrix, MatrixStore], ids=["memory", "store"])
+@pytest.fixture(params=[AequilibraeMatrix, MatrixStore], ids=["memory", "store"])
 def matrix_factory(request, tmp_path, manage):
     def create(index, index_name="zones"):
         if request.param is MatrixStore:
             return manage(MatrixStore(tmp_path / "matrix.omx", index, index_name, mode="w"))
 
-        return AequilibraEMatrix(index, index_name)
+        return AequilibraeMatrix(index, index_name)
 
     return create
 
@@ -167,7 +167,7 @@ def test_from_dict_accepts_array_like(tmp_path, manage, index, data, store):
 
 def test_from_dict(index, data, metadata):
     matrix = from_dict(data, index, index_name="zones", metadata=metadata)
-    assert isinstance(matrix, AequilibraEMatrix)
+    assert isinstance(matrix, AequilibraeMatrix)
     assert_matrix(matrix, index, data, metadata=metadata)
 
 
@@ -199,7 +199,7 @@ def test_from_dict_ignores_omx_attributes(tmp_path, manage, index, data, store):
 @pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
 def test_from_file(omx_path, manage, index, data, metadata, store):
     matrix = manage(from_file(omx_path, index_name="zones", store=store))
-    assert isinstance(matrix, MatrixStore if store else AequilibraEMatrix)
+    assert isinstance(matrix, MatrixStore if store else AequilibraeMatrix)
     assert_matrix(matrix, index, data, metadata=metadata)
 
 
@@ -231,7 +231,7 @@ def test_from_file_memory_rejects_mode(tmp_path):
 
 
 def test_from_omx(omx_path, index, data, metadata):
-    matrix = AequilibraEMatrix.from_omx(omx_path, index_name="zones")
+    matrix = AequilibraeMatrix.from_omx(omx_path, index_name="zones")
     assert_matrix(matrix, index, data, metadata=metadata)
 
 
@@ -516,7 +516,7 @@ def test_save_rejects_shape_option_before_creating_file(memory_matrix, tmp_path)
 @pytest.mark.parametrize("subset", [["car"], [], ["bus", "car"]], ids=["one", "empty", "all"])
 def test_subset_selects_names(matrix, index, data, subset):
     selected = matrix.subset(subset)
-    assert isinstance(selected, AequilibraEMatrix)
+    assert isinstance(selected, AequilibraeMatrix)
     assert_matrix(selected, index, {name: data[name] for name in subset})
 
 
@@ -822,11 +822,11 @@ def test_equality_compares_nested_metadata(matrix_pair, period, equal):
 
 @pytest.mark.parametrize("zones", [[10, 20], []], ids=["zones", "no-zones"])
 def test_empty_matrices_compare_equal(zones):
-    assert AequilibraEMatrix(zones) == AequilibraEMatrix(zones)
+    assert AequilibraeMatrix(zones) == AequilibraeMatrix(zones)
 
 
 def test_empty_matrices_compare_zone_indices():
-    assert AequilibraEMatrix([10, 20]) != AequilibraEMatrix([])
+    assert AequilibraeMatrix([10, 20]) != AequilibraeMatrix([])
 
 
 def test_equality_does_not_compare_with_plain_mappings(memory_matrix):
@@ -1009,13 +1009,13 @@ def test_matrix_names_reject_paths(matrix, key, tmp_path):
 @pytest.mark.parametrize("name", ["", ".", "..", "nested/zones", "/outside", "nested\\zones", "zones\0suffix"])
 def test_index_names_reject_paths(index, name):
     with pytest.raises(ValueError, match="index name"):
-        AequilibraEMatrix(index, index_name=name)
+        AequilibraeMatrix(index, index_name=name)
 
 
 @pytest.mark.parametrize("name", [1, None])
 def test_index_name_must_be_a_string(index, name):
     with pytest.raises(TypeError, match="index name"):
-        AequilibraEMatrix(index, index_name=name)
+        AequilibraeMatrix(index, index_name=name)
 
 
 def test_invalid_index_name_does_not_create_store(tmp_path, index):
@@ -1384,7 +1384,7 @@ def test_matrix_shape_validation(matrix, index, data, metadata, shape):
 )
 def test_index_validation(invalid_index, error):
     with pytest.raises(error):
-        AequilibraEMatrix(invalid_index)
+        AequilibraeMatrix(invalid_index)
 
 
 def test_store_validates_supplied_zone_ids(tmp_path):
@@ -1403,7 +1403,7 @@ def test_store_validates_supplied_zone_ids(tmp_path):
     ids=["list", "tuple", "uint64", "object"],
 )
 def test_index_accepts_full_uint64_range(zones):
-    matrix = AequilibraEMatrix(zones)
+    matrix = AequilibraeMatrix(zones)
     assert matrix.index.dtype == np.dtype("uint64")
     assert matrix.index.tolist() == [0, 2**64 - 1]
 
@@ -1528,7 +1528,7 @@ def test_from_df_accepts_nullable_integer_ids():
 )
 def test_from_scipy(index, data, array_type):
     matrix = from_scipy({name: array_type(values) for name, values in data.items()}, index, index_name="zones")
-    assert isinstance(matrix, AequilibraEMatrix)
+    assert isinstance(matrix, AequilibraeMatrix)
     assert_matrix(matrix, index, data)
 
 

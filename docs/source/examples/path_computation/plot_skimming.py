@@ -99,7 +99,7 @@ skm = graph.compute_skims()
 # skm.execute()
 
 # %%
-# The result is an AequilibraEMatrix object
+# The result is an AequilibraeMatrix object
 skims = skm.results.skims
 
 # Which we can manipulate directly from its temp file, if we wish

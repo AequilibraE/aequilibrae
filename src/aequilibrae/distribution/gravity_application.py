@@ -20,7 +20,7 @@ class GravityApplication:
 
     Model is an instance of SyntheticGravityModel class.
 
-    Impedance is an instance of AequilibraEMatrix.
+    Impedance is an instance of AequilibraeMatrix.
 
     Vectors are a pandas DataFrame.
 

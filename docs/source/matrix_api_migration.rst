@@ -2,12 +2,12 @@ Migrating to the matrix API
 ===========================
 
 The matrix API replaces the previous ``AequilibraeMatrix`` workflow with two
-objects: ``AequilibraEMatrix`` for in-memory work and ``MatrixStore`` for
+objects: ``AequilibraeMatrix`` for in-memory work and ``MatrixStore`` for
 interacting with an OMX file on disk. The import name for the in-memory class
-is now ``AequilibraEMatrix``.
+remains ``AequilibraeMatrix``.
 
 Both objects provide dictionary-style access to named matrices. Prefer
-``AequilibraEMatrix`` for calculations. Use ``MatrixStore`` to inspect or
+``AequilibraeMatrix`` for calculations. Use ``MatrixStore`` to inspect or
 update files and ``subset()`` to create an independent in-memory working set.
 Use the ``from_*`` functions to construct these objects from files, arrays or
 tabular data.
@@ -44,7 +44,7 @@ with ``subset()`` instead:
     demand["car"] *= 1.1
     demand["total"] = demand["car"] + demand["bus"]
 
-``subset()`` returns an ``AequilibraEMatrix`` containing the selected named
+``subset()`` returns an ``AequilibraeMatrix`` containing the selected named
 matrices, their zone index, file-level metadata and per-matrix attributes. It
 remains usable after the store closes, and changes to it do not change the
 source file.
@@ -84,15 +84,15 @@ values:
     matrix.matrix["car"][:, :] = np.zeros((3, 3))
     matrix.matrix["bus"][:, :] = np.zeros((3, 3))
 
-Use ``AequilibraEMatrix`` with the zone index, then add named arrays:
+Use ``AequilibraeMatrix`` with the zone index, then add named arrays:
 
 .. code-block:: python
 
     # Matrix API
     import numpy as np
-    from aequilibrae.matrix import AequilibraEMatrix
+    from aequilibrae.matrix import AequilibraeMatrix
 
-    matrix = AequilibraEMatrix(index=[101, 205, 309], index_name="zones")
+    matrix = AequilibraeMatrix(index=[101, 205, 309], index_name="zones")
     matrix["car"] = np.zeros(matrix.shape)
     matrix["bus"] = np.zeros(matrix.shape)
 
@@ -226,7 +226,7 @@ These assignments update the file without a separate save call.
 ``store["car"][:, 2] = ...`` only changes the returned array, so replace it
 with ``store.imat["car", :, 2] = ...``. The store provides file access through a
 similar interface to the in-memory object, but prefer ``subset()`` and an
-``AequilibraEMatrix`` for calculations.
+``AequilibraeMatrix`` for calculations.
 
 Use a ``with`` block to close stores, or call ``store.close()`` explicitly.
 In-memory objects do not need ``close()``. Use ``store.omx`` for OMX-specific

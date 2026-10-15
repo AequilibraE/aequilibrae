@@ -400,7 +400,7 @@ class _Matrix(MutableMapping[str, Any]):
         return self[key]
 
 
-class AequilibraEMatrix(_Matrix):
+class AequilibraeMatrix(_Matrix):
     def __init__(
         self,
         index: ArrayLike,
@@ -569,10 +569,10 @@ class MatrixStore(_Matrix):
     def subset(
         self,
         subset: Sequence[str | dict[str, Any]],
-    ) -> AequilibraEMatrix:
+    ) -> AequilibraeMatrix:
         datasets = _query_matrices(self._backend.data, subset, self.matrix_metadata)
 
-        other = AequilibraEMatrix(index=self.index, index_name=self.index_name)
+        other = AequilibraeMatrix(index=self.index, index_name=self.index_name)
         other.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
 
         for key, dataset in datasets.items():
@@ -590,7 +590,7 @@ def from_file(
     index_name: str = "main_index",
     subset: Sequence[str | dict[str, Any]] | None = None,
     store: Literal[False] = False,
-) -> AequilibraEMatrix: ...
+) -> AequilibraeMatrix: ...
 
 
 @overload
@@ -611,7 +611,7 @@ def from_file(
     index_name: str = "main_index",
     subset: Sequence[str | dict[str, Any]] | None = None,
     store: bool = False,
-) -> AequilibraEMatrix | MatrixStore:
+) -> AequilibraeMatrix | MatrixStore:
     if store:
         if subset is not None:
             raise ValueError("store=True and subset may not be provided at once")
@@ -623,7 +623,7 @@ def from_file(
     else:
         if mode is not None:
             raise ValueError("an in-memory matrix cannot have a mode")
-        return AequilibraEMatrix.from_omx(path=path, index_name=index_name, subset=subset)
+        return AequilibraeMatrix.from_omx(path=path, index_name=index_name, subset=subset)
 
 
 @overload
@@ -636,7 +636,7 @@ def from_dict(
     index_name: str = "main_index",
     metadata: Mapping[str, Any] | None = None,
     store: Literal[False] = False,
-) -> AequilibraEMatrix: ...
+) -> AequilibraeMatrix: ...
 
 
 @overload
@@ -661,8 +661,8 @@ def from_dict(
     index_name: str = "main_index",
     metadata: Mapping[str, Any] | None = None,
     store: bool = False,
-) -> AequilibraEMatrix | MatrixStore:
-    mat: AequilibraEMatrix | MatrixStore
+) -> AequilibraeMatrix | MatrixStore:
+    mat: AequilibraeMatrix | MatrixStore
     if store:
         if path is None:
             raise ValueError("a matrix store must have a path")
@@ -671,7 +671,7 @@ def from_dict(
             raise ValueError("from_dict stores only support modes 'w', 'a', 'r+', 'w-' and 'x'")
 
         # Check names, shapes and dtypes before opening a file or changing its index.
-        validated_index = AequilibraEMatrix(index=index, index_name=index_name).index
+        validated_index = AequilibraeMatrix(index=index, index_name=index_name).index
         prepared = {}
         for name, value in data.items():
             _validate_matrix_key(name)
@@ -691,7 +691,7 @@ def from_dict(
 
         if mode is not None:
             raise ValueError("an in-memory matrix cannot have a mode")
-        mat = AequilibraEMatrix(index=index, index_name=index_name)
+        mat = AequilibraeMatrix(index=index, index_name=index_name)
 
     try:
         mat.update(data)
@@ -716,7 +716,7 @@ def from_df(
     index_name: str = "main_index",
     fill_value: float = 0,
     dtype: DTypeLike = float,
-) -> AequilibraEMatrix:
+) -> AequilibraeMatrix:
     dtype = np.dtype(dtype)
     if subset is None:
         subset = [name for name in df.columns if name not in (row, col)]
@@ -726,7 +726,7 @@ def from_df(
     if index is None:
         index = np.union1d(row_ids, col_ids)
 
-    mat = AequilibraEMatrix(index=index, index_name=index_name)
+    mat = AequilibraeMatrix(index=index, index_name=index_name)
     matrix_index = pd.Index(mat.index)
     rows = matrix_index.get_indexer(row_ids)
     cols = matrix_index.get_indexer(col_ids)
@@ -748,14 +748,14 @@ def from_scipy(
     index: ArrayLike,
     *,
     index_name: str = "main_index",
-) -> AequilibraEMatrix:
+) -> AequilibraeMatrix:
     for value in data.values():
         if not isinstance(value, scipy.sparse.sparray):
             raise TypeError("data values must be SciPy sparse arrays")
         if value.ndim != 2 or value.shape[0] != value.shape[1]:  # type: ignore
             raise ValueError("sparse arrays must be square")
 
-    mat = AequilibraEMatrix(index=index, index_name=index_name)
+    mat = AequilibraeMatrix(index=index, index_name=index_name)
     mat.update({name: value.toarray() for name, value in data.items()})  # type: ignore
 
     return mat

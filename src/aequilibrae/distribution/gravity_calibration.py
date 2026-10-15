@@ -203,10 +203,10 @@ class GravityCalibration:
 
     def __check_inputs(self):
         if not isinstance(self.impedance, AequilibraeMatrix):
-            raise TypeError("Impedance matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError("Impedance matrix needs to be an instance of AequilibraeMatrix")
 
         if not isinstance(self.matrix, AequilibraeMatrix):
-            raise TypeError("Observed matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError("Observed matrix needs to be an instance of AequilibraeMatrix")
 
         # Check data dimensions
         if not np.array_equal(self.impedance.index, self.impedance.index):

@@ -3,7 +3,7 @@
 AequilibraE Matrix
 ==================
 
-The AequilibraEMatrix class is the AequilibraE vehicle to all things matrices, and in the 
+The AequilibraeMatrix class is the AequilibraE vehicle to all things matrices, and in the
 following sections we'll cover the main points regarding them.
 
 ``AequilibraeMatrix``
