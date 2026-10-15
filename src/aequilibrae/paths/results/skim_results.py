@@ -1,6 +1,7 @@
 from typing import List
 
-from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.dijkstra import HEAP_MAP
 from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
@@ -29,38 +30,36 @@ class SkimResults:
           >>> res = SkimResults()
           >>> res.prepare(car_graph)
 
-          >>> res.skims.export(project_path / "skim_matrices.omx")
+          >>> res.skims.save_as_omx(project_path / "skim_matrices.omx")
 
           >>> project.close()
     """
 
     def __init__(self):
-        self.skims = AequilibraeMatrix()
+        self.skims = None
         self.cores = omp_get_max_threads()
 
         self._heap = "4ary"
 
-    def prepare(self, graph: Graph):
+    def prepare(self, graph: Graph, output: SkimmingOutputs | None = None):
         """
         Prepares the object with dimensions corresponding to the graph objects
 
         :Arguments:
             **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+
+            **output** (:obj:`SkimmingOutputs`, *Optional*): Existing output buffer to share.
         """
 
         if not graph.cost_field:
             raise Exception('Cost field needs to be set for computation. use graph.set_graph("your_cost_field")')
 
-        zones = graph.num_zones
-        num_skims = len(graph.skim_fields)
-
-        self.skims = AequilibraeMatrix()
-        self.skims.create_empty(
-            file_name=AequilibraeMatrix().random_name(), zones=zones, matrix_names=graph.skim_fields
+        if output is None:
+            output = SkimmingOutputs(graph.num_zones, graph.num_zones, graph.skim_fields)
+        skims = output.to_matrix(graph.centroids)
+        self.skims = AequilibraeMatrix._from_shared_arrays(
+            {name: skims[name] for name in graph.skim_fields}, graph.centroids
         )
-        self.skims.index[:] = graph.centroids[:]
-        self.skims.computational_view(core_list=self.skims.names)
-        self.skims.matrix_view = self.skims.matrix_view.reshape(zones, zones, num_skims)
 
     def set_heap(self, heap: str) -> None:
         """

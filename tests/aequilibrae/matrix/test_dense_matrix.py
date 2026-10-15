@@ -18,6 +18,22 @@ def test_construction(dtype):
     assert dense.field_names == ("time", "distance")
 
 
+@pytest.mark.parametrize("origins,destinations", [(1, 4), (3, 2), (0, 4), (3, 0)])
+def test_rectangular_construction(dtype, origins, destinations):
+    dense = DenseMatrix(destinations, ["time"], dtype=dtype, origin_count=origins)
+    assert dense.origin_count == origins
+    assert dense.destination_count == destinations
+    assert dense.field_count == 1
+    with pytest.raises(ValueError, match="square"):
+        dense.to_matrix(np.arange(origins))
+
+
+@pytest.mark.parametrize("origin_count", [-1, 1.5, [1]])
+def test_bad_origin_count(origin_count):
+    with pytest.raises((TypeError, ValueError)):
+        DenseMatrix(2, ["time"], origin_count=origin_count)
+
+
 @pytest.mark.parametrize("names", [[], ["time"]])
 def test_export_rejects_wrong_index_length(names):
     dense = DenseMatrix(2, names)

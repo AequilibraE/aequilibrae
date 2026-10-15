@@ -9,7 +9,9 @@ from aequilibrae.utils.cython.array_allocations cimport array
 
 
 cdef class DenseMatrix:
-    """Hold square matrices in [origins, destinations, fields] order.
+    """Hold matrices in [origins, destinations, fields] order.
+
+    zone_count sets the destination count. The origin count defaults to it.
 
     Zone IDs and metadata belong to the Python result, not this buffer.
     Only float32 and float64 are supported, with one dtype for the whole
@@ -21,12 +23,15 @@ cdef class DenseMatrix:
     Adding or replacing matrices in that result does not change this buffer.
     """
 
-    def __init__(self, zone_count, field_names, dtype=np.float64, fill_value=np.inf):
+    def __init__(self, zone_count, field_names, dtype=np.float64, fill_value=np.inf, *, origin_count=None):
         if self._values is not None:
             raise RuntimeError("DenseMatrix cannot be reinitialised")
         zone_count = operator.index(zone_count)
         if zone_count < 0:
             raise ValueError("zone_count must be nonnegative")
+        origin_count = zone_count if origin_count is None else operator.index(origin_count)
+        if origin_count < 0:
+            raise ValueError("origin_count must be nonnegative")
         if isinstance(field_names, str):
             raise TypeError("field_names must be a sequence of names, not a string")
 
@@ -40,22 +45,23 @@ cdef class DenseMatrix:
         if dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
             raise TypeError("dtype must be float32 or float64")
 
-        shape = (zone_count, zone_count, len(names))
+        shape = (origin_count, zone_count, len(names))
         cdef float[:, :, ::1] values32
         cdef double[:, :, ::1] values64
         self._float32 = dtype == np.dtype(np.float32)
         if self._float32:
             values = array[float](shape, True, fill_value)
             values32 = values
-            if zone_count and names:
+            if origin_count and zone_count and names:
                 self._data = &values32[0, 0, 0]
         else:
             values = array[double](shape, True, fill_value)
             values64 = values
-            if zone_count and names:
+            if origin_count and zone_count and names:
                 self._data = &values64[0, 0, 0]
 
-        self.origin_count = self.destination_count = zone_count
+        self.origin_count = origin_count
+        self.destination_count = zone_count
         self.field_count = len(names)
         self.field_names = names
         self.dtype = dtype
@@ -87,9 +93,12 @@ cdef class DenseMatrix:
     def to_matrix(self, index, index_name="main_index"):
         """Return an AequilibraeMatrix sharing this buffer without copying values.
 
-        Named arrays may be strided. The supplied index is copied, and normal
-        assignment in the returned matrix keeps its usual copy rules.
+        Only square buffers can be returned. Named arrays may be strided.
+        The supplied index is copied, and normal assignment in the returned
+        matrix keeps its usual copy rules.
         """
+        if self.origin_count != self.destination_count:
+            raise ValueError("only square buffers can be returned as an AequilibraeMatrix")
         if len(index) != self.origin_count:
             raise ValueError("index length must match zone_count")
         values = np.asarray(self._values)

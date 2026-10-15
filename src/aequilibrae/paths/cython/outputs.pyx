@@ -320,10 +320,10 @@ cdef class SkimmingOutputs:
     """Holds the skim values calculated between origins and destinations.
 
     The values are arranged by origin, destination, and skim field, with one
-    named matrix for each requested field. Routing fills the values for each
-    origin, and resetting the output marks every entry as infinity until it is
-    calculated again. The ``skims`` and ``matrices`` properties provide
-    read-only views of the current results.
+    named matrix for each requested field. A DenseMatrix owns the buffer.
+    Routing fills the values for each origin, and resetting the output marks
+    every entry as infinity until it is calculated again. The ``skims`` and
+    ``matrices`` properties provide read-only views of the current results.
     """
 
     def __init__(self, origin_count, destination_count, field_names):
@@ -340,9 +340,8 @@ cdef class SkimmingOutputs:
         self.destination_count = destination_count
         self.field_count = len(names)
 
-        self.skims_buffer = array[double](
-            (origin_count, destination_count, self.field_count), True, np.inf
-        )
+        self.dense_matrix = DenseMatrix(destination_count, names, origin_count=origin_count)
+        self.skims_buffer = self.dense_matrix._values
         self.field_names = names
 
     @classmethod
@@ -475,6 +474,10 @@ cdef class SkimmingOutputs:
                 stepsize, cores, threading_threshold,
             )
         return self
+
+    def to_matrix(self, index, index_name="main_index"):
+        """Return square skim results as an AequilibraeMatrix without copying values."""
+        return self.dense_matrix.to_matrix(index, index_name)
 
     @property
     def skims(self):

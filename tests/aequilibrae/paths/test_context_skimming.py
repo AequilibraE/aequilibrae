@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pytest
 
+from aequilibrae.matrix import DenseMatrix
 from aequilibrae.paths.cython.aon_context import PreparedAoN
 from aequilibrae.paths.cython.network_loading import sum_weighted_turn_costs
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
@@ -120,6 +121,24 @@ def test_names_order_and_one_shot_allocation():
             matrices[name].flags.writeable = True
     assert np.all(output.skims[0, 2, :] == 0)
     assert np.all(np.isinf(output.skims[0, 0, :]))
+
+
+def test_dense_buffer_is_shared_with_matrix_results():
+    context = history_context(0.5)
+    inputs = SkimmingContext(4, cost_name="cost")
+    output = inputs.make_outputs(4, origin_count=4)
+    assert isinstance(output.dense_matrix, DenseMatrix)
+    assert output.dense_matrix.dtype == np.dtype(np.float64)
+    matrix = output.to_matrix(np.arange(4))
+    assert np.shares_memory(matrix["cost"], output.skims)
+
+    results = search(context, 2)
+    skimming(results, inputs, None, output, origin_row=2)
+    np.testing.assert_array_equal(matrix["cost"], output.matrices["cost"])
+    assert matrix["cost"][2, 2] == 0
+
+    output.reset()
+    assert np.isinf(matrix["cost"]).all()
 
 
 def test_origin_major_layout_with_rectangular_od_matrices():

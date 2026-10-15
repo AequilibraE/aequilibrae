@@ -151,8 +151,8 @@ def test_compute_skims(sioux_falls_example):
 
     skm = graph.compute_skims()
     skims = skm.results.skims
-    assert skims.cores == 2, "Number of cores is not correct"
-    assert skims.names == ["distance", "free_flow_time"], "Matrices names are not correct"
+    assert len(skims) == 2, "Number of matrices is not correct"
+    assert list(skims) == ["distance", "free_flow_time"], "Matrices names are not correct"
 
 
 def test_exclude_links(sioux_falls_example):
@@ -388,5 +388,5 @@ def test_degree_two_sink_is_not_compressed():
     assert graph.graph[graph.graph.link_id.isin([4, 5])].__compressed_id__.unique().tolist() == [dummy_id]
 
     # The only way from 1 to 2 is over link 3, on the compact graph just as on the full one
-    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 12.0
+    assert graph.compute_skims().results.skims["cost"][0, 1] == 12.0
     assert graph.compute_path(1, 2).milepost[-1] == 12.0

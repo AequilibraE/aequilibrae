@@ -1,5 +1,7 @@
 from libc.stddef cimport size_t
 
+from aequilibrae.matrix.cython.dense_matrix cimport DenseMatrix
+
 
 cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
     cdef cppclass CppLoadingOutputs "aequilibrae::paths::cpp::routing::LoadingOutputs"[T]:
@@ -70,6 +72,7 @@ cdef class LoadingOutputs:
 cdef class SkimmingOutputs:
     cdef readonly size_t origin_count, destination_count, field_count
     cdef readonly tuple field_names
+    cdef readonly DenseMatrix dense_matrix
     cdef double[:, :, ::1] skims_buffer
     cdef CppSkimmingOutputsView[double] view(self) noexcept nogil
 
