@@ -53,9 +53,7 @@ class TransportClassBase(ABC):  # noqa: B024
             "Matrix cores": matrix_names,
         }
         # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
-        mat_config["Matrix totals"] = {
-            name: float(np.nan_to_num(matrix[name]).sum()) for name in matrix_names
-        }
+        mat_config["Matrix totals"] = {name: float(np.nan_to_num(matrix[name]).sum()) for name in matrix_names}
         self._config["Matrix"] = str(mat_config)
 
     @property

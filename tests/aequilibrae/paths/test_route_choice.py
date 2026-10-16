@@ -208,7 +208,6 @@ def test_saving(route_choice_setup):
             np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name])
 
 
-
 def test_round_trip(route_choice_setup):
     project = route_choice_setup["project"]
     mat = route_choice_setup["mat"]

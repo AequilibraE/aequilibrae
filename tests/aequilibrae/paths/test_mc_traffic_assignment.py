@@ -45,7 +45,6 @@ def assignment_setup(sioux_falls_example):
     }
 
 
-
 def test_set_classes(assignment_setup):
     assignment = assignment_setup["assignment"]
     carclass = assignment_setup["carclass"]
