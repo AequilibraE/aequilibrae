@@ -6,7 +6,6 @@ nodes
 zones
 links
 turn_restrictions
-results
 matrices
 migrations
 periods
