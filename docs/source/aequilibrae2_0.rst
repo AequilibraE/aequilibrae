@@ -69,6 +69,16 @@ diagnostics and editing.
 
 The connectivity analysis is also a feature of the AequilibraE graph, making it substantially easier to use.
 
+.. testsetup::
+
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from aequilibrae.utils.create_example import create_example
+
+    _aequilibrae2_docs_tmp = TemporaryDirectory()
+    project_path = str(Path(_aequilibrae2_docs_tmp.name) / "project")
+
 .. doctest::
 
     >>> project = create_example(project_path)

@@ -5,6 +5,17 @@ An AequilibraE project helds geometric information that can be accessed by the u
 three different classes: ``Links``, ``Nodes``, and ``Zones``. We'll first cover these classes, and
 then we'll go over the project components without geo-spatial information.
 
+.. testsetup::
+
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from aequilibrae.utils.create_example import create_example
+
+    _component_docs_tmp = TemporaryDirectory()
+    my_folder_path = Path(_component_docs_tmp.name)
+    project_path = my_folder_path / "project"
+
 ``project.network.links``
 -------------------------
 
