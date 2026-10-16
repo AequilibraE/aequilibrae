@@ -12,9 +12,21 @@ defined based on the auto-generated link types. These include:
     `'walking_trav_time'`, `'transfer_time'`, `'in_vehicle_trav_time'`, and `'waiting_time'`.
 
 
+.. testsetup::
+
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    _transit_docs_tmp = TemporaryDirectory()
+    project_path = str(Path(_transit_docs_tmp.name) / "coquimbo")
+
 .. doctest::
 
+    >>> import numpy as np
+    >>> from aequilibrae.matrix import AequilibraeMatrix
     >>> from aequilibrae.paths import TransitAssignment, TransitClass
+    >>> from aequilibrae.transit import Transit
+    >>> from aequilibrae.utils.create_example import create_example
 
     >>> project = create_example(project_path, "coquimbo")
     >>> data = Transit(project)
@@ -34,11 +46,8 @@ defined based on the auto-generated link types. These include:
     >>> # We mock a demand matrix
     >>> num_zones = len(transit_graph.centroids)
 
-    >>> mat = AequilibraeMatrix()
-    >>> mat.create_empty(zones=num_zones, matrix_names=["pt"], memory_only=True)
-    >>> mat.index = transit_graph.centroids[:]
-    >>> mat.matrices[:, :, 0] = np.full((num_zones, num_zones), 1.0)
-    >>> mat.computational_view()
+    >>> mat = AequilibraeMatrix(index=transit_graph.centroids, index_name="zones")
+    >>> mat["pt"] = np.full((num_zones, num_zones), 1.0)
 
     >>> # We can now execute the assignment, and we will use some of the default skimming fields
     >>> skim_cols = ["trav_time", "boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
@@ -98,11 +107,8 @@ One example is skimming travel time in rail only.
     >>> # We mock a demand matrix
     >>> num_zones = len(transit_graph.centroids)
 
-    >>> mat = AequilibraeMatrix()
-    >>> mat.create_empty(zones=num_zones, matrix_names=["pt"], memory_only=True)
-    >>> mat.index = transit_graph.centroids[:]
-    >>> mat.matrices[:, :, 0] = np.full((num_zones, num_zones), 1.0)
-    >>> mat.computational_view()
+    >>> mat = AequilibraeMatrix(index=transit_graph.centroids, index_name="zones")
+    >>> mat["pt"] = np.full((num_zones, num_zones), 1.0)
 
     >>> # We can now execute the assignment, and we will use some of the default skimming fields
     >>> skim_cols = ["trav_time", "boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]

@@ -45,8 +45,7 @@ da.create_network("zones")
 
 # %%
 # Now we get the matrix we want and create the Delaunay Lines
-demand = project.matrices.get_matrix("demand_omx")
-demand.computational_view(["matrix"])
+demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
 # And we will call it 'delaunay_test'./ It will also be saved in the results_database.sqlite
