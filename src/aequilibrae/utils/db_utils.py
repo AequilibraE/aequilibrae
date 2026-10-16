@@ -15,6 +15,8 @@ from pandas.api import types as pd_types
 
 logger = logging.getLogger(__name__)
 
+DST_TABLE = "results"
+
 
 class _AequilibraEConnection(Connection):
     """SQLite connection type used by AequilibraEs NestedTransactionManager."""
@@ -336,6 +338,9 @@ class ConnectionClosure:
         except BaseException:
             path.unlink(missing_ok=True)
             raise
+        from aequilibrae.project.project_creation import add_blank_results_table
+
+        add_blank_results_table(self.__results_connection._connection)
         return self.__results_connection
 
     def create_transit_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:

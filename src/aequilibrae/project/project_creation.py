@@ -96,6 +96,13 @@ def run_queries_from_sql_file(conn: Connection, qry_file: Path) -> None:
             raise e
 
 
+def add_blank_results_table(results_conn: Connection):
+    run_queries_from_sql_file(
+        results_conn,
+        Path(__file__).parent / "database_specification" / "results" / "tables" / "results.sql",
+    )
+
+
 def recreate_columns(conn: Connection, table: str, old_table: str) -> dict[str, str]:
     """
     Recreate columns for a table if any were added. Returns a dict of the old column names to type
