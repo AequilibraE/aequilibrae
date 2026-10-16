@@ -611,7 +611,7 @@ def from_file(
     path: str | os.PathLike,
     mode: None = None,
     *,
-    index_name: str = "main_index",
+    index_name: str | None = None,
     subset: Sequence[str | dict[str, Any]] | None = None,
     store: Literal[False] = False,
 ) -> AequilibraeMatrix: ...
@@ -622,7 +622,7 @@ def from_file(
     path: str | os.PathLike,
     mode: Literal["r", "r+"] | None = None,
     *,
-    index_name: str = "main_index",
+    index_name: str | None = None,
     subset: None = None,
     store: Literal[True],
 ) -> MatrixStore: ...
@@ -632,22 +632,46 @@ def from_file(
     path: str | os.PathLike,
     mode: Literal["r", "r+"] | None = None,
     *,
-    index_name: str = "main_index",
+    index_name: str | None = None,
     subset: Sequence[str | dict[str, Any]] | None = None,
     store: bool = False,
 ) -> AequilibraeMatrix | MatrixStore:
+    """
+    Load an OMX file as an in-memory matrix or an on-disk store.
+
+    If ``index_name`` is omitted, and there is only one zone index in the file,
+    it is selected automatically. If the file contains multiple indices,
+    ``main_index`` is selected when present, otherwise, pass ``index_name``
+    explicitly.
+
+    Supply ``subset`` to load selected matrices into an in-memory
+    :class:`AequilibraeMatrix`. Supply ``store=True`` instead to open a
+    :class:`MatrixStore`; stores do not accept ``subset``.
+    """
     if store:
         if subset is not None:
             raise ValueError("store=True and subset may not be provided at once")
-
         if mode is not None and mode not in ("r", "r+"):
             raise ValueError("from_file stores only support modes 'r' and 'r+' (file must exist)")
+    elif mode is not None:
+        raise ValueError("an in-memory matrix cannot have a mode")
 
+    if index_name is None:
+        with omx.open_file(path, mode="r") as file:
+            index_names = list(file.lookup.keys())
+
+        if len(index_names) == 1:
+            index_name = index_names[0]
+        elif "main_index" in index_names:
+            index_name = "main_index"
+        elif not index_names:
+            raise ValueError(f"No zone index found in OMX matrix file {str(path)!r}")
+        else:
+            raise ValueError(f"Multiple zone indices found in OMX matrix file {str(path)!r}; please specify index_name")
+
+    if store:
         return MatrixStore(path=path, index_name=index_name, mode=mode if mode is not None else "r")
-    else:
-        if mode is not None:
-            raise ValueError("an in-memory matrix cannot have a mode")
-        return AequilibraeMatrix.from_omx(path=path, index_name=index_name, subset=subset)
+    return AequilibraeMatrix.from_omx(path=path, index_name=index_name, subset=subset)
 
 
 @overload

@@ -33,7 +33,10 @@ returns a new, independent ``AequilibraeMatrix``. Work on that object in memory,
 then save the result when needed.
 
 The following example assumes that ``demand.omx`` contains matrices named
-``car`` and ``bus`` and a zone mapping named ``zones``:
+``car`` and ``bus`` and a zone mapping named ``zones``. ``index_name`` is
+optional when the file has exactly one zone mapping. If it has multiple
+mappings, ``from_file()`` selects ``main_index`` when present, otherwise, pass
+``index_name`` explicitly.
 
 .. code-block:: python
 

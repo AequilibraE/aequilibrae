@@ -284,8 +284,25 @@ It is possible to access the log file contents, as presented in the next code bl
 ``project.matrices``
 --------------------
 
-This table provides access to all the matrices available in the model, which allows us to update the
-records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord`` object.
+This table provides access to all the matrices available in the model, which
+allows us to update the records in the 'matrices' table. Each item in the
+'matrices' table is a ``MatrixRecord`` object.
+
+``get_matrix()`` returns a lazy ``MatrixStore`` by default, so OMX data can be
+inspected without loading every matrix into memory. Pass ``subset`` to load the
+selected matrices as an in-memory ``AequilibraeMatrix`` for computation:
+
+.. code-block:: python
+
+    project = create_example(my_folder_path / "matrices")
+    matrices = project.matrices
+    with matrices.get_matrix("demand_mc") as store:
+        matrix_names = list(store)
+    demand = matrices.get_matrix("demand_mc", subset=["car", "truck"])
+
+If ``index_name`` is omitted, the only OMX index is selected automatically.
+When an OMX file has multiple indices, ``main_index`` is preferred if present,
+otherwise, provide ``index_name`` explicitly.
 
 .. doctest::
 

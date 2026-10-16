@@ -203,6 +203,30 @@ def test_from_file(omx_path, manage, index, data, metadata, store):
     assert_matrix(matrix, index, data, metadata=metadata)
 
 
+@pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
+def test_from_file_infers_single_index(omx_path, manage, index, data, store):
+    matrix = manage(from_file(omx_path, store=store))
+    assert isinstance(matrix, MatrixStore if store else AequilibraeMatrix)
+    assert_matrix(matrix, index, data, index_name="zones")
+
+
+def test_from_file_prefers_main_index_when_multiple_exist(omx_path, index, data):
+    with omx.open_file(omx_path, mode="a") as file:
+        file.create_mapping("main_index", index + 1000)
+
+    matrix = from_file(omx_path)
+    assert_matrix(matrix, index + 1000, data, index_name="main_index")
+
+
+def test_from_file_requires_index_when_multiple_nondefault_indices_exist(omx_path, index):
+    with omx.open_file(omx_path, mode="a") as file:
+        file.create_mapping("other_zones", index + 1000)
+
+    with pytest.raises(ValueError, match="Multiple zone indices"):
+        from_file(omx_path)
+    assert from_file(omx_path, index_name="zones").index_name == "zones"
+
+
 @pytest.mark.parametrize("mode, expected", [(None, "r"), ("r", "r"), ("r+", "r+")])
 def test_from_file_store_modes(omx_path, mode, expected):
     with from_file(omx_path, index_name="zones", mode=mode, store=True) as store:

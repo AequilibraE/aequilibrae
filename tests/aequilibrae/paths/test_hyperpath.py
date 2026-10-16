@@ -554,7 +554,7 @@ def test_SF_skimming_01(network_setup):
         network_setup["demand"]["demand"].values.astype(np.float64),
         check_demand=True,
     )
-    mats = hp.skim_matrix.matrix
+    mats = hp.skim_matrix
 
     np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [0, 0]]))  # travel time from paper
 
@@ -592,7 +592,7 @@ def test_SF_skimming_02(network_setup):
         network_setup["demand"]["demand"].values.astype(np.float64),
         check_demand=True,
     )
-    mats = hp.skim_matrix.matrix
+    mats = hp.skim_matrix
 
     # Only board once
     np.testing.assert_allclose(mats["boardings"], mats["alightings"])

@@ -19,12 +19,9 @@ def route_choice_setup(sioux_falls_single_class):
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)
 
-    mat = sioux_falls_single_class.matrices.get_matrix("demand_omx")
-    mat.computational_view()
+    mat = sioux_falls_single_class.matrices.get_matrix("demand_omx", subset=["matrix"])
 
     yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": RouteChoice(graph)}
-
-    mat.close()
 
 
 def test_prepare(route_choice_setup):
@@ -106,11 +103,11 @@ def test_link_results(route_choice_setup):
     df = rc.get_load_results()
     u_sl = rc.get_select_link_loading_results()
 
-    assert list(df.columns) == [f"{mat_name}_{dir}" for dir in ["ab", "ba", "tot"] for mat_name in mat.names]
+    assert list(df.columns) == [f"{mat_name}_{dir}" for dir in ["ab", "ba", "tot"] for mat_name in mat]
 
     assert list(u_sl.columns) == [
-        f"{mat_name}_{sl_name}_{dir}" for sl_name in ["sl1", "sl2"] for dir in ["ab", "ba"] for mat_name in mat.names
-    ] + [f"{mat_name}_{sl_name}_tot" for sl_name in ["sl1", "sl2"] for mat_name in mat.names]
+        f"{mat_name}_{sl_name}_{dir}" for sl_name in ["sl1", "sl2"] for dir in ["ab", "ba"] for mat_name in mat
+    ] + [f"{mat_name}_{sl_name}_tot" for sl_name in ["sl1", "sl2"] for mat_name in mat]
 
 
 @pytest.mark.parametrize("recompute_psl,change_cost", [(False, False), (True, False), (True, True)])
@@ -192,15 +189,15 @@ def test_saving(route_choice_setup):
             pd.testing.assert_frame_equal(df2, df)
             pd.testing.assert_frame_equal(df3, df)
 
-    matrices = AequilibraeMatrix()
-    matrices.create_from_omx((pathlib.Path(project.project_base_path) / "matrices" / "sl").with_suffix(".omx"))
-    matrices.computational_view()
+    matrices = AequilibraeMatrix.from_omx(
+        (pathlib.Path(project.project_base_path) / "matrices" / "sl").with_suffix(".omx"),
+        index_name="route_choice_sl_index",
+    )
 
     for sl_name, v in rc.get_select_link_od_matrix_results().items():
         for demand_name, matrix in v.items():
-            np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices.matrix[sl_name + "_" + demand_name])
+            np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name])
 
-    matrices.close()
 
 
 def test_round_trip(route_choice_setup):
@@ -283,15 +280,8 @@ def test_assign_from_df(route_choice_setup):
     graph = route_choice_setup["graph"]
     rc = RouteChoiceSet(graph)
 
-    mat2 = AequilibraeMatrix()
-    mat2.create_empty(
-        memory_only=True,
-        zones=graph.num_zones,
-        matrix_names=["all ones"],
-    )
-    mat2.index = graph.centroids[:]
-    mat2.computational_view()
-    mat2.matrix_view[:, :] = np.full((graph.num_zones, graph.num_zones), 1.0)
+    mat2 = AequilibraeMatrix(index=graph.centroids)
+    mat2["all ones"] = np.ones((graph.num_zones, graph.num_zones))
     demand = GeneralisedCOODemand(
         "origin id",
         "destination id",
@@ -428,16 +418,9 @@ def test_known_results(route_choice_setup, cost):
     np.random.seed(0)
     nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
 
-    mat = AequilibraeMatrix()
-    mat.create_empty(
-        memory_only=True,
-        zones=graph.num_zones,
-        matrix_names=["all zeros", "single one"],
-    )
-    mat.index = graph.centroids[:]
-    mat.computational_view()
-    mat.matrix_view[:, :, 0] = np.full((graph.num_zones, graph.num_zones), 1.0)
-    mat.matrix_view[:, :, 1] = np.zeros((graph.num_zones, graph.num_zones))
+    mat = AequilibraeMatrix(index=graph.centroids)
+    mat["all zeros"] = np.ones((graph.num_zones, graph.num_zones))
+    mat["single one"] = np.zeros((graph.num_zones, graph.num_zones))
     demand = GeneralisedCOODemand(
         "origin id",
         "destination id",
@@ -482,15 +465,8 @@ def test_select_link(route_choice_setup, cost):
     nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
     demand = demand_from_nodes(nodes, graph)
 
-    mat = AequilibraeMatrix()
-    mat.create_empty(
-        memory_only=True,
-        zones=graph.num_zones,
-        matrix_names=["all ones"],
-    )
-    mat.index = graph.centroids[:]
-    mat.computational_view()
-    mat.matrix_view[:, :] = np.full((graph.num_zones, graph.num_zones), 1.0)
+    mat = AequilibraeMatrix(index=graph.centroids)
+    mat["all ones"] = np.ones((graph.num_zones, graph.num_zones))
     demand.add_matrix(mat)
     demand.df = demand.df.loc[nodes]
 

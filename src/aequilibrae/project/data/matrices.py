@@ -2,12 +2,12 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import openmatrix as omx
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
+from aequilibrae.matrix import AequilibraeMatrix, MatrixStore, from_file
 from aequilibrae.project.project_table import NonSpatialProjectTable
 from aequilibrae.utils.db_utils import NestedTransactionManager
 
@@ -148,22 +148,55 @@ class Matrices(NonSpatialProjectTable):
         if moved:
             tombstone.unlink()
 
-    def get_matrix(self, name: str, index_name: str = "main_index") -> AequilibraeMatrix:
-        """Load a matrix by metadata name.
+    def get_matrix(
+        self,
+        name: str,
+        index_name: str | None = None,
+        subset: Sequence[str | dict[str, Any]] | None = None,
+    ) -> AequilibraeMatrix | MatrixStore:
+        """
+        Load a registered matrix, optionally selecting an in-memory subset.
+
+        Without ``subset``, the matrix is opened as a
+        :class:`~aequilibrae.matrix.MatrixStore` for generic OMX access.  When
+        ``subset`` is provided, the selected matrices are copied into an
+        in-memory :class:`~aequilibrae.matrix.AequilibraeMatrix`, ready for
+        computation. Subset entries can be matrix names or matrix metadata
+        queries, as described by
+        :meth:`~aequilibrae.matrix.AequilibraeMatrix.subset`.
+
+        If ``index_name`` is omitted, the only index in the OMX file is used
+        when there is exactly one. If there are multiple indices and one is
+        named ``main_index``, that index is used. Otherwise, pass
+        ``index_name`` explicitly.
 
         :Arguments:
             **name** (:obj:`str`): Registered matrix name.
 
-            **index_name** (:obj:`str`, *Optional*): Zone index to load. Default is "main_index".
+            **index_name** (:obj:`str`, *Optional*): Name of the OMX zone
+                index.  Inferred when omitted, as described above.
+
+            **subset** (:obj:`Sequence`, *Optional*): Matrix names or metadata
+                queries to copy into an in-memory matrix. If omitted, returns a
+                :class:`MatrixStore` instead.
 
         :Returns:
-            **matrix** (:obj:`AequilibraeMatrix`): Loaded matrix.
+            **matrix** (:class:`~aequilibrae.matrix.AequilibraeMatrix` or
+                :class:`~aequilibrae.matrix.MatrixStore`): An in-memory matrix
+                when ``subset`` is supplied, otherwise an OMX matrix store.
+
+        :raises ValueError: If the file is not OMX, no usable index exists, or
+            multiple indices are ambiguous.
         """
-        file_name = self.get(name, column="file_name")
+        file_name: str = self.get(name, column="file_name")
         path = self.folder / file_name
         if path.suffix.lower() != ".omx":
             raise ValueError("Only OMX (.omx) matrices are supported")
-        return AequilibraeMatrix.from_omx(path, index_name=index_name)
+
+        if subset is not None:
+            return from_file(path, index_name=index_name, subset=subset, store=False)
+        else:
+            return from_file(path, index_name=index_name, subset=None, store=True)
 
     def clear_database(self) -> None:
         """Remove metadata records whose files are absent."""

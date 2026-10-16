@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pytest
-
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
+
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import PathResults, SkimResults
@@ -50,7 +50,7 @@ def test_prepare_shares_existing_output():
     output = SkimmingOutputs(2, 2, ["distance", "time"])
     results = SkimResults()
     results.prepare(graph, output=output)
-    assert list(results.skims) == graph.skim_fields
+    assert set(results.skims) == set(graph.skim_fields)
     for name in graph.skim_fields:
         assert np.shares_memory(results.skims[name], output.skims)
 
@@ -94,7 +94,7 @@ def test_network_skimming_uses_routing_cost_and_turn_paths(cores, turn_penalty, 
     skim.results.set_heap("pairing")
     skim.execute()
     assert skim.report == ["Centroid 40 has no outgoing edges"]
-    assert list(skim.results.skims) == skim_fields
+    assert set(skim.results.skims) == set(skim_fields)
     np.testing.assert_array_equal(skim.results.skims.index, graph.centroids)
     path = PathResults(graph, 10, 40)
     assert skim.results.skims["time"][0, 3] == path.milepost[-1]

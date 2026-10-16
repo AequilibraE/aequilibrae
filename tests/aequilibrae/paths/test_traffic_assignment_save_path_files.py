@@ -12,12 +12,10 @@ def assignment(sioux_falls_single_class):
     project.network.build_graphs()
     graph = project.network.graphs["c"]
     graph.set_graph("free_flow_time")
-    matrix = project.matrices.get_matrix("demand_omx")
-    matrix.computational_view()
+    matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     result = TrafficAssignment()
     result.set_classes([TrafficClass("car", graph, matrix)])
     yield result
-    matrix.close()
 
 
 def test_path_saving_is_explicitly_unsupported(assignment):

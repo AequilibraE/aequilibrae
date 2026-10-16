@@ -27,12 +27,10 @@ class GravityCalibration:
         >>> project = create_example(project_path)
 
         # We load the demand matrix
-        >>> demand = project.matrices.get_matrix("demand_omx")
-        >>> demand.computational_view()
+        >>> demand = project.matrices.get_matrix("demand_omx", subset=["REPLACE WITH ACTUAL NAME"])
 
         # We load the skim matrix
-        >>> skim = project.matrices.get_matrix("skims")
-        >>> skim.computational_view(["time_final"])
+        >>> skim = project.matrices.get_matrix("skims", subset=["time_final"])
 
         >>> args = {"matrix": demand,
         ...         "impedance": skim,
@@ -84,10 +82,6 @@ class GravityCalibration:
         self.impedance = kwargs.get("impedance")  # type: AequilibraeMatrix
         deterrence_function = str(kwargs.get("function", "")).upper()
 
-        if self.nan_as_zero:
-            self.matrix = self.matrix.copy(memory_only=True)
-            self.impedance = self.impedance.copy(memory_only=True)
-
         self.result_matrix = None
         self.vectors: pd.DataFrame = pd.DataFrame([])
         self.gap = np.inf
@@ -136,13 +130,13 @@ class GravityCalibration:
 
             a = 1
             if max_cost > 0:
-                a = (self.impedance.matrix_view[:, :] < max_cost).astype(int)
+                a = (self.impedance[self.impedance_core] < max_cost).astype(int)
 
             # weighted average cost
             self.report.append("Iteration: 1")
-            cstar = np.nansum(self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :] * a) / np.nansum(
-                self.result_matrix.gravity[:, :] * a
-            )
+            gravity = self.result_matrix["gravity"]
+            impedance = self.impedance[self.impedance_core]
+            cstar = np.nansum(impedance * gravity * a) / np.nansum(gravity * a)
 
             b0 = 1 / cstar
 
@@ -208,20 +202,28 @@ class GravityCalibration:
         if not isinstance(self.matrix, AequilibraeMatrix):
             raise TypeError("Observed matrix needs to be an instance of AequilibraeMatrix")
 
-        # Check data dimensions
-        if not np.array_equal(self.impedance.index, self.impedance.index):
-            raise ValueError("Indices from impedance matrix do not match those from seed matrix")
+        if not np.array_equal(self.impedance.index, self.matrix.index):
+            raise ValueError("Indices from impedance and seed matrices do not match")
 
-        # Check if matrices were set for computation
-        mats = [(self.matrix, "Observed matrix"), (self.impedance, "Impedance matrix")]
-        for matrix, title in mats:
-            if matrix.matrix_view is None:
-                raise ValueError(f"{title} needs to be set for computation")
-            if matrix.matrix_view.ndim > 2:
-                raise ValueError(f"{title} computational view needs to be set for a single matrix core")
-            if np.nansum(matrix.matrix_view.data) == 0:
+        if len(self.matrix) != 1 or len(self.impedance) != 1:
+            raise ValueError("Observed and impedance matrices must each contain exactly one named matrix")
+        self.comput_core = next(iter(self.matrix))
+        self.impedance_core = next(iter(self.impedance))
+
+        if self.nan_as_zero:
+            self.matrix = self.matrix.subset([self.comput_core])
+            self.impedance = self.impedance.subset([self.impedance_core])
+            self.matrix[self.comput_core] = np.nan_to_num(self.matrix[self.comput_core])
+            self.impedance[self.impedance_core] = np.nan_to_num(self.impedance[self.impedance_core])
+
+        for matrix, core, title in (
+            (self.matrix, self.comput_core, "Observed matrix"),
+            (self.impedance, self.impedance_core, "Impedance matrix"),
+        ):
+            values = matrix[core]
+            if np.nansum(values) == 0:
                 raise ValueError(f"{title} has only zero values")
-            if np.nanmin(matrix.matrix_view.data) < 0:
+            if np.nanmin(values) < 0:
                 raise ValueError(f"{title} has negative values")
 
         # Augment parameters if we happen to have only passed one
@@ -231,15 +233,13 @@ class GravityCalibration:
                 self.parameters[para] = default_parameters[para]
 
         # Prepare the data for computation
-        self.comput_core = self.matrix.view_names[0]
-
-        self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"], memory_only=True)
+        observed = self.matrix[self.comput_core]
+        self.result_matrix = AequilibraeMatrix(index=self.matrix.index, index_name=self.matrix.index_name)
+        self.result_matrix["gravity"] = observed
 
         self.vectors = pd.DataFrame(
-            {"rows": self.matrix.rows()[:], "columns": self.matrix.columns()[:]}, index=self.matrix.index[:]
+            {"rows": np.nansum(observed, axis=1), "columns": np.nansum(observed, axis=0)}, index=self.matrix.index
         )
-
-        self.impedance_core = self.impedance.view_names[0]
 
     def __apply_gravity(self):
         args = {
@@ -256,9 +256,9 @@ class GravityCalibration:
         self.gravity.apply()
         self.result_matrix = self.gravity.output
 
-        return np.nansum(self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :]) / np.nansum(
-            self.result_matrix.gravity[:, :]
-        )
+        impedance = self.impedance[self.impedance_core]
+        gravity = self.result_matrix["gravity"]
+        return np.nansum(impedance * gravity) / np.nansum(gravity)
 
     def __get_parameters(self):
         par = Parameters().parameters

@@ -26,11 +26,12 @@ class TransportClassBase(ABC):  # noqa: B024
 
             **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
         """
+        if not isinstance(matrix, AequilibraeMatrix):
+            raise TypeError("Matrix must be an AequilibraeMatrix")
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
-
-        if matrix.matrix_view.dtype != "float64":
-            raise TypeError("Matrix's computational view need to be of type np.float64")
+        if any(values.dtype != np.float64 for values in matrix.values()):
+            raise TypeError("Matrix values need to be of type np.float64")
         self._config = {}
         self.graph = graph
         self.matrix = matrix
@@ -45,17 +46,16 @@ class TransportClassBase(ABC):  # noqa: B024
         }
         self._config["Graph"] = str(graph_config)
 
+        matrix_names = tuple(matrix)
         mat_config = {
-            "Source": matrix.file_path or "",
-            "Number of centroids": matrix.zones,
-            "Matrix cores": matrix.view_names,
+            "Source": matrix.metadata.get("source", ""),
+            "Number of centroids": len(matrix.index),
+            "Matrix cores": matrix_names,
         }
         # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
-        view = np.nan_to_num(matrix.matrix_view)
-        if len(matrix.view_names) == 1:
-            mat_config["Matrix totals"] = {nm: float(view.sum()) for nm in matrix.view_names}
-        else:
-            mat_config["Matrix totals"] = {nm: float(view[:, :, i].sum()) for i, nm in enumerate(matrix.view_names)}
+        mat_config["Matrix totals"] = {
+            name: float(np.nan_to_num(matrix[name]).sum()) for name in matrix_names
+        }
         self._config["Matrix"] = str(mat_config)
 
     @property
@@ -82,8 +82,7 @@ class TrafficClass(TransportClassBase):
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx")
-        >>> demand.computational_view()
+        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
         >>> tc = TrafficClass("car", graph, demand)
         >>> tc.set_pce(1.3)
@@ -277,8 +276,8 @@ class TransitClass(TransportClassBase):
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()
 
-        if len(matrix.view_names) == 1:
-            self.matrix_core = matrix.view_names[0]
+        if len(matrix) == 1:
+            self.matrix_core = next(iter(matrix))
         else:
             self.matrix_core = None
 
@@ -288,6 +287,6 @@ class TransitClass(TransportClassBase):
 
         :Arguments:
             **core** (:obj:`str`):"""
-        if core not in self.matrix.view_names:
-            raise KeyError(f"'{core}' is not present in `matrix.view_names`")
+        if core not in self.matrix:
+            raise KeyError(f"'{core}' is not present in the matrix")
         self.matrix_core = core

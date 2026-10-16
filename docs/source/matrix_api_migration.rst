@@ -53,7 +53,7 @@ There is no ``computational_view()`` or ``matrix_view`` step. Work with each
 named matrix directly. Select only the matrices needed for the calculation
 rather than loading the whole file into memory.
 
-When the subset of matrices is known ahead of time, use ``from_file()`` wit the
+When the subset of matrices is known ahead of time, use ``from_file()`` with the
 ``subset`` argument directly:
 
 .. code-block:: python
@@ -66,6 +66,21 @@ When the subset of matrices is known ahead of time, use ``from_file()`` wit the
 
 ``from_file()`` returns an in-memory object by default. Providing
 ``store=True`` makes it return a store instead.
+
+For matrices registered with a project, ``project.matrices.get_matrix()``
+returns a ``MatrixStore`` by default. Supply ``subset`` to get an independent,
+in-memory ``AequilibraeMatrix`` for computation:
+
+.. code-block:: python
+
+    with project.matrices.get_matrix("demand_mc") as store:
+        matrix_names = list(store)
+    demand = project.matrices.get_matrix("demand_mc", subset=["car", "bus"])
+
+When ``index_name`` is omitted, ``from_file()`` selects the only index in the
+OMX file when there is exactly one. If there are several indices,
+``main_index`` is used when present, otherwise, specify ``index_name``. Project
+matrix loading uses the same ``from_file()`` index selection.
 
 Replace empty-matrix creation
 -----------------------------
@@ -153,10 +168,12 @@ Replace index changes
 ---------------------
 
 Choose an OMX mapping with ``index_name`` when opening the file rather than
-calling ``set_index()`` after loading. Each object has one selected zone index.
-To use another mapping, open the file again with that mapping's name.
-Index names follow the same rules as matrix names: they must be non-empty
-strings, and HDF5 paths are not accepted.
+calling ``set_index()`` after loading. If the file has only one mapping,
+``from_file()`` selects it automatically. If there are several mappings, it
+selects ``main_index`` when present, otherwise, specify ``index_name``. Each
+object has one selected zone index. To use another mapping, open the file again
+with that mapping's name.  Index names follow the same rules as matrix names:
+they must be non-empty strings, and HDF5 paths are not accepted.
 
 The retrieved index is read-only. Replace slice assignment with assignment of
 the complete index:

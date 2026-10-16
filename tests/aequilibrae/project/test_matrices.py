@@ -4,6 +4,7 @@ from os.path import join
 from random import choice, randint
 from shutil import copyfile
 
+import openmatrix as omx
 import pytest
 
 from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
@@ -62,8 +63,14 @@ def test_get_matrix(sioux_falls_example):
     matrices = sioux_falls_example.matrices
     with pytest.raises(ValueError, match="matrices has no record with name='omxq'"):
         _ = matrices.get_matrix("omxq")
-    mat = matrices.get_matrix("demand_omx", index_name="taz")
+    mat = matrices.get_matrix("demand_omx")
+    assert isinstance(mat, MatrixStore)
     assert floor(sum(values.sum() for values in mat.values())) == 360600, "Matrix loaded incorrectly"
+    mat.close()
+
+    selected = matrices.get_matrix("demand_omx", subset=["matrix"])
+    assert isinstance(selected, AequilibraeMatrix)
+    assert floor(sum(values.sum() for values in selected.values())) == 360600, "Matrix subset loaded incorrectly"
 
 
 def test_get_record(sioux_falls_example):
@@ -160,9 +167,26 @@ def test_get_matrix_uses_requested_index(matrix_table):
     matrix = AequilibraeMatrix(index=[30, 10], index_name="zones")
     matrix["demand"] = [[0, 3], [2, 0]]
     matrix_table.create("demand", "demand.omx", matrix)
-    assert matrix_table.get_matrix("demand", index_name="zones") == matrix
-    with pytest.raises(ValueError, match="main_index"):
+    inferred = matrix_table.get_matrix("demand")
+    assert isinstance(inferred, MatrixStore)
+    assert inferred.index_name == "zones"
+    inferred.close()
+
+    selected = matrix_table.get_matrix("demand", subset=["demand"])
+    assert isinstance(selected, AequilibraeMatrix)
+    assert selected == matrix
+
+
+def test_get_matrix_requires_index_when_multiple_nondefault_indices_exist(matrix_table):
+    matrix = AequilibraeMatrix(index=[10, 20], index_name="zones")
+    matrix["demand"] = [[0, 1], [2, 0]]
+    matrix_table.create("demand", "demand.omx", matrix)
+    with omx.open_file(matrix_table.folder / "demand.omx", mode="a") as file:
+        file.lookup.create_dataset("other_zones", data=[10, 20])
+
+    with pytest.raises(ValueError, match="Multiple zone indices"):
         matrix_table.get_matrix("demand")
+    assert matrix_table.get_matrix("demand", index_name="zones", subset=["demand"]) == matrix
 
 
 @pytest.mark.parametrize("extension", [".aem", ".csv"])

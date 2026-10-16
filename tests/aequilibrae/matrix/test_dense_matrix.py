@@ -2,8 +2,9 @@ import gc
 
 import numpy as np
 import pytest
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 
-from aequilibrae.matrix import AequilibraeMatrix, DenseMatrix, from_dict
+from aequilibrae.matrix import AequilibraeMatrix, from_dict
 
 
 @pytest.fixture(params=[np.float32, np.float64])

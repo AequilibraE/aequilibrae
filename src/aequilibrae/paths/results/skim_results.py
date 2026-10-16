@@ -1,6 +1,5 @@
 from typing import List
 
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.dijkstra import HEAP_MAP
 from aequilibrae.paths.graph import Graph
@@ -56,10 +55,7 @@ class SkimResults:
 
         if output is None:
             output = SkimmingOutputs(graph.num_zones, graph.num_zones, graph.skim_fields)
-        skims = output.to_matrix(graph.centroids)
-        self.skims = AequilibraeMatrix._from_shared_arrays(
-            {name: skims[name] for name in graph.skim_fields}, graph.centroids
-        )
+        self.skims = output.to_matrix(graph.centroids)
 
     def set_heap(self, heap: str) -> None:
         """

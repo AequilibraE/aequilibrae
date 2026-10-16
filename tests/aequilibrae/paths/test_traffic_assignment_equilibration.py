@@ -27,8 +27,7 @@ def car_graph(project):
 
 @pytest.fixture
 def matrix(project):
-    mat = project.matrices.get_matrix("omx2")
-    mat.computational_view()
+    mat = project.matrices.get_matrix("omx2", subset=["matrix"])
     return mat
 
 
@@ -157,7 +156,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
 
     assert file_text.count(tc_graph) > 1
 
-    tc_matrix = "'Number of centroids': 24, 'Matrix cores': ['matrix'], 'Matrix totals': {'matrix': 360600.0}}\"}}"
+    tc_matrix = "'Number of centroids': 24, 'Matrix cores': ('matrix',), 'Matrix totals': {'matrix': 360600.0}}\"}}"
     assert file_text.count(tc_matrix) > 1
 
     assig_1 = (

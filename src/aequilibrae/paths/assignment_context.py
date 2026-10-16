@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.cython.aon_context import PreparedAoN
 from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
@@ -23,17 +24,16 @@ if TYPE_CHECKING:
 
 
 def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
-    """Copy a computational view into fixed, packed assignment demand."""
-    if matrix.view_names is None or matrix.matrix_view is None:
-        raise ValueError("Set the matrix computational view before assigning demand")
+    """Copy named matrices into fixed, packed assignment demand."""
+    if not isinstance(matrix, AequilibraeMatrix):
+        raise TypeError("Demand must be an AequilibraeMatrix")
     if not np.array_equal(matrix.index, centroids):
         raise ValueError("Matrix and graph must have the same centroid order")
 
-    demand = np.asarray(matrix.matrix_view)
+    names = tuple(matrix)
+    demand = np.stack([matrix[name] for name in names], axis=2) if names else np.empty((0, 0, 0))
     zones = len(centroids)
-    classes = len(matrix.view_names)
-    if demand.ndim == 2 and classes == 1:
-        demand = demand[:, :, None]
+    classes = len(names)
     if demand.shape != (zones, zones, classes) or not zones or not classes:
         raise ValueError("Demand must have shape (zones, zones, classes)")
     if not np.issubdtype(demand.dtype, np.number) or np.iscomplexobj(demand):
@@ -128,7 +128,7 @@ class AssignmentInputs:
     ):
         self.mapping = AssignmentMapping(graph)
         self.demand = assignment_demand(matrix, self.mapping.centroids)
-        self.class_names = tuple(matrix.view_names)
+        self.class_names = tuple(matrix)
         links = self.mapping.compact_link_count
         self.costs = np.zeros(links, dtype=np.float64)
         self.full_costs = np.zeros(self.mapping.link_count, dtype=np.float64)

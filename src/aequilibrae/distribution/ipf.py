@@ -22,16 +22,16 @@ class Ipf:
 
         >>> project = create_example(project_path)
 
-        >>> matrix = project.matrices.get_matrix("demand_omx")
-        >>> matrix.computational_view()
+        >>> matrix = project.matrices.get_matrix("demand_omx", subset=["REPLACE WITH ACTUAL NAME"])
 
         >>> vectors = pd.DataFrame(
-        ...     {"productions": np.zeros(matrix.zones), "attractions": np.zeros(matrix.zones)},
+        ...     {"productions": np.zeros(len(matrix.index)), "attractions": np.zeros(len(matrix.index))},
         ...     index=matrix.index,
         ... )
 
-        >>> vectors["productions"] = matrix.rows()
-        >>> vectors["attractions"] = matrix.columns()
+        >>> core = next(iter(matrix))
+        >>> vectors["productions"] = matrix[core].sum(axis=1)
+        >>> vectors["attractions"] = matrix[core].sum(axis=0)
 
         >>> ipf_args = {"matrix": matrix,
         ...             "vectors": vectors,
@@ -43,7 +43,7 @@ class Ipf:
         >>> fratar.fit()
 
         # We can get back to our OMX matrix in the end
-        >>> fratar.output.export(Path(my_folder_path) / "to_omx_output.omx")
+        >>> fratar.output.save_as_omx(Path(my_folder_path) / "to_omx_output.omx")
 
         >>> project.close()
     """
@@ -87,9 +87,7 @@ class Ipf:
         self.vectors = kwargs.get("vectors", None)
         self.rows_ = kwargs.get("row_field", None)
         self.cols_ = kwargs.get("column_field", None)
-        self.output_name = kwargs.get("output")
-
-        self.output = AequilibraeMatrix()
+        self.output = None
         self.error = None
         self.__required_parameters = ["convergence level", "max iterations", "balancing tolerance"]
         self.error_free = True
@@ -109,7 +107,10 @@ class Ipf:
             raise TypeError("Seed matrix needs to be an instance of AequilibraeMatrix")
 
         # Check data type
-        if not np.issubdtype(self.matrix.dtype, np.floating):
+        if len(self.matrix) != 1:
+            raise ValueError("Seed matrix must contain exactly one named matrix")
+        core = next(iter(self.matrix))
+        if not np.issubdtype(self.matrix[core].dtype, np.floating):
             raise ValueError("Seed matrix need to be a float type")
 
         row_data = self.vectors[self.rows_]
@@ -123,13 +124,6 @@ class Ipf:
 
         if not np.array_equal(self.matrix.index, self.vectors.index):
             raise ValueError("Indices from vectors do not match those from seed matrix")
-
-        # Check if matrix was set for computation
-        if self.matrix.matrix_view is None:
-            raise ValueError("Matrix needs to be set for computation")
-        else:
-            if len(self.matrix.matrix_view.shape[:]) > 2:
-                raise ValueError("Matrix' computational view needs to be set for a single matrix core")
 
         # check balancing:
         sum_rows = np.nansum(row_data)
@@ -164,16 +158,12 @@ class Ipf:
             max_iter = self.parameters["max iterations"]
             conv_criteria = self.parameters["convergence level"]
 
-            if self.matrix.is_omx():
-                self.output = AequilibraeMatrix()
-                self.output.create_from_omx(omx_path=self.matrix.file_path, cores=self.matrix.view_names)
-                self.output.computational_view()
-            else:
-                self.output = self.matrix.copy(self.output_name)
+            core = next(iter(self.matrix))
+            self.output = self.matrix.subset([core])
             if self.nan_as_zero:
-                self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
+                self.output[core] = np.nan_to_num(self.output[core])
 
-            tot_matrix = np.nansum(self.output.matrix_view[:, :])
+            tot_matrix = np.nansum(self.output[core])
 
             # Reporting
             self.report.append("Target convergence criteria: " + str(conv_criteria))
@@ -187,8 +177,8 @@ class Ipf:
             self.report.append("Iteration,   Convergence")
             self.gap = conv_criteria + 1
 
-            seed = np.array(self.output.matrix_view[:, :], copy=True)
-            iter, self.gap = ipf_core(
+            seed = np.array(self.output[core], copy=True)
+            iterations, self.gap = ipf_core(
                 seed,
                 self.__row_vector,
                 self.__col_vector,
@@ -196,9 +186,9 @@ class Ipf:
                 tolerance=conv_criteria,
                 cores=self.cpus,
             )
-            self.output.matrix_view[:, :] = seed[:, :]
+            self.output[core] = seed
 
-            self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
+            self.report.append(str(iterations) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
@@ -209,7 +199,7 @@ class Ipf:
         :Arguments:
             **name** (:obj:`str`): Name of the desired matrix record
 
-            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            **file_name** (:obj:`str`): Name for the OMX matrix file
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
             Defaults to the active project
