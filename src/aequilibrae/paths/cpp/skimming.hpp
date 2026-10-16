@@ -63,7 +63,8 @@ void skim_fields(const SearchResults &results,
     }
 
     const auto state_offset = terminal * workspace.field_count;
-    std::copy_n(workspace.state_skims + state_offset, workspace.field_count, row);
+    std::copy_n(workspace.state_skims + state_offset, workspace.field_count,
+                row);
   }
 }
 

@@ -5,8 +5,8 @@
 
 namespace aequilibrae::matrix::cpp {
 
-// Borrow one contiguous [destinations, fields] block. The owner must outlive the view.
-// Callers supply valid indices. Empty views do not offset pointers.
+// Borrow one contiguous [destinations, fields] block. The owner must outlive
+// the view. Callers supply valid indices. Empty views do not offset pointers.
 template <typename T> struct DenseMatrixOriginView {
   static_assert(std::is_floating_point_v<T>);
 
@@ -16,7 +16,7 @@ template <typename T> struct DenseMatrixOriginView {
 
   T *destination_data(std::size_t index) const noexcept {
     return destination_count && field_count ? data + index * field_count
-                                           : nullptr;
+                                            : nullptr;
   }
 };
 
