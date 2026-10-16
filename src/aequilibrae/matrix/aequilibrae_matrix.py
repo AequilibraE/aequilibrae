@@ -250,6 +250,48 @@ class _Matrix(MutableMapping[str, Any]):
         subset: Sequence[str | dict[str, Any]] | None = None,
         **kwargs,
     ) -> None:
+        """
+        Save named matrices, their attributes, the zone index and file
+        metadata to OMX.
+
+        By default, this saves all matrices to a new file and raises an error
+        if the file already exists. Pass ``subset`` to select matrices by name
+        or by their attributes. A query matches matrices with all the given
+        attributes. Each matrix is saved once, even if it matches several
+        entries.
+
+        When updating a file, matrices outside the subset are left unchanged.
+        Attributes provided here replace matching attributes in the file.
+        Other attributes are kept. The zone mapping and file metadata are
+        always written, apart from attributes managed by OMX.
+
+        :Arguments:
+            **path** (:obj:`str` or :obj:`os.PathLike`): Destination OMX file.
+
+            **mode** (:obj:`str`, *Optional*): Use ``"x"`` or ``"w-"`` to
+                create a new file, ``"w"`` to replace or create a file,
+                ``"r+"`` to update an existing file, or ``"a"`` to update or
+                create a file. Defaults to ``"x"``.
+
+            **subset** (sequence of :obj:`str` or :obj:`dict`, *Optional*):
+                Matrix names or attribute queries to save. Defaults to all
+                matrices. If nothing matches, only the zone mapping and file
+                metadata are written.
+
+            **kwargs**: Additional keyword arguments passed to
+              ``openmatrix.open_file``.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> demand = from_dict({"car": [[0, 12], [10, 0]]}, index=[101, 205])
+        >>> demand.matrix_metadata("car")["mode"] = "car"
+        >>> with TemporaryDirectory() as directory:
+        ...     path = Path(directory) / "demand.omx"
+        ...     demand.save_as_omx(path, subset=[{"mode": "car"}])
+        ...     loaded = from_file(path)
+        >>> loaded == demand
+        True
+        """
         if mode not in ("w", "a", "r+", "w-", "x"):
             raise ValueError("save_as_omx only supports modes 'w', 'a', 'r+', 'w-' and 'x'")
 
@@ -293,6 +335,14 @@ class _Matrix(MutableMapping[str, Any]):
         self,
         subset: Sequence[str | dict[str, Any]],
     ) -> "_Matrix":
+        """
+        Copy selected matrices into a new in-memory matrix object.
+
+        :Arguments:
+            **subset** (sequence of :obj:`str` or :obj:`dict`): Matrix names or
+                attribute queries.  A query matches matrices with all the given
+                attributes. Each matching matrix is included once.
+        """
         pass
 
     def _set_index(self, value: ArrayLike) -> None:
@@ -312,40 +362,138 @@ class _Matrix(MutableMapping[str, Any]):
 
     @property
     def index(self) -> np.ndarray:
+        """
+        Zone IDs in row and column order, returned as a read-only uint64 array.
+
+        IDs must be unique integers between ``0`` and ``2**64 - 1``. To relabel
+        zones, assign a new index of the same length. This does not move any
+        matrix values.
+
+        Changing a store's index requires write access. The mapping keeps its
+        existing dtype and attributes.
+
+        >>> demand = from_dict({"car": [[0, 12], [10, 0]]}, index=[101, 205])
+        >>> demand.index.tolist()
+        [101, 205]
+        >>> demand.index.flags.writeable
+        False
+        >>> demand.index = [1001, 1002]
+        >>> int(demand.mat["car", 1001, 1002])
+        12
+        """
         view = self._index.view()
         view.setflags(write=False)
         return view
 
     @index.setter
     def index(self, value: ArrayLike) -> None:
+        """
+        Relabel zones without changing the matrix shape or value order.
+
+        :Arguments:
+            **value** (array-like): One-dimensional sequence of unique integer
+                zone IDs from ``0`` to ``2**64 - 1``, with the same length as
+                the current index.
+        """
         self._set_index(value)
         self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
 
     @property
     def mat(self) -> _MatrixIndexer:
-        """Select by zone ID, with the matrix name first. Label slices include the stop."""
+        """
+        Read or change matrix values using zone IDs.
+
+        Use ``mat[name]`` for a whole matrix, ``mat[name, row]`` for rows, or
+        ``mat[name, row, column]`` to select both rows and columns. Slices
+        follow the stored zone order and include the stop ID. An unknown zone
+        ID raises ``KeyError``.
+
+        Zone IDs are converted to positions before indexing. In-memory matrices
+        support NumPy selections. Stores support the selections allowed by
+        h5py.
+
+        >>> demand = from_dict({"car": [[0, 12], [10, 0]]}, index=[101, 205])
+        >>> demand.mat["car", 101:205].tolist()
+        [[0, 12], [10, 0]]
+        >>> demand.mat["car", 101, 205] = 42
+        >>> int(demand.mat["car", 101, 205])
+        42
+        """
         return _MatrixIndexer(self, zones=True)
 
     @property
     def imat(self) -> _MatrixIndexer:
-        """Select by zero-based position, with the matrix name first."""
+        """
+        Read or change matrix values using zero-based positions.
+
+        Use ``imat[name]`` for a whole matrix, ``imat[name, row]`` for rows, or
+        ``imat[name, row, column]`` to select both rows and columns. Slices
+        exclude the stop position.
+
+        Selections follow NumPy rules in memory and h5py rules on disk. Writing
+        to a selection keeps the matrix's dtype. Values are broadcast and
+        converted according to NumPy or h5py rules.
+
+        >>> demand = from_dict({"car": [[0, 12], [10, 0]]}, index=[101, 205])
+        >>> demand.imat["car", :, 1].tolist()
+        [12, 0]
+        >>> demand.imat["car", 0, :] = [1, 2]
+        >>> demand.imat["car", :1].tolist()
+        [[1, 2]]
+        """
         return _MatrixIndexer(self, zones=False)
 
     @property
     def index_name(self) -> str:
+        """
+        Name of the zone mapping used when reading and writing OMX files.
+
+        >>> AequilibraeMatrix(index=[101, 205]).index_name
+        'main_index'
+        >>> AequilibraeMatrix(index=[101, 205], index_name="zones").index_name
+        'zones'
+        """
         return self.__index_name
 
     @property
     def metadata(self) -> MutableMapping[str, Any]:
+        """
+        File-level attributes that can be read and updated by name.
+
+        These are stored in a dictionary for in-memory matrices and in h5py
+        attributes for stores. Assign a new value to an attribute to update it.
+
+        Attributes managed by OMX are visible on a store but are ignored when
+        loading, copying, saving or comparing file metadata.
+
+        >>> demand = AequilibraeMatrix(index=[101, 205])
+        >>> demand.metadata["description"] = "Morning demand"
+        >>> demand.metadata["description"]
+        'Morning demand'
+        """
         return self._metadata
 
     @abstractmethod
     def matrix_metadata(self, name: str) -> MutableMapping[str, Any]:
-        """Return mutable attributes for an existing named matrix."""
+        """
+        Return mutable attributes for an existing named matrix.
+
+        :Arguments:
+            **name** (:obj:`str`): Name of an existing matrix.
+        """
         pass
 
     @property
     def shape(self) -> tuple[int, int]:
+        """
+        Shape of each matrix, determined by the number of zone IDs.
+
+        >>> demand = AequilibraeMatrix(index=[101, 205, 309])
+        >>> demand.shape
+        (3, 3)
+        >>> len(demand)
+        0
+        """
         length = len(self._index)
         return (length, length)
 
@@ -364,7 +512,24 @@ class _Matrix(MutableMapping[str, Any]):
         return key in self._backend.keys()
 
     def __eq__(self, other: object) -> bool:
-        """Compare matrices, their ordered zone index and metadata. Matching NaNs are equal."""
+        """
+        Compare matrix names and values, zone IDs, the index name and metadata.
+
+        NaNs in the same positions are considered equal. Matrix insertion order
+        and numeric dtypes do not affect the result. File attributes managed by
+        OMX are ignored. Comparing a store reads its matrix values from disk.
+
+        :Arguments:
+            **other** (:obj:`object`): Object to compare with this matrix collection.
+
+        >>> left = from_dict({"car": [[0, float("nan")], [10, 0]]}, index=[101, 205])
+        >>> right = left.subset(["car"])
+        >>> left == right
+        True
+        >>> right.matrix_metadata("car")["mode"] = "car"
+        >>> left == right
+        False
+        """
         if not isinstance(other, _Matrix):
             return NotImplemented
         if self is other:
@@ -389,23 +554,91 @@ class _Matrix(MutableMapping[str, Any]):
         )
 
     def clear(self) -> None:
-        """Remove all named matrices without reading their values."""
+        """
+        Remove all named matrices and their attributes.
+
+        The zone index and file-level metadata are kept.
+
+        >>> demand = from_dict({"car": [[0]]}, index=[101], metadata={"year": 2030})
+        >>> demand.clear()
+        >>> list(demand), demand.index.tolist(), demand.metadata["year"]
+        ([], [101], 2030)
+        """
         for key in list(self):
             del self[key]
 
     def setdefault(self, key: str, default: ArrayLike | None = None) -> np.ndarray:
-        """Insert a missing matrix, then return it using the usual read rules."""
+        """
+        Return a named matrix, adding it from ``default`` if it is missing.
+
+        An existing matrix is returned unchanged. If the name is missing,
+        ``default`` must contain a full square matrix. ``None`` cannot be used
+        to create a matrix.
+
+        As with a normal lookup, the result is a view for an in-memory matrix
+        and a copy for a store.
+
+        :Arguments:
+            **key** (:obj:`str`): Matrix name to look up or insert.
+
+            **default** (array-like, *Optional*): Full square matrix to insert
+                if the name is missing.  Defaults to ``None``, which is only
+                valid when the matrix already exists.
+
+        >>> demand = AequilibraeMatrix(index=[101])
+        >>> demand.setdefault("car", [[12]]).tolist()
+        [[12]]
+        >>> demand.setdefault("car", [[99]]).tolist()
+        [[12]]
+        """
         if key not in self:
             self[key] = default
         return self[key]
 
 
 class AequilibraeMatrix(_Matrix):
+    """
+    A dictionary-like collection of square matrices held in memory.
+
+    All matrices use the same zone index for rows and columns.
+
+    Assigning a whole matrix copies the values and keeps their dtype. Reading a
+    matrix or taking a basic slice returns a view of its data. Use ``.copy()``
+    when you need an independent array. You can also use dictionary operations
+    such as ``keys()``, ``items()`` and ``update()``.
+
+    Matrix and index names must be non-empty strings, not paths. They cannot be
+    ``"."`` or ``".."``, or contain a slash, backslash or null character.
+
+    >>> demand = AequilibraeMatrix(index=[101, 205], index_name="zones")
+    >>> demand["car"] = [[0, 12], [10, 0]]
+    >>> demand["bus"] = [[0, 2], [2, 0]]
+    >>> demand["total"] = demand["car"] + demand["bus"]
+    >>> list(demand)
+    ['car', 'bus', 'total']
+    >>> demand["total"].tolist()
+    [[0, 14], [12, 0]]
+    >>> del demand["total"]
+    >>> len(demand), demand.shape
+    (2, (2, 2))
+    """
+
     def __init__(
         self,
         index: ArrayLike,
         index_name: str = "main_index",
     ) -> None:
+        """
+        Create an empty in-memory collection with a shared zone index.
+
+        :Arguments:
+            **index** (array-like): One-dimensional sequence of unique integer
+                zone IDs from ``0`` to ``2**64 - 1`` in row and column
+                order.
+
+            **index_name** (:obj:`str`, *Optional*): Name of the zone
+                mapping. Defaults to ``"main_index"``.
+        """
         self._backend: dict[str, np.ndarray] = {}
         self._metadata: dict[str, Any] = {}
         self._matrix_metadata: dict[str, dict[str, Any]] = {}
@@ -418,19 +651,34 @@ class AequilibraeMatrix(_Matrix):
         index: ArrayLike,
         index_name: str = "main_index",
     ) -> Self:
-        """Keep supplied arrays without copying, including strided views.
+        """
+        Use supplied arrays without copying.
 
-        This private path lets DenseMatrix hand off its buffer. Normal matrix
-        assignment still copies values. Each array keeps its own buffer alive.
+        Used by DenseMatrix to share its buffer with an in-memory matrix.  The
+        arrays keep the buffer alive. Normal matrix assignment still copies
+        values.
+
+        :Arguments:
+            **data** (mapping of :obj:`str` to :obj:`numpy.ndarray`): Named
+                square arrays to share.  Each array must match the index length
+                and have a supported numeric or boolean dtype.
+
+            **index** (array-like): Ordered zone IDs shared by rows and
+                columns.
+
+            **index_name** (:obj:`str`, *Optional*): Name of the zone
+                mapping. Defaults to ``"main_index"``.
         """
         self = cls(index=index, index_name=index_name)
         for name, values in data.items():
             _validate_matrix_key(name)
             if not isinstance(values, np.ndarray):
                 raise TypeError("shared matrix values must be NumPy arrays")
+
             _validate_matrix_dtype(values.dtype)
             if values.shape != self.shape:
                 raise ValueError(f"got bad shape, expected {self.shape}, got {values.shape}")
+
             self._backend[name] = values
             self._matrix_metadata[name] = {}
         return self
@@ -443,6 +691,44 @@ class AequilibraeMatrix(_Matrix):
         subset: Sequence[str | dict[str, Any]] | None = None,
         **kwargs,
     ) -> Self:
+        """
+        Load matrices from an OMX file into memory.
+
+        The file must contain the mapping named by ``index_name``. By default,
+        all matrices are loaded. Pass ``subset`` to choose matrices by name or
+        by their attributes. A query matches matrices with all the given
+        attributes, and each matching matrix is loaded once.
+
+        Matrix values, the zone index and metadata are copied. Changing the
+        loaded object does not change the file.
+
+        :Arguments:
+            **path** (:obj:`str` or :obj:`os.PathLike`): Existing OMX file to
+                load.
+
+            **index_name** (:obj:`str`, *Optional*): Existing zone mapping to
+                read. Defaults to ``"main_index"``.
+
+            **subset** (sequence of :obj:`str` or :obj:`dict`, *Optional*):
+                Matrix names or attribute queries to load. Defaults to all
+                matrices.
+
+            **kwargs**: Additional keyword arguments passed to the matrix
+                constructor.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> demand = from_dict({"car": [[12]], "bus": [[2]]}, index=[101])
+        >>> demand.matrix_metadata("car")["mode"] = "car"
+        >>> with TemporaryDirectory() as directory:
+        ...     path = Path(directory) / "demand.omx"
+        ...     demand.save_as_omx(path)
+        ...     working = AequilibraeMatrix.from_omx(path, subset=[{"mode": "car"}])
+        >>> list(working)
+        ['car']
+        >>> working["car"].tolist()
+        [[12]]
+        """
         _validate_name(index_name, "index")
         with omx.open_file(path, mode="r") as file:
             index = file.lookup.get(index_name)
@@ -466,6 +752,23 @@ class AequilibraeMatrix(_Matrix):
             return self
 
     def matrix_metadata(self, name: str) -> MutableMapping[str, Any]:
+        """
+        Return the mutable attribute dictionary for an existing named
+        matrix.
+
+        Assign a new value to an attribute to update it. Attributes are kept
+        when you replace a matrix and can be used to select matrices with
+        ``subset()``.
+
+        :Arguments:
+            **name** (:obj:`str`): Name of an existing matrix.
+
+        >>> demand = from_dict({"car": [[12]]}, index=[101])
+        >>> demand.matrix_metadata("car")["mode"] = "car"
+        >>> demand["car"] = [[15.0]]
+        >>> demand.matrix_metadata("car")["mode"]
+        'car'
+        """
         _validate_matrix_key(name)
         return self._matrix_metadata[name]
 
@@ -475,6 +778,22 @@ class AequilibraeMatrix(_Matrix):
 
     # Normal write
     def __setitem__(self, key: str, value: ArrayLike) -> None:
+        """
+        Copy a full square array into a named matrix, preserving its dtype.
+
+        :Arguments:
+            **key** (:obj:`str`): Matrix name to create or replace.
+
+            **value** (array-like): Values matching the collection's square
+                shape, with an integer, float, boolean or complex dtype.
+
+        >>> values = np.array([[12]])
+        >>> demand = AequilibraeMatrix(index=[101])
+        >>> demand["car"] = values
+        >>> values[0, 0] = 99
+        >>> demand["car"].tolist()
+        [[12]]
+        """
         _validate_matrix_key(key)
         value = _matrix_values(value, self.shape)
         self._backend[key] = np.asarray(value, copy=True, order="C")
@@ -482,6 +801,20 @@ class AequilibraeMatrix(_Matrix):
 
     # Normal lookup
     def __getitem__(self, key: str) -> np.ndarray:
+        """
+        Return a view of a named matrix.
+
+        Changing values in the returned array also changes the matrix.
+
+        :Arguments:
+            **key** (:obj:`str`): Name of an existing matrix.
+
+        >>> demand = from_dict({"car": [[12]]}, index=[101])
+        >>> values = demand["car"]
+        >>> values[0, 0] = 42
+        >>> demand["car"].tolist()
+        [[42]]
+        """
         _validate_matrix_key(key)
         return self._backend[key].view()
 
@@ -489,6 +822,29 @@ class AequilibraeMatrix(_Matrix):
         self,
         subset: Sequence[str | dict[str, Any]],
     ) -> Self:
+        """
+        Copy selected matrices into a new in-memory matrix object.
+
+        Select matrices by name or by their attributes. A query matches
+        matrices with all the given attributes. Each matrix is included once,
+        even if it matches more than one entry.
+
+        The arrays, zone index and metadata are copied. Changes to the result
+        do not affect the original object.
+
+        :Arguments:
+            **subset** (sequence of :obj:`str` or :obj:`dict`): Matrix names or
+              attribute queries to copy.
+
+        >>> demand = from_dict({"car": [[12]], "bus": [[2]]}, index=[101])
+        >>> demand.matrix_metadata("car")["mode"] = "car"
+        >>> working = demand.subset([{"mode": "car"}, "car"])
+        >>> list(working)
+        ['car']
+        >>> working["car"] *= 2
+        >>> demand["car"].tolist(), working["car"].tolist()
+        ([[12]], [[24]])
+        """
         mats = _query_matrices(self, subset, self.matrix_metadata)
 
         other = self.__class__(index=self.index, index_name=self.index_name)
@@ -501,6 +857,36 @@ class AequilibraeMatrix(_Matrix):
 
 
 class MatrixStore(_Matrix):
+    """
+    A dictionary-like collection of square matrices backed by an OMX file.
+
+    Open an existing file by choosing a zone mapping with ``index_name``.
+    To create a file or relabel its zones, supply ``index`` and a writable
+    mode. Stores are read-only by default.
+
+    Each read loads values from disk into a new array. Changing that array does
+    not update the file. To write changes, assign a whole matrix by name or use
+    ``mat`` or ``imat`` to update part of a matrix.
+
+    Use ``subset()`` to copy selected matrices into memory for calculations.
+    Keep the store open while using it. Using a ``with`` block is recommended.
+
+    >>> from pathlib import Path
+    >>> from tempfile import TemporaryDirectory
+    >>> with TemporaryDirectory() as directory:
+    ...     path = Path(directory) / "demand.omx"
+    ...     with MatrixStore(path, index=[101, 205], mode="x") as store:
+    ...         store["car"] = [[0, 12], [10, 0]]
+    ...         values = store["car"]
+    ...         values[0, 1] = 99
+    ...         print(int(store.imat["car", 0, 1]))
+    ...         store.mat["car", 101, 205] = 42
+    ...         working = store.subset(["car"])
+    12
+    >>> working["car"].tolist()
+    [[0, 42], [10, 0]]
+    """
+
     def __init__(
         self,
         path: str | os.PathLike,
@@ -509,6 +895,33 @@ class MatrixStore(_Matrix):
         mode: Literal["r", "w", "a", "r+", "w-", "x"] = "r",
         **kwargs,
     ) -> None:
+        """
+        Open or create an OMX-backed matrix collection.
+
+        :Arguments:
+
+            **path** (:obj:`str` or :obj:`os.PathLike`): OMX file to open or
+                create.
+
+            **index** (array-like, *Optional*): One-dimensional sequence of
+                unique integer zone IDs from ``0`` to ``2**64 - 1`` in row and
+                column order. Its length must match the size of any existing
+                matrices. You must use a writable mode when providing an
+                index. If omitted, the mapping named by ``index_name`` is read
+                without changing it.
+
+            **index_name** (:obj:`str`, *Optional*): Zone mapping to read or
+                write. Defaults to ``"main_index"``.  Must be a non-empty name,
+                not a path.
+
+            **mode** (:obj:`str`, *Optional*): ``"r"`` for read-only access,
+                ``"r+"`` to update an existing file, ``"x"`` or ``"w-"`` to
+                create a new file, ``"w"`` to replace or create a file, or
+                ``"a"`` to update or create a file. Defaults to ``"r"``.
+
+            **kwargs**: Additional keyword arguments passed to
+                ``openmatrix.open_file``.
+        """
         _validate_name(index_name, "index")
         if mode == "r" and index is not None:
             raise ValueError("cannot supply an index when opening a read-only matrix store")
@@ -545,11 +958,39 @@ class MatrixStore(_Matrix):
             raise
 
     def matrix_metadata(self, name: str) -> h5py.AttributeManager:
+        """
+        Return h5py attributes for an existing matrix dataset.
+
+        Use a writable store to change attributes, and assign each new value as
+        a whole. Replacing a matrix with a different dtype creates a new
+        dataset. Call this method again afterwards to get its attributes.
+
+        :Arguments:
+            **name** (:obj:`str`): Name of an existing matrix dataset.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory:
+        ...     with MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x") as store:
+        ...         store["car"] = [[12]]
+        ...         store.matrix_metadata("car")["mode"] = "car"
+        ...         print(store.matrix_metadata("car")["mode"])
+        car
+        """
         _validate_matrix_key(name)
         return self._backend.data[name].attrs
 
     @property
     def omx(self) -> omx.File:
+        """
+        Underlying open OMX file for advanced operations.
+
+        >>> from pathlib import Path from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory: ...  with
+        >>> MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x")
+        >>> as store: ...  store["car"] = [[12]] ...
+        >>> print(store.omx.list_matrices()) ['car']
+        """
         return self._backend
 
     def __enter__(self) -> Self:
@@ -559,6 +1000,21 @@ class MatrixStore(_Matrix):
         self.close()
 
     def close(self) -> None:
+        """
+        Close the OMX file.
+
+        This is called automatically when leaving a ``with`` block.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory:
+        ...     store = MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x")
+        ...     store["car"] = [[12]]
+        ...     working = store.subset(["car"])
+        ...     store.close()
+        >>> working["car"].tolist()
+        [[12]]
+        """
         if hasattr(self, "_backend"):
             self.omx.close()
 
@@ -574,6 +1030,24 @@ class MatrixStore(_Matrix):
         self._index = value
 
     def __setitem__(self, key: str, value: ArrayLike) -> None:
+        """
+        Write a full square matrix using its supplied dtype, keeping attributes.
+        :Arguments:
+
+            **key** (:obj:`str`): Matrix name to create or replace.
+
+            **value** (array-like): Values matching the collection's square
+                shape, with an integer, float, boolean or complex dtype.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory:
+        ...     with MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x") as store:
+        ...         store["car"] = [[12]]
+        ...         store["car"] = [[12.5]]
+        ...         print(store["car"].tolist())
+        [[12.5]]
+        """
         _validate_matrix_key(key)
         value = _matrix_values(value, self.shape)
 
@@ -582,6 +1056,22 @@ class MatrixStore(_Matrix):
 
     # Normal lookup
     def __getitem__(self, key: str) -> np.ndarray:
+        """
+        Read a whole matrix into an independent array, without changing the file.
+
+        :Arguments:
+            **key** (:obj:`str`): Name of an existing matrix dataset.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory:
+        ...     with MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x") as store:
+        ...         store["car"] = [[12]]
+        ...         values = store["car"]
+        ...         values[0, 0] = 99
+        ...         print(store["car"].tolist())
+        [[12]]
+        """
         _validate_matrix_key(key)
         value = _lookup_to_key_error(self._backend, key)
         return np.asarray(value)
@@ -590,6 +1080,32 @@ class MatrixStore(_Matrix):
         self,
         subset: Sequence[str | dict[str, Any]],
     ) -> AequilibraeMatrix:
+        """
+        Copy selected matrices from the file into memory.
+
+        Select matrices by name or by their attributes. A query matches
+        matrices with all the given attributes. Each matrix is included once,
+        even if it matches more than one entry.
+
+        The zone index and metadata are also copied. You can keep using the
+        result after the store closes, and changes to it do not affect the
+        file.
+
+        :Arguments:
+            **subset** (sequence of :obj:`str` or :obj:`dict`): Matrix names or
+              attribute queries to load.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory:
+        ...     with MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x") as store:
+        ...         store["car"] = [[12]]
+        ...         store["bus"] = [[2]]
+        ...         store.matrix_metadata("car")["mode"] = "car"
+        ...         working = store.subset([{"mode": "car"}])
+        >>> list(working), working["car"].tolist()
+        (['car'], [[12]])
+        """
         datasets = _query_matrices(self._backend.data, subset, self.matrix_metadata)
 
         other = AequilibraeMatrix(index=self.index, index_name=self.index_name)
@@ -635,14 +1151,52 @@ def from_file(
     """
     Load an OMX file as an in-memory matrix or an on-disk store.
 
-    If ``index_name`` is omitted, and there is only one zone index in the file,
-    it is selected automatically. If the file contains multiple indices,
-    ``main_index`` is selected when present, otherwise, pass ``index_name``
-    explicitly.
+    By default, this copies all matrices and metadata into an in-memory
+    :class:`AequilibraeMatrix`. Pass ``subset`` to load only the matrices you
+    need.
 
-    Supply ``subset`` to load selected matrices into an in-memory
-    :class:`AequilibraeMatrix`. Supply ``store=True`` instead to open a
-    :class:`MatrixStore`; stores do not accept ``subset``.
+    Use ``store=True`` to work with the file through a :class:`MatrixStore`
+    instead. The store opens read-only unless you pass ``mode="r+"``.  Stores
+    do not accept ``subset``. Use their ``subset()`` method to copy selected
+    matrices into memory.
+
+    If the file has only one zone mapping, it is selected automatically. If
+    there are several, ``main_index`` is used when available. Otherwise, choose
+    a mapping with ``index_name``.
+
+    :Arguments:
+        **path** (:obj:`str` or :obj:`os.PathLike`): Existing OMX file to open.
+
+        **mode** (:obj:`str`, *Optional*): Store access mode, ``"r"`` or
+            ``"r+"``. Defaults to ``None``, which opens stores read-only. Must
+            be omitted for in-memory loading.
+
+        **index_name** (:obj:`str`, *Optional*): Zone mapping to read. Defaults
+            to automatic selection of the only mapping, or ``"main_index"``
+            when several exist. Required if neither choice is available.
+
+        **subset** (sequence of :obj:`str` or :obj:`dict`, *Optional*): Matrix
+            names or attribute queries to load into memory. Defaults to all
+            matrices. Cannot be combined with ``store=True``.
+
+        **store** (:obj:`bool`, *Optional*): Return an open
+            :class:`MatrixStore` instead of an in-memory
+            :class:`AequilibraeMatrix`. Defaults to ``False``.
+
+    >>> from pathlib import Path
+    >>> from tempfile import TemporaryDirectory
+    >>> demand = from_dict({"car": [[0, 12], [10, 0]]}, index=[101, 205], index_name="zones")
+    >>> with TemporaryDirectory() as directory:
+    ...     path = Path(directory) / "demand.omx"
+    ...     demand.save_as_omx(path)
+    ...     loaded = from_file(path, subset=["car"])
+    ...     with from_file(path, store=True, mode="r+") as store:
+    ...         store.mat["car", 101, 205] = 42
+    ...         working = store.subset(["car"])
+    >>> loaded["car"].tolist()
+    [[0, 12], [10, 0]]
+    >>> working["car"].tolist()
+    [[0, 42], [10, 0]]
     """
     if store:
         if subset is not None:
@@ -706,6 +1260,61 @@ def from_dict(
     metadata: Mapping[str, Any] | None = None,
     store: bool = False,
 ) -> AequilibraeMatrix | MatrixStore:
+    """
+    Create named square matrices from a mapping of names to array-like values.
+
+    The result is an in-memory :class:`AequilibraeMatrix` unless you pass
+    ``store=True``. Arrays are copied with their original dtypes. File metadata
+    is also copied, apart from attributes managed by OMX.
+
+    To create a :class:`MatrixStore`, pass ``store=True`` and a file path.  The
+    default mode is ``"x"``, which raises an error if the file already
+    exists. Close the store when finished, or use a ``with`` block. In-memory
+    matrices do not accept ``path`` or ``mode``.
+
+    :Arguments:
+
+        **data** (mapping of :obj:`str` to array-like): Named square matrices
+            matching the index length.  Values must have integer, float,
+            boolean or complex dtypes.
+
+        **index** (array-like): One-dimensional sequence of unique integer zone
+            IDs from ``0`` to ``2**64 - 1`` in row and column order.
+
+        **path** (:obj:`str` or :obj:`os.PathLike`, *Optional*): Destination
+            OMX file. Required when ``store=True`` and not accepted
+            otherwise. Defaults to ``None``.
+
+        **mode** (:obj:`str`, *Optional*): Writable store mode: ``"x"``,
+            ``"w-"``, ``"w"``, ``"r+"`` or ``"a"``. Defaults to ``None``, which
+            uses ``"x"`` for stores. Must be omitted for in-memory matrices.
+
+        **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
+          ``"main_index"``.
+
+        **metadata** (:obj:`Mapping`, *Optional*): File-level attributes to
+            copy, excluding OMX-managed attributes. Defaults to ``None``.
+
+        **store** (:obj:`bool`, *Optional*): Write to an OMX file and return an
+            open :class:`MatrixStore` instead of an in-memory
+            :class:`AequilibraeMatrix`. Defaults to ``False``.
+
+    >>> demand = from_dict(
+    ...     {"car": [[0, 12], [10, 0]], "bus": [[0, 2], [2, 0]]},
+    ...     index=[101, 205], index_name="zones", metadata={"year": 2030},
+    ... )
+    >>> demand["car"].tolist(), demand.metadata["year"]
+    ([[0, 12], [10, 0]], 2030)
+    >>> from pathlib import Path
+    >>> from tempfile import TemporaryDirectory
+    >>> with TemporaryDirectory() as directory:
+    ...     with from_dict(
+    ...         {"car": demand["car"]}, index=demand.index,
+    ...         path=Path(directory) / "demand.omx", store=True,
+    ...     ) as store:
+    ...         print(store["car"].tolist())
+    [[0, 12], [10, 0]]
+    """
     mat: AequilibraeMatrix | MatrixStore
     if store:
         if path is None:
@@ -761,6 +1370,53 @@ def from_df(
     fill_value: float = 0,
     dtype: DTypeLike = float,
 ) -> AequilibraeMatrix:
+    """
+    Create dense in-memory matrices from an origin-destination DataFrame.
+
+    Choose the origin and destination columns with ``row`` and ``col``.  Each
+    remaining column becomes a named matrix, or you can choose columns with
+    ``subset``. Values for repeated origin-destination pairs are added
+    together. Missing pairs are filled with ``fill_value``.
+
+    Pass ``index`` to set the zone order and include zones with no trips.  If
+    omitted, the index contains the sorted unique origin and destination
+    IDs. All IDs must be valid integer zone IDs and appear in the index.
+
+    :Arguments:
+        **df** (:obj:`pandas.DataFrame`): Origin-destination records with zone
+          IDs and matrix value columns.
+
+        **row** (:obj:`str`): Column containing origin zone IDs.
+
+        **col** (:obj:`str`): Column containing destination zone IDs.
+
+        **subset** (sequence of :obj:`str`, *Optional*): Value columns to
+            convert to named matrices.  Defaults to all columns except ``row``
+            and ``col``.
+
+        **index** (array-like, *Optional*): Unique integer zone IDs shared by
+            rows and columns.  Must include all origin and destination
+            IDs. Defaults to their sorted union.
+
+        **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
+          ``"main_index"``.
+
+        **fill_value** (:obj:`float`, *Optional*): Value for pairs without
+          records. Defaults to ``0``.
+
+        **dtype** (NumPy dtype-like, *Optional*): Dtype used for all output
+          matrices. Defaults to :obj:`float`.
+
+    >>> trips = pd.DataFrame({"origin": [101, 101, 309], "destination": [205, 205, 101], "car": [2, 3, 7]})
+    >>> demand = from_df(
+    ...     trips, row="origin", col="destination", subset=["car"],
+    ...     index=[101, 205, 309], index_name="zones", fill_value=-1,
+    ... )
+    >>> demand["car"].tolist()
+    [[-1.0, 5.0, -1.0], [-1.0, -1.0, -1.0], [7.0, -1.0, -1.0]]
+    >>> from_df(trips, row="origin", col="destination").index.tolist()
+    [101, 205, 309]
+    """
     dtype = np.dtype(dtype)
     if subset is None:
         subset = [name for name in df.columns if name not in (row, col)]
@@ -793,6 +1449,36 @@ def from_scipy(
     *,
     index_name: str = "main_index",
 ) -> AequilibraeMatrix:
+    """
+    Convert named SciPy sparse arrays to dense in-memory matrices.
+
+    Each sparse array becomes a named dense matrix with the same dtype.  Its
+    shape must match the number of zones in ``index``, which sets the row and
+    column order. The result stores full square arrays, so make sure they will
+    fit in memory.
+
+    :Arguments:
+
+        **data** (mapping of :obj:`str` to :obj:`scipy.sparse.sparray`): Named
+            square sparse arrays.  Each array's shape must match the index
+            length.
+
+        **index** (array-like): One-dimensional sequence of unique integer zone
+            IDs from ``0`` to ``2**64 - 1`` in row and column order.
+
+        **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
+          ``"main_index"``.
+
+    >>> from scipy.sparse import csr_array
+    >>> demand = from_scipy(
+    ...     {"car": csr_array([[0, 12], [10, 0]])},
+    ...     index=[101, 205], index_name="zones",
+    ... )
+    >>> demand["car"].tolist()
+    [[0, 12], [10, 0]]
+    >>> demand.index.tolist()
+    [101, 205]
+    """
     for value in data.values():
         if not isinstance(value, scipy.sparse.sparray):
             raise TypeError("data values must be SciPy sparse arrays")
