@@ -293,13 +293,25 @@ Save matrices and metadata
 
 Use ``save_as_omx()`` to save a matrix. The default ``mode="x"`` creates a new
 file and raises ``FileExistsError`` if the file already exists. Save all named
-matrices, or select which ones to write using the ``subset`` argument:
+matrices, or use ``subset`` to select them by name or by their attributes:
 
 .. code-block:: python
 
     demand.metadata["description"] = "Adjusted morning demand"
     demand.save_as_omx("updated_demand.omx")  # All matrices
     demand.save_as_omx("car_demand.omx", subset=["car"])
+
+Attribute queries use the source object's matrix attributes. You can mix names
+and queries, and each selected matrix is saved once:
+
+.. code-block:: python
+
+    demand.matrix_metadata("car")["mode"] = "car"
+    demand.save_as_omx("car_by_mode.omx", subset=[{"mode": "car"}])
+    demand.save_as_omx("selected_demand.omx", subset=["bus", {"mode": "car"}])
+
+All attributes in a query must match. If no matrices match, the zone mapping
+and file metadata are still written.
 
 OMX manages the file attributes ``OMX_VERSION``, ``OMX_CREATED_WITH``,
 ``SHAPE`` and ``TITLE``. They are ignored when loading, copying, saving or
@@ -371,8 +383,8 @@ attribute queries:
 All attributes within a query must match, and multiple queries select the
 combined matches, with each matrix included once.
 
-Attribute queries are only supported by ``subset()`` and the ``subset``
-arguments when loading matrices. They are not supported by ``store[...]``,
+Attribute queries are supported by ``subset()`` and the ``subset`` arguments
+when loading or saving matrices. They are not supported by ``store[...]``,
 ``.mat`` or ``.imat``. ``subset()`` creates a new in-memory
 ``AequilibraeMatrix`` with all matrices that matched the query. Use
 ``store.omx`` for advanced OMX-specific operations, or ``store.omx["/"]`` to

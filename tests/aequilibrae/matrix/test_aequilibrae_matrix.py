@@ -464,6 +464,123 @@ def test_save_subset_keeps_unselected_matrices(memory_matrix, omx_path, data):
     np.testing.assert_array_equal(loaded["bus"], data["bus"])
 
 
+@pytest.mark.parametrize(
+    "subset, names",
+    [
+        ([{"mode": "car"}], {"car"}),
+        ([{"mode": "car", "year": 2030}], {"car"}),
+        ([{"mode": "car", "year": 2029}], set()),
+        ([{"missing": "car"}], set()),
+        ([{"description": "Test demand"}], set()),
+        ([{}], {"car", "bus"}),
+        (["bus", {"mode": "car"}, "car"], {"car", "bus"}),
+        ([{"mode": "car"}, {"mode": "bus"}], {"car", "bus"}),
+        ([{"mode": "car"}, {"year": 2030}, "car"], {"car"}),
+        ([{"periods": [1, 2]}], {"car"}),
+        ([{"value": np.nan}], {"car"}),
+        ([{"values": [1.0, np.nan]}], {"car"}),
+    ],
+)
+def test_save_attribute_queries(matrix, tmp_path, index, data, metadata, subset, names):
+    matrix.matrix_metadata("car").update(
+        {"mode": "car", "year": 2030, "periods": [1, 2], "value": np.nan, "values": [1.0, np.nan]}
+    )
+    matrix.matrix_metadata("bus")["mode"] = "bus"
+    path = tmp_path / "query.omx"
+
+    matrix.save_as_omx(path, subset=subset)
+
+    loaded = from_file(path, index_name="zones")
+    assert_matrix(loaded, index, {name: data[name] for name in names}, metadata=metadata)
+    for name in names:
+        for key, value in matrix.matrix_metadata(name).items():
+            np.testing.assert_array_equal(loaded.matrix_metadata(name)[key], value)
+    assert_matrix(matrix, index, data, metadata=metadata)
+
+
+@pytest.mark.parametrize("mode", ["r+", "a"])
+def test_save_attribute_query_updates_source_matches(matrix, omx_path, index, data, metadata, mode):
+    matrix.matrix_metadata("car")["mode"] = "source"
+    matrix["car"] = np.zeros(matrix.shape)
+    matrix["bus"] = np.ones(matrix.shape)
+    matrix.index = index + 1000
+    matrix.metadata["description"] = "Updated demand"
+
+    matrix.save_as_omx(omx_path, mode=mode, subset=[{"mode": "source"}])
+
+    loaded = from_file(omx_path, index_name="zones")
+    assert_matrix(
+        loaded,
+        index + 1000,
+        {"car": np.zeros(matrix.shape), "bus": data["bus"]},
+        metadata={**metadata, "description": "Updated demand"},
+    )
+    assert loaded.matrix_metadata("car")["mode"] == "source"
+    assert loaded.matrix_metadata("bus")["mode"] == "bus"
+
+
+@pytest.mark.parametrize("mode", ["r+", "a"])
+def test_save_unmatched_query_still_updates_index_and_metadata(matrix, omx_path, index, data, mode):
+    matrix.index = index + 1000
+    matrix.metadata["description"] = "Updated demand"
+    matrix["car"] = np.zeros(matrix.shape)
+
+    matrix.save_as_omx(omx_path, mode=mode, subset=[{"missing": "car"}])
+
+    loaded = from_file(omx_path, index_name="zones")
+    assert_matrix(loaded, index + 1000, data, metadata={"description": "Updated demand"})
+
+
+@pytest.mark.parametrize(
+    "entry, error, message",
+    [
+        ("missing", KeyError, "missing"),
+        ("bad/path", ValueError, "not a path"),
+        (None, TypeError, "matrix names or attribute queries"),
+        (17, TypeError, "matrix names or attribute queries"),
+        (["car"], TypeError, "matrix names or attribute queries"),
+    ],
+)
+def test_save_rejects_invalid_query_subset_before_creating_file(matrix, tmp_path, entry, error, message):
+    path = tmp_path / "invalid.omx"
+    with pytest.raises(error, match=message):
+        matrix.save_as_omx(path, subset=[{}, entry])
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("mode", ["w", "r+", "a"])
+@pytest.mark.parametrize("entry, error", [("missing", KeyError), (None, TypeError)])
+def test_save_rejects_invalid_query_subset_before_changing_file(matrix, omx_path, mode, entry, error):
+    original = omx_path.read_bytes()
+    with pytest.raises(error):
+        matrix.save_as_omx(omx_path, mode=mode, subset=[{}, entry])
+    assert omx_path.read_bytes() == original
+
+
+def test_save_attribute_query_reads_each_selected_matrix_once(matrix, tmp_path, monkeypatch):
+    matrix.matrix_metadata("car")["mode"] = "car"
+    reads = []
+    original_getitem = type(matrix).__getitem__
+
+    def track_reads(self, key):
+        reads.append(key)
+        return original_getitem(self, key)
+
+    monkeypatch.setattr(type(matrix), "__getitem__", track_reads)
+    matrix.save_as_omx(tmp_path / "selected.omx", subset=[{"mode": "car"}, "car", {"mode": "car"}])
+    assert reads == ["car"]
+
+
+def test_read_only_store_save_attribute_query(omx_path, tmp_path, index, data, metadata):
+    path = tmp_path / "selected.omx"
+    with from_file(omx_path, index_name="zones", store=True) as store:
+        store.save_as_omx(path, subset=[{"mode": "car"}])
+
+    loaded = from_file(path, index_name="zones")
+    assert_matrix(loaded, index, {"car": data["car"]}, metadata=metadata)
+    assert loaded.matrix_metadata("car")["mode"] == "car"
+
+
 def test_save_empty_subset_still_writes_index(memory_matrix, omx_path, index):
     memory_matrix.index = index + 1000
     memory_matrix.save_as_omx(omx_path, mode="r+", subset=[])

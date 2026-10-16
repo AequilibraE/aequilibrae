@@ -49,6 +49,15 @@ def _metadata_equal(left: Any, right: Any) -> bool:
     return np.array_equal(left, right, equal_nan=equal_nan)
 
 
+def _lookup_to_key_error(mapping, key):
+    try:
+        return mapping[key]
+    except LookupError as e:
+        # OMX raises the parent class LookupError instead of the more
+        # appropriate KeyError.
+        raise KeyError(key) from e
+
+
 def _query_matrices(
     matrices: Mapping[str, Any],
     subset: Sequence[str | dict[str, Any]],
@@ -58,7 +67,7 @@ def _query_matrices(
     for key in subset:
         if isinstance(key, str):
             _validate_matrix_key(key)
-            mats[key] = matrices[key]
+            mats[key] = _lookup_to_key_error(matrices, key)
 
         elif isinstance(key, dict):
             for name in matrices.keys():
@@ -66,7 +75,7 @@ def _query_matrices(
 
                 if all(attr in attrs and _metadata_equal(attrs[attr], value) for attr, value in key.items()):
                     _validate_matrix_key(name)
-                    mats[name] = matrices[name]
+                    mats[name] = _lookup_to_key_error(matrices, name)
         else:
             raise TypeError("subset entries must be matrix names or attribute queries")
 
@@ -208,11 +217,7 @@ class _MatrixIndexer:
         if not selection:
             return self._matrix[name]
 
-        try:
-            dataset = self._matrix._backend[name]
-        except LookupError as exc:
-            raise KeyError(name) from exc
-
+        dataset = _lookup_to_key_error(self._matrix._backend, name)
         return dataset[selection]
 
     # Dataset slice (partial write), allows in-place modification without writing the whole matrix
@@ -221,11 +226,7 @@ class _MatrixIndexer:
         if not selection:
             self._matrix[name] = value
         else:
-            try:
-                dataset = self._matrix._backend[name]
-            except LookupError as exc:
-                raise KeyError(name) from exc
-
+            dataset = _lookup_to_key_error(self._matrix._backend, name)
             dataset[selection] = value
 
 
@@ -246,18 +247,17 @@ class _Matrix(MutableMapping[str, Any]):
         path: str | os.PathLike,
         mode: Literal["w", "a", "r+", "w-", "x"] = "x",
         *,
-        subset: Sequence[str] | None = None,
+        subset: Sequence[str | dict[str, Any]] | None = None,
         **kwargs,
     ) -> None:
         if mode not in ("w", "a", "r+", "w-", "x"):
             raise ValueError("save_as_omx only supports modes 'w', 'a', 'r+', 'w-' and 'x'")
 
-        keys = set(self) if subset is None else set(subset)
-        for key in keys:
-            _validate_matrix_key(key)
-
-        if missing_keys := keys - self.keys():
-            raise ValueError(f"found non-existent keys in subset: {missing_keys}")
+        if subset is not None:
+            # Query backend arrays or dataset handles without loading store values.
+            keys = set(_query_matrices(self._backend, subset, self.matrix_metadata))
+        else:
+            keys = set(self)
 
         if (shape := kwargs.get("shape")) is not None and tuple(shape) != self.shape:
             raise ValueError(f"destination matrix shape does not match, expected {self.shape}, got {shape}")
@@ -583,11 +583,7 @@ class MatrixStore(_Matrix):
     # Normal lookup
     def __getitem__(self, key: str) -> np.ndarray:
         _validate_matrix_key(key)
-        try:
-            value = self._backend[key]
-        except LookupError as e:
-            raise KeyError(key) from e
-
+        value = _lookup_to_key_error(self._backend, key)
         return np.asarray(value)
 
     def subset(
