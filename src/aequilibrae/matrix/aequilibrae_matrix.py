@@ -985,11 +985,13 @@ class MatrixStore(_Matrix):
         """
         Underlying open OMX file for advanced operations.
 
-        >>> from pathlib import Path from tempfile import TemporaryDirectory
-        >>> with TemporaryDirectory() as directory: ...  with
-        >>> MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x")
-        >>> as store: ...  store["car"] = [[12]] ...
-        >>> print(store.omx.list_matrices()) ['car']
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory:
+        ...     with MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x") as store:
+        ...         store["car"] = [[12]]
+        ...         print(store.omx.list_matrices())
+        ['car']
         """
         return self._backend
 
