@@ -34,7 +34,7 @@ dependencies = [
   "cysignals",
   "geopandas",
   "numpy>=2.4.6",
-  "openmatrix",
+  "openmatrix>0.4",
   "pandas>=3.0",
   "pyaml",
   "pyarrow",
