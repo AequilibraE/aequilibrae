@@ -22,22 +22,28 @@ def migrate(
     transit_conn: Optional[sqlite3.Connection] = None,
     results_conn: Optional[sqlite3.Connection] = None,
 ):
+    if project_conn is None:
+        raise RuntimeError("Network migration 010 requires a project_conn connection")
     src_exists = _table_exists(project_conn, SRC_TABLE)
 
     if src_exists and project_conn.execute(f'SELECT COUNT(*) FROM main."{SRC_TABLE}"').fetchone()[0] == 0:
         # it has a table, but no results yet. We just drop the empty table from the project database
         # carefully drop
-        try:
-            # project_conn.execute("BEGIN")
-            project_conn.execute(f'DROP TABLE "{SRC_TABLE}"')
-            # project_conn.commit()
-        except Exception:
-            project_conn.rollback()
-            raise
+        project_conn.execute(f'DROP TABLE "{SRC_TABLE}"')
         return
 
     if results_conn is None:
-        raise (ValueError("result_conn is required, but is not given"))
+        if not src_exists:
+            logger.info(
+                f"'{SRC_TABLE}' is not in the project database, and results connection not given, Nothing to migrate."
+            )
+            return
+        num_rows = project_conn.execute('SELECT COUNT(*) FROM main."{}"'.format(SRC_TABLE)).fetchall()[0]
+        raise (
+            ValueError(
+                f"There are {num_rows} rows in the results table in the project database, but result_conn is not given"
+            )
+        )
     logger.info("Beginning migration to move the results table in project_database.sqlite to results_database.sqlite")
 
     dst_exists = _table_exists(results_conn, DST_TABLE)
@@ -68,47 +74,18 @@ def migrate(
     )
     existing_columns = [row[1] for row in project_conn.execute('PRAGMA table_info("results")')]
 
-    assert set(cols.split(", ")) == set(existing_columns), ValueError(
-        f"project database has different columns. Expected: {set(cols.split(', '))}, got {set(existing_columns)}"
-    )
-
-    project_conn.execute("ATTACH DATABASE ? AS results_db", (results_path,))
-    attached = {name: path for _seq, name, path in project_conn.execute("PRAGMA database_list")}
-    if attached.get("results_db") != results_path:
-        raise RuntimeError("results_db is not attached to the expected file")
-
+    if set(cols.split(", ")) != set(existing_columns):
+        raise ValueError(
+            f"project database has different columns. Expected: {set(cols.split(', '))}, got {set(existing_columns)}"
+        )
     add_blank_results_table(results_conn)
 
-    try:
-        # project_conn.execute("BEGIN")
+    data = project_conn.execute(f"select {cols} from {SRC_TABLE}").fetchall()
 
-        src_count = project_conn.execute(f'SELECT COUNT(*) FROM main."{SRC_TABLE}"').fetchone()[0]
+    question_marks = ", ".join(["?" for col_name in cols.split(", ")])
+    results_conn.executemany(f"INSERT INTO {SRC_TABLE}({cols}) VALUES({question_marks})", data)
 
-        # copy the table
-        project_conn.execute(f'INSERT INTO results_db."{DST_TABLE}" ({cols}) SELECT {cols} FROM main."{SRC_TABLE}"')
-
-        dst_count = project_conn.execute(f'SELECT COUNT(*) FROM results_db."{DST_TABLE}"').fetchone()[0]
-        if src_count != dst_count:
-            raise RuntimeError(f"Row count mismatch: source={src_count}, destination={dst_count}")
-
-        # project_conn.commit()
-
-    except Exception:
-        project_conn.rollback()
-        logger.exception("Copy failed. Rollback project ")
-        raise
-    finally:
-        # detach
-        project_conn.execute("DETACH DATABASE results_db")
-
-    # carefully drop
-    try:
-        project_conn.execute("BEGIN")
-        project_conn.execute(f'DROP TABLE "{SRC_TABLE}"')
-        project_conn.commit()
-    except Exception:
-        project_conn.rollback()
-        raise
+    project_conn.execute(f'DROP TABLE "{SRC_TABLE}"')
 
 
 def main():

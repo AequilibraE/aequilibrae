@@ -142,7 +142,7 @@ def no_triggers_test(test_data_path, tmp_path) -> Project:
 
 @pytest.fixture(scope="session")
 def cached_sioux_falls_single_class(test_data_path, cache_path):
-    zipfile.ZipFile(test_data_path / "sioux_falls_single_class.zip").extractall(cache_path / "sioux_falls_single_class")
+    zipfile.ZipFile(test_data_path / "sioux_falls_single_class.zip").extractall(cache_path)
 
 
 @pytest.fixture(scope="function")

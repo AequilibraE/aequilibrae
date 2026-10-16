@@ -23,7 +23,7 @@ def add_blank_results_table(results_conn: Connection):
                         CREATE TABLE {DST_TABLE} (
                             table_name       TEXT     NOT NULL PRIMARY KEY,
                             procedure        TEXT     NOT NULL,
-                            procedure_id     TEXT     NOT NULL UNIQUE,
+                            procedure_id     TEXT     NOT NULL,
                             procedure_report TEXT     NOT NULL,
                             timestamp        DATETIME DEFAULT current_timestamp,
                             description      TEXT, year TEXT, scenario TEXT, reference_table TEXT
