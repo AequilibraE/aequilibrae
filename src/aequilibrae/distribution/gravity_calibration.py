@@ -27,7 +27,7 @@ class GravityCalibration:
         >>> project = create_example(project_path)
 
         # We load the demand matrix
-        >>> demand = project.matrices.get_matrix("demand_omx", subset=["REPLACE WITH ACTUAL NAME"])
+        >>> demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
         # We load the skim matrix
         >>> skim = project.matrices.get_matrix("skims", subset=["time_final"])
