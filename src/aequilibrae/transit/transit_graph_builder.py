@@ -14,6 +14,7 @@ TransitGraphBuilder Assumptions:
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import warnings
 
@@ -29,6 +30,8 @@ from scipy.spatial import KDTree
 from aequilibrae.paths import PathResults
 from aequilibrae.paths.graph import NewTransitGraph
 from aequilibrae.utils.geo_utils import haversine
+
+logger = logging.getLogger(__name__)
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
@@ -1292,10 +1295,9 @@ class TransitGraphBuilder:
             ]
         elif method == "connector project match":
             # Check validity of project and nodes database
-            warnings.warn(
+            logger.warning(
                 'In its current implementation, the "connector project match" method may take '
-                "a while for large networks.",
-                stacklevel=2,
+                "a while for large networks."
             )
 
             nodes = self.project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
@@ -1568,7 +1570,7 @@ class TransitGraphBuilder:
 
     def save(
         self,
-        robust=True,
+        robust=None,
         pt_conn: sqlite3.Connection | None = None,
         project_conn: sqlite3.Connection | None = None,
     ):
@@ -1581,8 +1583,16 @@ class TransitGraphBuilder:
 
             **project_conn** (:obj:`sqlite.Connection`): Optional project connection to use
         """
+        if robust is not None:
+            warnings.warn(
+                "the 'robust' argument is deprecated and no longer in use. Duplicate geometries are allowed "
+                "within the public transport database.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self.create_additional_db_fields(conn=pt_conn)
-        self.save_vertices(robust=robust, conn=pt_conn)
+        self.save_vertices(conn=pt_conn)
         self.save_edges(conn=pt_conn)
         self.save_config(conn=project_conn)
 

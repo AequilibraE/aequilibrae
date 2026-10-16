@@ -131,7 +131,7 @@ def bulk_connector_creation(
         Defaults to infinity.
 
         **projected_crs** (:obj:`str | int`, `Optional`): Coordinate reference system for
-        distance calculations. If None, uses the CRS from the input data.
+        distance calculations. If None, estimates a local UTM CRS from the centroids.
     """
     assert project_links.crs == project_nodes.crs == project_zones.crs, "Mismatched CRS"
     assert modes, "Modes must be provided"
@@ -144,6 +144,8 @@ def bulk_connector_creation(
         "All provided zones must have their corresponding centroid provided"
     )
 
+    distance_crs = projected_crs if projected_crs is not None else centroids.estimate_utm_crs()
+
     connectors = []
     for mode in modes:
         if limit_to_zone:
@@ -153,7 +155,7 @@ def bulk_connector_creation(
                 centroids,
                 nodes[nodes.modes.str.contains(mode)],
                 distance_upper_bound=distance_upper_bound,
-                crs=projected_crs if projected_crs is not None else centroids.crs,
+                crs=distance_crs,
             )
         else:
             df = k_nearest(
@@ -161,7 +163,7 @@ def bulk_connector_creation(
                 centroids,
                 nodes[nodes.modes.str.contains(mode)],
                 distance_upper_bound=distance_upper_bound,
-                crs=projected_crs if projected_crs is not None else centroids.crs,
+                crs=distance_crs,
             )
 
         connectors.append(df.assign(modes=mode))
@@ -176,8 +178,8 @@ def bulk_connector_creation(
         )
 
     # We need to find out which connectors already exist so we can update the links instead of inserting them.
-    centroid_connectors = project_links[project_links.link_type == "centroid_connector"]
-    centroid_connectors["modes"] = centroid_connectors["modes"].apply(normalise_mode_strings)
+    centroid_connectors = project_links.loc[project_links.link_type == "centroid_connector"].copy(deep=False)
+    centroid_connectors.loc[:, "modes"] = centroid_connectors["modes"].apply(normalise_mode_strings)
     existing_connectors = centroid_connectors.merge(
         connectors.assign(connector_index=connectors.index), on=["a_node", "b_node"], how="inner"
     )[["link_id", "direction", "modes_x", "modes_y", "connector_index"]]

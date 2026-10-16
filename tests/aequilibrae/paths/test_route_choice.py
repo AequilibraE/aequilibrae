@@ -63,7 +63,8 @@ def test_set_choice_set_generation(route_choice_setup):
         "max_depth": 0,
         "max_misses": 100,
         "penalty": 1.1,
-        "cutoff_prob": 0.0,
+        "disutility_cutoff_constant": float("inf"),
+        "disutility_cutoff_coefficient": float("inf"),
         "beta": 1.0,
         "store_results": True,
         "a_star": False,
@@ -78,7 +79,8 @@ def test_set_choice_set_generation(route_choice_setup):
         "max_depth": 0,
         "max_misses": 100,
         "penalty": 1.0,
-        "cutoff_prob": 0.0,
+        "disutility_cutoff_constant": float("inf"),
+        "disutility_cutoff_coefficient": float("inf"),
         "beta": 1.0,
         "store_results": True,
         "a_star": False,
@@ -88,6 +90,13 @@ def test_set_choice_set_generation(route_choice_setup):
 
     with pytest.raises(AttributeError):
         rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
+
+    with pytest.raises(
+        ValueError,
+        match="`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
+        "Both must be set or unset",
+    ):
+        rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1, disutility_cutoff_constant=0)
 
 
 def test_link_results(route_choice_setup):

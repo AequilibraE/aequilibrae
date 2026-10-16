@@ -17,7 +17,7 @@ def _sample_turn_pair(conn):
 
 
 def test_find_non_applicable_turn_restrictions(sioux_falls_example):
-    with sioux_falls_example.db_connection_spatial as conn:
+    with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)
         assert pair is not None
         from_node, via_node, to_node = pair

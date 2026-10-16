@@ -10,7 +10,7 @@ from aequilibrae.project.network.importer.staged_network import StagedNetwork
 def test_missing_other_attributes_raises(empty_project):
     from aequilibrae.project.project_creation import remove_triggers
 
-    with empty_project.db_connection_spatial as conn:
+    with empty_project.db_connection as conn:
         remove_triggers(conn, "network")
         conn.execute("ALTER TABLE links RENAME COLUMN other_attributes TO _dropped_other")
 

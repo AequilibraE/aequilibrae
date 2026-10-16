@@ -126,7 +126,7 @@ def test_disconnect_mode(nauru_example):
 
     zones.disconnect_mode("w", zone_id=1)
 
-    with project.db_connection_spatial as conn:
+    with project.db_connection as conn:
         cnt = conn.execute("""select COUNT(*) from links where a_node=1""").fetchone()[0]
         assert tot != cnt, "failed to delete links"
         cnt = conn.execute("""Select count(*) from links where a_node=1 and instr(modes,'w')>0""").fetchone()[0]

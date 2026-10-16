@@ -98,7 +98,7 @@ cpdef cython.floating[:, ::1] project_link_loads(
     const long long[::1] crosswalk,
     int cores,
     Py_ssize_t threading_threshold=*,
-) except * nogil
+) noexcept nogil
 
 cpdef cython.floating[:] aggregate_link_costs(
     const cython.floating[::1] actual,

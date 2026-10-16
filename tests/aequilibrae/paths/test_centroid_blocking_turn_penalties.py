@@ -40,9 +40,7 @@ def test_centroid_blocking_without_turn_penalties_uses_node_search():
 
 def test_centroid_blocking_with_turn_penalty_only_bans_centroid_traversal():
     graph = shared_junction_graph()
-    graph.set_turn_restrictions(
-        pd.DataFrame({"from_node": [1], "via_node": [4], "to_node": [3], "penalty": [0.5]})
-    )
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [4], "to_node": [3], "penalty": [0.5]}))
     graph.set_blocked_centroid_flows(False)
     assert list(graph.compute_path(3, 4).path_nodes) == [3, 5, 4]
 
