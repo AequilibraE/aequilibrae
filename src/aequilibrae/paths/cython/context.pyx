@@ -181,7 +181,7 @@ cdef class TurnBasedContext(GraphContext):
     the first link and the a_node of the last link in the chain.  For uncompressed links,
     these are the b_node and a_node, respectively.
 
-    We need this to distinguish between a u-turn an a series of links that compact into a
+    We need this to distinguish between a u-turn and a series of links that compact into a
     single link.
 
     Example network, with links in both directions:
