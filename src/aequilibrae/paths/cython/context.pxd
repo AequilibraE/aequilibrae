@@ -20,6 +20,8 @@ cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::routing" nogi
         const size_t *turn_fs
         const size_t *turn_to_links
         const double *turn_penalties
+        const size_t *first_nodes
+        const size_t *last_nodes
         cpp_bool allow_uturns
 
     cdef cppclass CppSkimmingContext "aequilibrae::paths::cpp::routing::SkimmingContext"[T]:
@@ -59,6 +61,7 @@ cdef class NodeBasedContext(GraphContext):
 
 cdef class TurnBasedContext(GraphContext):
     cdef const size_t[::1] tails_buffer, turn_offsets, turn_links
+    cdef const size_t[::1] first_nodes_buffer, last_nodes_buffer
     cdef double[::1] turn_penalties_buffer
     cdef cpp_bool uturns_allowed
     cdef CppTurnBasedContext view(self) noexcept nogil

@@ -21,6 +21,10 @@ struct TurnBasedContext {
   const std::size_t *turn_fs = nullptr;
   const std::size_t *turn_to_links = nullptr;
   const double *turn_penalties = nullptr;
+  // Adjacent neighbours at each end of a link, including links that have been
+  // compressed. Required for banning u-turns
+  const std::size_t *first_nodes = nullptr;
+  const std::size_t *last_nodes = nullptr;
   bool allow_uturns = true;
 };
 
