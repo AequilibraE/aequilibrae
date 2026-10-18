@@ -25,8 +25,7 @@ def car_graph(project):
 
 @pytest.fixture(scope="function")
 def matrix(project):
-    mat = project.matrices.get_matrix("demand_omx")
-    mat.computational_view()
+    mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     return mat
 
 
@@ -69,7 +68,8 @@ ALGORITHMS = ["msa", "cfw", "bfw", "frank-wolfe"]
 
 
 def test_matrix_with_wrong_type(matrix, car_graph):
-    matrix.matrix_view = np.array(matrix.matrix_view, np.int32)
+    core = next(iter(matrix))
+    matrix[core] = np.array(matrix[core], np.int32)
     with pytest.raises(TypeError):
         TrafficClass("car", car_graph, matrix)
 

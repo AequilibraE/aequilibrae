@@ -38,6 +38,7 @@ cysignals = declare_dependency(include_directories: inc_cysignals)
 deps = [openmp, cysignals]
 
 incdir = include_directories(
+    'src/aequilibrae/matrix/cpp/',
     'src/aequilibrae/paths/cpp/',
     'src/aequilibrae/utils/cpp/',
 )

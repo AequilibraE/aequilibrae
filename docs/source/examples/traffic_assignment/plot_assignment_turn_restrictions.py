@@ -73,8 +73,7 @@ graph = project.network.graphs["c"]
 graph.set_graph("free_flow_time")
 graph.set_blocked_centroid_flows(False)
 
-matrix = project.matrices.get_matrix("demand_omx")
-matrix.computational_view(["matrix"])
+matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
 # Base assignment.
@@ -156,6 +155,5 @@ axes[2].set_axis_off()
 plt.tight_layout()
 
 # %%
-# Close matrix and project.
-matrix.close()
+# Close the project.
 project.close()

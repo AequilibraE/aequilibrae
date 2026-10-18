@@ -96,7 +96,7 @@ skm = graph.compute_skims()
 # %%
 # Let's get the values for 'free_flow_time' matrix.
 skims = skm.results.skims
-skims.get_matrix("free_flow_time")
+skims["free_flow_time"]
 
 # %%
 # Now we're all set!

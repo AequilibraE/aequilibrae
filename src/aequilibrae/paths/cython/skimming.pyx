@@ -1,4 +1,4 @@
-"""Skim finalized paths using independent inputs, scratch and output owners."""
+"""Skim finalised paths using independent inputs, scratch and output owners."""
 
 import operator
 
@@ -16,7 +16,7 @@ def skimming(
     """Replace output.skims[origin_row], without changing the search or other rows.
 
     Destinations are physical nodes 0..destination_count-1. The output row is
-    independent of the search origin. Missing paths produce infinity; finalized
+    independent of the search origin. Missing paths produce infinity; finalised
     intrazonal paths produce zero. Supply None for workspace when every field
     projects a stored label. Concurrent calls need separate scratch and must
     write different rows. Validation completes before any scratch or output write.
