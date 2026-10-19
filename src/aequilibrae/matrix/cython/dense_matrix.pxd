@@ -1,9 +1,6 @@
 from libc.stddef cimport size_t
 
-
-ctypedef fused MatrixFloat:
-    float
-    double
+cimport cython
 
 
 cdef extern from "dense_matrix.hpp" namespace "aequilibrae::matrix::cpp" nogil:
@@ -31,4 +28,4 @@ cdef class DenseMatrix:
     cdef void *_data
     cdef bint _float32
 
-    cdef CppDenseMatrixView[MatrixFloat] view(self, MatrixFloat _type=*) except * nogil
+    cdef CppDenseMatrixView[cython.floating] view(self, cython.floating _type=*) except * nogil
