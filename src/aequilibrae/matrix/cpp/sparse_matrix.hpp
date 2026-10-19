@@ -6,6 +6,8 @@
 #include <iostream>
 #include <numeric>
 #include <stdexcept>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -88,17 +90,16 @@ public:
   // The insertion cache is intended to provide a common way to write values
   // into the matrix between a sparse and dense matrix.
   //
-  // The 'insertion_cache' contains a vector per row, of a vector of tuples of
-  // the column number, and pointers to where data can be written without
-  // concern. This is separated first by row allow lock free row based
-  // parallelised usage.
+  // The 'insertion_cache' contains a vector per row, with tuples of the column
+  // number and pointers to where data can be written without concern. This is
+  // separated by row to allow lock free row based parallelised usage.
   //
-  // In the dense case, these pairs will contain pointers to the start of the
+  // In the dense case, each tuple will contain a pointer to the start of the
   // appropriate segment within the real matrix.
   //
-  // In the sparse case, these pairs will contain pointers to new (zero'd and
-  // initialised) memory segments. These individual segments will then be
-  // merged together into the CSR matrix at a later time.
+  // In the sparse case, each tuple will contain a pointer to a new (zero'd and
+  // initialised) memory segment. These segments will then be merged into the
+  // CSR matrix at a later time.
   //
   // Because of this difference in implementation. Users should always
   // accumulate into the returned buffers. There is no guarantee the returned
@@ -118,8 +119,8 @@ public:
 
   SparseMatrix() = delete;
   explicit SparseMatrix(const SparseMatrix &other)
-      : MatrixBase<T1, T2>(other.n_rows, other.n_cols, other.n_cores,
-                           other.n_alloc),
+      : MatrixBase<T>(other.n_rows, other.n_cols, other.n_cores,
+                      other.n_alloc),
         row_index(nullptr), col_index(nullptr), insertion_cache(other.n_rows),
         true_n_alloc(other.n_alloc) {
     this->row_index = memory::acquire<size_t>(this->n_rows + 1);
@@ -130,40 +131,29 @@ public:
     std::copy(other.col_index, other.col_index + other.n_alloc,
               this->col_index);
 
-    this->cores.first =
-        memory::acquire<T1>(this->n_alloc * this->n_cores.first);
-    this->cores.second =
-        memory::acquire<T2>(this->n_alloc * this->n_cores.second);
-
-    std::copy(other.cores.first,
-              other.cores.first + other.n_alloc * other.n_cores.first,
-              this->cores.first);
-    std::copy(other.cores.second,
-              other.cores.second + other.n_alloc * other.n_cores.second,
-              this->cores.second);
+    this->cores = memory::acquire<T>(this->n_alloc * this->n_cores);
+    std::copy(other.cores, other.cores + other.n_alloc * other.n_cores,
+              this->cores);
   };
 
   SparseMatrix &operator=(const SparseMatrix &) = delete;
 
   // Allocate an sparse matrix, fields are initialised but may be
   // null/pointers to nothing. By default the matrix is empty
-  SparseMatrix(size_t rows, size_t cols, std::pair<size_t, size_t> n_cores,
+  SparseMatrix(size_t rows, size_t cols, size_t n_cores,
                size_t n_alloc = 0)
-      : MatrixBase<T1, T2>(rows, cols, n_cores, n_alloc), row_index(nullptr),
+      : MatrixBase<T>(rows, cols, n_cores, n_alloc), row_index(nullptr),
         col_index(nullptr), insertion_cache(rows), true_n_alloc(n_alloc) {
     row_index = memory::acquire<size_t>(this->n_rows + 1);
     std::fill(row_index, row_index + this->n_rows, 0);
     row_index[this->n_rows] = this->n_alloc;
 
     col_index = memory::acquire<size_t>(this->n_alloc);
-    this->cores.first =
-        memory::acquire<T1>(this->n_alloc * this->n_cores.first);
-    this->cores.second =
-        memory::acquire<T2>(this->n_alloc * this->n_cores.second);
+    this->cores = memory::acquire<T>(this->n_alloc * this->n_cores);
   }
 
   SparseMatrix(SparseMatrix &&other) noexcept
-      : MatrixBase<T1, T2>(std::move(other)), // Move the base class
+      : MatrixBase<T>(std::move(other)), // Move the base class
         row_index(other.row_index), col_index(other.col_index),
         insertion_cache(std::move(other.insertion_cache)),
         true_n_alloc(other.n_alloc) {
@@ -173,10 +163,9 @@ public:
 
   // Constructor from COO format
   SparseMatrix(const size_t nnz, const size_t rows, const size_t cols,
-               const std::pair<size_t, size_t> n_cores,
-               const size_t *coo_row_index, const size_t *coo_col_index,
-               std::pair<T1 **, T2 **> coo_values, bool verify)
-      : MatrixBase<T1, T2>(rows, cols, n_cores, 0), row_index(nullptr),
+               const size_t n_cores, const size_t *coo_row_index,
+               const size_t *coo_col_index, T **coo_values, bool verify)
+      : MatrixBase<T>(rows, cols, n_cores, 0), row_index(nullptr),
         col_index(nullptr), insertion_cache(rows), true_n_alloc(0) {
 
     if (coo_row_index == nullptr || coo_col_index == nullptr) {
@@ -196,14 +185,8 @@ public:
         throw std::logic_error("COO entry exceeds specified dimensions");
       }
 
-      for (size_t i = 0; i < n_cores.first; i++) {
-        if (coo_values.first[i] == nullptr) {
-          throw std::logic_error("Null pointer found in coo_values");
-        }
-      }
-
-      for (size_t i = 0; i < n_cores.second; i++) {
-        if (coo_values.second[i] == nullptr) {
+      for (size_t i = 0; i < n_cores; i++) {
+        if (coo_values[i] == nullptr) {
           throw std::logic_error("Null pointer found in coo_values");
         }
       }
@@ -224,11 +207,7 @@ public:
 
     this->row_index = memory::acquire<size_t>(this->n_rows + 1);
     this->col_index = memory::acquire<size_t>(this->n_alloc);
-
-    this->cores.first =
-        memory::acquire<T1>(this->n_alloc * this->n_cores.first);
-    this->cores.second =
-        memory::acquire<T2>(this->n_alloc * this->n_cores.second);
+    this->cores = memory::acquire<T>(this->n_alloc * this->n_cores);
 
     // CSR construction
 
@@ -265,14 +244,8 @@ public:
       this->col_index[dest] = coo_col_index[n];
 
       // We then do the same for each value within the cores.
-      for (size_t core = 0; core < this->n_cores.first; core++) {
-        this->cores.first[this->n_cores.first * dest + core] =
-            coo_values.first[core][n];
-      }
-
-      for (size_t core = 0; core < this->n_cores.second; core++) {
-        this->cores.second[this->n_cores.second * dest + core] =
-            coo_values.second[core][n];
+      for (size_t core = 0; core < this->n_cores; core++) {
+        this->cores[this->n_cores * dest + core] = coo_values[core][n];
       }
 
       this->row_index[row]++;
@@ -291,15 +264,14 @@ public:
 
     memory::release(this->row_index);
     memory::release(this->col_index);
-    memory::release(this->cores.first);
-    memory::release(this->cores.second);
+    memory::release(this->cores);
   }
 
   friend void swap(SparseMatrix &first, SparseMatrix &second) {
     using std::swap;
 
-    swap(static_cast<MatrixBase<T1, T2> &>(first),
-         static_cast<MatrixBase<T1, T2> &>(second));
+    swap(static_cast<MatrixBase<T> &>(first),
+         static_cast<MatrixBase<T> &>(second));
     swap(first.row_index, second.row_index);
     swap(first.col_index, second.col_index);
     swap(first.insertion_cache, second.insertion_cache);
@@ -311,7 +283,7 @@ public:
   void copy(SparseMatrix &other) {
     if (this->n_rows == other.n_rows && this->n_cols == other.n_cols &&
         this->n_cores == other.n_cores) {
-      SparseMatrix<T1, T2> tmp(other);
+      SparseMatrix<T> tmp(other);
       swap(*this, tmp);
       this->insert_cache(other);
     } else {
@@ -321,8 +293,8 @@ public:
   }
 
   // Create a new matrix with the same sparsity structure by all zeros
-  SparseMatrix<T1, T2> *like() const {
-    auto new_mat = new SparseMatrix<T1, T2>(this->n_rows, this->n_cols,
+  SparseMatrix<T> *like() const {
+    auto new_mat = new SparseMatrix<T>(this->n_rows, this->n_cols,
                                             this->n_cores, this->n_alloc);
 
     std::copy(this->row_index, this->row_index + this->n_rows + 1,
@@ -331,13 +303,8 @@ public:
     std::copy(this->col_index, this->col_index + this->n_alloc,
               access::rwp(new_mat->col_index));
 
-    std::fill(new_mat->cores.first,
-              new_mat->cores.first + new_mat->n_alloc * new_mat->n_cores.first,
-              0.0);
-    std::fill(new_mat->cores.second,
-              new_mat->cores.second +
-                  new_mat->n_alloc * new_mat->n_cores.second,
-              0.0);
+    std::fill(new_mat->cores,
+              new_mat->cores + new_mat->n_alloc * new_mat->n_cores, 0.0);
 
     return new_mat;
   }
@@ -404,7 +371,7 @@ public:
     this->set_index(row_index, col_index, col_length, true);
   }
 
-  RowSlice<T1, T2> row_slice(size_t row) {
+  RowSlice<T> row_slice(size_t row) {
     return RowSlice(row, this->row_index[row + 1] - this->row_index[row], this);
   }
 
@@ -448,83 +415,38 @@ public:
     return this->col_index[this->row_index[row] + offset];
   }
 
-  template <typename T>
-  T &get(const size_t row, const size_t offset, const size_t core) const {
+  template <typename Value = T>
+  Value &get(const size_t row, const size_t offset, const size_t core) const {
     auto idx = this->row_index[row] + offset;
-    return this->template get<T>(idx, core);
+    return this->template get<Value>(idx, core);
   };
 
-  T &get_first(const size_t row, const size_t offset, const size_t core) const {
-    return this->template get<T>(row, offset, core);
+  template <typename Value = T>
+  Value *get_address(const size_t idx, const size_t core) const {
+    static_assert(std::is_same_v<Value, T>, "Unsupported type.");
+    return this->cores + (idx * this->n_cores + core);
   }
 
-  T2 &get_second(const size_t row, const size_t offset,
-                 const size_t core) const {
-    return this->template get<T2>(row, offset, core);
+  template <typename Value = T>
+  Value &get(const size_t idx, const size_t core) const {
+    static_assert(std::is_same_v<Value, T>, "Unsupported type.");
+    return *this->get_address<Value>(idx, core);
   }
 
-  template <typename T>
-  T *get_address(const size_t idx, const size_t core) const {
-    if constexpr (std::is_same_v<T, T>) {
-      return std::get<T *>(this->cores) + (idx * this->n_cores.first + core);
-    } else if constexpr (std::is_same_v<T, T2>) {
-      return std::get<T2 *>(this->cores) + (idx * this->n_cores.second + core);
-    } else {
-      static_assert(std::is_same_v<T, T1> || std::is_same_v<T, T2>,
-                    "Unsupported type.");
-    }
-  };
-
-  template <typename T> T &get(const size_t idx, const size_t core) const {
-    if constexpr (std::is_same_v<T, T>) {
-      return *this->get_address<T>(idx, core);
-    } else if constexpr (std::is_same_v<T, T2>) {
-      return *this->get_address<T2>(idx, core);
-    } else {
-      static_assert(std::is_same_v<T, T1> || std::is_same_v<T, T2>,
-                    "Unsupported type.");
-    }
-  };
-
-  T &get_first(const size_t idx, const size_t core) const {
-    return this->template get<T>(idx, core);
-  }
-
-  T2 &get_second(const size_t idx, const size_t core) const {
-    return this->template get<T2>(idx, core);
-  }
-
-  // TODO reassess the unified methods, perhaps they'll find a use
   inline T get_unifed(const size_t offset, const size_t core) {
-    if (core < this->n_cores.first) {
-      return this->get_first(col_index, core);
-    } else {
-      return this->get_second(col_index, core - this->n_cores.first);
-    }
+    return this->get(this->col_index[offset], core);
   }
 
-  inline void set_unifed(const size_t col_index, const size_t core,
-                         const T value) {
-    if (core < this->n_cores.first) {
-      this->get_first(col_index, core) = value;
-    } else {
-      this->get_second(col_index, core - this->n_cores.first) = value;
-    }
+  inline void set_unifed(const size_t idx, const size_t core, const T value) {
+    this->get(idx, core) = value;
   }
 
   bool cell_is_nonzero(const size_t idx) const {
-    for (size_t j = 0; j < this->template core_count<T1>(); j++) {
+    for (size_t j = 0; j < this->n_cores; j++) {
       if (this->template get<T>(idx, j) != 0.0) {
         return true;
       }
     }
-
-    for (size_t j = 0; j < this->template core_count<T2>(); j++) {
-      if (this->template get<T2>(idx, j) != 0.0) {
-        return true;
-      }
-    }
-
     return false;
   }
 
@@ -537,14 +459,8 @@ public:
     }
 
     for (size_t i = row_index[row]; i < row_index[row + 1]; i++) {
-      for (size_t j = 0; j < this->template core_count<T1>(); j++) {
+      for (size_t j = 0; j < this->n_cores; j++) {
         if (this->template get<T>(i, j) != 0.0) {
-          return true;
-        }
-      }
-
-      for (size_t j = 0; j < this->template core_count<T2>(); j++) {
-        if (this->template get<T2>(i, j) != 0.0) {
           return true;
         }
       }
@@ -570,15 +486,8 @@ public:
     for (size_t i = row_index[row]; i < row_index[row + 1]; i++) {
       bool found = false;
 
-      for (size_t j = 0; j < this->template core_count<T1>(); j++) {
+      for (size_t j = 0; j < this->n_cores; j++) {
         if (this->template get<T>(i, j) > 0.0) {
-          found = true;
-          break;
-        }
-      }
-
-      for (size_t j = 0; !found && j < this->template core_count<T2>(); j++) {
-        if (this->template get<T2>(i, j) > 0.0) {
           found = true;
           break;
         }
@@ -601,11 +510,11 @@ public:
   class iterator {
     // private:
   public:
-    const SparseMatrix<T1, T2> &matrix_;
+    const SparseMatrix<T> &matrix_;
     size_t row_pos_;
     size_t col_pos_;
 
-    iterator(const SparseMatrix<T1, T2> &matrix, size_t row)
+    iterator(const SparseMatrix<T> &matrix, size_t row)
         : matrix_(matrix), row_pos_(row), col_pos_(0) {
 
       // Find the first non-zero row
@@ -679,10 +588,8 @@ public:
       return std::make_pair(row_pos_, matrix_.col_index[col_pos_]);
     }
 
-    std::pair<T1 *, T2 *> values() const {
-      return std::make_pair(
-          &matrix_.cores.first[col_pos_ * matrix_.n_cores.first],
-          &matrix_.cores.second[col_pos_ * matrix_.n_cores.second]);
+    T *values() const {
+      return &matrix_.cores[col_pos_ * matrix_.n_cores];
     }
   };
 
@@ -690,17 +597,12 @@ public:
   iterator end() const { return iterator(*this, this->n_rows); }
 
   // Returned pointers may be invalidated by successive insert calls
-  std::pair<T1 *, T2 *> insert(size_t row, size_t col) {
+  T *insert(size_t row, size_t col) {
     this->dirty = true;
-    T *tmp1 = memory::acquire<T1>(this->n_cores.first);
-    std::fill(tmp1, tmp1 + this->n_cores.first, 0.0);
-
-    T2 *tmp2 = memory::acquire<T2>(this->n_cores.second);
-    std::fill(tmp2, tmp2 + this->n_cores.second, 0.0f);
-
-    insertion_cache[row].emplace_back(col, tmp1, tmp2);
-
-    return std::make_pair(tmp1, tmp2);
+    T *values = memory::acquire<T>(this->n_cores);
+    std::fill(values, values + this->n_cores, 0.0);
+    insertion_cache[row].emplace_back(col, values);
+    return values;
   }
 
   // Insert the cache of another Sparse matrix into this one. This is useful
@@ -713,10 +615,7 @@ public:
         for (auto &col : row) {
           auto tmp = this->insert(i, std::get<0>(col));
 
-          std::copy(std::get<1>(col), std::get<1>(col) + this->n_cores.first,
-                    tmp.first);
-          std::copy(std::get<2>(col), std::get<2>(col) + this->n_cores.second,
-                    tmp.second);
+          std::copy(std::get<1>(col), std::get<1>(col) + this->n_cores, tmp);
         }
       }
     } else {
@@ -733,128 +632,76 @@ public:
       return;
     }
 
-    size_t nnz = 0;
-    for (auto &row : insertion_cache) {
-      nnz += row.size();
-    }
-
-    // Convert CSR to COO
     std::vector<size_t> coo_row_indices;
     std::vector<size_t> coo_col_indices;
-    std::vector<std::pair<T1 *, T2 *>> coo_values;
+    std::vector<std::vector<T>> coo_values;
 
-    coo_row_indices.reserve(this->n_alloc + nnz);
-    coo_col_indices.reserve(this->n_alloc + nnz);
-    coo_values.reserve(this->n_alloc + nnz);
+    coo_row_indices.reserve(this->n_alloc + 1);
+    coo_col_indices.reserve(this->n_alloc + 1);
+    coo_values.reserve(this->n_alloc + 1);
 
-    // Extract nonzero entries from the existing CSR matrix
     for (auto iter = this->begin(), end = this->end(); iter != end; ++iter) {
       coo_row_indices.push_back(iter.row());
       coo_col_indices.push_back(iter.col());
-      coo_values.emplace_back(iter.values());
+      coo_values.emplace_back(iter.values(), iter.values() + this->n_cores);
     }
 
-    // Concatenate COO entries
-    for (size_t i = 0; i < insertion_cache.size(); i++) {
-      auto &row = insertion_cache[i];
-      for (auto &col : row) {
-        coo_row_indices.push_back(i);
-        coo_col_indices.push_back(std::get<0>(col));
-        coo_values.emplace_back(std::get<1>(col), std::get<2>(col));
+    for (size_t row = 0; row < insertion_cache.size(); row++) {
+      for (const auto &entry : insertion_cache[row]) {
+        coo_row_indices.push_back(row);
+        coo_col_indices.push_back(std::get<0>(entry));
+        coo_values.emplace_back(std::get<1>(entry),
+                                std::get<1>(entry) + this->n_cores);
       }
     }
 
-    // Arg sort entries
-    std::vector<size_t> indices(coo_row_indices.size());
-    std::iota(indices.begin(), indices.end(), 0);
-    std::sort(indices.begin(), indices.end(), [&](size_t i, size_t j) {
-      return std::tie(coo_row_indices[i], coo_col_indices[i]) <
-             std::tie(coo_row_indices[j], coo_col_indices[j]);
+    std::vector<size_t> order(coo_row_indices.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::sort(order.begin(), order.end(), [&](size_t left, size_t right) {
+      return std::tie(coo_row_indices[left], coo_col_indices[left]) <
+             std::tie(coo_row_indices[right], coo_col_indices[right]);
     });
 
-    std::vector<size_t> sorted_row_indices;
-    std::vector<size_t> sorted_col_indices;
-    std::vector<std::pair<T1 *, T2 *>> sorted_values;
-
-    sorted_row_indices.reserve(coo_row_indices.size());
-    sorted_col_indices.reserve(coo_col_indices.size());
-    sorted_values.reserve(coo_values.size());
-
-    for (size_t idx : indices) {
-      sorted_row_indices.push_back(coo_row_indices[idx]);
-      sorted_col_indices.push_back(coo_col_indices[idx]);
-      sorted_values.push_back(coo_values[idx]);
-    }
-
-    // Merge Duplicates
-    std::vector<size_t> final_row_indices;
-    std::vector<size_t> final_col_indices;
-    std::pair<std::vector<std::vector<T1>>, std::vector<std::vector<T2>>>
-        final_values;
-
-    final_values.first.resize(this->n_cores.first);
-    final_values.second.resize(this->n_cores.second);
-
-    for (size_t i = 0; i < sorted_row_indices.size(); ++i) {
-      if (!final_row_indices.empty() &&
-          final_row_indices.back() == sorted_row_indices[i] &&
-          final_col_indices.back() == sorted_col_indices[i]) {
-        // Merge values for duplicate entries
-
-        std::vector<std::vector<T1>> &values1 = final_values.first;
-        std::vector<std::vector<T2>> &values2 = final_values.second;
-
-        for (size_t j = 0; j < this->n_cores.first; j++) {
-          values1[j].back() += sorted_values[i].first[j];
+    std::vector<size_t> final_rows;
+    std::vector<size_t> final_cols;
+    std::vector<std::vector<T>> final_values;
+    for (size_t index : order) {
+      if (!final_rows.empty() && final_rows.back() == coo_row_indices[index] &&
+          final_cols.back() == coo_col_indices[index]) {
+        for (size_t core = 0; core < this->n_cores; core++) {
+          final_values.back()[core] += coo_values[index][core];
         }
-
-        for (size_t j = 0; j < this->n_cores.second; j++) {
-          values2[j].back() += sorted_values[i].second[j];
-        }
-
       } else {
-        // Add new entry
-        final_row_indices.push_back(sorted_row_indices[i]);
-        final_col_indices.push_back(sorted_col_indices[i]);
-
-        for (size_t j = 0; j < this->n_cores.first; j++) {
-          final_values.first[j].push_back(sorted_values[i].first[j]);
-        }
-
-        for (size_t j = 0; j < this->n_cores.second; j++) {
-          final_values.second[j].push_back(sorted_values[i].second[j]);
-        }
+        final_rows.push_back(coo_row_indices[index]);
+        final_cols.push_back(coo_col_indices[index]);
+        final_values.push_back(coo_values[index]);
       }
     }
 
-    std::pair<T1 **, T2 **> cores(memory::acquire<T1 *>(this->n_cores.first),
-                                  memory::acquire<T2 *>(this->n_cores.second));
-
-    for (size_t j = 0; j < this->n_cores.first; j++) {
-      cores.first[j] = final_values.first[j].data();
+    std::vector<T *> coo_core_values(this->n_cores);
+    for (size_t core = 0; core < this->n_cores; core++) {
+      coo_core_values[core] = memory::acquire<T>(final_values.size());
+      for (size_t entry = 0; entry < final_values.size(); entry++) {
+        coo_core_values[core][entry] = final_values[entry][core];
+      }
     }
 
-    for (size_t j = 0; j < this->n_cores.second; j++) {
-      cores.second[j] = final_values.second[j].data();
-    }
-
-    auto tmp_mat = SparseMatrix<T1, T2>(
-        final_row_indices.size(), this->n_rows, this->n_cols, this->n_cores,
-        final_row_indices.data(), final_col_indices.data(), cores, true);
-
+    auto tmp_mat = SparseMatrix<T>(final_rows.size(), this->n_rows,
+                                   this->n_cols, this->n_cores,
+                                   final_rows.data(), final_cols.data(),
+                                   coo_core_values.data(), true);
     swap(*this, tmp_mat);
-
     this->clear_cache();
-
-    memory::release(cores.first);
-    memory::release(cores.second);
+    for (auto *core_values : coo_core_values) {
+      memory::release(core_values);
+    }
     this->dirty = false;
   };
 
   void clear() {
     this->clear_cache();
 
-    auto tmp = SparseMatrix<T1, T2>(this->n_rows, this->n_cols, this->n_cores);
+    auto tmp = SparseMatrix<T>(this->n_rows, this->n_cols, this->n_cores);
     swap(*this, tmp);
   }
 
@@ -862,7 +709,6 @@ public:
     for (auto &row : insertion_cache) {
       for (auto &col : row) {
         memory::release(std::get<1>(col));
-        memory::release(std::get<2>(col));
       }
       row.clear();
     }
@@ -892,25 +738,12 @@ public:
     memory::release(this->col_index);
     this->col_index = new_col_index;
 
-    // 3. Reallocate cores.first (T1)
-    if (this->n_cores.first > 0) {
-      T *new_core_t1 = memory::acquire<T1>(actual_nnz * this->n_cores.first);
-      std::copy(this->cores.first,
-                this->cores.first + (actual_nnz * this->n_cores.first),
-                new_core_t1);
-      memory::release(this->cores.first);
-      this->cores.first = new_core_t1;
-    }
-
-    // 4. Reallocate cores.second (T2)
-    if (this->n_cores.second > 0) {
-      T2 *new_core_t2 = memory::acquire<T2>(actual_nnz * this->n_cores.second);
-      std::copy(this->cores.second,
-                this->cores.second + (actual_nnz * this->n_cores.second),
-                new_core_t2);
-      memory::release(this->cores.second);
-      this->cores.second = new_core_t2;
-    }
+    // 3. Reallocate the value buffer
+    T *new_cores = memory::acquire<T>(actual_nnz * this->n_cores);
+    std::copy(this->cores, this->cores + actual_nnz * this->n_cores,
+              new_cores);
+    memory::release(this->cores);
+    this->cores = new_cores;
 
     // 5. Update allocation counters
     this->n_alloc = actual_nnz;
@@ -942,33 +775,25 @@ public:
       return bss.str();
     };
 
-    // --- 1. CSR Data Usage ---
-    size_t csr_t1_mem = this->n_alloc * this->n_cores.first * sizeof(T1);
-    size_t csr_t2_mem = this->n_alloc * this->n_cores.second * sizeof(T2);
-    size_t true_csr_t1_mem =
-        this->true_n_alloc * this->n_cores.first * sizeof(T1);
-    size_t true_csr_t2_mem =
-        this->true_n_alloc * this->n_cores.second * sizeof(T2);
-    size_t size_of_self = sizeof(SparseMatrix<T1, T2>);
+    // --- 1. Value Buffer Usage ---
+    size_t value_mem = this->n_alloc * this->n_cores * sizeof(T);
+    size_t true_value_mem = this->true_n_alloc * this->n_cores * sizeof(T);
+    size_t size_of_self = sizeof(SparseMatrix<T>);
 
     // --- 2. Cache Data Usage & Overhead ---
     size_t cache_entries = 0;
     size_t cache_struct_overhead = 0; // Vector + Tuple overhead
-
-    // Outer vector overhead
     cache_struct_overhead +=
         this->insertion_cache.capacity() *
-        sizeof(std::vector<std::tuple<size_t, T1 *, T2 *>>);
+        sizeof(std::vector<std::tuple<size_t, T *>>);
 
     for (const auto &row_vec : this->insertion_cache) {
       cache_entries += row_vec.size();
-      // Inner vector/tuple overhead
       cache_struct_overhead +=
-          row_vec.capacity() * sizeof(std::tuple<size_t, T1 *, T2 *>);
+          row_vec.capacity() * sizeof(std::tuple<size_t, T *>);
     }
 
-    size_t cache_t1_mem = cache_entries * this->n_cores.first * sizeof(T1);
-    size_t cache_t2_mem = cache_entries * this->n_cores.second * sizeof(T2);
+    size_t cache_value_mem = cache_entries * this->n_cores * sizeof(T);
 
     // --- 3. Index Overhead (CSR) ---
     size_t index_overhead = (this->n_rows + 1) * sizeof(size_t); // row_index
@@ -979,15 +804,13 @@ public:
     }
 
     // --- 4. Totals ---
-    size_t total_t1 = csr_t1_mem + cache_t1_mem;
-    size_t total_t2 = csr_t2_mem + cache_t2_mem;
-    size_t true_total_t1 = true_csr_t1_mem + cache_t1_mem;
-    size_t true_total_t2 = true_csr_t2_mem + cache_t2_mem;
+    size_t total_values = value_mem + cache_value_mem;
+    size_t true_total_values = true_value_mem + cache_value_mem;
     size_t total_overhead = index_overhead + cache_struct_overhead;
     size_t true_total_overhead = true_index_overhead + cache_struct_overhead;
-    size_t total_mem = total_t1 + total_t2 + total_overhead + size_of_self;
+    size_t total_mem = total_values + total_overhead + size_of_self;
     size_t true_total_mem =
-        true_total_t1 + true_total_t2 + true_total_overhead + size_of_self;
+        true_total_values + true_total_overhead + size_of_self;
 
     // --- 5. Report ---
     ss << "SparseMatrix Status Report" << "\n";
@@ -1000,10 +823,8 @@ public:
     ss << "\n";
 
     ss << "[Data Memory]" << "\n";
-    ss << "  T1 Usage : " << f(total_t1) << " (" << f(true_total_t1) << " true)"
-       << " (Cores: " << this->n_cores.first << ")\n";
-    ss << "  T2 Usage : " << f(total_t2) << " (" << f(true_total_t2) << " true)"
-       << " (Cores: " << this->n_cores.second << ")\n";
+    ss << "  Values : " << f(total_values) << " ("
+       << f(true_total_values) << " true) (Cores: " << this->n_cores << ")\n";
     ss << "\n";
 
     ss << "[Structure Overhead]" << "\n";
@@ -1019,15 +840,10 @@ public:
     return ss.str();
   }
 
-  std::pair<std::vector<T1>, std::vector<T2>> sum(void) {
-    return std::make_pair(
-        SparseMatrix::_sum<T1>(this->n_cores.first, this->n_alloc,
-                               this->cores.first),
-        SparseMatrix::_sum<T2>(this->n_cores.second, this->n_alloc,
-                               this->cores.second));
+  std::vector<T> sum(void) {
+    return SparseMatrix::_sum(this->n_cores, this->n_alloc, this->cores);
   }
 
-  template <typename T>
   static std::vector<T> _sum(const size_t stride, const size_t length,
                              const T *const values) {
     std::vector<T> result(stride);
@@ -1041,32 +857,31 @@ public:
     return result;
   }
 
-  void inplace_linear_combination_skims(SparseMatrix &other, T1 step_size) {
+  void inplace_linear_combination_skims(SparseMatrix &other, T step_size) {
     this->inplace_mult_scalar(step_size);
 
-    const T1 conjugate_step_size = 1.0 - step_size;
+    const T conjugate_step_size = 1.0 - step_size;
 
     this->inplace_fma_element_wise_scalar(other, conjugate_step_size);
   }
 
   // Computes A = A*x1 + B*x2 + C*x3
   void inplace_triple_linear_combination_skims(SparseMatrix &B, SparseMatrix &C,
-                                               T1 x1, T1 x2, T1 x3) {
+                                               T x1, T x2, T x3) {
     this->inplace_mult_scalar(x1);
 
     this->inplace_fma_element_wise_scalar(B, x2);
     this->inplace_fma_element_wise_scalar(C, x3);
   }
 
-  void inplace_mult_scalar(T1 x) {
-    this->_inplace_mult_scalar<T1>(x);
-    this->_inplace_mult_scalar<T2>(x);
+  void inplace_mult_scalar(T x) {
+    this->_inplace_mult_scalar(x);
   }
 
   // Performs A = A*x
-  template <typename T> void _inplace_mult_scalar(T x) {
-    T *core = std::get<T *>(this->cores);
-    const size_t core_count = this->template core_count<T>();
+  void _inplace_mult_scalar(T x) {
+    T *core = this->cores;
+    const size_t core_count = this->n_cores;
 
     // Modify the current CSR matrix (* step_size)
     for (size_t i = 0; i < this->n_alloc; i++) {
@@ -1078,7 +893,7 @@ public:
     // Modify the current insertion cache (* step_size)
     for (auto &row : insertion_cache) {
       for (auto &col : row) {
-        T *values = std::get<T *>(col);
+        T *values = std::get<1>(col);
         for (size_t j = 0; j < core_count; j++) {
           values[j] *= x;
         }
@@ -1090,44 +905,32 @@ public:
 // operation to all values in the insertion cache and in the cores.
 #define SPARSE_MATRIX_ELEMENT_WISE_OP(OTHER, OP)                               \
   do {                                                                         \
-    const auto core_counts = this->n_cores;                                    \
     auto &_other = (OTHER);                                                    \
-                                                                               \
     for (auto iter = _other.begin(), end = _other.end(); iter != end;          \
          ++iter) {                                                             \
-      auto A_values = this->insert(iter.row(), iter.col());                    \
-      auto B_values = iter.values();                                           \
-                                                                               \
-      for (size_t i = 0; i < core_counts.first; i++) {                         \
-        A_values.first[i] += B_values.first[i] OP;                             \
-      }                                                                        \
-                                                                               \
-      for (size_t i = 0; i < core_counts.second; i++) {                        \
-        A_values.second[i] += B_values.second[i] OP;                           \
+      T *A_values = this->insert(iter.row(), iter.col());                     \
+      T *B_values = iter.values();                                             \
+      for (size_t i = 0; i < this->n_cores; i++) {                             \
+        A_values[i] += B_values[i] OP;                                         \
       }                                                                        \
     }                                                                          \
-                                                                               \
-    for (size_t i = 0; i < _other.insertion_cache.size(); i++) {               \
-      auto &row = _other.insertion_cache[i];                                   \
-      for (auto &col : row) {                                                  \
-        auto A_values = this->insert(i, std::get<0>(col));                     \
-                                                                               \
-        for (size_t i = 0; i < core_counts.first; i++) {                       \
-          A_values.first[i] += std::get<1>(col)[i] OP;                         \
-        }                                                                      \
-                                                                               \
-        for (size_t i = 0; i < core_counts.second; i++) {                      \
-          A_values.second[i] += std::get<2>(col)[i] OP;                        \
+    for (size_t row_idx = 0; row_idx < _other.insertion_cache.size();          \
+         row_idx++) {                                                          \
+      for (auto &col : _other.insertion_cache[row_idx]) {                     \
+        T *A_values = this->insert(row_idx, std::get<0>(col));                 \
+        T *B_values = std::get<1>(col);                                        \
+        for (size_t core = 0; core < this->n_cores; core++) {                  \
+          A_values[core] += B_values[core] OP;                                \
         }                                                                      \
       }                                                                        \
     }                                                                          \
   } while (0)
 
-  void inplace_fma_element_wise_scalar(const SparseMatrix &B, T1 x) {
+  void inplace_fma_element_wise_scalar(const SparseMatrix &B, T x) {
     SPARSE_MATRIX_ELEMENT_WISE_OP(B, *x);
   }
 
-  void inplace_fda_element_wise_scalar(const SparseMatrix &B, T1 x) {
+  void inplace_fda_element_wise_scalar(const SparseMatrix &B, T x) {
     SPARSE_MATRIX_ELEMENT_WISE_OP(B, / x);
   }
 
@@ -1190,10 +993,10 @@ bool _element_wise_cell_op(const T a, const T *B, T *C, const size_t n,
 };
 
 // Adds two rows, writes results into out, returns the number of non-zero cells.
-template <typename T1, typename T2, typename binary_op>
-size_t _element_wise_row_op(const SparseMatrix<T1, T2> &A,
-                            const SparseMatrix<T1, T2> &B,
-                            SparseMatrix<T1, T2> &C, const size_t row,
+template <typename T, typename binary_op>
+size_t _element_wise_row_op(const SparseMatrix<T> &A,
+                            const SparseMatrix<T> &B,
+                            SparseMatrix<T> &C, const size_t row,
                             const binary_op &op) {
 
   size_t A_idx = A.row_index[row];
@@ -1209,15 +1012,10 @@ size_t _element_wise_row_op(const SparseMatrix<T1, T2> &A,
                                    (A.col_index[A_idx] < B.col_index[B_idx]))) {
       C.col_index[C_idx] = A.col_index[A_idx];
       bool any_nonzero = false;
-      any_nonzero |= _element_wise_cell_op(A.template get_address<T1>(A_idx, 0),
-                                           static_cast<T1>(0.0),
-                                           C.template get_address<T1>(C_idx, 0),
-                                           A.template core_count<T1>(), op);
-
-      any_nonzero |= _element_wise_cell_op(A.template get_address<T2>(A_idx, 0),
-                                           static_cast<T2>(0.0),
-                                           C.template get_address<T2>(C_idx, 0),
-                                           A.template core_count<T2>(), op);
+      any_nonzero |= _element_wise_cell_op(A.template get_address<T>(A_idx, 0),
+                                           static_cast<T>(0.0),
+                                           C.template get_address<T>(C_idx, 0),
+                                           A.n_cores, op);
 
       A_idx++;
       C_idx += any_nonzero;
@@ -1229,15 +1027,10 @@ size_t _element_wise_row_op(const SparseMatrix<T1, T2> &A,
                                    (B.col_index[B_idx] < A.col_index[A_idx]))) {
       C.col_index[C_idx] = B.col_index[B_idx];
       bool any_nonzero = false;
-      any_nonzero |= _element_wise_cell_op(static_cast<T1>(0.0),
-                                           B.template get_address<T1>(B_idx, 0),
-                                           C.template get_address<T1>(C_idx, 0),
-                                           A.template core_count<T1>(), op);
-
-      any_nonzero |= _element_wise_cell_op(static_cast<T2>(0.0),
-                                           B.template get_address<T2>(B_idx, 0),
-                                           C.template get_address<T2>(C_idx, 0),
-                                           A.template core_count<T2>(), op);
+      any_nonzero |= _element_wise_cell_op(static_cast<T>(0.0),
+                                           B.template get_address<T>(B_idx, 0),
+                                           C.template get_address<T>(C_idx, 0),
+                                           A.n_cores, op);
 
       B_idx++;
       C_idx += any_nonzero;
@@ -1249,15 +1042,10 @@ size_t _element_wise_row_op(const SparseMatrix<T1, T2> &A,
       C.col_index[C_idx] = A.col_index[A_idx];
 
       bool any_nonzero = false;
-      any_nonzero |= _element_wise_cell_op(A.template get_address<T1>(A_idx, 0),
-                                           B.template get_address<T1>(B_idx, 0),
-                                           C.template get_address<T1>(C_idx, 0),
-                                           A.template core_count<T1>(), op);
-
-      any_nonzero |= _element_wise_cell_op(A.template get_address<T2>(A_idx, 0),
-                                           B.template get_address<T2>(B_idx, 0),
-                                           C.template get_address<T2>(C_idx, 0),
-                                           A.template core_count<T2>(), op);
+      any_nonzero |= _element_wise_cell_op(A.template get_address<T>(A_idx, 0),
+                                           B.template get_address<T>(B_idx, 0),
+                                           C.template get_address<T>(C_idx, 0),
+                                           A.n_cores, op);
 
       A_idx++;
       B_idx++;
@@ -1267,9 +1055,9 @@ size_t _element_wise_row_op(const SparseMatrix<T1, T2> &A,
   return C_idx - C.row_index[row];
 };
 
-template <typename T1, typename T2, typename binary_op>
-SparseMatrix<T1, T2> *element_wise_op(const SparseMatrix<T1, T2> &A,
-                                      const SparseMatrix<T1, T2> &B,
+template <typename T, typename binary_op>
+SparseMatrix<T> *element_wise_op(const SparseMatrix<T> &A,
+                                      const SparseMatrix<T> &B,
                                       const binary_op &op) {
   if (!(A.n_rows == B.n_rows && A.n_cols == B.n_cols &&
         A.n_cores == B.n_cores)) {
@@ -1285,7 +1073,7 @@ SparseMatrix<T1, T2> *element_wise_op(const SparseMatrix<T1, T2> &A,
   // track how many cells have been actually added and "shrink" our structure.
   // This means we over allocate each object during operations but successive
   // additions don't get worse and worse if they don't add more elements.
-  auto *new_mat = new SparseMatrix<T1, T2>(A.n_rows, A.n_cols, A.n_cores,
+  auto *new_mat = new SparseMatrix<T>(A.n_rows, A.n_cols, A.n_cores,
                                            A.n_alloc + B.n_alloc);
 
   size_t cells_added = 0;
@@ -1299,27 +1087,27 @@ SparseMatrix<T1, T2> *element_wise_op(const SparseMatrix<T1, T2> &A,
   return new_mat;
 };
 
-template <typename T1, typename T2>
-SparseMatrix<T1, T2> *addition(const SparseMatrix<T1, T2> &A,
-                               const SparseMatrix<T1, T2> &B) {
+template <typename T>
+SparseMatrix<T> *addition(const SparseMatrix<T> &A,
+                               const SparseMatrix<T> &B) {
   return element_wise_op(A, B, std::plus());
 };
 
-template <typename T1, typename T2>
-SparseMatrix<T1, T2> *subtraction(const SparseMatrix<T1, T2> &A,
-                                  const SparseMatrix<T1, T2> &B) {
+template <typename T>
+SparseMatrix<T> *subtraction(const SparseMatrix<T> &A,
+                                  const SparseMatrix<T> &B) {
   return element_wise_op(A, B, std::minus());
 };
 
-template <typename T1, typename T2>
-SparseMatrix<T1, T2> *multiplication(const SparseMatrix<T1, T2> &A,
-                                     const SparseMatrix<T1, T2> &B) {
+template <typename T>
+SparseMatrix<T> *multiplication(const SparseMatrix<T> &A,
+                                     const SparseMatrix<T> &B) {
   return element_wise_op(A, B, std::multiplies());
 };
 
-template <typename T1, typename T2>
-SparseMatrix<T1, T2> *division(const SparseMatrix<T1, T2> &A,
-                               const SparseMatrix<T1, T2> &B) {
+template <typename T>
+SparseMatrix<T> *division(const SparseMatrix<T> &A,
+                               const SparseMatrix<T> &B) {
   return element_wise_op(A, B, std::divides());
 };
 
