@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <type_traits>
 
+#include "matrix_base.hpp"
+
 namespace aequilibrae::matrix::cpp {
 
 // Borrow one contiguous [destinations, fields] block. The owner must outlive
@@ -21,20 +23,14 @@ template <typename T> struct DenseMatrixOriginView {
 };
 
 // Borrow a contiguous [origins, destinations, fields] buffer without owning it.
-template <typename T> struct DenseMatrixView {
-  static_assert(std::is_floating_point_v<T>);
-
-  std::size_t origin_count = 0;
-  std::size_t destination_count = 0;
-  std::size_t field_count = 0;
-  T *data = nullptr;
-
+template <typename T> class DenseMatrixView : public MatrixBase<T> {
+public:
   DenseMatrixOriginView<T> origin(std::size_t index) const noexcept {
     T *values = nullptr;
-    if (origin_count && destination_count && field_count) {
-      values = data + index * destination_count * field_count;
+    if (this->origin_count && this->destination_count && this->field_count) {
+      values = this->data + index * this->destination_count * this->field_count;
     }
-    return {destination_count, field_count, values};
+    return {this->destination_count, this->field_count, values};
   }
 };
 
