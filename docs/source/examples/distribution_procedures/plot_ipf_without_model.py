@@ -55,11 +55,9 @@ num_zones = matrix.shape[0]
 
 # %%
 
-mtx = AequilibraeMatrix()
-mtx.create_empty(file_name=join(folder, "matrix.aem"), zones=num_zones)
-mtx.index[:] = np.arange(1, num_zones + 1)[:]
-mtx.matrices[:, :, 0] = matrix[:]
-mtx.computational_view()
+index = np.arange(1, num_zones + 1)
+mtx = AequilibraeMatrix(index=index, index_name="zones")
+mtx["matrix"] = matrix
 
 
 # %%
@@ -83,7 +81,7 @@ fratar = Ipf(**args)
 fratar.fit()
 
 # %%
-fratar.output.matrix_view
+fratar.output["matrix"]
 
 # %%
 for line in fratar.report:

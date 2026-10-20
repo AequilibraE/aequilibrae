@@ -79,8 +79,7 @@ proj_matrices.list()
 
 # %%
 # We get the demand matrix, and prepare it for computation
-demand = proj_matrices.get_matrix("demand_omx")
-demand.computational_view(["matrix"])
+demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
 # Let's perform the traffic assignment

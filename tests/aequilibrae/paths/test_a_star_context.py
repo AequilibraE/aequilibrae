@@ -3,8 +3,6 @@
 import numpy as np
 import pandas as pd
 import pytest
-
-from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
 from aequilibrae.paths.cython.a_star import (
     EuclideanContext,
     HaversineContext,
@@ -12,11 +10,15 @@ from aequilibrae.paths.cython.a_star import (
     estimate_context_scale,
 )
 from aequilibrae.paths.cython.queries import SearchQuery
-from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
+from aequilibrae.paths.cython.workspaces import AStarWorkspace, SearchWorkspace
+
+from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
 from aequilibrae.paths.results import path_results as path_results_module
+from aequilibrae.paths.routing_context import make_routing_context
 
 from .routing_helpers import allocate_results, assert_state_tree, history_context, make_context, search
 from .test_assignment_integration import diamond
+from .test_routing_context import compressed_uturn_graph
 
 
 def heuristic_for(context, name, x=None, y=None, scale=None):
@@ -35,6 +37,38 @@ def run(context, origin, destination, heuristic, heap="4ary", results=None):
     results = allocate_results(context) if results is None else results
     workspace = AStarWorkspace(context.node_count, context.state_count, heap=heap)
     return a_star(context, SearchQuery(context.node_count, origin, mask), destination, heuristic, results, workspace)
+
+
+def test_compact_a_star_allows_return_through_another_chain():
+    graph = compressed_uturn_graph()
+    assert 4 not in graph.compact_all_nodes
+    assert 5 not in graph.compact_all_nodes
+    np.testing.assert_array_equal(graph.compute_path(1, 6).path_nodes, [1, 2, 4, 3, 5, 2, 6])
+
+    context = make_routing_context(graph, compact=True)
+    origin = graph.compact_nodes_to_indices[1]
+    destination = graph.compact_nodes_to_indices[6]
+    results = run(context, origin, destination, heuristic_for(context, "euclidean"))
+
+    # Links 2/3 form the outward chain and links 4/5 are the return via 5.
+    forward = graph.graph.loc[graph.graph.direction == 1].set_index("link_id")
+    expected_links = forward.loc[[1, 2, 4, 6], "__compressed_id__"].to_numpy()
+    np.testing.assert_array_equal(results.path_links_to(destination), expected_links)
+    assert results.path_cost_to(destination) == 6.0
+
+
+def test_compact_a_star_bans_reversal_through_same_chain():
+    graph = compressed_uturn_graph(with_return_chain=False)
+
+    # Without 3 -> 5 -> 2, the only return is 3 -> 4 -> 3, so 6 is unreachable.
+    assert graph.compute_path(1, 6).path is None
+
+    # Check compact as well
+    context = make_routing_context(graph, compact=True)
+    origin = graph.compact_nodes_to_indices[1]
+    destination = graph.compact_nodes_to_indices[6]
+    results = run(context, origin, destination, heuristic_for(context, "euclidean"))
+    assert not results.reachable_to(destination)
 
 
 @pytest.mark.parametrize("heap", available_heaps())

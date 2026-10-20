@@ -25,3 +25,5 @@ foreach ext : exts
     subdir: thisdir,
   )
 endforeach
+
+subdir('cython')

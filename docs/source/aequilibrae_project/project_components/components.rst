@@ -5,6 +5,17 @@ An AequilibraE project helds geometric information that can be accessed by the u
 three different classes: ``Links``, ``Nodes``, and ``Zones``. We'll first cover these classes, and
 then we'll go over the project components without geo-spatial information.
 
+.. testsetup::
+
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from aequilibrae.utils.create_example import create_example
+
+    _component_docs_tmp = TemporaryDirectory()
+    my_folder_path = Path(_component_docs_tmp.name)
+    project_path = my_folder_path / "project"
+
 ``project.network.links``
 -------------------------
 
@@ -284,8 +295,25 @@ It is possible to access the log file contents, as presented in the next code bl
 ``project.matrices``
 --------------------
 
-This table provides access to all the matrices available in the model, which allows us to update the
-records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord`` object.
+This table provides access to all the matrices available in the model, which
+allows us to update the records in the 'matrices' table. Each item in the
+'matrices' table is a ``MatrixRecord`` object.
+
+``get_matrix()`` returns a lazy ``MatrixStore`` by default, so OMX data can be
+inspected without loading every matrix into memory. Pass ``subset`` to load the
+selected matrices as an in-memory ``AequilibraeMatrix`` for computation:
+
+.. code-block:: python
+
+    project = create_example(my_folder_path / "matrices")
+    matrices = project.matrices
+    with matrices.get_matrix("demand_mc") as store:
+        matrix_names = list(store)
+    demand = matrices.get_matrix("demand_mc", subset=["car", "truck"])
+
+If ``index_name`` is omitted, the only OMX index is selected automatically.
+When an OMX file has multiple indices, ``main_index`` is preferred if present,
+otherwise, provide ``index_name`` explicitly.
 
 .. doctest::
 

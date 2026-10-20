@@ -134,15 +134,8 @@ from aequilibrae.matrix import AequilibraeMatrix
 # %%
 zones_in_the_model = len(transit_graph.centroids)
 
-names_list = ['pt']
-
-mat = AequilibraeMatrix()
-mat.create_empty(zones=zones_in_the_model,
-                 matrix_names=names_list,
-                 memory_only=True)
-mat.index = transit_graph.centroids[:]
-mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
-mat.computational_view()
+mat = AequilibraeMatrix(index=transit_graph.centroids, index_name="zones")
+mat["pt"] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
 
 # %%
 # Hyperpath generation/assignment

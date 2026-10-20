@@ -115,7 +115,7 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
 
         penalty = explicit_turn ? context.turn_penalties[turn] : 0.0;
         if (state != root && !explicit_turn && !context.allow_uturns &&
-            next_node == context.tails[state]) {
+            context.first_nodes[link] == context.last_nodes[state]) {
           continue;
         }
       }

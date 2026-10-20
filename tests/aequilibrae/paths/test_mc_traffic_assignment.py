@@ -16,14 +16,11 @@ def assignment_setup(sioux_falls_example):
         graph.set_graph("free_flow_time")
         graph.set_blocked_centroid_flows(False)
 
-    car_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
-    car_matrix.computational_view(["car"])
+    car_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["car"])
 
-    truck_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
-    truck_matrix.computational_view(["trucks"])
+    truck_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["trucks"])
 
-    moto_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
-    moto_matrix.computational_view(["motorcycle"])
+    moto_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["motorcycle"])
 
     assignment = TrafficAssignment()
     carclass = TrafficClass("car", car_graph, car_matrix)
@@ -46,10 +43,6 @@ def assignment_setup(sioux_falls_example):
         "truckclass": truckclass,
         "algorithms": algorithms,
     }
-
-    # Teardown
-    for mat in [car_matrix, truck_matrix, moto_matrix]:
-        mat.close()
 
 
 def test_set_classes(assignment_setup):

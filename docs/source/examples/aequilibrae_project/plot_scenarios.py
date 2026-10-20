@@ -94,8 +94,7 @@ graph.set_graph("distance")
 graph.set_blocked_centroid_flows(False)
 
 # Get the demand matrix
-mat = project.matrices.get_matrix("demand_omx")
-mat.computational_view()
+mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # Create traffic assignment with alternative parameters
 assigclass = TrafficClass("car", graph, mat)
@@ -164,5 +163,4 @@ for _, scenario in final_scenarios.iterrows():
 # %%
 # Clean up
 project.use_scenario("root")  # Always end on root scenario
-mat.close()
 project.close()
