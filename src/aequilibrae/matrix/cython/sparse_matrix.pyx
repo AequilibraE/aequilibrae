@@ -177,8 +177,6 @@ cdef class SparseMatrix(_MatrixBase):
         for i, value in enumerate(cores.values()):
             self._values[:, i] = value
 
-
-
     # @classmethod
     # def from_matrix(cls, matrix, dtype=None):
     #     """Copy all named matrices into one packed buffer, keeping their order.

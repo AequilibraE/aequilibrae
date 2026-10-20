@@ -1,14 +1,16 @@
 Working with matrices
 =====================
 
-AequilibraE provides two objects for working with named matrices:
+AequilibraE provides three objects for working with named matrices:
 
 * ``AequilibraeMatrix`` holds matrices in memory and is backed by a dictionary.
-  Prefer this object for calculations and other in-memory work.
+  Prefer this object for dense calculations and other in-memory work.
+* ``AequilibraeSparseMatrix`` holds SciPy sparse arrays in memory and keeps
+  their sparse formats and dtypes.
 * ``MatrixStore`` is backed by an OMX file. Use it to read and update matrices
   on disk through a similar interface to the in-memory object.
 
-Both objects associate names with square matrices. All matrices in an object
+All three objects associate names with square matrices. All matrices in an object
 share the same zone index, which gives the zone IDs in row and column order.
 Use the ``from_file()``, ``from_dict()``, ``from_df()`` and ``from_scipy()``
 functions to create the appropriate object from your source data, or the
@@ -17,7 +19,7 @@ functions to create the appropriate object from your source data, or the
 These objects replace the previous ``AequilibraeMatrix`` which mixed both
 roles. For a migration guide, see :doc:`matrix_api_migration`.
 
-``AequilibraeMatrix`` and ``MatrixStore`` both implement the ``MutableMapping``
+``AequilibraeMatrix``, ``AequilibraeSparseMatrix`` and ``MatrixStore`` implement the ``MutableMapping``
 protocol and behave very similarly to a dictionary. You can use mapping
 operations including ``.keys()``, ``.values()``, ``.items()`` and ``.update()``.
 
@@ -426,5 +428,21 @@ Use ``from_scipy()`` when the input is a collection of SciPy sparse arrays:
         {"car": csr_array(car)}, index=index, index_name="zones"
     )
 
-Both helpers return an ``AequilibraeMatrix``. ``from_scipy()`` produces dense
-matrices, so allow enough memory for their full square shape.
+``from_df()`` returns an ``AequilibraeMatrix``. ``from_scipy()`` returns an
+``AequilibraeSparseMatrix`` and copies the sparse arrays without changing their
+formats or dtypes. You can also create an empty sparse collection with
+``AequilibraeSparseMatrix(index=index)`` and assign named sparse arrays.
+Whole-matrix reads return the stored sparse array. Selections through ``mat``
+and ``imat`` follow that sparse format's SciPy indexing rules.
+
+``save_as_omx()`` converts sparse arrays to CSR for storage without changing
+them in memory. Each matrix uses a group at ``/sparse/<name>`` with datasets
+``row_index`` (CSR row pointers), ``col_index`` (column positions) and ``data``.
+Group attributes ``shape`` and ``format="csr"`` describe the storage and are
+reserved; other attributes hold matrix metadata. Zone IDs remain under
+``/lookup``. This is an extension to OMX, so standard OMX readers will not see
+these sparse matrices.
+
+Load these files with ``AequilibraeSparseMatrix.from_omx()``. It only reads
+``/sparse`` and ignores dense matrices in ``/data``. ``from_file()`` and
+``MatrixStore`` still work only with dense matrices.
