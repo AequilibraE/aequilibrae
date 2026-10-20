@@ -19,6 +19,8 @@
 
 namespace aequilibrae::matrix::cpp {
 
+// Borrow CSR indices and a packed [stored positions, fields] buffer.
+// The owner must outlive the view. No memory is owned by this class.
 template <typename T> class SparseMatrix : public MatrixBase<T> {
 public:
   // In a SparseMatrix, n_alloc stores the number of non-zero cells across all
@@ -61,31 +63,32 @@ public:
   //   and is the NNZ.
   //                                               012345
   //                                              ┌──────┐
-  //   All values of a core are stored           0│      │
+  //   All fields of a cell are stored           0│      │
   //   contiguously in memory.                   1│. .  .│
   //                                             2│ ..   │
   //                                             3│    . │
   //   Example Python iteration.                  └──────┘
   //
-  //   for row in range(n_rows):
+  //   for row in range(origin_count):
   //       row_start = row_index[row]
   //       row_end = row_index[row + 1]
   //
   //       for col_idx in range(row_start, row_end):
   //           col = col_index[col_idx]
   //
-  //           for core in range(n_cores):
-  //               value = cores[col_idx * n_cores + core]
+  //           for field in range(field_count):
+  //               value = data[col_idx * field_count + field]
 
-  // row_index is of length n_rows + 1. row_index[i]:row_index[i + 1] defines
+  // row_index is of length origin_count + 1. row_index[i]:row_index[i + 1] defines
   // the range of indices for the values and column indices in each core, and
   // col_index.
   //
-  // row_index[n_rows] is equal to n_alloc.
-  size_t *row_index;
+  // row_index[origin_count] is equal to n_alloc.
+  size_t n_alloc = 0;
+  size_t *row_index = nullptr;
 
   // Each core and col_index are of length n_alloc.
-  size_t *col_index;
+  size_t *col_index = nullptr;
 
   // // The insertion cache is intended to provide a common way to write values
   // // into the matrix between a sparse and dense matrix.
@@ -133,13 +136,13 @@ public:
         : matrix_(matrix), row_pos_(row), col_pos_(0) {
 
       // Find the first non-zero row
-      while (row_pos_ < matrix_.n_rows &&
+      while (row_pos_ < matrix_.origin_count &&
              matrix_.row_index[row_pos_] == matrix_.row_index[row_pos_ + 1]) {
         row_pos_++;
       }
 
-      // If this is the end, then row_pos_ is n_rows, and col_pos_ is n_alloc
-      col_pos_ = matrix_.row_index[row_pos_];
+      // If this is the end, row_pos_ is origin_count and col_pos_ is n_alloc.
+      col_pos_ = matrix_.row_index ? matrix_.row_index[row_pos_] : 0;
     }
 
     // Move constructor
@@ -171,7 +174,7 @@ public:
       // If the column index is equal to the end of the row then we're
       // finished the row and need to increment it till we find the next
       // non-zero row.
-      while (row_pos_ < matrix_.n_rows &&
+      while (row_pos_ < matrix_.origin_count &&
              col_pos_ == matrix_.row_index[row_pos_ + 1]) {
         row_pos_++;
       }
@@ -180,8 +183,9 @@ public:
     }
 
     bool operator==(const iterator &other) const {
-      // FIXME: should we compare matrix_ as well?
-      return row_pos_ == other.row_pos_ && col_pos_ == other.col_pos_;
+      // Iterators match only when they refer to the same matrix and position.
+      return &matrix_ == &other.matrix_ && row_pos_ == other.row_pos_ &&
+             col_pos_ == other.col_pos_;
     }
 
     bool operator!=(const iterator &other) const { return !(*this == other); }
@@ -190,7 +194,7 @@ public:
      * values respective row and column. Their results between iterations may
      * change in a non-contiguous manner. */
     size_t row() const {
-      if (row_pos_ >= matrix_.n_alloc) {
+      if (row_pos_ >= matrix_.origin_count) {
         throw std::out_of_range("Iterator position out of range");
       }
 
@@ -203,10 +207,14 @@ public:
       return std::make_pair(row(), col());
     }
 
-    T *values() const { return &matrix_.cores[col_pos_ * matrix_.n_cores]; }
+    T *values() const {
+      return matrix_.n_alloc && matrix_.field_count
+                 ? matrix_.data + col_pos_ * matrix_.field_count
+                 : nullptr;
+    }
   };
 
   iterator begin() const { return iterator(*this, 0); }
-  iterator end() const { return iterator(*this, this->n_rows); }
+  iterator end() const { return iterator(*this, this->origin_count); }
 };
 } // namespace aequilibrae::matrix::cpp

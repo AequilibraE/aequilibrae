@@ -938,6 +938,43 @@ class AequilibraeSparseMatrix(_Matrix[sparray]):
 
         super().__init__(index=index, index_name=index_name)
 
+    @classmethod
+    def _from_shared_arrays(
+        cls,
+        data: Mapping[str, sparray],
+        index: ArrayLike,
+        index_name: str = "main_index",
+    ) -> Self:
+        """
+        Use supplied sparse arrays without copying.
+
+        Used by SparseMatrix to share its buffer with an in-memory matrix.
+        The arrays keep the buffer alive. Normal matrix assignment still
+        copies values.
+
+        :Arguments:
+            **data** (mapping of :obj:`str` to :obj:`scipy.sparse.sparray`):
+                Named square sparse arrays to share. Each array must match
+                the index length and have a supported numeric or boolean dtype.
+
+            **index** (array-like): Ordered zone IDs shared by rows and columns.
+
+            **index_name** (:obj:`str`, *Optional*): Name of the zone mapping.
+                Defaults to ``"main_index"``.
+        """
+        self = cls(index=index, index_name=index_name)
+        for name, value in data.items():
+            _validate_matrix_key(name)
+            if not isinstance(value, sparray):
+                raise TypeError("shared matrix values must be SciPy sparse arrays")
+            _validate_matrix_dtype(value.dtype)
+            if value.shape != self.shape:
+                raise ValueError(f"got bad shape, expected {self.shape}, got {value.shape}")
+
+            self._backend[name] = value
+            self._matrix_metadata[name] = {}
+        return self
+
     def __setitem__(self, key: str, value: sparray) -> None:
         """Copy a square sparse array, keeping its format, dtype and metadata."""
         _validate_matrix_key(key)

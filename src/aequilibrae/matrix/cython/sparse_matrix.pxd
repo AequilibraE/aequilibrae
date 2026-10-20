@@ -15,6 +15,7 @@ cdef extern from "sparse_matrix.hpp" namespace "aequilibrae::matrix::cpp" nogil:
         T *data
 
         # Sparse extras
+        size_t n_alloc
         size_t *row_index
         size_t *col_index
         # CppSparseMatrixOriginView[T] origin(size_t index) noexcept
