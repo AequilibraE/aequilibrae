@@ -43,4 +43,4 @@ __all__ = [
 ]
 
 # When updating the version, one must also update the docs/source/useful_links/version_history.rst file
-version = "1.7.0"
+version = "1.7.2"
