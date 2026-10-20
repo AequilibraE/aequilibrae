@@ -23,7 +23,7 @@ template <typename T> struct DenseMatrixOriginView {
 };
 
 // Borrow a contiguous [origins, destinations, fields] buffer without owning it.
-template <typename T> class DenseMatrixView : public MatrixBase<T> {
+template <typename T> class DenseMatrix : public MatrixBase<T> {
 public:
   DenseMatrixOriginView<T> origin(std::size_t index) const noexcept {
     T *values = nullptr;

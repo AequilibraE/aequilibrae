@@ -1,12 +1,29 @@
 thisdir = 'aequilibrae/matrix/cython'
 
-py.install_sources('__init__.py', pure: false, subdir: thisdir)
+pyfiles = [
+    '__init__.py',
+]
 
-py.extension_module(
-  'dense_matrix',
-  'dense_matrix.pyx',
-  dependencies: deps,
-  install: true,
-  subdir: thisdir,
-  include_directories: include_directories('../cpp'),
+exts = [
+    'dense_matrix',
+    'matrix_base',
+    'sparse_matrix',
+]
+
+py.install_sources(
+    pyfiles,
+    pure: false,
+    subdir: thisdir,
 )
+
+foreach ext : exts
+    sources = [ext + '.pyx']
+    py.extension_module(
+        ext,
+        sources,
+        dependencies: deps,
+        install: true,
+        subdir: thisdir,
+        include_directories: incdir,
+    )
+endforeach

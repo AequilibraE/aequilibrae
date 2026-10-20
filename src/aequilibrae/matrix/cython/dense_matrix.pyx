@@ -5,70 +5,36 @@ import operator
 import numpy as np
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, _validate_matrix_key
+
+cimport cython
+from .matrix_base cimport _MatrixBase
 from aequilibrae.utils.cython.array_allocations cimport array
 
 
-cdef class DenseMatrix:
-    """Hold matrices in [origins, destinations, fields] order.
-
-    zone_count sets the destination count. The origin count defaults to it.
-
-    Zone IDs and metadata belong to the Python result, not this buffer.
-    Only float32 and float64 are supported, with one dtype for the whole
-    buffer. Native callers use view[float]() or view[double]() and must keep
-    this object alive while using the view.
-
-    to_matrix() shares writable, named slices of the buffer. The returned
-    AequilibraeMatrix keeps the buffer alive after this object is discarded.
-    Adding or replacing matrices in that result does not change this buffer.
-    """
+@cython.final
+cdef class DenseMatrix(_MatrixBase):
+    """Hold matrices in [origins, destinations, fields] order."""
 
     def __init__(self, zone_count, field_names, dtype=np.float64, fill_value=np.inf, *, origin_count=None):
-        if self._values is not None:
-            raise RuntimeError("DenseMatrix cannot be reinitialised")
+        super().__init__(zone_count=zone_count, field_names=field_names, dtype=dtype, origin_count=origin_count)
 
-        zone_count = operator.index(zone_count)
-        if zone_count < 0:
-            raise ValueError("zone_count must be nonnegative")
-
-        origin_count = zone_count if origin_count is None else operator.index(origin_count)
-        if origin_count < 0:
-            raise ValueError("origin_count must be nonnegative")
-
-        if isinstance(field_names, str):
-            raise TypeError("field_names must be a sequence of names, not a string")
-
-        names = tuple(field_names)
-        for name in names:
-            _validate_matrix_key(name)
-        if len(set(names)) != len(names):
-            raise ValueError("field_names must be unique")
-
-        dtype = np.dtype(dtype)
-        if dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
-            raise TypeError("dtype must be float32 or float64")
-
-        shape = (origin_count, zone_count, len(names))
         cdef float[:, :, ::1] values32
         cdef double[:, :, ::1] values64
-        self._float32 = dtype == np.dtype(np.float32)
+        self._float32 = self.dtype == np.dtype(np.float32)
+
+        shape = (self.origin_count, self.destination_count, self.field_count)
 
         if self._float32:
             values = array[float](shape, True, fill_value)
             values32 = values
-            if origin_count and zone_count and names:
+            if self.origin_count and self.destination_count and self.field_names:
                 self._data = &values32[0, 0, 0]
         else:
             values = array[double](shape, True, fill_value)
             values64 = values
-            if origin_count and zone_count and names:
+            if self.origin_count and self.destination_count and self.field_names:
                 self._data = &values64[0, 0, 0]
 
-        self.origin_count = origin_count
-        self.destination_count = zone_count
-        self.field_count = len(names)
-        self.field_names = names
-        self.dtype = dtype
         self._values = values
 
     @classmethod
@@ -114,14 +80,14 @@ cdef class DenseMatrix:
         arrays = {name: values[:, :, field] for field, name in enumerate(self.field_names)}
         return AequilibraeMatrix._from_shared_arrays(arrays, index, index_name)
 
-    cdef CppDenseMatrixView[cython.floating] view(self, cython.floating _type=0) except * nogil:
+    cdef CppDenseMatrix[cython.floating] view(self, cython.floating _type=0) except * nogil:
         """Borrow a typed view. The default argument allows view[float/double]()."""
         # Cython needs the fused type in an argument to specialise the method.
         if (cython.floating is float and not self._float32) or (cython.floating is double and self._float32):
             with gil:
                 raise TypeError("view type must match the DenseMatrix dtype")
 
-        cdef CppDenseMatrixView[cython.floating] output
+        cdef CppDenseMatrix[cython.floating] output
         output.origin_count = self.origin_count
         output.destination_count = self.destination_count
         output.field_count = self.field_count
