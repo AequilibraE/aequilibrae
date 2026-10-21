@@ -16,6 +16,14 @@ template <typename T> struct DenseMatrixOriginView {
   std::size_t field_count = 0;
   T *data = nullptr;
 
+  std::size_t entry_count() const noexcept { return destination_count; }
+
+  std::size_t destination(std::size_t entry) const noexcept { return entry; }
+
+  const T *values(std::size_t entry) const noexcept {
+    return destination_data(entry);
+  }
+
   T *destination_data(std::size_t index) const noexcept {
     return destination_count && field_count ? data + index * field_count
                                             : nullptr;

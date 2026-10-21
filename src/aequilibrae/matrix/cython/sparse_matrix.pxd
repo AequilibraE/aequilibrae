@@ -5,6 +5,17 @@ cimport cython
 from .matrix_base cimport _MatrixBase
 
 cdef extern from "sparse_matrix.hpp" namespace "aequilibrae::matrix::cpp" nogil:
+    cdef cppclass CppSparseMatrixOriginView "aequilibrae::matrix::cpp::SparseMatrixOriginView"[T]:
+        CppSparseMatrixOriginView() noexcept
+        size_t destination_count
+        size_t field_count
+        size_t stored_count
+        const size_t *col_index
+        T *data
+        size_t entry_count() noexcept
+        size_t destination(size_t entry) noexcept
+        const T *values(size_t entry) noexcept
+
     cdef cppclass CppSparseMatrix "aequilibrae::matrix::cpp::SparseMatrix"[T]:
         CppSparseMatrix() noexcept  # Required for Cython usage
 
@@ -18,7 +29,7 @@ cdef extern from "sparse_matrix.hpp" namespace "aequilibrae::matrix::cpp" nogil:
         size_t n_alloc
         size_t *row_index
         size_t *col_index
-        # CppSparseMatrixOriginView[T] origin(size_t index) noexcept
+        CppSparseMatrixOriginView[T] origin(size_t index) noexcept
 
 
 @cython.final

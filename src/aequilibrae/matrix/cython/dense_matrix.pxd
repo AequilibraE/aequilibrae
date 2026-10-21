@@ -10,6 +10,9 @@ cdef extern from "dense_matrix.hpp" namespace "aequilibrae::matrix::cpp" nogil:
         size_t destination_count
         size_t field_count
         T *data
+        size_t entry_count() noexcept
+        size_t destination(size_t entry) noexcept
+        const T *values(size_t entry) noexcept
         T *destination_data(size_t index) noexcept
 
     cdef cppclass CppDenseMatrix "aequilibrae::matrix::cpp::DenseMatrix"[T]:
