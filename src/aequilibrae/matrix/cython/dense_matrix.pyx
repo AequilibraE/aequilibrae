@@ -1,10 +1,10 @@
 """Packed dense matrices for native code and shared Python results."""
 
-import operator
+from collections.abc import Mapping
 
 import numpy as np
 
-from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, _validate_matrix_key
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 cimport cython
 from .matrix_base cimport _MatrixBase
@@ -48,18 +48,42 @@ cdef class DenseMatrix(_MatrixBase):
         if not isinstance(matrix, AequilibraeMatrix):
             raise TypeError("matrix must be an AequilibraeMatrix")
 
-        names = tuple(matrix)
+        if not matrix:
+            return cls(matrix.shape[0], (), dtype=np.float64 if dtype is None else dtype)
+        return cls.from_dict({name: matrix[name] for name in matrix}, dtype=dtype)
+
+    @classmethod
+    def from_dict(cls, matrices, dtype=None):
+        """Copy named two-dimensional arrays into one packed buffer."""
+        if not isinstance(matrices, Mapping):
+            raise TypeError("matrices must be a mapping of names to arrays")
+
+        if not matrices:
+            raise ValueError("matrices must contain at least one array")
+
+        names = tuple(matrices)
+        sources = {name: np.asarray(matrices[name]) for name in names}
+        shape = next(iter(sources.values())).shape
+
+        for name, values in sources.items():
+            if values.ndim != 2:
+                raise ValueError(f"matrix {name!r} must be two-dimensional, got {values.shape}")
+            if values.shape != shape:
+                raise ValueError(
+                    f"all matrices must have the same shape; {name!r} has shape {values.shape}, expected {shape}"
+                )
+
         if dtype is None:
-            dtypes = {matrix[name].dtype for name in names}
+            dtypes = {values.dtype for values in sources.values()}
             if len(dtypes) > 1:
                 raise TypeError("source matrices have mixed dtypes; supply dtype explicitly")
 
             dtype = next(iter(dtypes), np.dtype(np.float64))
 
-        cdef DenseMatrix output = cls(matrix.shape[0], names, dtype=dtype)
+        cdef DenseMatrix output = cls(shape[1], names, dtype=dtype, origin_count=shape[0])
         values = np.asarray(output._values)
         for field, name in enumerate(names):
-            np.copyto(values[:, :, field], matrix[name], casting="same_kind")
+            np.copyto(values[:, :, field], sources[name], casting="same_kind")
 
         return output
 
