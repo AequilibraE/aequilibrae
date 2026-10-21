@@ -11,6 +11,7 @@ from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 
 
 def diamond(turn=False):
@@ -47,11 +48,18 @@ def diamond(turn=False):
 
 def matrix_for(graph, demand=None):
     if demand is None:
-        demand = np.zeros((graph.num_zones, graph.num_zones, 2))
-        demand[0, -1] = [8.0, 12.0]
+        demand = {
+            "work": np.zeros((graph.num_zones, graph.num_zones)),
+            "other": np.zeros((graph.num_zones, graph.num_zones)),
+        }
+        demand["work"][0, -1] = 8.0
+        demand["other"][0, -1] = 12.0
 
     matrix = AequilibraeMatrix(index=graph.centroids.copy())
-    if demand.ndim == 2:
+    if isinstance(demand, dict):
+        for name, values in demand.items():
+            matrix[name] = values
+    elif demand.ndim == 2:
         matrix["work"] = demand
     else:
         for index, name in enumerate(("work", "other")[: demand.shape[2]]):
@@ -158,19 +166,20 @@ def test_invalid_demand_rejected_at_assignment_entry(bad):
 
 def test_strided_demand_is_copied_once_without_reshaping_caller():
     graph = diamond()
-    source = np.arange(4 * 4 * 4, dtype=float).reshape(4, 4, 4)
-    view = source[:, :, 1:3]
+    source = np.arange(4 * 8, dtype=float).reshape(4, 8)
+    view = {"work": source[:, ::2], "other": source[:, 1::2]}
     matrix = matrix_for(graph, view)
     input_values = {name: values.copy() for name, values in matrix.items()}
     packed = assignment_demand(matrix, graph.centroids)
-    assert packed.flags.c_contiguous
-    assert not packed.flags.writeable
-    assert not np.shares_memory(packed, source)
-    np.testing.assert_array_equal(packed, np.stack([input_values[name] for name in matrix], axis=2))
+    assert isinstance(packed, DenseMatrix)
+    assert packed.field_names == tuple(matrix)
+    for name, values in packed.to_matrix(graph.centroids).items():
+        assert not np.shares_memory(values, source)
+        np.testing.assert_array_equal(values, input_values[name])
 
-    matrix = matrix_for(graph, source[:, :, 0])
+    matrix = matrix_for(graph, source[:, ::2])
     packed = assignment_demand(matrix, graph.centroids)
-    assert packed.shape == (4, 4, 1)
+    assert (packed.origin_count, packed.destination_count, packed.field_count) == (4, 4, 1)
     assert matrix["work"].ndim == 2
 
 
@@ -279,7 +288,7 @@ def test_compressed_chain_and_removed_link_project_without_dummy_storage():
 def test_zero_demand_without_skims_leaves_no_optional_outputs(turn):
     graph = diamond(turn)
     graph.set_skimming([])
-    matrix = matrix_for(graph, np.zeros((4, 4, 1)))
+    matrix = matrix_for(graph, {"work": np.zeros((4, 4))})
     inputs = AssignmentInputs(graph, matrix, "time", {}, 2)
     output = inputs.driver.run(inputs.driver.make_outputs())
     assert inputs.driver.origins.size == 0

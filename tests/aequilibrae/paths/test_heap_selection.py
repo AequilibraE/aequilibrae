@@ -1,5 +1,7 @@
 import geopandas as gpd
 import numpy as np
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pandas as pd
 import pytest
 
@@ -85,8 +87,9 @@ def test_separate_workspaces_reuse_their_heaps(heap, turn):
 @pytest.mark.parametrize("turn", [False, True])
 def test_prepared_aon_heap_dispatch(heap, turn):
     context = make_context([0, 2, 3, 3], [1, 2, 2], [1, 5, 2], turn=turn)
-    demand = np.zeros((3, 3, 1))
-    demand[0, 2, 0] = 7
+    demand = {"class_0": np.zeros((3, 3))}
+    demand["class_0"][0, 2] = 7
+    demand = DenseMatrix.from_dict(demand)
     prepared = PreparedAoN(context, demand, heap=heap, cores=2)
     output = prepared.make_outputs()
     prepared.run(output)

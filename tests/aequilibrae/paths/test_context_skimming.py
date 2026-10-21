@@ -52,8 +52,13 @@ def test_skim_state_tree_against_path_sums_and_assignment(turn, penalty, width):
         cost_name="objective",
         turn_cost_name="penalty",
     )
-    demand = np.ones((4, 4, 2))
-    prepared = PreparedAoN(context, demand, skimming=inputs, cores=3)
+    demand = {f"class_{field}": np.ones((4, 4)) for field in range(2)}
+    prepared = PreparedAoN(
+        context,
+        DenseMatrix.from_dict(demand),
+        skimming=inputs,
+        cores=3,
+    )
     assigned = prepared.run(prepared.make_outputs())
     output = inputs.make_outputs(4, origin_count=4)
     scratch = workspace_for(context, inputs)
@@ -521,7 +526,7 @@ def test_shared_inputs_and_disjoint_output_rows(labels_only):
 def test_label_only_assignment_searches_zero_demand_and_resets_skipped_rows(turn, label):
     context = history_context(0.5, turn=turn)
     inputs = SkimmingContext(4, **{label: "label"})
-    demand = np.zeros((4, 4, 1))
+    demand = DenseMatrix.from_dict({"class_0": np.zeros((4, 4))})
     prepared = PreparedAoN(context, demand, skimming=inputs, cores=3)
     np.testing.assert_array_equal(prepared.origins, np.arange(4))
     np.testing.assert_array_equal(prepared.destination_counts, [4])
@@ -544,7 +549,7 @@ def test_label_only_assignment_searches_zero_demand_and_resets_skipped_rows(turn
 
 def test_assignment_rejects_mismatched_names_before_reset():
     context = history_context()
-    demand = np.ones((4, 4, 1))
+    demand = DenseMatrix.from_dict({"class_0": np.ones((4, 4))})
     first = PreparedAoN(context, demand, skimming=SkimmingContext(4, cost_name="first"))
     second = PreparedAoN(context, demand, skimming=SkimmingContext(4, cost_name="second"))
     out = first.run(first.make_outputs())

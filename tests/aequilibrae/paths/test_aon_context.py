@@ -5,6 +5,8 @@ import weakref
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
 
 from aequilibrae.paths.cython.aon_context import PreparedAoN
@@ -42,12 +44,16 @@ def assert_walk_outputs(output, expected):
 @pytest.mark.parametrize("cores", [1, 3])
 def test_selected_full_paths_and_output_rotation(turn, cores):
     context = history_context(turn=turn)
-    demand = np.ones((4, 4, 2))
+    demand = {f"class_{field}": np.ones((4, 4)) for field in range(2)}
     selections = {"screenline": [0, 3, 3], "other": [2], "empty": []}
     fields = [np.ones(context.link_count)]
     skims = SkimmingContext(context.link_count, link_fields={"time": fields[0]})
     prepared = PreparedAoN(
-        context, demand, cores=cores, selected_links=SelectLinkContext(context.link_count, selections), skimming=skims
+        context,
+        DenseMatrix.from_dict(demand),
+        cores=cores,
+        selected_links=SelectLinkContext(context.link_count, selections),
+        skimming=skims,
     )
     previous, current = prepared.make_outputs(), prepared.make_outputs()
     retained = output_arrays(previous)
@@ -77,8 +83,8 @@ def test_worker_turn_totals_accumulate_across_origins_and_reset_between_runs(cor
         turns={(0, 1): 2.0, (1, 2): 3.0, (2, 0): 4.0},
         turn=True,
     )
-    demand = np.ones((3, 3, 2))
-    prepared = PreparedAoN(context, demand, cores=cores)
+    demand = {f"class_{field}": np.ones((3, 3)) for field in range(2)}
+    prepared = PreparedAoN(context, DenseMatrix.from_dict(demand), cores=cores)
     output = prepared.make_outputs()
     expected_total = 2 * (2.0 + 3.0 + 4.0)
 
@@ -114,12 +120,16 @@ def test_random_selected_loading_against_path_walks(turn, seed):
                     turns[incoming, outgoing] = np.inf if rng.random() < 0.2 else 5.0
     fs = np.r_[0, np.cumsum(np.bincount([a for a, _, _ in edges], minlength=nodes))]
     context = make_context(fs, [b for _, b, _ in edges], [c for _, _, c in edges], turns if turn else None, turn=turn)
-    demand = rng.integers(-2, 5, size=(nodes, nodes, 2)).astype(np.float64)
+    demand = {f"class_{field}": rng.integers(-2, 5, size=(nodes, nodes)).astype(np.float64) for field in range(2)}
     selected = {"first": list(range(0, context.link_count, 3)), "second": list(range(1, context.link_count, 2))}
     fields = [rng.random(context.link_count)]
     skims = SkimmingContext(context.link_count, link_fields={"distance": fields[0]})
     prepared = PreparedAoN(
-        context, demand, cores=3, selected_links=SelectLinkContext(context.link_count, selected), skimming=skims
+        context,
+        DenseMatrix.from_dict(demand),
+        cores=3,
+        selected_links=SelectLinkContext(context.link_count, selected),
+        skimming=skims,
     )
     out = prepared.run(prepared.make_outputs())
     assert_walk_outputs(out, path_walk_outputs(context, demand, fields, selected_links=list(selected.values())))
@@ -128,12 +138,13 @@ def test_random_selected_loading_against_path_walks(turn, seed):
 @pytest.mark.parametrize("turn", [False, True])
 def test_caller_creates_independent_cost_bindings_and_outputs_retain_no_inputs(turn):
     context = history_context(turn=turn)
-    demand = np.ones((4, 4, 1))
+    demand = {"class_0": np.ones((4, 4))}
     costs = np.array([1.0, 20.0, 1.0, 1.0] if turn else [20.0, 1.0, 1.0, 1.0])
     costs_ref = weakref.ref(costs)
     routing = context.with_costs(costs)
-    a = PreparedAoN(context, demand)
-    b = PreparedAoN(routing, demand)
+    packed = DenseMatrix.from_dict(demand)
+    a = PreparedAoN(context, packed)
+    b = PreparedAoN(routing, packed)
     first, second = a.run(a.make_outputs()), b.run(b.make_outputs())
     assert not np.array_equal(first.loading.link_loads, second.loading.link_loads)
     assert np.shares_memory(routing.costs, costs)
@@ -156,10 +167,14 @@ def test_caller_creates_independent_cost_bindings_and_outputs_retain_no_inputs(t
 def test_cost_updates_refresh_routing_without_repreparing_workers(turn, rebind, monkeypatch):
     costs = np.ones(4)
     context = history_context(turn=turn).with_costs(costs)
-    demand = np.ones((4, 4, 1))
+    demand = {"class_0": np.ones((4, 4))}
     skims = SkimmingContext(4, cost_name="objective")
     prepared = PreparedAoN(
-        context, demand, skimming=skims, cores=3, selected_links=SelectLinkContext(4, {"all": range(4)})
+        context,
+        DenseMatrix.from_dict(demand),
+        skimming=skims,
+        cores=3,
+        selected_links=SelectLinkContext(4, {"all": range(4)}),
     )
     out = prepared.run(prepared.make_outputs())
     initial_loads = out.loading.link_loads.copy()
@@ -197,7 +212,7 @@ def test_cost_updates_refresh_routing_without_repreparing_workers(turn, rebind, 
     def unexpected(*args, **kwargs):
         raise AssertionError("setup should not run inside an iteration")
 
-    for name in ("borrow_input", "choose_origins", "make_destination_masks"):
+    for name in ("choose_origins", "make_destination_masks"):
         monkeypatch.setattr(f"aequilibrae.paths.cython.aon_context.{name}", unexpected)
 
     for iteration in range(3):
@@ -236,8 +251,8 @@ def test_cost_updates_refresh_routing_without_repreparing_workers(turn, rebind, 
 @pytest.mark.parametrize("turn", [False, True])
 def test_drivers_can_share_a_context_and_observe_rebinding_between_runs(turn):
     context = history_context(turn=turn)
-    demand = np.ones((4, 4, 1))
-    drivers = [PreparedAoN(context, demand, cores=2) for _ in range(2)]
+    demand = {"class_0": np.ones((4, 4))}
+    drivers = [PreparedAoN(context, DenseMatrix.from_dict(demand), cores=2) for _ in range(2)]
     outputs = [driver.make_outputs() for driver in drivers]
     with ThreadPoolExecutor(max_workers=2) as pool:
         for costs in (np.ones(4), np.array([20.0, 15.0, 1.0, 1.0])):
@@ -253,9 +268,9 @@ def test_drivers_can_share_a_context_and_observe_rebinding_between_runs(turn):
 def test_centroid_blocking_is_configured_on_the_context(turn):
     context = make_context([0, 2, 3, 3], [1, 2, 2], [1, 10, 1], turn=turn, blocked_centroid_count=3)
     heads = context.heads.copy()
-    demand = np.zeros((3, 3, 1))
-    demand[0, 2, 0] = 1
-    prepared = PreparedAoN(context, demand, cores=3)
+    demand = {"class_0": np.zeros((3, 3))}
+    demand["class_0"][0, 2] = 1
+    prepared = PreparedAoN(context, DenseMatrix.from_dict(demand), cores=3)
     out = prepared.run(prepared.make_outputs())
     np.testing.assert_array_equal(out.loading.link_loads[:, 0], [0, 1, 0])
     np.testing.assert_array_equal(context.heads, heads)
@@ -265,7 +280,11 @@ def test_centroid_blocking_is_configured_on_the_context(turn):
 @pytest.mark.parametrize("turn", [False, True])
 def test_no_active_origins_resets_outputs(turn):
     context = make_context([0, 0, 0], [], [], turn=turn)
-    prepared = PreparedAoN(context, np.zeros((2, 2, 1)), selected_links=SelectLinkContext(0, {"empty": []}))
+    prepared = PreparedAoN(
+        context,
+        DenseMatrix.from_dict({"class_0": np.zeros((2, 2))}),
+        selected_links=SelectLinkContext(0, {"empty": []}),
+    )
     out = prepared.run(prepared.make_outputs())
     assert out.turn_cost_total == 0
     assert np.all(out.select_link.od.demand == 0)
@@ -278,7 +297,7 @@ def test_output_group_allocates_resets_and_releases_independent_components(skims
     context = history_context(0.5)
     prepared = PreparedAoN(
         context,
-        np.ones((4, 4, 1)),
+        DenseMatrix.from_dict({"class_0": np.ones((4, 4))}),
         skimming=SkimmingContext(4, cost_name="cost") if skims else None,
         selected_links=SelectLinkContext(4, {"all": range(4)}),
         select_link_loads=selected_loads,
@@ -370,10 +389,10 @@ def test_output_allocator_supports_empty_axes_and_fixed_components(dimensions):
 )
 def test_driver_checks_actual_components_before_any_output_writes(change):
     context = history_context(0.5)
-    demand = np.ones((4, 4, 1))
+    demand = {"class_0": np.ones((4, 4))}
     prepared = PreparedAoN(
         context,
-        demand,
+        DenseMatrix.from_dict(demand),
         skimming=SkimmingContext(4, cost_name="cost"),
         selected_links=SelectLinkContext(4, {"set": range(4)}),
     )
@@ -395,7 +414,7 @@ def test_driver_checks_actual_components_before_any_output_writes(change):
 
     other = PreparedAoN(
         other_context,
-        np.ones((zones, zones, classes)),
+        DenseMatrix.from_dict({f"class_{field}": np.ones((zones, zones)) for field in range(classes)}),
         skimming=skimming,
         selected_links=selections,
         select_link_loads=change != "od_only",
@@ -417,16 +436,17 @@ def test_driver_checks_actual_components_before_any_output_writes(change):
 
 def test_driver_has_no_routing_configuration_proxies():
     context = history_context()
-    demand = np.ones((4, 4, 1))
-    prepared = PreparedAoN(context, demand)
+    demand = {"class_0": np.ones((4, 4))}
+    packed = DenseMatrix.from_dict(demand)
+    prepared = PreparedAoN(context, packed)
     for name in ("costs", "update_costs", "shape"):
         assert not hasattr(prepared, name)
     for options in ({"costs": context.costs}, {"block_centroids": True}):
         with pytest.raises(TypeError):
-            PreparedAoN(context, demand, **options)
+            PreparedAoN(context, packed, **options)
     with pytest.raises(RuntimeError):
-        prepared.__init__(context, demand)
-    for bad in (demand.astype(np.float32), np.ones((4, 8, 1))[:, ::2], demand.tolist()):
+        prepared.__init__(context, packed)
+    for bad in (demand, np.ones((4, 4), dtype=np.float32), np.ones((4, 8))[:, ::2], np.ones((4, 4)).tolist()):
         with pytest.raises((ValueError, TypeError)):
             PreparedAoN(context, bad)
     with pytest.raises(ValueError, match="contiguous"):

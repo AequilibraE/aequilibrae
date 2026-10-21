@@ -859,7 +859,7 @@ class TrafficAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
+            uclass["matrix_totals"] = cls.matrix.totals()
             uclass["network mode"] = cls.graph.mode
             uclass["Value-of-time"] = cls.vot
             uclass["PCE"] = cls.pce
@@ -1133,7 +1133,7 @@ class TransitAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
+            uclass["matrix_totals"] = cls.matrix.totals()
             uclass["network mode"] = cls.graph.mode
 
             classes[cls._id] = uclass

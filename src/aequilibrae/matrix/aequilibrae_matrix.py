@@ -264,6 +264,10 @@ class _Matrix(MutableMapping[str, _ArrayT]):
         self._index = self._validate_index(index)  # Validate without writing a store's index
         self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
 
+    def totals(self) -> dict[str, Any]:
+        """Return each named matrix's total."""
+        return {name: values.sum().item() for name, values in self.items()}
+
     def save_as_omx(
         self,
         path: str | os.PathLike,

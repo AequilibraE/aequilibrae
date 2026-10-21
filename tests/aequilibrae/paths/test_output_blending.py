@@ -3,6 +3,8 @@
 import logging
 
 import numpy as np
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
 
 from aequilibrae.paths.cython.aon_context import PreparedAoN
@@ -122,10 +124,12 @@ def sources():
             turns={(0, 1): 2.0 * scale, (1, 2): 3.0 * scale},
             turn=True,
         )
-        demand = np.arange(1, 49, dtype=float).reshape(4, 4, 3) * scale
+        demand = {
+            f"class_{field}": (np.arange(16, dtype=float).reshape(4, 4) * 3 + field + 1) * scale for field in range(3)
+        }
         prepared = PreparedAoN(
             context,
-            demand,
+            DenseMatrix.from_dict(demand),
             skimming=SkimmingContext(4, cost_name=SKIMS[0], turn_cost_name=SKIMS[1]),
             selected_links=SelectLinkContext(4, {SETS[0]: [0], SETS[1]: [2, 3]}),
         )

@@ -5,6 +5,8 @@ import weakref
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
 
 from aequilibrae.paths.cython.aon_context import PreparedAoN
@@ -418,7 +420,7 @@ def test_workers_share_od_rows_and_reduce_only_link_loads(turn):
     selections = {"first": [0, 3], "last": [2]}
     inputs = SelectLinkContext(4, selections)
     output = inputs.make_outputs(4, 2, origin_count=4)
-    demand = np.arange(32, dtype=np.float64).reshape(4, 4, 2)
+    demand = {f"class_{field}": np.arange(16, dtype=np.float64).reshape(4, 4) + field * 16 for field in range(2)}
 
     def run(origins):
         results = allocate_results(context)
@@ -427,7 +429,14 @@ def test_workers_share_od_rows_and_reduce_only_link_loads(turn):
         for origin in origins:
             search(context, origin, results=results)
             select_link_loading(
-                results, LoadingQuery(demand[origin]), inputs, flags, loading, worker, output.od, origin_row=origin
+                results,
+                LoadingQuery(np.column_stack([matrix[origin] for matrix in demand.values()])),
+                inputs,
+                flags,
+                loading,
+                worker,
+                output.od,
+                origin_row=origin,
             )
         return worker
 
@@ -465,13 +474,25 @@ def test_workers_share_od_rows_and_reduce_only_link_loads(turn):
 def test_assignment_optional_components_match_standalone_and_outlive_driver(turn, link_loads, od):
     context = history_context(turn=turn)
     inputs = SelectLinkContext(4, {"first": [0, 3], "last": [2]})
-    demand = np.ones((4, 4, 2))
+    demand = {f"class_{field}": np.ones((4, 4)) for field in range(2)}
     prepared = PreparedAoN(
-        context, demand, cores=3, selected_links=inputs, select_link_loads=link_loads, select_link_od=od, origins=[0, 2]
+        context,
+        DenseMatrix.from_dict(demand),
+        cores=3,
+        selected_links=inputs,
+        select_link_loads=link_loads,
+        select_link_od=od,
+        origins=[0, 2],
     )
     assigned = prepared.make_outputs()
     # Start with all rows populated; the subset run must clear the skipped ones.
-    full = PreparedAoN(context, demand, selected_links=inputs, select_link_loads=link_loads, select_link_od=od)
+    full = PreparedAoN(
+        context,
+        DenseMatrix.from_dict(demand),
+        selected_links=inputs,
+        select_link_loads=link_loads,
+        select_link_od=od,
+    )
     full.run(assigned)
     standalone = inputs.make_outputs(4, 2, origin_count=4, link_loads=link_loads, od=od)
     flags, loading = SelectLinkWorkspace(context.state_count), LoadingWorkspace(context.state_count, 2)
@@ -482,7 +503,7 @@ def test_assignment_optional_components_match_standalone_and_outlive_driver(turn
         for origin in (0, 2):
             select_link_loading(
                 search(context, origin),
-                LoadingQuery(demand[origin]),
+                LoadingQuery(np.column_stack([matrix[origin] for matrix in demand.values()])),
                 inputs,
                 flags,
                 loading if link_loads else None,
@@ -507,7 +528,7 @@ def test_assignment_optional_components_match_standalone_and_outlive_driver(turn
     component.reset()
     select_link_loading(
         search(context, 0),
-        LoadingQuery(demand[0]),
+        LoadingQuery(np.column_stack([matrix[0] for matrix in demand.values()])),
         inputs,
         flags,
         loading if link_loads else None,
@@ -517,14 +538,18 @@ def test_assignment_optional_components_match_standalone_and_outlive_driver(turn
     if link_loads:
         np.testing.assert_array_equal(
             component.loading.link_loads,
-            walk_selected_paths(search(context, 0), demand[0], {"first": [0, 3], "last": [2]})[0],
+            walk_selected_paths(
+                search(context, 0),
+                np.column_stack([matrix[0] for matrix in demand.values()]),
+                {"first": [0, 3], "last": [2]},
+            )[0],
         )
 
 
 def test_assignment_checks_selection_configuration_before_resetting_output():
     context = history_context()
     inputs = SelectLinkContext(4, {"first": [0, 3], "last": [2]})
-    demand = np.ones((4, 4, 1))
+    demand = DenseMatrix.from_dict({"class_0": np.ones((4, 4))})
     prepared = PreparedAoN(context, demand, selected_links=inputs)
     out = prepared.run(prepared.make_outputs())
     views = out.loading.link_loads, out.select_link.loading.link_loads, out.select_link.od.demand
@@ -565,7 +590,7 @@ def test_masks_are_retained_by_driver_but_not_its_outputs():
     context = history_context()
     inputs = TrackedSelectLinkContext(4, {"all": range(4)})
     input_ref = weakref.ref(inputs)
-    prepared = PreparedAoN(context, np.ones((4, 4, 1)), selected_links=inputs)
+    prepared = PreparedAoN(context, DenseMatrix.from_dict({"class_0": np.ones((4, 4))}), selected_links=inputs)
     del inputs
     gc.collect()
     assert input_ref() is not None
@@ -582,11 +607,21 @@ def test_no_active_origins_clears_reused_selected_outputs(turn, link_loads, od):
     context = history_context(turn=turn)
     inputs = SelectLinkContext(4, {"all": range(4)})
     active = PreparedAoN(
-        context, np.ones((4, 4, 1)), selected_links=inputs, select_link_loads=link_loads, select_link_od=od, cores=3
+        context,
+        DenseMatrix.from_dict({"class_0": np.ones((4, 4))}),
+        selected_links=inputs,
+        select_link_loads=link_loads,
+        select_link_od=od,
+        cores=3,
     )
     out = active.run(active.make_outputs())
     empty = PreparedAoN(
-        context, np.zeros((4, 4, 1)), selected_links=inputs, select_link_loads=link_loads, select_link_od=od, cores=3
+        context,
+        DenseMatrix.from_dict({"class_0": np.zeros((4, 4))}),
+        selected_links=inputs,
+        select_link_loads=link_loads,
+        select_link_od=od,
+        cores=3,
     )
     empty.run(out)
     if link_loads:

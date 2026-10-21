@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
 
@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class TransportClassBase(ABC):  # noqa: B024
-    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
+    _matrix_types = (AequilibraeMatrix,)
+
+    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix | AequilibraeSparseMatrix) -> None:
         """
         Instantiates the class
 
@@ -24,10 +26,12 @@ class TransportClassBase(ABC):  # noqa: B024
 
             **graph** (:obj:`Graph`): Class/mode-specific graph
 
-            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
+            **matrix** (:obj:`AequilibraeMatrix` or :obj:`AequilibraeSparseMatrix`): Class/mode-specific matrix.
+            Supports multiple user classes
         """
-        if not isinstance(matrix, AequilibraeMatrix):
-            raise TypeError("Matrix must be an AequilibraeMatrix")
+        if not isinstance(matrix, self._matrix_types):
+            names = " or ".join(matrix_type.__name__ for matrix_type in self._matrix_types)
+            raise TypeError(f"Matrix must be an {names}")
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
         if any(values.dtype != np.float64 for values in matrix.values()):
@@ -52,8 +56,8 @@ class TransportClassBase(ABC):  # noqa: B024
             "Number of centroids": len(matrix.index),
             "Matrix cores": matrix_names,
         }
-        # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
-        mat_config["Matrix totals"] = {name: float(np.nan_to_num(matrix[name]).sum()) for name in matrix_names}
+
+        mat_config["Matrix totals"] = matrix.totals()
         self._config["Matrix"] = str(mat_config)
 
     @property
@@ -88,7 +92,9 @@ class TrafficClass(TransportClassBase):
         >>> project.close()
     """
 
-    def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:
+    _matrix_types = (AequilibraeMatrix, AequilibraeSparseMatrix)
+
+    def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix | AequilibraeSparseMatrix) -> None:
         """
         Instantiates the class
 
@@ -97,7 +103,8 @@ class TrafficClass(TransportClassBase):
 
             **graph** (:obj:`Graph`): Class/mode-specific graph
 
-            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
+            **matrix** (:obj:`AequilibraeMatrix` or :obj:`AequilibraeSparseMatrix`): Class/mode-specific matrix.
+            Supports multiple user classes
         """
         super().__init__(name, graph, matrix)
         self.pce = 1.0

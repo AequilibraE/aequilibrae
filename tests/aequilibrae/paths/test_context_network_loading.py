@@ -5,6 +5,8 @@ import weakref
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
 
 from aequilibrae.paths.cython.aon_context import PreparedAoN
@@ -27,8 +29,8 @@ from .routing_helpers import allocate_results, history_context, make_context, pa
 @pytest.mark.parametrize("cores", [1, 3])
 def test_loading_and_turn_totals_against_path_walks(turn, penalty, cores):
     context = history_context(penalty, turn=turn)
-    demand = np.arange(48, dtype=np.float64).reshape(4, 4, 3) - 10
-    prepared = PreparedAoN(context, demand, cores=cores)
+    demand = {f"class_{field}": np.arange(16, dtype=np.float64).reshape(4, 4) + field * 16 - 10 for field in range(3)}
+    prepared = PreparedAoN(context, DenseMatrix.from_dict(demand), cores=cores)
     out = prepared.make_outputs()
     expected, _, total, _, _ = path_walk_outputs(context, demand)
     for _ in range(3):
@@ -37,16 +39,19 @@ def test_loading_and_turn_totals_against_path_walks(turn, penalty, cores):
         assert out.turn_cost_total == total
 
 
-def test_fixed_demand_is_retained_without_changing_writeability():
+def test_fixed_dense_matrix_is_retained_without_changing_source_writeability():
     context = history_context()
-    demand = np.ones((4, 4, 1))
-    reference = weakref.ref(demand)
-    prepared = PreparedAoN(context, demand)
+    demand = {"class_0": np.ones((4, 4))}
+    source = demand["class_0"]
+    reference = weakref.ref(source)
+    packed = DenseMatrix.from_dict(demand)
+    prepared = PreparedAoN(context, packed)
     expected = path_walk_outputs(context, demand)[0]
-    assert demand.flags.writeable
-    del demand
+    assert source.flags.writeable
+    assert any(value is packed for value in gc.get_referents(prepared))
+    del demand, packed, source
     gc.collect()
-    assert reference() is not None
+    assert reference() is None
     out = prepared.make_outputs()
     for _ in range(3):
         prepared.run(out)
@@ -59,8 +64,8 @@ def test_fixed_demand_is_retained_without_changing_writeability():
 @pytest.mark.parametrize("turn", [False, True])
 def test_edgeless_network_and_intrazonal_demand(turn):
     context = make_context([0, 0, 0], [], [], turn=turn)
-    demand = np.ones((2, 2, 1))
-    prepared = PreparedAoN(context, demand, cores=3)
+    demand = {"class_0": np.ones((2, 2))}
+    prepared = PreparedAoN(context, DenseMatrix.from_dict(demand), cores=3)
     out = prepared.run(prepared.make_outputs())
     assert out.loading.link_loads.shape == (0, 1)
     assert out.turn_cost_total == 0
@@ -69,9 +74,10 @@ def test_edgeless_network_and_intrazonal_demand(turn):
 @pytest.mark.parametrize("turn", [False, True])
 def test_demand_classes_do_not_cancel_target_selection(turn):
     context = history_context(turn=turn)
-    demand = np.zeros((4, 4, 2))
-    demand[0, 3] = [1, -1]
-    prepared = PreparedAoN(context, demand)
+    demand = {"class_0": np.zeros((4, 4)), "class_1": np.zeros((4, 4))}
+    demand["class_0"][0, 3] = 1
+    demand["class_1"][0, 3] = -1
+    prepared = PreparedAoN(context, DenseMatrix.from_dict(demand))
     out = prepared.run(prepared.make_outputs())
     expected = path_walk_outputs(context, demand)[0]
     assert np.any(expected)
@@ -85,8 +91,13 @@ def test_standalone_loading_reuses_paths_scratch_and_output(turn, classes):
     results = allocate_results(context)
     workspace = LoadingWorkspace(context.state_count, classes)
     output = LoadingOutputs(context.link_count, classes)
-    demand = np.arange(16 * classes, dtype=np.float64).reshape(4, 4, classes) - 3
-    queries = [LoadingQuery(row) for row in demand]
+    demand = {
+        f"class_{field}": np.arange(16, dtype=np.float64).reshape(4, 4) + field * 16 - 3 for field in range(classes)
+    }
+    queries = [
+        LoadingQuery(np.column_stack([matrix[origin] for matrix in demand.values()]) if classes else np.empty((4, 0)))
+        for origin in range(4)
+    ]
     expected = path_walk_outputs(context, demand)[0]
     scratch_view, output_view = workspace.state_loads, output.link_loads
     for _ in range(3):
@@ -311,7 +322,7 @@ def test_loading_validates_dimensions_before_any_writes():
 @pytest.mark.parametrize("turn", [False, True])
 def test_worker_outputs_reduce_without_changing_workers(turn):
     context = history_context(turn=turn)
-    demand = np.arange(32, dtype=np.float64).reshape(4, 4, 2)
+    demand = {f"class_{field}": np.arange(16, dtype=np.float64).reshape(4, 4) + field * 16 for field in range(2)}
 
     def run(origins):
         results = allocate_results(context)
@@ -319,7 +330,8 @@ def test_worker_outputs_reduce_without_changing_workers(turn):
         output = LoadingOutputs(context.link_count, 2)
         for origin in origins:
             search(context, origin, results=results)
-            network_loading(results, LoadingQuery(demand[origin]), workspace, output)
+            query = np.column_stack([matrix[origin] for matrix in demand.values()])
+            network_loading(results, LoadingQuery(query), workspace, output)
         return output
 
     with ThreadPoolExecutor(max_workers=2) as pool:

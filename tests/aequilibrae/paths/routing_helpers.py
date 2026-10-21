@@ -75,7 +75,9 @@ def assert_state_tree(context, results):
 
 def path_walk_outputs(context, demand, fields=(), penalty_fields=(), selected_links=()):
     """Compare downstream kernels against separate OD-by-OD link walks."""
-    zones, _, classes = demand.shape
+    first = next(iter(demand.values()), None)
+    zones = context.node_count if first is None else first.shape[0]
+    classes = len(demand)
     loads = np.zeros((context.link_count, classes))
     skims = np.full((zones, zones, len(fields)), np.inf)
     selected_loads = np.zeros((len(selected_links), context.link_count, classes))
@@ -95,7 +97,7 @@ def path_walk_outputs(context, demand, fields=(), penalty_fields=(), selected_li
                     skims[origin, destination, field_index] += penalty
             if origin == destination:
                 continue
-            row = demand[origin, destination]
+            row = np.array([matrix[origin, destination] for matrix in demand.values()])
             total += row.sum() * penalty
             # A turn path may use a link more than once, so use scalar additions.
             for link in links:
