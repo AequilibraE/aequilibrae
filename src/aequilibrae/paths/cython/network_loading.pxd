@@ -45,9 +45,3 @@ cdef inline double cpp_sum_unassigned_demand(
         return _cpp_sum_unassigned_demand[double, SparseDemandRow](results, query)
     else:
         return _cpp_sum_unassigned_demand[double, DenseDemandRow](results, query)
-
-
-cdef class LoadingQuery:
-    cdef readonly size_t destination_count, class_count
-    cdef const double[:, ::1] demand_buffer
-    cdef DenseDemandRow view(self) noexcept nogil

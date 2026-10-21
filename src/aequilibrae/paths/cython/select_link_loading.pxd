@@ -1,6 +1,5 @@
 from libc.stddef cimport size_t
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults
-from aequilibrae.paths.cython.network_loading cimport LoadingQuery
 from aequilibrae.paths.cython.context cimport SelectLinkContext, CppSelectLinkContext
 from aequilibrae.paths.cython.outputs cimport (
     SelectLinkLoadingOutputs, SelectLinkODOutputs,

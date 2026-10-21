@@ -9,9 +9,7 @@ import pytest
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.paths.cython.aon import PreparedAoN
 from aequilibrae.paths.cython.context import SkimmingContext
-from aequilibrae.paths.cython.network_loading import sum_weighted_turn_costs
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
-from aequilibrae.paths.cython.network_loading import LoadingQuery
 from aequilibrae.paths.cython.skimming import skimming
 from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
 
@@ -560,27 +558,3 @@ def test_assignment_rejects_mismatched_names_before_reset():
     np.testing.assert_array_equal(out.loading.link_loads, saved_loads)
     with pytest.raises(ValueError, match="link_count"):
         PreparedAoN(context, demand, skimming=SkimmingContext(5, cost_name="bad"))
-
-
-@pytest.mark.parametrize("turn", [False, True])
-def test_weighted_turn_costs_are_independent_of_skimming(turn):
-    context = history_context(0.5, turn=turn)
-    demand = np.array([[np.nan, np.inf], [2.0, -1.0], [4.0, 3.0], [5.0, 6.0]])
-    query = LoadingQuery(demand)
-    results = allocate_results(context)
-    assert sum_weighted_turn_costs(results, query) == 0
-    search(context, 0, results=results)
-    expected = sum(demand[node, cls] * results.path_turn_cost_to(node) for node in range(1, 4) for cls in range(2))
-    labels = results.turn_costs.copy()
-    assert sum_weighted_turn_costs(results, query) == expected
-    np.testing.assert_array_equal(results.turn_costs, labels)
-    demand[1:] *= 2
-    assert sum_weighted_turn_costs(results, query) == 2 * expected
-    search(context, 0, targets=[1], results=results)
-    assert sum_weighted_turn_costs(results, query) == 0
-    assert sum_weighted_turn_costs(results, LoadingQuery(np.empty((0, 2)))) == 0
-    assert sum_weighted_turn_costs(results, LoadingQuery(np.empty((4, 0)))) == 0
-    demand[1] = np.inf
-    assert np.isnan(sum_weighted_turn_costs(results, query))
-    with pytest.raises(ValueError, match="destination_count"):
-        sum_weighted_turn_costs(results, LoadingQuery(np.ones((5, 2))))

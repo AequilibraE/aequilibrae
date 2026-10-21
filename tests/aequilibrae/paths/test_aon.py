@@ -11,11 +11,9 @@ import pytest
 
 from aequilibrae.paths.cython.aon import PreparedAoN
 from aequilibrae.paths.cython.context import SkimmingContext, SelectLinkContext
-from aequilibrae.paths.cython.network_loading import LoadingQuery
 from aequilibrae.paths.cython.outputs import AoNOutputs, LoadingOutputs, SelectLinkLoadingOutputs
-from aequilibrae.paths.cython.network_loading import network_loading
 from aequilibrae.paths.cython.search_results import SearchResults
-from aequilibrae.paths.cython.workspaces import AoNWorkspace, LoadingWorkspace
+from aequilibrae.paths.cython.workspaces import AoNWorkspace
 from .routing_helpers import history_context, make_context, path_walk_outputs, search
 
 
@@ -347,10 +345,6 @@ def test_output_group_allocates_resets_and_releases_independent_components(skims
         assert not hasattr(out, name)
 
     del prepared, out
-    loading.reset()
-    network_loading(
-        search(context, 0), LoadingQuery(np.ones((4, 1))), LoadingWorkspace(context.state_count, 1), loading
-    )
     assert np.any(retained[0])
     if skimming is not None:
         skimming.reset()
