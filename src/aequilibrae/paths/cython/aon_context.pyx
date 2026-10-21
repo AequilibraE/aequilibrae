@@ -10,6 +10,10 @@ from cython.parallel cimport prange, threadid
 from libcpp.vector cimport vector
 from libcpp cimport bool as cpp_bool
 
+from aequilibrae.matrix.cython.dense_matrix cimport DenseMatrix, CppDenseMatrix, CppDenseMatrixOriginView
+from aequilibrae.matrix.cython.sparse_matrix cimport SparseMatrix, CppSparseMatrix
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
+
 from aequilibrae.utils.cython.array_allocations cimport array
 from aequilibrae.utils.cython.array_allocations import readonly_view
 from aequilibrae.paths.cython.workspaces cimport AoNWorkspace
@@ -23,9 +27,13 @@ from aequilibrae.paths.cython.context cimport (
     SkimmingContext,
 )
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults
+from aequilibrae.paths.cython.queries cimport DemandRowView
 from aequilibrae.paths.cython.skimming cimport cpp_skimming
 from aequilibrae.paths.cython.network_loading cimport (
     cpp_network_loading,
+    cpp_sparse_network_loading,
+    cpp_sparse_sum_weighted_turn_costs,
+    cpp_sparse_sum_unassigned_demand,
     cpp_reduce_loading_outputs,
     cpp_sum_weighted_turn_costs,
     cpp_sum_unassigned_demand,
@@ -39,30 +47,27 @@ from aequilibrae.paths.cython.outputs cimport (
 )
 from aequilibrae.paths.cython.select_link_loading cimport (
     cpp_select_link_loading,
+    cpp_sparse_select_link_loading,
     cpp_reduce_select_link_loading,
 )
 
 
-def borrow_input(value, name):
-    """Retain packed demand without copying or changing caller writeability."""
-    values = np.asarray(memoryview(value))
-
-    if values.dtype != np.dtype(np.float64):
-        raise TypeError(f"{name} must have dtype float64")
-    if not values.flags.c_contiguous or not values.flags.aligned:
-        raise ValueError(f"{name} must be aligned and C-contiguous")
-
-    return values
-
-
-def choose_origins(origins, demand: np.ndarray, skimming: bool):
+def choose_origins(origins, _MatrixBase demand, skimming: bool):
     """Choose origins once; each OD output row must have just one writer."""
-    zones = demand.shape[0]
+    cdef SparseMatrix packed
+    zones = demand.origin_count
 
     if origins is None:
         if skimming:
             return np.arange(zones, dtype=np.uintp)
-        return np.flatnonzero(np.any(demand != 0, axis=(1, 2))).astype(np.uintp)
+        if isinstance(demand, SparseMatrix):
+            packed = demand
+            active = np.any(np.asarray(packed._values) != 0, axis=1)
+            return np.flatnonzero([
+                np.any(active[packed.row_index[row]:packed.row_index[row + 1]])
+                for row in range(zones)
+            ]).astype(np.uintp)
+        return np.flatnonzero(np.any(np.asarray(demand._values) != 0, axis=(1, 2))).astype(np.uintp)
 
     indices = np.asarray(origins)
     if indices.ndim != 1 or (indices.size and indices.dtype.kind not in "iu"):
@@ -77,20 +82,28 @@ def choose_origins(origins, demand: np.ndarray, skimming: bool):
     return np.asarray(indices, dtype=np.uintp)
 
 
-def make_destination_masks(demand: np.ndarray, nodes: int, skimming: bool):
+def make_destination_masks(_MatrixBase demand, nodes: int, skimming: bool):
     """Prepare fixed targets, sharing one all-centroid mask when skimming."""
     cdef cpp_bool[:, ::1] masks
     cdef Py_ssize_t origin, destination
+    cdef size_t entry
+    cdef SparseMatrix packed
 
-    zones = demand.shape[0]
+    zones = demand.origin_count
     mask_rows = 1 if skimming else zones
     masks = array[cpp_bool]((mask_rows, nodes), True, False)
 
     if skimming:
         for destination in range(zones):
             masks[0, destination] = True
+    elif isinstance(demand, SparseMatrix):
+        packed = demand
+        active = np.any(np.asarray(packed._values) != 0, axis=1)
+        for origin in range(zones):
+            for entry in range(packed.row_index[origin], packed.row_index[origin + 1]):
+                masks[origin, packed.col_index[entry]] = active[entry]
     else:
-        destinations = np.any(demand != 0, axis=2)
+        destinations = np.any(np.asarray(demand._values) != 0, axis=2)
         for origin in range(zones):
             for destination in range(zones):
                 masks[origin, destination] = destinations[origin, destination]
@@ -149,10 +162,11 @@ cdef class _AoNWorker:
 cdef class PreparedAoN:
     """Reuse assignment workers with a caller-configured routing context.
 
-    Demand [zones, zones, classes], topology, restrictions, origins and targets
-    stay fixed. Only routing costs change between iterations: update the supplied
-    context, or write valid costs into its borrowed buffer, before run(). The
-    driver retains that context directly and refreshes its view each run.
+    Packed DenseMatrix or SparseMatrix demand [zones, zones, classes], topology,
+    restrictions, origins and targets stay fixed. Only routing costs change
+    between iterations: update the supplied context, or write valid costs into
+    its borrowed buffer, before run(). The driver retains that context directly
+    and refreshes its view each run.
 
     Skimming and selection inputs are independent owners with fixed configuration
     and buffer bindings. Ordinary loading and weighted turn accounting always run.
@@ -161,7 +175,8 @@ cdef class PreparedAoN:
     """
 
     cdef GraphContext context
-    cdef const double[:, :, ::1] demand_buffer
+    cdef DenseMatrix dense_demand
+    cdef SparseMatrix sparse_demand
     cdef const cpp_bool[:, ::1] destination_masks_buffer
     cdef const size_t[::1] destination_counts_buffer, origins_buffer
     cdef SkimmingContext skim_context
@@ -172,7 +187,8 @@ cdef class PreparedAoN:
     cdef object heap_name
 
     cdef list workers
-    cdef vector[CppAoNOrigin] origin_queries
+    cdef vector[CppAoNOrigin[CppDenseMatrixOriginView[const double]]] origin_queries
+    cdef vector[CppAoNOrigin[CppSparseMatrixOriginView[double]]] sparse_origin_queries
     cdef vector[CppAoNWorkerView] worker_views
     cdef CppAoNInputs inputs
 
@@ -205,12 +221,15 @@ cdef class PreparedAoN:
         if not 1 <= cores <= np.iinfo(np.int32).max:
             raise ValueError("cores must be positive and fit an OpenMP thread count")
 
-        demand = borrow_input(demand, "demand")
+        if not isinstance(demand, (DenseMatrix, SparseMatrix)):
+            raise TypeError("demand must be a DenseMatrix or SparseMatrix")
+        if demand.dtype != np.dtype(np.float64):
+            raise TypeError("demand must have dtype float64")
+        shape = (demand.origin_count, demand.destination_count, demand.field_count)
         if (
-            demand.ndim != 3
-            or demand.shape[0] != demand.shape[1]
-            or not 1 <= demand.shape[0] <= context.node_count
-            or demand.shape[2] < 1
+            shape[0] != shape[1]
+            or not 1 <= shape[0] <= context.node_count
+            or shape[2] < 1
         ):
             raise ValueError("demand must have shape (zones, zones, classes), zones <= node_count, classes >= 1")
 
@@ -221,9 +240,12 @@ cdef class PreparedAoN:
 
         self.context = context
         self.cores = cores
-        self.demand_buffer = demand
-        self.zone_count = demand.shape[0]
-        self.class_count = demand.shape[2]
+        if isinstance(demand, SparseMatrix):
+            self.sparse_demand = demand
+        else:
+            self.dense_demand = demand
+        self.zone_count = shape[0]
+        self.class_count = shape[2]
 
         self.skim_context = skimming
         self.selection_context = selected_links
@@ -249,26 +271,39 @@ cdef class PreparedAoN:
     cdef void __prepare_origins(self) except *:
         """Bind each origin's demand and targets once, without Python row owners."""
         cdef size_t origin, mask_row
-        cdef CppAoNOrigin query
+        cdef CppSearchQuery search
+        cdef CppAoNOrigin[CppDenseMatrixOriginView[const double]] query
+        cdef CppAoNOrigin[CppSparseMatrixOriginView[double]] sparse_query
+        cdef CppSparseMatrix[double] sparse_view
+        cdef CppDenseMatrix[double] dense_view
+        cdef CppDenseMatrixOriginView[double] dense_row
+        if self.sparse_demand is not None:
+            sparse_view = self.sparse_demand.view[double]()
+        else:
+            dense_view = self.dense_demand.view[double]()
 
         for origin in self.origins_buffer:
-            query = CppAoNOrigin()
+            search = CppSearchQuery()
             mask_row = 0 if self.inputs.skimming.field_count else origin
-            query.search.node_count = self.context.node_count
-            query.search.origin = origin
-            query.search.target_count = self.destination_counts_buffer[mask_row]
-            if query.search.target_count:
-                query.search.target_mask = &self.destination_masks_buffer[mask_row, 0]
+            search.node_count = self.context.node_count
+            search.origin = origin
+            search.target_count = self.destination_counts_buffer[mask_row]
+            if search.target_count:
+                search.target_mask = &self.destination_masks_buffer[mask_row, 0]
 
             # An explicitly requested origin with no demand keeps the full-search
             # query. Automatic origin selection omits these rows without skims.
-            query.loading.destination_count = self.zone_count
-            query.loading.class_count = self.class_count
-            query.loading.demand = &self.demand_buffer[origin, 0, 0]
-            self.origin_queries.push_back(query)
-
-        self.inputs.origins = self.origin_queries.data()
-        self.inputs.origin_count = self.origin_queries.size()
+            if self.sparse_demand is not None:
+                sparse_query.search = search
+                sparse_query.loading = sparse_view.origin(origin)
+                self.sparse_origin_queries.push_back(sparse_query)
+            else:
+                dense_row = dense_view.origin(origin)
+                query.search = search
+                query.loading.destination_count = dense_row.destination_count
+                query.loading.field_count = dense_row.field_count
+                query.loading.data = dense_row.data
+                self.origin_queries.push_back(query)
 
     cdef void __prepare_workers(self) except *:
         """Allocate only the scratch and accumulators required by each worker."""
@@ -398,21 +433,30 @@ cdef class PreparedAoN:
             output.skimming.reset()
             output.selected_od.reset()
 
-            if node_based:
+            if self.sparse_demand is not None:
+                if node_based:
+                    assign_origins(
+                        <NodeBasedContext>self.context, self.sparse_origin_queries.data(),
+                        self.sparse_origin_queries.size(), self.inputs,
+                        self.worker_views.data(), self.cores, output,
+                    )
+                else:
+                    assign_origins(
+                        <TurnBasedContext>self.context, self.sparse_origin_queries.data(),
+                        self.sparse_origin_queries.size(), self.inputs,
+                        self.worker_views.data(), self.cores, output,
+                    )
+            elif node_based:
                 assign_origins(
-                    <NodeBasedContext>self.context,
-                    self.inputs,
-                    self.worker_views.data(),
-                    self.cores,
-                    output,
+                    <NodeBasedContext>self.context, self.origin_queries.data(),
+                    self.origin_queries.size(), self.inputs,
+                    self.worker_views.data(), self.cores, output,
                 )
             else:
                 assign_origins(
-                    <TurnBasedContext>self.context,
-                    self.inputs,
-                    self.worker_views.data(),
-                    self.cores,
-                    output,
+                    <TurnBasedContext>self.context, self.origin_queries.data(),
+                    self.origin_queries.size(), self.inputs,
+                    self.worker_views.data(), self.cores, output,
                 )
 
             cpp_reduce_loading_outputs[double](
@@ -438,7 +482,7 @@ cdef class PreparedAoN:
 
 cdef void assign_origin(
     RoutingContext routing,
-    const CppAoNOrigin &query,
+    const AoNOriginView &query,
     const CppAoNInputs &inputs,
     CppAoNWorkerView &worker,
     const CppAoNOutputsView &output,
@@ -458,29 +502,43 @@ cdef void assign_origin(
             output.skimming.origin(origin),
         )
 
-    cpp_network_loading[double](search, query.loading, worker.workspace.loading, worker.loading)
-
-    # OD rows have one writer. Selected link accumulators remain worker-local
-    # until reduction, and can reuse the ordinary loading scratch sequentially.
     if output.selected_od.set_count:
         selected_od = output.selected_od.origin(origin)
+    load_origin(search, query.loading, inputs, worker, selected_od)
 
-    cpp_select_link_loading[double](
-        search,
-        query.loading,
-        inputs.selection,
-        worker.workspace.select_link,
-        worker.workspace.loading,
-        worker.selected_loading,
-        selected_od,
-    )
 
-    worker.turn_cost_total += cpp_sum_weighted_turn_costs[double](search, query.loading)
-    worker.unassigned_demand += cpp_sum_unassigned_demand[double](search, query.loading)
+cdef void load_origin(
+    const CppSearchResults &search,
+    const DemandRowView &demand,
+    const CppAoNInputs &inputs,
+    CppAoNWorkerView &worker,
+    const CppSelectLinkODOriginView[double] &selected_od,
+) noexcept nogil:
+    # OD rows have one writer. Selected link accumulators remain worker-local
+    # until reduction, and can reuse the ordinary loading scratch sequentially.
+    # Each declaration binds one C++ template instance.
+    if DemandRowView is CppSparseMatrixOriginView[double]:
+        cpp_sparse_network_loading[double](search, demand, worker.workspace.loading, worker.loading)
+        cpp_sparse_select_link_loading[double](
+            search, demand, inputs.selection, worker.workspace.select_link,
+            worker.workspace.loading, worker.selected_loading, selected_od,
+        )
+        worker.turn_cost_total += cpp_sparse_sum_weighted_turn_costs[double](search, demand)
+        worker.unassigned_demand += cpp_sparse_sum_unassigned_demand[double](search, demand)
+    else:
+        cpp_network_loading[double](search, demand, worker.workspace.loading, worker.loading)
+        cpp_select_link_loading[double](
+            search, demand, inputs.selection, worker.workspace.select_link,
+            worker.workspace.loading, worker.selected_loading, selected_od,
+        )
+        worker.turn_cost_total += cpp_sum_weighted_turn_costs[double](search, demand)
+        worker.unassigned_demand += cpp_sum_unassigned_demand[double](search, demand)
 
 
 cdef void assign_origins(
     RoutingContext routing,
+    const AoNOriginView *origins,
+    size_t origin_count,
     const CppAoNInputs &inputs,
     CppAoNWorkerView *workers,
     int cores,
@@ -489,6 +547,6 @@ cdef void assign_origins(
     cdef Py_ssize_t index
 
     # MSVC requires the OpenMP loop counter generated by prange to be signed.
-    # origin_count cannot exceed the NumPy-backed demand dimension (Py_ssize_t).
-    for index in prange(<Py_ssize_t>inputs.origin_count, num_threads=cores, schedule="guided"):
-        assign_origin(routing, inputs.origins[index], inputs, workers[threadid()], output)
+    # origin_count cannot exceed the Python-backed demand dimension (Py_ssize_t).
+    for index in prange(<Py_ssize_t>origin_count, num_threads=cores, schedule="guided"):
+        assign_origin(routing, origins[index], inputs, workers[threadid()], output)

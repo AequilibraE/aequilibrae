@@ -1,6 +1,8 @@
 from libc.stddef cimport size_t
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchResults
-from aequilibrae.paths.cython.queries cimport LoadingQuery, CppLoadingQuery
+from aequilibrae.paths.cython.queries cimport LoadingQuery
+from aequilibrae.matrix.cython.dense_matrix cimport CppDenseMatrixOriginView
+from aequilibrae.matrix.cython.sparse_matrix cimport CppSparseMatrixOriginView
 from aequilibrae.paths.cython.context cimport SelectLinkContext, CppSelectLinkContext
 from aequilibrae.paths.cython.outputs cimport (
     SelectLinkLoadingOutputs, SelectLinkODOutputs,
@@ -14,7 +16,17 @@ from aequilibrae.paths.cython.workspaces cimport (
 cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
     void cpp_select_link_loading "aequilibrae::paths::cpp::routing::select_link_loading"[T](
         const CppSearchResults &results,
-        const CppLoadingQuery[T] &query,
+        const CppDenseMatrixOriginView[const T] &query,
+        const CppSelectLinkContext &context,
+        const CppSelectLinkWorkspace &selection,
+        const CppLoadingWorkspace[T] &loading,
+        const CppSelectLinkLoadingOutputsView[T] &loads,
+        const CppSelectLinkODOriginView[T] &od,
+    ) noexcept
+
+    void cpp_sparse_select_link_loading "aequilibrae::paths::cpp::routing::select_link_loading"[T](
+        const CppSearchResults &results,
+        const CppSparseMatrixOriginView[T] &query,
         const CppSelectLinkContext &context,
         const CppSelectLinkWorkspace &selection,
         const CppLoadingWorkspace[T] &loading,

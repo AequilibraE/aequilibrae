@@ -30,59 +30,59 @@ inline bool selected_terminal(const SearchResults &results,
          selection.selected_paths[terminal];
 }
 
-template <typename T>
+template <typename T, typename DemandRow>
 void write_selected_od(const SearchResults &results,
-                       const LoadingQuery<T> &query,
+                       const DemandRow &query,
                        const SelectLinkWorkspace &selection, T *od) noexcept {
-  if (query.class_count == 0) {
+  if (query.field_count == 0) {
     return;
   }
 
-  for (std::size_t node = 0; node < query.destination_count; ++node) {
-    T *row = od + node * query.class_count;
-
+  // Output remains dense, including destinations absent from sparse demand.
+  std::fill_n(od, query.destination_count * query.field_count, T{0});
+  for (std::size_t entry = 0; entry < query.entry_count(); ++entry) {
+    const auto node = query.destination(entry);
     if (selected_terminal(results, results.terminal_states[node], selection)) {
-      std::copy_n(query.demand + node * query.class_count, query.class_count,
-                  row);
-    } else {
-      std::fill_n(row, query.class_count, T{0});
+      std::copy_n(query.values(entry), query.field_count,
+                  od + node * query.field_count);
     }
   }
 }
 
 // Seed each matched OD once, even if its path crosses several set members.
 // The cascade loading then loads the whole path.
-template <typename T>
+template <typename T, typename DemandRow>
 void load_selected_paths(const SearchResults &results,
-                         const LoadingQuery<T> &query,
+                         const DemandRow &query,
                          const SelectLinkWorkspace &selection,
                          const LoadingWorkspace<T> &loading,
                          const LoadingOutputs<T> &output) noexcept {
-  const auto classes = query.class_count;
+  const auto classes = query.field_count;
   if (classes == 0) {
     return;
   }
 
   std::fill_n(loading.state_loads, loading.state_count * classes, T{0});
 
-  for (std::size_t node = 0; node < query.destination_count; ++node) {
+  for (std::size_t entry = 0; entry < query.entry_count(); ++entry) {
+    const auto node = query.destination(entry);
     const auto terminal = results.terminal_states[node];
     if (!selected_terminal(results, terminal, selection)) {
       continue;
     }
 
+    const T *demand = query.values(entry);
     for (std::size_t cls = 0; cls < classes; ++cls) {
-      loading.state_loads[terminal * classes + cls] +=
-          query.demand[node * classes + cls];
+      loading.state_loads[terminal * classes + cls] += demand[cls];
     }
   }
 
   cascade_loads(results, loading, output);
 }
 
-template <typename T>
+template <typename T, typename DemandRow>
 void select_link_loading(const SearchResults &results,
-                         const LoadingQuery<T> &query,
+                         const DemandRow &query,
                          const SelectLinkContext &context,
                          const SelectLinkWorkspace &selection,
                          const LoadingWorkspace<T> &loading,

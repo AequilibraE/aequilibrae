@@ -97,13 +97,13 @@ cdef class LoadingQuery:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef CppLoadingQuery[double] view(self) noexcept nogil:
-        cdef CppLoadingQuery[double] query
+    cdef CppDenseMatrixOriginView[const double] view(self) noexcept nogil:
+        cdef CppDenseMatrixOriginView[const double] query
         query.destination_count = self.destination_count
-        query.class_count = self.class_count
+        query.field_count = self.class_count
 
         if self.destination_count and self.class_count:
-            query.demand = &self.demand_buffer[0, 0]
+            query.data = &self.demand_buffer[0, 0]
         return query
 
     @property

@@ -1,5 +1,7 @@
 from libc.stddef cimport size_t
 from libcpp cimport bool as cpp_bool
+from aequilibrae.matrix.cython.dense_matrix cimport CppDenseMatrixOriginView
+from aequilibrae.matrix.cython.sparse_matrix cimport CppSparseMatrixOriginView
 
 
 cdef extern from "queries.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
@@ -10,11 +12,9 @@ cdef extern from "queries.hpp" namespace "aequilibrae::paths::cpp::routing" nogi
         const cpp_bool *target_mask
         size_t target_count
 
-    cdef cppclass CppLoadingQuery "aequilibrae::paths::cpp::routing::LoadingQuery"[T]:
-        CppLoadingQuery() noexcept
-        size_t destination_count
-        size_t class_count
-        const T *demand
+ctypedef fused DemandRowView:
+    CppDenseMatrixOriginView[const double]
+    CppSparseMatrixOriginView[double]
 
 
 cdef class SearchQuery:
@@ -27,4 +27,4 @@ cdef class SearchQuery:
 cdef class LoadingQuery:
     cdef readonly size_t destination_count, class_count
     cdef const double[:, ::1] demand_buffer
-    cdef CppLoadingQuery[double] view(self) noexcept nogil
+    cdef CppDenseMatrixOriginView[const double] view(self) noexcept nogil
