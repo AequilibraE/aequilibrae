@@ -1,5 +1,79 @@
 # cython: language_level=3
-"""Assignment orchestration over independent routing and operation components."""
+"""
+Assignment orchestration over independent routing and operation components.
+
+The dispatch of all this code can be hard to follow due to the mixing of fused
+types, C++ templates, ctypedefs, and conditional dispatch. I'll try to explain
+it all here.
+
+In the beginning User created the Python objects.
+
+We have some data that describes a particular combination of:
+
+Routing type:
+  - Node based
+  - Turn based
+
+Demand type:
+  - Dense
+  - Sparse
+
+On the C++ level we have instances of templated functions, one for every
+combination we of types we use. We need a way to go from runtime types to the
+correct C++ code. So we spell out all the combinations in an if-ladder in
+``PreparedAoN.run``.
+
+While we do have spell out the initial dispatch to each method, we don't want
+to write a different function for each combination, so the ``PreparedAoN.run``
+method calls the different instances of the 'fused type' functions. These are a
+Cython feature that let's us do templating like C++, in Cython. I'll use
+'templating' to refer to both C++ templating and Cython fused types because they
+are functionally the same here.
+
+``assign_origins`` is templated on the ``routing`` and ``query``
+arguments. These are a ``RoutingContext`` or ``AoNOriginView`` respectively.
+
+RoutingContext is either a:
+  - NodeBasedContext, or
+  - TurnBasedContext.
+
+These are both instances of the ``GraphContext`` Cython extension type (Python
+object). So we check the instance type and use that as a conditional.
+
+AoNOriginView (fused type) is either a:
+  - CppAoNOrigin[DenseDemandRow] or
+  - CppAoNOrigin[SparseDemandRow].
+
+CppAoNOrigin is a C++ template for the
+aequilibrae::paths::cpp::routing::AoNOrigin struct. This struct holds a
+SearchQuery (concrete type) 'search' and a DemandRow (templated type)
+'loading'. For this fused type, the DemandRow is either a DenseDemandRow or
+SparseDemandRow.
+
+DenseDemandRow is a ctypedef for a CppDenseMatrixOriginView[const double].
+SpraseDemandRow is a ctypedef for a CppSpraseMatrixOriginView[const double].
+
+CppDenseMatrixOriginView is a C++ template for the
+aequilibrae::matrix::cpp::DenseMatrixOriginView class, and
+CppSpraseMatrixOriginView is a C++ template for the
+aequilibrae::matrix::cpp::SpraseMatrixOriginView class.
+
+These two templates are single origin views into the CppSparseMatrix
+(aequilibrae::matrix::cpp::SparseMatrix) and CppDenseMatrix
+(aequilibrae::matrix::cpp::DenseMatrix) templates.
+
+These matrix templates are C++ views of the SparseMatrix and DenseMatrix Cython
+extension types! We create them via the .view() cdef function. We then call
+.origin() on these C++ classes and store the results in the
+PreparedAoN.sparse_origin_queries and PreparedAoN.dense_origin_queries
+vectors. We populate them in the __prepare_origins method.
+
+Cython see these fused type functions and generates each combination for each
+of the static types. It doesn't really care about the C++ templates other than
+that they exist and are declared (in pxd files). The C++ compiler then sees
+these and generates the correct C++ code for each instance. Tying the if-ladder
+to the correct static types.
+"""
 
 import operator
 
@@ -233,7 +307,7 @@ cdef class PreparedAoN:
                 dense_query.loading.destination_count = dense_row.destination_count
                 dense_query.loading.field_count = dense_row.field_count
                 dense_query.loading.data = dense_row.data
-                self.origin_queries.push_back(dense_query)
+                self.dense_origin_queries.push_back(dense_query)
 
     cdef void __prepare_workers(self) except *:
         """Allocate only the scratch and accumulators required by each worker."""
@@ -380,14 +454,14 @@ cdef class PreparedAoN:
             else:
                 if node_based:
                     assign_origins(
-                        <NodeBasedContext>self.context, self.origin_queries.data(),
-                        self.origin_queries.size(), self.inputs,
+                        <NodeBasedContext>self.context, self.dense_origin_queries.data(),
+                        self.dense_origin_queries.size(), self.inputs,
                         self.worker_views.data(), self.cores, output,
                     )
                 else:
                     assign_origins(
-                        <TurnBasedContext>self.context, self.origin_queries.data(),
-                        self.origin_queries.size(), self.inputs,
+                        <TurnBasedContext>self.context, self.dense_origin_queries.data(),
+                        self.dense_origin_queries.size(), self.inputs,
                         self.worker_views.data(), self.cores, output,
                     )
 
