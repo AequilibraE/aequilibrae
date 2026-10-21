@@ -39,14 +39,9 @@ cdef class SparseMatrix(_MatrixBase):
 
     @classmethod
     def from_csr(cls, shape: tuple[int, int], row_index, col_index, cores: dict, dtype=None):
-        """Copy CSR indices and named value arrays into one packed buffer.
-
-        The indices are shared by all fields. An omitted dtype requires
-        matching float32 or float64 source dtypes. Supply a dtype to convert
-        values. An empty field collection defaults to float64. Column indices
-        in each row must be sorted and unique. Stored zeros are kept.
-        """
+        """Copy CSR indices and named value arrays into one packed buffer"""
         cores = {name: np.asarray(value) for name, value in cores.items()}
+
         if dtype is None:
             dtypes = {value.dtype for value in cores.values()}
             if len(dtypes) > 1:
@@ -57,8 +52,10 @@ cdef class SparseMatrix(_MatrixBase):
         cdef SparseMatrix self = <SparseMatrix?>cls(
             zone_count=destinations, field_names=cores.keys(), origin_count=origins, dtype=dtype
         )
+
         for index in (row_index, col_index):
             index = np.asarray(index)
+
             if index.ndim != 1 or (index.size and index.dtype.kind not in "iu"):
                 raise TypeError("CSR indices must be one-dimensional integer arrays")
             if index.size and index.min() < 0:
@@ -78,11 +75,13 @@ cdef class SparseMatrix(_MatrixBase):
         mat.check_format(full_check=True)
         mat.sum_duplicates()
         mat.sort_indices()
+
         return cls.from_csr(mat.shape, mat.indptr, mat.indices, {"matrix": mat.data}, **kwargs)
 
     def to_scipy(self):
         shape = (self.origin_count, self.destination_count)
         values = np.asarray(self._values)
+
         return {
             name: sparse.csr_matrix((values[:, i], self.col_index, self.row_index), shape=shape, copy=False)
             for i, name in enumerate(self.field_names)
@@ -178,7 +177,10 @@ cdef class SparseMatrix(_MatrixBase):
 
         if not sources:
             return cls(
-                matrix.shape[1], (), dtype=np.float64 if dtype is None else dtype, origin_count=matrix.shape[0]
+                zone_count=matrix.shape[1],
+                field_names=(),
+                dtype=np.float64 if dtype is None else dtype,
+                origin_count=matrix.shape[0],
             )
         return cls.from_dict(sources, dtype=dtype)
 
@@ -195,10 +197,7 @@ cdef class SparseMatrix(_MatrixBase):
         source_dtype = None
         inputs = {}
         for name, matrix in matrices.items():
-            if sparse.issparse(matrix):
-                if matrix.format != "csr":
-                    raise TypeError(f"matrix {name!r} must be a dense array or CSR matrix")
-            else:
+            if not sparse.issparse(matrix):
                 matrix = np.asarray(matrix)
                 if matrix.ndim != 2:
                     raise ValueError(f"matrix {name!r} must be two-dimensional, got {matrix.shape}")
@@ -219,9 +218,12 @@ cdef class SparseMatrix(_MatrixBase):
                 or np.issubdtype(matrix.dtype, np.bool_)
             ):
                 raise TypeError("Matrix values must be real numbers")
+
             inputs[name] = matrix
 
-        csr_matrices = {}
+        # We're going to get scipy to build the union of the csr indptr and
+        # indices for us. To do that we supply with ones everywhere with a COO
+        # matrix.
         coo_matrices = {}
         for name, matrix in inputs.items():
             if sparse.issparse(matrix):
@@ -231,9 +233,10 @@ cdef class SparseMatrix(_MatrixBase):
                 csr = matrix
             else:
                 csr = sparse.csr_array(matrix)
+
             if not np.all(np.isfinite(csr.data)) or np.any(csr.data < 0):
                 raise ValueError("Matrix values must be finite and nonnegative")
-            csr_matrices[name] = csr
+
             coo_matrices[name] = csr.tocoo(copy=False)
 
         if dtype is None:
@@ -252,18 +255,12 @@ cdef class SparseMatrix(_MatrixBase):
         rows, cols = pattern.nonzero()
         cores = {
             name: np.asarray(matrix[rows, cols]).reshape(-1) if col_index.size else np.empty(0, dtype=matrix.dtype)
-            for name, matrix in csr_matrices.items()
+            for name, matrix in coo_matrices.items()
         }
         return cls.from_csr(shape, row_index, col_index, cores, dtype=dtype)
 
     def to_matrix(self, index, index_name="main_index"):
-        """Return an AequilibraeSparseMatrix sharing this buffer without copying values.
-
-        Only square buffers can be returned. Named CSR data arrays may be
-        strided. The supplied index is copied, and normal assignment in the
-        returned matrix keeps its usual copy rules. Shared value changes must
-        keep the stored positions unchanged.
-        """
+        """Return an AequilibraeSparseMatrix sharing this buffer without copying values"""
         if self.origin_count != self.destination_count:
             raise ValueError("only square buffers can be returned as an AequilibraeSparseMatrix")
 
@@ -271,9 +268,10 @@ cdef class SparseMatrix(_MatrixBase):
             raise ValueError("index length must match zone_count")
 
         values = np.asarray(self._values)
-        rows = np.asarray(self.row_index, dtype=np.intp)
-        cols = np.asarray(self.col_index, dtype=np.intp)
+        rows = np.asarray(self.row_index)
+        cols = np.asarray(self.col_index)
         shape = (self.origin_count, self.destination_count)
+
         arrays = {
             name: sparse.csr_array((values[:, field], cols, rows), shape=shape, copy=False)
             for field, name in enumerate(self.field_names)

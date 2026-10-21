@@ -1,13 +1,58 @@
 """Operations on search paths, with explicit query, scratch and output owners."""
 
+import numpy as np
+cimport cython
+
 from libcpp.vector cimport vector
+from aequilibrae.utils.cython.array_allocations import readonly_view
+
+
+cdef class LoadingQuery:
+    """Borrow demand [destinations, classes] for one loading operation.
+
+    Values may change between calls, but shape and allocation stay fixed. No
+    copying, packing or writeability changes are made. The caller chooses the
+    correct origin row; this object does not retain a search or routing context.
+    """
+
+    def __cinit__(self):
+        self.demand_buffer = None
+
+    def __init__(self, demand):
+        if self.demand_buffer is not None:
+            raise RuntimeError("LoadingQuery cannot be reinitialised")
+        if demand is None:
+            raise TypeError("demand must be a contiguous float64 buffer")
+
+        cdef const double[:, ::1] values = demand
+        if not np.asarray(values).flags.aligned:
+            raise ValueError("demand must be aligned")
+
+        self.demand_buffer = values
+        self.destination_count = values.shape[0]
+        self.class_count = values.shape[1]
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef DenseDemandRow view(self) noexcept nogil:
+        cdef DenseDemandRow query
+        query.destination_count = self.destination_count
+        query.field_count = self.class_count
+
+        if self.destination_count and self.class_count:
+            query.data = &self.demand_buffer[0, 0]
+        return query
+
+    @property
+    def demand(self):
+        return readonly_view(self.demand_buffer)
 
 
 def network_loading(SearchResults results not None, LoadingQuery query not None,
                     LoadingWorkspace workspace not None, LoadingOutputs output not None):
     """Accumulate this origin's demand without changing paths or allocating buffers.
 
-    Rows represent physical nodes 0..destination_count-1. Only finalized,
+    Rows represent physical nodes 0..destination_count-1. Only finalised,
     non-intrazonal paths are loaded. Output is not cleared: reset it once before
     processing the origins of an iteration. Scratch is replaced on every call.
     """
@@ -21,12 +66,12 @@ def network_loading(SearchResults results not None, LoadingQuery query not None,
         raise ValueError("query, workspace and output class_count must match")
 
     with nogil:
-        cpp_network_loading[double](results.read_view(), query.view(), workspace.view(), output.view())
+        cpp_network_loading(results.read_view(), query.view(), workspace.view(), output.view())
     return output
 
 
 def sum_weighted_turn_costs(SearchResults results not None, LoadingQuery query not None):
-    """Return demand-weighted turn cost over finalized, non-intrazonal paths.
+    """Return demand-weighted turn cost over finalised, non-intrazonal paths.
 
     Missing paths are ignored. Negative and nonfinite demand follows ordinary
     floating-point multiplication and addition. No scratch or output is written.
@@ -35,7 +80,7 @@ def sum_weighted_turn_costs(SearchResults results not None, LoadingQuery query n
     if query.destination_count > results.node_count:
         raise ValueError("demand destination_count exceeds results node_count")
     with nogil:
-        total = cpp_sum_weighted_turn_costs[double](results.read_view(), query.view())
+        total = cpp_sum_weighted_turn_costs(results.read_view(), query.view())
     return total
 
 

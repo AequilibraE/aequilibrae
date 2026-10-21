@@ -8,7 +8,8 @@ from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
 from aequilibrae import Graph, TrafficAssignment, TrafficClass
 from aequilibrae.paths import available_heaps
-from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
+from aequilibrae.paths.assignment_context import AssignmentInputs
+from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix

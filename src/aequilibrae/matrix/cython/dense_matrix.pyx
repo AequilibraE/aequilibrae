@@ -39,13 +39,7 @@ cdef class DenseMatrix(_MatrixBase):
 
     @classmethod
     def from_matrix(cls, matrix, dtype=None):
-        """Copy all named matrices into one packed buffer, keeping their order.
-
-        An omitted dtype requires matching float32 or float64 source dtypes.
-        Supply a dtype to convert values. An empty matrix defaults to float64.
-        Values must be finite, nonnegative real numbers. The source is not
-        changed. Its index and metadata are not retained.
-        """
+        """Copy all named matrices into one packed buffer, keeping their order."""
         if not isinstance(matrix, AequilibraeMatrix):
             raise TypeError("matrix must be an AequilibraeMatrix")
 
@@ -99,12 +93,7 @@ cdef class DenseMatrix(_MatrixBase):
         return output
 
     def to_matrix(self, index, index_name="main_index"):
-        """Return an AequilibraeMatrix sharing this buffer without copying values.
-
-        Only square buffers can be returned. Named arrays may be strided.
-        The supplied index is copied, and normal assignment in the returned
-        matrix keeps its usual copy rules.
-        """
+        """Return an AequilibraeMatrix sharing this buffer without copying values."""
         if self.origin_count != self.destination_count:
             raise ValueError("only square buffers can be returned as an AequilibraeMatrix")
 
@@ -116,7 +105,6 @@ cdef class DenseMatrix(_MatrixBase):
         return AequilibraeMatrix._from_shared_arrays(arrays, index, index_name)
 
     cdef CppDenseMatrix[cython.floating] view(self, cython.floating _type=0) except * nogil:
-        """Borrow a typed view. The default argument allows view[float/double]()."""
         # Cython needs the fused type in an argument to specialise the method.
         if (cython.floating is float and not self._float32) or (cython.floating is double and self._float32):
             with gil:

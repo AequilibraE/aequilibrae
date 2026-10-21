@@ -9,8 +9,8 @@ import numpy as np
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
 
-from aequilibrae.paths.cython.aon_context import PreparedAoN
-from aequilibrae.paths.cython.queries import LoadingQuery
+from aequilibrae.paths.cython.aon import PreparedAoN
+from aequilibrae.paths.cython.network_loading import LoadingQuery
 from aequilibrae.paths.cython.outputs import LoadingOutputs
 from aequilibrae.paths.cython.network_loading import network_loading, reduce_loading_outputs
 from aequilibrae.paths.cython.workspaces import (

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.cython.queries import SearchQuery
+from aequilibrae.paths.cython.search_query import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import SearchWorkspace
 

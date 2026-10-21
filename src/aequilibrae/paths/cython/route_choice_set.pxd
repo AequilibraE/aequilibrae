@@ -12,7 +12,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
 from aequilibrae.paths.cython.a_star cimport CppEuclideanContext, CppHaversineContext
 from aequilibrae.paths.cython.workspaces cimport CppAStarWorkspace
 from aequilibrae.paths.cython.context cimport CppNodeBasedContext, CppTurnBasedContext
-from aequilibrae.paths.cython.queries cimport CppSearchQuery
+from aequilibrae.paths.cython.search_query cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
 from libc.stdint cimport *
 from libc.stddef cimport size_t

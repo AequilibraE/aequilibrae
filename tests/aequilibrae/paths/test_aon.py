@@ -9,9 +9,9 @@ import numpy as np
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
 
-from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.paths.cython.aon import PreparedAoN
 from aequilibrae.paths.cython.context import SkimmingContext, SelectLinkContext
-from aequilibrae.paths.cython.queries import LoadingQuery
+from aequilibrae.paths.cython.network_loading import LoadingQuery
 from aequilibrae.paths.cython.outputs import AoNOutputs, LoadingOutputs, SelectLinkLoadingOutputs
 from aequilibrae.paths.cython.network_loading import network_loading
 from aequilibrae.paths.cython.search_results import SearchResults
@@ -213,7 +213,7 @@ def test_cost_updates_refresh_routing_without_repreparing_workers(turn, rebind, 
         raise AssertionError("setup should not run inside an iteration")
 
     for name in ("choose_origins", "make_destination_masks"):
-        monkeypatch.setattr(f"aequilibrae.paths.cython.aon_context.{name}", unexpected)
+        monkeypatch.setattr(f"aequilibrae.paths.cython.aon.{name}", unexpected)
 
     for iteration in range(3):
         values = [1.0, 20.0 + iteration, 1.0, 1.0] if turn else [20.0 + iteration, 1.0, 1.0, 1.0]

@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <limits>
 
+#include "dense_matrix.hpp"
+
 namespace aequilibrae::paths::cpp::routing {
 
 template <typename T> struct LoadingOutputs {
@@ -18,20 +20,7 @@ template <typename T> struct LoadingOutputs {
   }
 };
 
-// Borrow one origin's contiguous [destinations, fields] block.
-// Callers supply valid indices and ranges. Empty views do not offset pointers.
-template <typename T> struct SkimmingOriginView {
-  std::size_t field_count = 0;
-  std::size_t destination_count = 0;
-  T *data = nullptr;
-
-  T *destination_data(std::size_t index) const noexcept {
-    if (field_count == 0 || destination_count == 0) {
-      return nullptr;
-    }
-    return data + index * field_count;
-  }
-};
+using aequilibrae::matrix::cpp::DenseMatrixOriginView;
 
 // Borrow the complete contiguous output. Neither view owns its buffer.
 template <typename T> struct SkimmingOutputsView {
@@ -40,12 +29,14 @@ template <typename T> struct SkimmingOutputsView {
   std::size_t destination_count = 0;
   T *data = nullptr; // [origins, destinations, fields]
 
-  SkimmingOriginView<T> origin(std::size_t index) const noexcept {
+  // Borrow one origin's contiguous [destinations, fields] block.
+  // Callers supply valid indices and ranges. Empty views do not offset pointers.
+  DenseMatrixOriginView<T> origin(std::size_t index) const noexcept {
     T *values = nullptr;
     if (field_count && destination_count) {
       values = data + index * field_count * destination_count;
     }
-    return {field_count, destination_count, values};
+    return {destination_count, field_count, values};
   }
 
   void reset() const noexcept {

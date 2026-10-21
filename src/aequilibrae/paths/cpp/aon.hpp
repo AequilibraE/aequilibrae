@@ -1,10 +1,8 @@
 #pragma once
 
-#include <cstddef>
-
 #include "context.hpp"
 #include "outputs.hpp"
-#include "queries.hpp"
+#include "search_query.hpp"
 #include "search_results.hpp"
 #include "workspaces.hpp"
 

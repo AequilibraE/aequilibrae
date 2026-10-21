@@ -66,7 +66,7 @@ def select_link_loading(
         od = od_output.view().origin(row)
 
     with nogil:
-        cpp_select_link_loading[double](
+        cpp_select_link_loading(
             results.read_view(), query.view(), context.view(),
             selection_workspace.view(), loading, loads, od,
         )

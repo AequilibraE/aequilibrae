@@ -9,7 +9,7 @@ import numpy as np
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
 
-from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.paths.cython.aon import PreparedAoN
 from aequilibrae.paths.cython.outputs import AoNOutputs
 from aequilibrae.paths.cython.network_loading import network_loading
 from aequilibrae.paths.cython.outputs import (
@@ -18,7 +18,7 @@ from aequilibrae.paths.cython.outputs import (
     SelectLinkODOutputs,
     SelectLinkOutputs,
 )
-from aequilibrae.paths.cython.queries import LoadingQuery
+from aequilibrae.paths.cython.network_loading import LoadingQuery
 from aequilibrae.paths.cython.context import SelectLinkContext
 from aequilibrae.paths.cython.select_link_loading import (
     select_link_loading,

@@ -1,19 +1,9 @@
 #pragma once
 
-#include <algorithm>
 #include <cstring>
-#include <functional>
-#include <iostream>
-#include <numeric>
 #include <stdexcept>
-#include <tuple>
 #include <type_traits>
 #include <utility>
-#include <vector>
-
-#include <iomanip>
-#include <sstream>
-#include <string>
 
 #include "matrix_base.hpp"
 

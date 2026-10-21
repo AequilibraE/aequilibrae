@@ -1,6 +1,7 @@
 from libc.stddef cimport size_t
 
 from aequilibrae.matrix.cython.dense_matrix cimport DenseMatrix
+from aequilibrae.matrix.cython.views cimport CppDenseMatrixOriginView
 
 
 cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
@@ -11,20 +12,13 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::routing" nogi
         T *link_loads
         void reset() noexcept
 
-    cdef cppclass CppSkimmingOriginView "aequilibrae::paths::cpp::routing::SkimmingOriginView"[T]:
-        CppSkimmingOriginView() noexcept
-        size_t field_count
-        size_t destination_count
-        T *data
-        T *destination_data(size_t index) noexcept
-
     cdef cppclass CppSkimmingOutputsView "aequilibrae::paths::cpp::routing::SkimmingOutputsView"[T]:
         CppSkimmingOutputsView() noexcept
         size_t origin_count
         size_t field_count
         size_t destination_count
         T *data
-        CppSkimmingOriginView[T] origin(size_t index) noexcept
+        CppDenseMatrixOriginView[T] origin(size_t index) noexcept
         void reset() noexcept
 
     cdef cppclass CppSelectLinkLoadingOutputsView "aequilibrae::paths::cpp::routing::SelectLinkLoadingOutputsView"[T]:
