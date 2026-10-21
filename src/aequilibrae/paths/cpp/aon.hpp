@@ -11,9 +11,9 @@
 namespace aequilibrae::paths::cpp::routing {
 
 // The driver prepares these queries once because demand and targets are fixed.
-struct AoNOrigin {
+template <typename DemandRow> struct AoNOrigin {
   SearchQuery search;
-  LoadingQuery<double> loading;
+  DemandRow loading;
 };
 
 // These views only group existing components for the assignment driver.
@@ -21,8 +21,6 @@ struct AoNOrigin {
 struct AoNInputs {
   SkimmingContext<double> skimming;
   SelectLinkContext selection;
-  const AoNOrigin *origins = nullptr;
-  std::size_t origin_count = 0;
 };
 
 struct AoNWorkerView {

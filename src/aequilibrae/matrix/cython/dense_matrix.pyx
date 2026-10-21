@@ -43,10 +43,21 @@ cdef class DenseMatrix(_MatrixBase):
 
         An omitted dtype requires matching float32 or float64 source dtypes.
         Supply a dtype to convert values. An empty matrix defaults to float64.
-        The source is not changed. Its index and metadata are not retained.
+        Values must be finite, nonnegative real numbers. The source is not
+        changed. Its index and metadata are not retained.
         """
         if not isinstance(matrix, AequilibraeMatrix):
             raise TypeError("matrix must be an AequilibraeMatrix")
+
+        for name, values in matrix.items():
+            if (
+                not np.issubdtype(values.dtype, np.number)
+                or np.iscomplexobj(values)
+                or np.issubdtype(values.dtype, np.bool_)
+            ):
+                raise TypeError("Matrix values must be real numbers")
+            if not np.all(np.isfinite(values)) or np.any(values < 0):
+                raise ValueError("Matrix values must be finite and nonnegative")
 
         if not matrix:
             return cls(matrix.shape[0], (), dtype=np.float64 if dtype is None else dtype)

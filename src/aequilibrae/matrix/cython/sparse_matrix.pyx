@@ -168,89 +168,93 @@ cdef class SparseMatrix(_MatrixBase):
 
     @classmethod
     def from_matrix(cls, matrix, dtype=None):
-        """Copy all named matrices into one packed buffer, keeping their order.
-
-        Use the union of stored positions and fill missing field values with
-        zero. Source sparse formats are not changed. An omitted dtype requires
-        matching float32 or float64 source dtypes. Supply a dtype to convert
-        values. An empty matrix defaults to float64. The source is not changed.
-        Its index and metadata are not retained.
-        """
+        """Copy all named matrices into one packed buffer, keeping their order"""
         if not isinstance(matrix, AequilibraeSparseMatrix):
             raise TypeError("matrix must be an AequilibraeSparseMatrix")
 
-        names = tuple(matrix)
-        if not names:
+        sources = {}
+        for name, value in matrix.items():
+            sources[name] = value.tocsr()
+
+        if not sources:
             return cls(
                 matrix.shape[1], (), dtype=np.float64 if dtype is None else dtype, origin_count=matrix.shape[0]
             )
-        return cls.from_dict({name: matrix[name] for name in names}, dtype=dtype)
+        return cls.from_dict(sources, dtype=dtype)
 
     @classmethod
     def from_dict(cls, matrices, dtype=None):
-        """Copy named two-dimensional arrays into one packed sparse buffer"""
+        """Pack named dense or CSR matrices using their shared COO positions."""
         if not isinstance(matrices, Mapping):
             raise TypeError("matrices must be a mapping of names to arrays")
         if not matrices:
             raise ValueError("matrices must contain at least one array")
 
-        names = tuple(matrices)
-        sources = {}
-        original_formats = {}
-        shapes = set()
-        dtypes = set()
-
+        # Check all inputs before converting or copying any of them.
+        shape = None
+        source_dtype = None
+        inputs = {}
         for name, matrix in matrices.items():
             if sparse.issparse(matrix):
-                value = matrix.tocsr(copy=True)
-                value.check_format(full_check=True)
-                value.sum_duplicates()
-                value.sort_indices()
-                original_formats[name] = matrix.format
+                if matrix.format != "csr":
+                    raise TypeError(f"matrix {name!r} must be a dense array or CSR matrix")
             else:
-                dense = np.asarray(matrix)
-                if dense.ndim != 2:
-                    raise ValueError(f"matrix {name!r} must be two-dimensional, got {dense.shape}")
-                value = sparse.csr_array(dense)
-                original_formats[name] = None
+                matrix = np.asarray(matrix)
+                if matrix.ndim != 2:
+                    raise ValueError(f"matrix {name!r} must be two-dimensional, got {matrix.shape}")
 
-            if len(value.shape) != 2:
-                raise ValueError(f"matrix {name!r} must be two-dimensional, got {value.shape}")
+            if shape is None:
+                shape = matrix.shape
+            elif matrix.shape != shape:
+                raise ValueError(f"all matrices must have the same shape; expected {shape}, got {matrix.shape}")
 
-            shapes.add(value.shape)
-            dtypes.add(value.dtype)
-            sources[name] = value
-
-        if len(shapes) != 1:
-            raise ValueError("all matrices must have the same shape")
-
-        shape = next(iter(shapes))
-        if dtype is None:
-            if len(dtypes) > 1:
+            if source_dtype is None:
+                source_dtype = matrix.dtype
+            elif matrix.dtype != source_dtype and dtype is None:
                 raise TypeError("source matrices have mixed dtypes, supply dtype explicitly to convert them")
-            dtype = next(iter(dtypes))
 
-        pattern = sparse.csr_array(shape, dtype=bool)
-        for name, value in sources.items():
-            # Stored zeros are positions too, including duplicates that sum to zero.
-            positions = sparse.csr_array(
-                (np.ones(value.nnz, dtype=bool), value.indices, value.indptr), shape=shape
-            )
+            if (
+                not np.issubdtype(matrix.dtype, np.number)
+                or np.iscomplexobj(matrix)
+                or np.issubdtype(matrix.dtype, np.bool_)
+            ):
+                raise TypeError("Matrix values must be real numbers")
+            inputs[name] = matrix
 
-            if original_formats[name] == "dia":
-                # DIA drops stored zeros when converted to CSR, so mark its diagonals first.
-                positions = matrices[name].astype(bool, copy=True)
-                positions.data[:] = True
-                positions = positions.tocsr()
+        csr_matrices = {}
+        coo_matrices = {}
+        for name, matrix in inputs.items():
+            if sparse.issparse(matrix):
+                matrix.check_format(full_check=True)
+                matrix.sum_duplicates()
+                matrix.sort_indices()
+                csr = matrix
+            else:
+                csr = sparse.csr_array(matrix)
+            if not np.all(np.isfinite(csr.data)) or np.any(csr.data < 0):
+                raise ValueError("Matrix values must be finite and nonnegative")
+            csr_matrices[name] = csr
+            coo_matrices[name] = csr.tocoo(copy=False)
 
-            pattern = pattern.maximum(positions)
+        if dtype is None:
+            dtype = source_dtype
 
+        # Join all stored coordinates, then collapse them into one shared pattern.
+        rows = np.concatenate([matrix.row for matrix in coo_matrices.values()])
+        cols = np.concatenate([matrix.col for matrix in coo_matrices.values()])
+        pattern = sparse.coo_array((np.ones(rows.size), (rows, cols)), shape=shape).tocsr()
+        pattern.sum_duplicates()
+        pattern.data[:] = 1
+
+        # Read every class at the union positions
+        row_index = pattern.indptr
+        col_index = pattern.indices
         rows, cols = pattern.nonzero()
         cores = {
-            name: np.asarray(value[rows, cols]).reshape(-1) if pattern.nnz else np.empty(0, dtype=value.dtype)
-            for name, value in sources.items()
+            name: np.asarray(matrix[rows, cols]).reshape(-1) if col_index.size else np.empty(0, dtype=matrix.dtype)
+            for name, matrix in csr_matrices.items()
         }
-        return cls.from_csr(shape, pattern.indptr, pattern.indices, cores, dtype=dtype)
+        return cls.from_csr(shape, row_index, col_index, cores, dtype=dtype)
 
     def to_matrix(self, index, index_name="main_index"):
         """Return an AequilibraeSparseMatrix sharing this buffer without copying values.
