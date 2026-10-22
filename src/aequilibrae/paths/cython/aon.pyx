@@ -196,7 +196,7 @@ cdef class PreparedAoN:
     cdef object heap_name
 
     cdef list workers
-    cdef vector[CppAoNOrigin[DenseDemandRow]] origin_queries
+    cdef vector[CppAoNOrigin[DenseDemandRow]] dense_origin_queries
     cdef vector[CppAoNOrigin[SparseDemandRow]] sparse_origin_queries
     cdef vector[CppAoNWorkerView] worker_views
     cdef CppAoNInputs inputs
