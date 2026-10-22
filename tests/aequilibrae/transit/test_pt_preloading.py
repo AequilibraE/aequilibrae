@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
@@ -25,16 +26,10 @@ def graph(coquimbo_example: Project):
 @pytest.fixture(scope="function")
 def demand(graph):
     n_zones = graph.centroids.shape[0]
-    matrix = AequilibraeMatrix()
-    matrix.create_empty(zones=n_zones, matrix_names=["car"])
-    matrix.index = graph.centroids
-
-    matrix.matrices[:, :, 0] = 5  # 5 trips from each OD should cause a little bit of congestion
-    matrix.computational_view("car")
+    matrix = AequilibraeMatrix(index=graph.centroids)
+    matrix["car"] = np.full((n_zones, n_zones), 5.0)  # 5 trips per OD cause a little congestion
 
     yield matrix
-
-    matrix.close()
 
 
 def _assignment(

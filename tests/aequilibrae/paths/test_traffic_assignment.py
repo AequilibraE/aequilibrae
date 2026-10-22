@@ -25,8 +25,7 @@ def car_graph(project):
 
 @pytest.fixture(scope="function")
 def matrix(project):
-    mat = project.matrices.get_matrix("demand_omx")
-    mat.computational_view()
+    mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     return mat
 
 
@@ -69,7 +68,8 @@ ALGORITHMS = ["msa", "cfw", "bfw", "frank-wolfe"]
 
 
 def test_matrix_with_wrong_type(matrix, car_graph):
-    matrix.matrix_view = np.array(matrix.matrix_view, np.int32)
+    core = next(iter(matrix))
+    matrix[core] = np.array(matrix[core], np.int32)
     with pytest.raises(TypeError):
         TrafficClass("car", car_graph, matrix)
 
@@ -122,6 +122,17 @@ def test_set_algorithm(assignment, assigclass):
             pass  # Placeholder for any repeated logic if needed
     with pytest.raises(AttributeError):
         assignment.set_algorithm("not a valid algorithm")
+
+
+def test_steps_below_needed_to_terminate_reaches_algorithm(assignment, assigclass):
+    assignment.add_class(assigclass)
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
+    assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
+    assignment.set_algorithm("bfw")
+
+    assignment.steps_below_needed_to_terminate = 3
+    assert assignment.assignment.steps_below_needed_to_terminate == 3
 
 
 def test_set_time_field(assignment, assigclass):

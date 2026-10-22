@@ -116,6 +116,8 @@ cdef class GraphContext:
             other_turns.turn_links = source_turns.turn_links
             other_turns.turn_penalties_buffer = source_turns.turn_penalties_buffer
             other_turns.uturns_allowed = source_turns.uturns_allowed
+            other_turns.first_nodes_buffer = source_turns.first_nodes_buffer
+            other_turns.last_nodes_buffer = source_turns.last_nodes_buffer
         return other
 
     cdef CppNodeBasedContext graph_view(self) noexcept nogil:
@@ -171,9 +173,35 @@ cdef class NodeBasedContext(GraphContext):
 cdef class TurnBasedContext(GraphContext):
     """Graph context with sparse directed-link turn penalties.
 
-    ``turn_fs`` has ``link_count + 1`` entries. Explicit turns are grouped by
-    their incoming link; missing turns cost zero. Search states are incoming
-    links plus a virtual root.
+    ``turn_fs`` has ``link_count + 1`` entries. Explicit turns are grouped by their
+    incoming link. The "search states" include the incoming links plus a virtual root.
+
+    ``first_nodes`` and ``last_nodes`` identify the physical neighbours immediately after
+    each link's tail and before its head. For compressed links, these are the b_node of
+    the first link and the a_node of the last link in the chain.  For uncompressed links,
+    these are the b_node and a_node, respectively.
+
+    We need this to distinguish between a u-turn and a series of links that compact into a
+    single link.
+
+    Example network, with links in both directions:
+
+        1 <-> 2 <-> 3 <-> 4 <-> 5
+
+    Marking nodes 1, 4 and 5 as centroids gives the compressed graph:
+
+        1 <--------------> 4 <-> 5
+
+    1 <-> 4 now looks like a u-turn.
+
+    For links ordered as [(1, 4), (4, 1), (4, 5), (5, 4)], then
+
+        first_nodes = [2, 3, 5, 4]
+        last_nodes  = [3, 2, 4, 5]
+
+    The link 1 -> 4 starts with 2, then arrives from 3.
+    The uncompressed link 4 -> 5 starts with 5, then arrives from 4.
+
     """
 
     def __init__(
@@ -186,7 +214,9 @@ cdef class TurnBasedContext(GraphContext):
             turn_penalties=None,
             *,
             allow_uturns=True,
-            blocked_centroid_count=0
+            blocked_centroid_count=0,
+            first_nodes=None,
+            last_nodes=None,
     ):
         super().__init__(fs, heads, costs, blocked_centroid_count=blocked_centroid_count)
 
@@ -228,6 +258,15 @@ cdef class TurnBasedContext(GraphContext):
         np.copyto(np.asarray(self.turn_penalties_buffer), turn_penalties)
         self.uturns_allowed = bool(allow_uturns)
 
+        self.first_nodes_buffer = (
+            self.heads_buffer if first_nodes is None else validate_index_array(first_nodes, "first_nodes")
+        )
+        self.last_nodes_buffer = (
+            self.tails_buffer if last_nodes is None else validate_index_array(last_nodes, "last_nodes")
+        )
+        if self.first_nodes_buffer.shape[0] != m or self.last_nodes_buffer.shape[0] != m:
+            raise ValueError("boundary nodes must have one value per link")
+
     cdef CppTurnBasedContext view(self) noexcept nogil:
         """Borrow the graph and turn buffers for a turn-based search."""
         cdef CppTurnBasedContext turns
@@ -236,6 +275,8 @@ cdef class TurnBasedContext(GraphContext):
         turns.turn_fs = const_array_pointer(self.turn_offsets)
         turns.turn_to_links = const_array_pointer(self.turn_links)
         turns.turn_penalties = const_array_pointer[double](self.turn_penalties_buffer)
+        turns.first_nodes = const_array_pointer(self.first_nodes_buffer)
+        turns.last_nodes = const_array_pointer(self.last_nodes_buffer)
         turns.allow_uturns = self.uturns_allowed
         return turns
 

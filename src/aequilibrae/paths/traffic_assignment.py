@@ -212,10 +212,8 @@ class TrafficAssignment(AssignmentBase):
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx")
-
         # We will only assign one user class stored as 'matrix' inside the OMX file
-        >>> demand.computational_view(['matrix'])
+        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
         # Creates the assignment class
         >>> assigclass = TrafficClass("car", graph, demand)
@@ -310,6 +308,11 @@ class TrafficAssignment(AssignmentBase):
         # Special methods (__method__) cannot be override at runtime, instead we'll
         # just set a variable to indicate if the checking of attributes should be performed
         if self.__initalised:
+            if name == "steps_below_needed_to_terminate":
+                if not value >= 1:
+                    raise ValueError("Steps below the target needed to terminate must be a positive integer")
+                if isinstance(self.assignment, LinearApproximation):
+                    self.assignment.steps_below_needed_to_terminate = value
             check, value, message = self.__check_attributes(name, value)
             if not check:
                 raise ValueError(message)
@@ -856,12 +859,7 @@ class TrafficAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            if len(cls.matrix.view_names) == 1:
-                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
-            else:
-                uclass["matrix_totals"] = {
-                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
-                }
+            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
             uclass["network mode"] = cls.graph.mode
             uclass["Value-of-time"] = cls.vot
             uclass["PCE"] = cls.pce
@@ -893,7 +891,7 @@ class TrafficAssignment(AssignmentBase):
                 'blended': Averaged results for all iterations, 'all': Saves skims for both the final iteration and the
                 blended ones. Default is 'final'
 
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
+            **format** (:obj:`str`, *Optional*): File format ('omx'). Default is 'omx'
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
                 Defaults to the active project
@@ -905,9 +903,8 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("which_ones must be final, blended or all")
         records = []
         mat_format = format.lower()
-        if mat_format not in ["omx", "aem"]:
-            raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-            raise ImportError("OpenMatrix is not available on your system")
+        if mat_format != "omx":
+            raise ValueError("Only OMX matrix files are supported")
 
         if not project:
             project = self.project or get_active_project()
@@ -942,49 +939,26 @@ class TrafficAssignment(AssignmentBase):
                 continue
             # Assembling a single final skim file can be done like this
             # We will want only the time for the last iteration and the distance averaged out for all iterations
-            working_name = export_name if mat_format == "aem" else AequilibraeMatrix().random_name()
-
-            kwargs = {
-                "file_name": working_name,
-                "zones": self.classes[0].graph.centroids.shape[0],
-                "matrix_names": names,
-                "memory_only": False,
-            }
-
-            # Create the matrix to manipulate
-            out_skims = AequilibraeMatrix()
-            out_skims.create_empty(**kwargs)
-
-            out_skims.index[:] = self.classes[0].graph.centroids[:]
-            out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls._id}"
-
+            output_matrices = {}
             if which_ones in ["final", "all"]:
-                for core, values in last_skims.items():
-                    out_skims.matrix[f"{core}_final"][:, :] = values
-
+                output_matrices.update({f"{core}_final": values for core, values in last_skims.items()})
             if which_ones in ["blended", "all"]:
-                for core, values in avg_skims.items():
-                    out_skims.matrix[f"{core}_blended"][:, :] = values
+                output_matrices.update({f"{core}_blended": values for core, values in avg_skims.items()})
 
-            out_skims.matrices.flush()  # Make sure that all data went to the disk
-
-            # If it were supposed to be an OMX, we export to one
-            if mat_format == "omx":
-                out_skims.export(export_name)
-
-            out_skims.description = f"Skimming for assignment procedure. Class {cls._id}"
-            # Now we create the appropriate record
+            out_skims = AequilibraeMatrix(index=self.classes[0].graph.centroids)
+            out_skims.update(output_matrices)
+            description = f"Skimming for assignment procedure. Class {cls._id}"
+            out_skims.metadata["description"] = description
 
             record = mats.create(
                 name=f"{matrix_name}_{cls._id}",
                 file_name=file_name,
+                matrix=out_skims,
                 procedure_id=self.procedure_id,
                 timestamp=self.procedure_date,
                 procedure="Traffic Assignment",
-                description=out_skims.description,
+                description=description,
             )
-
-            out_skims.close()
             records.append(record)
 
         return records
@@ -1072,29 +1046,10 @@ class TrafficAssignment(AssignmentBase):
                     matrices[key] = values[:, :, column]
         if not matrices:
             return
-        names = list(matrices)
-
-        kwargs = {
-            "file_name": AequilibraeMatrix().random_name(),
-            "zones": self.classes[0].graph.centroids.shape[0],
-            "matrix_names": names,
-            "memory_only": False,
-        }
-
-        # Create the matrix to manipulate
-        out_skims = AequilibraeMatrix()
-        out_skims.create_empty(**kwargs)
-
-        out_skims.index[:] = self.classes[0].graph.centroids[:]
-
-        for name, values in matrices.items():
-            out_skims.matrix[name][:, :] = values
-
-        out_skims.matrices.flush()  # Make sure that all data went to the disk
-        out_skims.description = f"Select link matrix from procedure ID {self.procedure_id}_sl."
-
-        out_skims.export(export_name)
-        out_skims.close()
+        out_skims = AequilibraeMatrix(index=self.classes[0].graph.centroids)
+        out_skims.update(matrices)
+        out_skims.metadata["description"] = f"Select link matrix from procedure ID {self.procedure_id}_sl."
+        out_skims.save_as_omx(export_name)
 
     def save_select_link_results(self, name: str) -> None:
         """
@@ -1178,12 +1133,7 @@ class TransitAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            if len(cls.matrix.view_names) == 1:
-                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
-            else:
-                uclass["matrix_totals"] = {
-                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
-                }
+            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
             uclass["network mode"] = cls.graph.mode
 
             classes[cls._id] = uclass

@@ -20,7 +20,7 @@ class GravityApplication:
 
     Model is an instance of SyntheticGravityModel class.
 
-    Impedance is an instance of AequilibraEMatrix.
+    Impedance is an instance of AequilibraeMatrix.
 
     Vectors are a pandas DataFrame.
 
@@ -43,8 +43,7 @@ class GravityApplication:
         >>> model.beta = 0.0001
 
         # We load the impedance matrix
-        >>> matrix = project.matrices.get_matrix("skims")
-        >>> matrix.computational_view(["distance_blended"])
+        >>> matrix = project.matrices.get_matrix("skims", subset=["distance_blended"])
 
         # We create the vectors we will use
         >>> query = "SELECT zone_id, population, employment FROM zones;"
@@ -73,7 +72,7 @@ class GravityApplication:
 
         # Solve and save the outputs
         >>> gravity.apply()
-        >>> gravity.output.export(project_path / 'matrices' / 'gravity_omx.omx')
+        >>> gravity.output.save_as_omx(project_path / 'matrices' / 'gravity_omx.omx')
 
         >>> project.close()
     """
@@ -121,10 +120,9 @@ class GravityApplication:
 
         self.cols_ = kwargs.get("column_field", None)
 
-        self.impedance = kwargs.get("impedance")  # type: AequilibraeMatrix
+        self.impedance: AequilibraeMatrix | None = kwargs.get("impedance")  # type:
         self.model = kwargs.get("model")  # type: SyntheticGravityModel
-        self.core_name = kwargs.get("output_core", "gravity")
-        self.output_name = AequilibraeMatrix().random_name()
+        self.core_name: str = kwargs.get("output_core", "gravity")
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
         self.output = None  # type: AequilibraeMatrix
         self.gap = np.inf
@@ -142,25 +140,29 @@ class GravityApplication:
         self.procedure_date = str(datetime.today())
         t = perf_counter()
         max_cost = self.parameters["max trip length"]
+
         # We create the output
-        self.output = self.impedance.copy(
-            self.output_name, cores=self.impedance.view_names, names=[self.core_name], memory_only=True
-        )
-        self.output.computational_view([self.core_name])
+        assert self.impedance is not None
+        self.output = AequilibraeMatrix(index=self.impedance.index, index_name=self.impedance.index_name)
+
+        value = self.impedance[self.impedance_core]
         if self.nan_as_zero:
-            self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
+            value = np.nan_to_num(value)
+
+        self.output[self.core_name] = value
 
         # We apply the function
         self.__apply_function()
 
         # We zero those cells that have a trip length above the limit
         if max_cost > 0:
-            a = (self.output.matrix_view[:, :] < max_cost).astype(int)
-            self.output.matrix_view[:, :] = a * self.output.matrix_view[:, :]
+            values = self.output[self.core_name]
+            self.output[self.core_name] = (values < max_cost) * values
 
         # We adjust the total of the self.output
-        total_factor = np.nansum(self.vectors[self.rows_]) / np.nansum(self.output.matrix_view[:, :])
-        self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * total_factor
+        values = self.output[self.core_name]
+        total_factor = np.nansum(self.vectors[self.rows_]) / np.nansum(values)
+        self.output[self.core_name] = values * total_factor
 
         # And adjust with a fratar
         self.__ipf = Ipf(
@@ -183,8 +185,9 @@ class GravityApplication:
         self.gap = self.__ipf.gap
 
         self.report.extend(self.__ipf.report[1:] + ["", ""])
-        self.report.append("Total of matrix: " + "{:15,.4f}".format(float(np.nansum(self.output.matrix_view))))
-        intrazonals = float(np.nansum(np.diagonal(self.output.matrix_view)))
+        values = self.output[self.core_name]
+        self.report.append("Total of matrix: " + "{:15,.4f}".format(float(np.nansum(values))))
+        intrazonals = float(np.nansum(np.diagonal(values)))
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
         self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
 
@@ -194,7 +197,7 @@ class GravityApplication:
         :Arguments:
             **name** (:obj:`str`): Name of the desired matrix record
 
-            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            **file_name** (:obj:`str`): Name for the OMX matrix file
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
             Defaults to the active project
@@ -245,12 +248,9 @@ class GravityApplication:
         if not np.array_equal(self.impedance.index, self.vectors.index):
             raise ValueError("Indices from vectors do not match those from seed matrix")
 
-        # Check if matrix was set for computation
-        if self.impedance.matrix_view is None:
-            raise ValueError("Matrix needs to be set for computation")
-        else:
-            if len(self.impedance.matrix_view.shape[:]) > 2:
-                raise ValueError("Matrix' computational view needs to be set for a single matrix core")
+        if len(self.impedance) != 1:
+            raise ValueError("Impedance matrix must contain exactly one named matrix")
+        self.impedance_core = next(iter(self.impedance))
 
         # check balancing:
         sum_rows = np.nansum(self.vectors[self.rows_])
@@ -273,28 +273,30 @@ class GravityApplication:
                 break
 
     def __apply_function(self):
-        self.core_name = self.output.view_names[0]
+        assert (
+            self.impedance is not None
+            and self.output is not None
+            and self.vectors is not None
+            and self.model is not None
+        )
+        impedance = self.impedance[self.impedance_core]
+        output = self.output[self.core_name]
         for i in range(self.vectors.shape[0]):
             p = self.vectors[self.rows_].values[i]
             a = self.vectors[self.cols_].to_numpy()
 
             if self.model.function == "EXPO":
-                self.output.matrix_view[i, :] = np.exp(-self.model.beta * self.impedance.matrix_view[i, :]) * p * a
+                output[i, :] = np.exp(-self.model.beta * impedance[i, :]) * p * a
 
             elif self.model.function == "POWER":
-                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], -self.model.alpha) * p * a)[
-                    :
-                ]
+                output[i, :] = (np.power(impedance[i, :], -self.model.alpha) * p * a)[:]
             elif self.model.function == "GAMMA":
-                self.output.matrix_view[i, :] = (
-                    np.power(self.impedance.matrix_view[i, :], self.model.alpha)
-                    * np.exp(-self.model.beta * self.impedance.matrix_view[i, :])
-                    * p
-                    * a
+                output[i, :] = (
+                    np.power(impedance[i, :], self.model.alpha) * np.exp(-self.model.beta * impedance[i, :]) * p * a
                 )[:]
 
         # Deals with infinite and NaNs
-        infinite = np.isinf(self.output.matrix_view[:, :]).astype(int)
-        non_inf = np.ones_like(self.output.matrix_view[:, :]) - infinite
-        self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * non_inf
-        self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
+        infinite = np.isinf(output).astype(int)
+        non_inf = np.ones_like(output) - infinite
+        output[:] = output * non_inf
+        output[:] = np.nan_to_num(output)

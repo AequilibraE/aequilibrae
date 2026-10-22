@@ -30,6 +30,75 @@ def chain_graph(centroids=True):
     return graph
 
 
+def compressed_uturn_graph(with_return_chain=True):
+    r"""Ban 1 -> 2 -> 6 so reaching 6 requires returning to 2 with another arrival.
+
+    Physical graph:
+
+        1 -> 2 -> 6
+             | \
+             4  5
+             | /
+             3
+
+    The chain 2 <-> 4 <-> 3 is bidirectional. The optional chain 3 -> 5 -> 2
+    provides a legal return; reversing 3 -> 4 is a banned U-turn.
+    All link costs are 1. Chain compression removes the internal nodes.
+    """
+    graph = Graph()
+    graph.network = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3, 4, 5, 6],
+            "a_node": [1, 2, 4, 3, 5, 2],
+            "b_node": [2, 4, 3, 5, 2, 6],
+            "direction": [1, 0, 0, 1, 1, 1],
+            "time": [1.0] * 6,
+        }
+    )
+
+    # Drops links 4 & 5
+    if not with_return_chain:
+        graph.network = graph.network.loc[~graph.network.link_id.isin([4, 5])].copy()
+
+    graph.prepare_graph(np.array([1, 3, 6]), remove_dead_ends=False)
+    graph.set_blocked_centroid_flows(False)
+    graph.set_graph("time")
+    graph.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [6], "penalty": [np.inf]}))
+    return graph
+
+
+def test_compact_dijkstra_allows_return_through_another_chain():
+    graph = compressed_uturn_graph()
+    assert 4 not in graph.compact_all_nodes
+    assert 5 not in graph.compact_all_nodes
+    np.testing.assert_array_equal(graph.compute_path(1, 6).path_nodes, [1, 2, 4, 3, 5, 2, 6])
+
+    context = make_routing_context(graph, compact=True)
+    origin = graph.compact_nodes_to_indices[1]
+    destination = graph.compact_nodes_to_indices[6]
+    results = search(context, origin, destination)
+
+    # Links 2/3 form the outward chain and links 4/5 are the return via 5.
+    forward = graph.graph.loc[graph.graph.direction == 1].set_index("link_id")
+    expected_links = forward.loc[[1, 2, 4, 6], "__compressed_id__"].to_numpy()
+    np.testing.assert_array_equal(results.path_links_to(destination), expected_links)
+    assert results.path_cost_to(destination) == 6.0
+
+
+def test_compact_dijkstra_bans_reversal_through_same_chain():
+    graph = compressed_uturn_graph(with_return_chain=False)
+
+    # Without 3 -> 5 -> 2, the only return is 3 -> 4 -> 3, so 6 is unreachable.
+    assert graph.compute_path(1, 6).path is None
+
+    # Check compact as well
+    context = make_routing_context(graph, compact=True)
+    origin = graph.compact_nodes_to_indices[1]
+    destination = graph.compact_nodes_to_indices[6]
+    results = search(context, origin, destination)
+    assert not results.reachable_to(destination)
+
+
 @pytest.mark.parametrize("turn", [False, True])
 @pytest.mark.parametrize("compact", [False, True])
 def test_routing_context_copies_graph_inputs(turn, compact):

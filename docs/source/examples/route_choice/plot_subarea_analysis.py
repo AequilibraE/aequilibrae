@@ -92,15 +92,10 @@ graph.set_graph("utility")
 # ------------------
 #
 # We'll create a mock demand matrix with demand `10` for every zone and prepare it for computation.
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, from_df
 
-names_list = ["demand"]
-
-mat = AequilibraeMatrix()
-mat.create_empty(zones=graph.num_zones, matrix_names=names_list, memory_only=True)
-mat.index = graph.centroids[:]
-mat.matrices[:, :, 0] = np.full((graph.num_zones, graph.num_zones), 10.0)
-mat.computational_view()
+mat = AequilibraeMatrix(index=graph.centroids, index_name="zones")
+mat["demand"] = np.full((graph.num_zones, graph.num_zones), 10.0)
 
 # %%
 # Sub-area preparation
@@ -154,8 +149,17 @@ new_centroids
 # We can then perform an assignment using our new demand matrix on the limited graph
 from aequilibrae.paths import RouteChoice
 
+demand_matrix = from_df(
+    demand.reset_index(),
+    row="origin id",
+    col="destination id",
+    subset=list(demand.columns),
+    index=new_centroids,
+    index_name="zones",
+)
+
 rc = RouteChoice(graph)
-rc.add_demand(demand)
+rc.add_demand(demand_matrix)
 rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False, seed=123)
 rc.execute(perform_assignment=True)
 
