@@ -34,6 +34,7 @@ struct AoNWorkerView {
   void reset() noexcept {
     loading.reset();
     selected_loading.reset();
+    workspace.selected_od.reset();
     turn_cost_total = 0;
     unassigned_demand = 0;
     // Search and operation kernels replace their own scratch when called.

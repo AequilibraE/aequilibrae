@@ -3,7 +3,7 @@ from aequilibrae.paths.cython.search_results cimport SearchResults, CppSearchRes
 from aequilibrae.paths.cython.context cimport SelectLinkContext, CppSelectLinkContext
 from aequilibrae.paths.cython.outputs cimport (
     SelectLinkLoadingOutputs, SelectLinkODOutputs,
-    CppSelectLinkLoadingOutputsView, CppSelectLinkODOriginView,
+    CppSelectLinkLoadingOutputsView, CppSelectLinkODOriginView, CppSelectLinkODOutputsView,
 )
 from aequilibrae.paths.cython.workspaces cimport (
     LoadingWorkspace, SelectLinkWorkspace, CppLoadingWorkspace, CppSelectLinkWorkspace,
@@ -25,4 +25,7 @@ cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::r
         const CppSelectLinkLoadingOutputsView[T] *workers,
         size_t worker_count,
         const CppSelectLinkLoadingOutputsView[T] &output,
-    ) noexcept
+        const CppSelectLinkODOutputsView[T] *od_workers,
+        size_t od_worker_count,
+        const CppSelectLinkODOutputsView[T] &od_output,
+    ) except +

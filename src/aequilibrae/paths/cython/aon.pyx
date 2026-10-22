@@ -116,6 +116,7 @@ from aequilibrae.paths.cython.outputs cimport (
     LoadingOutputs,
     SelectLinkLoadingOutputs,
     CppSelectLinkODOriginView,
+    CppSelectLinkODOutputsView,
 )
 from aequilibrae.paths.cython.select_link_loading cimport (
     cpp_select_link_loading,
@@ -140,6 +141,8 @@ cdef class _AoNWorker:
         selection_names,
         load_selected_links,
         write_selected_od,
+        zone_count,
+        demand_names,
     ):
         self.search = SearchResults(context.node_count, context.state_count, context.link_count)
         self.workspace = AoNWorkspace(
@@ -149,6 +152,9 @@ cdef class _AoNWorker:
             class_count=class_count,
             field_count=skim_width,
             select_links=load_selected_links or write_selected_od,
+            od_zone_count=zone_count if write_selected_od else None,
+            demand_names=demand_names,
+            set_names=selection_names,
         )
         self.loading = LoadingOutputs(context.link_count, class_count)
         if load_selected_links:
@@ -201,10 +207,10 @@ cdef class PreparedAoN:
     cdef vector[CppAoNWorkerView] worker_views
     cdef CppAoNInputs inputs
 
-    # The standalone reductions require contiguous tables of component views.
-    # These tables borrow the same worker owners; they allocate no load buffers.
+    # The standalone reductions require contiguous tables of component views
     cdef vector[CppLoadingOutputs[double]] loading_outputs
     cdef vector[CppSelectLinkLoadingOutputsView[double]] selected_outputs
+    cdef vector[CppSelectLinkODOutputsView[double]] selected_od_outputs
 
     def __init__(
         self,
@@ -333,6 +339,8 @@ cdef class PreparedAoN:
                 selection_names,
                 self.load_selected_links,
                 self.write_selected_od,
+                self.zone_count,
+                self.demand.field_names,
             )
             self.workers.append(worker)
 
@@ -341,6 +349,8 @@ cdef class PreparedAoN:
             self.loading_outputs.push_back(view.loading)
             if self.load_selected_links:
                 self.selected_outputs.push_back(view.selected_loading)
+            if self.write_selected_od:
+                self.selected_od_outputs.push_back(view.workspace.selected_od)
 
     @property
     def origins(self):
@@ -367,6 +377,7 @@ cdef class PreparedAoN:
             select_link_names=selection_names,
             select_link_loads=self.load_selected_links,
             select_link_od=self.write_selected_od,
+            demand_names=self.demand.field_names,
         )
 
     cdef void validate_outputs(self, AoNOutputs out) except *:
@@ -414,6 +425,7 @@ cdef class PreparedAoN:
                 or out.select_link.od.destination_count != self.zone_count
                 or out.select_link.od.class_count != self.class_count
                 or out.select_link.od.set_names != self.selection_context.set_names
+                or out.select_link.od.field_names != self.demand.field_names
             ):
                 raise ValueError("selected OD dimensions and ordered names must match assignment")
 
@@ -427,16 +439,17 @@ cdef class PreparedAoN:
         cdef bint sparse = isinstance(self.demand, SparseMatrix)
 
         self.validate_outputs(out)
+        if self.write_selected_od:
+            out.select_link.od.reset()
         output = out.view()
 
         with nogil:
             for worker in range(self.worker_views.size()):
                 self.worker_views[worker].reset()
 
-            # Clear skipped rows as well. Link accumulators are replaced by the
-            # reductions below, so they do not need another full reset here.
+            # Clear skipped skim rows as well. Link accumulators and sparse OD
+            # results are replaced by the reductions below.
             output.skimming.reset()
-            output.selected_od.reset()
 
             if sparse:
                 if node_based:
@@ -470,17 +483,22 @@ cdef class PreparedAoN:
                 self.loading_outputs.size(),
                 output.loading,
             )
-            if self.load_selected_links:
+            if self.load_selected_links or self.write_selected_od:
                 cpp_reduce_select_link_loading[double](
                     self.selected_outputs.data(),
                     self.selected_outputs.size(),
                     output.selected_loading,
+                    self.selected_od_outputs.data(),
+                    self.selected_od_outputs.size(),
+                    output.selected_od,
                 )
 
             for worker in range(self.worker_views.size()):
                 turn_cost_total += self.worker_views[worker].turn_cost_total
                 unassigned_demand += self.worker_views[worker].unassigned_demand
 
+        if self.write_selected_od:
+            out.select_link.od.update_matrices()
         out.turn_cost_total = turn_cost_total
         out.unassigned_demand = unassigned_demand
         return out
@@ -508,8 +526,8 @@ cdef void assign_origin(
             output.skimming.origin(origin),
         )
 
-    if output.selected_od.set_count:
-        selected_od = output.selected_od.origin(origin)
+    if worker.workspace.selected_od.set_count:
+        selected_od = worker.workspace.selected_od.origin(origin)
     load_origin(search, query.loading, inputs, worker, selected_od)
 
 
@@ -520,8 +538,8 @@ cdef void load_origin(
     CppAoNWorkerView &worker,
     const CppSelectLinkODOriginView[double] &selected_od,
 ) noexcept nogil:
-    # OD rows have one writer. Selected link accumulators remain worker-local
-    # until reduction, and can reuse the ordinary loading scratch sequentially.
+    # OD builders and selected link accumulators remain worker-local until
+    # reduction, and can reuse the ordinary loading scratch sequentially.
     cpp_network_loading(search, demand, worker.workspace.loading, worker.loading)
     cpp_select_link_loading(
         search, demand, inputs.selection, worker.workspace.select_link,

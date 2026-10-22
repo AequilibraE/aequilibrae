@@ -8,6 +8,7 @@ exts = [
     'dense_matrix',
     'matrix_base',
     'sparse_matrix',
+    'sparse_matrix_builder',
 ]
 
 py.install_sources(

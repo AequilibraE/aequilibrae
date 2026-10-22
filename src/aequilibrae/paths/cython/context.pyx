@@ -9,7 +9,7 @@ cimport cython
 from libc.stddef cimport size_t
 
 from aequilibrae.paths.cython.outputs import (
-    SelectLinkOutputs, SkimmingOutputs, _validate_selection_names, _validate_skim_names,
+    SkimmingOutputs, _validate_selection_names, _validate_skim_names,
 )
 from aequilibrae.utils.cython.array_allocations cimport array, const_array_pointer
 from aequilibrae.utils.cython.array_allocations import readonly_view
@@ -431,7 +431,7 @@ cdef class SelectLinkContext:
         cdef cpp_bool[:, ::1] masks
         cdef size_t row, link_index
         if self.set_names is not None:
-            raise RuntimeError("SelectLinkContext cannot be reinitialized")
+            raise RuntimeError("SelectLinkContext cannot be reinitialised")
 
         link_count = operator.index(link_count)
         if link_count < 0:
@@ -477,14 +477,3 @@ cdef class SelectLinkContext:
         """Read-only [sets, links] view which keeps mask storage alive."""
         return readonly_view(self.masks_buffer)
 
-    def make_outputs(self, destination_count, class_count, *, origin_count=1, link_loads=True, od=True):
-        """Allocate either or both outputs; one origin row suffices for one shot."""
-        return SelectLinkOutputs(
-            self.link_count,
-            destination_count,
-            class_count,
-            self.set_names,
-            origin_count=origin_count,
-            link_loads=link_loads,
-            od=od,
-        )

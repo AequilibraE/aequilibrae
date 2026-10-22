@@ -1,10 +1,11 @@
 import itertools
 import logging
-from typing import Union
 from collections import defaultdict
+from typing import Union
 
 import geopandas as gpd
 import pandas as pd
+
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import RouteChoice
@@ -82,14 +83,14 @@ class SubAreaAnalysis:
         """
 
         if demand_cols is None:
-            demand_cols = self.rc.demand.df.columns
+            demand_cols = self.rc.demand.field_names
 
         sl_od = self.rc.get_select_link_od_matrix_results()
 
         sub_area_demand = []
         for col in demand_cols:
-            edge_totals = {k: sl_od[k][col].to_scipy() for k in self.single_edges}
-            edge_pair_values = {k: sl_od[k][col].to_scipy() for k in self.edge_pairs}
+            edge_totals = {k: sl_od[k][col] for k in self.single_edges}
+            edge_pair_values = {k: sl_od[k][col] for k in self.edge_pairs}
 
             entered = defaultdict(float)
             exited = defaultdict(float)
