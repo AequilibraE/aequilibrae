@@ -8,7 +8,7 @@ import pytest
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix, from_df, from_dict
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix, from_dict
 from aequilibrae.paths.route_choice import RouteChoice
 
 
