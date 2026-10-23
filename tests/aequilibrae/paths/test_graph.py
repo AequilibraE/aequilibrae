@@ -93,7 +93,7 @@ def test_compression_preserves_isolated_centroids(centroids):
     np.testing.assert_array_equal(graph.compact_nodes_to_indices[centroids], np.arange(len(centroids)))
     isolated = graph.compact_nodes_to_indices[99]
     assert graph.compact_fs[isolated] == graph.compact_fs[isolated + 1]
-    skims = graph.compute_skims().results.skims.matrix["cost"]
+    skims = graph.compute_skims().results.skims["cost"]
     assert skims[centroids.index(1), centroids.index(3)] == 2.0
     assert np.isinf(skims[centroids.index(1), centroids.index(99)])
 
@@ -151,7 +151,7 @@ def test_empty_compact_graph(links, centroids):
     idx, data, _ = graph.create_compressed_link_network_mapping()
     np.testing.assert_array_equal(idx, [0, len(links["link_id"])])
     np.testing.assert_array_equal(data, graph.graph["__supernet_id__"])
-    assert np.isinf(graph.compute_skims().results.skims.matrix["cost"][0, 1])
+    assert np.isinf(graph.compute_skims().results.skims["cost"][0, 1])
 
 
 def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
@@ -181,7 +181,7 @@ def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
     assert not (graph.compact_graph.a_node == graph.compact_graph.b_node).any()
     assert (graph.graph["__compressed_id__"] < graph.compact_num_links).all()
     graph.create_compressed_link_network_mapping()
-    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 5.0
+    assert graph.compute_skims().results.skims["cost"][0, 1] == 5.0
 
 
 def test_parallel_link_round_trip_is_not_a_turn_restriction_detour():
@@ -207,7 +207,7 @@ def test_parallel_link_round_trip_is_not_a_turn_restriction_detour():
     assert 4 in graph.compact_all_nodes
     assert {3, 4}.issubset(graph.compact_graph.link_id)
     assert not (graph.compact_graph.a_node == graph.compact_graph.b_node).any()
-    assert np.isinf(graph.compute_skims().results.skims.matrix["cost"][0, 1])
+    assert np.isinf(graph.compute_skims().results.skims["cost"][0, 1])
 
 
 def graph_with_required_self_loop():
@@ -239,7 +239,7 @@ def test_compaction_keeps_real_self_loop_needed_to_avoid_turn_ban():
     assert 2 not in graph.compact_all_nodes  # The separate chain 1 -> 2 -> 3 is compressed.
     loops = graph.compact_graph.loc[graph.compact_graph.a_node == graph.compact_graph.b_node]
     np.testing.assert_array_equal(loops.link_id, [4])
-    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 5.0
+    assert graph.compute_skims().results.skims["cost"][0, 1] == 5.0
 
 
 def test_set_graph(sioux_falls_example):
@@ -407,7 +407,7 @@ def test_dead_end_removal_preserves_turn_via_node():
     path = graph.compute_path(1, 4)
     np.testing.assert_array_equal(path.path_nodes, [1, 2, 3, 2, 4])
     assert path.milepost[-1] == 9.0
-    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 9.0
+    assert graph.compute_skims().results.skims["cost"][0, 1] == 9.0
 
 
 def test_compaction_preserves_bidir_nodes_when_path_uturns_are_allowed():
@@ -459,7 +459,7 @@ def test_dead_end_removal_preserves_branch_needed_for_allowed_uturn():
     np.testing.assert_array_equal(path.path, [1, 3, 3, 2])
     assert path.milepost[-1] == 4.0
     assert graph.dead_end_links.size == 0
-    assert graph.compute_skims().results.skims.matrix["cost"][0, 1] == 4.0
+    assert graph.compute_skims().results.skims["cost"][0, 1] == 4.0
 
 
 def test_dead_end_removal_stops_at_turn_via_node():
@@ -519,7 +519,7 @@ def test_turn_restrictions_allow_compressed_neighbour_nodes(penalty):
         assert path.milepost[-1] == 4.0 + penalty
     else:
         assert path.path is None
-    skims = graph.compute_skims().results.skims.matrix["cost"]
+    skims = graph.compute_skims().results.skims["cost"]
     assert skims[0, 1] == 4.0 + penalty
     assert skims[1, 0] == 4.0
 
