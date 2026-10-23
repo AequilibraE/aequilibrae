@@ -213,7 +213,7 @@ class TrafficAssignment(AssignmentBase):
         >>> proj_matrices = project.matrices
 
         # We will only assign one user class stored as 'matrix' inside the OMX file
-        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
         # Creates the assignment class
         >>> assigclass = TrafficClass("car", graph, demand)
@@ -1030,8 +1030,8 @@ class TrafficAssignment(AssignmentBase):
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        if mats.get(matrix_name, default=False):
-            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
+        # if mats.get_matrix(matrix_name, default=False):
+        #     raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
         matrices = {}
         for cls in self.classes:

@@ -73,7 +73,7 @@ graph = project.network.graphs["c"]
 graph.set_graph("free_flow_time")
 graph.set_blocked_centroid_flows(False)
 
-matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # %%
 # Base assignment.

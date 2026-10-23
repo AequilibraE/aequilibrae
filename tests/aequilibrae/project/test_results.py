@@ -10,7 +10,7 @@ from aequilibrae.utils.db_utils import ConnectionClosure
 @pytest.fixture
 def results():
     closure = ConnectionClosure(":memory:", ":memory:")
-    closure.db_connection._connection.execute(
+    closure.results_connection._connection.execute(
         """CREATE TABLE results (
             scenario TEXT,
             year TEXT,
@@ -23,7 +23,7 @@ def results():
             description TEXT
         )"""
     )
-    table = Results(closure.db_connection, closure.results_connection)
+    table = Results(closure.results_connection)
     yield table, closure.results_connection._connection
     closure.close()
 

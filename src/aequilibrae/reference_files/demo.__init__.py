@@ -28,13 +28,13 @@ def matrix_summary():
     """
     project = get_active_project()
     mats = project.matrices
-    df = mats.list()
+    mats_to_metadata = mats.get_available_matrices_and_metadata()
 
     res = {}
-    for name, file_name in zip(df["name"], df["file_name"], strict=True):
+    for file_name in mats_to_metadata["file_name"]:
         if not file_name.lower().endswith(".omx"):
             continue
-        with mats.get_matrix(name) as mat:
+        with mats.get_matrix(file_name) as mat:
             stats = {}
             for nm, array in mat.items():
                 stats[nm] = {
@@ -43,7 +43,7 @@ def matrix_summary():
                     "max": np.max(array),
                     "nnz": (array != 0.0).sum(),
                 }
-        res[name] = stats
+        res[file_name] = stats
 
     return res
 

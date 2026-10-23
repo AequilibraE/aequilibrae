@@ -16,7 +16,7 @@ def select_link_setup(sioux_falls_single_class):
     car_graph = sioux_falls_single_class.network.graphs["c"]  # type: Graph
     car_graph.set_graph("free_flow_time")
     car_graph.set_blocked_centroid_flows(False)
-    matrix = sioux_falls_single_class.matrices.get_matrix("demand_omx", subset=["matrix"])
+    matrix = sioux_falls_single_class.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     assignment = TrafficAssignment()
     assignclass = TrafficClass("car", car_graph, matrix)
@@ -58,8 +58,8 @@ def test_multiple_link_sets(select_link_setup):
     assignment.save_select_link_results("select_link_analysis")
 
     matrices = project.matrices
-    matrices.update_database()
-    assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
+    # matrices.update_database()
+    assert "select_link_analysis.omx" in matrices.get_available_matrices_and_metadata()["file_name"].tolist()
 
     # Test if matrices are with the correct shape and are not empty
     sla = matrices.get_matrix("select_link_analysis_omx")

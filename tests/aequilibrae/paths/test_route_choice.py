@@ -19,7 +19,7 @@ def route_choice_setup(sioux_falls_single_class):
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)
 
-    mat = sioux_falls_single_class.matrices.get_matrix("demand_omx", subset=["matrix"])
+    mat = sioux_falls_single_class.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": RouteChoice(graph)}
 

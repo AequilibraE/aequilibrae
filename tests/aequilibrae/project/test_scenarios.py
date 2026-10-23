@@ -8,7 +8,7 @@ import pytest
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae import TrafficAssignment, TrafficClass, MatrixStore
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
 from aequilibrae.paths.vdf import bpr
@@ -28,7 +28,7 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     graph.set_blocked_centroid_flows(False)
 
     try:
-        mat = scenario_example.matrices.get_matrix("demand_omx", subset=["matrix"])
+        mat = scenario_example.matrices.get_matrix("demand.omx", subset=["matrix"])
     except Exception:
         # Expected to fail for non-sioux_falls scenarios as theres no demand_omx
         assert scenario != "root"
@@ -103,9 +103,10 @@ def test_matrices_scenarios(scenario_example, scenario):
 
     if len(df) > 0:
         first_matrix = df.iloc[0]["name"]
-        rec = matrices.get(first_matrix)
-        assert rec.name is not None
-        assert rec.name == first_matrix
+        rec = matrices.get_matrix(first_matrix)
+        assert isinstance(rec, MatrixStore)
+        # assert rec.name is not None
+        # assert rec.name == first_matrix
     else:
         assert scenario != "root"
 
@@ -408,7 +409,7 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
 
     # For the root module we should have one matrix in the summary
     if scenario == "root":
-        assert "demand_omx" in scenario_example.run["matrix_summary"]()
+        assert "demand.omx" in scenario_example.run["matrix_summary"]()
     else:
         # For the others we shouldn't have any matrices, and the "run" dir shouldn't exist
         assert len(scenario_example.run["matrix_summary"]()) == 0

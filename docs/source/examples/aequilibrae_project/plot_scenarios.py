@@ -94,7 +94,7 @@ graph.set_graph("distance")
 graph.set_blocked_centroid_flows(False)
 
 # Get the demand matrix
-mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+mat = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # Create traffic assignment with alternative parameters
 assigclass = TrafficClass("car", graph, mat)

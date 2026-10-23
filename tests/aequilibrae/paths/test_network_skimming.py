@@ -29,8 +29,7 @@ def test_network_skimming(sioux_falls_example):
     assert not skm.report, f"Skimming returned an error: {skm.report}"
 
     matrices = sioux_falls_example.matrices
-    record = matrices.create(
-        "test_Skimming",
+    record = matrices.save_matrix(
         "test_Skimming.omx",
         skm.results.skims,
         procedure="Network skimming",

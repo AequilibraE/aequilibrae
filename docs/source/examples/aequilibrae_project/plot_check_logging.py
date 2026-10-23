@@ -43,7 +43,7 @@ graph.set_blocked_centroid_flows(False)
 # %%
 # We get our demand matrix from the project and create a computational view
 proj_matrices = project.matrices
-demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # %%
 # Now let's perform our traffic assignment
