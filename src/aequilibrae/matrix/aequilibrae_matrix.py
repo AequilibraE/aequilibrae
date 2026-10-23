@@ -1839,6 +1839,7 @@ def from_dict(
     return mat
 
 
+@overload
 def from_df(
     df: pd.DataFrame,
     row: str,
@@ -1849,22 +1850,54 @@ def from_df(
     index_name: str = "main_index",
     fill_value: float = 0,
     dtype: DTypeLike = float,
-) -> AequilibraeMatrix:
-    """
-    Create dense in-memory matrices from an origin-destination DataFrame.
+    sparse: Literal[False] = False,
+) -> AequilibraeMatrix: ...
 
-    Choose the origin and destination columns with ``row`` and ``col``.  Each
-    remaining column becomes a named matrix, or you can choose columns with
-    ``subset``. Values for repeated origin-destination pairs are added
-    together. Missing pairs are filled with ``fill_value``.
+
+@overload
+def from_df(
+    df: pd.DataFrame,
+    row: str,
+    col: str,
+    subset: Sequence[str] | None = None,
+    *,
+    index: ArrayLike | None = None,
+    index_name: str = "main_index",
+    fill_value: float = 0,
+    dtype: DTypeLike = float,
+    sparse: Literal[True],
+) -> AequilibraeSparseMatrix: ...
+
+
+def from_df(
+    df: pd.DataFrame,
+    row: str,
+    col: str,
+    subset: Sequence[str] | None = None,
+    *,
+    index: ArrayLike | None = None,
+    index_name: str = "main_index",
+    fill_value: float = 0,
+    dtype: DTypeLike = float,
+    sparse: bool = False,
+) -> AequilibraeMatrix | AequilibraeSparseMatrix:
+    """
+    Create dense or sparse in-memory matrices from an origin-destination DataFrame.
+
+    Choose the origin and destination columns with ``row`` and ``col``. All
+    other columns become a named matrix, or you can choose columns with
+    ``subset``. Values for repeated origin-destination pairs are
+    summed. Missing pairs are filled with ``fill_value``.
 
     Pass ``index`` to set the zone order and include zones with no trips.  If
     omitted, the index contains the sorted unique origin and destination
-    IDs. All IDs must be valid integer zone IDs and appear in the index.
+    IDs. All IDs must be valid integer zone IDs and appear in the index.  Pass
+    ``sparse=True`` to construct CSR arrays directly from the records without
+    allocating dense matrices. Sparse matrices require ``fill_value=0``.
 
     :Arguments:
         **df** (:obj:`pandas.DataFrame`): Origin-destination records with zone
-          IDs and matrix value columns.
+            IDs and matrix value columns.
 
         **row** (:obj:`str`): Column containing origin zone IDs.
 
@@ -1879,13 +1912,18 @@ def from_df(
             IDs. Defaults to their sorted union.
 
         **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
-          ``"main_index"``.
+            ``"main_index"``.
 
         **fill_value** (:obj:`float`, *Optional*): Value for pairs without
-          records. Defaults to ``0``.
+            records. Defaults to ``0``.
 
         **dtype** (NumPy dtype-like, *Optional*): Dtype used for all output
-          matrices. Defaults to :obj:`float`.
+            matrices. Defaults to :obj:`float`.
+
+        **sparse** (:obj:`bool`, *Optional*): Return an
+            :class:`AequilibraeSparseMatrix` instead of an
+            :class:`AequilibraeMatrix`.  Defaults to ``False``. Requires
+            ``fill_value=0``.
 
     >>> trips = pd.DataFrame({"origin": [101, 101, 309], "destination": [205, 205, 101], "car": [2, 3, 7]})
     >>> demand = from_df(
@@ -1897,6 +1935,9 @@ def from_df(
     >>> from_df(trips, row="origin", col="destination").index.tolist()
     [101, 205, 309]
     """
+    if sparse and fill_value != 0:
+        raise ValueError("sparse matrices require fill_value=0")
+
     dtype = np.dtype(dtype)
     if subset is None:
         subset = [name for name in df.columns if name not in (row, col)]
@@ -1906,7 +1947,8 @@ def from_df(
     if index is None:
         index = np.union1d(row_ids, col_ids)
 
-    mat = AequilibraeMatrix(index=index, index_name=index_name)
+    matrix_type = AequilibraeSparseMatrix if sparse else AequilibraeMatrix
+    mat = matrix_type(index=index, index_name=index_name)
     matrix_index = pd.Index(mat.index)
     rows = matrix_index.get_indexer(row_ids)
     cols = matrix_index.get_indexer(col_ids)
@@ -1915,9 +1957,14 @@ def from_df(
 
     for name in subset:
         values = df[name].to_numpy(dtype=dtype, copy=False)
-        values_matrix: np.ndarray = np.full(mat.shape, fill_value, dtype=dtype)
-        values_matrix[rows, cols] = 0
-        np.add.at(values_matrix, (rows, cols), values)
+        if sparse:
+            values_matrix = scipy.sparse.coo_array((values, (rows, cols)), shape=mat.shape).tocsr()
+            values_matrix.eliminate_zeros()
+        else:
+            values_matrix = np.full(mat.shape, fill_value, dtype=dtype)
+            values_matrix[rows, cols] = 0
+            np.add.at(values_matrix, (rows, cols), values)
+
         mat[name] = values_matrix
 
     return mat
