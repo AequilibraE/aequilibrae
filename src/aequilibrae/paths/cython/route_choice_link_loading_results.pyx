@@ -1,4 +1,3 @@
-cimport cython
 from cython.operator cimport dereference as d
 from cython.operator cimport predecrement as pre_dec
 
@@ -134,9 +133,11 @@ cdef class LinkLoadingResults:
         cpp_reduce_loading_outputs[double](self.loading_views.data(), self.loading_views.size(), self.loading.view())
 
     @staticmethod
-    cdef bool is_in_select_link_set(vector[long long] &route,
+    cdef bool is_in_select_link_set(
+        vector[long long] &route,
         const vector[unique_ptr[unordered_set[long long]]] &select_link_set,
-        const vector[size_t] &select_link_set_lengths) noexcept nogil:
+        const vector[size_t] &select_link_set_lengths,
+    ) noexcept nogil:
         """Confirm whether a route satisfies a select link set.
 
         Assumes the route contains unique links. Repeated links would be counted

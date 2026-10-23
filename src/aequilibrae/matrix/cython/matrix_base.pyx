@@ -1,7 +1,6 @@
 import operator
 
 import numpy as np
-import cython
 
 from aequilibrae.matrix.aequilibrae_matrix import _validate_matrix_key
 

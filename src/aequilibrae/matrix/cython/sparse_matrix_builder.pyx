@@ -166,7 +166,6 @@ cdef class SparseMatrixBuilder(_MatrixBase):
         else:
             return self._arrays[double]()
 
-
     def to_scipy(self):
         """Return independent named CSR arrays"""
         rows, cols, values = self.records()

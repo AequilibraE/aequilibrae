@@ -28,6 +28,7 @@ cdef extern from "sparse_matrix_builder.hpp" namespace "aequilibrae::matrix::cpp
         void extend(const CppSparseMatrixBuilderView[T] &) except +
         void reset() noexcept
 
+
 @cython.final
 cdef class SparseMatrixBuilder(_MatrixBase):
     cdef unique_ptr[COOStorage[float]] storage32

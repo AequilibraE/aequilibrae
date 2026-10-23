@@ -76,7 +76,6 @@ from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.routing_context import make_routing_context
 
 
-
 logger = logging.getLogger(__name__)
 
 

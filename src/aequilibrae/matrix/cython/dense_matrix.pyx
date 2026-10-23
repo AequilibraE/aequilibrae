@@ -43,7 +43,7 @@ cdef class DenseMatrix(_MatrixBase):
         if not isinstance(matrix, AequilibraeMatrix):
             raise TypeError("matrix must be an AequilibraeMatrix")
 
-        for name, values in matrix.items():
+        for _name, values in matrix.items():
             if values.shape != matrix.shape:
                 raise ValueError("matrix fields must match the zone index shape")
             if (

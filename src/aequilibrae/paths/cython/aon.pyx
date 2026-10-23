@@ -87,7 +87,12 @@ from libcpp cimport bool as cpp_bool
 from aequilibrae.matrix.cython.dense_matrix cimport DenseMatrix
 from aequilibrae.matrix.cython.sparse_matrix cimport SparseMatrix
 from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
-from aequilibrae.matrix.cython.views cimport CppDenseMatrix, CppSparseMatrixOriginView, CppDenseMatrixOriginView, CppSparseMatrix
+from aequilibrae.matrix.cython.views cimport (
+    CppDenseMatrix,
+    CppSparseMatrixOriginView,
+    CppDenseMatrixOriginView,
+    CppSparseMatrix,
+)
 
 from aequilibrae.utils.cython.array_allocations import readonly_view
 from aequilibrae.paths.cython.workspaces cimport AoNWorkspace

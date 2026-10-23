@@ -476,4 +476,3 @@ cdef class SelectLinkContext:
     def masks(self):
         """Read-only [sets, links] view which keeps mask storage alive."""
         return readonly_view(self.masks_buffer)
-
