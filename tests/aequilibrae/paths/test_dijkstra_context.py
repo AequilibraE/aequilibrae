@@ -111,6 +111,42 @@ def test_reuse_updates_metadata_and_retained_views(context):
     assert_state_tree(context, results)
 
 
+@pytest.mark.parametrize("heap", ["4ary", "pairing", "std"])
+@pytest.mark.parametrize("turn", [False, True])
+def test_reuse_clears_sparse_and_dense_trees_and_pending_labels(heap, turn):
+    context = make_context(
+        [0, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14],
+        [1, 2, 3, 2, 4, 4, 5, 5, 6, 7, 8, 9, 10, 11],
+        [1, 8, 50, 1, 30, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        turn=turn,
+    )
+    results = allocate_results(context)
+    workspace = SearchWorkspace(context.node_count, context.state_count, heap=heap)
+    names = ("predecessors", "connectors", "settlement_order", "terminal_states", "distances", "turn_costs")
+    views = {name: getattr(results, name) for name in names}
+
+    # Short searches leave pending labels and use different terminal nodes.
+    # The exhaustive search then exercises the dense-reset path before an
+    # isolated origin and another short search change the finalized tree again.
+    for origin, target in ((0, 1), (2, 4), (0, None), (11, None), (0, 2)):
+        fresh_workspace = SearchWorkspace(context.node_count, context.state_count, heap=heap)
+        expected = search(context, origin, target, workspace=fresh_workspace)
+        search(context, origin, target, results, workspace)
+        assert results.origin == expected.origin
+        assert results.root == expected.root
+        assert results.settled_count == expected.settled_count
+        assert results.exhausted == expected.exhausted
+        for name, view in views.items():
+            assert np.shares_memory(view, getattr(results, name))
+            np.testing.assert_array_equal(view, getattr(expected, name))
+        assert_state_tree(context, results)
+
+    results.reset()
+    for name, view in views.items():
+        expected = np.inf if name in ("distances", "turn_costs") else results.sentinel
+        np.testing.assert_array_equal(view, expected)
+
+
 @pytest.mark.parametrize("turn", [False, True])
 @pytest.mark.parametrize("targets", [None, [2], [2, 3]])
 def test_reset_clears_results_in_place(turn, targets):

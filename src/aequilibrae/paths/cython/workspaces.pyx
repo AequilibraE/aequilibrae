@@ -52,14 +52,17 @@ cdef class AStarWorkspace(SearchWorkspace):
 
     def __init__(self, node_count, state_count, heap="4ary"):
         super().__init__(node_count, state_count, heap)
-        self.costs_buffer = array[double](self.state_count, True, np.inf)
-        self.estimates_buffer = array[double](self.node_count, True, -1.0)
+        self.costs_buffer = array[double](self.state_count, False)
+        self.estimates_buffer = array[double](self.node_count, False)
+        self.estimate_epochs_buffer = array[uint32_t](self.node_count, True, 0)
 
     cdef CppAStarWorkspace a_star_view(self) noexcept nogil:
         cdef CppAStarWorkspace workspace
         workspace.search = self.view()
         workspace.costs = array_pointer(self.costs_buffer)
         workspace.estimates = array_pointer(self.estimates_buffer)
+        workspace.estimate_epochs = array_pointer(self.estimate_epochs_buffer)
+        workspace.estimate_cache = &self.estimate_cache
         return workspace
 
 

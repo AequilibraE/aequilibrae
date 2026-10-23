@@ -47,11 +47,28 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
   // Heap keys include the heuristic, but reported distances contain only costs.
   auto *costs = workspace.costs;
   auto *estimates = workspace.estimates;
-  std::fill_n(costs, results.state_count, infinity);
-  std::fill_n(estimates, graph.node_count, -1.0);
+  auto *estimate_epochs = workspace.estimate_epochs;
+  auto &cache = *workspace.estimate_cache;
+  constexpr bool haversine = std::is_same_v<HeuristicContext, HaversineContext>;
+  // An identity of zero belongs to a caller-managed C++ view whose coordinate
+  // lifetime or contents may have changed since the previous call.
+  if (heuristic.cache_identity == 0 || cache.epoch == 0 ||
+      cache.identity != heuristic.cache_identity ||
+      cache.destination != destination || cache.scale != heuristic.scale ||
+      cache.haversine != haversine) {
+    if (++cache.epoch == 0) {
+      std::fill_n(estimate_epochs, graph.node_count, std::uint32_t{0});
+      cache.epoch = 1;
+    }
+    cache.identity = heuristic.cache_identity;
+    cache.destination = destination;
+    cache.scale = heuristic.scale;
+    cache.haversine = haversine;
+  }
   const auto priority = [&](std::size_t node, double cost) {
-    if (estimates[node] < 0.0) {
+    if (estimate_epochs[node] != cache.epoch) {
       estimates[node] = heuristic(node, destination);
+      estimate_epochs[node] = cache.epoch;
     }
     // Overflow in the priority must not make a finite-cost path unreachable.
     return std::min(cost + estimates[node], std::numeric_limits<double>::max());
@@ -74,7 +91,7 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
     results.distances[state] = cost;
 
     if (results.terminal_states[node] == invalid_state) {
-      results.terminal_states[node] = state;
+      results.set_terminal(node, state);
       if (node == destination) {
         metadata.reached_target_count = 1;
         stopped_at_target = true;
@@ -121,7 +138,10 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
       }
 
       const double next_cost = cost + graph.costs[link] + penalty;
-      if (!std::isfinite(next_cost) || next_cost >= costs[next]) {
+      // Only current pending states have a tentative cost. Never read labels
+      // left by an earlier search for a state first reached in this search.
+      if (!std::isfinite(next_cost) ||
+          (next_state == IN_HEAP && next_cost >= costs[next])) {
         continue;
       }
 
@@ -142,13 +162,11 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
   // Reaching the destination does not prove the reachable state space
   // exhausted.
   metadata.exhausted = !stopped_at_target;
-  for (std::size_t state = 0; state < results.state_count; ++state) {
-    if (queue.effective_state(state) == IN_HEAP) {
-      results.predecessors[state] = invalid_state;
-      results.connectors[state] = invalid_state;
-      results.turn_costs[state] = infinity;
-    }
-  }
+  queue.for_each_pending([&](std::size_t state) {
+    results.predecessors[state] = invalid_state;
+    results.connectors[state] = invalid_state;
+    results.turn_costs[state] = infinity;
+  });
 }
 
 template <class RoutingContext, class HeuristicContext>

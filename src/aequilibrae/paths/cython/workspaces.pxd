@@ -1,4 +1,5 @@
 from libc.stddef cimport size_t
+from libc.stdint cimport uint32_t
 from libcpp cimport bool as cpp_bool
 
 
@@ -15,11 +16,16 @@ cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" n
         CppSearchWorkspace() noexcept
         CppSearchHeapStorage *heap
 
+    cdef cppclass CppAStarEstimateCache "aequilibrae::paths::cpp::routing::AStarEstimateCache":
+        CppAStarEstimateCache() noexcept
+
     cdef cppclass CppAStarWorkspace "aequilibrae::paths::cpp::routing::AStarWorkspace":
         CppAStarWorkspace() noexcept
         CppSearchWorkspace search
         double *costs
         double *estimates
+        uint32_t *estimate_epochs
+        CppAStarEstimateCache *estimate_cache
 
     cdef cppclass CppLoadingWorkspace "aequilibrae::paths::cpp::routing::LoadingWorkspace"[T]:
         CppLoadingWorkspace() noexcept
@@ -55,6 +61,8 @@ cdef class SearchWorkspace:
 
 cdef class AStarWorkspace(SearchWorkspace):
     cdef double[::1] costs_buffer, estimates_buffer
+    cdef uint32_t[::1] estimate_epochs_buffer
+    cdef CppAStarEstimateCache estimate_cache
     cdef CppAStarWorkspace a_star_view(self) noexcept nogil
 
 

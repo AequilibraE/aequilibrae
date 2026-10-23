@@ -3,6 +3,9 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <new>
+#include <stdexcept>
 
 #include "pq_heap_base.hpp"
 
@@ -19,15 +22,37 @@ public:
 private:
   friend class PriorityQueueBase<FourAryHeap>;
 
-  void init_heap_impl(std::size_t length) noexcept { alloc_heap(length); }
+  void init_heap_impl(std::size_t length) { alloc_heap(length); }
 
-  void alloc_heap_impl(std::size_t length) noexcept {
+  void alloc_heap_impl(std::size_t length) {
+    // UINT32_MAX is reserved for SCANNED; valid positions are [0, length).
+    if (length > kScanned ||
+        length > std::numeric_limits<std::size_t>::max() / sizeof(Node) -
+                     kLeadingSlots) {
+      throw std::invalid_argument("FourAryHeap capacity exceeds its position range");
+    }
+
+    const std::size_t slots = length + kLeadingSlots;
+    void *allocation =
+        ::operator new[](slots * sizeof(Node), std::align_val_t{kCacheLineBytes});
+    Element *elements = nullptr;
+    try {
+      elements = new Element[length];
+    } catch (...) {
+      ::operator delete[](allocation, std::align_val_t{kCacheLineBytes});
+      throw;
+    }
+
+    // Placement array-new starts the trivial nodes' lifetimes without writing
+    // their contents. The raw allocation is retained for matching deallocation.
+    Node *nodes = ::new (allocation) Node[slots];
     free_heap();
 
     length_ = length;
     size_ = 0;
-    heap_ = new Node[length];
-    elements_ = new Element[length];
+    heap_allocation_ = allocation;
+    heap_ = nodes + kLeadingSlots;
+    elements_ = elements;
     current_epoch_ = 1;
 
     for (std::size_t i = 0; i < length_; ++i) {
@@ -51,10 +76,11 @@ private:
   }
 
   void free_heap_impl() noexcept {
-    delete[] heap_;
+    ::operator delete[](heap_allocation_, std::align_val_t{kCacheLineBytes});
     delete[] elements_;
 
     heap_ = nullptr;
+    heap_allocation_ = nullptr;
     elements_ = nullptr;
     length_ = 0;
     size_ = 0;
@@ -68,7 +94,6 @@ private:
     assert(effective_state(element_idx) != IN_HEAP);
     assert(key < kInfinity);
 
-    elements_[element_idx].state = IN_HEAP;
     elements_[element_idx].epoch = current_epoch_;
     elements_[element_idx].key = key;
     sift_up(size_++, {key, element_idx});
@@ -94,7 +119,7 @@ private:
     assert(size_ > 0);
 
     const std::size_t element_idx = heap_[0].element_idx;
-    elements_[element_idx].state = SCANNED;
+    elements_[element_idx].node_idx = kScanned;
     if (--size_ > 0) {
       sift_down(heap_[size_]);
     }
@@ -106,49 +131,60 @@ private:
     if (element.epoch != current_epoch_) {
       return NOT_IN_HEAP;
     }
-    return element.state;
+    return element.node_idx == kScanned ? SCANNED : IN_HEAP;
   }
 
   double element_key_impl(std::size_t element_idx) const noexcept {
     return elements_[element_idx].key;
   }
 
-  struct Element {
+  template <class F> void for_each_pending_impl(F &&fn) const {
+    for (std::size_t i = 0; i < size_; ++i) {
+      fn(heap_[i].element_idx);
+    }
+  }
+
+  struct alignas(16) Element {
     double key;
     std::uint32_t epoch;
-    ElementState state;
-    std::size_t node_idx;
+    std::uint32_t node_idx;
   };
+  static_assert(sizeof(Element) == 16);
 
-  // Keys live in the heap so a node's children share a cache line.
-  struct Node {
+  // The allocation is line-aligned and the logical root is offset by 3 slots,
+  // so every full group of four 16-byte children occupies one cache line.
+  struct alignas(16) Node {
     double key;
     std::size_t element_idx;
   };
 
   static constexpr std::size_t kArity = 4;
+  static constexpr std::size_t kCacheLineBytes = 64;
+  static constexpr std::size_t kLeadingSlots = 3;
+  static constexpr std::uint32_t kScanned =
+      std::numeric_limits<std::uint32_t>::max();
 
   std::size_t length_ = 0;
   std::size_t size_ = 0;
   Node *heap_ = nullptr;
+  void *heap_allocation_ = nullptr;
   Element *elements_ = nullptr;
   std::uint32_t current_epoch_ = 0;
 
   void initialize_element(std::size_t element_idx) noexcept {
     elements_[element_idx].key = kInfinity;
     elements_[element_idx].epoch = 0;
-    elements_[element_idx].state = NOT_IN_HEAP;
-    elements_[element_idx].node_idx = length_;
+    elements_[element_idx].node_idx = kScanned;
   }
 
   bool element_is_in_heap(std::size_t element_idx) const noexcept {
     const Element &element = elements_[element_idx];
-    return element.epoch == current_epoch_ && element.state == IN_HEAP;
+    return element.epoch == current_epoch_ && element.node_idx != kScanned;
   }
 
   void place(std::size_t node_idx, Node node) noexcept {
     heap_[node_idx] = node;
-    elements_[node.element_idx].node_idx = node_idx;
+    elements_[node.element_idx].node_idx = static_cast<std::uint32_t>(node_idx);
   }
 
   // Sifts move a hole instead of swapping, so each level writes once.
@@ -166,24 +202,38 @@ private:
 
   void sift_down(Node node) noexcept {
     std::size_t current = 0;
-    while (true) {
-      std::size_t smallest = current;
-      double min_key = node.key;
-
+    while (kArity * current + kArity < size_) {
       const std::size_t first_child = kArity * current + 1;
-      const std::size_t end_child =
-          first_child + kArity < size_ ? first_child + kArity : size_;
-
-      for (std::size_t child = end_child; child-- > first_child;) {
-        if (heap_[child].key < min_key) {
-          smallest = child;
-          min_key = heap_[child].key;
-        }
+      // Strict comparisons choose the right child on ties, preserving the
+      // descending child scan's extraction order. The replacement wins ties.
+      const std::size_t left =
+          heap_[first_child].key < heap_[first_child + 1].key
+              ? first_child
+              : first_child + 1;
+      const std::size_t right =
+          heap_[first_child + 2].key < heap_[first_child + 3].key
+              ? first_child + 2
+              : first_child + 3;
+      const std::size_t smallest =
+          heap_[left].key < heap_[right].key ? left : right;
+      if (!(heap_[smallest].key < node.key)) {
+        place(current, node);
+        return;
       }
+      place(current, heap_[smallest]);
+      current = smallest;
+    }
 
-      if (smallest == current) {
-        break;
+    const std::size_t first_child = kArity * current + 1;
+    std::size_t smallest = current;
+    double min_key = node.key;
+    for (std::size_t child = size_; child-- > first_child;) {
+      if (heap_[child].key < min_key) {
+        smallest = child;
+        min_key = heap_[child].key;
       }
+    }
+    if (smallest != current) {
       place(current, heap_[smallest]);
       current = smallest;
     }

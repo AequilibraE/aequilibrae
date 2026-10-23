@@ -1,6 +1,7 @@
 """Single-destination A* with caller-supplied heuristic inputs."""
 
 import operator
+from itertools import count
 import numpy as np
 
 from libc.math cimport isfinite
@@ -9,6 +10,11 @@ from aequilibrae.paths.cython.queries cimport SearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.workspaces cimport AStarWorkspace, CppAStarWorkspace
 from aequilibrae.utils.cython.array_allocations cimport const_array_pointer
+
+
+# Coordinates are private copies. A stable identity avoids reusing estimates
+# when a destroyed heuristic's allocation addresses are recycled.
+_heuristic_identities = count(1)
 
 
 def validate_scale(scale):
@@ -46,6 +52,7 @@ cdef class EuclideanContext:
         x, y = _coordinates(x, y)
         self.scale = validate_scale(scale)
         self.x, self.y = x, y
+        self.cache_identity = next(_heuristic_identities)
         self.node_count = x.size
 
     def update_scale(self, scale: float):
@@ -53,6 +60,7 @@ cdef class EuclideanContext:
 
     cdef CppEuclideanContext view(self) noexcept nogil:
         cdef CppEuclideanContext context
+        context.cache_identity = self.cache_identity
         context.node_count = self.node_count
         context.x = const_array_pointer[double](self.x)
         context.y = const_array_pointer[double](self.y)
@@ -75,6 +83,7 @@ cdef class HaversineContext:
         self.longitudes = np.deg2rad(longitudes)
         self.latitudes = np.deg2rad(latitudes)
         self.cos_latitudes = np.cos(self.latitudes)
+        self.cache_identity = next(_heuristic_identities)
         self.node_count = latitudes.size
 
     def update_scale(self, scale: float):
@@ -82,6 +91,7 @@ cdef class HaversineContext:
 
     cdef CppHaversineContext view(self) noexcept nogil:
         cdef CppHaversineContext context
+        context.cache_identity = self.cache_identity
         context.node_count = self.node_count
         context.longitudes = const_array_pointer[double](self.longitudes)
         context.latitudes = const_array_pointer[double](self.latitudes)

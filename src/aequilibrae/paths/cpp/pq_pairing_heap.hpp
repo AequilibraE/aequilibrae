@@ -18,7 +18,7 @@ public:
 private:
   friend class PriorityQueueBase<PairingHeap>;
 
-  void init_heap_impl(std::size_t length) noexcept {
+  void init_heap_impl(std::size_t length) {
     free_heap();
 
     length_ = length;
@@ -31,7 +31,7 @@ private:
     }
   }
 
-  void alloc_heap_impl(std::size_t length) noexcept { init_heap(length); }
+  void alloc_heap_impl(std::size_t length) { init_heap(length); }
 
   void reset_heap_impl() noexcept {
     size_ = 0;
@@ -153,6 +153,36 @@ private:
 
   double element_key_impl(std::size_t element_idx) const noexcept {
     return elements_[element_idx].key;
+  }
+
+  template <class F> void for_each_pending_impl(F &&fn) const {
+    std::size_t current = root_;
+    while (current != kNullIdx) {
+      fn(current);
+      if (elements_[current].child != kNullIdx) {
+        current = elements_[current].child;
+        continue;
+      }
+      while (current != kNullIdx && elements_[current].next == kNullIdx) {
+        // prev denotes either a previous sibling or the parent. Walk siblings
+        // backwards to find the parent, using the existing tree links as stack.
+        while (true) {
+          const std::size_t prev = elements_[current].prev;
+          if (prev == kNullIdx) {
+            current = kNullIdx;
+            break;
+          }
+          const bool reached_parent = elements_[prev].child == current;
+          current = prev;
+          if (reached_parent) {
+            break;
+          }
+        }
+      }
+      if (current != kNullIdx) {
+        current = elements_[current].next;
+      }
+    }
   }
 
   struct Element {

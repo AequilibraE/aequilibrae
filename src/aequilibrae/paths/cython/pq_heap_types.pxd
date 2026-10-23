@@ -10,8 +10,8 @@ cdef extern from "pq_heap_base.hpp" namespace "aequilibrae::paths::cpp" nogil:
 
     cdef cppclass PriorityQueueBase:
         void attach_logger(AeqLogClosure *closure) noexcept
-        void init_heap(size_t length) noexcept
-        void alloc_heap(size_t length) noexcept
+        void init_heap(size_t length) except +
+        void alloc_heap(size_t length) except +
         void reset_heap() noexcept
         void free_heap() noexcept
         void insert(size_t element_idx, double key) noexcept

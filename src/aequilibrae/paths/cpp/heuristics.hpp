@@ -3,11 +3,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 
 namespace aequilibrae::paths::cpp::routing {
 
 // Coordinates use local node order. Views borrow their Cython owner's arrays.
 struct EuclideanContext {
+  std::uint64_t cache_identity = 0;
   std::size_t node_count = 0;
   const double *x = nullptr;
   const double *y = nullptr;
@@ -23,6 +25,7 @@ struct EuclideanContext {
 };
 
 struct HaversineContext {
+  std::uint64_t cache_identity = 0;
   std::size_t node_count = 0;
   const double *latitudes = nullptr;  // Radians.
   const double *longitudes = nullptr; // Radians.

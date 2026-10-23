@@ -37,6 +37,7 @@ cdef class SearchResults:
         self.connectors_buffer = array[size_t](state_count, True, INVALID)
         self.settlement_order_buffer = array[size_t](state_count, True, INVALID)
         self.terminal_states_buffer = array[size_t](node_count, True, INVALID)
+        self.terminal_nodes_buffer = array[size_t](node_count)
         self.distances_buffer = array[double](state_count, True, np.inf)
         self.turn_costs_buffer = array[double](state_count, True, np.inf)
 
@@ -50,6 +51,7 @@ cdef class SearchResults:
         result.connectors = array_pointer(self.connectors_buffer)
         result.settlement_order = array_pointer(self.settlement_order_buffer)
         result.terminal_states = array_pointer(self.terminal_states_buffer)
+        result.terminal_nodes = array_pointer(self.terminal_nodes_buffer)
         result.distances = array_pointer(self.distances_buffer)
         result.turn_costs = array_pointer(self.turn_costs_buffer)
         result.metadata = &self.metadata
