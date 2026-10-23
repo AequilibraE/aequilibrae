@@ -4,11 +4,11 @@
 Route Choice with sub-area analysis
 ===================================
 
-In this example, we show how to perform sub-area analysis using route choice assignment, 
+In this example, we show how to perform sub-area analysis using route choice assignment,
 for a city in La Serena Metropolitan Area in Chile.
 
 .. admonition:: References
- 
+
    * :doc:`../../route_choice`
 
 .. seealso::
@@ -23,14 +23,14 @@ for a city in La Serena Metropolitan Area in Chile.
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
-from os.path import join
 import itertools
+from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
 
-import pandas as pd
-import numpy as np
 import folium
+import numpy as np
+import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
@@ -156,10 +156,11 @@ demand_matrix = from_df(
     subset=list(demand.columns),
     index=new_centroids,
     index_name="zones",
+    sparse=True,
 )
 
 rc = RouteChoice(graph)
-rc.add_demand(demand_matrix)
+rc.set_demand(demand_matrix)
 rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False, seed=123)
 rc.execute(perform_assignment=True)
 
@@ -261,22 +262,22 @@ graph.set_graph("utility")
 graph.set_blocked_centroid_flows(False)
 
 # %%
-# This object construction might take a minute depending on the size of the graph due to the
-# construction of the compressed link to network link mapping that's required. This is a one
-# time operation per graph and is cached. We need to supply a Graph and an AequilibraeMatrix
-# or DataFrame via the ``add_demand`` method, if demand is not provided link loading cannot
+# This object construction might take a minute depending on the size of the
+# graph due to the construction of the compressed link to network link mapping
+# that's required. This is a one time operation per graph and is cached. We
+# need to supply a Graph and an AequilibraeMatrix or AequilibraeSparseMatrix
+# via the ``set_demand`` method, if demand is not provided link loading cannot
 # be performed.
 rc = RouteChoice(graph)
-rc.add_demand(mat)
+rc.set_demand(mat)
 
 # %%
 # Here we add the union of edges as select link sets.
 rc.set_select_links(single_edges | edge_pairs)
 
 # %%
-# For the sake of demonstration we limit out demand matrix to a few OD pairs. This filter is also
-# possible with the automated approach, just edit the ``subarea.rc.demand.df`` DataFrame, however
-# make sure the index remains intact.
+# For the sake of demonstration we limit out demand matrix to a few OD
+# pairs.
 ods_pairs_of_interest = [
     (4, 39),
     (92, 37),
@@ -300,8 +301,8 @@ subarea_zone.add_to(map)
 map
 
 # %%
-# We'll pull out just OD matrix results as well we need it for the post-processing, we'll also
-# convert the sparse matrices to SciPy COO matrices.
+# We'll pull out just OD matrix results as well we need it for the
+# post-processing, we'll also use the returned SciPy CSR arrays directly.
 sl_od = rc.get_select_link_od_matrix_results()
 edge_totals = {k: sl_od[k]["demand"].to_scipy() for k in single_edges}
 edge_pair_values = {k: sl_od[k]["demand"].to_scipy() for k in edge_pairs}

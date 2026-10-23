@@ -305,6 +305,8 @@ cdef class PreparedAoN:
                 sparse_query.search = search
                 sparse_query.loading.destination_count = sparse_row.destination_count
                 sparse_query.loading.field_count = sparse_row.field_count
+                sparse_query.loading.stored_count = sparse_row.stored_count
+                sparse_query.loading.col_index = sparse_row.col_index
                 sparse_query.loading.data = sparse_row.data
                 self.sparse_origin_queries.push_back(sparse_query)
             else:

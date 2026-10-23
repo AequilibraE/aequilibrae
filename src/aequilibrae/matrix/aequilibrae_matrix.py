@@ -1247,7 +1247,10 @@ class _MatrixStore(_Matrix[_ArrayT]):
                 raise ValueError(f"matrix shape does not match index, expected {self.shape}, got {shape}")
 
             if overlap := file["/"].get("data", {}).keys() & file["/"].get("sparse", {}).keys():
-                raise ValueError(f"matrix names {sorted(overlap)} exist in both the data and sparse groups")
+                raise ValueError(
+                    f"matrix names {sorted(overlap)} exist in both the data and sparse groups. "
+                    "Use OMX h5py directly to resolve the conflict"
+                )
 
             if supplied_index:
                 self.index = index

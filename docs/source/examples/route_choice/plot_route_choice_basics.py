@@ -143,7 +143,7 @@ print(rc.default_parameters)
 
 # %%
 # Let's add the demand. If it's not provided, link loading cannot be performed.
-rc.add_demand(mat)
+rc.set_demand(mat)
 
 # %%
 # It is highly recommended to set either ``max_routes`` or ``max_depth`` to prevent runaway results.
@@ -199,9 +199,9 @@ sl = rc.get_select_link_loading_results()
 sl
 
 # %%
-# We can also access the OD matrices for this link loading. These matrices are sparse and can be converted to
-# SciPy sparse matrices for ease of use. They're stored in a dictionary where the key is the matrix name concatenated
-# with the select link set name via an underscore.
+# We can also access the OD matrices for this link loading. These labelled matrices contain SciPy CSR arrays
+# for ease of use. They're stored in a dictionary keyed by select link set name, with demand fields
+# inside each matrix.
 rc.get_select_link_od_matrix_results()
 
 # %%

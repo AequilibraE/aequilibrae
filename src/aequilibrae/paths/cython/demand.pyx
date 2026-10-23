@@ -21,12 +21,15 @@ def assignment_demand(matrix, centroids):
         raise ValueError("Demand must have shape (zones, zones, classes)")
 
     if isinstance(matrix, AequilibraeSparseMatrix):
-        return SparseMatrix.from_matrix(matrix, dtype=np.float64)
-    return DenseMatrix.from_matrix(matrix, dtype=np.float64)
+        packed = SparseMatrix.from_matrix(matrix, dtype=np.float64)
+    else:
+        packed = DenseMatrix.from_matrix(matrix, dtype=np.float64)
+    validate_demand(packed, len(centroids))
+    return packed
 
 
 def validate_demand(demand, nodes):
-    """Check packed assignment dimensions and return its shape."""
+    """Check demand dimensions, dtype and values, and return its shape."""
     if not isinstance(demand, (DenseMatrix, SparseMatrix)):
         raise TypeError("demand must be a DenseMatrix or SparseMatrix")
     if demand.dtype != np.dtype(np.float64):
@@ -35,6 +38,10 @@ def validate_demand(demand, nodes):
     shape = (demand.origin_count, demand.destination_count, demand.field_count)
     if shape[0] != shape[1] or not 1 <= shape[0] <= nodes or shape[2] < 1:
         raise ValueError("demand must have shape (zones, zones, classes), zones <= node_count, classes >= 1")
+
+    values = np.asarray((<_MatrixBase>demand)._values)
+    if not np.all(np.isfinite(values)) or np.any(values < 0):
+        raise ValueError("Demand values must be finite and nonnegative")
 
     return shape
 

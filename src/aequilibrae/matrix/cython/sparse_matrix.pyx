@@ -5,7 +5,7 @@ from collections.abc import Mapping
 import numpy as np
 import scipy.sparse as sparse
 
-from aequilibrae.matrix.aequilibrae_matrix import AequilibraeSparseMatrix
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 
 cimport cython
 from libcpp cimport nullptr
@@ -71,12 +71,7 @@ cdef class SparseMatrix(_MatrixBase):
     @classmethod
     def from_scipy(cls, mat, **kwargs):
         """Copy to canonical CSR, keeping stored zeros and leaving mat unchanged."""
-        mat = mat.tocsr(copy=True)
-        mat.check_format(full_check=True)
-        mat.sum_duplicates()
-        mat.sort_indices()
-
-        return cls.from_csr(mat.shape, mat.indptr, mat.indices, {"matrix": mat.data}, **kwargs)
+        return cls.from_dict({"matrix": mat}, **kwargs)
 
     def to_scipy(self):
         shape = (self.origin_count, self.destination_count)
@@ -168,12 +163,14 @@ cdef class SparseMatrix(_MatrixBase):
     @classmethod
     def from_matrix(cls, matrix, dtype=None):
         """Copy all named matrices into one packed buffer, keeping their order"""
-        if not isinstance(matrix, AequilibraeSparseMatrix):
-            raise TypeError("matrix must be an AequilibraeSparseMatrix")
+        if not isinstance(matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+            raise TypeError("matrix must be an AequilibraeMatrix or AequilibraeSparseMatrix")
 
         sources = {}
         for name, value in matrix.items():
-            sources[name] = value.tocsr()
+            if value.shape != matrix.shape:
+                raise ValueError("matrix fields must match the zone index shape")
+            sources[name] = value
 
         if not sources:
             return cls(
@@ -186,7 +183,7 @@ cdef class SparseMatrix(_MatrixBase):
 
     @classmethod
     def from_dict(cls, matrices, dtype=None):
-        """Pack named dense or CSR matrices using their shared COO positions."""
+        """Pack named dense or sparse matrices using their canonical shared COO positions."""
         if not isinstance(matrices, Mapping):
             raise TypeError("matrices must be a mapping of names to arrays")
         if not matrices:
@@ -199,8 +196,8 @@ cdef class SparseMatrix(_MatrixBase):
         for name, matrix in matrices.items():
             if not sparse.issparse(matrix):
                 matrix = np.asarray(matrix)
-                if matrix.ndim != 2:
-                    raise ValueError(f"matrix {name!r} must be two-dimensional, got {matrix.shape}")
+            if matrix.ndim != 2:
+                raise ValueError(f"matrix {name!r} must be two-dimensional, got {matrix.shape}")
 
             if shape is None:
                 shape = matrix.shape
@@ -221,42 +218,45 @@ cdef class SparseMatrix(_MatrixBase):
 
             inputs[name] = matrix
 
-        # We're going to get scipy to build the union of the csr indptr and
-        # indices for us. To do that we supply with ones everywhere with a COO
-        # matrix.
+        dtype = np.dtype(source_dtype if dtype is None else dtype)
+        if dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
+            raise TypeError("dtype must be float32 or float64")
+
+        # Canonicalise each field with SciPy before constructing the union of
+        # CSR indices.
         coo_matrices = {}
         for name, matrix in inputs.items():
             if sparse.issparse(matrix):
-                matrix.check_format(full_check=True)
-                matrix.sum_duplicates()
-                matrix.sort_indices()
-                csr = matrix
+                source.check_format(full_check=True)
+                source = source.tocoo(copy=False)
+                # Cast values before summing duplicates to avoid source-dtype overflow.
+                csr = sparse.coo_array(
+                    (source.data.astype(dtype), (source.row, source.col)), shape=shape,
+                ).tocsr()
             else:
-                csr = sparse.csr_array(matrix)
-
-            if not np.all(np.isfinite(csr.data)) or np.any(csr.data < 0):
-                raise ValueError("Matrix values must be finite and nonnegative")
-
+                csr = sparse.csr_array(np.asarray(matrix, dtype=dtype))
+            csr.sum_duplicates()
+            csr.sort_indices()
             coo_matrices[name] = csr.tocoo(copy=False)
-
-        if dtype is None:
-            dtype = source_dtype
 
         # Join all stored coordinates, then collapse them into one shared pattern.
         rows = np.concatenate([matrix.row for matrix in coo_matrices.values()])
         cols = np.concatenate([matrix.col for matrix in coo_matrices.values()])
-        pattern = sparse.coo_array((np.ones(rows.size), (rows, cols)), shape=shape).tocsr()
-        pattern.sum_duplicates()
-        pattern.data[:] = 1
+        coordinates, positions = np.unique(np.column_stack((rows, cols)), axis=0, return_inverse=True)
+        row_index = np.zeros(shape[0] + 1, dtype=np.uintp)
+        row_index[1:] = np.cumsum(np.bincount(coordinates[:, 0], minlength=shape[0]), dtype=np.uintp)
+        col_index = coordinates[:, 1]
 
-        # Read every class at the union positions
-        row_index = pattern.indptr
-        col_index = pattern.indices
-        rows, cols = pattern.nonzero()
-        cores = {
-            name: np.asarray(matrix[rows, cols]).reshape(-1) if col_index.size else np.empty(0, dtype=matrix.dtype)
-            for name, matrix in coo_matrices.items()
-        }
+        # Read every class at the union positions, including explicitly stored zeros.
+        cores = {}
+        offset = 0
+        for name, matrix in coo_matrices.items():
+            values = np.zeros(len(coordinates), dtype=dtype)
+            count = matrix.nnz
+            values[positions[offset:offset + count]] = matrix.data
+            cores[name] = values
+            offset += count
+
         return cls.from_csr(shape, row_index, col_index, cores, dtype=dtype)
 
     def to_matrix(self, index, index_name="main_index"):

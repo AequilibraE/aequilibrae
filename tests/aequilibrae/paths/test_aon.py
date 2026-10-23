@@ -18,15 +18,13 @@ from .routing_helpers import history_context, make_context, path_walk_outputs, s
 
 
 def output_arrays(output):
-    """Retain every allocated component array, without aggregate aliases."""
+    """Retain every dense component array, without aggregate aliases."""
     arrays = [output.loading.link_loads]
     if output.skimming is not None:
         arrays.append(output.skimming.skims)
     if output.select_link is not None:
         if output.select_link.loading is not None:
             arrays.append(output.select_link.loading.link_loads)
-        if output.select_link.od is not None:
-            arrays.append(output.select_link.od.demand)
     return arrays
 
 

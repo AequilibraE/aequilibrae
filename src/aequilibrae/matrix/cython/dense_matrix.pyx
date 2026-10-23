@@ -44,14 +44,14 @@ cdef class DenseMatrix(_MatrixBase):
             raise TypeError("matrix must be an AequilibraeMatrix")
 
         for name, values in matrix.items():
+            if values.shape != matrix.shape:
+                raise ValueError("matrix fields must match the zone index shape")
             if (
                 not np.issubdtype(values.dtype, np.number)
                 or np.iscomplexobj(values)
                 or np.issubdtype(values.dtype, np.bool_)
             ):
                 raise TypeError("Matrix values must be real numbers")
-            if not np.all(np.isfinite(values)) or np.any(values < 0):
-                raise ValueError("Matrix values must be finite and nonnegative")
 
         if not matrix:
             return cls(matrix.shape[0], (), dtype=np.float64 if dtype is None else dtype)
