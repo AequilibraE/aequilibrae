@@ -286,8 +286,16 @@ ods_pairs_of_interest = [
     (39, 34),
 ]
 ods_pairs_of_interest = ods_pairs_of_interest + [(x[1], x[0]) for x in ods_pairs_of_interest]
-rc.demand.df = rc.demand.df.loc[ods_pairs_of_interest].sort_index().astype(np.float32)
-rc.demand.df
+demand = pd.DataFrame(
+    {name: [mat.mat[name, o, d] for o, d in ods_pairs_of_interest] for name in mat},
+    index=pd.MultiIndex.from_tuples(ods_pairs_of_interest, names=["origin id", "destination id"]),
+).sort_index()
+demand_matrix = from_df(demand.reset_index(), "origin id", "destination id", index=mat.index, sparse=True)
+
+rc = RouteChoice(graph)
+rc.set_demand(demand_matrix)
+rc.set_select_links(single_edges | edge_pairs)
+rc.demand
 
 # %%
 # Perform the assignment
@@ -304,8 +312,9 @@ map
 # We'll pull out just OD matrix results as well we need it for the
 # post-processing, we'll also use the returned SciPy CSR arrays directly.
 sl_od = rc.get_select_link_od_matrix_results()
-edge_totals = {k: sl_od[k]["demand"].to_scipy() for k in single_edges}
-edge_pair_values = {k: sl_od[k]["demand"].to_scipy() for k in edge_pairs}
+od_index = demand_matrix.index
+edge_totals = {k: sl_od[k]["demand"] for k in single_edges}
+edge_pair_values = {k: sl_od[k]["demand"] for k in edge_pairs}
 
 # %%
 # For the post processing, we are interested in the demand of OD pairs that enter or exit the
@@ -319,8 +328,8 @@ exited = defaultdict(float)
 for (link_id, dir), v in edge_totals.items():
     link = g.loc[link_id, dir]
     for (o, d), load in v.todok().items():
-        o = graph.all_nodes[o]
-        d = graph.all_nodes[d]
+        o = od_index[o]
+        d = od_index[d]
 
         o_inside = o in inside_nodes.index
         d_inside = d in inside_nodes.index
@@ -348,6 +357,8 @@ for (l1, l2), v in edge_pair_values.items():
     link2 = g.loc[l2]
 
     for (o, d), load in v.todok().items():
+        o = od_index[o]
+        d = od_index[d]
         o_inside = o in inside_nodes.index
         d_inside = d in inside_nodes.index
 
@@ -359,10 +370,12 @@ through
 # %%
 # With these results we can construct a new demand matrix. Usually this would be now transplanted
 # onto another network, however for demonstration purposes we'll reuse the same network.
+manual_od_pairs = list(entered.keys()) + list(exited.keys()) + list(through.keys())
+manual_od_pairs = np.asarray(manual_od_pairs, dtype=np.uint64)
 demand = pd.DataFrame(
     list(entered.values()) + list(exited.values()) + list(through.values()),
-    index=pd.MultiIndex.from_tuples(
-        list(entered.keys()) + list(exited.keys()) + list(through.keys()), names=["origin id", "destination id"]
+    index=pd.MultiIndex.from_arrays(
+        [manual_od_pairs[:, 0], manual_od_pairs[:, 1]], names=["origin id", "destination id"]
     ),
     columns=["demand"],
 ).sort_index()
@@ -378,7 +391,7 @@ new_centroids
 # %%
 # Re-perform our assignment
 rc = RouteChoice(graph)
-rc.add_demand(demand)
+rc.set_demand(from_df(demand.reset_index(), "origin id", "destination id", index=new_centroids, sparse=True))
 rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False, seed=123)
 rc.execute(perform_assignment=True)
 

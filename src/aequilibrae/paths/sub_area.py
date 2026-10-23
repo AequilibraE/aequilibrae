@@ -4,7 +4,9 @@ from collections import defaultdict
 from typing import Union
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
+from scipy.sparse import coo_array, issparse
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
@@ -88,7 +90,6 @@ class SubAreaAnalysis:
 
         sl_od = self.rc.get_select_link_od_matrix_results()
         index = self.rc.demand.index
-
         sub_area_demand = []
         for col in demand_cols:
             edge_totals = {k: sl_od[k][col] for k in self.single_edges}
@@ -131,31 +132,53 @@ class SubAreaAnalysis:
                             (self.graph.all_nodes[link1.a_node], self.graph.all_nodes[link2.b_node]) + original_ods
                         ] += load
 
+            subarea_od_keys = list(entered) + list(exited) + list(through)
+            subarea_od_values = list(entered.values()) + list(exited.values()) + list(through.values())
+            subarea_od_ids = np.asarray(subarea_od_keys, dtype=np.uint64).reshape(-1, 4 if keep_original_ods else 2)
+
+            id_columns = list(subarea_od_ids.T)
+            id_names = ["origin id", "destination id"]
+            if keep_original_ods:
+                id_names += ["original origin id", "original destination id"]
+
             sub_area_demand.append(
                 pd.DataFrame(
-                    list(entered.values()) + list(exited.values()) + list(through.values()),
-                    index=pd.MultiIndex.from_tuples(
-                        list(entered.keys()) + list(exited.keys()) + list(through.keys()),
-                        names=["origin id", "destination id"]
-                        + (["original origin id", "original destination id"] if keep_original_ods else []),
-                    ),
+                    subarea_od_values,
+                    index=pd.MultiIndex.from_arrays(id_columns, names=id_names),
                     columns=[col],
                 )
             )
 
         interior = []
-        for o, d in self.rc.demand.df.index:
-            if o in self.interior_nodes.index and d in self.interior_nodes.index:
-                interior.append((o, d))
+        inside = np.flatnonzero(np.isin(self.rc.demand.index, self.interior_nodes.index))
+        inside_ids = self.rc.demand.index[inside]
+        for col in demand_cols:
+            values = self.rc.demand[col]
+            values = values.tocsr()[inside][:, inside] if issparse(values) else values[np.ix_(inside, inside)]
+            records = coo_array(values)
+            nonzero = records.data != 0
+            interior.append(
+                pd.Series(
+                    records.data[nonzero],
+                    name=col,
+                    index=pd.MultiIndex.from_arrays(
+                        [
+                            inside_ids[records.row[nonzero]].astype(np.uint64, copy=False),
+                            inside_ids[records.col[nonzero]].astype(np.uint64, copy=False),
+                        ],
+                        names=["origin id", "destination id"],
+                    ),
+                )
+            )
 
         self.sub_area_demand = pd.concat(sub_area_demand, axis=1).fillna(0.0)
 
-        interior = self.rc.demand.df.loc[interior]
         interior = pd.concat(interior, axis=1).fillna(0.0)
         if keep_original_ods:
             # We need to duplicate the interior ODs if we're "keeping the originals"
-            interior.index = pd.MultiIndex.from_tuples(
-                (x + x for x in interior.index), names=self.sub_area_demand.index.names
+            interior.index = pd.MultiIndex.from_arrays(
+                [np.asarray(interior.index.get_level_values(level % 2), dtype=np.uint64) for level in range(4)],
+                names=self.sub_area_demand.index.names,
             )
 
         self.sub_area_demand = pd.concat([self.sub_area_demand, interior]).sort_index()

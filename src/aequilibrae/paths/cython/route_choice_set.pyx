@@ -36,13 +36,18 @@ from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 from openmp cimport omp_get_max_threads
 
-from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.matrix.cython.sparse_matrix cimport SparseMatrix
+from aequilibrae.matrix.cython.views cimport CppSparseMatrix, CppSparseMatrixOriginView
 from aequilibrae.paths.cython.a_star cimport EuclideanContext, HaversineContext, cpp_a_star
-from aequilibrae.paths.cython.a_star import validate_scale
 from aequilibrae.paths.cython.context cimport NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.dijkstra cimport cpp_dijkstra
+from aequilibrae.paths.cython.route_choice_set_results cimport (
+    recompute_route_probabilities,
+    imported_route_dataframe,
+)
 from aequilibrae.paths.cython.route_choice_types cimport (
-    LinkSet_t, RouteVec_t,
+    LinkSet_t,
+    RouteVec_t,
     RouteCandidate,
     RouteCandidateSet_t,
     minstd_rand,
@@ -50,18 +55,9 @@ from aequilibrae.paths.cython.route_choice_types cimport (
 )
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.workspaces cimport SearchWorkspace, AStarWorkspace, CppAStarWorkspace
-from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
-from aequilibrae.paths.routing_context import make_routing_context
-from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
-from aequilibrae.paths.cython.route_choice_set_results cimport (
-    recompute_route_probabilities,
-    imported_route_dataframe,
-)
-from aequilibrae.paths.cython.route_choice_set_results import check_disutility_cutoff_values
 from aequilibrae.utils.cython.bar cimport Bar
 from aequilibrae.utils.cython.bridge cimport Bridge, log, aeq_format_string as f, DEBUG, WARNING
 
-from typing import Tuple
 import builtins
 import logging
 import operator
@@ -71,7 +67,36 @@ import numpy as np
 import pandas as pd
 
 
+from aequilibrae.matrix import from_df
+from aequilibrae.paths.cython.a_star import validate_scale
+from aequilibrae.paths.cython.demand import validate_demand
+from aequilibrae.paths.cython.route_choice_set_results import check_disutility_cutoff_values
+from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
+from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
+from aequilibrae.paths.routing_context import make_routing_context
+
+
+
 logger = logging.getLogger(__name__)
+
+
+cdef void collect_demand_entries(
+    SparseMatrix packed,
+    vector[pair[size_t, size_t]]& matrix_ods,
+    vector[const double *]& demand_values,
+):
+    cdef CppSparseMatrix[double] demand_view = packed.view[double]()
+    cdef CppSparseMatrixOriginView[double] demand_row
+    cdef const double *values
+    cdef size_t origin, entry, destination
+
+    for origin in range(packed.origin_count):
+        demand_row = demand_view.origin(origin)
+        for entry in range(demand_row.entry_count()):
+            values = demand_row.values(entry)
+            destination = demand_row.destination(entry)
+            matrix_ods.push_back(pair[size_t, size_t](origin, destination))
+            demand_values.push_back(values)
 
 
 @cython.embedsignature(True)
@@ -132,8 +157,13 @@ cdef class RouteChoiceSet:
         self.results = None
         self.ll_results = None
 
+    def clear_results(self):
+        """Discard outputs when the configured inputs change."""
+        self.results = None
+        self.ll_results = None
+
     @cython.embedsignature(True)
-    def run(self, origin: int, destination: int, shape: Tuple[int, int], demand: float = 0.0, *args, **kwargs):
+    def run(self, origin: int, destination: int, demand: float = 0.0, *args, **kwargs):
         """Compute the a route set for a single OD pair.
 
         Often the returned list's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
@@ -146,7 +176,7 @@ cdef class RouteChoiceSet:
                 centroid.
             **destination** (:obj:`int`): Destination node ID. Must be present within compact graph. Recommended to
                 choose a centroid.
-            **demand** (:obj:`double`): Demand for this single OD pair.
+            **demand** (:obj:`double`): Demand for this single OD pair. Non-zero demand requires centroid endpoints.
 
         :Returns: **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of
             link IDs. Represents paths from ``origin`` to ``destination``.
@@ -155,11 +185,10 @@ cdef class RouteChoiceSet:
             "origin id": [origin],
             "destination id": [destination],
             "demand": [demand]
-        }).set_index(["origin id", "destination id"])
-        demand_coo = GeneralisedCOODemand("origin id", "destination id", np.asarray(self.nodes_to_indices_view), shape)
-        demand_coo.add_df(df)
+        })
+        matrix = from_df(df, "origin id", "destination id", sparse=True) if demand else None
 
-        self.batched(demand_coo, {}, *args, **kwargs)
+        self.batched(matrix, {}, *args, nodes=[(origin, destination)] if matrix is None else None, **kwargs)
         where = kwargs.get("where", None)
         if where is not None:
             results = RouteChoiceSetResults.read_dataset(where)
@@ -185,8 +214,8 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     def batched(
         self,
-        demand: GeneralisedCOODemand,
-        select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+        demand=None,
+        select_links: dict[str, FrozenSet[FrozenSet[int]]] = None,
         sl_link_loading: bool = True,
         max_routes: int = 0,
         max_depth: int = 0,
@@ -204,6 +233,7 @@ cdef class RouteChoiceSet:
         disutility_cutoff_constant: float = float('inf'),
         disutility_cutoff_coefficient: float = float('inf'),
         *,
+        nodes=None,
         heuristic: str = "euclidean",
         heuristic_scale: float | None = None,
         bridge: Bridge
@@ -214,8 +244,10 @@ cdef class RouteChoiceSet:
         or if all unique possible paths have been found then a smaller set will be returned.
 
         :Arguments:
-            **ods** (:obj:`list[tuple[int, int]]`): List of OD pairs ``(origin, destination)``. Origin and destination
-                node ID must be present within compact graph. Recommended to choose a centroids.
+            **demand** (:obj:`AequilibraeMatrix` or :obj:`AequilibraeSparseMatrix`): Centroid-labelled demand.
+                Only OD pairs with non-zero demand in at least one field are routed.
+            **nodes** (:obj:`list[tuple[int, int]]`): Explicit routing pairs without demand. Origin and destination
+                node IDs must be present within the compact graph.
             **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of
                 ``0`` for unlimited.
             **max_depth** (:obj:`int`): Maximum depth BFSLE can explore, or maximum number of iterations for link
@@ -237,9 +269,7 @@ cdef class RouteChoiceSet:
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
             **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
         """
-        cdef:
-            long long origin, dest
-            long int i
+        cdef long int i
 
         self._validate_search_options(a_star, heuristic, heuristic_scale, penalty)
         cdef RouteChoiceHeuristic search_heuristic
@@ -273,13 +303,45 @@ cdef class RouteChoiceSet:
         if path_size_logit:
             check_disutility_cutoff_values(disutility_cutoff_constant, disutility_cutoff_coefficient)
 
-        for origin, dest in demand.df.index:
-            if self.nodes_to_indices_view[origin] == -1:
-                raise ValueError(f"Origin {origin} is not present within the compact graph")
-            if self.nodes_to_indices_view[dest] == -1:
-                raise ValueError(f"Destination {dest} is not present within the compact graph")
+        self.results = None
+        self.ll_results = None
+        cdef SparseMatrix packed
+        cdef vector[pair[size_t, size_t]] matrix_ods
+        cdef vector[const double *] demand_values
+        cdef size_t field_count = 0
+        cdef bint load_demand = path_size_logit and demand is not None
+        if demand is not None:
+            if nodes is not None:
+                raise ValueError("provide either nodes or a demand matrix, not both")
 
-        cdef Bar bar = bridge.new_bar("{}/{} ODs processed", len(demand.df))
+            packed = SparseMatrix.from_matrix(demand, dtype=np.float64)
+            if not np.all(np.isin(demand.index, self.centroids)):
+                raise ValueError("Demand index must contain graph centroids only")
+
+            validate_demand(packed, self.num_nodes)
+            index, index_name = demand.index.copy(), demand.index_name
+            field_count = packed.field_count
+            collect_demand_entries(packed, matrix_ods, demand_values)
+
+            ods = [
+                (int(index[matrix_ods[i].first]), int(index[matrix_ods[i].second]))
+                for i in range(matrix_ods.size())
+            ]
+        else:
+            if nodes is None:
+                raise ValueError("provide nodes or a demand matrix")
+
+            pairs = np.asarray(nodes)
+            if pairs.ndim != 2 or pairs.shape[1] != 2 or pairs.dtype.kind not in "iu":
+                raise ValueError("nodes must contain pairs of integer node IDs")
+
+            pairs = np.unique(pairs, axis=0)
+            if np.any(pd.Index(self.node_ids).get_indexer(pairs.reshape(-1)) < 0):
+                raise ValueError("Origin or destination is not present within the compact graph")
+
+            ods = [tuple(od) for od in pairs.tolist()]
+
+        cdef Bar bar = bridge.new_bar("{}/{} ODs processed", len(ods))
 
         cdef:
             long long origin_index, dest_index
@@ -339,17 +401,32 @@ cdef class RouteChoiceSet:
             int thread_id = 0
             bint found_zero_cost = False
 
-        demand._initalise_col_names()
-        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
+        cdef LinkLoadingResults loading
+        if load_demand:
+            loading = LinkLoadingResults(
+                packed.field_names,
+                select_links,
+                self.num_links,
+                sl_link_loading,
+                c_cores,
+                index=index,
+                index_name=index_name,
+            )
 
-        for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
+        cdef size_t batch_start, batch_stop, position
+        boundaries = [0]
+        if where is not None:
+            for position in range(1, <size_t>len(ods)):
+                if ods[position][0] != ods[position - 1][0]:
+                    boundaries.append(position)
+
+        boundaries.append(len(ods))
+        for batch_start, batch_stop in zip(boundaries[:len(boundaries) - 1], boundaries[1:]):
             if bridge.should_stop():
                 break
 
-            demand._initalise_c_data(grouped_demand_df)
-
             self.results = RouteChoiceSetResults(
-                demand,
+                ods[batch_start:batch_stop],
                 disutility_cutoff_constant,
                 disutility_cutoff_coefficient,
                 beta,
@@ -369,12 +446,12 @@ cdef class RouteChoiceSet:
                 thread_id = threadid()
                 found_zero_cost = False
 
-                for i in prange(<long int>demand.ods.size(), schedule="guided"):
+                for i in prange(<long int>self.results.ods.size(), schedule="guided"):
                     if bridge.should_stop():
                         break
 
-                    origin_index = self.nodes_to_indices_view[demand.ods[i].first]
-                    dest_index = self.nodes_to_indices_view[demand.ods[i].second]
+                    origin_index = self.nodes_to_indices_view[self.results.ods[i].first]
+                    dest_index = self.nodes_to_indices_view[self.results.ods[i].second]
                     log(bridge.c, DEBUG, f("Route choice: ", origin_index, ", ", dest_index))
 
                     if origin_index == dest_index:
@@ -414,14 +491,23 @@ cdef class RouteChoiceSet:
                         prob_vec = self.results.compute_result(
                             i, d(route_vec), d(turn_vecs), &found_zero_cost, thread_id
                         )
-                        self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
-                        self.ll_results.sl_link_load_single_route_set(
-                            i, d(route_vec),
-                            d(prob_vec),
-                            origin_index,
-                            dest_index,
-                            thread_id
-                        )
+                        if load_demand:
+                            loading.link_load_single_route_set(
+                                demand_values[batch_start + i],
+                                field_count,
+                                d(route_vec),
+                                d(prob_vec),
+                                thread_id,
+                            )
+                            loading.sl_link_load_single_route_set(
+                                matrix_ods[batch_start + i].first,
+                                matrix_ods[batch_start + i].second,
+                                demand_values[batch_start + i],
+                                field_count,
+                                d(route_vec),
+                                d(prob_vec),
+                                thread_id,
+                            )
 
                     if found_zero_cost:
                         log(
@@ -429,9 +515,9 @@ cdef class RouteChoiceSet:
                             WARNING,
                             f(
                                 "Found zero cost route for: ",
-                                demand.ods[i].first,
+                                self.results.ods[i].first,
                                 ", ",
-                                demand.ods[i].second,
+                                self.results.ods[i].second,
                                 ". The entire route set has been masked.",
                             ),
                         )
@@ -442,9 +528,9 @@ cdef class RouteChoiceSet:
                             WARNING,
                             f(
                                 "Found unreachable: ",
-                                demand.ods[i].first,
+                                self.results.ods[i].first,
                                 ", ",
-                                demand.ods[i].second,
+                                self.results.ods[i].second,
                                 ". No choice sets were generated.",
                             ),
                         )
@@ -461,21 +547,15 @@ cdef class RouteChoiceSet:
                 if where is not None:
                     self.results.write(where, to_parquet_kwargs if to_parquet_kwargs is not None else {})
 
-        if path_size_logit:
-            self.ll_results.reduce_link_loading()
-            self.ll_results.reduce_sl_link_loading()
-            self.ll_results.reduce_sl_od_matrix()
+        if load_demand:
+            loading.reduce_link_loading()
+            loading.reduce_sl_link_loading()
+            loading.reduce_sl_od_matrix()
+            self.ll_results = loading
 
             self.get_link_loading(cores=c_cores)
             self.get_sl_link_loading(cores=c_cores)
             self.get_sl_od_matrices()
-
-    def make_demand(self, origin_column, destination_column):
-        """Create demand using the borrowed node mapping and centroid count."""
-        return GeneralisedCOODemand(
-            origin_column, destination_column, self.graph.nodes_to_indices,
-            shape=(len(self.centroids), len(self.centroids))
-        )
 
     def compact_links(self, link_id, direction):
         """Map a selected link and direction using the graph's link mapping."""
@@ -742,8 +822,8 @@ cdef class RouteChoiceSet:
     def assign_from_df(
         self,
         df: pd.DataFrame,
-        demand: GeneralisedCOODemand,
-        select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+        demand,
+        select_links: dict[str, FrozenSet[FrozenSet[int]]] = None,
         recompute_psl: bool = False,
         sl_link_loading: bool = True,
         store_results: bool = True,
@@ -770,6 +850,7 @@ cdef class RouteChoiceSet:
         cdef vector[size_t] positions
         cdef vector[long long] *route
 
+        self.clear_results()
         df = self.import_dataframe(df, log_warnings, routes, mask)
 
         if recompute_psl:
@@ -796,15 +877,28 @@ cdef class RouteChoiceSet:
             int thread_id = 0
 
         # An OD with no routes loads no demand. Import has removed empty route rows.
-        demand_indices = {od: i for i, od in enumerate(demand.df.index)}
-        groups = df.groupby(list(demand.df.index.names), sort=False).indices
+        cdef SparseMatrix packed = SparseMatrix.from_matrix(demand, dtype=np.float64)
+        if not np.all(np.isin(demand.index, self.centroids)):
+            raise ValueError("Demand index must contain graph centroids only")
 
-        # Now we initialise the demand matrix and prepare to insert the route sets
-        demand._initalise_col_names()
-        demand._initalise_c_data(None)
+        validate_demand(packed, self.num_nodes)
 
+        cdef vector[pair[size_t, size_t]] matrix_ods
+        cdef vector[const double *] demand_values
+        cdef size_t i
+
+        collect_demand_entries(packed, matrix_ods, demand_values)
+        index = demand.index.copy()
+        ods = [
+            (int(index[matrix_ods[i].first]), int(index[matrix_ods[i].second]))
+            for i in range(matrix_ods.size())
+        ]
+        demand_indices = {od: i for i, od in enumerate(ods)}
+        groups = df.groupby(["origin id", "destination id"], sort=False).indices
+
+        # Now we initialise the results and prepare to insert the route sets.
         self.results = RouteChoiceSetResults(
-            demand,
+            ods,
             disutility_cutoff_constant,
             disutility_cutoff_coefficient,
             beta,
@@ -819,7 +913,10 @@ cdef class RouteChoiceSet:
             full_directions=self.full_directions,
         )
 
-        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
+        cdef LinkLoadingResults loading = LinkLoadingResults(
+            packed.field_names, select_links, self.num_links, sl_link_loading, c_cores,
+            index=index, index_name=demand.index_name,
+        )
 
         # We iterate over the OD pairs in the path files. ODs without demand are omitted.
         for od, group in groups.items():
@@ -828,9 +925,6 @@ cdef class RouteChoiceSet:
 
             od_idx = demand_indices[od]
             positions = group
-            origin_index = self.nodes_to_indices_view[demand.ods[od_idx].first]
-            dest_index = self.nodes_to_indices_view[demand.ods[od_idx].second]
-
             compact_routes.clear()
             probabilities.clear()
             for position in positions:
@@ -852,16 +946,20 @@ cdef class RouteChoiceSet:
                 probabilities.push_back(route_probabilities[position])
 
             # Route and probability vectors can now be used for LL and SLL.
-            self.ll_results.link_load_single_route_set(od_idx, compact_routes, probabilities, thread_id)
-            self.ll_results.sl_link_load_single_route_set(
-                od_idx, compact_routes, probabilities, origin_index, dest_index, thread_id
+            loading.link_load_single_route_set(
+                demand_values[od_idx], packed.field_count, compact_routes, probabilities, thread_id,
+            )
+            loading.sl_link_load_single_route_set(
+                matrix_ods[od_idx].first, matrix_ods[od_idx].second, demand_values[od_idx],
+                packed.field_count, compact_routes, probabilities, thread_id,
             )
             self.results.store_imported_result(od_idx, routes, costs, mask, overlap, route_probabilities, positions)
 
         # Clean up and reduce any results from the threaded storage
-        self.ll_results.reduce_link_loading()
-        self.ll_results.reduce_sl_link_loading()
-        self.ll_results.reduce_sl_od_matrix()
+        loading.reduce_link_loading()
+        loading.reduce_sl_link_loading()
+        loading.reduce_sl_od_matrix()
+        self.ll_results = loading
 
         self.get_link_loading(cores=c_cores)
         self.get_sl_link_loading(cores=c_cores)
@@ -1172,7 +1270,7 @@ cdef class RouteChoiceSet:
     def get_link_loading(RouteChoiceSet self, cores: int = 0):
         """
         :Returns:
-            **link loading results** (:obj:`Dict[str, np.array]`): Returns a dict of demand column names to
+            **link loading results** (:obj:`dict[str, np.array]`): Returns a dict of demand column names to
                 uncompressed link loads.
         """
         if self.ll_results is None:
@@ -1186,7 +1284,7 @@ cdef class RouteChoiceSet:
     def get_sl_link_loading(RouteChoiceSet self, cores: int = 0):
         """
         :Returns:
-            **select link loading results** (:obj:`Dict[str, Dict[str, np.array]]`): Returns a dict of select link set
+            **select link loading results** (:obj:`dict[str, dict[str, np.array]]`): Returns a dict of select link set
                 names to a dict of demand column names to uncompressed select link loads.
         """
         if self.ll_results is None:
@@ -1200,8 +1298,8 @@ cdef class RouteChoiceSet:
     def get_sl_od_matrices(RouteChoiceSet self):
         """
         :Returns:
-            **select link OD matrix results** (:obj:`Dict[str, Dict[str, scipy.sparse.coo_matrix]]`): Returns a dict of
-                select link set names to a dict of demand column names to a sparse OD matrix
+            **select link OD matrix results** (:obj:`dict[str, AequilibraeSparseMatrix]`): Returns a dict of
+                select link set names to labelled sparse OD matrices
         """
         if self.ll_results is None:
             raise RuntimeError("Link loading results not computed yet")

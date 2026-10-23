@@ -32,7 +32,9 @@ def assert_walk_outputs(output, expected):
     np.testing.assert_allclose(output.skimming.skims, expected[1])
     assert output.turn_cost_total == expected[2]
     np.testing.assert_allclose(output.select_link.loading.link_loads, expected[3])
-    np.testing.assert_allclose(output.select_link.od.demand, expected[4])
+    for selection, matrices in enumerate(output.select_link.od.matrices.values()):
+        for field, matrix in enumerate(matrices.values()):
+            np.testing.assert_allclose(matrix.toarray(), expected[4][:, selection, :, field])
 
 
 @pytest.mark.parametrize("turn", [False, True])
@@ -115,7 +117,7 @@ def test_random_selected_loading_against_path_walks(turn, seed):
                     turns[incoming, outgoing] = np.inf if rng.random() < 0.2 else 5.0
     fs = np.r_[0, np.cumsum(np.bincount([a for a, _, _ in edges], minlength=nodes))]
     context = make_context(fs, [b for _, b, _ in edges], [c for _, _, c in edges], turns if turn else None, turn=turn)
-    demand = {f"class_{field}": rng.integers(-2, 5, size=(nodes, nodes)).astype(np.float64) for field in range(2)}
+    demand = {f"class_{field}": rng.integers(0, 7, size=(nodes, nodes)).astype(np.float64) for field in range(2)}
     selected = {"first": list(range(0, context.link_count, 3)), "second": list(range(1, context.link_count, 2))}
     fields = [rng.random(context.link_count)]
     skims = SkimmingContext(context.link_count, link_fields={"distance": fields[0]})
@@ -341,7 +343,7 @@ def test_output_group_allocates_resets_and_releases_independent_components(skims
         assert not hasattr(out, name)
 
     del prepared, out
-    assert np.any(retained[0])
+    assert not np.any(retained[0])  # The retained buffer still contains the reset values.
     if skimming is not None:
         skimming.reset()
     if selection is not None:

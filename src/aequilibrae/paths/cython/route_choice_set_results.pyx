@@ -38,7 +38,7 @@ cdef class RouteChoiceSetResults:
 
     def __init__(
             self,
-            demand: GeneralisedCOODemand,
+            ods,
             disutility_cutoff_constant: float,
             disutility_cutoff_coefficient: float,
             beta: float,
@@ -54,8 +54,8 @@ cdef class RouteChoiceSetResults:
     ):
         """
         :Arguments:
-            **demand** (`obj`: GeneralisedCOODemand): A GeneralisedCOODemand object stores the ODs pairs and various
-              demand values in a COO form. No verification of these is performed here.
+            **ods** (`obj`: list[tuple[int, int]]): Labelled OD pairs in execution order.
+              No verification of these is performed here.
 
             **disutility_cutoff_constant** (`obj`: float): The constant term of the linear (cuttoff = m * x + c)
               disutility cutoff function. Any route with a cost higher than this function when applied to the minimum
@@ -85,7 +85,6 @@ cdef class RouteChoiceSetResults:
         if not store_results and not perform_assignment:
             raise ValueError("either `store_results` or `perform_assignment` must be True")
 
-        self.demand = demand
         self.disutility_cutoff_constant = disutility_cutoff_constant
         self.disutility_cutoff_coefficient = disutility_cutoff_coefficient
         self.beta = beta
@@ -101,7 +100,8 @@ cdef class RouteChoiceSetResults:
         self.full_directions = full_directions
         self.table = None
 
-        cdef size_t size = self.demand.ods.size()
+        self.ods = ods
+        cdef size_t size = self.ods.size()
 
         # As the objects are attribute of the extension class they will be allocated before the object is
         # initialised. This ensures that accessing them is always valid and that they are just empty. We resize the ones
@@ -680,7 +680,7 @@ cdef class RouteChoiceSetResults:
             columns["probability"] = []
 
         if have_assignment_results:
-            for i in range(self.demand.ods.size()):
+            for i in range(self.ods.size()):
                 n_routes = d(self.__route_vecs[i]).size()
                 if not d(self.__route_vecs[i]).size():  # If there's no routes to add just skip these.
                     continue
@@ -712,11 +712,11 @@ cdef class RouteChoiceSetResults:
                     np.asarray(<double[:tmp]>d(self.__prob_set[i]).data())
                 )
 
-        for i in range(self.demand.ods.size()):
+        for i in range(self.ods.size()):
             route_set = self.__route_vecs[i]
 
-            columns["origin id"].append(np.full(d(route_set).size(), self.demand.ods[i].first, "uint32"))
-            columns["destination id"].append(np.full(d(route_set).size(), self.demand.ods[i].second, "uint32"))
+            columns["origin id"].append(np.full(d(route_set).size(), self.ods[i].first, "uint32"))
+            columns["destination id"].append(np.full(d(route_set).size(), self.ods[i].second, "uint32"))
 
             # Instead of constructing a "list of lists" style object for storing the route sets we instead will
             # construct one big array of link IDs (with direction as sign) with a corresponding offsets array that

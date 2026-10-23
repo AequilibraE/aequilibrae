@@ -45,7 +45,7 @@ cdef class SparseMatrix(_MatrixBase):
         if dtype is None:
             dtypes = {value.dtype for value in cores.values()}
             if len(dtypes) > 1:
-                raise TypeError("source matrices have mixed dtypes; supply dtype explicitly")
+                raise TypeError("source matrices have mixed dtypes. Supply dtype explicitly")
             dtype = next(iter(dtypes), np.dtype(np.float64))
 
         origins, destinations = shape
@@ -64,13 +64,33 @@ cdef class SparseMatrix(_MatrixBase):
         cdef const size_t[::1] _row_index = np.ascontiguousarray(row_index, dtype=np.uintp)
         cdef const size_t[::1] _col_index = np.ascontiguousarray(col_index, dtype=np.uintp)
         self.set_index(_row_index, _col_index, len(_col_index))
-        self.set_cores(cores)
 
+        packed_cores = self.validate_cores(cores, len(_col_index))
+        active = np.zeros(len(_col_index), dtype=np.bool_)
+        for value in packed_cores.values():
+            active |= value != 0
+
+        if not np.all(active):
+            active_rows = np.searchsorted(
+                np.asarray(_row_index)[1:],
+                np.flatnonzero(active),
+                side="right",
+            )
+            filtered_row_index = np.zeros(origins + 1, dtype=np.uintp)
+            filtered_row_index[1:] = np.cumsum(
+                np.bincount(active_rows, minlength=origins),
+                dtype=np.uintp,
+            )
+            filtered_col_index = np.asarray(_col_index)[active]
+            packed_cores = {name: value[active] for name, value in packed_cores.items()}
+            self.set_index(filtered_row_index, filtered_col_index, len(filtered_col_index))
+
+        self.set_cores(packed_cores)
         return self
 
     @classmethod
     def from_scipy(cls, mat, **kwargs):
-        """Copy to canonical CSR, keeping stored zeros and leaving mat unchanged."""
+        """Copy to canonical CSR, removing explicit zeros and leaving mat unchanged."""
         return cls.from_dict({"matrix": mat}, **kwargs)
 
     def to_scipy(self):
@@ -126,18 +146,23 @@ cdef class SparseMatrix(_MatrixBase):
         self.col_index = array[size_t](nnz, False)
         self.col_index[:] = col_index
 
-    cdef set_cores(self, dict cores):
+    cdef dict validate_cores(self, dict cores, size_t nnz):
         if len(cores) != self.field_count:
             raise ValueError(f"expected {self.field_count} cores, got {len(cores)}")
 
+        validated = {}
         for key, value in cores.items():
+            value = np.asarray(value)
             if not np.can_cast(value.dtype, self.dtype, casting="same_kind"):
                 raise TypeError(f"expected values that can be cast to {self.dtype}, got {value.dtype}")
             if value.ndim != 1:
                 raise ValueError(f"expected 1D array, got {value.shape}")
-            if len(value) != self.n_alloc:
-                raise ValueError(f"mismatched length for {key}, expected {self.n_alloc}, got {len(value)}")
+            if len(value) != nnz:
+                raise ValueError(f"mismatched length for {key}, expected {nnz}, got {len(value)}")
+            validated[key] = value.astype(self.dtype, copy=False)
+        return validated
 
+    cdef set_cores(self, dict cores):
         shape = (self.n_alloc, self.field_count)
 
         # Can't conditionally declare variables in Cython
@@ -235,6 +260,7 @@ cdef class SparseMatrix(_MatrixBase):
             else:
                 csr = sparse.csr_array(np.asarray(matrix, dtype=dtype))
             csr.sum_duplicates()
+            csr.eliminate_zeros()
             csr.sort_indices()
             coo_matrices[name] = csr.tocoo(copy=False)
 
@@ -246,7 +272,7 @@ cdef class SparseMatrix(_MatrixBase):
         row_index[1:] = np.cumsum(np.bincount(coordinates[:, 0], minlength=shape[0]), dtype=np.uintp)
         col_index = coordinates[:, 1]
 
-        # Read every class at the union positions, including explicitly stored zeros.
+        # Read every class at the union positions.
         cores = {}
         offset = 0
         for name, matrix in coo_matrices.items():
