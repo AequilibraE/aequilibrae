@@ -16,11 +16,11 @@ def assignment_setup(sioux_falls_example):
         graph.set_graph("free_flow_time")
         graph.set_blocked_centroid_flows(False)
 
-    car_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["car"])
+    car_matrix = sioux_falls_example.matrices.get_matrix("demand_mc.omx", subset=["car"])
 
-    truck_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["trucks"])
+    truck_matrix = sioux_falls_example.matrices.get_matrix("demand_mc.omx", subset=["trucks"])
 
-    moto_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["motorcycle"])
+    moto_matrix = sioux_falls_example.matrices.get_matrix("demand_mc.omx", subset=["motorcycle"])
 
     assignment = TrafficAssignment()
     carclass = TrafficClass("car", car_graph, car_matrix)

@@ -9,8 +9,7 @@ from aequilibrae.distribution import Ipf
 
 def test_fit(sioux_falls_test):
     mats = sioux_falls_test.matrices
-    mats.update_database()
-    seed = mats.get_matrix("SiouxFalls_omx", subset=["matrix"])
+    seed = mats.get_matrix("SiouxFalls2.omx", subset=["matrix"])
 
     rows = np.random.rand(len(seed.index))[:] * 1000
     cols = np.random.rand(len(seed.index))[:] * 1000
@@ -44,6 +43,6 @@ def test_fit(sioux_falls_test):
     assert np.isclose(np.nansum(result["matrix"]), np.nansum(vectors["rows"]), rtol=0.0001), "Ipf did not converge"
     assert fratar.parameters["convergence level"] > fratar.gap, "Ipf did not converge"
 
-    mats.create("my_matrix_ipf", "my_matrix_ipf.omx", fratar.output)
+    mats.save_matrix("my_matrix_ipf.omx", fratar.output)
 
     assert os.path.isfile(os.path.join(mats.folder, "my_matrix_ipf.omx")), "Did not save file to the appropriate place"

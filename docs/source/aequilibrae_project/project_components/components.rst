@@ -321,8 +321,8 @@ otherwise, provide ``index_name`` explicitly.
 
     >>> matrices = project.matrices
 
-    # One can also check all the project matrices as a Pandas' DataFrame
-    >>> matrices.list() # doctest: +SKIP
+    # One can also check all the project matrices as a Dictionary
+    >>> matrices.get_available_matrices_and_metadata() # doctest: +SKIP
 
     # We can add a new matrix
     >>> matrices.create(...) # doctest: +SKIP

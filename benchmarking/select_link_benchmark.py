@@ -24,7 +24,7 @@ def aequilibrae_init(proj_path: str, cost: str):
     proj.open(proj_path)
     proj.network.build_graphs([cost, "capacity_ab", "capacity_ba"], ["c"])
     graph = proj.network.graphs["c"]
-    matrix = proj.matrices.get_matrix("demand_omx")
+    matrix = proj.matrices.get_matrix("demand.omx")
     matrix.computational_view()
     assignment = TrafficAssignment()
     car = TrafficClass("car", graph, matrix)

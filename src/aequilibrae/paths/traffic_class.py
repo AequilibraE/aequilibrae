@@ -80,7 +80,7 @@ class TrafficClass(TransportClassBase):
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
         >>> tc = TrafficClass("car", graph, demand)
         >>> tc.set_pce(1.3)

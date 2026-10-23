@@ -25,7 +25,7 @@ def test_create_delaunay_network(sioux_falls_example):
 
 
 def test_assign_matrix(sioux_falls_example):
-    demand = sioux_falls_example.matrices.get_matrix("demand_omx", subset=["matrix"])
+    demand = sioux_falls_example.matrices.get_matrix("demand.omx", subset=["matrix"])
     da = DelaunayAnalysis(sioux_falls_example)
 
     # Create network and assign matrix

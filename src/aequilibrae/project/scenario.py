@@ -52,7 +52,7 @@ class Scenario:
         (self.base_path / "matrices").mkdir(parents=True, exist_ok=True)
         self.about = About(self.connections.db_connection)
         self.network = Network(self.connections, project)
-        self.matrices = Matrices(self.connections.db_connection, self.base_path / "matrices")
+        self.matrices = Matrices(self.base_path / "matrices")
 
         if results_path is not None:
             self._results = Results(self.connections.results_connection)

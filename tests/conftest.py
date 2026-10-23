@@ -41,8 +41,8 @@ def test_data_path():
 
 @pytest.fixture(scope="function")
 def omx_example(test_data_path, tmp_path):
-    file = tmp_path / "test_omx.omx"
-    shutil.copy(test_data_path / "test_omx.omx", file)
+    file = tmp_path / "SiouxFalls2.omx"
+    shutil.copy(test_data_path / "SiouxFalls2.omx", file)
     return file
 
 

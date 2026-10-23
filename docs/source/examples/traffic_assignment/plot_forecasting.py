@@ -80,11 +80,11 @@ graph.set_blocked_centroid_flows(False)
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
-proj_matrices.list()
+proj_matrices.get_available_matrices_and_metadata()
 
 # %%
 # Load the demand matrix core for computation.
-demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # %%
 # Let's perform the traffic assignment
@@ -170,7 +170,7 @@ from aequilibrae.distribution import GravityCalibration
 
 # %%
 # Load the demand matrix core for computation.
-demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # %%
 # We also need the skims we just saved into our project. We select the congested-time core.
@@ -303,8 +303,8 @@ for function in ["power", "expo"]:
 
 # %%
 # We update the matrices table/records and verify that the new matrices are indeed there
-proj_matrices.update_database()
-proj_matrices.list()
+# proj_matrices.update_database()
+proj_matrices.get_available_matrices_and_metadata()
 
 # %%
 # Traffic assignment with Select Link Analysis

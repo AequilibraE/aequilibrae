@@ -22,7 +22,7 @@ class Ipf:
 
         >>> project = create_example(project_path)
 
-        >>> matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
         >>> vectors = pd.DataFrame(
         ...     {"productions": np.zeros(len(matrix.index)), "attractions": np.zeros(len(matrix.index))},
