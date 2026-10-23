@@ -120,7 +120,7 @@ def migrate(
             f"First affected link IDs: {link_ids}"
         )
 
-    add_triggers(project_conn, "network")
+    add_triggers(project_conn, "network", skip={"turn_restrictions_triggers"})
 
     if repaired:
         logger.warning("Repaired the geometry of %s links with inconsistent endpoints", repaired)

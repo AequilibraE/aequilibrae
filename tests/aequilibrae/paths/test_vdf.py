@@ -38,8 +38,7 @@ def car_graph(project):
 
 @pytest.fixture
 def matrix(project):
-    mat = project.matrices.get_matrix("demand_omx")
-    mat.computational_view()
+    mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     return mat
 
 

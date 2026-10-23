@@ -66,16 +66,9 @@ for element in dem.to_records(index=False):
     mtx[element[0]-1][element[1]-1] = element[2]
 
 # %%
-# Now let's create an AequilibraE Matrix with out data
-aemfile = os.path.join(folder, "demand.aem")
-aem = AequilibraeMatrix()
-kwargs = {'file_name': aemfile,
-          'zones': zones,
-          'matrix_names': ['matrix']}
-
-aem.create_empty(**kwargs)
-aem.matrix['matrix'][:,:] = mtx[:,:]
-aem.index[:] = index[:]
+# Now let's create an in-memory AequilibraE matrix with our data.
+aem = AequilibraeMatrix(index=index, index_name="zones")
+aem["matrix"] = mtx
 
 # %%
 # Let's import information about our network. As we're loading data in TNTP format,
@@ -121,8 +114,7 @@ g.network["id"] = g.network.link_id
 g.lonlat_index = geom.loc[g.all_nodes]
 
 # %%
-# Let's prepare our matrix for computation
-aem.computational_view(["matrix"])
+# The named matrix is ready to use in the assignment.
 
 # %%
 # Let's perform our assignment. Feel free to try different algorithms,

@@ -95,14 +95,9 @@ graph.set_graph("utility")
 # We'll create a mock demand matrix with demand 1 for every zone and prepare it for computation.
 from aequilibrae.matrix import AequilibraeMatrix
 
-names_list = ["demand", "5x demand"]
-
-mat = AequilibraeMatrix()
-mat.create_empty(zones=graph.num_zones, matrix_names=names_list, memory_only=True)
-mat.index = graph.centroids[:]
-mat.matrices[:, :, 0] = np.full((graph.num_zones, graph.num_zones), 10.0)
-mat.matrices[:, :, 1] = np.full((graph.num_zones, graph.num_zones), 50.0)
-mat.computational_view()
+mat = AequilibraeMatrix(index=graph.centroids, index_name="zones")
+mat["demand"] = np.full((graph.num_zones, graph.num_zones), 10.0)
+mat["5x demand"] = np.full((graph.num_zones, graph.num_zones), 50.0)
 
 # %%
 # Create plot function

@@ -197,8 +197,7 @@ time costs during the equilibration process.
     >>> graph.set_graph('free_flow_time')
 
     # Turn restrictions are automatically included
-    >>> demand_matrix = project.matrices.get_matrix("demand_omx")
-    >>> demand_matrix.computational_view(["matrix"])
+    >>> demand_matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     >>> traffic_class = TrafficClass('car', graph, demand_matrix)
 
     >>> assignment = TrafficAssignment()

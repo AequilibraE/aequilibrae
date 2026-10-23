@@ -28,13 +28,11 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     graph.set_blocked_centroid_flows(False)
 
     try:
-        mat = scenario_example.matrices.get_matrix("demand_omx")
+        mat = scenario_example.matrices.get_matrix("demand_omx", subset=["matrix"])
     except Exception:
         # Expected to fail for non-sioux_falls scenarios as theres no demand_omx
         assert scenario != "root"
         return
-
-    mat.computational_view()
 
     assigclass = TrafficClass("car", graph, mat)
     assignment = TrafficAssignment(scenario_example)
@@ -49,7 +47,6 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
 
     assert assigclass.results.total_link_loads is not None
     assert len(assigclass.results.total_link_loads) > 0
-    mat.close()
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
@@ -73,13 +70,8 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
     graph.create_line_geometry(method="connector project match", graph="c")
     transit_graph = graph.to_transit_graph()
     zones_in_the_model = len(transit_graph.centroids)
-    names_list = ["pt"]
-
-    mat = AequilibraeMatrix()
-    mat.create_empty(zones=zones_in_the_model, matrix_names=names_list, memory_only=True)
-    mat.index = transit_graph.centroids[:]
-    mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
-    mat.computational_view()
+    mat = AequilibraeMatrix(index=transit_graph.centroids)
+    mat["pt"] = np.ones((zones_in_the_model, zones_in_the_model))
 
     assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
     assig = TransitAssignment()

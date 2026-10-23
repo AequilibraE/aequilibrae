@@ -1,17 +1,16 @@
 """Assignment translation, output ownership and optimizer units."""
 
-from types import SimpleNamespace
-
 import numpy as np
 import pandas as pd
 import pytest
+from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
 from aequilibrae import Graph, TrafficAssignment, TrafficClass
 from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 from aequilibrae.paths.vdf import bpr
+from aequilibrae.matrix import AequilibraeMatrix
 
 
 def diamond(turn=False):
@@ -50,13 +49,14 @@ def matrix_for(graph, demand=None):
     if demand is None:
         demand = np.zeros((graph.num_zones, graph.num_zones, 2))
         demand[0, -1] = [8.0, 12.0]
-    return SimpleNamespace(
-        matrix_view=demand,
-        view_names=["work", "other"][: demand.shape[2] if demand.ndim == 3 else 1],
-        index=graph.centroids.copy(),
-        file_path=None,
-        zones=graph.num_zones,
-    )
+
+    matrix = AequilibraeMatrix(index=graph.centroids.copy())
+    if demand.ndim == 2:
+        matrix["work"] = demand
+    else:
+        for index, name in enumerate(("work", "other")[: demand.shape[2]]):
+            matrix[name] = demand[:, :, index]
+    return matrix
 
 
 def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, cores=1, iterations=8):
@@ -91,7 +91,7 @@ def test_assignment_uses_selected_heap(heap, turn):
 def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
     graph = diamond(turn)
     assignment, traffic = assignment_for(graph, cores=cores)
-    original = traffic.matrix.matrix_view.copy()
+    original = {name: values.copy() for name, values in traffic.matrix.items()}
     graph_costs = graph.compact_cost.copy()
     graph_skims = graph.compact_skims.copy()
     assignment.execute()
@@ -116,7 +116,8 @@ def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
     assert assignment.assignment.fw_total_turn_cost == 2.5 * results.total_turn_penalty
     assert results.skims.matrices["time"][0, 3] == (2.5 if turn else 2.0)
     assert results.skims.matrices["distance"][0, 3] == 7.0
-    np.testing.assert_array_equal(traffic.matrix.matrix_view, original)
+    for name, values in original.items():
+        np.testing.assert_array_equal(traffic.matrix[name], values)
     np.testing.assert_array_equal(graph.compact_cost, graph_costs)
     np.testing.assert_array_equal(graph.compact_skims, graph_skims)
 
@@ -149,7 +150,7 @@ def test_turn_cost_and_selected_outputs_follow_accepted_solution(algorithm):
 def test_invalid_demand_rejected_at_assignment_entry(bad):
     graph = diamond()
     matrix = matrix_for(graph)
-    matrix.matrix_view[0, 1, 0] = bad
+    matrix["work"][0, 1] = bad
     assignment, _ = assignment_for(graph, matrix)
     with pytest.raises(ValueError, match="finite and nonnegative"):
         assignment.execute()
@@ -160,25 +161,27 @@ def test_strided_demand_is_copied_once_without_reshaping_caller():
     source = np.arange(4 * 4 * 4, dtype=float).reshape(4, 4, 4)
     view = source[:, :, 1:3]
     matrix = matrix_for(graph, view)
+    input_values = {name: values.copy() for name, values in matrix.items()}
     packed = assignment_demand(matrix, graph.centroids)
     assert packed.flags.c_contiguous
     assert not packed.flags.writeable
-    assert matrix.matrix_view is view
     assert not np.shares_memory(packed, source)
-    np.testing.assert_array_equal(packed, view)
+    np.testing.assert_array_equal(packed, np.stack([input_values[name] for name in matrix], axis=2))
 
     matrix = matrix_for(graph, source[:, :, 0])
     packed = assignment_demand(matrix, graph.centroids)
     assert packed.shape == (4, 4, 1)
-    assert matrix.matrix_view.ndim == 2
+    assert matrix["work"].ndim == 2
 
 
 @pytest.mark.parametrize("cores", [1, 2])
 def test_unreachable_demand_is_reported_without_loading_or_counting_intrazonal(caplog, cores):
     graph = diamond()
     matrix = matrix_for(graph)
-    matrix.matrix_view[3, 0] = [3.0, 7.0]
-    matrix.matrix_view[3, 3] = [100.0, 200.0]
+    matrix["work"][3, 0] = 3.0
+    matrix["other"][3, 0] = 7.0
+    matrix["work"][3, 3] = 100.0
+    matrix["other"][3, 3] = 200.0
     assignment, traffic = assignment_for(graph, matrix, cores=cores)
     assignment.execute()
     assert traffic.results.unassigned_demand == 10.0
@@ -388,13 +391,13 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
     selected = project.matrices.get_matrix("new_selected_omx")
     try:
         for name, values in traffic.results.skims.matrices.items():
-            np.testing.assert_array_equal(skims.get_matrix(f"{name}_blended"), values)
-            np.testing.assert_array_equal(skims.get_matrix(f"{name}_final"), values)
+            np.testing.assert_array_equal(skims[f"{name}_blended"], values)
+            np.testing.assert_array_equal(skims[f"{name}_final"], values)
         expected_names = {f"{name}_cars_{column}" for name in ("upper", "either") for column in ("work", "other")}
-        assert set(selected.names) == expected_names
+        assert set(selected) == expected_names
         for name, values in traffic.results.select_link_od.matrices.items():
             for index, column in enumerate(("work", "other")):
-                np.testing.assert_array_equal(selected.get_matrix(f"{name}_cars_{column}"), values[:, :, index])
+                np.testing.assert_array_equal(selected[f"{name}_cars_{column}"], values[:, :, index])
     finally:
         skims.close()
         selected.close()

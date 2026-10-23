@@ -379,12 +379,8 @@ class HyperpathGenerating:
             else:
                 arr = self.skim_matrix
 
-            self.skim_matrix = AequilibraeMatrix()
-            self.skim_matrix.create_empty(zones=len(self._o_vert_ids), matrix_names=skim_cols)
-            self.skim_matrix.index[:] = self._o_vert_ids
-            self.skim_matrix.indices[:] = self.skim_matrix.indices.reshape(-1, 1)
-            self.skim_matrix.computational_view()
-            self.skim_matrix.matrices[:, :, :] = arr
+            self.skim_matrix = AequilibraeMatrix(index=self._o_vert_ids)
+            self.skim_matrix.update({name: arr[:, :, i] for i, name in enumerate(skim_cols)})
 
         else:
             self.skim_matrix = None

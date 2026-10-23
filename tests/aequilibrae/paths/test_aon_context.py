@@ -344,7 +344,7 @@ def test_output_allocator_supports_empty_axes_and_fixed_components(dimensions):
     out = AoNOutputs(*dimensions, skim_names=("cost",), select_link_names=("set",))
     links, zones, classes = dimensions
     assert out.loading.link_loads.shape == (links, classes)
-    assert out.skimming.skims.shape == (zones, 1, zones)
+    assert out.skimming.skims.shape == (zones, zones, 1)
     assert out.select_link.loading.link_loads.shape == (1, links, classes)
     assert out.select_link.od.demand.shape == (zones, 1, zones, classes)
     out.reset()

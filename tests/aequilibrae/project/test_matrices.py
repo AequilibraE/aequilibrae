@@ -4,9 +4,10 @@ from os.path import join
 from random import choice, randint
 from shutil import copyfile
 
+import openmatrix as omx
 import pytest
 
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
 from aequilibrae.project.data.matrices import Matrices
 from aequilibrae.utils.db_utils import NestedTransactionManager
 
@@ -63,8 +64,13 @@ def test_get_matrix(sioux_falls_example):
     with pytest.raises(ValueError, match="matrices has no record with name='omxq'"):
         _ = matrices.get_matrix("omxq")
     mat = matrices.get_matrix("demand_omx")
-    mat.computational_view()
-    assert floor(mat.matrix_view.sum()) == 360600, "Matrix loaded incorrectly"
+    assert isinstance(mat, MatrixStore)
+    assert floor(sum(values.sum() for values in mat.values())) == 360600, "Matrix loaded incorrectly"
+    mat.close()
+
+    selected = matrices.get_matrix("demand_omx", subset=["matrix"])
+    assert isinstance(selected, AequilibraeMatrix)
+    assert floor(sum(values.sum() for values in selected.values())) == 360600, "Matrix subset loaded incorrectly"
 
 
 def test_get_record(sioux_falls_example):
@@ -127,24 +133,124 @@ def matrix_table(tmp_path):
     manager.close()
 
 
-def test_create_exports_and_registers_an_in_memory_matrix(matrix_table):
-    matrix = AequilibraeMatrix()
-    matrix.create_empty(zones=2, matrix_names=["demand"], memory_only=True)
-    matrix.matrices[:, :, 0] = [[0, 1], [2, 0]]
-
-    try:
-        record = matrix_table.create("future_demand", "future_demand.omx", matrix)
-    finally:
+@pytest.fixture(params=[AequilibraeMatrix, MatrixStore], ids=["memory", "store"])
+def source_matrix(request, tmp_path):
+    if request.param is MatrixStore:
+        matrix = MatrixStore(tmp_path / "source.omx", index=[10, 20], mode="x")
+    else:
+        matrix = AequilibraeMatrix(index=[10, 20])
+    matrix["demand"] = [[0, 1], [2, 0]]
+    matrix.metadata["description"] = "Future demand"
+    matrix.matrix_metadata("demand")["purpose"] = "work"
+    yield matrix
+    if isinstance(matrix, MatrixStore):
         matrix.close()
+
+
+def test_create_exports_and_registers_a_matrix(matrix_table, source_matrix):
+    record = matrix_table.create("future_demand", "future_demand.omx", source_matrix)
 
     assert record == matrix_table.get("future_demand")
     assert record.cores == 1
     assert (matrix_table.folder / record.file_name).is_file()
-    loaded = matrix_table.get_matrix(record.name)
-    try:
-        assert loaded.names == ["demand"]
-    finally:
-        loaded.close()
+    assert matrix_table.get_matrix(record.name) == source_matrix
+
+
+def test_create_empty_matrix(matrix_table, source_matrix):
+    source_matrix.clear()
+    record = matrix_table.create("empty", "empty.omx", source_matrix)
+    assert record.cores == 0
+    assert matrix_table.get_matrix(record.name) == source_matrix
+
+
+def test_get_matrix_uses_requested_index(matrix_table):
+    matrix = AequilibraeMatrix(index=[30, 10], index_name="zones")
+    matrix["demand"] = [[0, 3], [2, 0]]
+    matrix_table.create("demand", "demand.omx", matrix)
+    inferred = matrix_table.get_matrix("demand")
+    assert isinstance(inferred, MatrixStore)
+    assert inferred.index_name == "zones"
+    inferred.close()
+
+    selected = matrix_table.get_matrix("demand", subset=["demand"])
+    assert isinstance(selected, AequilibraeMatrix)
+    assert selected == matrix
+
+
+def test_get_matrix_requires_index_when_multiple_nondefault_indices_exist(matrix_table):
+    matrix = AequilibraeMatrix(index=[10, 20], index_name="zones")
+    matrix["demand"] = [[0, 1], [2, 0]]
+    matrix_table.create("demand", "demand.omx", matrix)
+    with omx.open_file(matrix_table.folder / "demand.omx", mode="a") as file:
+        file.lookup.create_dataset("other_zones", data=[10, 20])
+
+    with pytest.raises(ValueError, match="Multiple zone indices"):
+        matrix_table.get_matrix("demand")
+    assert matrix_table.get_matrix("demand", index_name="zones", subset=["demand"]) == matrix
+
+
+@pytest.mark.parametrize("extension", [".aem", ".csv"])
+def test_create_rejects_other_formats(matrix_table, source_matrix, extension):
+    with pytest.raises(ValueError, match="Only OMX"):
+        matrix_table.create("demand", f"demand{extension}", source_matrix)
+    assert "demand" not in matrix_table
+
+
+def test_register_rejects_other_formats(matrix_table):
+    path = matrix_table.folder / "demand.aem"
+    path.write_bytes(b"old matrix")
+    with pytest.raises(ValueError, match="Only OMX"):
+        matrix_table.register_matrix("demand", path.name)
+
+
+def test_register_counts_matrices_without_an_index(matrix_table, no_index_omx):
+    record = matrix_table.register_matrix("no_index", no_index_omx.name)
+    assert record.cores > 0
+
+
+def test_update_database_only_registers_omx_files(matrix_table):
+    matrix = AequilibraeMatrix(index=[1])
+    matrix["demand"] = [[2]]
+    matrix.save_as_omx(matrix_table.folder / "demand.OMX")
+    (matrix_table.folder / "old.aem").write_bytes(b"old matrix")
+    (matrix_table.folder / "notes.txt").write_text("notes")
+    (matrix_table.folder / "directory.omx").mkdir()
+
+    matrix_table.update_database()
+    assert [record.file_name for record in matrix_table] == ["demand.OMX"]
+
+
+def test_create_does_not_overwrite_existing_file(matrix_table, source_matrix):
+    path = matrix_table.folder / "demand.omx"
+    path.write_bytes(b"existing")
+    with pytest.raises(FileExistsError):
+        matrix_table.create("demand", path.name, source_matrix)
+    assert path.read_bytes() == b"existing"
+    assert "demand" not in matrix_table
+
+
+def test_create_removes_partial_export(matrix_table, source_matrix, monkeypatch):
+    def fail(path):
+        path.write_bytes(b"partial")
+        raise OSError("export failed")
+
+    monkeypatch.setattr(source_matrix, "save_as_omx", fail)
+    with pytest.raises(OSError, match="export failed"):
+        matrix_table.create("demand", "demand.omx", source_matrix)
+    assert not (matrix_table.folder / "demand.omx").exists()
+    assert not list(matrix_table.folder.glob(".demand.*.tmp.omx"))
+    assert "demand" not in matrix_table
+
+
+def test_create_removes_export_when_registration_fails(matrix_table, source_matrix, monkeypatch):
+    def fail(**kwargs):
+        raise ValueError("insert failed")
+
+    monkeypatch.setattr(matrix_table, "insert", fail)
+    with pytest.raises(ValueError, match="insert failed"):
+        matrix_table.create("demand", "demand.omx", source_matrix)
+    assert not (matrix_table.folder / "demand.omx").exists()
+    assert "demand" not in matrix_table
 
 
 def test_generic_and_resource_deletes_are_distinct(matrix_table, omx_example):

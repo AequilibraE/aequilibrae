@@ -2,11 +2,12 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
+import openmatrix as omx
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, MatrixStore, from_file
 from aequilibrae.project.project_table import NonSpatialProjectTable
 from aequilibrae.utils.db_utils import NestedTransactionManager
 
@@ -37,7 +38,7 @@ class Matrices(NonSpatialProjectTable):
         self,
         name: str,
         file_name: str,
-        matrix: AequilibraeMatrix | None = None,
+        matrix: AequilibraeMatrix | MatrixStore | None = None,
         *,
         procedure: str | None = None,
         procedure_id: str | None = None,
@@ -52,9 +53,9 @@ class Matrices(NonSpatialProjectTable):
         :Arguments:
             **name** (:obj:`str`): Unique matrix name stored in project metadata.
 
-            **file_name** (:obj:`str`): Matrix file name relative to the project's matrix directory.
+            **file_name** (:obj:`str`): OMX file name relative to the project's matrix directory.
 
-            **matrix** (:obj:`AequilibraeMatrix`, *Optional*): Matrix to export.
+            **matrix** (:obj:`AequilibraeMatrix` or :obj:`MatrixStore`, *Optional*): Matrix to export.
             If omitted, ``file_name`` must already exist.
 
         :Returns:
@@ -66,24 +67,25 @@ class Matrices(NonSpatialProjectTable):
         if self._connection._connection.execute("SELECT 1 FROM matrices WHERE file_name=?", (file_name,)).fetchone():
             raise ValueError(f"There is already a matrix record for file name ({file_name}). It must be unique.")
 
+        suffix = path.suffix.lower()
+        if suffix != ".omx":
+            raise ValueError("Only OMX (.omx) matrices are supported")
+
         created = False
         temporary = None
-        if matrix is not None and matrix.cores > 0:
+        if matrix is not None:
             if path.exists():
-                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
-            suffix = path.suffix.lower()
-            if suffix != ".omx":
-                raise ValueError("Only OMX (.omx) matrixes are supported")
+                raise FileExistsError(f"{file_name} already exists. Choose a different name")
             temporary = path.with_name(f".{path.stem}.{uuid.uuid4().hex}.tmp{suffix}")
             try:
-                matrix.export(temporary)
+                matrix.save_as_omx(temporary)
                 os.replace(temporary, path)
                 created = True
             except BaseException:
                 if temporary.exists():
                     temporary.unlink()
                 raise
-            cores = matrix.cores
+            cores = len(matrix)
         else:
             if not path.is_file():
                 raise FileNotFoundError(f"{file_name} does not exist. Cannot create this matrix record")
@@ -146,19 +148,55 @@ class Matrices(NonSpatialProjectTable):
         if moved:
             tombstone.unlink()
 
-    def get_matrix(self, name: str) -> AequilibraeMatrix:
-        """Load a matrix by metadata name.
+    def get_matrix(
+        self,
+        name: str,
+        index_name: str | None = None,
+        subset: Sequence[str | dict[str, Any]] | None = None,
+    ) -> AequilibraeMatrix | MatrixStore:
+        """
+        Load a registered matrix, optionally selecting an in-memory subset.
+
+        Without ``subset``, the matrix is opened as a
+        :class:`~aequilibrae.matrix.MatrixStore` for generic OMX access.  When
+        ``subset`` is provided, the selected matrices are copied into an
+        in-memory :class:`~aequilibrae.matrix.AequilibraeMatrix`, ready for
+        computation. Subset entries can be matrix names or matrix metadata
+        queries, as described by
+        :meth:`~aequilibrae.matrix.AequilibraeMatrix.subset`.
+
+        If ``index_name`` is omitted, the only index in the OMX file is used
+        when there is exactly one. If there are multiple indices and one is
+        named ``main_index``, that index is used. Otherwise, pass
+        ``index_name`` explicitly.
 
         :Arguments:
             **name** (:obj:`str`): Registered matrix name.
 
+            **index_name** (:obj:`str`, *Optional*): Name of the OMX zone
+                index.  Inferred when omitted, as described above.
+
+            **subset** (:obj:`Sequence`, *Optional*): Matrix names or metadata
+                queries to copy into an in-memory matrix. If omitted, returns a
+                :class:`MatrixStore` instead.
+
         :Returns:
-            **matrix** (:obj:`AequilibraeMatrix`): Loaded matrix.
+            **matrix** (:class:`~aequilibrae.matrix.AequilibraeMatrix` or
+                :class:`~aequilibrae.matrix.MatrixStore`): An in-memory matrix
+                when ``subset`` is supplied, otherwise an OMX matrix store.
+
+        :raises ValueError: If the file is not OMX, no usable index exists, or
+            multiple indices are ambiguous.
         """
-        file_name = self.get(name, column="file_name")
-        matrix = AequilibraeMatrix()
-        matrix.load(self.folder / file_name)
-        return matrix
+        file_name: str = self.get(name, column="file_name")
+        path = self.folder / file_name
+        if path.suffix.lower() != ".omx":
+            raise ValueError("Only OMX (.omx) matrices are supported")
+
+        if subset is not None:
+            return from_file(path, index_name=index_name, subset=subset, store=False)
+        else:
+            return from_file(path, index_name=index_name, subset=None, store=True)
 
     def clear_database(self) -> None:
         """Remove metadata records whose files are absent."""
@@ -170,10 +208,10 @@ class Matrices(NonSpatialProjectTable):
         self._invalidate()
 
     def update_database(self) -> None:
-        """Register unrecorded matrix files found in the matrix directory."""
+        """Register unrecorded OMX files found in the matrix directory."""
         existing = {record.file_name for record in self}
         for path in self.folder.iterdir():
-            if path.name in existing or path.suffix.lower() not in (".omx", ".aem"):
+            if path.name in existing or path.suffix.lower() != ".omx" or not path.is_file():
                 continue
             candidate = path.name.replace(".", "_").replace(" ", "_")
             name = candidate
@@ -199,9 +237,5 @@ class Matrices(NonSpatialProjectTable):
         return (self.folder / self.get(name, column="file_name")).is_file()
 
     def __cores_on_disk(self, file_name: str) -> int:
-        matrix = AequilibraeMatrix()
-        matrix.load(self.folder / file_name)
-        try:
-            return len(matrix.names)
-        finally:
-            matrix.close()
+        with omx.open_file(self.folder / file_name, mode="r") as matrix:
+            return len(matrix.list_matrices())

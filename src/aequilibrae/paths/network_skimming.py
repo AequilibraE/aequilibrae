@@ -4,7 +4,6 @@ from uuid import uuid4
 
 import numpy as np
 
-from aequilibrae.context import get_active_project
 from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.network_skimming_core import skimming_parallel
 from aequilibrae.paths.results.skim_results import SkimResults
@@ -38,11 +37,11 @@ class NetworkSkimming(WorkerThread):
         >>> skm.report
         []
 
-        # To access the skim matrix directly from its temporary file
+        # To access the in-memory skim matrix
         >>> matrix = skm.results.skims
 
         # Or you can save the results to disk
-        >>> skm.save_to_project('skimming_result_omx', 'omx')
+        >>> matrix.save_as_omx(project_path / 'skimming_result.omx')
 
         >>> project.close()
     """
@@ -71,9 +70,9 @@ class NetworkSkimming(WorkerThread):
         self.signal.emit(["start", self.graph.num_zones, ""])
 
         self.results.cores = self.cores
-        self.results.prepare(self.graph)
 
         if self.graph.num_zones == 0:
+            self.results.prepare(self.graph)
             self.signal.emit(["update", 0, "0/0"])
             self.procedure_id = uuid4().hex
             self.procedure_date = str(datetime.today())
@@ -96,6 +95,9 @@ class NetworkSkimming(WorkerThread):
             cost_name=graph.cost_field if graph.cost_field in graph.skim_fields else None,
         )
         output = inputs.make_outputs(graph.num_zones, origin_count=graph.num_zones)
+        # Keep the requested field order and centroid index while sharing the
+        # origin-major output buffer with the public AequilibraeMatrix.
+        self.results.prepare(graph, output=output)
 
         origins = []
         for row, orig in enumerate(graph.centroids):
@@ -119,11 +121,6 @@ class NetworkSkimming(WorkerThread):
             self.results.cores,
             self.results._heap,
         )
-        # Keep the public AequilibraeMatrix layout and centroid index. The
-        # internal output is origin-major with fields before destinations.
-        matrices = output.matrices
-        for name in graph.skim_fields:
-            self.results.skims.matrix[name][:] = matrices[name]
 
         self.signal.emit(["update", self.graph.num_zones, f"{self.graph.num_zones}/{self.graph.num_zones}"])
 
@@ -147,27 +144,3 @@ class NetworkSkimming(WorkerThread):
             **cores** (:obj:`int`): Number of cores to be used in computation
         """
         self.cores = clamp_cores(cores)
-
-    def save_to_project(self, name: str, format="omx", project=None) -> None:
-        """Saves skim results to the project folder and creates record in the database
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
-
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
-        """
-
-        file_name = f"{name}.{format.lower()}"
-        if not project:
-            project = self.project or get_active_project()
-        project.matrices.create(
-            name,
-            file_name,
-            self.results.skims,
-            procedure="Network skimming",
-            procedure_id=self.procedure_id,
-            timestamp=self.procedure_date,
-        )

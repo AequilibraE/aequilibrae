@@ -21,21 +21,10 @@ class OptimalStrategies:
 
             self.__results[cls._id] = cls.results
             try:
-                # converts 0 based array with custom index to COO matrix, ignores custom index
-                idx = cls.matrix.view_names.index(cls.matrix_core)
-                demand = sparse.coo_matrix(
-                    (
-                        cls.matrix.matrix_view[:, :, idx]
-                        if len(cls.matrix.view_names) > 1
-                        else cls.matrix.matrix_view[:, :]
-                    ),
-                    dtype=np.float64,
-                )
-            except ValueError as e:
-                raise ValueError(
-                    f"matrix core {cls.matrix_core} not found in matrix view. "
-                    f"Ensure the matrix is prepared and the core exists"
-                ) from e
+                # Converts the named matrix to a 0-based COO matrix; the custom zone IDs are mapped below.
+                demand = sparse.coo_matrix(cls.matrix[cls.matrix_core], dtype=np.float64)
+            except KeyError as e:
+                raise ValueError(f"matrix core {cls.matrix_core} is not present in the matrix") from e
 
             hypergraph = cls.graph.context
 

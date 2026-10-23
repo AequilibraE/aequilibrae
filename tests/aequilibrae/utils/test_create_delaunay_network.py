@@ -25,8 +25,7 @@ def test_create_delaunay_network(sioux_falls_example):
 
 
 def test_assign_matrix(sioux_falls_example):
-    demand = sioux_falls_example.matrices.get_matrix("demand_omx")
-    demand.computational_view(["matrix"])
+    demand = sioux_falls_example.matrices.get_matrix("demand_omx", subset=["matrix"])
     da = DelaunayAnalysis(sioux_falls_example)
 
     # Create network and assign matrix
@@ -55,7 +54,7 @@ def test_assign_matrix_with_invalid_matrix(sioux_falls_example):
     da.create_network()
 
     # Test assigning matrix with invalid input
-    with pytest.raises(AttributeError):
+    with pytest.raises(TypeError, match="AequilibraeMatrix"):
         da.assign_matrix(None, "invalid_test")
 
 

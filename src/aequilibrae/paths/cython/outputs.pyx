@@ -319,11 +319,11 @@ def _validate_skim_names(field_names):
 cdef class SkimmingOutputs:
     """Holds the skim values calculated between origins and destinations.
 
-    The values are arranged by origin, skim field, and destination, with one
-    named matrix for each requested field. Routing fills the values for each
-    origin, and resetting the output marks every entry as infinity until it is
-    calculated again. The ``skims`` and ``matrices`` properties provide
-    read-only views of the current results.
+    The values are arranged by origin, destination, and skim field, with one
+    named matrix for each requested field. A DenseMatrix owns the buffer.
+    Routing fills the values for each origin, and resetting the output marks
+    every entry as infinity until it is calculated again. The ``skims`` and
+    ``matrices`` properties provide read-only views of the current results.
     """
 
     def __init__(self, origin_count, destination_count, field_names):
@@ -340,9 +340,8 @@ cdef class SkimmingOutputs:
         self.destination_count = destination_count
         self.field_count = len(names)
 
-        self.skims_buffer = array[double](
-            (origin_count, self.field_count, destination_count), True, np.inf
-        )
+        self.dense_matrix = DenseMatrix(destination_count, names, origin_count=origin_count)
+        self.skims_buffer = self.dense_matrix._values
         self.field_names = names
 
     @classmethod
@@ -370,7 +369,7 @@ cdef class SkimmingOutputs:
         values = np.asarray(output.skims_buffer)
 
         for field, matrix in enumerate(arrays):
-            np.copyto(values[:, field, :], matrix)
+            np.copyto(values[:, :, field], matrix)
 
         return output
 
@@ -477,9 +476,13 @@ cdef class SkimmingOutputs:
             )
         return self
 
+    def to_matrix(self, index, index_name="main_index"):
+        """Return square skim results as an AequilibraeMatrix without copying values."""
+        return self.dense_matrix.to_matrix(index, index_name)
+
     @property
     def skims(self):
-        """Read-only, contiguous [origin rows, fields, destinations] array."""
+        """Read-only, contiguous [origin rows, destinations, fields] array."""
         return readonly_view(self.skims_buffer)
 
     @property
@@ -488,7 +491,7 @@ cdef class SkimmingOutputs:
         skims = self.skims
 
         # These slices preserve the array's read-only storage for each matrix.
-        return {name: skims[:, field, :] for field, name in enumerate(self.field_names)}
+        return {name: skims[:, :, field] for field, name in enumerate(self.field_names)}
 
 
 def _validate_selection_names(set_names):

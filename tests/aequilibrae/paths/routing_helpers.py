@@ -77,7 +77,7 @@ def path_walk_outputs(context, demand, fields=(), penalty_fields=(), selected_li
     """Compare downstream kernels against separate OD-by-OD link walks."""
     zones, _, classes = demand.shape
     loads = np.zeros((context.link_count, classes))
-    skims = np.full((zones, len(fields), zones), np.inf)
+    skims = np.full((zones, zones, len(fields)), np.inf)
     selected_loads = np.zeros((len(selected_links), context.link_count, classes))
     selected_od = np.zeros((zones, len(selected_links), zones, classes))
     total = 0.0
@@ -90,9 +90,9 @@ def path_walk_outputs(context, demand, fields=(), penalty_fields=(), selected_li
             links = results.path_links_to(destination)
             penalty = results.path_turn_cost_to(destination)
             for field_index, field in enumerate(fields):
-                skims[origin, field_index, destination] = field[links].sum()
+                skims[origin, destination, field_index] = field[links].sum()
                 if penalty_fields and penalty_fields[field_index]:
-                    skims[origin, field_index, destination] += penalty
+                    skims[origin, destination, field_index] += penalty
             if origin == destination:
                 continue
             row = demand[origin, destination]

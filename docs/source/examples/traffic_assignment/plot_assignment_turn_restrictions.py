@@ -9,7 +9,7 @@ In this example, we run static traffic assignment for Sioux Falls in two scenari
 1. Base case (no custom turn restrictions)
 2. Custom turn controls with:
    - a turn penalty from link 7 to link 36
-   - a turn prohibition from link 24 to link 23
+   - a turn prohibition from link 24 to link 19
 
 All turn directions are 1 and node-based U-turn transitions are allowed.
 """
@@ -73,8 +73,7 @@ graph = project.network.graphs["c"]
 graph.set_graph("free_flow_time")
 graph.set_blocked_centroid_flows(False)
 
-matrix = project.matrices.get_matrix("demand_omx")
-matrix.computational_view(["matrix"])
+matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
 # Base assignment.
@@ -83,13 +82,13 @@ base_flows = run_assignment(graph, matrix)
 # %%
 # Apply turn controls in memory as node triples equivalent to:
 # - a turn penalty from link 7 to link 36 (dir=1)
-# - a turn prohibition from link 24 to link 23 (dir=1)
+# - a turn prohibition from link 24 to link 19 (dir=1)
 links = project.network.links.data.set_index("link_id")
 turn_restrictions = pd.DataFrame(
     {
         "from_node": [int(links.loc[7, "a_node"]), int(links.loc[24, "a_node"])],
         "via_node": [int(links.loc[7, "b_node"]), int(links.loc[24, "b_node"])],
-        "to_node": [int(links.loc[36, "b_node"]), int(links.loc[23, "b_node"])],
+        "to_node": [int(links.loc[36, "b_node"]), int(links.loc[19, "b_node"])],
         "penalty": [5.0, np.nan],  # 5.0 minutes penalty, and one prohibited turn
     }
 )
@@ -156,6 +155,5 @@ axes[2].set_axis_off()
 plt.tight_layout()
 
 # %%
-# Close matrix and project.
-matrix.close()
+# Close the project.
 project.close()

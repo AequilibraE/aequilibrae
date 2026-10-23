@@ -11,8 +11,7 @@ def tc(sioux_falls_example):
     car_graph = sioux_falls_example.network.graphs["c"]  # type: Graph
     car_graph.set_graph("distance")
     car_graph.set_blocked_centroid_flows(False)
-    matrix = sioux_falls_example.matrices.get_matrix("demand_omx")
-    matrix.computational_view()
+    matrix = sioux_falls_example.matrices.get_matrix("demand_omx", subset=["matrix"])
     return TrafficClass(name="car", graph=car_graph, matrix=matrix)
 
 

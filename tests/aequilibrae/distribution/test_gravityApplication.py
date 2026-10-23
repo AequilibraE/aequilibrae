@@ -44,12 +44,8 @@ def test_gravity_application(model_expo, model_gamma, model_power):
 
     vectors = pd.DataFrame({"rows": rows, "columns": cols}, index=idx)  # row vector
 
-    matrix = AequilibraeMatrix()
-    matrix.create_empty(zones=zones, matrix_names=["impedance"], memory_only=True)
-
-    matrix.matrices[:, :, 0] = np.random.rand(zones, zones)[:, :]
-    matrix.index[:] = np.arange(matrix.zones) + 100
-    matrix.computational_view(["impedance"])
+    matrix = AequilibraeMatrix(index=idx)
+    matrix["impedance"] = np.random.rand(zones, zones)
 
     proj = Parameters()
     args = {

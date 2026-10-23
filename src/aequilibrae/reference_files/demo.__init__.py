@@ -31,19 +31,18 @@ def matrix_summary():
     df = mats.list()
 
     res = {}
-    for name in df["name"]:
-        mat = mats.get_matrix(name)
-        mat.computational_view()
-
-        stats = {}
-        for i, nm in enumerate(mat.view_names):
-            array = mat.matrix_view[:, :] if len(mat.view_names) == 1 else mat.matrix_view[:, :, i]
-            stats[nm] = {
-                "total": np.sum(array),
-                "min": np.min(array),
-                "max": np.max(array),
-                "nnz": (array != 0.0).sum(),
-            }
+    for name, file_name in zip(df["name"], df["file_name"], strict=True):
+        if not file_name.lower().endswith(".omx"):
+            continue
+        with mats.get_matrix(name) as mat:
+            stats = {}
+            for nm, array in mat.items():
+                stats[nm] = {
+                    "total": np.sum(array),
+                    "min": np.min(array),
+                    "max": np.max(array),
+                    "nnz": (array != 0.0).sum(),
+                }
         res[name] = stats
 
     return res

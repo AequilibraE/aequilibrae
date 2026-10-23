@@ -23,9 +23,18 @@ assigned. There are three pieces of information that are required in the instant
 * **matrix**: it is the AequilibraE matrix with the demand for that traffic class, which can have
   an arbitrary number of user-classes setup as different layers (cores) of the matrix object.
 
+.. testsetup::
+
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    _assignment_docs_tmp = TemporaryDirectory()
+    project_path = str(Path(_assignment_docs_tmp.name) / "project")
+
 .. doctest::
 
     >>> from aequilibrae.paths import TrafficClass
+    >>> from aequilibrae.utils.create_example import create_example
 
     >>> project = create_example(project_path)
     >>> project.network.build_graphs()
@@ -35,11 +44,9 @@ assigned. There are three pieces of information that are required in the instant
     >>> graph_truck = project.network.graphs['T']
 
     # And also get the matrices for cars and trucks
-    >>> matrix_car = project.matrices.get_matrix("demand_mc")
-    >>> matrix_car.computational_view("car")
+    >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
 
-    >>> matrix_truck = project.matrices.get_matrix("demand_mc")
-    >>> matrix_truck.computational_view("trucks")
+    >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
 
     # We create the Traffic Classes
     >>> tc_car = TrafficClass("car", graph_car, matrix_car)

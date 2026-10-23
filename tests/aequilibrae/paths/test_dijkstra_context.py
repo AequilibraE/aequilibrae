@@ -7,9 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 import networkx as nx
 import numpy as np
 import pytest
-
-from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import SearchWorkspace
@@ -543,6 +542,20 @@ def test_uturn_policy_and_zero_cost_cycles(cost, allow_uturns, override, reachab
         assert results.path_cost_to(3) == 4 * cost + (override or 0)
         assert results.path_turn_cost_to(3) == (override or 0)
     assert_state_tree(context, results)
+
+
+@pytest.mark.parametrize(
+    "name, nodes, error",
+    [
+        ("first_nodes", [0], "one value per link"),
+        ("last_nodes", [0], "one value per link"),
+        ("first_nodes", [-1, 0], "invalid index"),
+        ("last_nodes", [0.0, 1.0], "integers"),
+    ],
+)
+def test_invalid_physical_neighbours(name, nodes, error):
+    with pytest.raises(ValueError, match=error):
+        TurnBasedContext([0, 1, 2, 2], [1, 2], np.ones(2), **{name: nodes})
 
 
 def test_turn_topology_copied_then_shared_by_independent_objectives():

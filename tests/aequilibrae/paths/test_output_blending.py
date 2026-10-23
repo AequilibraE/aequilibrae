@@ -413,7 +413,8 @@ def test_rectangular_outputs_and_retained_named_views(method, kind):
 
     np.testing.assert_allclose(arrays(output)[0], expected)
     for index, view in enumerate(retained.values()):
-        np.testing.assert_allclose(view, expected[:, index])
+        expected_view = expected[:, :, index] if kind == "skimming" else expected[:, index]
+        np.testing.assert_allclose(view, expected_view)
         assert not view.flags.writeable
         assert np.shares_memory(view, arrays(output)[0])
     output.reset()

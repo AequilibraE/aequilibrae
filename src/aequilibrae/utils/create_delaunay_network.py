@@ -112,7 +112,7 @@ class DelaunayAnalysis:
         ta.execute()
 
         cols = []
-        for x in matrix.view_names:
+        for x in matrix:
             cols.extend([f"{x}_ab", f"{x}_ba", f"{x}_tot"])
         df = ta.results()[cols]
 

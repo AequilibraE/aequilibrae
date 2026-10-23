@@ -248,7 +248,7 @@ class ProjectTable(ABC):
         self._invalidate()
         return row[self.key]
 
-    def update(self, key: Any, **values: Any) -> None:
+    def update(self, key: Any = MISSING, **values: Any) -> None:
         """Update the supplied fields of one record.
 
         :Arguments:
@@ -256,6 +256,9 @@ class ProjectTable(ABC):
 
             **values** (:obj:`Any`): Column values to write.
         """
+        if key is MISSING and (key := values.get(self.key, MISSING)) is MISSING:
+            raise ValueError(f"table key ({self.key}) argument not provided")
+
         with self._connection as conn:
             sql = self._update_statement(tuple(values))
             parameters = [self._database_value(value) for value in values.values()]
@@ -266,12 +269,18 @@ class ProjectTable(ABC):
 
         self._invalidate()
 
-    def delete(self, key: Any) -> None:
+    def delete(self, key: Any = MISSING, **kw_key) -> None:
         """Delete one record identified by ``key``.
 
         :Arguments:
             **key** (:obj:`Any`): Key of the record to delete.
         """
+        if (len(kw_key) > 1) or (key is not MISSING and len(kw_key)):
+            raise ValueError(f"too many arguments provided for key ({self.key}), only one is accepted")
+
+        if key is MISSING and (key := kw_key.get(self.key, MISSING)) is MISSING:
+            raise ValueError(f"table key ({self.key}) argument not provided")
+
         with self._connection as conn:
             cursor = conn.execute(self._delete_sql, [key])
             if cursor.rowcount == 0:

@@ -88,11 +88,8 @@ transit_graph = graph_db.to_transit_graph()
 
 # Mock demand matrix
 zones = len(transit_graph.centroids)
-mat = AequilibraeMatrix()
-mat.create_empty(zones=zones, matrix_names=['pt'], memory_only=True)
-mat.index = transit_graph.centroids[:]
-mat.matrices[:, :, 0] = np.full((zones, zones), 1.0)
-mat.computational_view()
+mat = AequilibraeMatrix(index=transit_graph.centroids, index_name="zones")
+mat["pt"] = np.full((zones, zones), 1.0)
 
 # %%
 # Hyperpath generation/assignment
@@ -119,7 +116,7 @@ assigclass.set_demand_matrix_core("pt")
 assig.execute()
 
 # We can use the get_skim_results() method to retrieve the skims
-assig.get_skim_results()["pt"].matrix["boardings"].sum()
+assig.get_skim_results()["pt"]["boardings"].sum()
 
 # %%
 # Saving results

@@ -145,7 +145,7 @@ void dijkstra_with_queue(const TurnBasedContext &context,
           turn < turn_end && context.turn_to_links[turn] == next;
       const double penalty = explicit_turn ? context.turn_penalties[turn] : 0.0;
       if (state != root && !explicit_turn && !context.allow_uturns &&
-          graph.heads[next] == context.tails[state]) {
+          context.first_nodes[next] == context.last_nodes[state]) {
         continue;
       }
       const double next_cost = cost + graph.costs[next] + penalty;

@@ -18,23 +18,18 @@ template <typename T> struct LoadingOutputs {
   }
 };
 
-// Borrow one origin's contiguous [fields, destinations] block.
+// Borrow one origin's contiguous [destinations, fields] block.
 // Callers supply valid indices and ranges. Empty views do not offset pointers.
 template <typename T> struct SkimmingOriginView {
   std::size_t field_count = 0;
   std::size_t destination_count = 0;
   T *data = nullptr;
 
-  T *field_data(std::size_t index) const noexcept {
+  T *destination_data(std::size_t index) const noexcept {
     if (field_count == 0 || destination_count == 0) {
       return nullptr;
     }
-    return data + index * destination_count;
-  }
-
-  SkimmingOriginView<T> subfields(std::size_t first,
-                                  std::size_t count) const noexcept {
-    return {count, destination_count, count ? field_data(first) : nullptr};
+    return data + index * field_count;
   }
 };
 
@@ -43,7 +38,7 @@ template <typename T> struct SkimmingOutputsView {
   std::size_t origin_count = 0;
   std::size_t field_count = 0;
   std::size_t destination_count = 0;
-  T *data = nullptr; // [origins, fields, destinations]
+  T *data = nullptr; // [origins, destinations, fields]
 
   SkimmingOriginView<T> origin(std::size_t index) const noexcept {
     T *values = nullptr;
