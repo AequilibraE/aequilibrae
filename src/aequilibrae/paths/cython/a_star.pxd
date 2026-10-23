@@ -1,6 +1,6 @@
 from libc.stddef cimport size_t
 from aequilibrae.paths.cython.context cimport CppNodeBasedContext, CppTurnBasedContext
-from aequilibrae.paths.cython.queries cimport CppSearchQuery
+from aequilibrae.paths.cython.search_query cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
 from aequilibrae.paths.cython.workspaces cimport CppAStarWorkspace
 

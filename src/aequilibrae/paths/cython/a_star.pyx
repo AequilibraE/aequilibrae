@@ -5,7 +5,7 @@ import numpy as np
 
 from libc.math cimport isfinite
 from aequilibrae.paths.cython.dijkstra cimport RoutingContext
-from aequilibrae.paths.cython.queries cimport SearchQuery
+from aequilibrae.paths.cython.search_query cimport SearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.workspaces cimport AStarWorkspace, CppAStarWorkspace
 from aequilibrae.utils.cython.array_allocations cimport const_array_pointer

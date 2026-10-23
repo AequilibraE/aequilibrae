@@ -8,7 +8,7 @@ import pytest
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae.matrix import AequilibraeMatrix, GeneralisedCOODemand
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix, from_dict
 from aequilibrae.paths.route_choice import RouteChoice
 
 
@@ -39,11 +39,15 @@ def test_prepare(route_choice_setup):
     with pytest.raises(ValueError):
         rc.prepare([1])
 
+    rc.set_choice_set_generation("bfsle", max_routes=1)
     rc.prepare([1, 2])
-    assert list(rc.demand.df.index) == [(1, 2), (2, 1)]
+    rc.execute(perform_assignment=False)
+    pairs = list(rc.get_results()[["origin id", "destination id"]].itertuples(index=False, name=None))
+    assert pairs == [(1, 2), (2, 1)]
 
     rc.prepare([(1, 2)])
-    assert list(rc.demand.df.index) == [(1, 2)]
+    rc.execute(perform_assignment=False)
+    assert list(rc.get_results()[["origin id", "destination id"]].itertuples(index=False, name=None)) == [(1, 2)]
 
 
 def test_set_save_routes(route_choice_setup):
@@ -105,7 +109,7 @@ def test_link_results(route_choice_setup):
 
     rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
     rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
-    rc.add_demand(mat)
+    rc.set_demand(mat)
     rc.prepare()
     rc.execute(perform_assignment=True)
 
@@ -130,7 +134,7 @@ def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost)
     tmp_path.mkdir()
 
     rc.set_choice_set_generation("link-penalization", max_routes=5, penalty=1.1)
-    rc.add_demand(mat)
+    rc.set_demand(mat)
     rc.prepare()
     rc.execute(perform_assignment=True)
 
@@ -142,7 +146,7 @@ def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost)
         graph.set_graph("free_flow_time")
 
     rc2 = RouteChoice(graph)
-    rc2.add_demand(mat)
+    rc2.set_demand(mat)
     rc2.set_choice_set_generation(store_results=True)
 
     rc2.execute_from_path_files(tmp_path, recompute_psl=recompute_psl)
@@ -178,14 +182,14 @@ def test_saving(route_choice_setup):
 
     rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
     rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
-    rc.add_demand(mat)
+    rc.set_demand(mat)
     rc.prepare()
     rc.execute(perform_assignment=True)
     lloads = rc.get_load_results()
     u_sl = rc.get_select_link_loading_results()
 
     rc.save_link_flows("ll")
-    rc.save_select_link_flows("sl")
+    rc.save_select_link("sl")
 
     with project.results_connection as conn:
         for table, df in [
@@ -198,14 +202,14 @@ def test_saving(route_choice_setup):
             pd.testing.assert_frame_equal(df2, df)
             pd.testing.assert_frame_equal(df3, df)
 
-    matrices = AequilibraeMatrix.from_omx(
+    matrices = AequilibraeSparseMatrix.from_omx(
         (pathlib.Path(project.project_base_path) / "matrices" / "sl").with_suffix(".omx"),
         index_name="route_choice_sl_index",
     )
 
     for sl_name, v in rc.get_select_link_od_matrix_results().items():
         for demand_name, matrix in v.items():
-            np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name])
+            np.testing.assert_allclose(matrix.toarray(), matrices[sl_name + "_" + demand_name].toarray())
 
 
 def test_round_trip(route_choice_setup):
@@ -213,7 +217,7 @@ def test_round_trip(route_choice_setup):
     mat = route_choice_setup["mat"]
     rc = route_choice_setup["rc"]
 
-    rc.add_demand(mat)
+    rc.set_demand(mat)
     rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
     rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
     rc.prepare()
@@ -241,7 +245,7 @@ def test_to_parquet_kwargs(route_choice_setup):
     mat = route_choice_setup["mat"]
     rc = route_choice_setup["rc"]
 
-    rc.add_demand(mat)
+    rc.set_demand(mat)
     rc.set_choice_set_generation("link-penalization", max_routes=5, penalty=1.1)
     rc.prepare()
 
@@ -290,13 +294,7 @@ def test_assign_from_df(route_choice_setup):
 
     mat2 = AequilibraeMatrix(index=graph.centroids)
     mat2["all ones"] = np.ones((graph.num_zones, graph.num_zones))
-    demand = GeneralisedCOODemand(
-        "origin id",
-        "destination id",
-        graph.nodes_to_indices,
-        shape=(graph.num_zones, graph.num_zones),
-    )
-    demand.add_matrix(mat2)
+    demand = from_dict({"all ones": np.ones((graph.num_zones, graph.num_zones))}, index=graph.centroids)
 
     args = {
         "demand": demand,
@@ -369,9 +367,8 @@ def test_assign_from_df(route_choice_setup):
     )
 
     # Reduce demand matrix to half the route sets
-    args["demand"].df = args["demand"].df.loc[
-        df[["origin id", "destination id"]].head(len(df) // 2).itertuples(name=None, index=False)
-    ]
+    demand.imat["all ones", :, :] = 0
+    demand.mat["all ones", df["origin id"].head(len(df) // 2), df["destination id"].head(len(df) // 2)] = 1
 
     # Test with recompute_psl=False
     rc.assign_from_df(df=df, **args)
@@ -392,7 +389,7 @@ def test_assign_from_df(route_choice_setup):
 
     pd.testing.assert_series_equal(
         results["probability"],
-        df.head(len(df) // 2)["probability"],
+        df.head(len(df) // 2).sort_values(["origin id", "destination id"])["probability"],
         check_index=False,
     )
 
@@ -409,7 +406,7 @@ def test_assign_from_df(route_choice_setup):
         "Link loading results don't match the expected values",
     )
 
-    links2 = links.head(len(df) // 2)
+    links2 = links.head(len(df) // 2).sort_values(["a_node", "b_node"])
     np.testing.assert_array_equal(results["cost"].to_numpy(), links2["distance"].to_numpy())
     np.testing.assert_array_equal(results["mask"].to_numpy(), True)
     np.testing.assert_array_equal(results["path overlap"].to_numpy(), 1.0)
@@ -427,22 +424,12 @@ def test_known_results(route_choice_setup, cost):
     nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
 
     mat = AequilibraeMatrix(index=graph.centroids)
-    mat["all zeros"] = np.ones((graph.num_zones, graph.num_zones))
+    mat["all zeros"] = np.zeros((graph.num_zones, graph.num_zones))
     mat["single one"] = np.zeros((graph.num_zones, graph.num_zones))
-    demand = GeneralisedCOODemand(
-        "origin id",
-        "destination id",
-        graph.nodes_to_indices,
-        shape=(graph.num_zones, graph.num_zones),
-    )
-    demand.add_matrix(mat)
-
-    demand.df.loc[nodes] = 0.0
-    demand.df.loc[nodes[0], "single one"] = 1.0
-    demand.df = demand.df.loc[nodes].fillna(0.0)
+    mat.mat["single one", *nodes[0]] = 1
 
     with Bridge() as b:
-        rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, bridge=b)
+        rc.batched(mat, max_routes=20, max_depth=10, path_size_logit=True, bridge=b)
 
     link_loads = rc.get_link_loading()
     table = rc.get_results()
@@ -470,13 +457,9 @@ def test_select_link(route_choice_setup, cost):
     graph.set_graph(cost)
 
     np.random.seed(0)
-    nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
-    demand = demand_from_nodes(nodes, graph)
-
-    mat = AequilibraeMatrix(index=graph.centroids)
-    mat["all ones"] = np.ones((graph.num_zones, graph.num_zones))
-    demand.add_matrix(mat)
-    demand.df = demand.df.loc[nodes]
+    nodes = tuple(np.random.choice(graph.centroids, size=(10, 2), replace=False).T)
+    demand = from_dict({"all ones": np.zeros((graph.num_zones, graph.num_zones))}, index=graph.centroids)
+    demand.mat["all ones", *nodes] = 1
 
     with Bridge() as b:
         rc.batched(
@@ -500,8 +483,8 @@ def test_select_link(route_choice_setup, cost):
     sl_link_loads = rc.get_sl_link_loading()
     sl_od_matrices = rc.get_sl_od_matrices()
 
-    m = sl_od_matrices["sl1"]["all ones"].to_scipy()
-    m2 = sl_od_matrices["sl2"]["all ones"].to_scipy()
+    m = sl_od_matrices["sl1"]["all ones"]
+    m2 = sl_od_matrices["sl2"]["all ones"]
     assert set(zip(*(m.toarray() > 0.0001).nonzero(), strict=True)) == {(o - 1, d - 1) for o, d in ods}
     assert set(zip(*(m2.toarray() > 0.0001).nonzero(), strict=True)) == {(20 - 1, 4 - 1), (5 - 1, 3 - 1)}
 
@@ -518,14 +501,3 @@ def test_select_link(route_choice_setup, cost):
 
     assert abs(u.sum() - (t1["route set"].apply(len) * t1.probability).sum()) < 1e-6
     assert abs(u2.sum() - (t2["route set"].apply(len) * t2.probability).sum()) < 1e-6
-
-
-# Helper function from original file
-def demand_from_nodes(nodes, graph):
-    demand = GeneralisedCOODemand(
-        "origin id", "destination id", graph.nodes_to_indices, shape=(graph.num_zones, graph.num_zones)
-    )
-    df = pd.DataFrame()
-    df.index = pd.MultiIndex.from_tuples(nodes, names=["origin id", "destination id"])
-    demand.add_df(df)
-    return demand

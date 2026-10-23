@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.cython.queries import SearchQuery
+from aequilibrae.paths.cython.search_query import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import SearchWorkspace
 
@@ -38,9 +38,7 @@ def test_results_are_only_path_storage(context):
         "path_nodes_to",
         "path_nodes",
         "path_cost",
-        "network_loading",
         "skim_fields",
-        "select_link_loading",
     ):
         assert not hasattr(results, name)
     for name in ("predecessors", "connectors", "settlement_order", "terminal_states"):

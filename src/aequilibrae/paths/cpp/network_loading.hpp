@@ -5,7 +5,6 @@
 #include <type_traits>
 
 #include "outputs.hpp"
-#include "queries.hpp"
 #include "search_results.hpp"
 #include "workspaces.hpp"
 
@@ -42,44 +41,47 @@ void cascade_loads(const SearchResults &results,
 
 // Load one origin. Scratch is replaced each call, while output accumulates
 // across origins. Missing terminals and intrazonal demand are ignored.
-template <typename T>
-void network_loading(const SearchResults &results, const LoadingQuery<T> &query,
+template <typename T, typename DemandRow>
+void network_loading(const SearchResults &results, const DemandRow &query,
                      const LoadingWorkspace<T> &workspace,
                      const LoadingOutputs<T> &output) noexcept {
   static_assert(std::is_floating_point_v<T>);
-  const auto classes = query.class_count;
+  const auto classes = query.field_count;
   if (classes == 0) {
     return;
   }
 
   std::fill_n(workspace.state_loads, workspace.state_count * classes, T{0});
 
-  for (std::size_t node = 0; node < query.destination_count; ++node) {
+  for (std::size_t entry = 0; entry < query.entry_count(); ++entry) {
+    const auto node = query.destination(entry);
     const auto terminal = results.terminal_states[node];
     if (terminal == invalid_state || terminal == results.metadata->root) {
       continue;
     }
 
+    const T *demand = query.values(entry);
     T *row = workspace.state_loads + terminal * classes;
     for (std::size_t cls = 0; cls < classes; ++cls) {
-      row[cls] += query.demand[node * classes + cls];
+      row[cls] += demand[cls];
     }
   }
   cascade_loads(results, workspace, output);
 }
 
-template <typename T>
+template <typename T, typename DemandRow>
 T sum_weighted_turn_costs(const SearchResults &results,
-                          const LoadingQuery<T> &query) noexcept {
+                          const DemandRow &query) noexcept {
   T total = 0;
-  for (std::size_t node = 0; node < query.destination_count; ++node) {
+  for (std::size_t entry = 0; entry < query.entry_count(); ++entry) {
+    const auto node = query.destination(entry);
     const auto terminal = results.terminal_states[node];
     if (terminal == invalid_state || terminal == results.metadata->root) {
       continue;
     }
-    for (std::size_t cls = 0; cls < query.class_count; ++cls) {
-      total += query.demand[node * query.class_count + cls] *
-               results.turn_costs[terminal];
+    const T *demand = query.values(entry);
+    for (std::size_t cls = 0; cls < query.field_count; ++cls) {
+      total += demand[cls] * results.turn_costs[terminal];
     }
   }
   return total;
@@ -87,17 +89,19 @@ T sum_weighted_turn_costs(const SearchResults &results,
 
 // Assignment searches every destination with demand. Missing terminals here
 // therefore mean unreachable demand, not targets omitted by an early stop.
-template <typename T>
+template <typename T, typename DemandRow>
 T sum_unassigned_demand(const SearchResults &results,
-                        const LoadingQuery<T> &query) noexcept {
+                        const DemandRow &query) noexcept {
   T total = 0;
-  for (std::size_t node = 0; node < query.destination_count; ++node) {
+  for (std::size_t entry = 0; entry < query.entry_count(); ++entry) {
+    const auto node = query.destination(entry);
     if (node == results.metadata->origin ||
         results.terminal_states[node] != invalid_state) {
       continue;
     }
-    for (std::size_t cls = 0; cls < query.class_count; ++cls) {
-      total += query.demand[node * query.class_count + cls];
+    const T *demand = query.values(entry);
+    for (std::size_t cls = 0; cls < query.field_count; ++cls) {
+      total += demand[cls];
     }
   }
   return total;

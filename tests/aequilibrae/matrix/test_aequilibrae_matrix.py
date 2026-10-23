@@ -7,7 +7,15 @@ import pandas as pd
 import pytest
 import scipy.sparse as sparse
 
-from aequilibrae.matrix import AequilibraeMatrix, MatrixStore, from_df, from_dict, from_file, from_scipy
+from aequilibrae.matrix import (
+    AequilibraeMatrix,
+    AequilibraeSparseMatrix,
+    MatrixStore,
+    from_df,
+    from_dict,
+    from_file,
+    from_scipy,
+)
 
 
 @pytest.fixture
@@ -105,7 +113,8 @@ def assert_matrix(matrix, index, data, index_name="zones", metadata=None):
     assert len(matrix) == len(data)
 
     for name, expected in data.items():
-        np.testing.assert_array_equal(matrix[name], expected)
+        actual = matrix[name]
+        np.testing.assert_array_equal(actual.toarray() if isinstance(actual, sparse.sparray) else actual, expected)
 
     if metadata is not None:
         for key, value in metadata.items():
@@ -1669,8 +1678,9 @@ def test_from_df_accepts_nullable_integer_ids():
 )
 def test_from_scipy(index, data, array_type):
     matrix = from_scipy({name: array_type(values) for name, values in data.items()}, index, index_name="zones")
-    assert isinstance(matrix, AequilibraeMatrix)
+    assert isinstance(matrix, AequilibraeSparseMatrix)
     assert_matrix(matrix, index, data)
+    assert all(isinstance(value, array_type) for value in matrix.values())
 
 
 @pytest.mark.parametrize("dtype", [np.int32, np.float32])
@@ -1678,4 +1688,4 @@ def test_from_scipy_preserves_dtype(index, dtype):
     values = np.arange(9, dtype=dtype).reshape(3, 3)
     matrix = from_scipy({"car": sparse.csr_array(values)}, index)
     assert matrix["car"].dtype == np.dtype(dtype)
-    np.testing.assert_array_equal(matrix["car"], values)
+    np.testing.assert_array_equal(matrix["car"].toarray(), values)

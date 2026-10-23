@@ -15,7 +15,7 @@ from aequilibrae.paths.cython.context cimport (
 from aequilibrae.paths.cython.dijkstra cimport RoutingContext, cpp_dijkstra
 from aequilibrae.paths.cython.dijkstra import validate_routing_heap
 from aequilibrae.paths.cython.outputs cimport SkimmingOutputs, CppSkimmingOutputsView
-from aequilibrae.paths.cython.queries cimport CppSearchQuery
+from aequilibrae.paths.cython.search_query cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppMutableSearchResults
 from aequilibrae.paths.cython.skimming cimport cpp_skimming
 from aequilibrae.paths.cython.workspaces cimport (
