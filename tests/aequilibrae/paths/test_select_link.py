@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, PathResults
-from aequilibrae.paths.vdf import bpr
+from aequilibrae import Graph, PathResults, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths.vdf import bpr
 
 
 @pytest.fixture
@@ -51,7 +51,8 @@ def test_multiple_link_sets(select_link_setup):
 
     for key in assignclass._selected_links.keys():
         od_mask, link_loading = create_od_mask(assignclass.matrix, assignclass.graph, assignclass._selected_links[key])
-        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        selected = assignclass.results.select_link_od.matrices[key]["matrix"]
+        np.testing.assert_allclose(selected.toarray(), od_mask)
         np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
     # Test if files are saved in the right place
@@ -86,7 +87,8 @@ def test_equals_demand_one_origin(select_link_setup):
 
     for key in assignclass._selected_links.keys():
         od_mask, link_loading = create_od_mask(assignclass.matrix, assignclass.graph, assignclass._selected_links[key])
-        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        selected = assignclass.results.select_link_od.matrices[key]["matrix"]
+        np.testing.assert_allclose(selected.toarray(), od_mask)
         np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
 
@@ -110,7 +112,8 @@ def test_single_demand(select_link_setup):
 
     for key in assignclass._selected_links.keys():
         od_mask, link_loading = create_od_mask(assignclass.matrix, assignclass.graph, assignclass._selected_links[key])
-        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        selected = assignclass.results.select_link_od.matrices[key]["matrix"]
+        np.testing.assert_allclose(selected.toarray(), od_mask)
         np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
 

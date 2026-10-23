@@ -5,15 +5,14 @@ import weakref
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-
-from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pytest
-
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.paths.cython.aon import PreparedAoN
-from aequilibrae.paths.cython.context import SkimmingContext, SelectLinkContext
+from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext
 from aequilibrae.paths.cython.outputs import AoNOutputs, LoadingOutputs, SelectLinkLoadingOutputs
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import AoNWorkspace
+
 from .routing_helpers import history_context, make_context, path_walk_outputs, search
 
 
@@ -283,7 +282,7 @@ def test_no_active_origins_resets_outputs(turn):
     )
     out = prepared.run(prepared.make_outputs())
     assert out.turn_cost_total == 0
-    assert np.all(out.select_link.od.demand == 0)
+    assert out.select_link.od.matrices["empty"]["class_0"].nnz == 0
     assert out.select_link.loading.link_loads.shape == (1, 0, 1)
 
 
@@ -317,13 +316,12 @@ def test_output_group_allocates_resets_and_releases_independent_components(skims
     if selected_loads:
         assert not np.any(out.select_link.loading.link_loads)
     if selected_od:
-        assert not np.any(out.select_link.od.demand)
+        assert out.select_link.od.matrices["all"]["class_0"].nnz == 0
 
     for previous, current in zip(retained, output_arrays(out), strict=True):
         assert previous.ctypes.data == current.ctypes.data
         assert not current.flags.writeable
 
-    loading = out.loading
     skimming = out.skimming
     selection = out.select_link
     for name in (
@@ -352,12 +350,19 @@ def test_output_group_allocates_resets_and_releases_independent_components(skims
 
 @pytest.mark.parametrize("dimensions", [(0, 0, 0), (0, 2, 1), (2, 0, 1), (2, 3, 0)])
 def test_output_allocator_supports_empty_axes_and_fixed_components(dimensions):
-    out = AoNOutputs(*dimensions, skim_names=("cost",), select_link_names=("set",))
+    demand_names = ("class_0",) if dimensions[2] else ()
+    out = AoNOutputs(
+        *dimensions,
+        skim_names=("cost",),
+        select_link_names=("set",),
+        demand_names=demand_names,
+    )
     links, zones, classes = dimensions
     assert out.loading.link_loads.shape == (links, classes)
     assert out.skimming.skims.shape == (zones, zones, 1)
     assert out.select_link.loading.link_loads.shape == (1, links, classes)
-    assert out.select_link.od.demand.shape == (zones, 1, zones, classes)
+    assert out.select_link.od.field_names == demand_names
+    assert all(matrix.shape == (zones, zones) for matrix in out.select_link.od.matrices["set"].values())
     out.reset()
     with pytest.raises(RuntimeError):
         out.__init__(*dimensions)

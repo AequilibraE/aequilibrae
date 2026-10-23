@@ -227,8 +227,7 @@ cdef class SparseMatrix(_MatrixBase):
         coo_matrices = {}
         for name, matrix in inputs.items():
             if sparse.issparse(matrix):
-                source.check_format(full_check=True)
-                source = source.tocoo(copy=False)
+                source = matrix.tocoo(copy=False)
                 # Cast values before summing duplicates to avoid source-dtype overflow.
                 csr = sparse.coo_array(
                     (source.data.astype(dtype), (source.row, source.col)), shape=shape,

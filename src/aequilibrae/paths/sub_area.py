@@ -7,7 +7,7 @@ import geopandas as gpd
 import pandas as pd
 
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths import RouteChoice
 from aequilibrae.paths.graph import Graph
 
@@ -19,7 +19,7 @@ class SubAreaAnalysis:
         self,
         graph: Graph,
         subarea: gpd.GeoDataFrame,
-        demand: Union[pd.DataFrame, AequilibraeMatrix],
+        demand: Union[AequilibraeMatrix, AequilibraeSparseMatrix],
         project=None,
     ):
         """
@@ -38,7 +38,7 @@ class SubAreaAnalysis:
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union
             represents the sub-area.
 
-            **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to
+            **demand** (:obj:`Union[AequilibraeMatrix, AequilibraeSparseMatrix]`): The demand matrix to
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
@@ -64,7 +64,7 @@ class SubAreaAnalysis:
         logger.info(f"Created: {len(self.edge_pairs)} edge pairs from {len(self.single_edges)} edges")
 
         self.rc = RouteChoice(self.graph)
-        self.rc.add_demand(demand)
+        self.rc.set_demand(demand)
         self.rc.set_select_links(self.single_edges | self.edge_pairs, link_loading=False)
 
     def post_process(self, demand_cols=None, keep_original_ods: bool = False):
@@ -81,11 +81,13 @@ class SubAreaAnalysis:
         :Returns:
             **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area demand matrix.
         """
+        assert self.rc.demand is not None
 
         if demand_cols is None:
-            demand_cols = self.rc.demand.field_names
+            demand_cols = tuple(self.rc.demand)
 
         sl_od = self.rc.get_select_link_od_matrix_results()
+        index = self.rc.demand.index
 
         sub_area_demand = []
         for col in demand_cols:
@@ -98,8 +100,8 @@ class SubAreaAnalysis:
             for (link_id, dir), v in edge_totals.items():
                 link = self.interior_graph.loc[link_id, dir]
                 for (o, d), load in v.todok().items():
-                    o = self.graph.all_nodes[o]
-                    d = self.graph.all_nodes[d]
+                    o = index[o]
+                    d = index[d]
 
                     o_inside = o in self.interior_nodes.index
                     d_inside = d in self.interior_nodes.index
@@ -118,6 +120,8 @@ class SubAreaAnalysis:
                 link2 = self.interior_graph.loc[l2]
 
                 for (o, d), load in v.todok().items():
+                    o = index[o]
+                    d = index[d]
                     o_inside = o in self.interior_nodes.index
                     d_inside = d in self.interior_nodes.index
 
@@ -147,6 +151,7 @@ class SubAreaAnalysis:
         self.sub_area_demand = pd.concat(sub_area_demand, axis=1).fillna(0.0)
 
         interior = self.rc.demand.df.loc[interior]
+        interior = pd.concat(interior, axis=1).fillna(0.0)
         if keep_original_ods:
             # We need to duplicate the interior ODs if we're "keeping the originals"
             interior.index = pd.MultiIndex.from_tuples(

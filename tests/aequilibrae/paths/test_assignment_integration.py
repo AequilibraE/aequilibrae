@@ -3,16 +3,16 @@
 import numpy as np
 import pandas as pd
 import pytest
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
 from aequilibrae import Graph, TrafficAssignment, TrafficClass
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs
-from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.vdf import bpr
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 
 
 def diamond(turn=False):
@@ -119,7 +119,9 @@ def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
         assert loads.loc[link, "work_ab"] == 0.0
     np.testing.assert_allclose(results.link_loads, traffic._aon_results.link_loads)
     np.testing.assert_allclose(assignment.assignment.total_flow, 2.5 * results.total_link_loads)
-    np.testing.assert_array_equal(results.select_link_od.matrices["upper"][0, 3], [8.0, 12.0])
+    np.testing.assert_array_equal(
+        [matrix[0, 3] for matrix in results.select_link_od.matrices["upper"].values()], [8.0, 12.0]
+    )
     np.testing.assert_array_equal(results.select_link_loading["either"], results.compact_link_loads)
     assert results.total_turn_penalty == (10.0 if turn else 0.0)
     assert assignment.assignment.fw_total_turn_cost == 2.5 * results.total_turn_penalty
@@ -140,8 +142,10 @@ def test_turn_cost_and_selected_outputs_follow_accepted_solution(algorithm):
     upper = results.get_load_results().loc[71, "work_tot"] + results.get_load_results().loc[71, "other_tot"]
     assert results.total_turn_penalty == pytest.approx(0.5 * upper)
     np.testing.assert_allclose(results.select_link_loading["either"], results.compact_link_loads)
-    np.testing.assert_allclose(results.select_link_od.matrices["either"][0, 3], [8.0, 12.0])
-    assert results.select_link_od.matrices["upper"].sum() == pytest.approx(upper)
+    np.testing.assert_allclose(
+        [matrix[0, 3] for matrix in results.select_link_od.matrices["either"].values()], [8.0, 12.0]
+    )
+    assert sum(matrix.sum() for matrix in results.select_link_od.matrices["upper"].values()) == pytest.approx(upper)
 
     optimizer = assignment.assignment
     current = traffic.pce * (
@@ -199,7 +203,11 @@ def test_unreachable_demand_is_reported_without_loading_or_counting_intrazonal(c
     assert "10 demand could not be assigned" in caplog.text
     assert np.isinf(traffic.results.skims.matrices["time"][3, 0])
     assert traffic.results.skims.matrices["time"][3, 3] == 0.0
-    assert traffic.results.select_link_od.demand[3].sum() == 0.0
+    assert all(
+        matrix[3:4].nnz == 0
+        for matrices in traffic.results.select_link_od.matrices.values()
+        for matrix in matrices.values()
+    )
     assert traffic.results.total_link_loads.sum() == 40.0
 
     traffic.results.reset()
@@ -240,7 +248,7 @@ def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
     inputs = AssignmentInputs(graph, matrix, "time", {"upper": [0]}, 2)
     state = inputs.make_state(1, 10000)
     output = state.output
-    buffers = [output.loading.link_loads, output.skimming.skims, output.select_link.od.demand]
+    buffers = [output.loading.link_loads, output.skimming.skims]
     addresses = [buffer.ctypes.data for buffer in buffers]
     for cost in (1.0, 2.0, np.inf, 1.0):
         inputs.update_costs(np.full(graph.num_links, cost), np.zeros(graph.num_links))
@@ -249,13 +257,12 @@ def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
         assert [
             output.loading.link_loads.ctypes.data,
             output.skimming.skims.ctypes.data,
-            output.select_link.od.demand.ctypes.data,
         ] == addresses
         assert output.unassigned_demand == (20.0 if np.isinf(cost) else 0.0)
     output.reset()
     assert not np.any(buffers[0])
     assert np.isinf(buffers[1]).all()
-    assert not np.any(buffers[2])
+    assert all(matrix.nnz == 0 for matrix in output.select_link.od.matrices["upper"].values())
 
 
 def test_compressed_chain_and_removed_link_project_without_dummy_storage():
@@ -406,8 +413,8 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
         expected_names = {f"{name}_cars_{column}" for name in ("upper", "either") for column in ("work", "other")}
         assert set(selected) == expected_names
         for name, values in traffic.results.select_link_od.matrices.items():
-            for index, column in enumerate(("work", "other")):
-                np.testing.assert_array_equal(selected[f"{name}_cars_{column}"], values[:, :, index])
+            for column, matrix in values.items():
+                np.testing.assert_array_equal(selected[f"{name}_cars_{column}"].toarray(), matrix.toarray())
     finally:
         skims.close()
         selected.close()
