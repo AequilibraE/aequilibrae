@@ -160,6 +160,7 @@ private:
 
   static constexpr std::size_t kArity = 4;
   static constexpr std::size_t kCacheLineBytes = 64;
+  static_assert(kArity * sizeof(Node) == kCacheLineBytes);
   static constexpr std::size_t kLeadingSlots = 3;
   static constexpr std::uint32_t kScanned =
       std::numeric_limits<std::uint32_t>::max();
