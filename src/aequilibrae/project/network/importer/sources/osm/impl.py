@@ -1,12 +1,12 @@
 import geopandas as gpd
 import logging
 import math
-import networkx as nx
 import numpy as np
 import pandas as pd
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from requests.exceptions import RequestException
 from shapely.geometry import MultiPolygon, Point, Polygon, box
 from typing import Sequence
 
@@ -32,8 +32,6 @@ _DEFAULT_PLACE_BBOX_HALF_WIDTH = 0.15
 _QUERY_AREA_CRS = "EPSG:6933"
 _OSMNX_GRAPH_LOCK = threading.Lock()
 
-# osmnx reports several recoverable data conditions through exception text, so
-# characterization tests fail if a future osmnx version rewords these messages.
 _OSMNX_EMPTY_RESPONSE = "No data elements in server response"
 _OSMNX_NO_NODES_IN_POLYGON = "Found no graph nodes within the requested polygon"
 _OSMNX_NO_POLYGON = "to a geometry of type (Multi)Polygon"
@@ -66,6 +64,8 @@ def acquire_overpass(
     custom_filter=None,
 ) -> StagedNetwork:
     ox = require("osmnx", feature="OSM Overpass download")
+    import networkx as nx
+
     params = _configure_osmnx(ox)
 
     if (model_area is None) == (place_name is None):
@@ -74,24 +74,10 @@ def acquire_overpass(
     if place_name is not None:
         model_area = _geocode_place(ox, place_name)
 
-    return _fetch_and_stage(
-        ox,
-        modes=modes,
-        download_cache=download_cache,
-        model_area=model_area,
-        place_name=place_name,
-        custom_filter=custom_filter,
-        max_query_area_size=_max_query_area_size(params),
-    )
-
-
-def _fetch_and_stage(
-    ox, *, modes, download_cache, model_area, custom_filter, max_query_area_size, place_name=None
-) -> StagedNetwork:
     source_url = (
         f"overpass:place={place_name}" if place_name is not None else f"overpass:bbox={list(model_area.bounds)}"
     )
-    query_areas = _subdivide_model_area(model_area, max_query_area_size)
+    query_areas = _subdivide_model_area(model_area, _max_query_area_size(params))
     has_query_seams = len(query_areas) > 1
     fetch_kwargs = {
         "network_type": "all",
@@ -131,9 +117,7 @@ def _fetch_and_stage(
         "source_url": source_url,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
-    net = _edges_nodes_to_staged(edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area)
-    net.validate()
-    return net
+    return _edges_nodes_to_staged(edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area)
 
 
 def _fetch_graph(ox, area, fetch_kwargs, source_url: str, part: int, total: int):
@@ -153,12 +137,8 @@ def _fetch_graph(ox, area, fetch_kwargs, source_url: str, part: int, total: int)
             logger.info(f"No OSM nodes in {source_url}, part {part}/{total}; skipping it")
             return None
         raise
-    except Exception as exc:
-        from requests.exceptions import RequestException
-
-        if isinstance(exc, RequestException):
-            raise ImporterError(f"Overpass request failed for {source_url}, part {part}/{total}: {exc}") from exc
-        raise
+    except RequestException as exc:
+        raise ImporterError(f"Overpass request failed for {source_url}, part {part}/{total}: {exc}") from exc
 
     if graph is None or graph.number_of_edges() == 0:
         logger.info(f"No OSM edges in {source_url}, part {part}/{total}; skipping it")
@@ -227,12 +207,8 @@ def _geocode_to_gdf(ox, place_name, **kwargs):
         return ox.geocode_to_gdf(place_name, **kwargs)
     except InsufficientResponseError as exc:
         raise ImporterError(f"Nominatim could not resolve {place_name!r}: {exc}") from exc
-    except Exception as exc:
-        from requests.exceptions import RequestException
-
-        if isinstance(exc, RequestException):
-            raise ImporterError(f"Nominatim request failed for {place_name!r}: {exc}") from exc
-        raise
+    except RequestException as exc:
+        raise ImporterError(f"Nominatim request failed for {place_name!r}: {exc}") from exc
 
 
 def _geocode_place_bbox(ox, place_name):
@@ -255,9 +231,9 @@ def _geocode_place_bbox(ox, place_name):
 def _max_query_area_size(params: dict) -> float:
     try:
         size = float(params.get("max_query_area_size", _DEFAULT_MAX_QUERY_AREA_SIZE))
-    except (TypeError, ValueError) as exc:
-        raise ImporterError("osm.max_query_area_size must be a positive number in square metres") from exc
-    if not math.isfinite(size) or size <= 0:
+    except (TypeError, ValueError):
+        size = math.nan
+    if not (math.isfinite(size) and size > 0):
         raise ImporterError("osm.max_query_area_size must be a positive number in square metres")
     return size
 
@@ -319,10 +295,7 @@ def _collapse_reciprocal_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     keep, kept_keys = [], set()
     for key, is_reversed in zip(keys, reversed_flags, strict=True):
-        # Drop a reversed row only when its forward twin is present.
-        if is_reversed and key in forward_keys:
-            keep.append(False)
-        elif key in kept_keys:
+        if (is_reversed and key in forward_keys) or key in kept_keys:
             keep.append(False)
         else:
             kept_keys.add(key)
@@ -339,15 +312,10 @@ def _configure_osmnx(ox) -> dict:
 
     params = Parameters().parameters.get("osm", {}) or {}
     if "overpass_endpoint" in params:
-        # osmnx appends "/interpreter" itself, so this must stay a base URL
-        # (e.g. "https://overpass-api.de/api"). Appending it here too yields
-        # ".../interpreter/interpreter" and the server rejects every request.
         ox.settings.overpass_url = params["overpass_endpoint"].rstrip("/")
     if "nominatim_endpoint" in params:
         ox.settings.nominatim_url = params["nominatim_endpoint"]
     if "timeout" in params:
-        # osmnx 2.x calls this ``requests_timeout``; assigning to ``timeout``
-        # silently creates an attribute the library never reads.
         ox.settings.requests_timeout = int(params["timeout"])
     if "overpass_rate_limit" in params:
         ox.settings.overpass_rate_limit = bool(params["overpass_rate_limit"])
@@ -377,11 +345,11 @@ def _persist_overpass_payload(
             "source": "osm-overpass",
             "backend": "osmnx",
             "place_name": place_name,
-            "bbox": list(model_area.bounds) if model_area is not None else None,
+            "bbox": list(model_area.bounds),
             "modes": list(modes),
             "custom_filter": custom_filter,
-            "n_nodes": int(len(nodes_gdf)),
-            "n_edges": int(len(edges_gdf)),
+            "n_nodes": len(nodes_gdf),
+            "n_edges": len(edges_gdf),
         }
     )
 
@@ -421,17 +389,11 @@ def _first_last_points(geom):
     if geom is None or geom.is_empty:
         return None, None
     if geom.geom_type == "LineString":
-        coords = list(geom.coords)
-        return (Point(coords[0]), Point(coords[-1])) if coords else (None, None)
+        return Point(geom.coords[0]), Point(geom.coords[-1])
     if geom.geom_type == "MultiLineString":
-        parts = list(geom.geoms)
-        if not parts:
-            return None, None
-        first_coords = list(parts[0].coords)
-        last_coords = list(parts[-1].coords)
-        if not first_coords or not last_coords:
-            return None, None
-        return Point(first_coords[0]), Point(last_coords[-1])
+        first, last = geom.geoms[0], geom.geoms[-1]
+        if not first.is_empty and not last.is_empty:
+            return Point(first.coords[0]), Point(last.coords[-1])
     return None, None
 
 
@@ -488,9 +450,12 @@ def _edges_nodes_to_staged(
     edges = _add_osm_attributes(edges, requested_codes)
     edges = _filter_edges(edges, modes, clip_to)
     edges = _finalize_edges(edges)
-    nodes_out = _staged_nodes(nodes_gdf, edges)
-    links_out = gpd.GeoDataFrame(edges, geometry="geometry", crs="EPSG:4326")
-    return StagedNetwork(nodes=nodes_out, links=links_out, source_meta=source_meta)
+    used_nodes = set(edges["a_node"]) | set(edges["b_node"])
+    nodes = nodes_gdf[nodes_gdf["node_id"].isin(used_nodes)].reset_index(drop=True)
+    nodes = nodes[["node_id", "geometry"]].assign(
+        modes=compute_node_modes(nodes["node_id"].to_numpy(), edges), source_id=nodes["osm_id"].astype(str)
+    )
+    return StagedNetwork(nodes=nodes, links=edges, source_meta=source_meta)
 
 
 def _prepare_nodes(nodes_gdf: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:
@@ -548,37 +513,29 @@ def _edge_diagnostics(edges: gpd.GeoDataFrame, limit: int = 10) -> str:
 
 def _add_osm_attributes(edges: gpd.GeoDataFrame, requested_codes: set) -> gpd.GeoDataFrame:
     records = edges[[c for c in edges.columns if c not in _NON_TAG_COLS]].to_dict(orient="records")
-    modes_strs, directions = [], []
-    speed_abs, speed_bas = [], []
-    lanes_abs, lanes_bas = [], []
-    link_types, names = [], []
+    attributes = []
 
     for tags in records:
         tags = {k: v for k, v in tags.items() if not is_missing(v)}
         highway = tags.get("highway")
         if isinstance(highway, list) and highway:
             tags["highway"] = highway[0]
-        modes_strs.append(filter_by_modes(modes_for_tags(tags), requested_codes))
-        directions.append(parse_direction(tags))
         speed_ab, speed_ba = directional_speeds(tags)
-        speed_abs.append(speed_ab)
-        speed_bas.append(speed_ba)
         lanes_ab, lanes_ba = directional_lanes(tags)
-        lanes_abs.append(lanes_ab)
-        lanes_bas.append(lanes_ba)
-        link_types.append(str(tags.get("highway") or "unknown"))
-        names.append(tags.get("name"))
+        attributes.append(
+            {
+                "modes": filter_by_modes(modes_for_tags(tags), requested_codes),
+                "direction": parse_direction(tags),
+                "speed_ab": speed_ab,
+                "speed_ba": speed_ba,
+                "lanes_ab": lanes_ab,
+                "lanes_ba": lanes_ba,
+                "link_type": str(tags.get("highway") or "unknown"),
+                "name": tags.get("name"),
+            }
+        )
 
-    return edges.assign(
-        modes=modes_strs,
-        direction=directions,
-        speed_ab=speed_abs,
-        speed_ba=speed_bas,
-        lanes_ab=lanes_abs,
-        lanes_ba=lanes_bas,
-        link_type=link_types,
-        name=names,
-    )
+    return edges.assign(**pd.DataFrame(attributes, index=edges.index))
 
 
 def _filter_edges(edges: gpd.GeoDataFrame, modes: Sequence[str], clip_to) -> gpd.GeoDataFrame:
@@ -608,23 +565,5 @@ def _finalize_edges(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     else:
         edges["source_id"] = edges["link_id"].astype(str)
 
-    edges = edges.drop(columns=[c for c in ("u", "v", "key", "osmid") if c in edges.columns])
-    rename_map = {
-        c: normalise_tag_key(c) for c in edges.columns if c not in _RESERVED_LINK_COLS and normalise_tag_key(c) != c
-    }
-    return edges.rename(columns=rename_map) if rename_map else edges
-
-
-def _staged_nodes(nodes_gdf: gpd.GeoDataFrame, edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    used_nodes = set(edges["a_node"]) | set(edges["b_node"])
-    nodes_out = gpd.GeoDataFrame(
-        {
-            "node_id": nodes_gdf["node_id"].astype(np.int64),
-            "geometry": nodes_gdf["geometry"],
-            "modes": compute_node_modes(nodes_gdf["node_id"].to_numpy(), edges, fallback="c"),
-            "source_id": nodes_gdf["osm_id"].astype(str),
-        },
-        geometry="geometry",
-        crs="EPSG:4326",
-    )
-    return nodes_out[nodes_out["node_id"].isin(used_nodes)].reset_index(drop=True)
+    edges = edges.drop(columns=["u", "v", "key", "osmid"], errors="ignore")
+    return edges.rename(columns={c: normalise_tag_key(c) for c in edges.columns if c not in _RESERVED_LINK_COLS})
