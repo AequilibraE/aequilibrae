@@ -31,7 +31,8 @@ template <typename T> struct SkimmingOutputsView {
   T *data = nullptr; // [origins, destinations, fields]
 
   // Borrow one origin's contiguous [destinations, fields] block.
-  // Callers supply valid indices and ranges. Empty views do not offset pointers.
+  // Callers supply valid indices and ranges. Empty views do not offset
+  // pointers.
   DenseMatrixOriginView<T> origin(std::size_t index) const noexcept {
     T *values = nullptr;
     if (field_count && destination_count) {
@@ -78,7 +79,8 @@ template <typename T> struct SelectLinkODOriginView {
   std::size_t origin_index = 0;
   SparseMatrixBuilderView<T> *builders = nullptr;
 
-  void append(std::size_t set, std::size_t destination, const T *values) const noexcept {
+  void append(std::size_t set, std::size_t destination,
+              const T *values) const noexcept {
     builders[set].append(origin_index, destination, values);
   }
 };
@@ -92,7 +94,8 @@ template <typename T> struct SelectLinkODOutputsView {
   }
 
   void reset() const noexcept {
-    for (std::size_t set = 0; set < set_count; ++set) builders[set].reset();
+    for (std::size_t set = 0; set < set_count; ++set)
+      builders[set].reset();
   }
 };
 
