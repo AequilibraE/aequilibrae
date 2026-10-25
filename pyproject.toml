@@ -83,7 +83,7 @@ tests = [
   "seaborn",
   "coveralls",
   "ruff==0.16.1",
-  "cython-lint==0.21.0",
+  "cython-lint==0.22.0",
   "wheel",
 ]
 
