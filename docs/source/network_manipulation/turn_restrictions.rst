@@ -146,7 +146,7 @@ Building Graphs with Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``build_graph()`` loads turn restrictions from the database and applies them to the returned graph.
-Traffic assignment loads these restrictions when execution starts.
+Traffic assignment copies these restrictions during construction.
 
 .. code-block:: python
 
@@ -160,7 +160,7 @@ Traffic assignment loads these restrictions when execution starts.
 Manual Turn Restriction Setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can also manually set turn restrictions on a graph:
+You can also supply turn restrictions when building a graph:
 
 .. code-block:: python
 
@@ -174,11 +174,11 @@ You can also manually set turn restrictions on a graph:
     ...     "penalty": [20.0],
     ... })
 
-    # Apply turn restrictions
-    >>> graph.set_turn_restrictions(turn_df, allow_path_uturns=False)
+    # Build with the supplied turn restrictions
+    >>> graph = network.build_graph("c", "distance", turn_restrictions=turn_df, allow_uturns=False)
 
-    # Clear turn restrictions
-    >>> graph.clear_turn_restrictions()
+    # Build without turn restrictions
+    >>> graph = network.build_graph("c", "distance", turn_restrictions=turn_df.iloc[:0])
 
 Traffic Assignment with Turn Restrictions
 -----------------------------------------
@@ -193,8 +193,6 @@ time costs during the equilibration process.
     >>> from aequilibrae.paths.vdf import bpr
 
     >>> network = project.network
-    >>> graph = network.build_graph(mode='c', cost="distance")
-    >>> graph.set_graph('free_flow_time')
 
     # Turn restrictions are automatically included
     >>> demand_matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])

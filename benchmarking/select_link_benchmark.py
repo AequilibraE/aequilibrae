@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from aequilibrae import Graph, Project, TrafficAssignment, TrafficClass
+from aequilibrae import Network, Project, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -48,7 +48,7 @@ def arkansas(path: str):
 
     proj = Project.from_path(path)
     net = proj.network
-    network = Graph(network=net.links.data, turn_restrictions=net.turn_restrictions.data)
+    network = Network(net.links.data, turn_restrictions=net.turn_restrictions.data)
     with proj.db_connection as conn:
         excluded = {
             row[0]
@@ -56,7 +56,7 @@ def arkansas(path: str):
                 "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
             ).fetchall()
         }
-    links = network.network
+    links = network.links
     unavailable = (links.builtyear > 2010) | (links.removedyear < 2010) | ~links.mode_code.between(10, 11)
     links.loc[unavailable | links.link_id.isin(excluded), "modes"] = ""
     defaults = {

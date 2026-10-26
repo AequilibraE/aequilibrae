@@ -77,17 +77,12 @@ network = project.network
 network.list_modes()
 
 # %%
-# We grab the graph for cars
-graph = network.build_graph(mode="c", cost="distance")
-
-# Let's say that utility is just a function of distance, so we build our 'utility' field as distance * theta
-graph.network = graph.network.assign(utility=graph.network.distance * theta)
-
-# Prepare the graph with all nodes of interest as centroids
-graph.prepare_graph(np.array(nodes_of_interest))
-
-# And set the cost of the graph the as the utility field just created
-graph.set_graph("utility")
+# Add the utility field to the source network before graph preparation.
+network = network.build()
+network.links["utility"] = network.links.distance * theta
+graph = network.build_graph(
+    mode="c", cost="utility", centroids=np.array(nodes_of_interest), compact=True
+)
 
 # %%
 # Mock demand matrix

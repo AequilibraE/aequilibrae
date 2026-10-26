@@ -2,16 +2,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import AequilibraeMatrix, Graph, TrafficAssignment, TrafficClass
+from aequilibrae import AequilibraeMatrix, Graph, Network, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
-from aequilibrae.paths.assignment_context import _AssignmentNetwork
-from aequilibrae.paths.graph import _prepare_network_graph
 
 
 @pytest.fixture
 def network():
-    return Graph(
-        network=pd.DataFrame(
+    return Network(
+        pd.DataFrame(
             {
                 "link_id": [1, 2, 3],
                 "a_node": [1, 2, 1],
@@ -34,46 +32,38 @@ def network():
 def demand():
     matrix = AequilibraeMatrix(index=[1, 3])
     matrix["demand"] = [[0.0, 10.0], [0.0, 0.0]]
-    yield matrix
+    return matrix
 
 
 def assignment(network, classes, **kwargs):
     return TrafficAssignment(
-        network=network,
-        classes=classes,
-        time_field="time",
-        capacity_field="capacity",
-        vdf=bpr,
-        algorithm="all-or-nothing",
-        **kwargs,
+        network=network, classes=classes, time_field="time", capacity_field="capacity",
+        vdf=bpr, algorithm="all-or-nothing", **kwargs,
     )
 
 
 def test_deferred_graph_and_repeat_execution(network, demand, monkeypatch):
-    from aequilibrae.paths import Graph, graph
-
     traffic = TrafficClass(mode="c", cost="time", demand=demand, skimming=["time"])
-    prepare = graph.prepare_assignment_graph
+    build = Network.build_graph
     calls = []
 
-    def build(*args, **kwargs):
-        calls.append(args)
-        return prepare(*args, **kwargs)
+    def prepare(*args, **kwargs):
+        calls.append((args, kwargs))
+        return build(*args, **kwargs)
 
-    def reject_graph(*args, **kwargs):
-        pytest.fail("Assignment must not construct or retain a public Graph")
-
-    monkeypatch.setattr(graph, "prepare_assignment_graph", build)
-    monkeypatch.setattr(Graph, "__init__", reject_graph)
+    monkeypatch.setattr(Network, "build_graph", prepare)
     assig = assignment(network, [traffic])
     assert calls == []
     assert not hasattr(traffic, "graph")
     assert assig.assignment is None
     result = assig.execute(max_iterations=1, rgap=1e-4, cores=1)
     assert len(calls) == 1
-    state = assig._class_states[0]
-    assert not any(isinstance(value, Graph) for value in vars(state).values())
-    assert not any(isinstance(value, pd.DataFrame) for value in vars(state.graph).values())
+    graph = assig._class_states[0].graph
+    assert isinstance(graph, Graph)
+    assert graph.compact
+    assert not any(isinstance(value, pd.DataFrame) for value in vars(graph).values())
+    assert not hasattr(graph, "network")
+    assert not hasattr(graph, "compact_graph")
     np.testing.assert_allclose(assig.class_results[traffic.name].total_link_loads, [0, 10, 0, 10, 0, 0])
     np.testing.assert_allclose(assig.class_results[traffic.name].skims.matrices["time"][0, 1], 2)
     pd.testing.assert_frame_equal(result, assig.execute(cores=1))
@@ -84,7 +74,6 @@ def test_generalized_cost_and_fixed_cost(network, demand):
     traffic = TrafficClass(mode="c", cost="cost", demand=demand, skimming=["time", "cost"])
     assig = assignment(network, [traffic])
     assig.execute(cores=1)
-    # The direct link costs 3; the two-link path costs 4.
     np.testing.assert_allclose(assig.class_results[traffic.name].total_link_loads, [0, 0, 0, 0, 0, 10])
     np.testing.assert_allclose(assig.class_results[traffic.name].skims.matrices["cost"][0, 1], 3)
     np.testing.assert_allclose(assig.class_results[traffic.name].skims.matrices["time"][0, 1], 10)
@@ -97,12 +86,8 @@ def test_generalized_cost_and_fixed_cost(network, demand):
 def test_multiple_modes_and_selected_loads_without_od(network, demand):
     car = TrafficClass(mode="c", cost="time", demand=demand)
     truck = TrafficClass(
-        mode="h",
-        cost="time",
-        demand=demand,
-        pce=2.0,
-        select_link_sets={"screenline": [1]},
-        select_link_od=False,
+        mode="h", cost="time", demand=demand, pce=2.0,
+        select_link_sets={"screenline": [1]}, select_link_od=False,
     )
     assig = assignment(network, [car, truck])
     assig.execute(cores=1)
@@ -121,10 +106,30 @@ def test_multiple_modes_and_selected_loads_without_od(network, demand):
         ({"select_link_sets": {"bad": [99]}}, "Selected link"),
     ],
 )
-def test_invalid_network_configuration_fails_at_execution(network, demand, changes, match):
+def test_invalid_network_configuration_fails_at_construction(network, demand, changes, match):
     traffic = TrafficClass(**dict({"mode": "c", "cost": "time", "demand": demand}, **changes))
     with pytest.raises(ValueError, match=match):
-        assignment(network, [traffic]).execute(cores=1)
+        assignment(network, [traffic])
+
+
+@pytest.mark.parametrize(
+    "turns, match",
+    [
+        (pd.DataFrame({"from_node": [1]}), "missing required columns"),
+        (pd.DataFrame({"from_node": [1], "via_node": [2], "to_node": [3], "penalty": [-1.0]}), "Negative turn"),
+        (pd.DataFrame({"from_node": [1], "via_node": [99], "to_node": [3], "penalty": [1.0]}), "missing directed legs"),
+    ],
+)
+def test_invalid_turns_fail_at_construction(network, demand, turns, match):
+    network.turn_restrictions = turns
+    with pytest.raises(ValueError, match=match):
+        assignment(network, [TrafficClass(mode="c", cost="time", demand=demand)])
+
+
+def test_registered_mode_without_links_fails_at_construction(network, demand):
+    network.modes = (*network.modes, "x")
+    with pytest.raises(ValueError, match="No links are available"):
+        assignment(network, [TrafficClass(mode="x", cost="time", demand=demand)])
 
 
 def test_demand_centroid_order_and_invalid_nodes(network, demand):
@@ -135,7 +140,9 @@ def test_demand_centroid_order_and_invalid_nodes(network, demand):
     np.testing.assert_array_equal(assig._class_states[0].graph.mapping.centroids, [3, 1])
     demand.index = [1, 99]
     with pytest.raises(ValueError, match="centroids"):
-        assignment(network, [traffic]).execute(cores=1)
+        assignment(network, [traffic])
+    with pytest.raises(ValueError, match="centroids"):
+        assig.execute(cores=1)
 
 
 def test_preload_array_and_frame_are_equivalent(network, demand):
@@ -144,47 +151,94 @@ def test_preload_array_and_frame_are_equivalent(network, demand):
     frame = pd.DataFrame({"link_id": [1], "direction": [1], "preload": [5.0]})
     first = assignment(network, [traffic], preload=array)
     first.execute(cores=1)
-    second = assignment(network, [TrafficClass(mode="c", cost="time", demand=demand)], preload=frame)
+    second = assignment(network, [traffic], preload=frame)
     second.execute(cores=1)
     np.testing.assert_allclose(first.assignment.preload, second.assignment.preload)
     assert list(frame.columns) == ["link_id", "direction", "preload"]
 
 
 def test_project_build_and_independent_paths(sioux_falls_example):
+    project = sioux_falls_example
     fields = ["free_flow_time", "capacity", "distance"]
     original = fields.copy()
-    network = sioux_falls_example.network
-    assert not hasattr(sioux_falls_example.network, "graphs")
-    graph = network.build_graph(
-        mode="c", cost="free_flow_time", fields=fields, skimming=["distance"], block_centroid_flows=False
-    )
+    network = project.network.build(fields=fields, modes=["c"])
+    assert not hasattr(project.network, "graphs")
+    graph = network.build_graph("c", "free_flow_time", skimming=["distance"], block_centroid_flows=False)
     assert fields == original
-    path = graph.compute_path(1, 24)
-    assert path.path is not None
-    graph.network.loc[:, "distance"] = 999
-    assert not (network.links.data["distance"] == 999).all()
+    assert graph.compute_path(1, 24).path is not None
+    network.links.loc[:, "distance"] = 999
+    assert not (project.network.links.data["distance"] == 999).all()
+    project.close()
+    assert graph.compute_path(1, 24).path is not None
+    assert network.build_graph("c", "free_flow_time", block_centroid_flows=False).compute_path(1, 24).path is not None
+
+
+@pytest.mark.parametrize("compact", [False, True])
+def test_graph_topology_is_static_and_costs_can_close_links(network, compact):
+    graph = network.build_graph("c", "time", compact=compact, block_centroid_flows=False, skimming=["time"])
+    assert graph.compact == compact
+    assert not any(isinstance(value, pd.DataFrame) for value in vars(graph).values())
+    path = graph.compute_path(1, 3)
+    np.testing.assert_array_equal(path.path_nodes, [1, 2, 3])
+    np.testing.assert_allclose(path.milepost, [0, 1, 2])
+    for method in ("prepare_graph", "exclude_links", "set_turn_restrictions", "set_skimming"):
+        assert not hasattr(graph, method)
+    costs = network.field_values("time").copy()
+    costs[network.link_ids == 1] = np.inf
+    graph.set_costs(costs)
+    np.testing.assert_array_equal(graph.compute_path(1, 3).path_nodes, [1, 3])
+    assert graph.compute_skims(cores=1).results.skims["time"][0, 1] == 10
+    # Existing path results keep the costs of their own snapshot.
+    np.testing.assert_allclose(path.milepost, [0, 1, 2])
+
+
+@pytest.mark.parametrize("costs", [[1.0], [np.nan] * 6, [-1.0] * 6])
+def test_invalid_cost_updates_leave_graph_unchanged(network, costs):
+    graph = network.build_graph("c", "time", block_centroid_flows=False)
+    original = graph.cost.copy()
+    with pytest.raises(ValueError):
+        graph.set_costs(costs)
+    np.testing.assert_array_equal(graph.cost, original)
+
+
+def test_route_choice_keeps_a_consistent_cost_snapshot(network):
+    from aequilibrae.paths import RouteChoice
+
+    graph = network.build_graph("c", "time", compact=True, block_centroid_flows=False)
+    choice = RouteChoice(graph)
+    routes = pd.DataFrame({"origin id": [1], "destination id": [3], "route set": [[1, 2]]})
+    assert choice.recompute_psl(routes)["cost"].iloc[0] == 2.0
+    graph.set_costs(network.field_values("cost"))
+    assert choice.recompute_psl(routes)["cost"].iloc[0] == 2.0
+    assert RouteChoice(graph).recompute_psl(routes)["cost"].iloc[0] == 4.0
+
+
+def test_assignment_rejects_prepared_graphs(network, demand):
+    graph = network.build_graph("c", "time")
+    with pytest.raises(TypeError, match="network must be a Network"):
+        assignment(graph, [TrafficClass(mode="c", cost="time", demand=demand)])
+
+
+@pytest.mark.parametrize("compact", [False, True])
+def test_mode_subset_preserves_isolated_centroids(network, compact):
+    source = Network(network.links.assign(modes=["c", "h", "h"]), modes=["c"], centroids=[1, 3])
+    with pytest.warns(UserWarning, match="centroids not present"):
+        graph = source.copy().build_graph("c", "time", compact=compact)
+    assert graph.compute_path(1, 3).path is None
+    np.testing.assert_array_equal(graph.centroids, [1, 3])
 
 
 @pytest.mark.parametrize("algorithm", ["msa", "bfw"])
 def test_equilibrium_mapping_and_repeat_execution(sioux_falls_example, algorithm):
     project = sioux_falls_example
     demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
-    network = project.network
     traffic = TrafficClass(
-        mode="c",
-        cost="free_flow_time",
-        demand=demand,
-        skimming=["free_flow_time", "distance"],
-        block_centroid_flows=False,
+        mode="c", cost="free_flow_time", demand=demand,
+        skimming=["free_flow_time", "distance"], block_centroid_flows=False,
     )
     assig = TrafficAssignment(
-        network=network,
-        classes=[traffic],
-        time_field="free_flow_time",
-        capacity_field="capacity",
-        vdf=bpr,
-        name_mapping={"alpha": "b", "beta": "power"},
-        algorithm=algorithm,
+        network=project.network, classes=[traffic], time_field="free_flow_time", capacity_field="capacity",
+        vdf=bpr, name_mapping={"alpha": "b", "beta": "power"}, algorithm=algorithm,
     )
     actual = assig.execute(max_iterations=5, rgap=1e-4, cores=1)
     skims = assig.class_results[traffic.name].skims
@@ -240,7 +294,6 @@ def test_same_mode_classes_share_graph_but_not_costs(network, demand):
 def test_graph_sharing_respects_routing_policy(network, demand, changed):
     from types import SimpleNamespace
 
-    prepared = _AssignmentNetwork(network.network, turn_restrictions=network._turn_restrictions)
     base = SimpleNamespace(mode="c", demand=demand, block_centroid_flows=True)
     alternative = SimpleNamespace(**vars(base))
     if changed == "mode":
@@ -249,21 +302,16 @@ def test_graph_sharing_respects_routing_policy(network, demand, changed):
         alternative.demand = SimpleNamespace(index=np.array([3, 1]))
     else:
         alternative.block_centroid_flows = False
-    assert prepared.graph(base) is not prepared.graph(alternative)
+    assert network._assignment_graph(base) is not network._assignment_graph(alternative)
 
 
 @pytest.mark.parametrize("fields", [["time"], ["time", "cost"]])
 @pytest.mark.parametrize("turn_delay", [0.0, 0.5])
 def test_time_skim_is_independent_of_requested_cost_skim(network, demand, fields, turn_delay):
-    network.network["cost"] = [2.0, 2.0, 20.0]
+    network.links["cost"] = [2.0, 2.0, 20.0]
     if turn_delay:
-        network._turn_restrictions = pd.DataFrame(
-            {
-                "from_node": [1],
-                "via_node": [2],
-                "to_node": [3],
-                "penalty": [turn_delay],
-            }
+        network.turn_restrictions = pd.DataFrame(
+            {"from_node": [1], "via_node": [2], "to_node": [3], "penalty": [turn_delay]}
         )
     traffic = TrafficClass(mode="c", cost="cost", demand=demand, skimming=fields)
     assig = assignment(network, [traffic])
@@ -279,18 +327,16 @@ def test_time_skim_is_independent_of_requested_cost_skim(network, demand, fields
 
 
 def test_numeric_text_time_field_is_normalized(network, demand):
-    network.network["time"] = network.network.time.astype(str)
-    traffic = TrafficClass(mode="c", cost="cost", demand=demand, skimming=["time", "cost"])
-    assig = assignment(network, [traffic])
+    network.links["time"] = network.links.time.astype(str)
+    assig = assignment(network, [TrafficClass(mode="c", cost="cost", demand=demand, skimming=["time", "cost"])])
     assig.execute(cores=1)
     assert assig.class_results["c"].skims.matrices["time"][0, 1] == 10.0
 
 
 def test_congested_skims_use_execution_attribute_snapshot(network, demand):
-    traffic = TrafficClass(mode="c", cost="time", demand=demand)
-    assig = assignment(network, [traffic])
+    assig = assignment(network, [TrafficClass(mode="c", cost="time", demand=demand)])
     assig.execute(cores=1)
-    network.network["cost"] = 999.0
+    network.links["cost"] = 999.0
     skims = assig.skim_congested(["cost"], return_matrices=True)["c"]
     assert skims.matrices["cost"][0, 1] == 4.0
 
@@ -315,9 +361,7 @@ def test_selected_od_export_reindexes_class_centroids(network, demand, tmp_path)
     with omx.open_file(str(tmp_path / "selected.omx"), "r") as output:
         assert output.mapping("main_index") == {1: 0, 2: 1, 3: 2}
         for name, origin, destination, trips in (
-            ("forward", 0, 2, 10),
-            ("reverse", 2, 0, 20),
-            ("subset", 0, 1, 30),
+            ("forward", 0, 2, 10), ("reverse", 2, 0, 20), ("subset", 0, 1, 30),
         ):
             expected = np.zeros((3, 3))
             expected[origin, destination] = trips
@@ -325,22 +369,11 @@ def test_selected_od_export_reindexes_class_centroids(network, demand, tmp_path)
 
 
 def test_directional_fields_and_preloads_share_network_order(demand):
-    # Source row order and link IDs differ from routing node order.
-    network = Graph(
-        network=pd.DataFrame(
-            {
-                "link_id": [23, 9],
-                "a_node": [1, 2],
-                "b_node": [2, 3],
-                "direction": [0, 0],
-                "modes": ["c", "c"],
-                "time_ab": [1.0, 2.0],
-                "time_ba": [4.0, 5.0],
-                "capacity_ab": [100.0, 200.0],
-                "capacity_ba": [300.0, 400.0],
-            }
-        )
-    )
+    network = Network(pd.DataFrame({
+        "link_id": [23, 9], "a_node": [1, 2], "b_node": [2, 3], "direction": [0, 0], "modes": ["c", "c"],
+        "time_ab": [1.0, 2.0], "time_ba": [4.0, 5.0],
+        "capacity_ab": [100.0, 200.0], "capacity_ba": [300.0, 400.0],
+    }))
     demand["demand"][1, 0] = 20.0
     traffic = TrafficClass(mode="c", cost="time", demand=demand, skimming=["time"])
     preload = pd.DataFrame({"link_id": [23], "direction": [-1], "preload": [5.0]})
@@ -358,13 +391,11 @@ def test_directional_fields_and_preloads_share_network_order(demand):
 @pytest.mark.parametrize("blocking", [False, True])
 @pytest.mark.parametrize("penalty", [0.5, None])
 def test_public_and_assignment_graphs_share_routing_policy(network, demand, blocking, penalty):
-    network._turn_restrictions = pd.DataFrame(
+    network.turn_restrictions = pd.DataFrame(
         {"from_node": [1], "via_node": [2], "to_node": [3], "penalty": [penalty], "modes": ["c"]}
     )
     traffic = TrafficClass(mode="c", cost="time", demand=demand, block_centroid_flows=blocking)
-    public = Graph(network=network.network)
-    _prepare_network_graph(public, "c", demand.index, network._turn_restrictions, blocking, False)
-    public.set_graph("time")
+    public = network.build_graph("c", "time", block_centroid_flows=blocking)
     assig = assignment(network, [traffic])
     assig.execute(cores=1)
     path = public.compute_path(1, 3)
@@ -375,14 +406,16 @@ def test_public_and_assignment_graphs_share_routing_policy(network, demand, bloc
     np.testing.assert_array_equal(assig.class_results["c"].total_link_loads, expected)
 
 
-def test_network_mutation_is_revalidated_before_execution(network, demand):
+def test_network_mutation_is_isolated_and_assignment_edits_are_revalidated(network, demand):
     assig = assignment(network, [TrafficClass(mode="c", cost="time", demand=demand)])
-    network.network["capacity"] = 0.0
+    network.links["capacity"] = 0.0
+    assig.execute(cores=1)
+    assig.network.links["capacity"] = 0.0
     with pytest.raises(ValueError, match="positive finite"):
         assig.execute(cores=1)
 
 
-def test_project_network_loads_once_per_execution_and_observes_edits(sioux_falls_example, monkeypatch):
+def test_project_network_loads_once_at_construction(sioux_falls_example, monkeypatch):
     project = sioux_falls_example
     demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     traffic = TrafficClass(mode="c", cost="free_flow_time", demand=demand, block_centroid_flows=False)
@@ -399,48 +432,53 @@ def test_project_network_loads_once_per_execution_and_observes_edits(sioux_falls
         network=source, classes=[traffic], time_field="free_flow_time", capacity_field="capacity",
         vdf=bpr, algorithm="all-or-nothing",
     )
-    assert calls == []
+    assert len(calls) == 1
     assert assig.assignment is None
     with project.db_connection as conn:
-        conn.execute("UPDATE links SET free_flow_time=free_flow_time*2")
-        times = dict(conn.execute("SELECT link_id, free_flow_time FROM links"))
-    assig.execute(cores=1)
-    assert len(calls) == 1
-    np.testing.assert_allclose(assig.free_flow_tt, [times[link] for link in assig._prepared_network.link_ids])
-    original_times = assig.free_flow_tt.copy()
-    original_loads = assig.class_results["c"].link_loads.copy()
-    original_skims = assig.skim_congested(["distance"], return_matrices=True)["c"].matrices["distance"].copy()
-    with project.db_connection as conn:
         conn.execute("UPDATE links SET free_flow_time=free_flow_time*2, distance=999")
-    current_skims = assig.skim_congested(["distance"], return_matrices=True)["c"].matrices["distance"]
-    np.testing.assert_array_equal(current_skims, original_skims)
-    assert len(calls) == 1
     assig.execute(cores=1)
-    assert len(calls) == 2
-    np.testing.assert_allclose(assig.free_flow_tt, 2 * original_times)
-    np.testing.assert_allclose(assig.class_results["c"].link_loads, original_loads)
+    assert len(calls) == 1
+    original = assig.free_flow_tt.copy()
+    skims = assig.skim_congested(["distance"], return_matrices=True)["c"].matrices["distance"].copy()
+    project.close()
+    assig.execute(cores=1)
+    np.testing.assert_array_equal(assig.free_flow_tt, original)
+    current_skims = assig.skim_congested(["distance"], return_matrices=True)["c"].matrices["distance"]
+    np.testing.assert_array_equal(current_skims, skims)
 
 
 @pytest.mark.parametrize("field", ["time_field", "capacity_field"])
-def test_project_field_validation_is_deferred(sioux_falls_example, field):
+def test_project_field_validation_at_construction(sioux_falls_example, field):
     project = sioux_falls_example
     demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     configuration = {"time_field": "free_flow_time", "capacity_field": "capacity"}
     configuration[field] = "missing"
-    assig = TrafficAssignment(
-        network=project.network,
-        classes=[TrafficClass(mode="c", cost="free_flow_time", demand=demand)],
-        vdf=bpr, algorithm="all-or-nothing", **configuration,
-    )
     with pytest.raises(ValueError, match="not in network"):
-        assig.execute(cores=1)
+        TrafficAssignment(
+            network=project.network,
+            classes=[TrafficClass(mode="c", cost="free_flow_time", demand=demand)],
+            vdf=bpr, algorithm="all-or-nothing", **configuration,
+        )
 
 
-def test_in_memory_graph_needs_no_preparation_or_modes_column(network, demand):
-    graph = Graph(network=network.network.drop(columns="modes"))
-    assig = assignment(graph, [TrafficClass(mode="h", cost="time", demand=demand)])
+def test_in_memory_network_needs_no_preparation_or_modes_column(network, demand):
+    source = Network(network.links.drop(columns="modes"))
+    assig = assignment(source, [TrafficClass(mode="h", cost="time", demand=demand)])
     assig.execute(cores=1)
     np.testing.assert_array_equal(assig.class_results["h"].total_link_loads, [0, 10, 0, 10, 0, 0])
-    assert graph.graph.empty
-    assert graph.num_links == -1
-    assert "modes" not in graph.network
+    assert not hasattr(source, "routing")
+    assert "modes" not in source.links
+
+
+def test_mode_excluded_links_cannot_bypass_turn_bans(network, demand):
+    network.links = network.links.copy()
+    network.links.loc[network.links.link_id == 3, ["a_node", "b_node", "modes"]] = [2, 4, "h"]
+    network.turn_restrictions = pd.DataFrame(
+        {"from_node": [1], "via_node": [2], "to_node": [3], "penalty": [None], "modes": ["c"]}
+    )
+    for compact in (False, True):
+        assert network.build_graph("c", "time", compact=compact).compute_path(1, 3).path is None
+    assig = assignment(network, [TrafficClass(mode="c", cost="time", demand=demand)])
+    assig.execute(cores=1)
+    assert assig.class_results["c"].unassigned_demand == 10
+    assert not assig.class_results["c"].total_link_loads.any()

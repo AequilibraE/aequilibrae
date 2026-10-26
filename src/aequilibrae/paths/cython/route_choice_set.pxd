@@ -28,6 +28,7 @@ cdef struct RouteChoiceHeuristic:
 cdef class RouteChoiceSet:
     cdef:
         const double [::1] cost_view
+        const double [::1] full_cost_view
         object routing
         object coordinates
         object lonlat
@@ -46,8 +47,8 @@ cdef class RouteChoiceSet:
         long long num_nodes
         long long num_links
 
-        unsigned int [:] mapping_idx
-        int64_t [::] mapping_data
+        const unsigned int [:] mapping_idx
+        const int64_t [::] mapping_data
         const int64_t [::] link_id_direction
 
         readonly RouteChoiceSetResults results

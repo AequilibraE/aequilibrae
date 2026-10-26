@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
+from aequilibrae import TrafficAssignment, TrafficClass, Network, Project, AequilibraeMatrix
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.transit import Transit
 
@@ -13,13 +13,10 @@ def transit(coquimbo_example: Project):
 
 @pytest.fixture(scope="function")
 def graph(coquimbo_example: Project):
-    g = coquimbo_example.network.build_graph("c", "distance", fields=["distance"], block_centroid_flows=False)
-    g.network["capacity"] = 500.0
-    g.network["travel_time"] = g.network.distance / 50
-    g.prepare_graph(g.centroids)
-    g.set_graph("travel_time")
-    g.set_skimming(["travel_time"])
-    return g
+    network = coquimbo_example.network.build(fields=["distance"])
+    network.links["capacity"] = 500.0
+    network.links["travel_time"] = network.links.distance / 50
+    return network
 
 
 @pytest.fixture(scope="function")
@@ -31,9 +28,8 @@ def demand(graph):
     yield matrix
 
 
-def _assignment(graph: Graph, demand: AequilibraeMatrix, preload=None) -> TrafficAssignment:
-    links = graph.network.assign(capacity=500.0, travel_time=graph.network.distance / 50)
-    network = Graph(network=links, centroids=graph.centroids)
+def _assignment(graph: Network, demand: AequilibraeMatrix, preload=None) -> TrafficAssignment:
+    network = graph
     traffic = TrafficClass(
         name="car", mode="c", cost="travel_time", demand=demand, skimming=["travel_time"], block_centroid_flows=False
     )
@@ -57,7 +53,7 @@ def calc_preload(transit: Transit, start, end):
     return transit.build_pt_preload(hr_to_sec(start), hr_to_sec(end), inclusion_cond="start")
 
 
-def test_building_pt_preload(graph: Graph, demand: AequilibraeMatrix, transit: Transit):
+def test_building_pt_preload(graph: Network, demand: AequilibraeMatrix, transit: Transit):
     """
     Check that building pt preload works correctly for a basic example from
     the coquimbo network.
@@ -70,16 +66,16 @@ def test_building_pt_preload(graph: Graph, demand: AequilibraeMatrix, transit: T
     assert preloads[2]["preload"].sum() == 39696
 
     # the preload returned should be only for links which have transit routes on them
-    assert len(preloads[0]) < len(graph.graph)
+    assert len(preloads[0]) < len(graph.link_ids)
 
     assignment = _assignment(graph, demand, preload=preloads[0])
     assignment.execute(max_iterations=1, cores=1)
 
     # After adding the preload to the assignment object it should be expanded to cover ALL links
-    assert len(assignment.assignment.preload) == len(graph.graph)
+    assert len(assignment.assignment.preload) == len(graph.link_ids)
 
 
-def test_run(graph: Graph, demand: AequilibraeMatrix, transit: Transit):
+def test_run(graph: Network, demand: AequilibraeMatrix, transit: Transit):
     """Tests a full run through of pt preloading."""
 
     preload = calc_preload(transit, 7, 8)

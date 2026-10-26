@@ -67,8 +67,7 @@ if centroid_count == 0:
     nodes.update(arbitrary_node, is_centroid=1)
 
 network = project.network
-graph = network.build_graph(mode=mode, cost="distance")
-graph.set_blocked_centroid_flows(False)
+graph = network.build_graph(mode=mode, cost="distance", block_centroid_flows=False)
 
 if centroid_count == 0:
     # Let's revert to setting up that node as centroid in case we had to do it
@@ -77,7 +76,7 @@ if centroid_count == 0:
 
 # %%
 # We set the graph for computation
-graph.set_skimming("distance")
+graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%
 # Get the nodes that are part of the car network

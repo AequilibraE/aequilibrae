@@ -53,13 +53,13 @@ network = project.network
 
 # %%
 # Build the car graph with distance as the cost field.
-graph = network.build_graph(mode="c", cost="distance")
+graph = network.build_graph(mode="c", cost="distance", centroids=np.array(nodes_of_interest), compact=True)
 
 # Available network modes:
 network.list_modes()
 
 # We set the nodes of interest as centroids to make sure they are not simplified away when we create the network
-graph.prepare_graph(np.array(nodes_of_interest))
+graph.centroids
 
 # %%
 # Route Choice class

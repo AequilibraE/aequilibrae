@@ -140,6 +140,22 @@ class Network(WorkerThread):
 
         logger.info("Network exported successfully")
 
+    def build(self, fields=None, modes=None, limit_to_area=None):
+        """Copy project tables into an independent routing Network."""
+        from aequilibrae.paths.network import Network
+
+        if isinstance(modes, str):
+            modes = [modes]
+        available = self.list_modes()
+        if modes is not None and (missing := set(modes) - set(available)):
+            raise ValueError(f"Modes are not available in this network: {sorted(missing)}")
+        links, centroids, restrictions, allow_uturns = self._load_graph_data(fields, limit_to_area)
+        return Network(
+            links, modes=available if modes is None else modes, centroids=centroids,
+            turn_restrictions=restrictions, allow_uturns=allow_uturns,
+            lonlat=self.nodes.lonlat.set_index("node_id"),
+        )
+
     def build_graph(
         self,
         mode: str,
@@ -150,28 +166,20 @@ class Network(WorkerThread):
         skimming=None,
         block_centroid_flows=True,
         limit_to_area=None,
+        compact=False,
+        turn_restrictions=None,
+        allow_uturns=None,
     ) -> "Graph":
-        """Load and prepare a graph for standalone paths, skimming, or route choice."""
-        from aequilibrae.paths.graph import Graph, _prepare_network_graph
-
-        if mode not in self.list_modes():
-            raise ValueError(f"Mode '{mode}' is not available in this network")
+        """Build a standalone graph without retaining project connections."""
+        if isinstance(skimming, str):
+            skimming = [skimming]
         if fields is not None:
             fields = list(dict.fromkeys([*fields, cost, *(skimming or [])]))
-        links, project_centroids, restrictions, allow_uturns = self._load_graph_data(fields, limit_to_area)
-        graph = Graph(network=links)
-        _prepare_network_graph(
-            graph,
-            mode,
-            project_centroids if centroids is None else np.asarray(centroids),
-            restrictions,
-            block_centroid_flows,
-            allow_uturns,
+        return self.build(fields=fields, modes=[mode], limit_to_area=limit_to_area).build_graph(
+            mode, cost, centroids=centroids, skimming=skimming or (), compact=compact,
+            block_centroid_flows=block_centroid_flows, turn_restrictions=turn_restrictions,
+            allow_uturns=allow_uturns,
         )
-        graph.lonlat_index = self.nodes.lonlat.set_index("node_id").loc[graph.all_nodes]
-        graph.set_graph(cost)
-        graph.set_skimming(list(skimming or []))
-        return graph
 
     def _load_graph_data(self, fields=None, limit_to_area=None):
         """Read source tables once for a graph or an assignment execution."""

@@ -59,9 +59,7 @@ mode = "c"
 
 # Let's set the graph for computation
 network = project.network
-graph = network.build_graph(mode=mode, cost="distance")
-graph.set_skimming("distance")
-graph.set_blocked_centroid_flows(False)
+graph = network.build_graph(mode=mode, cost="distance", compact=True, block_centroid_flows=False)
 
 # %%
 

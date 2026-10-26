@@ -128,7 +128,7 @@ def test_execute_no_project(configuration):
     project = configuration.pop("project")
     with project.db_connection as conn:
         reference = pd.read_sql("select volume from links order by link_id", conn).volume
-    configuration["network"] = project.network.build_graph("c", "free_flow_time", block_centroid_flows=False)
+    configuration["network"] = project.network.build()
     project.close()
     assignment = TrafficAssignment(**(configuration | {"algorithm": "msa"}))
     assignment.execute(max_iterations=10, cores=1)

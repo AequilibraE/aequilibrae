@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from aequilibrae import Graph, TrafficAssignment, TrafficClass
+from aequilibrae import Network, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 
@@ -92,7 +92,7 @@ def test_frank_wolfe_alias(configuration, algorithm):
 
 
 def test_vdf_defaults_do_not_depend_on_matching_network_fields(configuration):
-    configuration["network"] = Graph(network=configuration["network"].links.data.assign(alpha=0.8, beta=2.0))
+    configuration["network"] = Network(configuration["network"].links.data.assign(alpha=0.8, beta=2.0))
     assignment = TrafficAssignment(**(configuration | {"name_mapping": None}))
     assignment.execute(max_iterations=1, cores=1)
     np.testing.assert_array_equal(assignment.vdf_parameters["alpha"], 0.15)

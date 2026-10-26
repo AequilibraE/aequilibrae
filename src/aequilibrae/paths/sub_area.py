@@ -50,12 +50,14 @@ class SubAreaAnalysis:
         nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
 
-        self.interior_graph = (
-            self.graph.graph.set_index("link_id")
-            .loc[self.interior_links.link_id]
-            .drop(self.graph.dead_end_links, errors="ignore")
-            .reset_index()
-            .set_index(["link_id", "direction"])
+        self.node_ids = graph.full_node_ids
+        retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
+        edges = pd.DataFrame({
+            "link_id": graph.full_link_ids[retained], "direction": graph.full_directions[retained],
+            "a_node": graph.full_tails[retained], "b_node": graph.full_heads[retained],
+        })
+        self.interior_graph = edges.loc[edges.link_id.isin(self.interior_links.link_id)].set_index(
+            ["link_id", "direction"]
         )
 
         self.edge_pairs = {x: (x,) for x in itertools.permutations(self.interior_graph.index, r=2)}
@@ -97,17 +99,17 @@ class SubAreaAnalysis:
             for (link_id, dir), v in edge_totals.items():
                 link = self.interior_graph.loc[link_id, dir]
                 for (o, d), load in v.todok().items():
-                    o = self.graph.all_nodes[o]
-                    d = self.graph.all_nodes[d]
+                    o = self.node_ids[o]
+                    d = self.node_ids[d]
 
                     o_inside = o in self.interior_nodes.index
                     d_inside = d in self.interior_nodes.index
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if o_inside and not d_inside:
-                        exited[(o, self.graph.all_nodes[link.b_node]) + original_ods] += load
+                        exited[(o, self.node_ids[link.b_node]) + original_ods] += load
                     elif not o_inside and d_inside:
-                        entered[(self.graph.all_nodes[link.a_node], d) + original_ods] += load
+                        entered[(self.node_ids[link.a_node], d) + original_ods] += load
                     elif not o_inside and not d_inside:
                         pass
 
@@ -123,7 +125,7 @@ class SubAreaAnalysis:
                     original_ods = (o, d) if keep_original_ods else ()
                     if not o_inside and not d_inside:
                         through[
-                            (self.graph.all_nodes[link1.a_node], self.graph.all_nodes[link2.b_node]) + original_ods
+                            (self.node_ids[link1.a_node], self.node_ids[link2.b_node]) + original_ods
                         ] += load
 
             sub_area_demand.append(

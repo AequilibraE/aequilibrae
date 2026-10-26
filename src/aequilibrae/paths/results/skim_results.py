@@ -18,12 +18,9 @@ class SkimResults:
           >>> network = project.network
 
           # Mode c is car in this project
-          >>> car_graph = network.build_graph(mode='c', cost="free_flow_time")
-
-          # minimize travel time
-
-          # Skims travel time and distance
-          >>> car_graph.set_skimming(['free_flow_time', 'distance'])
+          >>> car_graph = network.build_graph(
+          ...     mode='c', cost="free_flow_time", skimming=['free_flow_time', 'distance']
+          ... )
 
           >>> res = SkimResults()
           >>> res.prepare(car_graph)
@@ -50,7 +47,7 @@ class SkimResults:
         """
 
         if not graph.cost_field:
-            raise Exception('Cost field needs to be set for computation. use graph.set_graph("your_cost_field")')
+            raise ValueError("Build the graph with a cost field before skimming")
 
         if output is None:
             output = SkimmingOutputs(graph.num_zones, graph.num_zones, graph.skim_fields)

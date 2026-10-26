@@ -46,9 +46,14 @@ class NetworkSimplifier(WorkerThread):
         self.graph = graph
 
         # Creates the sequence of compressed link IDs so we don't have to rebuild through path computation
-        compressed_idx, compressed_link_data, _ = self.graph.create_compressed_link_network_mapping()
-
-        link_set_df = self.graph.network.merge(self.graph.graph[["link_id", "__compressed_id__"]], on="link_id")
+        if not graph.compact:
+            raise ValueError("Network simplification requires a compact graph")
+        compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links
+        correspondence = pd.DataFrame({
+            "link_id": graph.full_link_ids,
+            "__compressed_id__": graph.mapping.crosswalk[graph.full_to_network],
+        })
+        link_set_df = self.link_layer.merge(correspondence, on="link_id")
 
         # compressed_ids that appear for more than one link
         relevant_compressed_ids = pd.DataFrame(link_set_df.value_counts("__compressed_id__")).query("count>1").index
@@ -59,7 +64,7 @@ class NetworkSimplifier(WorkerThread):
 
         # We only need one link ID per "super link"
         link_set_df = link_set_df.drop_duplicates(subset="__compressed_id__")
-        centroid_connectors = self.graph.network.query("link_id not in @self.link_layer.link_id").link_id.to_numpy()
+        centroid_connectors = graph.full_link_ids[~np.isin(graph.full_link_ids, self.link_layer.link_id)]
 
         links_to_delete, new_links = [], []
         max_link_id = self.link_layer.link_id.max() + 1
@@ -79,8 +84,7 @@ class NetworkSimplifier(WorkerThread):
             if len(link_sequence) < 2:
                 continue
 
-            # compressed_link_data now stores __supernet_id__ (graph indices); resolve to link IDs
-            link_sequence = self.graph.graph.iloc[link_sequence]["link_id"].tolist()
+            link_sequence = graph.full_link_ids[link_sequence].tolist()
             self.link_sequence = np.array([x for x in link_sequence if x not in centroid_connectors])
             self.candidates = self.link_layer.query("link_id in @link_sequence").set_index("link_id")
 

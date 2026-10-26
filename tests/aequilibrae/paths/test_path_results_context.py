@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import Graph
+from aequilibrae.paths.graph import GraphBase as Graph
 from aequilibrae.paths.results import PathResults
 
 from .test_assignment_integration import diamond

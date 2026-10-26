@@ -23,7 +23,7 @@ from TNTP.
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths import Network
 # sphinx_gallery_thumbnail_path = '../source/_images/graph_network.png'
 
 # %%
@@ -37,7 +37,7 @@ net_file = "https://raw.githubusercontent.com/bstabler/TransportationNetworks/ma
 net = pd.read_csv(net_file, skiprows=8, sep="\t", lineterminator="\n", usecols=np.arange(1, 11))
 
 # %%
-# The Graph object requires several default fields: link_id, a_node, b_node, and direction.
+# The Network requires link_id, a_node, b_node, and direction.
 # 
 # We need to manipulate the data to add the missing fields (link_id and direction) and
 # rename the node columns accordingly.
@@ -50,22 +50,11 @@ net.rename(columns={"init_node": "a_node", "term_node": "b_node"}, inplace=True)
 net.head()
 
 # %%
-# Building an AequilibraE graph from our network is pretty straightforward. We assign
-# our network to be the graph's network ...
-graph = Graph()
-graph.network = net
-
-# %%
-# ... and then set the graph's configurations.
-
-graph.prepare_graph(np.arange(1, 25))  # sets the centroids for which we will perform computation
-
-graph.set_graph("length")  # sets the cost field for path computation
-
-graph.set_skimming(["length", "free_flow_time"]) # sets the skims to be computed
-
-graph.set_blocked_centroid_flows(False)  # keep centroid connector turns allowed because all
-                                         # nodes in the Sioux Falls network are centroids
+# Create the source network, then prepare its routing arrays.
+network = Network(net, centroids=np.arange(1, 25))
+graph = network.build_graph(
+    mode="c", cost="length", skimming=["length", "free_flow_time"], block_centroid_flows=False
+)
 
 # %%
 # Two of AequilibraE's new features consist in directly computing path or skims.

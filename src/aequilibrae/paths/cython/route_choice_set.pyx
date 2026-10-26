@@ -50,7 +50,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
 )
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.workspaces cimport SearchWorkspace, AStarWorkspace, CppAStarWorkspace
-from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
+from aequilibrae.paths.graph import Graph, GraphBase, freeze_graph, _get_graph_to_network_mapping
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.cython.route_choice_set_results cimport (
@@ -82,15 +82,17 @@ cdef class RouteChoiceSet:
     """
 
     def __init__(self, graph: Graph, *, coordinates: pd.DataFrame | None = None):
+        if isinstance(graph, GraphBase):
+            graph = freeze_graph(graph, compact=True)
         self.graph = graph
-        self.routing = make_routing_context(graph, compact=True)
+        self.routing = make_routing_context(graph)
         self.coordinates = coordinates.copy() if coordinates is not None else None
         self.lonlat = graph.lonlat_index.copy()
-        self.node_ids = graph.compact_all_nodes.copy()
+        self.node_ids = graph.all_nodes.copy()
         self.turn_based = isinstance(self.routing, TurnBasedContext)
-        # Directed link indices use full-graph row order, before compression can hide invalid steps.
-        self.full_link_ids = graph.graph.link_id.to_numpy(copy=False)
-        self.full_directions = graph.graph.direction.to_numpy(copy=False)
+        # Full-link mappings retain steps that compression hides from the search.
+        self.full_link_ids = graph.full_link_ids
+        self.full_directions = graph.full_directions
         self.full_link_indices = {
             int(link) * int(direction): i
             for i, (link, direction) in enumerate(zip(self.full_link_ids, self.full_directions))
@@ -110,24 +112,17 @@ cdef class RouteChoiceSet:
             self.has_turn_costs = np.any((penalties > 0) & np.isfinite(penalties))
 
         self.cost_view = self.routing.costs
+        self.full_cost_view = graph.full_costs.copy()
 
         # The search loop needs a dense lookup without the GIL.
-        self.nodes_to_indices_view = graph.compact_nodes_to_indices
+        self.nodes_to_indices_view = graph.nodes_to_indices
         self.num_nodes = self.routing.node_count
         self.num_links = self.routing.link_count
 
-        # Keep the full-to-compact link crosswalk in graph-row order for loading.
-        self.graph_compressed_id_view = graph.graph.__compressed_id__.to_numpy(copy=False)
-        idx, data, _ = graph.create_compressed_link_network_mapping()
-        self.mapping_idx = idx
-        self.mapping_data = data
-
-        # Compressed route expansion uses supernetwork order, unlike imported links.
-        signed_ids = np.empty(graph.num_links, dtype=np.int64)
-        signed_ids[graph.graph.__supernet_id__.to_numpy(copy=False)] = (
-            np.asarray(self.full_link_ids) * np.asarray(self.full_directions)
-        )
-        self.link_id_direction = signed_ids
+        self.graph_compressed_id_view = graph.mapping.crosswalk[graph.full_to_network]
+        self.mapping_idx = graph.expansion_indices
+        self.mapping_data = graph.expansion_links
+        self.link_id_direction = np.asarray(self.full_link_ids) * np.asarray(self.full_directions)
 
         self.results = None
         self.ll_results = None
@@ -473,7 +468,7 @@ cdef class RouteChoiceSet:
     def make_demand(self, origin_column, destination_column):
         """Create demand using the borrowed node mapping and centroid count."""
         return GeneralisedCOODemand(
-            origin_column, destination_column, self.graph.nodes_to_indices,
+            origin_column, destination_column, self.graph.full_nodes_to_indices,
             shape=(len(self.centroids), len(self.centroids))
         )
 
@@ -526,7 +521,7 @@ cdef class RouteChoiceSet:
             mask,
             overlap,
             probabilities,
-            self.graph.cost,
+            self.full_cost_view,
             beta,
             disutility_cutoff_constant,
             disutility_cutoff_coefficient
@@ -598,10 +593,10 @@ cdef class RouteChoiceSet:
         bint log_warnings
     ):
         """Walk full-link paths once, costing and checking each step before PSL."""
-        cdef const int64_t[::1] node_ids = self.graph.all_nodes
-        cdef const int64_t[::1] tails = self.graph.graph.a_node.to_numpy(copy=False)
-        cdef const int64_t[::1] heads = self.graph.graph.b_node.to_numpy(copy=False)
-        cdef const double[::1] link_costs = self.graph.cost[:tails.shape[0]]
+        cdef const int64_t[::1] node_ids = self.graph.full_node_ids
+        cdef const int64_t[::1] tails = self.graph.full_tails
+        cdef const int64_t[::1] heads = self.graph.full_heads
+        cdef const double[::1] link_costs = self.full_cost_view
         cdef const int64_t[::1] turn_fs, turn_to_arcs
         cdef const double[::1] turn_penalties
         cdef const vector[long long] *route
@@ -615,9 +610,9 @@ cdef class RouteChoiceSet:
         cdef double cost, penalty
 
         if self.turn_based:
-            turn_fs = self.graph.turn_fs
-            turn_to_arcs = self.graph.turn_to_arcs
-            turn_penalties = self.graph.turn_penalties
+            turn_fs = self.graph.full_turn_fs
+            turn_to_arcs = self.graph.full_turn_to_arcs
+            turn_penalties = self.graph.full_turn_penalties
 
         costs.resize(routes.size(), 0.0)
         turns.resize(routes.size())
@@ -776,7 +771,7 @@ cdef class RouteChoiceSet:
             self.recost_routes(df, routes, turns, costs, mask, log_warnings)
             recompute_route_probabilities(
                 df, routes, turns, costs, mask, overlap, route_probabilities,
-                self.graph.cost, beta, disutility_cutoff_constant, disutility_cutoff_coefficient
+                self.full_cost_view, beta, disutility_cutoff_constant, disutility_cutoff_coefficient
             )
         else:
             if "probability" not in df:

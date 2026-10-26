@@ -58,7 +58,7 @@ graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], b
 
 # %%
 # With the method ``graph_summary()``, we can check the total number of links, nodes, and zones,
-# as well as the compact number of links and nodes used for computation.
+# and whether the graph uses compact topology.
 
 project.run["graph_summary"](graph)
 

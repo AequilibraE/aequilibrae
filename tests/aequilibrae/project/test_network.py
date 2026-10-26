@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 from shapely.geometry import Polygon
 
@@ -70,7 +71,6 @@ def test_build_applies_project_uturn_setting_without_turns(sioux_falls_example):
     sioux_falls_example.about.update(infoname="allow_uturns", infovalue=1)
 
     graph = sioux_falls_example.network.build_graph("c", "distance")
-    assert graph.allow_uturns_everywhere
     assert graph.allow_path_uturns
     assert not graph.has_turn_restrictions
 
@@ -80,9 +80,11 @@ def test_build_filters_turns_by_mode(sioux_falls_example):
     kept = network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=5.0, modes="c")
     network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=9.0, modes="w")
 
-    graph = network.build_graph("c", "distance")
+    source = network.build(modes=["c"])
+    graph = source.build_graph("c", "distance", block_centroid_flows=False)
 
-    assert graph._turn_restrictions.restriction_id.tolist() == [kept]
+    assert source.turn_restrictions.restriction_id.tolist() == [kept]
+    assert graph.full_turn_penalties[np.isfinite(graph.full_turn_penalties)].tolist() == [5.0]
 
 
 def test_build_filters_turns_by_area(sioux_falls_example):
@@ -92,12 +94,13 @@ def test_build_filters_turns_by_area(sioux_falls_example):
     network.turn_restrictions.insert(from_node=4, via_node=5, to_node=9, penalty=9.0, modes="c")
     polygon = Polygon(((-96.75, 43.50), (-96.75, 43.55), (-96.70, 43.55), (-96.70, 43.50)))
 
-    graph = network.build_graph("c", "distance", limit_to_area=polygon)
-    assert graph._turn_restrictions.restriction_id.tolist() == [kept]
+    source = network.build(modes=["c"], limit_to_area=polygon)
+    graph = source.build_graph("c", "distance")
+    assert source.turn_restrictions.restriction_id.tolist() == [kept]
     assert 1 not in graph.all_nodes
     # All three nodes remain, but the incoming leg 4 -> 5 is outside the selection.
     assert {4, 5, 9}.issubset(graph.all_nodes)
-    incoming = (graph.graph.a_node == graph.nodes_to_indices[4]) & (graph.graph.b_node == graph.nodes_to_indices[5])
+    incoming = (graph.full_node_ids[graph.full_tails] == 4) & (graph.full_node_ids[graph.full_heads] == 5)
     assert not incoming.any()
 
 

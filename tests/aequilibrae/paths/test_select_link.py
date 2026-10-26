@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, PathResults
+from aequilibrae import TrafficAssignment, TrafficClass, Network, Graph, PathResults
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.matrix import AequilibraeMatrix
 
@@ -166,7 +166,7 @@ def test_kaitang(test_data_path, tmp_path):
         select_link_sets={"trace": [(7, 0), (13, 0)]},
     )
     assign = TrafficAssignment(
-        network=Graph(network=net, centroids=centroids_array),
+        network=Network(net, centroids=centroids_array),
         classes=[traffic],
         vdf=bpr,
         name_mapping={"alpha": "alpha", "beta": "beta"},
@@ -200,8 +200,7 @@ def test_multi_iteration(select_link_setup, algorithm):
 
 def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
     demand = np.stack([demand[name] for name in demand], axis=2)
-    # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
-    graph.set_graph("free_flow_time")
+    # This uses the full graph so paths can end at any node.
 
     def g(o, d):
         res = PathResults(graph, o, d)
@@ -210,10 +209,12 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
     a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
     sl_links = []
     for link_id, direction in sl:
-        rows = graph.graph[graph.graph.link_id == link_id]
+        mask = graph.full_link_ids == link_id
         if direction:
-            rows = rows[rows.direction == direction]
-        sl_links.extend((row.a_node + 1, row.b_node + 1) for row in rows.itertuples())
+            mask &= graph.full_directions == direction
+        sl_links.extend(zip(
+            graph.full_node_ids[graph.full_tails[mask]], graph.full_node_ids[graph.full_heads[mask]], strict=True
+        ))
     mask = {}
     for origin, val in enumerate(a):
         for dest, path in enumerate(val):
@@ -233,11 +234,9 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
     for orig, dest in mask.keys():
         path = a[orig][dest]
         for i in range(len(path) - 1):
-            link = (
-                graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
-                    "link_id"
-                ].values[0]
-                - 1
+            mask = (graph.full_node_ids[graph.full_tails] == path[i]) & (
+                graph.full_node_ids[graph.full_heads] == path[i + 1]
             )
+            link = graph.full_link_ids[mask][0] - 1
             loading[link] += demand[orig, dest]
     return sl_od, loading

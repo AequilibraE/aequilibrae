@@ -23,7 +23,7 @@ All turn directions are 1 and node-based U-turn transitions are allowed.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph.Graph.set_turn_restrictions`
+#     * :func:`aequilibrae.paths.network.Network.build_graph`
 #     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
 #     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment`
 
@@ -86,8 +86,10 @@ turn_restrictions = pd.DataFrame(
         "penalty": [5.0, np.nan],  # 5.0 minutes penalty, and one prohibited turn
     }
 )
-graph = network.build_graph("c", "free_flow_time", block_centroid_flows=False)
-graph.set_turn_restrictions(turn_restrictions, allow_path_uturns=True)
+graph = network.build_graph(
+    "c", "free_flow_time", block_centroid_flows=False,
+    turn_restrictions=turn_restrictions, allow_uturns=True,
+)
 
 # %%
 # Assignment with custom turn controls.

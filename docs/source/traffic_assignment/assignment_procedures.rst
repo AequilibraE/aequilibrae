@@ -1,23 +1,24 @@
 Traffic Assignment Procedure
 ============================
 
-Traffic assignment starts with a project network or an in-memory graph and a set of traffic class configurations.
-The constructor checks the configuration without reading network tables.
-Execution loads and validates network values, prepares routing contexts, and runs the assignment.
+Traffic assignment starts with a network and a set of traffic class configurations.
+The constructor copies source data and checks network compatibility without preparing routing topology.
+Execution prepares routing contexts and runs the assignment.
 For an example of a regional assignment procedure, see [1]_.
 
 Network data
 ------------
 
 ``project.network`` manages the network database and can be passed directly to ``TrafficAssignment``.
-Assignment derives the required modes and fields from its configuration.
-No network build is necessary before assignment.
+Assignment derives the required fields from its configuration and loads them during construction.
+An explicit ``project.network.build(fields=..., modes=...)`` returns an independent ``Network`` for reuse.
 
-For workflows without a project, ``Graph(network=links)`` accepts an in-memory link DataFrame.
+For workflows without a project, ``Network(links)`` accepts an in-memory link DataFrame.
 The table requires ``link_id``, ``a_node``, ``b_node``, and ``direction`` columns.
 A ``modes`` column limits which classes can use each link.
 Without this column, all assignment modes can use all links.
-``Graph`` also accepts ``turn_restrictions`` and ``allow_uturns`` for in-memory assignments.
+``Network`` also accepts ``turn_restrictions`` and ``allow_uturns`` for in-memory assignments.
+Traffic assignment accepts networks, not prepared graphs.
 
 .. testsetup::
 
@@ -30,7 +31,7 @@ Without this column, all assignment modes can use all links.
 .. doctest::
 
     >>> from aequilibrae.utils.create_example import create_example
-    >>> from aequilibrae.paths import TrafficClass, TrafficAssignment, Graph
+    >>> from aequilibrae.paths import TrafficClass, TrafficAssignment, Network
     >>> from aequilibrae.paths.vdf import bpr
     >>> project = create_example(project_path)
     >>> network = project.network
@@ -106,10 +107,11 @@ The ``max_iterations``, ``rgap``, and ``cores`` arguments apply to each executio
 Zero cores uses all available cores. A negative value leaves that many cores unused.
 ``bfw_conjugacy="exact"`` selects the exact BFW conjugacy calculation.
 
-Each execution reads the current network and creates fresh routing contexts and result buffers.
-Network edits before execution are included in that run.
-The project must remain open until execution loads its inputs.
-Network edits after execution do not change the results or additional skims from that run.
+Construction copies the source network and checks modes, centroids, fields, VDF parameters and preloads.
+Invalid combinations fail before execution. Graph preparation remains deferred until execution.
+Later edits to the original network do not change the assignment.
+The project can close after construction.
+Each execution creates fresh routing contexts and result buffers from the assignment's network snapshot.
 The execution retains numeric network attributes for additional skims.
 The returned DataFrame contains link results.
 ``assig.report()`` returns the convergence report.

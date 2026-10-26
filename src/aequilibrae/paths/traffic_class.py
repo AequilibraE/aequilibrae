@@ -21,7 +21,7 @@ class TransportClassBase(ABC):  # noqa: B024
         :Arguments:
             **name** (:obj:`str`): UNIQUE class name.
 
-            **graph** (:obj:`GraphBase`): Class-specific graph
+            **graph** (:obj:`Graph`): Class/mode-specific graph
 
             **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
         """
@@ -33,17 +33,17 @@ class TransportClassBase(ABC):  # noqa: B024
             raise TypeError("Matrix values need to be of type np.float64")
         self._config = {}
         self.graph = graph
-        self._config["Graph"] = str(
-            {
-                "Mode": graph.mode,
-                "Block through centroids": graph.block_centroid_flows,
-                "Number of centroids": graph.num_zones,
-                "Links": graph.num_links,
-                "Nodes": graph.num_nodes,
-            }
-        )
         self.matrix = matrix
         self._id = name
+
+        graph_config = {
+            "Mode": graph.mode,
+            "Block through centroids": graph.block_centroid_flows,
+            "Number of centroids": graph.num_zones,
+            "Links": graph.num_links,
+            "Nodes": graph.num_nodes,
+        }
+        self._config["Graph"] = str(graph_config)
 
         matrix_names = tuple(matrix)
         mat_config = {

@@ -109,9 +109,9 @@ def test_matrices_scenarios(scenario_example, scenario):
 def test_route_choice_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    graph = scenario_example.network.build_graph(mode="c", cost="distance", fields=["distance"])
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
+    graph = scenario_example.network.build_graph(
+        mode="c", cost="distance", fields=["distance"], block_centroid_flows=False
+    )
 
     if len(graph.centroids) >= 2:
         rc = RouteChoiceSet(graph)

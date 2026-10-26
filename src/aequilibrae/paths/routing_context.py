@@ -90,6 +90,14 @@ def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compa
     borrowed so assignment can update its own buffer between searches. No Graph
     arrays are changed or retained by the context when costs are omitted.
     """
+    from aequilibrae.paths.graph import Graph
+
+    if isinstance(graph, Graph):
+        if costs is None:
+            costs = np.array(graph.routing.costs, copy=True)
+            costs.flags.writeable = False
+        return graph.routing.with_costs(costs)
+
     if compact:
         links = graph.compact_graph
         offsets = graph.compact_fs

@@ -6,14 +6,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
-import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.cython.aon_context import PreparedAoN
 from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext, TurnBasedContext
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import sum_axis1
-from aequilibrae.paths.graph import AssignmentMapping, PreparedGraph
+from aequilibrae.paths.graph import AssignmentMapping, Graph
 
 if TYPE_CHECKING:
     from aequilibrae.paths.cython.outputs import AoNOutputs
@@ -109,7 +108,7 @@ class AssignmentInputs:
 
     def __init__(
         self,
-        graph: PreparedGraph,
+        graph: Graph,
         matrix: AequilibraeMatrix,
         time_field: str,
         selected_links: dict[str, np.ndarray],
@@ -185,7 +184,7 @@ class PreparedTrafficClass:
 
         self.configuration = configuration
         self.network = network
-        self.graph = network.graph(configuration)
+        self.graph = network._assignment_graph(configuration)
         self.results = AssignmentResults()
         self._aon_results = AssignmentResults()
         self.results.set_heap(configuration.heap)
@@ -215,97 +214,3 @@ class PreparedTrafficClass:
         output = inputs.driver.run(inputs.driver.make_outputs()).skimming
         self.congested_skims = inputs.report_skims(output)
         return self.congested_skims
-
-
-class _AssignmentNetwork:
-    """Source attributes and shared routing contexts owned by one execution."""
-
-    def __init__(self, links, *, modes=None, turn_restrictions=None, allow_uturns=False):
-        required = {"link_id", "a_node", "b_node", "direction"}
-        if missing := required - set(links.columns):
-            raise ValueError(f"Network is missing required fields: {sorted(missing)}")
-        self.links = links
-        if links.empty or links.link_id.duplicated().any():
-            raise ValueError("Network must contain links with unique IDs")
-        if not links.direction.isin([-1, 0, 1]).all():
-            raise ValueError("Link directions must be -1, 0 or 1")
-        if "modes" not in links:
-            links["modes"] = "c" if modes is None else "".join(modes)
-        available = set("".join(links.modes.fillna("").astype(str)))
-        self.modes = tuple(sorted(available) if modes is None else modes)
-        self.turn_restrictions = turn_restrictions
-        self.allow_uturns = allow_uturns
-        self._rows, self.directions = self._directed_indices()
-        self.link_ids = links.link_id.to_numpy(dtype=np.int64)[self._rows].copy()
-        self._fields = {}
-        self._graphs = {}
-
-    @property
-    def fields(self):
-        columns = set(self.links.columns)
-        return sorted(
-            {c for c in columns if not c.endswith(("_ab", "_ba"))}
-            | {c[:-3] for c in columns if c.endswith("_ab") and c[:-3] + "_ba" in columns}
-        )
-
-    def _directed_indices(self):
-        direction = self.links.direction.to_numpy()
-        ab = np.flatnonzero(direction != -1)
-        ba = np.flatnonzero(direction != 1)
-        rows = np.concatenate([ab, ba])
-        directions = np.concatenate([np.ones(len(ab), dtype=np.int8), -np.ones(len(ba), dtype=np.int8)])
-        order = np.lexsort((directions, self.links.link_id.to_numpy(dtype=np.int64)[rows]))
-        return rows[order], directions[order]
-
-    def field_values(self, field):
-        """Return numeric values in ascending link-ID and direction order."""
-        if field not in self._fields:
-            values = self._field_values(field, self._rows, self.directions)
-            values.flags.writeable = False
-            self._fields[field] = values
-        return self._fields[field]
-
-    def _field_values(self, field, rows, directions):
-        if field not in self.fields:
-            raise ValueError(f"'{field}' not in network")
-        values = np.empty(len(rows), dtype=np.float64)
-        for direction, suffix in ((1, "_ab"), (-1, "_ba")):
-            column = field + suffix if field + suffix in self.links else field
-            mask = directions == direction
-            try:
-                values[mask] = pd.to_numeric(self.links.iloc[rows[mask]][column], errors="raise").to_numpy(
-                    dtype=np.float64
-                )
-            except (TypeError, ValueError) as exc:
-                raise ValueError(f"Field {field} must contain numeric values") from exc
-        return values
-
-    def validate_mode(self, mode):
-        if mode not in self.modes:
-            raise ValueError(f"Mode '{mode}' is not available in this network")
-
-    def validate_centroids(self, centroids):
-        values = np.asarray(centroids)
-        nodes = np.union1d(self.links.a_node, self.links.b_node)
-        if values.ndim != 1 or not np.issubdtype(values.dtype, np.integer):
-            raise ValueError("Centroids must be a one-dimensional array of integers")
-        if not len(values) or np.any(values <= 0) or len(np.unique(values)) != len(values):
-            raise ValueError("Centroids must be nonempty, unique and positive")
-        if not np.isin(values, nodes).all():
-            raise ValueError("Demand centroids are not present in the network")
-
-    def graph(self, configuration):
-        from aequilibrae.paths.graph import prepare_assignment_graph
-
-        # Turn restrictions and U-turn policy belong to this execution's snapshot.
-        key = (configuration.mode, tuple(configuration.demand.index), configuration.block_centroid_flows)
-        if key not in self._graphs:
-            self._graphs[key] = prepare_assignment_graph(
-                self.links,
-                configuration.mode,
-                configuration.demand.index,
-                self.turn_restrictions,
-                configuration.block_centroid_flows,
-                self.allow_uturns,
-            )
-        return self._graphs[key]

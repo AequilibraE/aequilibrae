@@ -55,8 +55,7 @@ def graph_summary(graph):
             "num_links": graph.num_links,
             "num_nodes": graph.num_nodes,
             "num_zones": graph.num_zones,
-            "compact_num_links": graph.compact_num_links,
-            "compact_num_nodes": graph.compact_num_nodes,
+            "compact": graph.compact,
         }
     }
 

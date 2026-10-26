@@ -7,11 +7,11 @@ from scipy.sparse.csgraph import connected_components
 sys.dont_write_bytecode = True
 
 
-def _analysis(anodes: np.ndarray, bnodes: np.ndarray) -> np.ndarray:
-    if anodes.size == 0 or bnodes.size == 0:
+def _analysis(anodes: np.ndarray, bnodes: np.ndarray, num_nodes: int = 0) -> np.ndarray:
+    if (anodes.size == 0 or bnodes.size == 0) and not num_nodes:
         return np.array([], dtype=np.int64)
 
-    n = np.max([np.max(anodes), np.max(bnodes)]) + 1
+    n = max(int(max(anodes.max(), bnodes.max())) + 1 if anodes.size else 0, num_nodes)
     csr = coo_matrix((np.ones(anodes.shape[0]), (anodes, bnodes)), shape=(n, n)).tocsr()
     n_components, labels = connected_components(csgraph=csr, directed=True, return_labels=True, connection="strong")
 
@@ -24,7 +24,7 @@ def _analysis(anodes: np.ndarray, bnodes: np.ndarray) -> np.ndarray:
 def non_blocking_through_centroids(graph) -> np.ndarray:
     anodes = graph.graph.a_node.to_numpy()
     bnodes = graph.graph.b_node.to_numpy()
-    disconnected = _analysis(anodes, bnodes)
+    disconnected = _analysis(anodes, bnodes, len(graph.all_nodes))
     return graph.all_nodes[disconnected]
 
 
@@ -55,6 +55,22 @@ def blocking_through_centroids(graph) -> np.ndarray:
 
 
 def disconnected_analysis(graph) -> np.ndarray:
+    from types import SimpleNamespace
+
+    from aequilibrae.paths.graph import Graph
+
+    if isinstance(graph, Graph):
+        import pandas as pd
+
+        active = np.isfinite(graph.cost)
+        tails = np.repeat(np.arange(graph.num_nodes), np.diff(graph.routing.fs).astype(np.int64))
+        graph = SimpleNamespace(
+            graph=pd.DataFrame({
+                "id": np.arange(active.sum()), "a_node": tails[active],
+                "b_node": graph.routing.heads[active].astype(np.int64),
+            }),
+            all_nodes=graph.all_nodes, centroids=graph.centroids, block_centroid_flows=graph.block_centroid_flows,
+        )
     if graph.block_centroid_flows:
         return blocking_through_centroids(graph)
     return non_blocking_through_centroids(graph)

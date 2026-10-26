@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph, RouteChoice, estimate_heuristic_scale
+from aequilibrae.paths import RouteChoice, estimate_heuristic_scale
+from aequilibrae.paths.graph import GraphBase as Graph
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
